@@ -10,7 +10,7 @@ internal static class FlowStepIcons
         "tool" => "wrench",
         "router" => "route",
         "condition" => "git-branch",
-        "transform" => "arrows-exchange",
+        "transform" or "artifacttransform" => "arrows-exchange",
         "output" => "log-out",
         "manager" => "users-group",
         "conversation" => "message",

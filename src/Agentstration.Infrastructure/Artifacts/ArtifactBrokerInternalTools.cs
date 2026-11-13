@@ -54,7 +54,7 @@ public sealed class StagedArtifactCreateMcpTool(ArtifactManagementService artifa
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.create", "Create staged artifact",
         "Creates a governed temporary Artifact. The physical backend reference is never returned.",
-        Schema(new { type = "object", properties = new { fileName = new { type = "string" }, mediaType = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "fileName", "mediaType" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { fileName = new { type = "string" }, mediaType = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "fileName", "mediaType" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -83,7 +83,7 @@ public sealed class StagedArtifactWriteMcpTool(ArtifactManagementService artifac
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.write", "Write staged artifact",
         "Writes one bounded base64 content chunk through the governed staging binding.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, offset = new { type = "integer" }, contentBase64 = new { type = "string" } }, required = new[] { "artifactId", "offset", "contentBase64" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, offset = new { type = "integer" }, contentBase64 = new { type = "string" } }, required = new[] { "artifactId", "offset", "contentBase64" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -98,7 +98,7 @@ public sealed class StagedArtifactSealMcpTool(ArtifactManagementService artifact
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.seal", "Seal staged artifact",
         "Seals staged content after verifying its length and digest.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         View((await Artifacts.SealAsync(StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")), cancellationToken)).Value);
@@ -108,7 +108,7 @@ public sealed class StagedArtifactInspectMcpTool(ArtifactManagementService artif
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.inspect", "Inspect staged artifact",
         "Returns metadata and provenance for an explicitly delegated staged Artifact.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" } }, required = new[] { "artifactId", "leaseId" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" } }, required = new[] { "artifactId", "leaseId" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -126,7 +126,7 @@ public sealed class StagedArtifactReadContentMcpTool(ArtifactManagementService a
     private const int MaximumTextBytes = 64 * 1024;
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.read-content", "Read staged artifact content",
         "Reads delegated content as bounded UTF-8 text or a bounded base64 binary chunk.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" }, offset = new { type = "integer" }, length = new { type = "integer", maximum = ArtifactManagementService.MaximumChunkBytes }, disclosure = new { type = "string", @enum = new[] { "bounded-text", "binary" } } }, required = new[] { "artifactId", "leaseId", "disclosure" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, leaseId = new { type = "string" }, offset = new { type = "integer" }, length = new { type = "integer", maximum = ArtifactManagementService.MaximumChunkBytes }, disclosure = new { type = "string", @enum = new[] { "bounded-text", "binary" } } }, required = new[] { "artifactId", "leaseId", "disclosure" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -151,7 +151,7 @@ public sealed class StagedArtifactManageRetentionMcpTool(ArtifactManagementServi
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.manage-retention", "Manage staged artifact retention",
         "Extends retention within the selected binding policy.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "expiresAt" }, additionalProperties = false }), RequiresApproval: true, InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "expiresAt" }, additionalProperties = false }), RequiresApproval: true, OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         View((await Artifacts.ExtendRetentionAsync(StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId")),
@@ -162,7 +162,7 @@ public sealed class StagedArtifactPurgeMcpTool(ArtifactManagementService artifac
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.purge", "Purge staged artifact",
         "Purges temporary content after lifecycle and active-lease checks.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), RequiresApproval: true, InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" } }, required = new[] { "artifactId" }, additionalProperties = false }), RequiresApproval: true, OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -176,7 +176,7 @@ public sealed class StagedArtifactCreateLeaseMcpTool(ArtifactManagementService a
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.create-lease", "Delegate staged artifact",
         "Creates a bounded delegation for an explicit consumer and Artifact.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "consumerKind", "consumerId", "operations", "expiresAt" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, expiresAt = new { type = "string" } }, required = new[] { "artifactId", "consumerKind", "consumerId", "operations", "expiresAt" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -194,7 +194,7 @@ public sealed class StagedArtifactHandoffMcpTool(ArtifactManagementService artif
 {
     public override InternalMcpToolDefinition Definition { get; } = new("staged-artifact.handoff", "Handoff staged artifact",
         "Delegates, copies, or moves a sealed Artifact to an explicit consumer and governed staging binding.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, operationId = new { type = "string" }, mode = new { type = "string", @enum = new[] { "reuse", "copy", "move", "reuseOrCopy" } }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, leaseExpiresAt = new { type = "string" }, targetBinding = new { type = "string" } }, required = new[] { "artifactId", "operationId", "mode", "consumerKind", "consumerId", "operations", "leaseExpiresAt" }, additionalProperties = false }), InitialCategory: Category);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, operationId = new { type = "string" }, mode = new { type = "string", @enum = new[] { "reuse", "copy", "move", "reuseOrCopy" } }, consumerKind = new { type = "string" }, consumerId = new { type = "string" }, operations = new { type = "array", items = new { type = "string" } }, leaseExpiresAt = new { type = "string" }, targetBinding = new { type = "string" } }, required = new[] { "artifactId", "operationId", "mode", "consumerKind", "consumerId", "operations", "leaseExpiresAt" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {

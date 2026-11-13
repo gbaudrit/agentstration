@@ -201,7 +201,7 @@ public partial class MainLayout
         NavigationManager.LocationChanged += OnLocationChanged;
         platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
-            ContextState.LoadAsync(lifetimeCancellation.Token),
+            ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
         NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
         locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(PreserveConsoleContextAsync);
@@ -376,18 +376,21 @@ public partial class MainLayout
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
         if (requestedContext is not null
-            && ContextState.Current is { } current
-            && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
+            && (ContextState.IsLoading || ContextState.Current is not { } current
+                || !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal)))
         {
-            await ContextState.LoadAsync(lifetimeCancellation.Token);
+            await ContextState.LoadAsync(requestedContext, lifetimeCancellation.Token);
         }
+        if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         StateHasChanged();
         try
         {
             await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
-            if (contextModule is not null && ContextState.Current is { } context)
+            if (contextModule is not null && ContextState.Current is { } context && !ContextState.IsLoading
+                && ContextState.Error is null && string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal))
                 await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
         }
         catch (JSDisconnectedException) { }

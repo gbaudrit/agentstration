@@ -16,7 +16,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
     {
         "$schema", "$id", "title", "description", "type", "properties", "required", "additionalProperties",
         "items", "enum", "default", "examples", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
-        "minLength", "maxLength", "minItems", "maxItems", "pattern", "format"
+        "minLength", "maxLength", "minItems", "maxItems", "pattern", "format", "anyOf", "oneOf", "allOf"
     };
 
     private static readonly HashSet<string> SupportedTypes = new(StringComparer.Ordinal)
@@ -51,6 +51,31 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         var issues = new List<SchemaFormatValidationIssue>();
         ValidateValue(definition, instance, "$", 0, issues);
         return new(issues);
+    }
+
+    public async ValueTask<SchemaFormatValidationResult> ValidateSymbolicStringsAsync(JsonElement definition,
+        JsonElement instance, Func<JsonElement, bool> isProtectedString, CancellationToken cancellationToken)
+    {
+        var checkedDefinition = await ValidateDefinitionAsync(definition, null, cancellationToken);
+        if (!checkedDefinition.IsValid) return checkedDefinition;
+        var issues = new List<SchemaFormatValidationIssue>();
+        ValidateValue(definition, instance, "$", 0, issues, isProtectedString);
+        return new(issues);
+    }
+
+    private static bool MayAcceptString(JsonElement schema)
+    {
+        if (schema.TryGetProperty("type", out var type))
+        {
+            if (type.ValueKind == JsonValueKind.String && type.GetString() != "string") return false;
+            if (type.ValueKind == JsonValueKind.Array && !type.EnumerateArray().Any(item => item.GetString() == "string")) return false;
+        }
+        else if (schema.TryGetProperty("properties", out _)) return false;
+        if (schema.TryGetProperty("enum", out var values) && !values.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String)) return false;
+        if (schema.TryGetProperty("allOf", out var all) && !all.EnumerateArray().All(MayAcceptString)) return false;
+        foreach (var name in new[] { "anyOf", "oneOf" })
+            if (schema.TryGetProperty(name, out var alternatives) && !alternatives.EnumerateArray().Any(MayAcceptString)) return false;
+        return true;
     }
 
     private static void ValidateDialect(JsonElement definition, string? declaredDialect,
@@ -93,6 +118,14 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
                     $"Keyword '{property.Name}' is not supported by the built-in JSON Schema handler.");
 
         _ = ReadType(schema, path, issues);
+        foreach (var keyword in new[] { "anyOf", "oneOf", "allOf" })
+            if (schema.TryGetProperty(keyword, out var alternatives))
+            {
+                if (alternatives.ValueKind != JsonValueKind.Array || alternatives.GetArrayLength() is < 1 or > 8)
+                    Add(issues, PropertyPath(path, keyword), "json_schema_union_invalid", "Schema compositions require between one and eight branches.");
+                else
+                    foreach (var alternative in alternatives.EnumerateArray()) ValidateSchema(alternative, PropertyPath(path, keyword), depth + 1, issues);
+            }
         ValidateText(schema, "$schema", path, issues);
         ValidateText(schema, "$id", path, issues);
         ValidateText(schema, "title", path, issues);
@@ -156,12 +189,37 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
     }
 
     private static void ValidateValue(JsonElement schema, JsonElement value, string path, int depth,
-        ICollection<SchemaFormatValidationIssue> issues)
+        ICollection<SchemaFormatValidationIssue> issues, Func<JsonElement, bool>? isProtectedString = null)
     {
         if (issues.Count >= MaximumIssues || depth > MaximumDepth) return;
+        if (isProtectedString?.Invoke(value) == true)
+        {
+            if (!MayAcceptString(schema)) Add(issues, path, "json_schema_instance_type", "The protected value is a string reference.");
+            return;
+        }
+        foreach (var keyword in new[] { "anyOf", "oneOf", "allOf" })
+            if (schema.TryGetProperty(keyword, out var alternatives))
+            {
+                var matches = 0;
+                foreach (var branch in alternatives.EnumerateArray())
+                {
+                    var branchIssues = new List<SchemaFormatValidationIssue>();
+                    ValidateValue(branch, value, path, depth + 1, branchIssues, isProtectedString);
+                    if (branchIssues.Count == 0) matches++;
+                }
+                if (keyword == "anyOf" && matches == 0 || keyword == "oneOf" && matches != 1
+                    || keyword == "allOf" && matches != alternatives.GetArrayLength())
+                    Add(issues, path, "json_schema_instance_" + keyword.ToLowerInvariant(), "The value does not satisfy the declared schema composition.");
+            }
+        if (schema.TryGetProperty("type", out var union) && union.ValueKind == JsonValueKind.Array
+            && !union.EnumerateArray().Any(candidateType => Matches(value, candidateType.GetString()!)))
+        {
+            Add(issues, path, "json_schema_instance_type", "The value does not match any declared primitive type.");
+            return;
+        }
         var type = schema.TryGetProperty("type", out var typeValue) && typeValue.ValueKind == JsonValueKind.String
             ? typeValue.GetString()
-            : schema.TryGetProperty("properties", out _) ? "object" : null;
+            : schema.TryGetProperty("type", out _) ? null : schema.TryGetProperty("properties", out _) ? "object" : null;
         if (type is not null && !Matches(value, type))
         {
             Add(issues, path, "json_schema_instance_type", $"The value must be of type '{type}'.");
@@ -172,9 +230,9 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
             Add(issues, path, "json_schema_instance_enum", "The value is not one of the allowed enum values.");
 
         if (value.ValueKind == JsonValueKind.Object)
-            ValidateObject(schema, value, path, depth, issues);
+            ValidateObject(schema, value, path, depth, issues, isProtectedString);
         else if (value.ValueKind == JsonValueKind.Array)
-            ValidateArray(schema, value, path, depth, issues);
+            ValidateArray(schema, value, path, depth, issues, isProtectedString);
         else if (value.ValueKind == JsonValueKind.String)
             ValidateString(schema, value.GetString()!, path, issues);
         else if (value.ValueKind == JsonValueKind.Number)
@@ -182,7 +240,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
     }
 
     private static void ValidateObject(JsonElement schema, JsonElement value, string path, int depth,
-        ICollection<SchemaFormatValidationIssue> issues)
+        ICollection<SchemaFormatValidationIssue> issues, Func<JsonElement, bool>? isProtectedString)
     {
         var required = schema.TryGetProperty("required", out var requiredValue)
             ? requiredValue.EnumerateArray().Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal)
@@ -198,7 +256,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         foreach (var property in value.EnumerateObject())
         {
             if (properties.TryGetValue(property.Name, out var propertySchema))
-                ValidateValue(propertySchema, property.Value, PropertyPath(path, property.Name), depth + 1, issues);
+                ValidateValue(propertySchema, property.Value, PropertyPath(path, property.Name), depth + 1, issues, isProtectedString);
             else if (rejectAdditional)
                 Add(issues, PropertyPath(path, property.Name), "json_schema_instance_additional_property",
                     $"Property '{property.Name}' is not allowed.");
@@ -206,14 +264,14 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
     }
 
     private static void ValidateArray(JsonElement schema, JsonElement value, string path, int depth,
-        ICollection<SchemaFormatValidationIssue> issues)
+        ICollection<SchemaFormatValidationIssue> issues, Func<JsonElement, bool>? isProtectedString)
     {
         ValidateCount(value.GetArrayLength(), Integer(schema, "minItems"), Integer(schema, "maxItems"), path,
             "json_schema_instance_items", "items", issues);
         if (!schema.TryGetProperty("items", out var items)) return;
         var index = 0;
         foreach (var item in value.EnumerateArray())
-            ValidateValue(items, item, $"{path}[{index++}]", depth + 1, issues);
+            ValidateValue(items, item, $"{path}[{index++}]", depth + 1, issues, isProtectedString);
     }
 
     private static void ValidateString(JsonElement schema, string value, string path,
@@ -261,10 +319,13 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
     private static string? ReadType(JsonElement schema, string path, ICollection<SchemaFormatValidationIssue> issues)
     {
         if (!schema.TryGetProperty("type", out var type)) return null;
+        if (type.ValueKind == JsonValueKind.Array && type.GetArrayLength() is > 0 and <= 7
+            && type.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String && SupportedTypes.Contains(item.GetString()!))
+            && type.EnumerateArray().Select(item => item.GetString()).Distinct(StringComparer.Ordinal).Count() == type.GetArrayLength()) return null;
         if (type.ValueKind != JsonValueKind.String || !SupportedTypes.Contains(type.GetString()!))
         {
             Add(issues, PropertyPath(path, "type"), "json_schema_type_unsupported",
-                "The type keyword must contain one supported primitive type.");
+                "The type keyword must contain a supported primitive type or a nonempty set of distinct supported types.");
             return null;
         }
         return type.GetString();

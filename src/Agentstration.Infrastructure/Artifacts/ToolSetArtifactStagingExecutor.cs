@@ -95,12 +95,18 @@ public sealed class ToolSetArtifactStagingExecutor(
         CancellationToken cancellationToken)
     {
         using var systemScope = requestScopes.PushSystem();
-        return await toolSets.ResolveRouteExactAsync(
-            binding.Definition.ToolSet.ScopeRef
-                ?? binding.ScopeRef
-                ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding and ToolSet reference have no scope."),
-            binding.Definition.ToolSet.Namespace ?? binding.Namespace, binding.Definition.ToolSet.Name,
-            binding.Definition.ToolSetVersion, capability, "default", cancellationToken);
+        var scope = binding.Definition.ToolSet.ScopeRef ?? binding.ScopeRef
+            ?? throw Error("artifact_staging_binding_scope_invalid", "The Artifact staging binding and ToolSet reference have no scope.");
+        var toolNamespace = binding.Definition.ToolSet.Namespace ?? binding.Namespace;
+        try
+        {
+            return await toolSets.ResolveRouteExactAsync(scope, toolNamespace, binding.Definition.ToolSet.Name,
+                binding.Definition.ToolSetVersion, capability, "default", cancellationToken);
+        }
+        catch (ToolSetValidationException exception)
+        {
+            throw Error(exception.Code, $"{exception.Code}: Artifact staging binding '{binding.Namespace}/{binding.Name}', ToolSet '{scope}/{toolNamespace}/{binding.Definition.ToolSet.Name}:{binding.Definition.ToolSetVersion}', capability '{capability}': {exception.Message}");
+        }
     }
 
     private static readonly string[] RequiredCapabilities =

@@ -16,6 +16,8 @@ public sealed record StoragePublicationReference(StorageContentRequest Target, s
 /// <summary>Provider-owned publication semantics. Generic read/write capability does not imply support.</summary>
 public interface IStoragePublicationGateway
 {
+    Task<bool> RetireAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => Task.FromResult(false);
+
     Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken);
     Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId,
         ReadOnlyMemory<byte> content, CancellationToken cancellationToken);

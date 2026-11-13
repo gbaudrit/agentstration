@@ -771,7 +771,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 Assert.AreEqual(accepted.Uid, completed.Uid);
                 Assert.AreEqual(accepted.FlowRunId, completed.FlowRunId);
                 Assert.AreEqual(source.Uid, completed.DataSourceUid);
-                Assert.AreEqual(fixture.Storage.StorageUid, completed.Dataset!.Definition.Storage.StorageUid);
+                Assert.AreEqual(fixture.Storage.StorageUid, completed.Dataset!.Definition.Storage!.StorageUid);
                 Assert.AreEqual(fixture.Operation.Uid, completed.Dataset.Operation.Uid);
                 retainedKnowledge = (await second.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
                 {

@@ -119,7 +119,7 @@ internal sealed class ConnectedServiceAcquisitionMcpTool(ConnectedServiceAcquisi
             properties = new { acquisitionId = new { type = "string", minLength = 1, maxLength = 128 } },
             required = new[] { "acquisitionId" },
             additionalProperties = false
-        }), ExposeThroughMcp: false);
+        }), JsonSerializer.SerializeToElement(new { }), ExposeThroughMcp: false);
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         execution.ExecuteAsync(invocation, cancellationToken);
 }

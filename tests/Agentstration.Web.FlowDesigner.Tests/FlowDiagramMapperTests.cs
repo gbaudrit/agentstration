@@ -9,6 +9,24 @@ namespace Agentstration.Web.FlowDesigner.Tests;
 public sealed class FlowDiagramMapperTests
 {
     [TestMethod]
+    public void ArtifactProcessingUsesTwoBottomPortsAndKeepsOuterContinuationsOnTheRight()
+    {
+        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+            new InputFlowStepDefinition { Name = "input" }, new ArtifactTransformFlowStepDefinition { Name = "process" },
+            new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
+            Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
+                new("return", "body", "completed", "process"), new("done", "process", "completed", "completed")] };
+        var projection = FlowDiagramMapper.Project(FlowDesignerDocument.From(graph));
+        var owner = projection.NodesByName["process"];
+        var start = owner.Outputs.Single(port => port.EventName == "process");
+        Assert.AreEqual(Blazor.Diagrams.Core.Models.PortAlignment.Bottom, start.Alignment);
+        Assert.AreEqual(Blazor.Diagrams.Core.Models.PortAlignment.Bottom, owner.ProcessingResult!.Alignment);
+        Assert.AreSame(start, ((SinglePortAnchor)projection.Links.Single(link => link.Id == "body").Source).Port);
+        Assert.AreSame(owner.ProcessingResult, ((SinglePortAnchor)projection.Links.Single(link => link.Id == "return").Target).Port);
+        Assert.IsTrue(owner.Outputs.Where(port => port.EventName != "process").All(port => port.Alignment == Blazor.Diagrams.Core.Models.PortAlignment.Right));
+    }
+
+    [TestMethod]
     public void ProjectPreservesNodePositionsAndTransitionEndpoints()
     {
         var definition = new FlowGraphDefinition

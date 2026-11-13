@@ -24,6 +24,7 @@ internal static class ArtifactsServiceCollectionExtensions
         services.AddSingleton<IStorageUsageProvider, ArtifactStorageUsageProvider>();
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
+        services.AddSingleton<ArtifactProcessingService>();
         services.AddSingleton<IStoredArtifactRegistrar>(provider => provider.GetRequiredService<ArtifactManagementService>());
         services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
         services.AddSingleton<DurableArtifactContentReader>();

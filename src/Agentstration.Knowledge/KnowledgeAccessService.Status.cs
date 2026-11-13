@@ -17,10 +17,11 @@ public sealed partial class KnowledgeAccessService
         {
             var evidence = active?.Snapshot.ProjectionInputs.SingleOrDefault(value => value.BindingName == binding.Name);
             return new KnowledgeInputStatus(binding.Name, evidence?.AcquisitionId, evidence?.AcquiredAt,
-                KnowledgeFreshness.IsFresh(binding, evidence?.AcquiredAt, clock),
-                KnowledgeFreshness.RequiresRefresh(binding, evidence?.AcquiredAt, clock), binding.Required);
+                KnowledgeFreshness.IsInputFresh(binding, evidence, clock),
+                KnowledgeFreshness.InputRequiresRefresh(binding, evidence, clock), binding.Required)
+            { Direct = evidence?.DirectInput is not null, AcquisitionTimeToLive = evidence?.AcquisitionTimeToLive, RefreshErrorCode = evidence?.RefreshFailure?.Code };
         }).ToArray();
-        var unavailable = active?.LifecycleState == KnowledgeSnapshotLifecycleState.Unavailable;
+        var unavailable = active?.LifecycleState is KnowledgeSnapshotLifecycleState.Unavailable or KnowledgeSnapshotLifecycleState.Retired;
         var required = unavailable || NeedsPreparation(source, active?.Snapshot);
         var state = !source.Definition.Enabled ? "disabled"
             : history?.State == KnowledgeProjectionState.Running ? "preparing"
@@ -30,6 +31,8 @@ public sealed partial class KnowledgeAccessService
             SourceUid = source.Uid,
             State = state,
             CheckedAt = clock.GetUtcNow(),
+            ActiveExpiresAt = active is not null && source.Definition.Lifecycle?.TimeToLive is { } ttl ? active.Snapshot.PublishedAt + ttl : null,
+            AllowExpiredOnRefreshFailure = source.Definition.Lifecycle?.AllowExpiredOnRefreshFailure == true,
             ActiveSnapshotId = active?.Snapshot.Name,
             ActivePublishedAt = active?.Snapshot.PublishedAt,
             LatestPublishedSnapshotId = latest?.Snapshot.Name,

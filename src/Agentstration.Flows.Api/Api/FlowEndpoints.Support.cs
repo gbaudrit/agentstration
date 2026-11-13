@@ -66,7 +66,10 @@ public static partial class FlowEndpoints
         catch (ResourceScopePolicyException exception) { return Results.Problem(statusCode: 422, title: "resource_scope_invalid", detail: exception.Message); }
         catch (FlowValidationException exception) when (exception.Code == "flow_version_already_published") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (FlowValidationException exception) when (exception.Code == "flow_run_in_use_by_knowledge_snapshot") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
-        catch (FlowValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
+        catch (FlowValidationException exception) { return Results.Problem(statusCode: exception.ContractFailure is null ? 400 : 422, title: exception.Code, detail: exception.Message,
+            extensions: exception.ContractFailure is null ? null : new Dictionary<string, object?> { ["contractFailure"] = exception.ContractFailure }); }
+        catch (Agentstration.Schemas.DataContractException exception) { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message,
+            extensions: new Dictionary<string, object?> { ["contractFailure"] = exception.Failure }); }
         catch (WorkValidationException exception) when (exception.Code == "flow_invocation_idempotency_conflict") { return Results.Problem(statusCode: 409, title: exception.Code, detail: exception.Message); }
         catch (WorkValidationException exception) { return Results.Problem(statusCode: 400, title: exception.Code, detail: exception.Message); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation_failed", detail: exception.Message); }

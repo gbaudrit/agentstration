@@ -239,4 +239,14 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 210. [ADR-0210 — Knowledge exposes native Snapshot access Tools](0210-knowledge-exposes-native-snapshot-access-tools.md)
 
+211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)
+
+212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
+
+213. [ADR-0213 — Artifact transformations own scoped content processing](0213-artifact-transformations-own-scoped-content-processing.md)
+
+214. [ADR-0214 — Effective data contracts follow Flow invocations](0214-effective-data-contracts-follow-flow-invocations.md)
+
+215. [ADR-0215 — Process regions have derived Flow identities](0215-process-regions-have-derived-flow-identities.md)
+
 219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)

@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
 
@@ -6,6 +7,7 @@ namespace Agentstration.Runtime.Abstractions;
 public static class RuntimeExecutionMaterialVersions
 {
     public const string V1 = "1.0";
+    public const string CoordinatedProcesses = "1.1";
 }
 
 public sealed record RuntimeExecutionToolMaterial(
@@ -48,6 +50,9 @@ public sealed record RuntimeExecutionAgentMaterial(
     public ResourceScopeRef? AgentScopeRef { get; init; }
     public ResourceScopeRef? ModelProfileScopeRef { get; init; }
     public Guid RevisionUid { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public DataContractDefinition? OutputContract { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
 }
@@ -104,6 +109,8 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId)
 {
     public string? FlowScopeRef { get; init; }
+    public InvocationDataContracts? ContractContext { get; init; }
+    public JsonElement? ProcessOrigin { get; init; }
 }
 
 public sealed record RuntimeFlowResumeMaterial(

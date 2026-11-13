@@ -23,7 +23,7 @@ else
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
     <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
+        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
@@ -42,6 +42,10 @@ else
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("NativeLegacyRetrieval")</span><select @bind="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select><small>@T("NativeLegacyRetrievalHelp")</small></label>
             <div class="form-span-2" data-testid="knowledge-automatic-parameters"><span>@T("NativeAutomaticParameters")</span><JsonSchemaInputEditor Schema="AutomaticParametersSchema" Value="automaticParameters" ValueChanged="value => automaticParameters = value" ValidationChanged="state => automaticParametersValid = state.IsValid" Disabled="busy" /><small>@T("NativeAutomaticParametersHelp")</small></div>
+            <div class="form-span-2"><SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="projectionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
+                @if (lifecycleEnabled) { <label class="knowledge-choice"><input type="checkbox" @bind="allowExpiredFallback" data-testid="knowledge-expired-fallback" /><span>@T("AllowExpiredFallback")</span></label> }
+            </div>
+            <div class="form-span-2"><SourceFlowCompositionEditor Boundary="projection" StandardPoint="postAggregate" @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="busy" /></div>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
                 <div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><button class="button-secondary" type="button" @onclick="AddBinding">@T("AddDataSource")</button></div>
                 @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
@@ -52,16 +56,24 @@ else
                         <label><span>@T("DataSource")</span><select value="@binding.DataSourceKey" @onchange="args => ChangeDataSourceAsync(binding, args)" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
                         @if (TargetOptions(binding).Count > 0) { <label><span>@T("AcquisitionTarget")</span><select @bind="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</select></label> }
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+                        <div class="form-span-2"><FlowSequenceEditor Title="@T("TransformationFlowOptional")" @bind-Value="binding.Transformations" TemplateFlow="TransformationSequence" ReadOnly="@(busy || !string.IsNullOrEmpty(binding.TransformationFlowKey))" /></div>
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
+                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.AllowStaleOnRefreshFailure" disabled="@IsDirectBinding(binding)" data-testid="knowledge-binding-fallback" /><span>@T("AllowInputFallback")</span></label>
+                        @if (binding.AllowStaleOnRefreshFailure) { <label><span>@T("InputFallbackAge")</span><input @bind="binding.MaximumFallbackAgeText" placeholder="hh:mm:ss" data-testid="knowledge-binding-fallback-age" /><small>@T("InputFallbackAgeHelp")</small></label> }
+                        @if (!FallbackValid(binding)) { <p class="form-alert form-alert-danger" role="alert">@T("FallbackInvalid")</p> }
+                        @if (HasInputLifecycle(binding)) { <p class="form-span-2">@T("DataSourceOwnsFreshness")</p> }
+                        else
+                        {
                         <label class="knowledge-choice"><input type="checkbox" @bind="binding.RefreshIfNecessary" data-testid="knowledge-binding-refresh" /><span>@T("RefreshIfNecessary")</span></label>
                         <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
+                        }
                         <div class="form-span-2 knowledge-transformation-configuration" data-testid="knowledge-source-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
                         <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
                     </div>
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></div>
         </fieldset>
     </EditForm>
 }
@@ -96,6 +108,7 @@ else
     private string? etag, message;
     private JsonElement automaticParameters = JsonSerializer.SerializeToElement(new { });
     private bool automaticParametersValid = true;
+    private static readonly FlowCallReference TransformationSequence = new("content-transformation-sequence-builtin", FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: ResourceScopeRef.Instance);
     private JsonElement? AutomaticParametersSchema => JsonSchemaInputSchema.ObjectProperty(projectionFlows.FirstOrDefault(value => value.Key == projectionFlowKey)?.InputSchema, "parameters");
     private bool enabled, busy, interactive, rebindDependencies, rebindRequested, confirmRebind, loading = true;
     private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
@@ -131,6 +144,14 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
+                lifecycleEnabled = snapshot.Value.Definition.Lifecycle is not null;
+                projectionTtl = LifecycleDuration.Format(snapshot.Value.Definition.Lifecycle?.TimeToLive);
+                keepHistory = snapshot.Value.Definition.Lifecycle?.KeepHistory == true;
+                historyRetention = LifecycleDuration.Format(snapshot.Value.Definition.Lifecycle?.HistoryRetention);
+                allowExpiredFallback = snapshot.Value.Definition.Lifecycle?.AllowExpiredOnRefreshFailure == true;
+                orchestration = snapshot.Value.Definition.Orchestration;
+                compositionPoints = snapshot.Value.Definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                if (snapshot.Value.Definition.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["postAggregate"] = snapshot.Value.Definition.Transformations };
                 automaticParameters = snapshot.Value.Definition.ProjectionParameters.Clone();
                 savedOutput = snapshot.Value.Definition.Output;
                 outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
@@ -158,7 +179,7 @@ else
         if (!rebindRequested) return SaveAsync();
         rebindRequested = false;
         if (!busy && interactive && (!enabled || automaticParametersValid)
-            && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed)) confirmRebind = true;
+            && LifecycleValid && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value))) confirmRebind = true;
         return Task.CompletedTask;
     }
 
@@ -170,9 +191,25 @@ else
         finally { rebindDependencies = false; }
     }
 
+    private bool lifecycleEnabled, keepHistory, allowExpiredFallback;
+    private string projectionTtl = string.Empty, historyRetention = string.Empty;
+    private bool LifecycleValid => !lifecycleEnabled || LifecycleDuration.TryParse(projectionTtl, out _)
+        && (!keepHistory || LifecycleDuration.TryParse(historyRetention, out var retention) && retention is not null);
+    private KnowledgeProjectionPolicy? LifecycleSelection()
+    {
+        if (!lifecycleEnabled) return null;
+        _ = LifecycleDuration.TryParse(projectionTtl, out var ttl); _ = LifecycleDuration.TryParse(historyRetention, out var retention);
+        return new() { TimeToLive = ttl, KeepHistory = keepHistory, HistoryRetention = keepHistory ? retention : null, AllowExpiredOnRefreshFailure = allowExpiredFallback };
+    }
+    private bool HasInputLifecycle(BindingModel binding) => dataSources.Any(source => DataSourceKey(source) == binding.DataSourceKey && source.Definition.Dataset?.Lifecycle is not null);
+    private bool IsDirectBinding(BindingModel binding) => dataSources.Any(source => DataSourceKey(source) == binding.DataSourceKey && source.Definition.Dataset is { Storage: null });
+    private static bool FallbackValid(BindingModel binding) => !binding.AllowStaleOnRefreshFailure
+        || LifecycleDuration.TryParse(binding.MaximumFallbackAgeText, out var maximum) && maximum is not null;
+    private FlowCallReference? orchestration;
+    private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync()
     {
-        if (busy || !interactive || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed)) return;
+        if (busy || !interactive || !LifecycleValid || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed || !FallbackValid(value))) return;
         busy = true;
         message = null;
         try
@@ -186,6 +223,7 @@ else
                 ProjectionFlow = FlowTarget(projectionFlowKey),
                 ProjectionParameters = automaticParameters.Clone(),
                 RetrievalFlow = FlowTarget(retrievalFlowKey),
+                Lifecycle = LifecycleSelection(), Orchestration = orchestration, Compositions = compositionPoints,
                 Output = OutputSelection()
             };
             var saved = IsNew
@@ -203,6 +241,10 @@ else
                 Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
             }
         }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_fallback_invalid", StringComparison.Ordinal) == true)
+        { message = T("FallbackInvalid"); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_lifecycle_invalid", StringComparison.Ordinal) == true)
+        { message = T("LifecycleInvalid"); }
         catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
             || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
         { message = T("OutputStorageInvalid"); }
@@ -245,8 +287,10 @@ else
         return new() { Name = value.Name.Trim(), DataSource = dataSource,
             AcquisitionTarget = string.IsNullOrWhiteSpace(value.AcquisitionTargetName) ? null
                 : new(value.AcquisitionTargetName, TargetOptions(value).Single(target => target.Target.Name == value.AcquisitionTargetName).Target.ScopeRef, dataSource.Namespace),
+            Transformations = value.Transformations,
             TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
-            MaximumAge = ParseMaximumAge(value.MaximumAgeText), RefreshIfNecessary = value.RefreshIfNecessary };
+            MaximumAge = ParseMaximumAge(value.MaximumAgeText), RefreshIfNecessary = value.RefreshIfNecessary,
+            AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAge = value.AllowStaleOnRefreshFailure ? ParseMaximumAge(value.MaximumFallbackAgeText) : null };
     }
     private TimeSpan? ParseMaximumAge(string value)
     {
@@ -282,7 +326,7 @@ else
         return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
     private async Task ChangeDataSourceAsync(BindingModel binding, ChangeEventArgs args)
-    { message = null; binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; await LoadTargetsAsync(binding); }
+    { message = null; binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; if (IsDirectBinding(binding)) { binding.AllowStaleOnRefreshFailure = false; binding.MaximumFallbackAgeText = string.Empty; } await LoadTargetsAsync(binding); }
     private async Task LoadTargetsAsync(BindingModel binding)
     {
         binding.TargetsLoadFailed = false;
@@ -332,12 +376,15 @@ else
         public string Name { get; set; } = string.Empty;
         public string DataSourceKey { get; set; } = string.Empty;
         public string AcquisitionTargetName { get; set; } = string.Empty;
+        public IReadOnlyList<FlowCompositionCall> Transformations { get; set; } = [];
         public string TransformationFlowKey { get; set; } = string.Empty;
         public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
         public bool ConfigurationValid { get; set; } = true;
         public bool TargetsLoadFailed { get; set; }
         public bool Required { get; set; } = true;
         public bool RefreshIfNecessary { get; set; }
+        public bool AllowStaleOnRefreshFailure { get; set; }
+        public string MaximumFallbackAgeText { get; set; } = string.Empty;
         public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
         {
@@ -346,9 +393,11 @@ else
                 : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
             AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
             TransformationFlowKey = transformationFlowKey,
+            Transformations = value.Transformations,
             Configuration = value.Configuration.Clone(),
             Required = value.Required,
             RefreshIfNecessary = value.RefreshIfNecessary,
+            AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAgeText = LifecycleDuration.Format(value.MaximumFallbackAge),
             MaximumAgeText = FormatMaximumAge(value.MaximumAge)
         };
     }

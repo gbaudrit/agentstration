@@ -303,8 +303,13 @@ export class SchemaContractsPage {
   }
 
   private async saveAndReload(consoleUrl: string, name: string): Promise<void> {
-    await this.page.getByTestId(TestIds.flowObservability.designerSave).click();
-    await expect(this.page.locator('.save-state.saved')).toBeVisible();
+    const saved = this.page.locator('.save-state.saved');
+    await expect(async () => {
+      if (!await saved.isVisible()) {
+        await this.page.getByTestId(TestIds.flowObservability.designerSave).click({ timeout: 1_000 });
+      }
+      await expect(saved).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
     await this.openFlow(consoleUrl, name);
   }
 

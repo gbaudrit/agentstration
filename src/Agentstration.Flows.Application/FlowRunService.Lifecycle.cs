@@ -96,7 +96,11 @@ public sealed partial class FlowRunService
         CancellationToken cancellationToken)
     {
         var resolved = await ResolveVersionAsync(scope.AccessScopeRef, flowId, version, null, cancellationToken);
-        ValidateInput(resolved.Graph?.InputSchema, input);
+        var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
+            : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
+                new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), scope.AccessScopeRef, cancellationToken);
+        resolved = composed.Definition;
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), input);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
@@ -104,6 +108,7 @@ public sealed partial class FlowRunService
             Id = $"flowrun-{Guid.NewGuid():N}",
             FlowId = flowId,
             FlowVersion = resolved.Version,
+            Composition = composed.Receipt,
             DeploymentResourceId = string.IsNullOrWhiteSpace(deploymentResourceId) ? "local" : deploymentResourceId,
             Trigger = trigger,
             StartedBy = string.IsNullOrWhiteSpace(startedBy) ? "local-user" : startedBy,

@@ -18,16 +18,22 @@ public sealed class FlowDiagramNode : NodeModel
         Size = new Size(RenderedWidth, RenderedHeight);
         Input = new FlowDiagramPort(this, PortAlignment.Left, FlowDiagramPortDirection.Input);
         Outputs = source.OutputEvents
-            .Select(eventName => new FlowDiagramPort(this, PortAlignment.Right, FlowDiagramPortDirection.Output, eventName,
+            .Select(eventName => new FlowDiagramPort(this, eventName == "process" ? PortAlignment.Bottom : PortAlignment.Right, FlowDiagramPortDirection.Output, eventName,
                 source.OutputOutcomes.TryGetValue(eventName, out var outcome) ? outcome : null))
             .ToArray();
         AddPort(Input);
+        if (source.OutputEvents.Contains("process", StringComparer.Ordinal))
+        {
+            ProcessingResult = new FlowDiagramPort(this, PortAlignment.Bottom, FlowDiagramPortDirection.Input, "result");
+            AddPort(ProcessingResult);
+        }
         foreach (var output in Outputs)
             AddPort(output);
     }
 
     public FlowDesignerNode Source { get; }
     public FlowDiagramPort Input { get; }
+    public FlowDiagramPort? ProcessingResult { get; }
     public IReadOnlyList<FlowDiagramPort> Outputs { get; }
 }
 
@@ -43,6 +49,7 @@ public sealed class FlowDiagramPort(
     public FlowDiagramPortDirection Direction { get; } = direction;
     public string? EventName { get; } = eventName;
     public FlowOutputOutcome? Outcome { get; } = outcome;
+    public string? ContractProblem { get; set; }
 
     public override bool CanAttachTo(Blazor.Diagrams.Core.Models.Base.ILinkable other)
     {
@@ -78,10 +85,25 @@ public static class FlowDiagramMapper
             if (output is null)
                 continue;
 
-            var model = new LinkModel(link.Id, output, byName[link.To].Input);
+            var target = byName[link.To];
+            var resultConnection = target.ProcessingResult is not null && IsProcessingReturn(document, target.Source.Name, link.From);
+            var model = new LinkModel(link.Id, output, resultConnection ? target.ProcessingResult! : target.Input);
             model.AddLabel(link.Event, offset: new Point(0, -14));
             links.Add(model);
         }
         return new(nodes, links, byName);
+    }
+
+    public static bool IsProcessingReturn(FlowDesignerDocument document, string owner, string source)
+    {
+        var queue = new Queue<string>(document.Links.Where(link => link.From == owner && link.Event == "process").Select(link => link.To));
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (queue.TryDequeue(out var name))
+        {
+            if (name == owner || !visited.Add(name)) continue;
+            if (name == source) return true;
+            foreach (var link in document.Links.Where(link => link.From == name)) queue.Enqueue(link.To);
+        }
+        return false;
     }
 }

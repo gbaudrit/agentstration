@@ -643,8 +643,9 @@ public sealed class DataSourceManagementService(
             throw Error("data_source_configuration_invalid", "Data Source configuration must be a bounded JSON object.");
         if (resource.Definition.Dataset is { } dataset)
         {
-            if (dataset.Storage is null || dataset.Rule is null || dataset.Acquisition?.Operation is null)
-                throw Error("data_source_composition_required", "Dataset Storage, rule and acquisition are required.");
+            if (dataset.Rule is null || dataset.Acquisition?.Operation is null)
+                throw Error("data_source_composition_required", "Dataset rule and acquisition are required.");
+            DataSourceDatasetCompositionService.ValidateLifecycle(dataset);
             if (resource.Definition.Configuration.EnumerateObject().Any())
                 throw Error("data_source_connection_override", "Dataset Data Sources cannot carry connection configuration.");
         }

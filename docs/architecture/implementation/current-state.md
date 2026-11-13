@@ -612,3 +612,26 @@ catalogue and content materialization Flow serve previews/downloads. The recover
 worker reconciles missing metadata from earlier native histories under the original
 caller's current permissions, without rewriting immutable Snapshots or origin data.
 See [ADR-0208](../../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
+
+## Resource-bound Flow composition
+
+Published Flows can declare typed composition points. Data Sources and Knowledge
+Sources bind ordered published child Flows and literal parameters to those points.
+Admission expands them into ordinary governed child calls with exact versions,
+resource UIDs and hashes; Flow Run receipts distinguish the immutable template
+from the compiled executable graph. Standard orchestrations preserve source-owned
+acquisition and publication boundaries, per-binding Knowledge preparation and a
+global post-aggregation sequence. See
+[ADR-0211](../../decisions/0211-resource-bound-flow-composition-points.md) and
+[the source composition inventory](data-source-composition.md#configurable-flow-sequences).
+
+## Source freshness and retained history
+
+Native acquisition and Knowledge Snapshot lifecycles are independent opt-in
+policies. Direct read-only acquisitions use bounded ephemeral Flow/runtime payloads;
+retained inputs refresh according to their source TTL. Explicit binding fallback
+records failed refresh evidence and an exact compatible previous input. Snapshot
+access uses its own publication TTL and explicit expired-serving option. Bounded
+history reconciliation preserves active work, read leases and immutable provenance;
+provider-qualified retirement can remain pending. See
+[ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).

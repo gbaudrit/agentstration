@@ -51,6 +51,7 @@ public sealed class KnowledgeProjectionInputResolver(
                 $"Data Source '{source.Value.Address}' has no ownership scope.");
         if (source.Value.Definition.Dataset is not null && binding.AcquisitionTarget is not null)
             throw new KnowledgeSourceValidationException("knowledge_projection_target_incompatible", "Native datasets do not use historical acquisition targets.");
+        ValidateFallback(binding, source.Value);
         if (source.Value.Definition.Dataset is not null)
             return new()
             {
@@ -106,7 +107,7 @@ public sealed class KnowledgeProjectionInputResolver(
                 source.Value.ScopeRef, cancellationToken);
             var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
             var latest = Compatible(values, source.Value, dependency, target?.Uid).FirstOrDefault();
-            if (binding.RefreshIfNecessary)
+            if (binding.RefreshIfNecessary || source.Value.Definition.Dataset?.Lifecycle is not null)
                 return new(binding.Name, source.Value.ScopeRef, source.Value.Uid, true, null, null);
             if (latest is null)
                 return new(binding.Name, source.Value.ScopeRef, source.Value.Uid, false,
@@ -142,7 +143,8 @@ public sealed class KnowledgeProjectionInputResolver(
         if (acquisition.Uid != evidence.AcquisitionUid || acquisition.DataSourceUid != source.Value.Uid
             || acquisition.State != DataSourceAcquisitionState.Succeeded)
             throw Error("knowledge_projection_input_changed", "The accepted acquisition evidence no longer matches.");
-        if (acquisition.Dataset is not null) _ = await datasets.ReadAsync(acquisition, 0, 1, cancellationToken);
+        if (acquisition.DirectResult is { } direct) _ = await datasets.ReadDirectAsync(acquisition, direct.RequestId, cancellationToken);
+        else if (acquisition.Dataset is not null) _ = await datasets.ReadAsync(acquisition, 0, 1, cancellationToken);
     }
 
     public async Task<KnowledgeProjectionInputEvidence> ResolveAsync(
@@ -175,36 +177,81 @@ public sealed class KnowledgeProjectionInputResolver(
         var available = await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name,
             source.Value.ScopeRef, cancellationToken);
         var target = await ResolveTargetAsync(executionScope, ownerNamespace, source.Value, binding, cancellationToken);
-        available = Compatible(available, source.Value, dependency, target?.Uid).ToArray();
+        var compatible = Compatible(available, source.Value, dependency, target?.Uid).ToArray();
         var acquisition = string.IsNullOrWhiteSpace(acquisitionId)
-            ? available.FirstOrDefault()
-            : available.SingleOrDefault(value => string.Equals(value.Name, acquisitionId, StringComparison.Ordinal));
-        if (string.IsNullOrWhiteSpace(acquisitionId) && KnowledgeFreshness.RequiresRefresh(binding, acquisition?.CompletedAt, timeProvider))
+            ? compatible.FirstOrDefault(value => value.DirectResult is null || value.DirectResult.RequestId == requestId)
+            : compatible.SingleOrDefault(value => string.Equals(value.Name, acquisitionId, StringComparison.Ordinal));
+        var policy = source.Value.Definition.Dataset?.Lifecycle;
+        var directOnly = source.Value.Definition.Dataset is { Storage: null };
+        KnowledgeInputRefreshFailure? refreshFailure = null;
+        var needsRefresh = string.IsNullOrWhiteSpace(acquisitionId) && (directOnly || policy is not null
+            ? directOnly || acquisition?.CompletedAt is null || policy?.TimeToLive is { } ttl && timeProvider.GetUtcNow() >= acquisition.CompletedAt + ttl
+            : KnowledgeFreshness.RequiresRefresh(binding, acquisition?.CompletedAt, timeProvider));
+        if (!needsRefresh && acquisition is { Dataset: not null, DirectResult: null } && policy is not null)
+            try { _ = await datasets.ReadAsync(acquisition, 0, 1, cancellationToken); }
+            catch (Exception exception) when (exception is DataSourceAcquisitionException or StorageException)
+            { needsRefresh = string.IsNullOrWhiteSpace(acquisitionId); }
+        if (needsRefresh)
         {
-            var started = await acquisitions.StartAsync(source.Value.Namespace, source.Value.Name, source.Value.ScopeRef,
-                JsonSerializer.SerializeToElement(new { }), requestId, requestId, binding.AcquisitionTarget?.Name, cancellationToken);
-            var deadline = timeProvider.GetUtcNow().AddMinutes(2);
-            do
+            var fallback = acquisition;
+            string? refreshId = null;
+            try
             {
-                var currentAcquisition = await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, cancellationToken);
-                acquisition = currentAcquisition.Value;
-                if (acquisition.State is not (DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running)) break;
-                if (timeProvider.GetUtcNow() >= deadline) throw Error("knowledge_refresh_timeout", "The acquisition refresh timed out.");
-                await Task.Delay(TimeSpan.FromMilliseconds(50), timeProvider, cancellationToken);
-            } while (true);
+                StoredResource<DataSourceAcquisitionResource> started;
+                try
+                {
+                    started = await acquisitions.StartAsync(source.Value.Namespace, source.Value.Name, source.Value.ScopeRef,
+                        JsonSerializer.SerializeToElement(new { }), requestId, requestId, binding.AcquisitionTarget?.Name, cancellationToken);
+                }
+                catch (DataSourceAcquisitionException exception) when (!directOnly && exception.Code == "data_source_acquisition_already_running")
+                {
+                    var running = (await acquisitions.ListAsync(source.Value.Namespace, source.Value.Name, source.Value.ScopeRef, cancellationToken))
+                        .FirstOrDefault(value => value.DataSourceUid == source.Value.Uid && value.DataSourceGeneration == source.Value.Generation
+                            && value.State is DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running)
+                        ?? throw Error("knowledge_refresh_unavailable", "The concurrent refresh is unavailable.");
+                    started = await acquisitions.GetAsync(running.Namespace, running.Name, cancellationToken);
+                }
+                refreshId = started.Value.Name;
+                var deadline = timeProvider.GetUtcNow().AddMinutes(2);
+                do
+                {
+                    acquisition = (await acquisitions.GetAsync(started.Value.Namespace, started.Value.Name, cancellationToken)).Value;
+                    if (acquisition.State is not (DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running)) break;
+                    if (timeProvider.GetUtcNow() >= deadline) throw Error("knowledge_refresh_timeout", "The acquisition refresh timed out.");
+                    await Task.Delay(TimeSpan.FromMilliseconds(50), timeProvider, cancellationToken);
+                } while (true);
+                if (acquisition.State != DataSourceAcquisitionState.Succeeded)
+                    throw Error(acquisition.ErrorCode ?? "knowledge_refresh_failed", "The required acquisition refresh failed.");
+                if (acquisition.Dataset is not null && acquisition.DirectResult is null) _ = await datasets.ReadAsync(acquisition, 0, 1, cancellationToken);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && exception is KnowledgeProjectionException or DataSourceAcquisitionException or DataSourceValidationException or StorageException)
+            {
+                if (directOnly || !binding.AllowStaleOnRefreshFailure || fallback?.DirectResult is not null
+                    || fallback?.CompletedAt is not { } completed || binding.MaximumFallbackAge is not { } ceiling
+                    || timeProvider.GetUtcNow() - completed > ceiling) throw;
+                _ = await ResolveSourceAsync(executionScope, ownerNamespace, binding, dependency, cancellationToken);
+                if (fallback.Dataset is not null) _ = await datasets.ReadAsync(fallback, 0, 1, cancellationToken);
+                acquisition = fallback;
+                refreshFailure = new(refreshId, exception switch
+                {
+                    KnowledgeProjectionException failure => failure.Code,
+                    DataSourceAcquisitionException failure => failure.Code,
+                    DataSourceValidationException failure => failure.Code,
+                    StorageException failure => failure.Code,
+                    _ => "knowledge_refresh_failed"
+                }, timeProvider.GetUtcNow());
+            }
         }
         if (acquisition is null)
-            throw Error("knowledge_projection_acquisition_missing",
-                $"Binding '{binding.Name}' has no matching Data Source acquisition.");
-        if (acquisition.State != DataSourceAcquisitionState.Succeeded || (acquisition.Manifest is null && acquisition.Content is null)
+            throw Error("knowledge_projection_acquisition_missing", $"Binding '{binding.Name}' has no matching acquisition.");
+        if (acquisition.State != DataSourceAcquisitionState.Succeeded || (acquisition.Manifest is null && acquisition.Content is null && acquisition.DirectResult is null)
             || acquisition.CompletedAt is null)
-            throw Error("knowledge_projection_acquisition_not_ready",
-                $"Data Source acquisition '{acquisition.Name}' for binding '{binding.Name}' is not successful.");
-        if (IsStale(binding, acquisition.CompletedAt))
-            throw Error("knowledge_projection_acquisition_stale",
-                $"Data Source acquisition '{acquisition.Name}' is older than the maximum age configured for binding '{binding.Name}'.");
+            throw Error("knowledge_projection_acquisition_not_ready", "The selected acquisition has no successful result.");
+        if (refreshFailure is null && (policy is null && !directOnly ? IsStale(binding, acquisition.CompletedAt)
+            : !directOnly && policy?.TimeToLive is { } maximum && timeProvider.GetUtcNow() >= acquisition.CompletedAt + maximum))
+            throw Error("knowledge_projection_acquisition_stale", "The selected acquisition exceeds its source freshness policy.");
         var selected = acquisition.Dataset is not null
-            ? await NativeContentAsync(acquisition, cancellationToken)
+            ? await NativeContentAsync(acquisition, requestId, cancellationToken)
             : acquisition.Manifest!.Artifacts
             .Where(value => value.Disposition == DataSourceArtifactDisposition.Publishable)
             .Select(value => new KnowledgeProjectionArtifact
@@ -222,6 +269,11 @@ public sealed class KnowledgeProjectionInputResolver(
                 $"Data Source acquisition '{acquisition.Name}' exposes no publishable artifacts.");
         return new()
         {
+            UsesAcquisitionLifecycle = policy is not null,
+            AcquisitionTimeToLive = policy?.TimeToLive,
+            InputLeaseId = acquisition.Dataset is not null && acquisition.DirectResult is null ? requestId : null,
+            RefreshFailure = refreshFailure,
+            DirectInput = acquisition.DirectResult is { } direct ? new(direct.Length, direct.Sha256, direct.ExpiresAt, direct.RequestId) : null,
             BindingName = binding.Name,
             DataSourceScopeRef = source.Value.ScopeRef!.Value,
             DataSourceUid = source.Value.Uid,
@@ -236,7 +288,7 @@ public sealed class KnowledgeProjectionInputResolver(
             AcquisitionUid = acquisition.Uid,
             AcquisitionFlowRunId = acquisition.FlowRunId,
             StorageInput = acquisition.Dataset is { } nativeDataset && acquisition.Content is { } content
-                ? new(nativeDataset.Definition.Storage, content.Key, content.Version, content.Length, content.Sha256)
+                ? new(nativeDataset.Definition.Storage!, content.Key, content.Version, content.Length, content.Sha256)
                 : null,
             AcquiredAt = acquisition.CompletedAt.Value,
             AcquisitionComposition = JsonSerializer.SerializeToElement<object?>(acquisition.Dataset is { } native ? native : acquisition.Composition),
@@ -245,13 +297,35 @@ public sealed class KnowledgeProjectionInputResolver(
         };
     }
 
+    public async Task ReleaseAsync(KnowledgeProjectionInputEvidence evidence, CancellationToken cancellationToken)
+    {
+        if (evidence.InputLeaseId is not { } requestId) return;
+        try
+        {
+            var acquisition = await acquisitions.GetAsync(evidence.DataSourceNamespace, evidence.AcquisitionId, cancellationToken);
+            await datasets.ReleaseProjectionLeaseAsync(acquisition.Value, requestId, cancellationToken);
+        }
+        catch (DataSourceAcquisitionException exception) { throw Error(exception.Code, exception.Message); }
+    }
+
+    private static void ValidateFallback(KnowledgeDataSourceBinding binding, DataSourceResource source)
+    {
+        if (!binding.AllowStaleOnRefreshFailure && binding.MaximumFallbackAge is null) return;
+        if (!binding.AllowStaleOnRefreshFailure || binding.MaximumFallbackAge is not { } maximum || maximum <= TimeSpan.Zero
+            || maximum > TimeSpan.FromDays(3650) || source.Definition.Dataset is { Storage: null }
+            || source.Definition.Dataset?.Lifecycle?.TimeToLive is { } ttl && maximum < ttl)
+            throw new KnowledgeSourceValidationException("knowledge_source_fallback_invalid", "Stale fallback requires a retained input and a positive age ceiling at least as long as the Data Source TTL.");
+    }
+
     private static string DatasetHash(DataSourceResource source) => Convert.ToHexStringLower(
-        SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source.Definition.Dataset)));
+        SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes<object?>(source.Definition.Dataset is { } dataset
+            && dataset.Lifecycle is null && dataset.Orchestration is null && dataset.Transformations.Count == 0 && dataset.Compositions.Count == 0
+                ? new { dataset.Storage, dataset.Rule, dataset.Acquisition } : source.Definition.Dataset)));
 
     private static IEnumerable<DataSourceAcquisitionResource> Compatible(IEnumerable<DataSourceAcquisitionResource> values,
         DataSourceResource source, ResolvedKnowledgeDataSourceBinding dependency, Guid? targetUid) => values.Where(value => value.DataSourceUid == source.Uid
             && value.DataSourceGeneration == source.Generation && value.Target?.Uid == targetUid
-            && value.State == DataSourceAcquisitionState.Succeeded && value.CompletedAt is not null
+            && value.State == DataSourceAcquisitionState.Succeeded && value.CompletedAt is not null && value.ContentRetiredAt is null
             && (value.Dataset is not null && source.Definition.Dataset is not null
                 ? JsonElement.DeepEquals(JsonSerializer.SerializeToElement(value.Dataset.Definition), JsonSerializer.SerializeToElement(source.Definition.Dataset))
                 : value.Manifest?.Artifacts.Count > 0 && value.Composition?.Profile is { } profile
@@ -259,8 +333,16 @@ public sealed class KnowledgeProjectionInputResolver(
                     && profile.DefinitionHash == dependency.ProfileDefinitionHash && profile.DependencyHash == dependency.ProfileDependencyHash))
         .OrderByDescending(value => value.CompletedAt).ThenBy(value => value.Name, StringComparer.Ordinal);
 
-    private async Task<KnowledgeProjectionArtifact[]> NativeContentAsync(DataSourceAcquisitionResource acquisition, CancellationToken cancellationToken)
+    private async Task<KnowledgeProjectionArtifact[]> NativeContentAsync(DataSourceAcquisitionResource acquisition, string requestId, CancellationToken cancellationToken)
     {
+        if (acquisition.DirectResult is { } direct)
+        {
+            var value = await datasets.ReadDirectAsync(acquisition, requestId, cancellationToken);
+            return [new() { ArtifactId = "direct-" + acquisition.Uid.ToString("N"), Kind = KnowledgeArtifactKind.Inline,
+                Disposition = KnowledgeArtifactDisposition.Publishable, MediaType = "application/json", Digest = direct.Sha256,
+                DataContract = DatasetContract(acquisition), ContentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(value)) }];
+        }
+        await datasets.AcquireProjectionLeaseAsync(acquisition, requestId, cancellationToken);
         var item = acquisition.Content ?? throw Error("knowledge_projection_acquisition_empty", "The acquisition has no content.");
         if (item.Length > 65536) throw Error("knowledge_projection_input_too_large", "The native input exceeds the inline Flow limit.");
         using var buffer = new MemoryStream();
@@ -286,8 +368,13 @@ public sealed class KnowledgeProjectionInputResolver(
         }
         return [new() { ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId ?? acquisition.Name, Kind = KnowledgeArtifactKind.Inline,
             Disposition = KnowledgeArtifactDisposition.Publishable, MediaType = "application/json",
-            Digest = item.Sha256, ContentBase64 = Convert.ToBase64String(buffer.ToArray()) }];
+            DataContract = DatasetContract(acquisition), Digest = item.Sha256, ContentBase64 = Convert.ToBase64String(buffer.ToArray()) }];
     }
+
+    private static Agentstration.Schemas.ResolvedDataContract? DatasetContract(DataSourceAcquisitionResource acquisition) =>
+        Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset?.OutputSchema,
+            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json") is { } contract
+                ? contract with { Validated = true } : null;
 
     private bool IsStale(KnowledgeDataSourceBinding binding, DateTimeOffset? completedAt) =>
         !KnowledgeFreshness.IsFresh(binding, completedAt, timeProvider);
@@ -381,7 +468,9 @@ public sealed class KnowledgeProjectionFlowGateway(FlowRunService runs) : IKnowl
                 null,
                 scope)
             {
-                DefinitionScopeRef = request.Flow.ScopeRef
+                DefinitionScopeRef = request.Flow.ScopeRef,
+                Compositions = request.Compositions,
+                TransientPayloads = request.TransientPayloads
             }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             return Snapshot(completed.Value);

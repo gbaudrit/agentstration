@@ -46,4 +46,11 @@
   <data name="StorageKey" xml:space="preserve"><value>Content key</value></data>
   <data name="StorageVersion" xml:space="preserve"><value>Content version</value></data>
   <data name="StorageVersionUnavailable" xml:space="preserve"><value>No provider version; integrity verified by SHA-256</value></data>
+  <data name="TransformationInputArtifact" xml:space="preserve"><value>Input Artifact</value></data>
+  <data name="TransformationProcessingRun" xml:space="preserve"><value>Processing execution</value></data>
+  <data name="TransformationInputDigest" xml:space="preserve"><value>Input SHA-256</value></data>
+  <data name="DataContract" xml:space="preserve"><value>Data contract</value></data>
+  <data name="DataContractValidated" xml:space="preserve"><value>Validated against the published content.</value></data>
+  <data name="DataContractUnvalidated" xml:space="preserve"><value>Contract available; no content validation evidence.</value></data>
+  <data name="DataContractOrigin" xml:space="preserve"><value>Contract origin</value></data>
 </root>

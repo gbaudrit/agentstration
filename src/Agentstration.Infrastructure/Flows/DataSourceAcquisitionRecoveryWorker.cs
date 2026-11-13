@@ -10,11 +10,10 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class DataSourceAcquisitionRecoveryWorker(
     DataSourceAcquisitionService acquisitions,
     DataSourceDiscoveryService discoveries,
-    KnowledgeProjectionService projections,
     StoredArtifactReconciliationService artifactReconciliation,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
-    ILogger<DataSourceAcquisitionRecoveryWorker> logger) : BackgroundService
+    ILogger<DataSourceAcquisitionRecoveryWorker> logger, Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance? history = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -30,8 +29,8 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
             using var scope = requestScopes.PushSystem();
             await acquisitions.RecoverPendingAsync(cancellationToken);
             await discoveries.RecoverPendingAsync(cancellationToken);
-            await projections.RecoverPendingAsync(cancellationToken);
             await artifactReconciliation.ReconcileAsync(cancellationToken);
+            if (history is not null) await history.ReconcileAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)

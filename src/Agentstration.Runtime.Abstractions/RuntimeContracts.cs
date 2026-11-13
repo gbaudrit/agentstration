@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -141,6 +142,9 @@ public sealed record ExecutableAgentDefinition
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public DataContractDefinition? OutputContract { get; init; }
 }
 
 public sealed record ResolvedRuntimeAgent(
@@ -326,6 +330,7 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }

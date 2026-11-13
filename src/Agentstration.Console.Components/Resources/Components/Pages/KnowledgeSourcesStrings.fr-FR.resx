@@ -121,4 +121,28 @@
   <data name="Yes" xml:space="preserve"><value>Oui</value></data>
   <data name="No" xml:space="preserve"><value>Non</value></data>
   <data name="NativeLegacyRetrievalHelp" xml:space="preserve"><value>Les Tools natifs read, search_regex et get_status accèdent directement aux Snapshots. Ce Flow facultatif sert uniquement aux appels REST de consultation personnalisée.</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Fraîcheur et historique des Snapshots</value></data>
+  <data name="AllowExpiredFallback" xml:space="preserve"><value>Autoriser le Snapshot actif expiré après un échec de reprojection</value></data>
+  <data name="AllowInputFallback" xml:space="preserve"><value>Autoriser une ancienne acquisition après un échec de rafraîchissement</value></data>
+  <data name="InputFallbackAge" xml:space="preserve"><value>Âge maximal pour le repli (hh:mm:ss)</value></data>
+  <data name="InputFallbackAgeHelp" xml:space="preserve"><value>Le rafraîchissement est toujours tenté d’abord. Ce plafond doit être au moins égal à la durée de fraîcheur de la Data Source ; il ne retarde jamais le rafraîchissement. Les résultats directs ne peuvent pas servir de repli.</value></data>
+  <data name="FallbackInvalid" xml:space="preserve"><value>Choisissez une entrée stockée et un âge maximal de repli positif, au moins égal à la durée de fraîcheur de sa Data Source.</value></data>
+  <data name="LifecycleInvalid" xml:space="preserve"><value>Vérifiez la durée de fraîcheur, la conservation de l’historique et le Storage de sortie sélectionné.</value></data>
+  <data name="DataSourceOwnsFreshness" xml:space="preserve"><value>Cette Data Source fixe la fraîcheur des acquisitions et leur rafraîchissement. Le plafond de repli s’applique uniquement après un échec de rafraîchissement.</value></data>
+  <data name="SnapshotState.Retired" xml:space="preserve"><value>Retiré</value></data>
+  <data name="SnapshotState.Retiring" xml:space="preserve"><value>Retrait en attente</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Entrée directe</value></data>
+  <data name="InputFallbackUsed" xml:space="preserve"><value>Ancienne acquisition utilisée</value></data>
+  <data name="InputRefreshFailed" xml:space="preserve"><value>Échec du rafraîchissement :</value></data>
+  <data name="ProjectionStarting" xml:space="preserve"><value>Démarrage de la projection…</value></data>
+  <data name="ProjectionRunning" xml:space="preserve"><value>Projection en cours…</value></data>
+  <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquisition des sources de données…</value></data>
+  <data name="ProjectionPreparing" xml:space="preserve"><value>Préparation des entrées et des transformations…</value></data>
+  <data name="ProjectionPublishing" xml:space="preserve"><value>Publication du Snapshot…</value></data>
+  <data name="ProjectionStepProgress" xml:space="preserve"><value>{0} étape(s) terminée(s) sur {1}.</value></data>
+  <data name="ProjectionElapsed" xml:space="preserve"><value>Durée : {0}</value></data>
+  <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Le suivi n’a pas pu être actualisé. Le traitement peut continuer ; réessayez l’actualisation.</value></data>
+  <data name="ProjectionFailed" xml:space="preserve"><value>La projection n’a pas abouti : {0}</value></data>
+  <data name="ProjectionAccepted" xml:space="preserve"><value>Projection acceptée. Le suivi s’actualise automatiquement.</value></data>
+  <data name="FlowRunNewTab" xml:space="preserve"><value>Afficher l’exécution de Flow {0} dans un nouvel onglet.</value></data>
 </root>

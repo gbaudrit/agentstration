@@ -27,6 +27,19 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     public Task<ReadOnlyMemory<byte>> ReadAsync(StoragePublicationReference reference, long offset, int length,
         CancellationToken cancellationToken) => GuardAsync(() => ReadCoreAsync(reference, offset, length, cancellationToken));
 
+    public Task<bool> RetireAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => GuardAsync(async () =>
+    {
+        await ValidateCoreAsync(reference.Target, cancellationToken);
+        await authorization.EnsurePermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, cancellationToken);
+        var directory = DirectoryFor(reference);
+        await using var lease = await LockAsync(directory, cancellationToken);
+        var path = FileFor(reference, false);
+        if (!File.Exists(path)) return true;
+        _ = await LoadAsync(reference, path, cancellationToken);
+        File.Delete(LocalStoragePaths.Checked(path));
+        return true;
+    });
+
     private async Task ValidateCoreAsync(StorageContentRequest target, CancellationToken cancellationToken)
     {
         var resolved = await resolver.ResolveAsync(target.Storage, target.Consumer, cancellationToken);
@@ -55,12 +68,15 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
             + Hash(Encoding.UTF8.GetBytes(publicationId));
         if (!AllowsKey(target.Policy, key) || !AllowsKey(envelope, key))
             throw Error("storage_publication_forbidden", "The publication is outside the authorized key range.");
-        target = target with { Policy = target.Policy with
+        target = target with
         {
-            MaximumReadBytes = Math.Min(target.Policy.MaximumReadBytes, Math.Min(resolved.Limits.MaximumReadBytes, envelope.MaximumReadBytes)),
-            MaximumWriteBytes = Math.Min(target.Policy.MaximumWriteBytes, Math.Min(resolved.Limits.MaximumWriteBytes, envelope.MaximumWriteBytes)),
-            MaximumPageSize = Math.Min(target.Policy.MaximumPageSize, Math.Min(resolved.Limits.MaximumPageSize, envelope.MaximumPageSize))
-        } };
+            Policy = target.Policy with
+            {
+                MaximumReadBytes = Math.Min(target.Policy.MaximumReadBytes, Math.Min(resolved.Limits.MaximumReadBytes, envelope.MaximumReadBytes)),
+                MaximumWriteBytes = Math.Min(target.Policy.MaximumWriteBytes, Math.Min(resolved.Limits.MaximumWriteBytes, envelope.MaximumWriteBytes)),
+                MaximumPageSize = Math.Min(target.Policy.MaximumPageSize, Math.Min(resolved.Limits.MaximumPageSize, envelope.MaximumPageSize))
+            }
+        };
         var reference = new StoragePublicationReference(target, key, Hash(bytes.Span), bytes.Length, Hash(bytes.Span))
         {
             Binding = new(resolved.Type, resolved.ConnectedService, resolved.ConnectedServiceType,

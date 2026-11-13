@@ -25,6 +25,56 @@ namespace Agentstration.Web.Tests;
 public sealed class FlowDetailsDesignerTests
 {
     [TestMethod]
+    [DataRow("en-US", "artifact_processing_json_invalid", "text/plain")]
+    [DataRow("fr-FR", "artifact_processing_json_invalid", "text/plain")]
+    [DataRow("en-US", "artifact_processing_input_json_invalid", "input Artifact")]
+    [DataRow("fr-FR", "artifact_processing_input_json_invalid", "artefact d’entrée")]
+    [DataRow("en-US", "artifact_storage_failed", "local copy")]
+    [DataRow("fr-FR", "artifact_storage_failed", "copie locale")]
+    public void ArtifactJsonErrorsExplainTheCorrectSideAndRemedy(string language, string code, string explanation)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workspace = WorkspaceId.New();
+        var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
+        var run = new FlowRun
+        {
+            Id = "invalid-json-run", WorkspaceId = workspace, FlowId = new("anonymization"), FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed, Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = FlowClientStub.Now,
+            Error = new(code, "Old generic error", "Tool storage.local.read requires explicit input and output schemas."),
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, new("anonymization"), "1.0.0", null, definition,
+                new Dictionary<string, string>(), FlowClientStub.Now)
+        };
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(run: run));
+        context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
+        context.Services.AddSingleton(TimeProvider.System);
+        var rendered = context.Render<FlowRunDetails>(p => p.Add(c => c.RunId, run.Id));
+        Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-error']").TextContent);
+        Assert.DoesNotContain("Old generic error", rendered.Find("[data-testid='flow-run-error']").TextContent);
+        Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
+        if (code == "artifact_storage_failed")
+        {
+            Assert.HasCount(1, rendered.FindAll(".contract-failure-heading .contract-failure-icon"));
+            Assert.DoesNotContain("requires explicit input", rendered.Markup);
+            rendered.Find(".contract-failure-toggle").Click();
+            Assert.Contains("requires explicit input", rendered.Find(".contract-failure-body").TextContent);
+            Assert.Contains(code, rendered.Find(".contract-failure-body").TextContent);
+            rendered.Find(".contract-failure-toggle").Click();
+        }
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
+        foreach (var tab in new[] { "Causality", "Activity", "RawEvents" })
+        {
+            rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings[tab].Value).Click();
+            Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error']"));
+        }
+        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Summary"].Value).Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='flow-run-error']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
+    }
+
+    [TestMethod]
     [DataRow("/instance")]
     [DataRow("/tenants/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
     [DataRow("/workspaces/11111111-1111-1111-1111-111111111111")]
@@ -158,7 +208,12 @@ public sealed class FlowDetailsDesignerTests
         StringAssert.Contains(error.TextContent, strings[resourceKey].Value);
         var taskStrings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<TaskFlowRunDetailsStrings>>();
         Assert.AreEqual(strings[resourceKey].Value, taskStrings[resourceKey].Value);
-        if (errorCode == "agent_model_profile_unavailable") StringAssert.Contains(error.TextContent, diagnostic);
+        if (errorCode == "agent_model_profile_unavailable")
+        {
+            Assert.DoesNotContain(diagnostic, error.TextContent);
+            rendered.Find(".run-error .contract-failure-toggle").Click();
+            StringAssert.Contains(rendered.Find(".run-error").TextContent, diagnostic);
+        }
     }
 
     [TestMethod]
@@ -194,7 +249,9 @@ public sealed class FlowDetailsDesignerTests
 
         var error = rendered.Find(".run-error");
         StringAssert.Contains(error.TextContent, message);
-        StringAssert.Contains(error.TextContent, detail);
+        Assert.DoesNotContain(detail, error.TextContent);
+        rendered.Find(".run-error .contract-failure-toggle").Click();
+        StringAssert.Contains(rendered.Find(".run-error").TextContent, detail);
         Assert.IsFalse(error.TextContent.Contains("agent_model_profile_unavailable", StringComparison.Ordinal));
     }
 
@@ -484,6 +541,7 @@ public sealed class FlowDetailsDesignerTests
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "analyst"));
         var run = new FlowRun
         {
+            Steps = [new FlowStepRun { StepName = "notify", StepType = "toolRoute", Process = new(1, "process", true, []) }],
             WorkspaceId = workspaceId,
             Id = "flowrun-news",
             FlowId = flowId,
@@ -505,7 +563,8 @@ public sealed class FlowDetailsDesignerTests
             run.Id, flowId, run.FlowVersion, true, FlowDefinitionState.Published, run.Status, null, null, 0,
             run.CreatedAt, run.StartedAt, run.CompletedAt, null, [],
             [new(logicalCallId, "notify", "notification.send", "agentstration", "notification.send", "agentstration.internal", "agentstration", "work.notification.create", "succeeded", run.CorrelationId,
-                [new(invocationId, 1, "succeeded", run.CreatedAt, run.CreatedAt.AddMilliseconds(12), 12, null, null, 1)])]);
+                [new(invocationId, 1, "succeeded", run.CreatedAt, run.CreatedAt.AddMilliseconds(12), 12, null, null, 1)])])
+        { Processes = new Dictionary<string, FlowProcessAdmission> { ["notify"] = new(1, "process", true, []) } };
         var causality = new FlowRunCausalityPageResponse(
             new(run.Id, FlowInvocationOrigin.Trigger, FlowRunTrigger.Event, "news-watcher", "news-item-42", "news-42", Guid.NewGuid().ToString("D")),
             [node], 1, null);
@@ -514,7 +573,12 @@ public sealed class FlowDetailsDesignerTests
         context.Services.AddSingleton(TimeProvider.System);
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
 
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo($"/flow-runs/{run.Id}?step=notify");
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
+        var ownerHref = rendered.Find(".process-summary summary a").GetAttribute("href")!;
+        Assert.Contains(run.Id, ownerHref);
+        Assert.Contains("step=notify", ownerHref);
+        Assert.DoesNotContain("run.Id", ownerHref);
         rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Causality"].Value).Click();
 
         rendered.WaitForAssertion(() =>
@@ -522,6 +586,10 @@ public sealed class FlowDetailsDesignerTests
             StringAssert.Contains(rendered.Markup, "news-analysis · 2.0.0");
             StringAssert.Contains(rendered.Markup, strings["ResolvedFromActive"].Value);
             StringAssert.Contains(rendered.Markup, "notification.send");
+            var causalOwner = rendered.Find(".process-summary summary a").GetAttribute("href")!;
+            Assert.Contains(run.Id, causalOwner);
+            Assert.Contains("step=notify", causalOwner);
+            Assert.DoesNotContain("node.FlowRunId", causalOwner);
             var link = rendered.Find(".tool-attempts a");
             StringAssert.Contains(link.GetAttribute("href"), "toolCallId=flow%3Aflowrun-news%3Astep%3Anotify");
             StringAssert.Contains(link.GetAttribute("href"), "invocationId=flow%3Aflowrun-news%3Astep%3Anotify%3Aattempt%3A1");

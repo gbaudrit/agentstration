@@ -14,7 +14,7 @@ else
 {
     <DataGrid TItem="DataSourceResource" Items="items">
         <Header><tr><th>@T("Name")</th><th>@T("DatasetStorageOrProfile")</th><th>@T("Scope")</th><th>@T("State")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td><td><code>@(item.Definition.Dataset?.Storage.Storage.Name ?? item.Definition.Profile?.Name)</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@Url(item)">@T("Open")</a></td></tr></Row>
+        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td><td><code>@(item.Definition.Dataset is { Storage: null } ? T("DirectInput") : item.Definition.Dataset?.Storage?.Storage.Name ?? item.Definition.Profile?.Name)</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@Url(item)">@T("Open")</a></td></tr></Row>
     </DataGrid>
 }
 

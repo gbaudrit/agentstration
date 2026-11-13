@@ -26,6 +26,7 @@ public sealed record KnowledgeRetrievalExecutionContext(
     string? ToolCallId = null,
     string? ToolInvocationId = null)
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     public JsonElement? SymbolicRequest { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
