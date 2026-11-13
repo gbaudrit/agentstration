@@ -53,10 +53,18 @@ public sealed partial class FlowDesignerReadOnlyTests
         StringAssert.Contains(rendered.Markup, "Read only");
         StringAssert.Contains(rendered.Markup, "pack.sample");
         StringAssert.Contains(rendered.Markup, "Published version 2.1.0");
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("/namespaces/pack.sample/flows/sample/designer?version=2.1.0&scopeRef=%2Finstance&context=%2Finstance");
+        rendered.Render();
+        var draftUrl = rendered.Find("[data-testid=flow-designer-open-draft]").GetAttribute("href")!;
+        Assert.DoesNotContain("version=", draftUrl);
+        Assert.Contains("/namespaces/pack.sample/flows/sample/designer", draftUrl);
+        Assert.Contains("scopeRef=%2Finstance", draftUrl);
+        Assert.Contains("context=%2Finstance", draftUrl);
         Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);
-        Assert.HasCount(9, rendered.FindAll(".step-palette-group:not(.palette-view) button .ui-icon"));
+        Assert.HasCount(10, rendered.FindAll(".step-palette-group:not(.palette-view) button .ui-icon"));
         Assert.HasCount(4, rendered.FindAll(".palette-view button .ui-icon"));
 
         var readOnlyCanvas = rendered.FindComponent<FlowCanvas>();
@@ -178,5 +186,31 @@ public sealed partial class FlowDesignerReadOnlyTests
         var strings = context.Services.GetRequiredService<IStringLocalizer<FlowDesignerStrings>>();
         Assert.AreEqual("Appliquer et enregistrer", strings["ApplyAndSaveYaml"].Value);
         Assert.AreEqual("2 agents disponibles. Les routes sont explicites et restent des références immuables après publication.", strings["AvailableAgents.Many", 2].Value);
+    }
+    [TestMethod]
+    public async Task ADelayedPublishedResponseCannotReplaceTheDraftAfterNavigation()
+    {
+        using var context = CreateContext();
+        var original = new BackendStub(readOnly: false);
+        var target = new FlowDesignerTarget(ResourceNamespace.Default, "sample", TestScope);
+        var draft = await original.LoadAsync(target, CancellationToken.None);
+        var published = new TaskCompletionSource<FlowDesignerLoadResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var backend = new BackendStub(readOnly: false) { LoadOverride = value => value.PublishedVersion is null
+            ? Task.FromResult(draft) : published.Task };
+        context.Services.AddSingleton<IFlowDesignerBackend>(backend);
+        context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
+        context.Services.AddSingleton<FlowEditorStore>();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Setup<Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new(0, 0, 1024, 768));
+        var rendered = context.Render<FlowDesignerComponent>(parameters => parameters.Add(value => value.ResourceId, "sample")
+            .Add(value => value.ScopeRef, TestScope).Add(value => value.PublishedVersion, "1.0.0"));
+        rendered.Render(parameters => parameters.Add(value => value.PublishedVersion, (string?)null));
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=flow-designer-save]")));
+        await rendered.InvokeAsync(() => published.SetResult(draft with { PublishedVersion = "1.0.0", ETag = null }));
+        rendered.WaitForAssertion(() => Assert.IsFalse(context.Services.GetRequiredService<FlowEditorStore>().State.IsReadOnly));
+        Assert.HasCount(1, rendered.FindAll("[data-testid=flow-designer-save]"));
+        Assert.HasCount(0, rendered.FindAll(".read-only-badge"));
+        Assert.AreEqual(0, backend.SaveCount);
     }
 }

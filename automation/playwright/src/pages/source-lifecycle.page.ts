@@ -91,6 +91,11 @@ export class SourceLifecyclePage {
       .filter({ hasText: acquisition.flowRunId }).getByRole('link').click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
     const summary = this.page.getByTestId(TestIds.sourceLifecycle.runError);
+    const disclosure = summary.getByRole('button', { name: text.showErrorDetails, exact: true });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    await expect(summary).not.toContainText('acquisition_failed');
+    await disclosure.click();
+    await expect(summary.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
     await expect(summary).toContainText('acquisition_failed');
     await expect(summary).toContainText(message);
     await expect(summary).not.toContainText('${transition.output}');
@@ -118,6 +123,9 @@ export class SourceLifecyclePage {
       await expect(inspector).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
     await topology.getByRole('button', { name: /Acquire source content/ }).click();
+    const stepDisclosure = inspector.getByRole('button', { name: text.showErrorDetails, exact: true });
+    await expect(stepDisclosure).toHaveAttribute('aria-expanded', 'false');
+    await stepDisclosure.click();
     await expect(inspector).toContainText(code);
     await expect(inspector).toContainText(message);
     await expect(inspector).toContainText('fetch-failure');
@@ -451,8 +459,11 @@ export class SourceLifecyclePage {
     }, { timeout: 90_000 }).toBe(true);
     expect(result.state, result.errorMessage ?? undefined).toBe(4);
     expect(result.snapshotName).toBeTruthy();
-    await this.openKnowledge(consoleUrl, 'projections');
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).locator(`button[title="${result.metadata.name}"]`).click();
+    const completedRow = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).filter({ has: this.page.locator(`button[title="${result.metadata.name}"]`) });
+    await expect(completedRow).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toHaveJSProperty('scrollLeft', 0);
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionProgress)).toHaveCount(0);
+    await completedRow.locator(`button[title="${result.metadata.name}"]`).click();
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.projectionProvenance)).toBeVisible();
     return result;
   }

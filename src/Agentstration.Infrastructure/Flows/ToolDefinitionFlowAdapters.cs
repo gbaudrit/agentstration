@@ -189,7 +189,7 @@ public sealed class ToolDefinitionExecutor(
                 "Protected inputs require durable Secret references.");
         var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace,
             ((FlowToolDefinitionProperties)stored.Value.Definition).Flow, cancellationToken);
-        try { FlowRunService.ValidateInput(flowContract.InputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(flowInput, references)); }
+        try { FlowRunService.ValidateInput(flowContract.InputSchema, flowInput, references); }
         catch (FlowValidationException exception)
         {
             throw new ToolDefinitionInvocationException("tool_definition_fixed_input_invalid", exception.Message, exception);
@@ -257,7 +257,7 @@ public sealed class ToolDefinitionExecutor(
             throw new ToolDefinitionInvocationException("tool_definition_output_invalid", "The Flow returned no output for a ToolDefinition with an output schema.");
         if (output is not null)
         {
-            try { FlowRunService.ValidateInput(stored.Value.Definition.OutputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(output.Value, references)); }
+            try { FlowRunService.ValidateInput(stored.Value.Definition.OutputSchema, output.Value, references); }
             catch (FlowValidationException exception)
             {
                 throw new ToolDefinitionInvocationException("tool_definition_output_invalid", exception.Message, exception);
@@ -442,8 +442,7 @@ public sealed class ToolDefinitionExecutor(
                         $"ToolDefinition argument '{property.Name}' is fixed and cannot be supplied by the caller.");
         try
         {
-            FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(
-                invocation.Arguments, invocation.ExecutionContext?.SecretInputs ?? []));
+            FlowRunService.ValidateInput(stored.Value.Definition.InputSchema, invocation.Arguments, invocation.ExecutionContext?.SecretInputs);
         }
         catch (FlowValidationException exception)
         {

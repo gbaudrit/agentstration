@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
@@ -5,7 +6,10 @@ using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows;
 
-public sealed record FlowRunError(string Code, string Message, string? Details = null);
+public sealed record FlowRunError(string Code, string Message, string? Details = null)
+{
+    public FlowFailureOrigin? Origin { get; init; }
+}
 public sealed record FlowRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
@@ -117,9 +121,13 @@ public sealed record FlowToolRouteResolution(
     ResourceNamespace ProviderNamespace);
 public sealed record FlowStepRun
 {
+    public FlowProcessAdmission? Process { get; init; }
     public required string StepName { get; init; }
     public required string StepType { get; init; }
     public FlowStepRunStatus Status { get; init; } = FlowStepRunStatus.NotStarted;
+    public InvocationDataContracts? Contracts { get; init; }
+    public IReadOnlyList<InvocationDataContracts> ArtifactContracts { get; init; } = [];
+    public bool MoreArtifactContracts { get; init; }
     public JsonElement? DeclaredInput { get; init; }
     public JsonElement? ResolvedInput { get; init; }
     public JsonElement? Output { get; init; }
@@ -145,6 +153,9 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public FlowProcessRunOrigin? ProcessOrigin { get; init; }
+    public IReadOnlyList<string>? ReservedDescendantRunIds { get; init; }
+    public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }
     public bool TransientPayloads { get; init; }
     public string? TransientPayloadTicket { get; init; }
     [JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
@@ -177,6 +188,7 @@ public sealed record FlowRun
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }
+    public InvocationDataContracts? ContractContext { get; init; }
     public required FlowRunScope Scope { get; init; }
     public ResourceScopeRef ExecutionScopeRef => Scope.ScopeRef;
     public required JsonElement Input { get; init; }

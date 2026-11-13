@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Agentstration.Flows;
@@ -27,9 +28,22 @@ public sealed class RuntimeWorkerOperationGateway(
     FlowRunService flowRuns,
     TimeProvider timeProvider,
     IRequestContextScopeFactory requestScopes,
-    ILogger<RuntimeWorkerOperationGateway> logger) : IRuntimeWorkerOperationGateway
+    ILogger<RuntimeWorkerOperationGateway> logger,
+    Agentstration.Infrastructure.Artifacts.ArtifactProcessingService? artifactProcessing = null) : IRuntimeWorkerOperationGateway
 {
+    private static readonly JsonSerializerOptions ProcessJson = new(JsonSerializerDefaults.Web);
     private const string ArtifactRuntimeType = "awp-artifact-v1";
+
+    public async Task<JsonElement> ProcessArtifactAsync(ResourceScopeRef executionScopeRef, Agentstration.Resources.WorkspaceId workspaceId,
+        string flowRunId, string stepDefinitionId, int index, string action, JsonElement arguments, CancellationToken cancellationToken)
+    {
+        var (run, step) = await GetFlowStepAsync(executionScopeRef, flowRunId, stepDefinitionId, cancellationToken);
+        if (run.WorkspaceId != workspaceId || step is not ArtifactTransformFlowStepDefinition processing)
+            throw new RuntimeGovernedOperationException("artifact_processing_scope_invalid", "Artifact processing requires its owning Flow step.");
+        using var requestScope = EnterScope(run.Scope);
+        return await (artifactProcessing ?? throw new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."))
+            .ExecuteOwnerAsync(run, processing, index, action, arguments, cancellationToken);
+    }
 
     public async Task<RuntimeGovernedModelResponse> InvokeModelAsync(
         RuntimeGovernedModelRequest request,
@@ -88,6 +102,14 @@ public sealed class RuntimeWorkerOperationGateway(
             : EnterScope(request.ExecutionScopeRef, request.TenantId, request.PrincipalId);
         try
         {
+            if (request.Tool.ProviderId == RuntimeArtifactProcessingTools.Provider)
+            {
+                var run = (await flowRunRepository.GetRunExactAsync(request.ExecutionScopeRef, request.RunId, cancellationToken))?.Value
+                    ?? throw new RuntimeGovernedOperationException("artifact_processing_scope_invalid", "The processing Flow is unavailable.");
+                using var artifactScope = EnterScope(run.Scope);
+                return await (artifactProcessing ?? throw new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."))
+                    .ExecuteToolAsync(run, request.Tool.ExternalId!, request.Arguments ?? JsonSerializer.SerializeToElement(new { }), cancellationToken);
+            }
             return await toolExecution.ExecuteAsync(new ToolExecutionContext
             {
                 OwnerKind = request.StepExecutionId is null ? ToolExecutionOwnerKind.RuntimeRun : ToolExecutionOwnerKind.FlowRun,
@@ -202,6 +224,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 resolvedRoute)
             { SecretInputs = run.SecretInputs, TransientPayloads = run.TransientPayloads }, cancellationToken);
         }
+        catch (FlowValidationException exception)
+        { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.ContractFailure }; }
         catch (ToolDefinitionInvocationException exception)
         {
             logger.LogWarning("Governed Flow Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, FlowRun {FlowRunId}, Step {StepDefinitionId}, Attempt {StepAttempt}",
@@ -309,17 +333,50 @@ public sealed class RuntimeWorkerOperationGateway(
         JsonElement input,
         string purpose,
         int? iteration,
+        CancellationToken cancellationToken) => await AdmitProcessUnitAsync(executionScopeRef, workspaceId, parentRunId,
+            stepDefinitionId, Guid.Empty, input, purpose, iteration, null, cancellationToken);
+
+    public async Task CloseProcessAsync(ResourceScopeRef scope, string ownerRunId, string stepName, CancellationToken token)
+    {
+        try { await flowRuns.CloseProcessAdmissionExactAsync(scope, ownerRunId, stepName, token); }
+        catch (FlowValidationException exception) { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception); }
+    }
+
+    public async Task<RuntimeGovernedChildFlow> AdmitProcessUnitAsync(ResourceScopeRef executionScopeRef,
+        Agentstration.Resources.WorkspaceId workspaceId, string parentRunId, string stepDefinitionId,
+        Guid stepExecutionId, JsonElement input, string purpose, int? iteration, RuntimeProcessUnit? unit,
         CancellationToken cancellationToken)
     {
         try
         {
+            InvocationDataContracts? contracts = null;
+            if (purpose is "artifactProcessing" or "process" && iteration is { } index)
+            {
+                var (owner, definition) = await GetFlowStepAsync(executionScopeRef, parentRunId, stepDefinitionId, cancellationToken);
+                using var context = EnterScope(owner.Scope);
+                if (definition is ArtifactTransformFlowStepDefinition processing)
+                    contracts = await artifactProcessing!.ContractsAsync(owner, processing, index, cancellationToken);
+            }
             var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
-                stepDefinitionId, input, purpose, iteration, cancellationToken);
-            return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone());
+                stepDefinitionId, input, purpose, iteration, cancellationToken, contracts,
+                unit is null ? null : new(unit.Key, unit.Ordinal, unit.Descriptor, unit.TotalUnits), stepExecutionId == Guid.Empty ? null : stepExecutionId);
+            return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone())
+            {
+                FlowId = child.Value.FlowId.Value, FlowNamespace = child.Value.FlowId.Namespace.Value,
+                FlowVersion = child.Value.FlowVersion,
+                OutputName = child.Value.OutputName, Outcome = child.Value.Status == FlowRunStatus.Succeeded ? "success" : "error",
+                ErrorCode = child.Value.Error?.Code, ErrorMessage = child.Value.Error?.Message, ErrorDetails = child.Value.Error?.Details,
+                ErrorOrigin = child.Value.Error?.Origin is { } origin ? JsonSerializer.SerializeToElement(origin, ProcessJson) : null
+            };
         }
         catch (FlowValidationException exception)
         {
-            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception);
+            throw new RuntimeGovernedOperationException(exception.Code, $"Child Flow input at step '{stepDefinitionId}' of run '{parentRunId}' was rejected: {exception.Message}", exception)
+            { ContractFailure = exception.ContractFailure is { } failure ? failure with { FlowRunId = parentRunId, StepName = stepDefinitionId } : null };
+        }
+        catch (DataContractException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.Failure };
         }
     }
 

@@ -14,6 +14,45 @@ namespace Agentstration.Web.Tests;
 public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
+    public void OverviewDescribesTheOrderedInputTransformationsInsteadOfAnIdentityTransformation()
+    {
+        var source = ProjectedSource();
+        var original = source.Definition.DataSources[0];
+        source = source with { Definition = source.Definition with { DataSources = [original with { Transformations = [
+            new() { Flow = new("redact", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) },
+            new() { Flow = new("verify", FlowCallVersionStrategy.Exact, "1.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) }] }] } };
+        using var context = CreateContext(new KnowledgeClientStub(source));
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
+        rendered.WaitForAssertion(() => Assert.Contains("default/redact:2.0.0 → default/verify:1.0.0", rendered.Find("tbody").TextContent));
+    }
+
+    [TestMethod]
+    public void ReopeningASequenceSelectsItsSavedVersionRatherThanTheFirstCatalogEntry()
+    {
+        using var context = CreateContext(new KnowledgeClientStub());
+        var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = ManifestValueSchema, parameters = new { type = "object" } } });
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { TransformationVersions = ["1.0.0", "2.0.0"],
+            SequenceGraph = new() { EntryStep = "input", InputSchema = input, OutputSchema = ManifestValueSchema } });
+        var call = new FlowCompositionCall { Flow = new("artifact-transform-builtin", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) };
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var rendered = context.Render<FlowSequenceEditor>(parameters => parameters.Add(value => value.Value, [call]));
+            var selected = rendered.Find("[data-testid=flow-sequence-target] option[selected]");
+            Assert.EndsWith("|2.0.0", selected.GetAttribute("value"));
+            Assert.AreEqual("2.0.0", selected.TextContent);
+            Assert.HasCount(1, rendered.FindAll("[data-testid=flow-sequence-flow] option"));
+            var link = rendered.Find("[data-testid=flow-sequence-open]");
+            Assert.AreEqual("_blank", link.GetAttribute("target"));
+            Assert.Contains("/designer?version=2.0.0&scopeRef=%2Fworkspaces%2F", link.GetAttribute("href")!);
+            rendered.Find("[data-testid=flow-sequence-search]").Input("missing name");
+            Assert.HasCount(1, rendered.FindAll("[data-testid=flow-sequence-flow] option"));
+            rendered.Find("[data-testid=flow-sequence-refresh]").Click();
+            Assert.EndsWith("|2.0.0", rendered.Find("[data-testid=flow-sequence-target] option[selected]").GetAttribute("value"));
+            rendered.Dispose();
+        }
+    }
+
+    [TestMethod]
     [DataRow("en-US", "No published transformation Flow", "Create a transformation Flow")]
     [DataRow("fr-FR", "Aucun Flow de transformation publié", "Créer un flow de transformation")]
     public void EmptyTransformationCatalogExplainsCreationAndHonorsReadOnly(string locale, string empty, string create)
@@ -47,7 +86,7 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.IsFalse(rendered.Find("[data-testid='flow-sequence-add']").HasAttribute("disabled"));
         rendered.Find("[data-testid='flow-sequence-add']").Click();
         rendered.Render(parameters => parameters.Add(value => value.Value, calls));
-        StringAssert.Contains(rendered.Find("[data-testid='flow-sequence-target']").TextContent, "artifact-transform-builtin");
+        StringAssert.Contains(rendered.Find("[data-testid='flow-sequence-flow']").TextContent, "artifact-transform-builtin");
     }
 
     [TestMethod]

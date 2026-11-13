@@ -177,4 +177,10 @@
   <data name="SequenceCreated" xml:space="preserve"><value>Brouillon créé. Après sa publication dans le Designer, actualisez les Flows pour l’ajouter à la séquence.</value></data>
   <data name="SequenceCreateFailed" xml:space="preserve"><value>Le brouillon n’a pas pu être créé. Vérifiez le nom, le contexte et les droits de création des Flows, puis réessayez.</value></data>
   <data name="SequenceClose" xml:space="preserve"><value>Fermer</value></data>
+  <data name="SequenceSearchFlow" xml:space="preserve"><value>Rechercher un Flow</value></data>
+  <data name="SequenceResource" xml:space="preserve"><value>Flow</value></data>
+  <data name="SequenceVersion" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="SequenceOpenVersion" xml:space="preserve"><value>Ouvrir cette version du Flow</value></data>
+  <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations avant publication</value></data>
+  <data name="BeforePublicationHelp" xml:space="preserve"><value>Ces transformations traitent les résultats réunis de toutes les sources d’entrée, avant la création et la publication du Snapshot.</value></data>
 </root>

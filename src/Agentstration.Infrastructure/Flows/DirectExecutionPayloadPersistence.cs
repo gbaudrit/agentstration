@@ -80,6 +80,30 @@ public sealed class DirectExecutionPayloadPersistence(TimeProvider clock)
             ? hot with { TransientPayloadTicket = assignment.TransientPayloadTicket, TransientPayloadsAvailable = true }
             : assignment with { TransientPayloadsAvailable = false };
 
+    // Mutable processing drafts share the direct handoff's admission budget. A failed
+    // replacement preserves the accepted revision; live entries are never evicted.
+    internal void StoreProcessing<T>(ResourceScopeRef scope, string id, T value, DateTimeOffset expires) where T : class
+    {
+        var size = JsonSerializer.SerializeToUtf8Bytes(value, Json).LongLength;
+        var key = Key(scope, "artifact-processing", id, "current");
+        lock (gate)
+        {
+            var now = clock.GetUtcNow();
+            foreach (var expired in values.Where(pair => pair.Value.Expires <= now).Select(pair => pair.Key).ToArray()) values.Remove(expired);
+            if (expires <= now) throw new FlowValidationException("direct_content_unavailable", "The ephemeral execution payload has expired.");
+            values.TryGetValue(key, out var previous);
+            var oldSize = previous?.Bytes ?? 0;
+            if (previous is null && values.Count >= MaximumEntries
+                || values.Values.Sum(entry => entry.Bytes) - oldSize + size > MaximumBytes
+                || values.Values.Where(entry => entry.Scope == scope).Sum(entry => entry.Bytes) - oldSize + size > MaximumWorkspaceBytes)
+                throw new FlowValidationException("direct_content_capacity", "The ephemeral execution payload capacity has been reached.");
+            values[key] = new(scope, value, size, expires);
+        }
+    }
+
+    internal T? GetProcessing<T>(ResourceScopeRef scope, string id) where T : class =>
+        Find<T>(scope, "artifact-processing", id, "current");
+
     private string Save<T>(ResourceScopeRef scope, string family, string id, T value, DateTimeOffset expires) where T : class
     {
         var size = JsonSerializer.SerializeToUtf8Bytes(value, Json).LongLength;

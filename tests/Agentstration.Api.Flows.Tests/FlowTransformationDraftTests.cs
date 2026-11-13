@@ -27,7 +27,7 @@ public sealed partial class FlowTests
         var published = await drafts.PublishExactAsync(TestScope.WorkspaceId, ResourceScopeRef.Instance, new("created-transformation"), "1.0.0", null, true, default);
         var publishedGraph = published.Value.Graph!;
         Assert.IsTrue(JsonElement.DeepEquals(graph.InputSchema.Value, publishedGraph.ResolveInputSchema()!.Value));
-        Assert.AreEqual("${steps.transform.output}", publishedGraph.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome == FlowOutputOutcome.Success).OutputMapping?.GetString());
+        Assert.AreEqual("${transition.output}", publishedGraph.Steps.OfType<OutputFlowStepDefinition>().Single(step => step.Outcome == FlowOutputOutcome.Success).OutputMapping?.GetString());
     }
 
     [TestMethod]

@@ -24,12 +24,14 @@ public partial class FlowDesigner
         FlowStepDefinition step = type switch
         {
             "input" => new InputFlowStepDefinition { Name = name, DisplayName = "Input" },
-            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = defaultAgent?.DisplayName ?? T("Step.agent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "agent" => new AgentFlowStepDefinition { Name = name, DisplayName = T("CallAgent"), Agent = defaultAgent is null ? new(UnconfiguredAgent) : AgentReference(defaultAgent), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "flow" => new FlowCallStepDefinition { Name = name, DisplayName = "Flow", Flow = DefaultFlowReference(), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "tool" => new ToolFlowStepDefinition { Name = name, DisplayName = T("Step.tool"), Tool = DefaultToolReference(), ArgumentsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "composition" => new FlowCompositionPointStepDefinition { Name = name, Point = name, DisplayName = T("Step.composition"), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "artifactTransform" => new ArtifactTransformFlowStepDefinition { Name = name, DisplayName = T("Step.artifactTransform"),
+                ArtifactsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported Flow step type.")
@@ -42,7 +44,7 @@ public partial class FlowDesigner
         }
         var errorEvent = step switch
         {
-            AgentFlowStepDefinition or ToolFlowStepDefinition => "error",
+            AgentFlowStepDefinition or ToolFlowStepDefinition or ArtifactTransformFlowStepDefinition => "error",
             FlowCallStepDefinition selectedCall => ResolveFlowVersion(selectedCall, callVersions ?? [])?.NamedOutputs
                 .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name,
             _ => null
@@ -101,10 +103,10 @@ public partial class FlowDesigner
         if (SelectedStep is not AgentFlowStepDefinition step) return Task.CompletedTask;
         var value = Text(e);
         if (value == "${steps.route-request.output.selectedAgent}")
-            return UpdateSelectedAsync(step with { Agent = new(value), DisplayName = T("RouterOutput") });
+            return UpdateSelectedAsync(step with { Agent = new(value) });
         if (!TryParseFlowKey(value, out var target)) return Task.CompletedTask;
         var selected = agents.FirstOrDefault(agent => ResourceKey(agent.ScopeRef, agent.Namespace, agent.Name) == ResourceKey(target.ScopeRef, target.Namespace, target.Name));
-        return selected is null ? Task.CompletedTask : UpdateSelectedAsync(step with { Agent = AgentReference(selected), DisplayName = selected.DisplayName });
+        return selected is null ? Task.CompletedTask : UpdateSelectedAsync(step with { Agent = AgentReference(selected) });
     }
     private async Task UpdateFlowTargetAsync(ChangeEventArgs e)
     {

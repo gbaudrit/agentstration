@@ -37,6 +37,29 @@ public sealed class ArtifactAdministrationComponentTests
             staged.Find("[data-testid=staged-artifact-download]").GetAttribute("href")!));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Input Artifact", "Processing execution")]
+    [DataRow("fr-FR", "Artefact d’entrée", "Exécution du traitement")]
+    public void TransformedArtifactsLinkTheirExactInputAndProcessingRun(string language, string inputLabel, string processingLabel)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        var client = new ArtifactClient("redacted");
+        var inputId = Guid.NewGuid().ToString("N");
+        client.Durable = client.Durable with { Receipt = client.Durable.Receipt with { StorageFlowRunId = string.Empty,
+            Provenance = new Dictionary<string, string> { ["inputArtifactId"] = inputId, ["inputArtifactKind"] = "durable",
+                ["processingRunId"] = "flowrun-processing", ["inputSha256"] = new string('a', 64) } } };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        rendered.WaitForAssertion(() => Assert.Contains(inputLabel, rendered.Markup));
+        Assert.Contains(processingLabel, rendered.Markup);
+        Assert.AreEqual("/artifacts/durable/" + inputId, rendered.Find("[data-testid='artifact-transformation-input']").GetAttribute("href"));
+        Assert.AreEqual("/flow-runs/flowrun-processing", rendered.Find("[data-testid='artifact-processing-run']").GetAttribute("href"));
+    }
+
     private sealed class ArtifactNavigationContext(string scopeRef) : IConsoleNavigationContext
     {
         public string? ScopeRef => scopeRef;
@@ -378,6 +401,8 @@ public sealed class ArtifactAdministrationComponentTests
         public StagedArtifactView Artifact { get; }
         public FlowRunArtifactResource Durable { get; set; }
         public int ContentReadCount { get; private set; }
+        public IReadOnlyList<FlowRunArtifactResource>? DurableCatalog { get; set; }
+        public bool RejectDurableCatalog { get; set; }
         public bool HasLocalCopy { get; set; } = true;
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
@@ -408,7 +433,7 @@ public sealed class ArtifactAdministrationComponentTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>([Durable]);
+            RejectDurableCatalog ? throw new HttpRequestException("Catalogue unavailable") : Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>(DurableCatalog ?? [Durable]);
 
         public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default) =>
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);

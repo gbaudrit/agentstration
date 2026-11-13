@@ -34,7 +34,9 @@ from replacing a committed record's cached payload.
 
 A cold process or expired receipt cannot resume direct content or silently replay
 its Operation. Accepted work fails and the caller may explicitly start another
-attempt. Intermediate Artifact capture is refused. Tool arguments and sensitive
+attempt. Intermediate Artifact capture is refused. ADR-0213 permits execution-owned
+in-memory processing drafts under the same bounded cache and lifetime; only the
+final published Snapshot materializes their output. Tool arguments and sensitive
 errors are excluded from durable diagnostics. Ordinary composed child Flows inherit
 the marker. Flow-backed Tool Definitions are refused in direct execution until
 their WorkItem boundary supports transient payloads; they must not persist an

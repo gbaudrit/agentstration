@@ -14,7 +14,8 @@ public interface IInstanceInitializationCoordinator
 public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
-    public int TargetVersion { get; set; } = 3;
+    // Reconcile internal Tool contracts together with current staging ToolSet pins and bindings.
+    public int TargetVersion { get; set; } = 5;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

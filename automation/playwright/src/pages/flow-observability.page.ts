@@ -65,6 +65,23 @@ export class FlowObservabilityPage {
     await expect(split.locator('.flow-node')).toHaveCount(3);
   }
 
+  public async inspectCausalOutputs(): Promise<void> {
+    await this.page.getByRole('tab', { name: 'Causality', exact: true }).click();
+    const tree = this.page.locator('.causality-tree');
+    await expect(tree.locator('.causality-node').first()).toBeVisible();
+    const link = tree.locator('.causality-meta a[href^="/flow-runs/"]').first();
+    await expect(link).toHaveAttribute('href', /scopeRef=/);
+    const toggle = tree.getByTestId(TestIds.flowObservability.causalOutputToggle).first();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.output)).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await link.click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
+    await this.page.getByRole('tab', { name: 'Summary', exact: true }).click();
+    await expect(this.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
+  }
+
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
     const openRun = this.page.getByTestId(TestIds.flowObservability.runOpen);

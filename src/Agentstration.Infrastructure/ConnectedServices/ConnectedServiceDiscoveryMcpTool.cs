@@ -127,6 +127,17 @@ public sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryEx
             },
             required = new[] { "discoveryId", "discoveryNamespace" },
             additionalProperties = false
+        }), JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                contract = new { type = "string", @enum = new[] { ConnectedServiceOperationDiscoveryContracts.V1 } },
+                operations = new { type = "array", items = new { type = "object" } },
+                diagnostics = new { type = "array", items = new { type = "object" } }
+            },
+            required = new[] { "contract", "operations", "diagnostics" },
+            additionalProperties = false
         }), ExposeThroughMcp: false);
 
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>

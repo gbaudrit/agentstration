@@ -1,5 +1,6 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Schemas/Agentstration.Schemas.csproj" />
     <ProjectReference Include="../../src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
     <ProjectReference Include="../../src/Agentstration.Console.Components/Agentstration.Console.Components.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />

@@ -354,7 +354,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                     Name = "persist",
                     DisplayName = "Persist acquired content",
                     Flow = new(ArtifactPlatformResourceProvisioner.StorageWriteFlowName,
-                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion,
+                        FlowCallVersionStrategy.Exact, ArtifactPlatformResourceProvisioner.StorageFlowVersion,
                         ScopeRef: scope),
                     InputMapping = JsonSerializer.SerializeToElement(new
                     {
@@ -516,6 +516,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             nodes.Add(new FlowCompositionPointStepDefinition
             {
                 Name = sequence,
+                DisplayName = sequence == "postAggregate" ? "Transform before publication" : "Transformations",
                 Point = sequence,
                 AllowEmpty = true,
                 InputSchema = result,

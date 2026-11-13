@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
 
@@ -143,6 +144,7 @@ public sealed record StagedArtifactResource : Resource
 
 public sealed record ArtifactStorageReceipt
 {
+    public ResolvedDataContract? DataContract { get; init; }
     public ArtifactStorageMaterialization? Materialization { get; init; }
     public required string StorageFlowRunId { get; init; }
     public required string OpaqueReference { get; init; }
