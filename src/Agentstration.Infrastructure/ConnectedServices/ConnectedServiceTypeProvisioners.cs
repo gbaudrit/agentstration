@@ -10,12 +10,14 @@ using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
 
-public sealed class ConnectedServicePlatformResourceProvisioner(
+public sealed partial class ConnectedServicePlatformResourceProvisioner(
     ConnectedServiceTypeManagementService types,
+    ConnectedServiceOperationTypeManagementService operationTypes,
+    FlowService flows,
     IResourceGovernanceContext governance)
 {
     public const string HttpTypeName = "http-endpoint";
-    public const string HttpTypeVersion = "1.0.0";
+    public const string HttpTypeVersion = "1.1.0";
     private static readonly JsonElement HttpSchema = JsonSerializer.SerializeToElement(new
     {
         type = "object",
@@ -26,6 +28,38 @@ public sealed class ConnectedServicePlatformResourceProvisioner(
     {
         using var governanceScope = governance.Push(
             ResourceGovernance.Core("connected-services.http", HttpTypeVersion));
+        var discoveryFlow = await EnsureHttpFlowAsync(true, cancellationToken);
+        var acquisitionFlow = await EnsureHttpFlowAsync(false, cancellationToken);
+        var existingOperation = await operationTypes.GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, BuiltinHttpOperation.TypeName, cancellationToken);
+        var existingService = await types.GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, HttpTypeName, cancellationToken);
+        var operationType = (await operationTypes.SynchronizeManagedAsync(new ConnectedServiceOperationTypeResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedServiceOperationType,
+            Metadata = new() { Name = BuiltinHttpOperation.TypeName },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new()
+            {
+                DisplayName = "HTTP GET operation",
+                PreferredVersion = BuiltinHttpOperation.Version,
+                UsePolicy = existingOperation?.Value.Definition.UsePolicy ?? new(),
+                Versions = [new(BuiltinHttpOperation.Version, AepSchemaDigest.Compute(BuiltinHttpOperation.DefinitionSchema),
+                    BuiltinHttpOperation.DefinitionSchema, ConnectedServiceOperationInteraction.RequestResponse,
+                    new(BuiltinHttpOperation.ProviderOperationId, "1.0")) { Acquisition = new(acquisitionFlow) }]
+            }
+        }, cancellationToken)).Value;
+        var operationVersion = operationType.Definition.Versions.Single();
+        var discovery = new ConnectedServiceOperationDiscoveryDescriptor
+        {
+            Flow = discoveryFlow,
+            ProducedTypes = [new()
+            {
+                Type = new(operationType.Name, ResourceScopeRef.Instance, operationType.Namespace),
+                TypeUid = operationType.Uid, Version = operationVersion.Version, SchemaDigest = operationVersion.SchemaDigest
+            }]
+        };
         _ = await types.SynchronizeManagedAsync(new ConnectedServiceTypeResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -44,8 +78,19 @@ public sealed class ConnectedServicePlatformResourceProvisioner(
                 DisplayName = "HTTP endpoint",
                 Description = "A remote HTTP system identified by an exact base URL.",
                 PreferredVersion = HttpTypeVersion,
+                UsePolicy = existingService?.Value.Definition.UsePolicy ?? new(),
                 Versions =
                 [
+                    new(
+                        "1.0.0",
+                        AepSchemaDigest.Compute(HttpSchema),
+                        HttpSchema,
+                        [new("baseUrl", true, ConnectedServiceValueType.Text,
+                            ConnectedServiceValueProtection.Standard, "uri",
+                            "The absolute base URL of the remote HTTP system.")],
+                        [new("baseUrl", ConnectedServiceValueType.Text,
+                            ConnectedServiceValueProtection.Standard, "uri",
+                            "The absolute base URL of the remote HTTP system.", "baseUrl")]),
                     new(
                         HttpTypeVersion,
                         AepSchemaDigest.Compute(HttpSchema),
@@ -55,7 +100,7 @@ public sealed class ConnectedServicePlatformResourceProvisioner(
                             "The absolute base URL of the remote HTTP system.")],
                         [new("baseUrl", ConnectedServiceValueType.Text,
                             ConnectedServiceValueProtection.Standard, "uri",
-                            "The absolute base URL of the remote HTTP system.", "baseUrl")])
+                            "The absolute base URL of the remote HTTP system.", "baseUrl")]) { OperationDiscovery = discovery }
                 ]
             }
         }, cancellationToken);

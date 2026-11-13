@@ -17,6 +17,52 @@ They may be:
 The builtin `http-endpoint` type is Instance-scoped and Core-owned. Its required
 standard `baseUrl` input is also exposed as a standard `baseUrl` export.
 
+### Discover a GET operation from an HTTP URL
+
+The preferred builtin version, `http-endpoint@1.1.0`, supports discovery without an
+OpenAPI contract or an extension. Set `baseUrl` to a complete example request URL:
+
+```text
+https://news.google.com/rss/search?q=Nantes+when:1d&hl=fr&gl=FR&ceid=FR:fr
+```
+
+Run discovery in the Connected Service's **Discovery** section. It performs no
+network request and proposes one `GET /rss/search` operation with query inputs
+`q`, `hl`, `gl`, and `ceid`. These inputs are optional strings. The example values
+are discarded from the operation; `when:1d` remains part of the example `q` value
+and is not a separate input.
+
+Explicitly enable the operation, then select it in a Data Source and configure
+its acquisition parameters independently, for example:
+
+```json
+{ "q": "Rennes when:1d", "hl": "fr", "gl": "FR", "ceid": "FR:fr" }
+```
+
+Another Data Source can select the same operation with different values. An empty
+input object sends no query parameters; it never reuses the example values. Empty
+string values produce `name=`. Names and values are encoded separately, including
+spaces, plus signs, ampersands and Unicode. Repeated decoded parameter names are
+refused rather than merged. URLs without query parameters produce empty-input
+operations. Fragments and credentials in URLs are refused.
+
+Acquisition uses the existing public HTTP(S) transport with no redirects, a
+20-second timeout and a 48 KiB body limit. Supported UTF-8 text media types include
+JSON, XML, RSS, Atom, HTML, Markdown and plain text. Its JSON result contains
+`mediaType` and `content`; the existing 64 KiB serialized result limit also applies.
+RSS contents are not parsed into articles by discovery or this acquisition adapter.
+Knowledge Sources continue to consume Data Sources through their existing flows.
+
+The original `http-endpoint@1.0.0` remains unchanged and has no operation discovery.
+Existing services keep their exact version pin. To adopt discovery, explicitly
+select `1.1.0` through the service API (or create a new service using the preferred
+version), then rediscover and configure consumers. Updating a bound Parameter to
+a different endpoint or query structure requires explicit rediscovery and consumer
+reconciliation; historical operations are never silently redirected. Existing
+scope/use permissions still apply; provisioning creates no additional grants.
+
+See [ADR-0219](../decisions/0219-builtin-http-discovery-derives-request-shape-from-example-urls.md).
+
 Every type publishes a preferred version and an additive set of immutable versions.
 A version contains a JSON configuration schema and digest, typed `standard` or
 `secured` inputs, and typed exports. Mutable metadata, enablement and use policy can

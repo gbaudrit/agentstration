@@ -146,4 +146,6 @@
   <data name="Discovery.State.Failed" xml:space="preserve"><value>Failed</value></data>
   <data name="Discovery.State.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="Discovery.State.TimedOut" xml:space="preserve"><value>Timed out</value></data>
+  <data name="Http.DiscoveryHelp"><value>The HTTP URL is an example used to discover one GET operation and its query parameters. Discovery sends no request. Example values are discarded; configure acquisition values independently on each Data Source. Repeated query parameter names are not supported.</value></data>
+  <data name="Http.SampleUrlHelp"><value>Enter the complete example HTTP(S) request URL, including its query parameters. Their values are used only as examples and are not copied to the operation or Data Source.</value></data>
 </root>
