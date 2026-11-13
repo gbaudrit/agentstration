@@ -3,6 +3,14 @@
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
+    <label>@T("TransformProcessing")<select data-testid="transform-process-mode" disabled="@ReadOnly" value="@(Step.Processing?.Partition.ToString() ?? "None")" @onchange="ProcessChangedAsync"><option value="None">@T("TransformProcessing.None")</option><option value="Batches">@T("TransformProcessing.Batches")</option><option value="TextChunks">@T("TransformProcessing.TextChunks")</option></select></label>
+    @if (Step.Processing is { } processing)
+    {
+        <p class="muted">@T("TransformProcessing.Help")</p>
+        <label>@T("TransformProcessing.UnitSize")<input type="number" min="1" max="65536" disabled="@ReadOnly" value="@processing.UnitSize" @onchange="e => ProcessLimitAsync(e, 0)" /></label>
+        <label>@T("TransformProcessing.MaximumUnits")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@processing.MaximumUnits" @onchange="e => ProcessLimitAsync(e, 1)" /></label>
+        <label>@T("ProcessConcurrency")<input type="number" min="1" max="16" disabled="@ReadOnly" value="@processing.MaximumConcurrency" @onchange="e => ProcessLimitAsync(e, 2)" /></label>
+    }
     <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
@@ -34,6 +42,7 @@
     [Parameter, EditorRequired] public TransformFlowStepDefinition Step { get; set; } = default!;
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
     [Parameter] public JsonElement? EffectiveIncomingSchema { get; set; }
     [Parameter] public string IncomingContractUnavailableText { get; set; } = string.Empty;
     [Parameter] public IReadOnlyList<FlowDesignerSchemaVersion> SchemaVersions { get; set; } = [];
@@ -42,5 +51,11 @@
     [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaDefinitionAsync { get; set; }
     [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaInstanceAsync { get; set; }
 
+    private Task ProcessChangedAsync(ChangeEventArgs args) => Enum.TryParse<FlowProcessPartition>(args.Value?.ToString(), out var mode)
+        ? Changed.InvokeAsync(Step with { Processing = (Step.Processing ?? new()) with { Partition = mode } })
+        : Changed.InvokeAsync(Step with { Processing = null });
+    private Task ProcessLimitAsync(ChangeEventArgs args, int field) => int.TryParse(args.Value?.ToString(), out var value) && Step.Processing is { } process
+        ? Changed.InvokeAsync(Step with { Processing = field switch { 0 => process with { UnitSize = value }, 1 => process with { MaximumUnits = value }, _ => process with { MaximumConcurrency = value } } })
+        : Task.CompletedTask;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 }

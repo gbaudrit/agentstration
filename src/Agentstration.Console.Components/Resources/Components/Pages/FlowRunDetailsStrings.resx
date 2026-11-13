@@ -197,4 +197,124 @@
   <data name="GovernanceEvaluations"><value>Governance ({0})</value></data>
   <data name="Error.ModelOutputTokenLimit"><value>The model reached its generation token limit without producing a final answer. Increase the output token budget or review the reasoning settings.</value></data>
   <data name="Error.ModelEmptyResponse"><value>The model completed without producing a final answer. Review the model response and generation settings.</value></data>
+  <data name="OutputRefresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="TransientOutputUnavailable" xml:space="preserve"><value>The temporary content of this direct execution is no longer available. Retained Artifacts remain accessible through their links.</value></data>
+  <data name="NoReturnedOutput" xml:space="preserve"><value>The Flow returned no output value.</value></data>
+  <data name="NoReturnedOutputHelp" xml:space="preserve"><value>Check the final Output step mapping to return the connected result. Produced Artifacts are listed below independently.</value></data>
+  <data name="ProducedArtifacts" xml:space="preserve"><value>Output Artifacts</value></data>
+  <data name="ProducedArtifactsLoading" xml:space="preserve"><value>Loading produced Artifacts…</value></data>
+  <data name="ProducedArtifactsUnavailable" xml:space="preserve"><value>Produced Artifacts could not be loaded. Try refreshing.</value></data>
+  <data name="NoProducedArtifacts" xml:space="preserve"><value>No retained Artifact is associated with this execution.</value></data>
+  <data name="OutputBytes" xml:space="preserve"><value>{0} bytes</value></data>
+  <data name="Error.ArtifactOutputJsonInvalid" xml:space="preserve"><value>The transformation produced content that is not valid JSON, while the output media type requires JSON (application/json or +json). Ask the Agent or processing Flow to return valid JSON without Markdown fences or surrounding text. If you want plain text, set the output media type to text/plain, publish the updated transformation Flow and select its new version in the Knowledge Source.</value></data>
+  <data name="Error.ArtifactInputJsonInvalid" xml:space="preserve"><value>The input Artifact declares a JSON media type, but its content is not valid JSON. Correct the source content or its media type, then retry the transformation.</value></data>
+  <data name="ContractFailureHelp" xml:space="preserve"><value>The value does not satisfy the contract at this boundary. Correct the output format, mapping or declared schema, then start a new execution.</value></data>
+  <data name="ContractBoundary" xml:space="preserve"><value>Boundary</value></data>
+  <data name="ContractPath" xml:space="preserve"><value>Data path</value></data>
+  <data name="ContractExpected" xml:space="preserve"><value>Expected</value></data>
+  <data name="ContractActual" xml:space="preserve"><value>Received type or format</value></data>
+  <data name="ContractRule" xml:space="preserve"><value>Validation rule</value></data>
+  <data name="ContractOrigin" xml:space="preserve"><value>Contract origin</value></data>
+  <data name="ContractSourceRun" xml:space="preserve"><value>Originating execution / step</value></data>
+  <data name="EffectiveContracts" xml:space="preserve"><value>Effective port contracts</value></data>
+  <data name="EffectiveContractsHelp" xml:space="preserve"><value>Concrete contracts used for this execution. These schemas describe the envelope or final result; Artifact content has its own data contract.</value></data>
+  <data name="Error.ContractJsonInvalid" xml:space="preserve"><value>The result must be valid JSON. Remove Markdown fences and surrounding explanation, or select a text MIME type when text is expected.</value></data>
+  <data name="Error.ContractUnresolved" xml:space="preserve"><value>The dynamic contract could not be resolved: the selected input or parent has no data contract. Declare a fixed contract or provide the missing contract.</value></data>
+  <data name="Error.ContractViolation" xml:space="preserve"><value>The result does not satisfy the expected schema. See the originating step and validation path below.</value></data>
+  <data name="Error.ContractMediaMismatch" xml:space="preserve"><value>The output MIME type differs from the expected contract. Align the transformation and producer declarations.</value></data>
+  <data name="Error.ContractConflict" xml:space="preserve"><value>The transformation expectation conflicts with the producer’s explicit output contract. The producer contract takes precedence.</value></data>
+  <data name="Error.ToolContractRequired" xml:space="preserve"><value>A Tool called directly by a Flow must declare both input and output schemas. Update the Tool, then publish the Flow again.</value></data>
+  <data name="Error.ToolContractStale" xml:space="preserve"><value>The Tool contract changed after publication. Publish a new Flow version to use the new contract.</value></data>
+  <data name="AdditionalArtifactContracts" xml:space="preserve"><value>Additional distinct content contracts are available on the linked Artifacts. Inspection metadata is bounded to 256 KiB.</value></data>
+  <data name="ContractCode" xml:space="preserve"><value>Originating error code</value></data>
+  <data name="Error.ContractEncodingInvalid" xml:space="preserve"><value>The output content is not valid UTF-8. Encode the text or JSON as UTF-8 before publishing the Artifact.</value></data>
+  <data name="ContractTitle.Format" xml:space="preserve"><value>Format incompatibility</value></data>
+  <data name="ContractTitle.Schema" xml:space="preserve"><value>Data contract incompatibility</value></data>
+  <data name="ContractSummary.Json" xml:space="preserve"><value>A valid JSON result was expected, but the produced content cannot be parsed as JSON.</value></data>
+  <data name="ContractSummary.Encoding" xml:space="preserve"><value>The produced content is not valid UTF-8 text.</value></data>
+  <data name="ContractSummary.Media" xml:space="preserve"><value>The produced media type differs from the expected media type.</value></data>
+  <data name="ContractSummary.Unresolved" xml:space="preserve"><value>The dynamic data contract could not be resolved from the selected input or parent.</value></data>
+  <data name="ContractSummary.Conflict" xml:space="preserve"><value>The transformation expectation conflicts with the producer’s declared output contract.</value></data>
+  <data name="ContractSummary.Schema" xml:space="preserve"><value>The produced value does not satisfy the expected data schema.</value></data>
+  <data name="ContractAdvice.Json" xml:space="preserve"><value>Request JSON without Markdown fences or surrounding explanation. If text is intended, check the output MIME type and result mapping.</value></data>
+  <data name="ContractLevel" xml:space="preserve"><value>Where the incompatibility occurs</value></data>
+  <data name="ContractProducedBy" xml:space="preserve"><value>Result produced by</value></data>
+  <data name="ContractRequiredBy" xml:space="preserve"><value>Contract defined by</value></data>
+  <data name="ContractWholeValue" xml:space="preserve"><value>Entire result</value></data>
+  <data name="ContractLocationUnavailable" xml:space="preserve"><value>Information unavailable</value></data>
+  <data name="ContractTechnicalDetails" xml:space="preserve"><value>Technical details</value></data>
+  <data name="ContractParentCode" xml:space="preserve"><value>Parent Flow error code</value></data>
+  <data name="ContractAgentDeclaration" xml:space="preserve"><value>The Agent’s declared output contract</value></data>
+  <data name="ContractInvocationDeclaration" xml:space="preserve"><value>The effective contract for this invocation</value></data>
+  <data name="ContractPayloadDetails" xml:space="preserve"><value>Input, output and logs</value></data>
+  <data name="ContractValue.Json" xml:space="preserve"><value>Valid JSON</value></data>
+  <data name="ContractValue.InvalidJson" xml:space="preserve"><value>Content that cannot be parsed as JSON</value></data>
+  <data name="ContractValue.String" xml:space="preserve"><value>Text value</value></data>
+  <data name="ContractValue.Object" xml:space="preserve"><value>JSON object</value></data>
+  <data name="ContractValue.Array" xml:space="preserve"><value>JSON array</value></data>
+  <data name="ContractValue.Integer" xml:space="preserve"><value>Integer</value></data>
+  <data name="ContractValue.Number" xml:space="preserve"><value>Number</value></data>
+  <data name="ContractValue.Boolean" xml:space="preserve"><value>Boolean</value></data>
+  <data name="ContractValue.Null" xml:space="preserve"><value>Null value</value></data>
+  <data name="ContractValue.Absent" xml:space="preserve"><value>Missing value</value></data>
+  <data name="ContractValue.Required" xml:space="preserve"><value>Required property</value></data>
+  <data name="ContractValue.DeclaredProperties" xml:space="preserve"><value>Declared properties only</value></data>
+  <data name="ContractValue.ExtraProperty" xml:space="preserve"><value>Undeclared property</value></data>
+  <data name="ContractValue.Utf8" xml:space="preserve"><value>Valid UTF-8 text</value></data>
+  <data name="ContractValue.InvalidUtf8" xml:space="preserve"><value>Invalid UTF-8 encoding</value></data>
+  <data name="ContractLevel.AgentInput" xml:space="preserve"><value>Agent input</value></data>
+  <data name="ContractLevel.AgentOutput" xml:space="preserve"><value>Agent output</value></data>
+  <data name="ContractLevel.ToolInput" xml:space="preserve"><value>Tool input</value></data>
+  <data name="ContractLevel.ToolOutput" xml:space="preserve"><value>Tool output</value></data>
+  <data name="ContractLevel.FlowInput" xml:space="preserve"><value>Child Flow input</value></data>
+  <data name="ContractLevel.FlowOutput" xml:space="preserve"><value>Flow output</value></data>
+  <data name="ContractLevel.ArtifactInput" xml:space="preserve"><value>Input Artifact content</value></data>
+  <data name="ContractLevel.ArtifactOutput" xml:space="preserve"><value>Output Artifact content</value></data>
+  <data name="ContractLevel.Publication" xml:space="preserve"><value>Artifact publication</value></data>
+  <data name="ContractLevel.TransformOutput" xml:space="preserve"><value>Transformation output</value></data>
+  <data name="ContractLevel.Resolution" xml:space="preserve"><value>Contract resolution</value></data>
+  <data name="ContractCorrectionTitle" xml:space="preserve"><value>How to correct it</value></data>
+  <data name="ContractShowDetails" xml:space="preserve"><value>Show incompatibility details</value></data>
+  <data name="ContractHideDetails" xml:space="preserve"><value>Hide incompatibility details</value></data>
+  <data name="OpenExecution" xml:space="preserve"><value>Open execution</value></data>
+  <data name="CausalOutput" xml:space="preserve"><value>Returned value and Artifacts</value></data>
+  <data name="CausalOutputLoading" xml:space="preserve"><value>Loading execution output…</value></data>
+  <data name="CausalOutputUnavailable" xml:space="preserve"><value>This execution output is unavailable in the current scope.</value></data>
+  <data name="OutputNullValue" xml:space="preserve"><value>The returned value is explicitly null.</value></data>
+  <data name="OutputEmptyText" xml:space="preserve"><value>The returned text is empty.</value></data>
+  <data name="CausalFailureOrigin" xml:space="preserve"><value>Original failure</value></data>
+  <data name="CausalFailurePropagated" xml:space="preserve"><value>Failure propagated from</value></data>
+  <data name="OutputPreviewTruncated" xml:space="preserve"><value>Preview limited to {0} characters. Open the execution to inspect its complete output.</value></data>
+  <data name="ContractTitle.Mapping" xml:space="preserve"><value>Unavailable mapping reference</value></data>
+  <data name="ContractSummary.Mapping" xml:space="preserve"><value>The mapping references a step that does not exist in this execution graph.</value></data>
+  <data name="ContractAdvice.Mapping" xml:space="preserve"><value>Check the referenced step identifier. To forward the connected result, use ${transition.output}, or choose an available step output.</value></data>
+  <data name="ContractValue.AvailableStep" xml:space="preserve"><value>Available step output</value></data>
+  <data name="ContractValue.UnavailableStep" xml:space="preserve"><value>Step missing from the execution graph</value></data>
+  <data name="ContractLevel.Mapping" xml:space="preserve"><value>Output mapping</value></data>
+  <data name="FailureTitle.Storage" xml:space="preserve"><value>Artifact storage failed</value></data>
+  <data name="FailureSummary.Storage" xml:space="preserve"><value>The Artifact storage or local copy operation failed. Expand the details to see the cause.</value></data>
+  <data name="FailureTitle.ToolContract" xml:space="preserve"><value>Tool contract unavailable</value></data>
+  <data name="FailureTitle.Execution" xml:space="preserve"><value>Flow execution failed</value></data>
+  <data name="FailureShowDetails" xml:space="preserve"><value>Show error details</value></data>
+  <data name="FailureHideDetails" xml:space="preserve"><value>Hide error details</value></data>
+  <data name="ProcessRun" xml:space="preserve"><value>Process of {0} — Unit {1}</value></data>
+  <data name="SourceFlow" xml:space="preserve"><value>Source Flow</value></data>
+  <data name="ProcessRegion" xml:space="preserve"><value>Process region</value></data>
+  <data name="ProcessOwner" xml:space="preserve"><value>Owning step</value></data>
+  <data name="ProcessUnits" xml:space="preserve"><value>Process units</value></data>
+  <data name="ProcessProgress" xml:space="preserve"><value>{0} completed · {1} admitted</value></data>
+  <data name="ProcessDiscovering" xml:space="preserve"><value>Discovering work units</value></data>
+  <data name="ProcessClosed" xml:space="preserve"><value>Admission closed</value></data>
+  <data name="ProcessEmpty" xml:space="preserve"><value>No work units to process.</value></data>
+  <data name="ProcessUnit" xml:space="preserve"><value>Unit {0}</value></data>
+  <data name="ProcessAdmitted" xml:space="preserve"><value>Admitted</value></data>
+  <data name="ProcessAttempt" xml:space="preserve"><value>Owner attempt {0}</value></data>
+  <data name="FailureOrigin" xml:space="preserve"><value>Original failure</value></data>
+  <data name="FailurePropagated" xml:space="preserve"><value>Propagated from a child execution</value></data>
+  <data name="ProcessDefinition" xml:space="preserve"><value>Implicit process definition</value></data>
+  <data name="LegacyRunOrigin" xml:space="preserve"><value>Flow invocation / historical origin</value></data>
+  <data name="Event.ProcessUnitChanged" xml:space="preserve"><value>Process unit updated</value></data>
+  <data name="EventType.ProcessUnitChanged" xml:space="preserve"><value>Process unit updated</value></data>
+  <data name="ProcessProgressKnown" xml:space="preserve"><value>{0}/{1} completed · {2} running</value></data>
+  <data name="ProcessActiveStep" xml:space="preserve"><value>Current step</value></data>
 </root>

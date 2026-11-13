@@ -69,34 +69,55 @@ public sealed class ConsoleContextState(IConsoleContextProvider provider)
 {
     private readonly object loadLock = new();
     private Task? loadTask;
+    private string? loadingScopeRef;
+    private long loadRevision;
     public event Action? Changed;
     public ConsoleContextSnapshot? Current { get; private set; }
     public bool IsLoading { get; private set; }
     public string? Error { get; private set; }
 
-    public Task LoadAsync(CancellationToken cancellationToken)
+    public Task LoadAsync(CancellationToken cancellationToken) => LoadAsync(null, cancellationToken);
+
+    public Task LoadAsync(string? scopeRef, CancellationToken cancellationToken)
     {
         lock (loadLock)
-            return loadTask ??= LoadCoreAsync(cancellationToken);
+        {
+            if (loadTask is { IsCompleted: false } && (scopeRef is null || loadingScopeRef == scopeRef)) return loadTask;
+            loadingScopeRef = scopeRef;
+            var revision = ++loadRevision;
+            var task = LoadCoreAsync(revision, cancellationToken);
+            if (revision == loadRevision) loadTask = task.IsCompleted ? null : task;
+            return task;
+        }
     }
 
     public Task EnsureLoadedAsync(CancellationToken cancellationToken)
     {
         lock (loadLock)
-            return Current is not null ? Task.CompletedTask : loadTask ??= LoadCoreAsync(cancellationToken);
+            return Current is not null ? Task.CompletedTask : LoadAsync(cancellationToken);
     }
 
-    private async Task LoadCoreAsync(CancellationToken cancellationToken)
+    private async Task LoadCoreAsync(long revision, CancellationToken cancellationToken)
     {
         IsLoading = true;
         Error = null;
-        try { Current = await provider.GetAsync(cancellationToken); }
-        catch (Exception exception) { Error = exception.Message; }
+        try
+        {
+            var current = await provider.GetAsync(cancellationToken);
+            lock (loadLock) { if (revision == loadRevision) Current = current; }
+        }
+        catch (Exception exception)
+        {
+            lock (loadLock) { if (revision == loadRevision) Error = exception.Message; }
+        }
         finally
         {
-            IsLoading = false;
-            lock (loadLock) loadTask = null;
-            Changed?.Invoke();
+            var notify = false;
+            lock (loadLock)
+            {
+                if (revision == loadRevision) { IsLoading = false; loadTask = null; notify = true; }
+            }
+            if (notify) Changed?.Invoke();
         }
     }
 

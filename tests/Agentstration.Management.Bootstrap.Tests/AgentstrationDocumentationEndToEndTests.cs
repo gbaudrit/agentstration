@@ -198,7 +198,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
             await client.ActivateSessionAsync(default);
             _ = await client.RegisterAsync(new([AwpProtocol.Version], new(client.WorkerId, client.SessionId,
                 "bootstrap-test", 1,
-                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), default);
+                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])])), default);
             return worker;
         }
 
@@ -298,7 +298,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { startUrl = new { type = "string" }, maximumDepth = new { type = "integer" }, maximumPages = new { type = "integer" }, correlationId = new { type = "string" } },
                 required = new[] { "startUrl" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "object" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
@@ -339,7 +339,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { contentReference = new { type = "string" }, offset = new { type = "integer" }, maximumBytes = new { type = "integer" } },
                 required = new[] { "contentReference", "offset" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "object" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
@@ -372,7 +372,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { contentReference = new { type = "string" } },
                 required = new[] { "contentReference" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "boolean" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {

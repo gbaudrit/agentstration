@@ -154,6 +154,13 @@ public sealed class KnowledgeSnapshotService(
         return new(snapshot.Value, KnowledgeSnapshotLifecycleState.Active);
     }
 
+    public async Task EnsureNewReadAllowedAsync(KnowledgeSourceResource source, KnowledgeSnapshotResource snapshot, CancellationToken cancellationToken)
+    {
+        var observed = await LoadObservedAsync(ResourceScopeRef.Workspace(RequireContext().WorkspaceId), source, cancellationToken);
+        if (observed?.Value.RetiringSnapshots.Contains(snapshot.Uid) == true || observed?.Value.RetiredSnapshots.ContainsKey(snapshot.Uid) == true)
+            throw Error("knowledge_snapshot_content_retired", "This Snapshot no longer accepts new content leases.");
+    }
+
     private async Task<KnowledgeSnapshotView> ViewAsync(
         KnowledgeSnapshotResource snapshot,
         ResourceScopeRef scopeRef,
@@ -167,6 +174,8 @@ public sealed class KnowledgeSnapshotService(
             Kind = KnowledgeResourceKinds.KnowledgeSource,
             Uid = snapshot.KnowledgeSourceUid
         }, cancellationToken);
+        if (observed?.Value.RetiredSnapshots.TryGetValue(snapshot.Uid, out var retiredAt) == true)
+            return new(snapshot with { ContentRetiredAt = retiredAt }, KnowledgeSnapshotLifecycleState.Retired);
         try
         {
             _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(scopeRef.TargetId!.Value,
@@ -177,6 +186,8 @@ public sealed class KnowledgeSnapshotService(
         {
             return new(snapshot, KnowledgeSnapshotLifecycleState.Unavailable);
         }
+        if (observed?.Value.RetiringSnapshots.Contains(snapshot.Uid) == true)
+            return new(snapshot, KnowledgeSnapshotLifecycleState.Retiring);
         return new(snapshot, observed?.Value.ActiveSnapshotUid == snapshot.Uid
             ? KnowledgeSnapshotLifecycleState.Active
             : KnowledgeSnapshotLifecycleState.Superseded);
@@ -184,6 +195,11 @@ public sealed class KnowledgeSnapshotService(
 
     private async Task ValidateContentAsync(KnowledgeSnapshotResource snapshot, CancellationToken cancellationToken)
     {
+        var observed = await InWorkspaceAsync(() => store.GetExactAsync<KnowledgeSnapshotObservedResource>(
+            Scoped(snapshot.ScopeRef!.Value, snapshot.KnowledgeSourceNamespace, KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
+                ObservedName(snapshot.KnowledgeSourceUid)), cancellationToken));
+        if (observed?.Value.RetiredSnapshots.ContainsKey(snapshot.Uid) == true)
+            throw Error("knowledge_snapshot_content_retired", "The Snapshot content has been retired.");
         foreach (var item in snapshot.Artifacts.Where(value => value.Content is not null))
         {
             if (item.Content!.Length != item.Length || item.Content.Sha256 != item.Sha256)
@@ -202,8 +218,13 @@ public sealed class KnowledgeSnapshotService(
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var current = await LoadObservedAsync(scopeRef, source, cancellationToken);
+            if (current?.Value.RetiringSnapshots.Contains(active.Uid) == true || current?.Value.RetiredSnapshots.ContainsKey(active.Uid) == true)
+                throw Error("knowledge_snapshot_content_retired", "The selected Snapshot content has been retired.");
             var value = new KnowledgeSnapshotObservedResource
             {
+                RetiringSnapshots = current?.Value.RetiringSnapshots ?? [],
+                RetiredSnapshots = current?.Value.RetiredSnapshots ?? new Dictionary<Guid, DateTimeOffset>(),
+                RetirementPendingSnapshots = current?.Value.RetirementPendingSnapshots ?? [],
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
                 Metadata = new() { Name = ObservedName(source.Uid), Namespace = source.Namespace },

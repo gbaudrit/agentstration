@@ -30,7 +30,12 @@ public sealed record KnowledgeAccessDocument(string DocumentId, string MediaType
 public sealed record KnowledgeReadChunk(string DocumentId, string MediaType, KnowledgeCharacterRange Range, string Content, bool EndOfDocument);
 public sealed record KnowledgeRegexMatch(string DocumentId, KnowledgeCharacterRange MatchRange, KnowledgeCharacterRange ReadRange, string Excerpt);
 public sealed record KnowledgeInputStatus(string BindingName, string? AcquisitionId, DateTimeOffset? AcquiredAt,
-    bool Fresh, bool RefreshRequired, bool Required);
+    bool Fresh, bool RefreshRequired, bool Required)
+{
+    public bool Direct { get; init; }
+    public TimeSpan? AcquisitionTimeToLive { get; init; }
+    public string? RefreshErrorCode { get; init; }
+}
 
 public sealed record KnowledgeAccessResult
 {
@@ -54,6 +59,8 @@ public sealed record KnowledgeAccessStatus
     public required Guid SourceUid { get; init; }
     public required string State { get; init; }
     public required DateTimeOffset CheckedAt { get; init; }
+    public DateTimeOffset? ActiveExpiresAt { get; init; }
+    public bool AllowExpiredOnRefreshFailure { get; init; }
     public string? ActiveSnapshotId { get; init; }
     public DateTimeOffset? ActivePublishedAt { get; init; }
     public string? LatestPublishedSnapshotId { get; init; }
@@ -70,6 +77,7 @@ public sealed record KnowledgeAccessStatus
 
 public sealed record KnowledgeReadSessionResource : Resource
 {
+    public bool Ready { get; init; } = true;
     public required Guid SourceUid { get; init; }
     public required string SnapshotName { get; init; }
     public required Guid SnapshotUid { get; init; }

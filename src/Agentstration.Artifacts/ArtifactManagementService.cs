@@ -1,4 +1,5 @@
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Schemas;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -382,6 +383,19 @@ public sealed class ArtifactManagementService(
             || source.Value.Length != request.Receipt.Length
             || !string.Equals(source.Value.MediaType, request.Receipt.MediaType, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The storage receipt does not match the sealed StagedArtifact integrity metadata.");
+        if (request.Receipt.DataContract is { } declaredContract)
+        {
+            var contract = await ValidateStoredContractAsync(declaredContract, request.Receipt.MediaType, source.Value.Length,
+                async (offset, length) =>
+                {
+                    var binding = await RequireBindingAsync(source.Value, cancellationToken);
+                    var chunk = await staging.ReadAsync(binding.Value, source.Value.Backend, offset, length,
+                        Command(current, $"staged-artifact:{sourceId}:contract", source.Value.Producer.CorrelationId,
+                            source.Value.Producer.FlowRunId, source.Value.Producer.FlowStepId), cancellationToken);
+                    return Convert.FromBase64String(chunk.ContentBase64);
+                }, cancellationToken);
+            request = request with { Receipt = request.Receipt with { DataContract = contract } };
+        }
         var existing = (await store.ListAllAsync<FlowRunArtifactResource>(ArtifactResourceKinds.FlowRunArtifact, cancellationToken))
             .SingleOrDefault(value => value.Value.WorkspaceId.Value == current.WorkspaceId
                 && value.Value.SourceArtifactId == sourceId
@@ -437,6 +451,9 @@ public sealed class ArtifactManagementService(
             .StatAsync(materialization.WorkspaceId, reference, cancellationToken);
         if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
+        if (request.DataContract is { } declaredContract)
+            request = request with { DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
+                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken) };
         var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
         var resource = new FlowRunArtifactResource
         {
@@ -459,6 +476,7 @@ public sealed class ArtifactManagementService(
                 StorageFlowRunId = string.Empty,
                 OpaqueReference = reference,
                 Materialization = materialization,
+                DataContract = request.DataContract,
                 MediaType = request.MediaType,
                 Length = materialization.Length,
                 Sha256 = materialization.Sha256,
@@ -679,10 +697,36 @@ public sealed class ArtifactManagementService(
     private static bool HasLease(StagedArtifactResource artifact, ArtifactLeaseId id, ArtifactLeaseOperation operation, DateTimeOffset now) =>
         artifact.Leases.Any(value => value.Id == id && value.RevokedAt is null && value.ExpiresAt > now && value.Operations.Contains(operation));
 
+    private static async Task<ResolvedDataContract> ValidateStoredContractAsync(ResolvedDataContract declaration, string mediaType,
+        long length, Func<long, int, Task<byte[]>> read, CancellationToken token)
+    {
+        var contract = DataContracts.Declared(declaration.Schema, declaration.Origin, declaration.MediaType)
+            ?? throw DataContracts.Failure("data_contract_unresolved", "artifact-publication", "artifact", "$", "contract_missing", "concrete contract", "absent");
+        if (contract.MediaType is { } expected && !string.Equals(expected, mediaType, StringComparison.OrdinalIgnoreCase))
+            throw DataContracts.Failure("data_contract_media_mismatch", "artifact-publication", contract.Origin, "$", "media_type", expected, mediaType);
+        if (contract.Schema is null && !DataContracts.IsJsonMediaType(mediaType)) return contract with { Validated = true };
+        if (length > DataContracts.MaximumValueCharacters)
+            throw DataContracts.Failure("data_contract_value_too_large", "artifact-publication", contract.Origin, "$", "value_size", "bounded value", "oversized");
+        using var content = new MemoryStream();
+        while (content.Length < length)
+        {
+            token.ThrowIfCancellationRequested();
+            var remaining = (int)Math.Min(MaximumChunkBytes, length - content.Length);
+            var chunk = await read(content.Length, remaining);
+            if (chunk.Length == 0 || chunk.Length > remaining) throw Error("artifact_content_incomplete", "The Artifact content is incomplete.");
+            await content.WriteAsync(chunk, token);
+        }
+        _ = DataContracts.ReadUtf8(contract, content.GetBuffer().AsSpan(0, (int)content.Length), "artifact-publication");
+        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true };
+    }
+
     private static bool SameReceipt(ArtifactStorageReceipt left, ArtifactStorageReceipt right) =>
         string.Equals(left.StorageFlowRunId, right.StorageFlowRunId, StringComparison.Ordinal)
         && string.Equals(left.OpaqueReference, right.OpaqueReference, StringComparison.Ordinal)
         && string.Equals(left.MediaType, right.MediaType, StringComparison.OrdinalIgnoreCase)
+        && left.DataContract?.Digest == right.DataContract?.Digest
+        && left.DataContract?.Origin == right.DataContract?.Origin
+        && left.DataContract?.Validated == right.DataContract?.Validated
         && left.Length == right.Length
         && string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase)
         && left.Provenance.Count == right.Provenance.Count

@@ -11,6 +11,7 @@
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
     <Project Path="automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj" />
     <Project Path="automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj" />
+    <Project Path="automation/playwright/fixtures/SourcePolicyHost/SourcePolicyHost.csproj" />
   </Folder>
   <Folder Name="/aep/">
     <Project Path="aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />

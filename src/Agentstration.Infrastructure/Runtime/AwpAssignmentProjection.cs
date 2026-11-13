@@ -17,6 +17,7 @@ public sealed class AwpAssignmentProjection(
     IFlowInputRequestSink? inputRequestSink = null,
     FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null) : IRuntimeAssignmentProjection
 {
+    private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
         configuredTokenUsageConsolidator ?? new(flowRuns);
 
@@ -84,7 +85,9 @@ public sealed class AwpAssignmentProjection(
                 cancelled ? "The Flow Run was cancelled."
                 : functionalFailure ? StringProperty(terminalPayload, "error") ?? "Flow execution failed."
                 : SafeAssignmentFailureMessage(errorCode, result.ErrorMessage),
-                functionalFailure ? StringProperty(terminalPayload, "errorDetails") : null),
+                functionalFailure ? StringProperty(terminalPayload, "errorDetails")
+                    : stored.Value.Steps.LastOrDefault(value => value.Error?.Details is not null)?.Error?.Details ?? assignment.CurrentAttempt?.ErrorDetails)
+                { Origin = stored.Value.Steps.LastOrDefault(value => value.Error is not null)?.Error?.Origin },
             CompletedAt = now,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,
@@ -159,10 +162,13 @@ public sealed class AwpAssignmentProjection(
         var step = executionEvent.StepExecutionId is { } stepId
             ? assignment.StepExecutions.SingleOrDefault(value => value.Id == stepId)
             : null;
+        var notifyProcess = false;
         switch (executionEvent.Kind)
         {
             case "RunStarted":
                 if (stored.Value.Status is FlowRunStatus.Pending or FlowRunStatus.WaitingForChild)
+                {
+                    notifyProcess = true;
                     await UpdateFlowAsync(stored, stored.Value with
                     {
                         Status = FlowRunStatus.Running,
@@ -170,8 +176,12 @@ public sealed class AwpAssignmentProjection(
                         ExecutionLeaseId = assignment.Id.Value.ToString("N"),
                         ExecutionLeaseExpiresAt = assignment.CurrentAttempt?.LeaseExpiresAt
                     }, FlowRunEventType.FlowRunStarted, null, null, executionEvent.OccurredAt, cancellationToken);
+                }
                 break;
             case "StepStarted" when step is not null:
+                if (stored.Value.ProcessOrigin is not null && (stored.Value.Status.IsTerminal()
+                    || stored.Value.Steps.Single(value => value.StepName == step.StepDefinitionId).Status != FlowStepRunStatus.NotStarted)) break;
+                notifyProcess = true;
                 await MutateStepAsync(stored, step.StepDefinitionId, current => current with
                 {
                     Status = FlowStepRunStatus.Running,
@@ -180,17 +190,37 @@ public sealed class AwpAssignmentProjection(
                 }, FlowRunEventType.StepRunStarted, executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
             case "StepCompleted" when step is not null:
+                if (stored.Value.ProcessOrigin is not null && (stored.Value.Status.IsTerminal()
+                    || stored.Value.Steps.Single(value => value.StepName == step.StepDefinitionId).Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)) break;
+                notifyProcess = true;
                 var failed = executionEvent.Payload is { } completedPayload
                     && completedPayload.TryGetProperty("status", out var completedStatus)
                     && string.Equals(completedStatus.GetString(), "failed", StringComparison.OrdinalIgnoreCase);
+                if (!failed && stored.Value.Steps.Single(value => value.StepName == step.StepDefinitionId).Process is { } processAdmission)
+                {
+                    if (processAdmission.RequiresClosure && !processAdmission.Closed
+                        || processAdmission.TotalUnits is { } total && total != processAdmission.Units.Count)
+                        throw new RuntimeGovernedOperationException("process_incomplete", "The owning step cannot complete before process admission closes and all required units are admitted.");
+                    foreach (var unit in processAdmission.Units)
+                    {
+                        var child = await flowRuns.GetRunExactAsync(stored.Value.ExecutionScopeRef, unit.RunId, cancellationToken);
+                        if (child?.Value.Status != FlowRunStatus.Succeeded || child.Value.ParentFlowRunId != stored.Value.Id)
+                            throw new RuntimeGovernedOperationException("process_incomplete", "The owning step cannot succeed before its process runs succeed.");
+                    }
+                }
                 var childFlowRunIds = StringArrayProperty(executionEvent.Payload, "childFlowRunIds");
                 var artifactStorageFlowRunId = StringProperty(executionEvent.Payload, "artifactStorageFlowRunId");
                 var artifacts = ParseArtifacts(executionEvent.Payload);
+                var failureOrigin = failed ? await ResolveFailureOriginAsync(stored.Value, step.StepDefinitionId,
+                    executionEvent.Payload, cancellationToken) : null;
                 await MutateStepAsync(stored, step.StepDefinitionId, current => current with
                 {
                     Status = failed ? FlowStepRunStatus.Failed : FlowStepRunStatus.Succeeded,
                     CompletedAt = executionEvent.OccurredAt,
                     Output = Property(executionEvent.Payload, "output"),
+                    Contracts = Property(executionEvent.Payload, "contracts")?.Deserialize<Agentstration.Schemas.InvocationDataContracts>(ContractJson),
+                    ArtifactContracts = Property(executionEvent.Payload, "artifactContracts")?.Deserialize<Agentstration.Schemas.InvocationDataContracts[]>(ContractJson) ?? [],
+                    MoreArtifactContracts = Property(executionEvent.Payload, "moreArtifactContracts") is { ValueKind: JsonValueKind.True },
                     SelectedTransition = StringProperty(executionEvent.Payload, "selectedTransition"),
                     AgentResourceId = StringProperty(executionEvent.Payload, "agentResourceId") ?? current.AgentResourceId,
                     AgentVersion = LongProperty(executionEvent.Payload, "agentVersion") ?? current.AgentVersion,
@@ -208,7 +238,7 @@ public sealed class AwpAssignmentProjection(
                     Artifacts = artifacts.Count > 0 ? artifacts : current.Artifacts,
                     ArtifactStorageFlowRunId = artifactStorageFlowRunId ?? current.ArtifactStorageFlowRunId,
                     Error = failed ? new FlowRunError(StringProperty(executionEvent.Payload, "errorCode") ?? "flow_step_failed",
-                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.") : null
+                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.", StringProperty(executionEvent.Payload, "errorDetails")) { Origin = failureOrigin } : null
                 }, failed ? FlowRunEventType.StepRunFailed : FlowRunEventType.StepRunCompleted,
                     executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
@@ -225,12 +255,27 @@ public sealed class AwpAssignmentProjection(
                     executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
             case "RunCompleted":
+                if (stored.Value.Status.IsTerminal()) break;
+                notifyProcess = true;
                 await CompleteChildAsync(stored, executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
             case "WaitingForInput":
                 await SuspendForInputAsync(assignment, stored, executionEvent.Payload,
                     executionEvent.OccurredAt, cancellationToken);
                 break;
+        }
+        if (notifyProcess && stored.Value.ProcessOrigin is { } process)
+        {
+            var ownerIds = new[] { process.OwnerRunId, stored.Value.RootFlowRunId }.OfType<string>().Distinct(StringComparer.Ordinal);
+            foreach (var ownerId in ownerIds)
+            {
+                var owner = await flowRuns.GetRunExactAsync(stored.Value.ExecutionScopeRef, ownerId, cancellationToken);
+                if (owner?.Value.Scope != stored.Value.Scope) continue;
+                await AppendFlowEventAsync(owner.Value, FlowRunEventType.ProcessUnitChanged, ownerId == process.OwnerRunId ? process.OwnerStepName : null,
+                    JsonSerializer.SerializeToElement(new { processRunId = stored.Value.Id, process.OwnerRunId, process.OwnerStepName,
+                        process.UnitKey, process.Ordinal, stepName = step?.StepDefinitionId, sourceEventId = executionEvent.EventId }),
+                    executionEvent.OccurredAt, cancellationToken);
+            }
         }
     }
 
@@ -283,27 +328,60 @@ public sealed class AwpAssignmentProjection(
         if (stored.Value.RootFlowRunId is null || stored.Value.Status.IsTerminal()) return;
         var statusValue = StringProperty(payload, "status");
         var timedOut = string.Equals(statusValue, "timedOut", StringComparison.OrdinalIgnoreCase);
-        var failed = timedOut || string.Equals(statusValue, "failed", StringComparison.OrdinalIgnoreCase);
+        var cancelled = string.Equals(statusValue, "cancelled", StringComparison.OrdinalIgnoreCase);
+        var failed = timedOut || cancelled || string.Equals(statusValue, "failed", StringComparison.OrdinalIgnoreCase);
+        var origin = failed ? await ResolveFailureOriginAsync(stored.Value, null, payload, cancellationToken) : null;
         var updated = stored.Value with
         {
-            Status = timedOut ? FlowRunStatus.TimedOut
+            Status = cancelled ? FlowRunStatus.Cancelled : timedOut ? FlowRunStatus.TimedOut
                 : failed ? FlowRunStatus.Failed : FlowRunStatus.Succeeded,
             Output = Property(payload, "output"),
             OutputName = StringProperty(payload, "outputName"),
             OutputOutcome = ParseOutcome(payload),
             Error = failed ? new FlowRunError(StringProperty(payload, "errorCode") ?? "child_flow_failed",
                 StringProperty(payload, "error") ?? "The child Flow failed.",
-                StringProperty(payload, "errorDetails")) : null,
+                StringProperty(payload, "errorDetails")) { Origin = origin } : null,
             CompletedAt = occurredAt,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,
             Steps = stored.Value.Steps.Select(step => step.Status == FlowStepRunStatus.NotStarted
                 ? step with { Status = FlowStepRunStatus.Skipped, CompletedAt = occurredAt }
-                : step).ToArray()
+                : step.Status == FlowStepRunStatus.Running && failed
+                    ? step with { Status = cancelled ? FlowStepRunStatus.Cancelled : FlowStepRunStatus.Failed, CompletedAt = occurredAt }
+                    : step).ToArray()
         };
-        await UpdateFlowAsync(stored, updated, timedOut ? FlowRunEventType.FlowRunTimedOut
+        await UpdateFlowAsync(stored, updated, cancelled ? FlowRunEventType.FlowRunCancelled : timedOut ? FlowRunEventType.FlowRunTimedOut
                 : failed ? FlowRunEventType.FlowRunFailed : FlowRunEventType.FlowRunCompleted,
             null, payload, occurredAt, cancellationToken);
+    }
+
+    private async Task<FlowFailureOrigin?> ResolveFailureOriginAsync(FlowRun current, string? stepName, JsonElement? payload, CancellationToken token)
+    {
+        var proposed = Property(payload, "errorOrigin")?.Deserialize<FlowFailureOrigin>(ContractJson);
+        if (proposed is not null)
+        {
+            if (proposed.RunId == current.Id && (proposed.StepName == stepName
+                || current.Steps.Any(step => step.StepName == proposed.StepName && step.Error is not null)))
+                return proposed with { UnitKey = current.ProcessOrigin?.UnitKey };
+            // Only a proven descendant with an already-projected failure may originate this failure.
+            var source = await flowRuns.GetRunExactAsync(current.ExecutionScopeRef, proposed.RunId, token);
+            if (source?.Value.Scope == current.Scope && source.Value.RootFlowRunId == (current.RootFlowRunId ?? current.Id)
+                && source.Value.Steps.SingleOrDefault(step => step.StepName == proposed.StepName)?.Error is { } sourceError)
+            {
+                var candidate = source.Value;
+                for (var depth = 0; depth <= flowOptions.Value.MaximumNestingDepth && candidate.ParentFlowRunId is { } parentId; depth++)
+                {
+                    if (parentId == current.Id)
+                        return sourceError.Origin ?? new(source.Value.Id, proposed.StepName, source.Value.ProcessOrigin?.UnitKey);
+                    var parent = await flowRuns.GetRunExactAsync(current.ExecutionScopeRef, parentId, token);
+                    if (parent?.Value.Scope != current.Scope) break;
+                    candidate = parent.Value;
+                }
+            }
+        }
+        var failed = current.Steps.LastOrDefault(step => step.Error is not null);
+        var sourceStep = stepName ?? failed?.StepName ?? current.Steps.LastOrDefault(step => step.Status == FlowStepRunStatus.Running)?.StepName;
+        return failed?.Error?.Origin ?? (sourceStep is null ? null : new(current.Id, sourceStep, current.ProcessOrigin?.UnitKey));
     }
 
     private async Task MutateStepAsync(StoredFlowRun stored, string stepName,
@@ -342,7 +420,9 @@ public sealed class AwpAssignmentProjection(
             && string.Equals(value.RunId, runId, StringComparison.Ordinal))?.Payload;
 
     private static string SafeAssignmentFailureMessage(string errorCode, string? errorMessage) =>
-        errorCode == "agent_model_profile_unavailable" && !string.IsNullOrWhiteSpace(errorMessage)
+        (errorCode == "agent_model_profile_unavailable" || errorCode.StartsWith("data_contract_", StringComparison.Ordinal)
+            || errorCode.StartsWith("flow_input_", StringComparison.Ordinal) || errorCode.StartsWith("flow_composition_", StringComparison.Ordinal))
+            && !string.IsNullOrWhiteSpace(errorMessage)
             ? errorMessage
             : "The Runtime Worker could not complete the Flow Run.";
 

@@ -9,6 +9,8 @@ namespace Agentstration.Web.FlowDesigner.Backend;
 public sealed record FlowDesignerAgent(string Name, string DisplayName, ResourceScopeRef ScopeRef)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
+    public Agentstration.Schemas.DataContractDefinition? OutputContract { get; init; }
+    public JsonElement? OutputSchema { get; init; }
     public JsonElement? InputSchema { get; init; }
     public SchemaVersionReference? InputSchemaReference { get; init; }
 }

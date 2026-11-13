@@ -121,4 +121,28 @@
   <data name="Yes" xml:space="preserve"><value>Yes</value></data>
   <data name="No" xml:space="preserve"><value>No</value></data>
   <data name="NativeLegacyRetrievalHelp" xml:space="preserve"><value>The native read, search_regex and get_status Tools access Snapshots directly. This optional Flow serves only custom retrieval REST calls.</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Snapshot freshness and history</value></data>
+  <data name="AllowExpiredFallback" xml:space="preserve"><value>Allow the expired active Snapshot after a failed reprojection</value></data>
+  <data name="AllowInputFallback" xml:space="preserve"><value>Allow an older acquisition after a failed refresh</value></data>
+  <data name="InputFallbackAge" xml:space="preserve"><value>Maximum age for fallback (hh:mm:ss)</value></data>
+  <data name="InputFallbackAgeHelp" xml:space="preserve"><value>Refresh always runs first. This ceiling must be at least the Data Source freshness duration; it never delays refresh. Direct results cannot be reused as fallback.</value></data>
+  <data name="FallbackInvalid" xml:space="preserve"><value>Select a retained input and a positive fallback age at least as long as its Data Source freshness duration.</value></data>
+  <data name="LifecycleInvalid" xml:space="preserve"><value>Check the freshness duration, history retention and selected output Storage.</value></data>
+  <data name="DataSourceOwnsFreshness" xml:space="preserve"><value>This Data Source controls acquisition freshness and refresh. The fallback ceiling only applies after a failed refresh.</value></data>
+  <data name="SnapshotState.Retired" xml:space="preserve"><value>Retired</value></data>
+  <data name="SnapshotState.Retiring" xml:space="preserve"><value>Retirement pending</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Direct input</value></data>
+  <data name="InputFallbackUsed" xml:space="preserve"><value>Older acquisition used</value></data>
+  <data name="InputRefreshFailed" xml:space="preserve"><value>Refresh failed:</value></data>
+  <data name="ProjectionStarting" xml:space="preserve"><value>Starting projection…</value></data>
+  <data name="ProjectionRunning" xml:space="preserve"><value>Projection in progress…</value></data>
+  <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquiring Data Sources…</value></data>
+  <data name="ProjectionPreparing" xml:space="preserve"><value>Preparing inputs and transformations…</value></data>
+  <data name="ProjectionPublishing" xml:space="preserve"><value>Publishing Snapshot…</value></data>
+  <data name="ProjectionStepProgress" xml:space="preserve"><value>{0} of {1} steps completed.</value></data>
+  <data name="ProjectionElapsed" xml:space="preserve"><value>Elapsed: {0}</value></data>
+  <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Progress could not be refreshed. Processing may still continue; try refreshing again.</value></data>
+  <data name="ProjectionFailed" xml:space="preserve"><value>Projection did not succeed: {0}</value></data>
+  <data name="ProjectionAccepted" xml:space="preserve"><value>Projection accepted. Progress will refresh automatically.</value></data>
+  <data name="FlowRunNewTab" xml:space="preserve"><value>Open Flow Run {0} in a new tab.</value></data>
 </root>

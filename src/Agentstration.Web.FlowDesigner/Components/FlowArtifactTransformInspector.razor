@@ -1,0 +1,102 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <p class="muted">@T("ArtifactProcessingHelp")</p>
+    <label>@T("ArtifactProcessingMode")
+        <select data-testid="artifact-processing-mode" disabled="@ReadOnly" value="@Step.Mode" @onchange="ModeChangedAsync">
+            <option value="Content">@T("ArtifactProcessingMode.Content")</option>
+            <option value="Access">@T("ArtifactProcessingMode.Access")</option>
+        </select>
+    </label>
+    <p class="muted">@T(Step.Mode == ArtifactProcessingMode.Content ? "ArtifactContentHelp" : "ArtifactAccessHelp")</p>
+    <label>@T("ProcessConcurrency")<input data-testid="artifact-process-concurrency" type="number" min="1" max="16" disabled="@ReadOnly" value="@(Step.MaximumConcurrency ?? 1)" @onchange="ConcurrencyChangedAsync" /></label>
+    <small>@T("ProcessConcurrency.Help")</small>
+    <label>@T("ArtifactMaximumCount")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@Step.MaximumArtifacts" @onchange="e => LimitChangedAsync(e, true)" /></label>
+    <label>@T("ArtifactMaximumInput")<input type="number" min="1" max="1048576" disabled="@ReadOnly" value="@Step.MaximumContentBytes" @onchange="e => LimitChangedAsync(e, false)" /></label>
+    <label>@T("ArtifactMaximumOutput")<input type="number" min="1" max="16777216" disabled="@ReadOnly" value="@Step.MaximumOutputBytes" @onchange="OutputLimitChangedAsync" /></label>
+    <label>@T("ArtifactOutputName")<input disabled="@ReadOnly" value="@Step.OutputFileName" @onchange="e => Changed.InvokeAsync(Step with { OutputFileName = Optional(e) })" /></label>
+    <label>@T("ArtifactOutputMediaType")<input list="@mediaTypesId" data-testid="artifact-output-media-type" disabled="@ReadOnly" value="@Step.OutputMediaType" @onchange="e => Changed.InvokeAsync(Step with { OutputMediaType = Optional(e) })" /></label>
+    <datalist id="@mediaTypesId">@foreach (var media in SuggestedMediaTypes) { <option value="@media"></option> }</datalist>
+    <small>@T("ArtifactOutputMediaTypeHelp")</small>
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <ContractHeading Direction="Input" Source="@T("ContractSource.ArtifactEnvelope")" />
+    <SchemaDocumentEditor Value="ArtifactTransformContracts.Input" ReadOnly="true" />
+    <p class="muted">@T("ArtifactInputContentContract")</p>
+    <label>@T("ArtifactManifestMapping")<textarea data-testid="artifact-manifest-mapping" disabled="@ReadOnly" value="@(Step.ArtifactsMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 0)"></textarea></label>
+    <label>@T("ArtifactProcessingInputMapping")<textarea data-testid="artifact-input-mapping" disabled="@ReadOnly" value="@(Step.ProcessingInputMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 1)"></textarea></label>
+    <p class="muted">@T("ArtifactProcessingInputHelp")</p>
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <ContractHeading Direction="Output" Source="@T("ContractSource.ArtifactEnvelope")" />
+    <SchemaDocumentEditor Value="ArtifactTransformContracts.Manifest" ReadOnly="true" />
+    <label>@T("ArtifactResultMapping")<textarea data-testid="artifact-result-mapping" disabled="@ReadOnly" value="@(Step.ResultMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 2)"></textarea></label>
+    <p class="muted">@T("ArtifactResultHelp")</p>
+    <label>@T("DataContractMode")
+        <select disabled="@ReadOnly" value="@(Step.OutputContract?.Mode ?? DataContractMode.Absent)" @onchange="ContractModeChangedAsync">
+            @foreach (var mode in Enum.GetValues<DataContractMode>()) { <option value="@mode">@T($"DataContractMode.{mode}")</option> }
+        </select>
+    </label>
+    <p class="muted">@T("ArtifactContractHelp")</p>
+    @if (Step.OutputContract is { Mode: DataContractMode.Fixed } fixedContract)
+    {
+        <label>@T("ArtifactDataSchema")<textarea disabled="@ReadOnly" value="@(fixedContract.Schema?.GetRawText() ?? "{}")" @onchange="ContractSchemaChangedAsync"></textarea></label>
+    }
+    @if (Step.OutputContract is { Mode: DataContractMode.Dynamic } dynamicContract)
+    {
+        <label>@T("ContractSource")<select disabled="@ReadOnly" value="@dynamicContract.Source" @onchange="ContractSourceChangedAsync">
+            <option value="input">@T("ContractSource.Input")</option><option value="parent">@T("ContractSource.Parent")</option>
+        </select></label>
+    }
+}
+@if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
+
+@code {
+    [Parameter, EditorRequired] public ArtifactTransformFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private Task ContractSourceChangedAsync(ChangeEventArgs args) => Changed.InvokeAsync(Step with { OutputContract = Step.OutputContract! with { Source = args.Value?.ToString() ?? "input" } });
+    private Task ContractModeChangedAsync(ChangeEventArgs args) => Enum.TryParse<DataContractMode>(args.Value?.ToString(), out var mode)
+        ? Changed.InvokeAsync(Step with { OutputContract = mode == DataContractMode.Absent ? null : new() { Mode = mode,
+            Schema = mode == DataContractMode.Fixed ? JsonSerializer.SerializeToElement(new { }) : null } }) : Task.CompletedTask;
+    private async Task ContractSchemaChangedAsync(ChangeEventArgs args)
+    {
+        try
+        {
+            var schema = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "{}");
+            DataContracts.ValidateDefinition(new() { Schema = schema }, "artifact-output");
+            invalidJson = false;
+            await Changed.InvokeAsync(Step with { OutputContract = new() { Schema = schema } });
+        }
+        catch (Exception exception) when (exception is JsonException or DataContractException) { invalidJson = true; }
+    }
+    private bool invalidJson;
+    private readonly string mediaTypesId = "artifact-media-types-" + Guid.NewGuid().ToString("N");
+    private static readonly string[] SuggestedMediaTypes = ["text/plain", "application/json", "text/markdown", "text/csv", "text/html", "text/xml", "application/ld+json", "application/geo+json"];
+    private string T(string key) => Localizer[key].Value;
+    private static string? Optional(ChangeEventArgs args) => string.IsNullOrWhiteSpace(args.Value?.ToString()) ? null : args.Value.ToString();
+    private Task ModeChangedAsync(ChangeEventArgs args) => Enum.TryParse<ArtifactProcessingMode>(args.Value?.ToString(), out var mode)
+        ? Changed.InvokeAsync(Step with { Mode = mode }) : Task.CompletedTask;
+    private Task LimitChangedAsync(ChangeEventArgs args, bool count) => int.TryParse(args.Value?.ToString(), out var limit)
+        ? Changed.InvokeAsync(count ? Step with { MaximumArtifacts = limit } : Step with { MaximumContentBytes = limit }) : Task.CompletedTask;
+    private Task ConcurrencyChangedAsync(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out var value)
+        ? Changed.InvokeAsync(Step with { MaximumConcurrency = value }) : Task.CompletedTask;
+    private Task OutputLimitChangedAsync(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out var limit)
+        ? Changed.InvokeAsync(Step with { MaximumOutputBytes = limit }) : Task.CompletedTask;
+    private async Task MappingChangedAsync(ChangeEventArgs args, int field)
+    {
+        try
+        {
+            var value = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "null");
+            JsonElement? mapping = value.ValueKind == JsonValueKind.Null ? null : value;
+            invalidJson = false;
+            await Changed.InvokeAsync(field switch { 0 => Step with { ArtifactsMapping = mapping },
+                1 => Step with { ProcessingInputMapping = mapping }, _ => Step with { ResultMapping = mapping } });
+        }
+        catch (JsonException) { invalidJson = true; }
+    }
+}

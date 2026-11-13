@@ -31,10 +31,20 @@ public interface IFlowAgentReferenceResolver
         FlowTargetReference reference, CancellationToken cancellationToken);
 }
 
+public interface IFlowToolContractResolver
+{
+    Task<FlowToolReference> ResolveAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace, FlowToolReference reference, CancellationToken cancellationToken);
+}
+
 public interface IFlowDiscoveryPolicy
 {
     Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
         CancellationToken cancellationToken);
+}
+
+public interface IFlowUsePolicy
+{
+    Task ValidateAsync(FlowResource flow, string version, ResourceScopeRef consumer, CancellationToken cancellationToken);
 }
 
 public sealed class FlowService(
@@ -48,10 +58,20 @@ public sealed class FlowService(
     IFlowDiscoveryPolicy? discoveryPolicy = null,
     IResourceGovernanceContext? governanceContext = null,
     ISecurityAuditWriter? audit = null,
-    IFlowResourceReferenceResolver? resourceReferenceResolver = null)
+    IFlowResourceReferenceResolver? resourceReferenceResolver = null,
+    IFlowUsePolicy? usePolicy = null,
+    IFlowToolContractResolver? toolContracts = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
+
+    public async Task ValidateUseAsync(ResourceScopeRef owner, FlowId id, string version, ResourceScopeRef consumer, Guid? expectedUid, CancellationToken ct)
+    {
+        var flow = await repository.GetExactAsync(owner, id, ct);
+        if (flow?.Value.Enabled != true || expectedUid is { } uid && flow.Value.Uid != uid)
+            throw new FlowValidationException("flow_composition_child_unavailable", "The exact published Flow is unavailable.");
+        if (usePolicy is not null) await usePolicy.ValidateAsync(flow.Value, version, consumer, ct);
+    }
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
@@ -299,10 +319,10 @@ public sealed class FlowService(
     private async Task<FlowGraphDefinition> PinAgentsAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
         FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
-        if (agentReferences is null) return graph;
+        if (agentReferences is null && toolContracts is null && resourceReferenceResolver is null) return graph;
         async Task<FlowResourceReference> Resolve(FlowResourceReference reference)
         {
-            var resolved = await agentReferences.ResolveAsync(ownerScopeRef, ownerNamespace,
+            var resolved = await agentReferences!.ResolveAsync(ownerScopeRef, ownerNamespace,
                 new(FlowTargetKind.Agent, reference.ResourceId,
                     reference.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), reference.Namespace,
                     reference.ScopeRef), cancellationToken);
@@ -313,14 +333,24 @@ public sealed class FlowService(
                 Version = long.Parse(resolved.Version!, System.Globalization.CultureInfo.InvariantCulture),
                 ResourceUid = resolved.ResourceUid,
                 RevisionUid = resolved.RevisionUid,
-                DefinitionHash = resolved.DefinitionHash
+                DefinitionHash = resolved.DefinitionHash,
+                InputSchema = resolved.InputSchema,
+                OutputSchema = resolved.OutputSchema,
+                OutputContract = resolved.OutputContract
             };
+        }
+        async Task<FlowCallReference> ResolveCall(FlowCallReference reference)
+        {
+            var resolved = await resourceReferenceResolver!.ResolveFlowAsync(ownerScopeRef, ownerNamespace, reference, cancellationToken);
+            return resolved is null ? reference : reference with { ScopeRef = resolved.ScopeRef, InputSchema = resolved.InputSchema, OutputSchema = resolved.OutputSchema, OutputMediaType = resolved.OutputMediaType };
         }
         var steps = await Task.WhenAll(graph.Steps.Select(async step => step switch
         {
-            AgentFlowStepDefinition agent when !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal) =>
+            FlowCallStepDefinition call when resourceReferenceResolver is not null => call with { Flow = await ResolveCall(call.Flow) },
+            ToolFlowStepDefinition tool when toolContracts is not null => tool with { Tool = await toolContracts.ResolveAsync(ownerScopeRef, ownerNamespace, tool.Tool, cancellationToken) },
+            AgentFlowStepDefinition agent when agentReferences is not null && !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal) =>
                 agent with { Agent = await Resolve(agent.Agent) },
-            RouterFlowStepDefinition router => router with
+            RouterFlowStepDefinition router when agentReferences is not null => router with
             {
                 Candidates = await Task.WhenAll(router.Candidates.Select(async candidate =>
                     candidate with { Agent = await Resolve(candidate.Agent) })),

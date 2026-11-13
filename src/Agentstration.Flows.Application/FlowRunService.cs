@@ -19,6 +19,7 @@ public sealed record FlowToolExecutionRequest(
     JsonElement Arguments,
     ResolvedFlowToolRoute? Route = null)
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 

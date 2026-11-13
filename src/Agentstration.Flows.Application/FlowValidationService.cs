@@ -18,6 +18,7 @@ public sealed record ResolvedFlowCall(
     JsonElement? OutputSchema,
     IReadOnlyList<FlowOutputDefinition>? Outputs = null)
 {
+    public string? OutputMediaType { get; init; }
     public ResourceScopeRef? ScopeRef { get; init; }
 }
 
@@ -123,13 +124,15 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             "inputSchema", null, issues);
         ValidateSchemaContract(definition.OutputSchema, definition.OutputSchemaBinding,
             "outputSchema", null, issues);
+        foreach (var duplicate in definition.Steps.OfType<FlowCompositionPointStepDefinition>().GroupBy(point => point.Point, StringComparer.Ordinal).Where(group => group.Count() > 1))
+            issues.Add(Error("flow_composition_point_duplicate", "Composition point names must be unique within a Flow.", duplicate.First().Name));
         var steps = new Dictionary<string, FlowStepDefinition>(StringComparer.Ordinal);
         foreach (var step in definition.Steps)
         {
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
             await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
-            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition
+            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition or ArtifactTransformFlowStepDefinition
                 && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
                 issues.Add(Error(
                     "error_transition_required",
@@ -137,6 +140,14 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     step.Name,
                     property: "transitions"));
         }
+
+        var expressionParser = new FlowExpressionParser();
+        foreach (var output in definition.Steps.OfType<OutputFlowStepDefinition>())
+            if (output.OutputMapping is { } mapping)
+                foreach (var text in EnumerateStrings(mapping))
+                    if (expressionParser.Parse(text).Expression is { } expression
+                        && expressionParser.Validate(expression, new(steps.Keys.ToArray())) is { IsValid: false } validation)
+                        issues.Add(Error("expression_step_unavailable", validation.Error!, output.Name, property: "outputMapping"));
 
         if (!steps.ContainsKey(definition.EntryStep)) issues.Add(Error("entry_step_unknown", "The entry step does not exist.", property: "entryStep"));
         if (definition.Steps.Count(step => step is InputFlowStepDefinition) != 1) issues.Add(Error("input_step_required", "A Flow requires exactly one Input step."));
@@ -161,7 +172,20 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             var reachable = Reachable(definition.EntryStep, definition.Transitions);
             foreach (var step in steps.Keys.Where(name => !reachable.Contains(name)))
                 issues.Add(new FlowValidationIssue("step_unreachable", FlowValidationSeverity.Warning, $"Step '{step}' is unreachable.", step));
-            if (HasCycle(definition.EntryStep, definition.Transitions)) issues.Add(Error("flow_cycle_not_supported", "Cycles are not supported in this execution increment."));
+            IReadOnlyList<FlowTransitionDefinition> executionTransitions = definition.Transitions;
+            foreach (var processing in definition.Steps.Where(step => step.Region() is not null))
+            {
+                try
+                {
+                    var region = FlowProcessGraph.Extract(definition, processing);
+                    if (HasCycle(region.EntryStep, FlowProcessGraph.ExecutionTransitions(region)))
+                        issues.Add(Error("artifact_processing_cycle", "Artifact processing must be acyclic.", processing.Name));
+                    executionTransitions = FlowProcessGraph.ExecutionTransitions(definition);
+                }
+                catch (InvalidOperationException exception)
+                { issues.Add(Error("artifact_processing_connections_invalid", exception.Message, processing.Name)); }
+            }
+            if (HasCycle(definition.EntryStep, executionTransitions)) issues.Add(Error("flow_cycle_not_supported", "Cycles are not supported in this execution increment."));
         }
 
         foreach (var terminal in definition.Steps.OfType<OutputFlowStepDefinition>())
@@ -185,6 +209,10 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         CancellationToken token)
     {
         await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
+        if (step is TransformFlowStepDefinition { Processing: { } process }
+            && (process.MaximumUnits is < 1 or > 128 || process.MaximumConcurrency is < 1 or > 16
+                || process.UnitSize is < 1 or > 65536 || !Enum.IsDefined(process.Partition)))
+            issues.Add(Error("process_limits_invalid", "Process partition limits are outside their supported bounds.", step.Name, property: "processing"));
         switch (step)
         {
             case InputFlowStepDefinition input:
@@ -217,6 +245,32 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 if (!ValidContractSchema(transform.Schema))
                     issues.Add(Error("flow_transform_schema_invalid", "The transformed output has an invalid or unsupported schema.", step.Name, property: "schema"));
                 ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
+                break;
+            case ArtifactTransformFlowStepDefinition processing:
+                if (processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
+                    || processing.MaximumOutputBytes is < 1 or > 16_777_216 || !Enum.IsDefined(processing.Mode))
+                    issues.Add(Error("artifact_processing_limits_invalid", "Artifact processing limits are outside their supported bounds.", step.Name));
+                if (processing.OutputContract is { } outputContract)
+                {
+                    try { Agentstration.Schemas.DataContracts.ValidateDefinition(outputContract, "artifact-output"); }
+                    catch (Agentstration.Schemas.DataContractException exception) { issues.Add(Error(exception.Code, exception.Message, step.Name, property: "outputContract")); }
+                }
+                ValidateJsonExpressions(processing.ArtifactsMapping, issues, step.Name, "artifactsMapping");
+                ValidateJsonExpressions(processing.ProcessingInputMapping, issues, step.Name, "processingInputMapping");
+                ValidateJsonExpressions(processing.ResultMapping, issues, step.Name, "resultMapping");
+                if (processing.OutputFileName is { } outputName && (string.IsNullOrWhiteSpace(outputName)
+                    || outputName.Length > 255 || outputName.Contains('/') || outputName.Contains('\\')))
+                    issues.Add(Error("artifact_processing_file_name_invalid", "Output requires a simple file name.", step.Name));
+                if (processing.OutputMediaType is { } media && (media.Length > 255 || !media.Contains('/')))
+                    issues.Add(Error("artifact_processing_media_type_invalid", "Output requires a valid media type.", step.Name));
+                break;
+            case FlowCompositionPointStepDefinition point:
+                if (string.IsNullOrWhiteSpace(point.Point) || point.Point.Length > 128
+                    || !FlowCompositionSchema.IsSupported(point.InputSchema) || !FlowCompositionSchema.IsSupported(point.OutputSchema))
+                    issues.Add(Error("flow_composition_point_invalid", "A composition point requires a bounded name and typed input/output contracts.", step.Name));
+                ValidateJsonExpressions(point.InputMapping, issues, point.Name, "inputMapping");
+                if (point.AllowEmpty && !FlowCompositionSchema.IsAssignable(point.InputSchema, point.OutputSchema))
+                    issues.Add(Error("flow_composition_identity_invalid", "An empty composition must preserve its declared output contract.", point.Name));
                 break;
             case FlowCallStepDefinition flowCall:
                 await ValidateFlowCallAsync(flowCall, transitions, context, issues, token);
@@ -520,11 +574,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
 
     private static bool ValidContractSchema(JsonElement? schema)
     {
-        if (schema is null) return true;
-        if (schema.Value.ValueKind != JsonValueKind.Object) return false;
-        if (schema.Value.TryGetProperty("type", out var type)
-            && (type.ValueKind != JsonValueKind.String || !string.Equals(type.GetString(), "object", StringComparison.Ordinal))) return false;
-        return !schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind == JsonValueKind.Object;
+        try { _ = Agentstration.Schemas.DataContracts.Declared(schema, "flow-definition"); return true; }
+        catch (Agentstration.Schemas.DataContractException) { return false; }
     }
 
     private static void ValidateSchemaContract(JsonElement? legacy, SchemaBinding? binding,

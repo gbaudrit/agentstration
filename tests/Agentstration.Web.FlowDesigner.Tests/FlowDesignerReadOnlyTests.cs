@@ -129,6 +129,7 @@ public sealed partial class FlowDesignerReadOnlyTests
             this.readOnly = readOnly;
             draft = CreateDraft(definition);
         }
+        public Func<FlowDesignerTarget, Task<FlowDesignerLoadResult>>? LoadOverride { get; init; }
         public int SaveCount { get; private set; }
         public int ValidationCount { get; private set; }
         public FlowGraphDefinition? LastSavedDefinition { get; private set; }
@@ -141,6 +142,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         public Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
         {
             LoadedTarget = target;
+            if (LoadOverride is not null) return LoadOverride(target);
             var value = draft.Value;
             return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }

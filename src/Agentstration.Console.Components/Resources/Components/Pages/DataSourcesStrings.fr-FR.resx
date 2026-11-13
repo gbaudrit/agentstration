@@ -136,4 +136,51 @@
   <data name="DatasetNoContent" xml:space="preserve"><value>Aucun contenu acquis n’est disponible pour le moment. Lancez une acquisition, puis actualisez son historique.</value></data>
   <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition à consulter</value></data>
   <data name="DatasetYamlHelp" xml:space="preserve"><value>Manifeste en lecture seule de la source de données sauvegardée. Utilisez l’onglet Définition pour modifier sa configuration.</value></data>
+  <data name="SequenceHelp" xml:space="preserve"><value>Les Flows s’exécutent dans cet ordre. Chacun reçoit le résultat précédent dans value et ses paramètres enregistrés. Seules les versions publiées compatibles peuvent être enregistrées.</value></data>
+  <data name="SequenceIdentity" xml:space="preserve"><value>Aucune transformation : conserver l’entrée.</value></data>
+  <data name="SequenceUnavailable" xml:space="preserve"><value>Le Flow publié ou ses dépendances n’ont pas pu être chargés.</value></data>
+  <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
+  <data name="SequenceFlow" xml:space="preserve"><value>Version publiée du Flow</value></data>
+  <data name="SequenceUp" xml:space="preserve"><value>Monter</value></data>
+  <data name="SequenceDown" xml:space="preserve"><value>Descendre</value></data>
+  <data name="SequenceRemove" xml:space="preserve"><value>Retirer la transformation</value></data>
+  <data name="SequenceAdd" xml:space="preserve"><value>Ajouter une transformation</value></data>
+  <data name="CompositionTitle" xml:space="preserve"><value>Orchestration des Flows et transformations</value></data>
+  <data name="CompositionOrchestration" xml:space="preserve"><value>Flow d’orchestration</value></data>
+  <data name="CompositionStandard" xml:space="preserve"><value>Orchestration standard</value></data>
+  <data name="CompositionBoundaryHelp" xml:space="preserve"><value>Configurez les points déclarés. L’acquisition et la publication restent gouvernées par la source.</value></data>
+  <data name="CompositionOrphanHelp" xml:space="preserve"><value>Ce point n’est pas déclaré par l’orchestration sélectionnée. Retirez sa configuration ou sélectionnez son Flow d’origine avant d’enregistrer.</value></data>
+  <data name="CompositionRemovePoint" xml:space="preserve"><value>Retirer la configuration du point</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Fraîcheur et historique</value></data>
+  <data name="LifecycleEnable" xml:space="preserve"><value>Configurer la fraîcheur et la conservation</value></data>
+  <data name="LifecycleTtl" xml:space="preserve"><value>Durée de fraîcheur (hh:mm:ss)</value></data>
+  <data name="LifecycleTtlHelp" xml:space="preserve"><value>Laissez vide pour ne pas appliquer d’expiration automatique. La durée commence lorsque le résultat est disponible avec succès.</value></data>
+  <data name="LifecycleHistory" xml:space="preserve"><value>Conserver les versions précédentes réussies</value></data>
+  <data name="LifecycleRetention" xml:space="preserve"><value>Durée de conservation de l’historique (hh:mm:ss)</value></data>
+  <data name="LifecycleHistoryHelp" xml:space="preserve"><value>Sans historique, le dernier résultat réussi reste disponible jusqu’au succès de son remplacement. Les exécutions et curseurs de lecture en cours protègent leur contenu exact.</value></data>
+  <data name="LifecycleDurationInvalid" xml:space="preserve"><value>Saisissez une durée positive sous la forme heures:minutes:secondes (au maximum 3 650 jours).</value></data>
+  <data name="LifecycleStorageRequired" xml:space="preserve"><value>La fraîcheur et l’historique des acquisitions nécessitent un Storage d’entrée.</value></data>
+  <data name="DirectPermission" xml:space="preserve"><value>Autoriser l’acquisition directe sans Storage d’entrée</value></data>
+  <data name="DirectPermissionHelp" xml:space="preserve"><value>Sans Storage d’entrée, chaque nouvelle projection acquiert un résultat borné en mémoire. Les métadonnées et la provenance restent disponibles ; le Snapshot final est stocké séparément.</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Entrée directe · sans Storage intermédiaire</value></data>
+  <data name="DirectResult" xml:space="preserve"><value>Résultat direct · contenu temporaire</value></data>
+  <data name="DirectResultHelp" xml:space="preserve"><value>Le contenu a été transmis à sa projection ; l’historique d’acquisition conserve son identité et sa provenance.</value></data>
+  <data name="ContentRetired" xml:space="preserve"><value>Contenu retiré · provenance conservée</value></data>
+  <data name="ContentRetirementPending" xml:space="preserve"><value>Retrait du contenu en attente</value></data>
+  <data name="SequenceCreate" xml:space="preserve"><value>Créer un flow de transformation</value></data>
+  <data name="SequenceCreateHelp" xml:space="preserve"><value>Les contrats d’entrée et de sortie sont préremplis pour ce point. Le Designer s’ouvre dans un autre onglet ; vos modifications de la source restent ici.</value></data>
+  <data name="SequenceNoPublishedFlows" xml:space="preserve"><value>Aucun Flow de transformation publié n’est disponible dans ce contexte. Créez-en un, définissez sa transformation et publiez-le, puis actualisez la liste.</value></data>
+  <data name="SequenceRefresh" xml:space="preserve"><value>Actualiser les Flows</value></data>
+  <data name="SequenceCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="SequenceCreateDraft" xml:space="preserve"><value>Créer le brouillon et ouvrir le Designer</value></data>
+  <data name="SequenceOpenDesigner" xml:space="preserve"><value>Ouvrir le Designer dans un autre onglet</value></data>
+  <data name="SequenceCreated" xml:space="preserve"><value>Brouillon créé. Après sa publication dans le Designer, actualisez les Flows pour l’ajouter à la séquence.</value></data>
+  <data name="SequenceCreateFailed" xml:space="preserve"><value>Le brouillon n’a pas pu être créé. Vérifiez le nom, le contexte et les droits de création des Flows, puis réessayez.</value></data>
+  <data name="SequenceClose" xml:space="preserve"><value>Fermer</value></data>
+  <data name="SequenceSearchFlow" xml:space="preserve"><value>Rechercher un Flow</value></data>
+  <data name="SequenceResource" xml:space="preserve"><value>Flow</value></data>
+  <data name="SequenceVersion" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="SequenceOpenVersion" xml:space="preserve"><value>Ouvrir cette version du Flow</value></data>
+  <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations avant publication</value></data>
+  <data name="BeforePublicationHelp" xml:space="preserve"><value>Ces transformations traitent les résultats réunis de toutes les sources d’entrée, avant la création et la publication du Snapshot.</value></data>
 </root>

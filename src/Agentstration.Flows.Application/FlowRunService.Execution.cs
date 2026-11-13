@@ -1,3 +1,4 @@
+using Agentstration.Secrets.Abstractions;
 using System.Diagnostics;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
@@ -32,32 +33,14 @@ public sealed partial class FlowRunService
         return steps;
     }
 
-    public static void ValidateInput(JsonElement? schema, JsonElement input)
+    public static void ValidateInput(JsonElement? schema, JsonElement input, IReadOnlyList<SecretInputReference>? secretInputs = null)
     {
-        if (schema is null || schema.Value.ValueKind != JsonValueKind.Object) return;
-        if (schema.Value.TryGetProperty("type", out var rootType) && rootType.GetString() == "object" && input.ValueKind != JsonValueKind.Object)
-            throw new FlowValidationException("flow_input_invalid", "Flow input must be a JSON object.");
-        if (input.ValueKind != JsonValueKind.Object) return;
-        if (schema.Value.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array)
+        try { Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(schema, "flow-input"), input, "flow-input", isProtectedString: secretInputs is { Count: > 0 } ? value => SecretInputs.IsReference(value, secretInputs) : null); }
+        catch (Agentstration.Schemas.DataContractException exception)
         {
-            foreach (var property in required.EnumerateArray().Select(item => item.GetString()).Where(name => !string.IsNullOrWhiteSpace(name)))
-                if (!input.TryGetProperty(property!, out _)) throw new FlowValidationException("flow_input_required", $"Flow input property '{property}' is required.");
-        }
-        if (!schema.Value.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object) return;
-        foreach (var propertySchema in properties.EnumerateObject())
-        {
-            if (!input.TryGetProperty(propertySchema.Name, out var value) || !propertySchema.Value.TryGetProperty("type", out var type)) continue;
-            var valid = type.GetString() switch
-            {
-                "string" => value.ValueKind == JsonValueKind.String,
-                "number" => value.ValueKind == JsonValueKind.Number,
-                "integer" => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
-                "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
-                "object" => value.ValueKind == JsonValueKind.Object,
-                "array" => value.ValueKind == JsonValueKind.Array,
-                _ => true
-            };
-            if (!valid) throw new FlowValidationException("flow_input_type_invalid", $"Flow input property '{propertySchema.Name}' has an invalid type.");
+            var code = exception.Failure.Rule == "json_schema_instance_required" ? "flow_input_required"
+                : exception.Failure.Path == "$" && exception.Failure.Expected == "object" ? "flow_input_invalid" : "flow_input_type_invalid";
+            throw new FlowValidationException(code, exception.Message) { ContractFailure = exception.Failure };
         }
     }
 
