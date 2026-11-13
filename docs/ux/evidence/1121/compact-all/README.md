@@ -2,7 +2,7 @@
 
 These **92 unedited screenshots** come from the actual SQLite/offline application and its disposable browser fixtures. They supersede the earlier first-wave, all-list and Flow-prototype galleries for this compact presentation. No generated image, mock DOM, image manipulation or production demonstration resource is used.
 
-The product source is `44058e720b118545a19a73bb08a3f9c20552ec05`. The four maintained local version/action variants passed on that source: Chromium **154.0.8037.57**, English desktop **1440 × 1000**, French mobile **390 × 844**, both themes. The local browser differs from CI's pinned Playwright browser because its download host is unavailable in this environment. CI uses Playwright **1.63.0** with its pinned Chromium. Captures store original bytes and SHA-256 hashes in the JSON indexes below.
+The baseline product source for the Console and CI captures is `44058e720b118545a19a73bb08a3f9c20552ec05`. The six Workplace captures are refreshed on `7db199ff6deebdaf468718bcf7e69d008ecaf2c2`: the shared context now carries the authorized Workspace ID, so task/artifact/notification markers resolve the real name only for that exact owner. No extra product request is added. A component regression rejects mismatching owner IDs and follows context changes; all **994 Fast tests** pass on that follow-up. The four maintained local version/action variants passed on that source: Chromium **154.0.8037.57**, English desktop **1440 × 1000**, French mobile **390 × 844**, both themes. The local browser differs from CI's pinned Playwright browser because its download host is unavailable in this environment. CI uses Playwright **1.63.0** with its pinned Chromium. Captures store original bytes and SHA-256 hashes in the JSON indexes below.
 
 The expanded CI campaign at coverage `d3ccdf873b2d952b3f284d58883544f44486bb08`, stacked on that exact product source, passed **483 cases**, with zero failures, skipped or flaky cases. [Full run and its seven evidence artifacts](https://github.com/gbaudrit/agentstration/actions/runs/43391503391). The latest subsequent documentation/coverage HEAD checks are linked from both draft PRs; this immutable run remains the capture provenance.
 
@@ -58,7 +58,7 @@ The following successful domain checkpoints retain their family commands and ass
 
 ## Workplace
 
-A separate final-source execution passed the complete populated Workplace interaction and saved these six stable states:
+A separate exact-owner follow-up execution passed the complete populated Workplace interaction and saved these six stable states:
 
 - [workplace-home](workplace-home.png)
 - [workplace-response-completed](workplace-response-completed.png)
@@ -67,7 +67,7 @@ A separate final-source execution passed the complete populated Workplace intera
 - [collections-workplace-task](collections-workplace-task.png)
 - [collections-workplace-notifications](collections-workplace-notifications.png)
 
-[Workplace result, observed collection counts and hashes](workplace-observations.json). The journey submits a deterministic report request, waits for its real Task/Agent response, inspects activity, task list/details and notifications, then marks a notification read. Native chronological/thread behavior remains intact.
+[Workplace result, observed collection counts and hashes](workplace-observations.json). The journey additionally verifies full accessible owner names, focus disclosure, Escape and focus restoration. Owner labels are saved in the raw observations. It submits a deterministic report request, waits for its real Task/Agent response, inspects activity, task list/details and notifications, then marks a notification read. Native chronological/thread behavior remains intact.
 
 ## All route families and the adoption matrix
 

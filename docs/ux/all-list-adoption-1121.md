@@ -2,7 +2,7 @@
 
 **Approved all-list compact adoption (2026-11-13):** The maintainer’s authorization supersedes the earlier Flow-only boundary. Applicable resource identities now compose the tiny I/T/W owner badge at top-left, state at top-right and independent managed/inherited read-only lock at bottom-right. Namespace folders are omitted; complete qualified copy is adjacent and revealed through desktop hover/focus or continuously on touch. Publication metadata shows the actual publication or an em dash. Family information, direct primary actions, optional secondary menus and existing pagination contracts are retained. [Current presentation and data semantics](flow-compact-1121.md).
 
-The [current evidence gallery](evidence/1121/compact-all/README.md) archives 92 real application screenshots and links all 98 route captures. [Validation provenance](evidence/1121/compact-all/validation.json) records the final product commit, 993 Fast / 1,017 Integration passes and both green browser campaigns.
+The [current evidence gallery](evidence/1121/compact-all/README.md) archives 92 real application screenshots and links all 98 route captures. [Validation provenance](evidence/1121/compact-all/validation.json) records the baseline product commit, 993 Fast / 1,017 Integration passes and both green browser campaigns, plus the exact-owner Workplace follow-up with 994 Fast passes and refreshed captures. Latest delivery checks are recorded in the draft PR.
 
 Every manifest entry retains its domain-specific adaptation and gains a compact-adoption decision. Historical route images remain marked as historical; current source review is distinct from fresh populated browser evidence. Specialized contexts are preserved explicitly, rather than relabeled as owners.
 
