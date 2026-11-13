@@ -1,0 +1,37 @@
+name: Collection circuit artifact diagnostics
+on:
+  push:
+    branches: [diagnostics/1122-circuit-43472011196]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  extract-existing-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Read the failed browser artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 43472011196 --repo gbaudrit/agentstration --name browser-ux-evidence-mobile-chromium-3-1 --dir evidence
+      - name: Extract circuit exception blocks only
+        shell: python
+        run: |
+          import pathlib
+          root = pathlib.Path("evidence")
+          excerpts = []
+          for log in sorted(root.rglob("console.log")):
+              lines = log.read_text(errors="replace").splitlines()
+              for index, line in enumerate(lines):
+                  if "Unhandled exception in circuit" in line:
+                      excerpts.append("SOURCE " + str(log) + "\n" + "\n".join(lines[max(0,index-2):index+36]))
+          report = "\n\n".join(excerpts) or "No circuit exception blocks found in archived console logs."
+          pathlib.Path("diagnostics").mkdir(exist_ok=True)
+          pathlib.Path("diagnostics/circuit-exceptions.txt").write_text(report)
+          print(report)
+      - name: Preserve the small diagnostic extract
+        uses: actions/upload-artifact@v7
+        with:
+          name: collection-circuit-exception-extract
+          path: diagnostics
+          retention-days: 3
