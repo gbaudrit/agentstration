@@ -28,11 +28,14 @@ test('Workplace populated entry, conversation, task, activity and notifications 
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const collections = new CollectionContractPage(page);
   const observations: CollectionObservation[] = [];
+  const workspace = await pages.workplace.openRoot(product.workplaceUrl);
+  const owner = await collections.authorizedWorkspaceOwner(product.consoleUrl, workspace.workspaceName);
   const record = async (name: string) => {
     observations.push(await collections.inspect('en-US'));
+    const disclosed = await collections.assertWorkplaceOwnerNames(owner);
     await testInfo.attach(name, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    if (disclosed) await collections.dismissWorkplaceOwnerDisclosure();
   };
-  const workspace = await pages.workplace.openRoot(product.workplaceUrl);
   await record(Checkpoints.workplace.home);
   await pages.workplace.openEntry(product.workplaceUrl, workspace, 'default', 'prepare-report');
   const conversation = await pages.workplace.submitPrompt('Prepare a deterministic collection contract report.');

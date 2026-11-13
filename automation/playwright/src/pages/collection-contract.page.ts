@@ -12,6 +12,7 @@ export interface CollectionObservation {
   menus: number;
   scopes: number;
   states: number;
+  ownerLabels: Array<{ scopeRef: string | null; name: string | null }>;
 }
 
 /** Applicable presentation assertions; family page objects still own commands and data. */
@@ -164,7 +165,39 @@ export class CollectionContractPage {
       this.page.locator('.resource-owner-scope:visible').count(),
       this.page.locator('.status-badge:visible').count(),
     ]);
-    return { url: this.page.url(), frames, identities, menus, scopes, states };
+    const ownerLabels = await this.page.locator('.resource-owner-icon:visible').evaluateAll(elements => elements.map(element => ({
+      scopeRef: element.getAttribute('data-scope-ref'), name: element.querySelector('button')?.getAttribute('aria-label') ?? null,
+    })));
+    return { url: this.page.url(), frames, identities, menus, scopes, states, ownerLabels };
+  }
+
+  public async authorizedWorkspaceOwner(consoleUrl: string, workspaceName: string): Promise<{ scopeRef: string; displayName: string }> {
+    const response = await this.page.request.get(`${consoleUrl}/api/workspaces/${encodeURIComponent(workspaceName)}`);
+    expect(response.ok()).toBe(true);
+    const owner = await response.json() as { id: string; displayName: string };
+    return { scopeRef: `/workspaces/${owner.id}`, displayName: owner.displayName };
+  }
+
+  public async assertWorkplaceOwnerNames(owner: { scopeRef: string; displayName: string }): Promise<boolean> {
+    const markers = this.page.locator('.resource-owner-icon:visible');
+    const name = `${CollectionTextByLocale['en-US'].scopeTypes[2]} — ${owner.displayName}`;
+    for (const marker of await markers.all()) {
+      const scope = await marker.getAttribute('data-scope-ref');
+      if (scope !== null) expect(scope).toBe(owner.scopeRef);
+      await expect(marker.getByRole('button')).toHaveAccessibleName(name);
+    }
+    if (!await markers.count()) return false;
+    await markers.first().getByRole('button').focus();
+    await expect(markers.first().locator('[role=tooltip]')).toBeVisible();
+    await expect(markers.first().locator('[role=tooltip]')).toHaveText(name);
+    return true;
+  }
+
+  public async dismissWorkplaceOwnerDisclosure(): Promise<void> {
+    const marker = this.page.locator('.resource-owner-icon:visible').first();
+    await this.page.keyboard.press('Escape');
+    await expect(marker.locator('[role=tooltip]')).toBeHidden();
+    await expect(marker.getByRole('button')).toBeFocused();
   }
 
   public async prepareLongOwnerHomonyms(consoleUrl: string): Promise<{ scope: string; owner: string; namespaces: string[] }> {
