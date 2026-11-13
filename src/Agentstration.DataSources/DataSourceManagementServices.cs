@@ -519,7 +519,7 @@ public sealed class DataSourceManagementService(
         var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), Definition = definition };
         if ((existing.Value.Definition.Dataset is null) != (definition.Dataset is null))
             throw Error("data_source_composition_mode_fixed", "Create a separate Data Source to change its composition mode.");
-        if (datasets is not null) updated = await datasets.AdoptSchemasAsync(updated, cancellationToken);
+        if (datasets is not null) updated = await datasets.AdoptSchemasAsync(updated, cancellationToken, existing.Value);
         var readiness = await ValidateAndResolveAsync(updated, false, cancellationToken);
         updated = PinProfile(updated, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,

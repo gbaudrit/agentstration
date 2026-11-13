@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
@@ -157,7 +158,7 @@ public sealed class StorageManagementService(
         var scope = stored.Value.ScopeRef!.Value;
         return await scopeOperations.WriteAsync(stored.Value, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
-            var changed = await AdoptSchemasAsync(stored.Value with { Definition = definition }, ct);
+            var changed = await AdoptSchemasAsync(stored.Value with { Definition = definition }, ct, stored.Value);
             definition = changed.Definition;
             Shape(changed);
             if (!definition.Enabled || StorageDigests.Binding(stored.Value.Definition) != StorageDigests.Binding(definition))
@@ -171,7 +172,7 @@ public sealed class StorageManagementService(
         }, token);
     }
 
-    private async Task<StorageResource> AdoptSchemasAsync(StorageResource resource, CancellationToken token)
+    private async Task<StorageResource> AdoptSchemasAsync(StorageResource resource, CancellationToken token, StorageResource? previous = null)
     {
         var collections = new List<StorageDocumentCollection>();
         foreach (var collection in resource.Definition.Collections)
@@ -181,7 +182,10 @@ public sealed class StorageManagementService(
             if (schemaBindings is null) throw new StorageException("schema_resolver_unavailable", "Schema binding resolution is unavailable.");
             try
             {
-                var snapshot = await schemaBindings.ResolveAsync($"$.collections[{collection.Name}].schema", binding,
+                var prior = previous?.Definition.Collections.SingleOrDefault(c => c.Uid == collection.Uid);
+                var unchanged = prior?.SchemaSnapshot is not null && prior.SchemaBinding is not null
+                    && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(binding), JsonSerializer.SerializeToElement(prior.SchemaBinding));
+                var snapshot = unchanged ? prior!.SchemaSnapshot! : await schemaBindings.ResolveAsync($"$.collections[{collection.Name}].schema", binding,
                     new(resource.ScopeRef!.Value, resource.Namespace, SchemaFormatIds.JsonSchema), token);
                 if (snapshot.Dialect is { } dialect && dialect != BuiltinJsonSchemaFormatHandler.Draft202012)
                     throw new StorageException("schema_dialect_incompatible", "The document validator does not support the selected dialect.");

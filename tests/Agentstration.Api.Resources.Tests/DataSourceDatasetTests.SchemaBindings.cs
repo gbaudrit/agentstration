@@ -86,5 +86,13 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual("$.dataset", pending.ContractFailure!.Path);
         Assert.IsNull(pending.Manifest);
         Assert.AreEqual("A", receipt.DataContract.SchemaEvidence.Version);
+        var resources = factory.Services.GetRequiredService<IResourceStore>();
+        await resources.DeleteExactAsync(new(Owner, parent.Value.Namespace, SchemaResourceKinds.Schema, parent.Value.Name), changed.ETag, default);
+        var renamed = await sources.PutAsync(source.Value.Namespace, source.Value.Name, Owner,
+            source.Value.Definition with { DisplayName = "Metadata only" }, source.ETag, default);
+        Assert.AreEqual("A", renamed.Value.Definition.Dataset!.Acquisition.OutputSchemaSnapshot!.Source!.Version);
+        var missingParent = await Assert.ThrowsAsync<DataSourceValidationException>(() => sources.CreateAsync(desired with
+        { Metadata = new() { Name = "new-missing-parent-binding" } }, default));
+        Assert.AreEqual("schema_reference_not_found", missingParent.Code);
     }
 }

@@ -34,8 +34,8 @@ public sealed class DataSourceDatasetCompositionService(
             || readOnly.ValueKind != JsonValueKind.True)
             throw Invalid("data_source_operation_not_read_only", "Actions are not eligible for acquisition.");
         var input = Schema(operation.Definition.Definition, adapter.InputSchemaProperty);
-        var operationOutput = definition.Acquisition.OutputSchemaSnapshot?.Content
-            ?? Schema(operation.Definition.Definition, adapter.OutputSchemaProperty);
+        var declaredOutput = Schema(operation.Definition.Definition, adapter.OutputSchemaProperty);
+        var operationOutput = definition.Acquisition.OutputSchemaSnapshot?.Content ?? declaredOutput;
         var rawOutput = JsonSchemaSelection.Select(operationOutput);
         ValidateSchema(rawOutput);
         var finalSnapshot = definition.OutputSchemaSnapshot;
@@ -93,11 +93,14 @@ public sealed class DataSourceDatasetCompositionService(
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
-    public async Task<DataSourceResource> AdoptSchemasAsync(DataSourceResource resource, CancellationToken token)
+    public async Task<DataSourceResource> AdoptSchemasAsync(DataSourceResource resource, CancellationToken token, DataSourceResource? previous = null)
     {
         if (resource.Definition.Dataset is not { } dataset) return resource;
-        var raw = await ResolveBindingAsync(dataset.Acquisition.OutputSchemaBinding, "$.dataset.acquisition.outputSchema", resource, token);
-        var final = await ResolveBindingAsync(dataset.OutputSchemaBinding, "$.dataset.outputSchema", resource, token);
+        var prior = previous?.Definition.Dataset;
+        var raw = await ResolveBindingAsync(dataset.Acquisition.OutputSchemaBinding, "$.dataset.acquisition.outputSchema", resource,
+            prior?.Acquisition.OutputSchemaBinding, prior?.Acquisition.OutputSchemaSnapshot, token);
+        var final = await ResolveBindingAsync(dataset.OutputSchemaBinding, "$.dataset.outputSchema", resource,
+            prior?.OutputSchemaBinding, prior?.OutputSchemaSnapshot, token);
         return resource with { Definition = resource.Definition with { Dataset = dataset with
         {
             Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw }, OutputSchemaSnapshot = final
@@ -105,9 +108,12 @@ public sealed class DataSourceDatasetCompositionService(
     }
 
     private async Task<SchemaBindingSnapshot?> ResolveBindingAsync(SchemaBinding? binding, string path,
-        DataSourceResource source, CancellationToken token)
+        DataSourceResource source, SchemaBinding? previousBinding, SchemaBindingSnapshot? previousSnapshot, CancellationToken token)
     {
         if (binding is null) return null;
+        if (previousSnapshot is not null && previousBinding is not null
+            && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(binding), JsonSerializer.SerializeToElement(previousBinding)))
+            return previousSnapshot;
         if (schemaBindings is null) throw Invalid("schema_resolver_unavailable", "Schema binding resolution is unavailable.");
         try
         {
