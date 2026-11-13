@@ -9,6 +9,7 @@ import { inspectConsoleAdministration } from '../src/journeys/inspect-console-ad
 import { exerciseSchemaAdministration } from '../src/journeys/exercise-schema-administration.journey.js';
 import { exerciseModelAdministration } from '../src/journeys/exercise-model-administration.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
+import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
 
 test.use({ authenticationMode: 'Local', collectionCampaign: true });
 
@@ -19,7 +20,8 @@ const cases: ReadonlyArray<{ name: string; run: Journey<Record<string, never>> }
   { name: 'Trigger occurrences and operational ownership', run: context => exerciseOperationalTriggers(context, {}) },
   { name: 'members, personal tokens and command results', run: async context => {
     await authenticateConsole(context, {});
-    await context.pages.organizationWorkspaces.selectByName('default');
+    const workspaceId = await context.pages.organizationWorkspaces.selectByName('default');
+    await new CollectionContractPage(context.pages.page).prepareMemberFixture(context.consoleUrl, workspaceId);
     await inspectConsoleAdministration(context, {});
   } },
   { name: 'Schema versions', run: context => exerciseSchemaAdministration(context, {}) },

@@ -173,6 +173,19 @@ export class CollectionContractPage {
     return { scope, owner, namespaces };
   }
 
+  public async prepareMemberFixture(consoleUrl: string, workspaceId: string): Promise<void> {
+    // Public, disposable local fixture: the platform administrator is not necessarily a Tenant member.
+    const response = await this.page.request.post(`${consoleUrl}/api/identity/accounts`, {
+      headers: { 'X-Agentstration-Context': `/workspaces/${workspaceId}` },
+      data: {
+        userName: `collection-member-${randomUUID().slice(0, 8)}`,
+        password: 'Collection-Contract-Fixture-1122!',
+        displayName: 'Collection contract member', email: null, workspaceId, role: 'Viewer',
+      },
+    });
+    expect(response.status(), await response.text()).toBe(201);
+  }
+
   public async inspectLongOwnerHomonyms(consoleUrl: string, fixture: { scope: string; owner: string; namespaces: string[] }, touch: boolean): Promise<void> {
     const open = async () => {
       expect((await this.page.goto(`${consoleUrl}/modelprofiles?context=${encodeURIComponent(fixture.scope)}`))?.ok()).toBeTruthy();
