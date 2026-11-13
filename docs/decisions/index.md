@@ -248,3 +248,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 214. [ADR-0214 — Effective data contracts follow Flow invocations](0214-effective-data-contracts-follow-flow-invocations.md)
 
 215. [ADR-0215 — Process regions have derived Flow identities](0215-process-regions-have-derived-flow-identities.md)
+
+219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)

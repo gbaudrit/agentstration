@@ -27,6 +27,7 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
         services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
         services.AddSingleton<ConnectedServiceBoundValues>();
+        services.AddSingleton<BuiltinHttpOperationExecutor>();
         AddInternalTool<ConnectedServiceAcquisitionMcpTool>(services);
         services.AddSingleton<ConnectedServiceAcquisitionExecutor>();
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
