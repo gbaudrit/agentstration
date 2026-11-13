@@ -1,0 +1,33 @@
+Running tests from /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64)
+failed DisposalWaitsForPendingMenuUpdatesAndNeverUsesAReleasedModule (355ms)
+  from /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64)
+  Assertion failed. Expected condition to be false.
+  An in-flight menu update must retain its module until it completes.
+  
+  actual: true
+  
+  Assert.IsFalse(runtime.Module.Disposed)
+    at Agentstration.Web.Components.Tests.CollectionActionsLifecycleTests.DisposalWaitsForPendingMenuUpdatesAndNeverUsesAReleasedModule() in /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/CollectionActionsLifecycleTests.cs:31
+    at Agentstration.Web.Components.Tests.CollectionActionsLifecycleTests.DisposalWaitsForPendingMenuUpdatesAndNeverUsesAReleasedModule() in /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/CollectionActionsLifecycleTests.cs:37
+    at Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution.TestMethodInfo.ExecuteInternalAsync(Object[] arguments, CancellationTokenSource timeoutTokenSource)
+failed AModuleImportedAfterDisposalIsReleasedWithoutAttachingTheRemovedMenu (20ms)
+  from /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64)
+  Assertion failed. Expected condition to be false.
+  Disposal must also wait for an outstanding import.
+  
+  actual: true
+  
+  Assert.IsFalse(disposal!.IsCompleted)
+    at Agentstration.Web.Components.Tests.CollectionActionsLifecycleTests.AModuleImportedAfterDisposalIsReleasedWithoutAttachingTheRemovedMenu() in /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/CollectionActionsLifecycleTests.cs:57
+    at Agentstration.Web.Components.Tests.CollectionActionsLifecycleTests.AModuleImportedAfterDisposalIsReleasedWithoutAttachingTheRemovedMenu() in /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/CollectionActionsLifecycleTests.cs:62
+    at Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution.TestMethodInfo.ExecuteInternalAsync(Object[] arguments, CancellationTokenSource timeoutTokenSource)
+/workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64) failed with 2 error(s) (710ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 2
+  failed: 2
+  succeeded: 0
+  skipped: 0
+  duration: 921ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

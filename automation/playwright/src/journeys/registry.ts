@@ -1,3 +1,4 @@
+import { inspectCollections, type InspectCollectionsInput } from './inspect-collections.journey.js';
 import { exerciseSharedForm, type ExerciseSharedFormInput } from './exercise-shared-form.journey.js';
 import { exerciseFormAdapter, type ExerciseFormAdapterInput } from './exercise-form-adapter.journey.js';
 import { exerciseFormWorkflow, type ExerciseFormWorkflowInput } from './exercise-form-workflow.journey.js';
@@ -72,6 +73,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'create-pack-project': (context, input) => createPackProject(context, input as unknown as CreatePackProjectInput),
   'inspect-flow-observability': (context, input) => inspectFlowObservability(context, input as unknown as InspectFlowObservabilityInput),
   'inspect-console-administration': (context, input) => inspectConsoleAdministration(context, input as unknown as InspectConsoleAdministrationInput),
+  'inspect-collections': (context, input) => inspectCollections(context, input as unknown as InspectCollectionsInput),
   'inspect-resource-administration': (context, input) => inspectResourceAdministration(context, input as unknown as InspectResourceAdministrationInput),
   'exercise-model-administration': (context, input) => exerciseModelAdministration(context, input as unknown as ExerciseModelAdministrationInput),
   'exercise-descendant-secrets': (context, input) => exerciseDescendantSecrets(context, input as unknown as ExerciseDescendantSecretsInput),

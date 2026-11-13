@@ -300,6 +300,12 @@ export const OrganizationStructureTextByLocale = {
   },
 } as const;
 
+/** Independent collection vocabulary; deliberately not derived from product RESX. */
+export const CollectionTextByLocale = {
+  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
+  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
+} as const;
+
 export const CollectionVersionTextByLocale = {
   'en-US': { version: 'Version', active: 'Published version', draft: 'Draft version', generation: 'Generation', targetArchive: 'Target archive version', configure: 'Configure' },
   'fr-FR': { version: 'Version', active: 'Version publiée', draft: 'Version du brouillon', generation: 'Génération', targetArchive: 'Version cible de l’archive', configure: 'Configurer' },

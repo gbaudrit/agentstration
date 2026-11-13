@@ -20,30 +20,65 @@
     private ElementReference root;
     private IJSObjectReference? module;
     private ElementReference? attachedRoot;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private Task pendingInterop = Task.CompletedTask;
+    private Task? disposal;
+    private bool disposed;
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
-        if (SecondaryContent is null)
-        {
-            if (module is not null && attachedRoot is { } previous)
-            {
-                await module.InvokeVoidAsync("releaseActions", previous);
-                attachedRoot = null;
-            }
-            return;
-        }
-        if (attachedRoot?.Id == root.Id) return;
-        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
-        if (attachedRoot is { } replaced) await module.InvokeVoidAsync("releaseActions", replaced);
-        await module.InvokeVoidAsync("attachActions", root);
-        attachedRoot = root;
+        if (disposed) return Task.CompletedTask;
+        return pendingInterop = UpdateAfterAsync(pendingInterop);
     }
 
-    public async ValueTask DisposeAsync()
+    private async Task UpdateAfterAsync(Task previous)
     {
-        if (module is not null)
+        try
         {
-            try { if (attachedRoot is { } attached) await module.InvokeVoidAsync("releaseActions", attached); await module.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
+            // Renders can overlap at an interop await. Retain the module until
+            // all queued updates finish, including during component disposal.
+            await previous;
+            if (disposed) return;
+            if (SecondaryContent is null)
+            {
+                if (module is not null && attachedRoot is { } removed)
+                {
+                    await module.InvokeVoidAsync("releaseActions", removed);
+                    attachedRoot = null;
+                }
+                return;
+            }
+            if (attachedRoot?.Id == root.Id) return;
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+            if (disposed) return;
+            if (attachedRoot is { } replaced)
+            {
+                await module.InvokeVoidAsync("releaseActions", replaced);
+                attachedRoot = null;
+            }
+            if (disposed) return;
+            var target = root;
+            await module.InvokeVoidAsync("attachActions", target);
+            attachedRoot = target;
         }
+        catch (JSDisconnectedException) when (disposed) { }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        disposed = true;
+        return new(disposal ??= ReleaseAfterUpdatesAsync());
+    }
+
+    private async Task ReleaseAfterUpdatesAsync()
+    {
+        try
+        {
+            await pendingInterop;
+            if (module is null) return;
+            if (attachedRoot is { } attached) await module.InvokeVoidAsync("releaseActions", attached);
+            await module.DisposeAsync();
+            module = null;
+            attachedRoot = null;
+        }
+        catch (JSDisconnectedException) { }
     }
 }
