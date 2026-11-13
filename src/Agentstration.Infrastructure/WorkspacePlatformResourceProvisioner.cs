@@ -35,6 +35,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     {
         using (scopes.PushSystem())
         {
+            await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
             await connectedServiceTypes.EnsureAsync(cancellationToken);
             await storageTypes.EnsureAsync(cancellationToken);
         }
@@ -50,6 +51,8 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
+        // Flow publication snapshots Tool contracts, so project the adapters before their Flows.
+        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await connectedServiceTypes.EnsureAsync(cancellationToken);
         await storageTypes.EnsureAsync(cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
@@ -60,7 +63,6 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         else
             await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
             ResourceScopeRef.Workspace(workspaceId),

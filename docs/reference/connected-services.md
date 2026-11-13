@@ -53,6 +53,7 @@ JSON, XML, RSS, Atom, HTML, Markdown and plain text. Its JSON result contains
 RSS contents are not parsed into articles by discovery or this acquisition adapter.
 Knowledge Sources continue to consume Data Sources through their existing flows.
 
+Startup initialization version 6 installs the additive HTTP operation types and Flows.
 The original `http-endpoint@1.0.0` remains unchanged and has no operation discovery.
 Existing services keep their exact version pin. To adopt discovery, explicitly
 select `1.1.0` through the service API (or create a new service using the preferred
