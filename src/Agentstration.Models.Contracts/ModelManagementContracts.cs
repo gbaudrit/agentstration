@@ -102,7 +102,10 @@ public sealed record ModelProfileUsageResponse(
     string DisplayName,
     string Namespace,
     ResourceScopeRef ScopeRef,
-    string ScopeDisplayName);
+    string ScopeDisplayName)
+{
+    public bool IsManaged { get; init; }
+}
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
 
 public sealed record ModelProfileIdentityResponse(

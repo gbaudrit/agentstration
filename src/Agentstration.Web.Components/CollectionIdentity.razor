@@ -1,7 +1,7 @@
 <div class="collection-identity">
     @if (IconBadges is not null)
     {
-        <span class="collection-family-icon"><ResourceIcon IconName="@IconName" Domain="@Domain" />@IconBadges</span>
+        <span class="collection-family-icon"><ResourceIcon IconName="@IconName" Domain="@Domain" /><span class="collection-icon-badges">@IconBadges</span></span>
     }
     else { <ResourceIcon IconName="@IconName" Domain="@Domain" /> }
     @if (Indicators is not null) { <div class="collection-identity-indicators">@Indicators</div> }
@@ -35,7 +35,7 @@
     [Parameter] public string Domain { get; set; } = "neutral";
     [Parameter] public RenderFragment? Versions { get; set; }
     [Parameter] public RenderFragment? Badges { get; set; }
-    [Parameter] public bool ShowNamespaceIcon { get; set; } = true;
+    [Parameter] public bool ShowNamespaceIcon { get; set; }
     [Parameter] public RenderFragment? Indicators { get; set; }
     [Parameter] public RenderFragment? NameSuffix { get; set; }
     [Parameter] public RenderFragment? IconBadges { get; set; }

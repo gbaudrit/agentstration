@@ -43,7 +43,7 @@ export class DistributionPage {
       return;
     }
     const labels = CollectionVersionTextByLocale[locale];
-    const expected = route.startsWith('/data-source-profiles') ? [labels.active, labels.draft]
+    const expected = route.startsWith('/data-source-profiles') ? [labels.active]
       : route.startsWith('/agents') ? [labels.generation] : [labels.version];
     const assertIdentity = async () => {
       const identity = frame.locator('.collection-identity').first();

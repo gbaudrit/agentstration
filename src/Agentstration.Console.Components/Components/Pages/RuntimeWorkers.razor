@@ -13,9 +13,7 @@ else
     <section class="runtime-workers-grid">
     <CollectionView TItem="RuntimeWorkerSummaryResponse" Items="items" InformationLabels="@(new string[] { T("Session"), T("Version"), T("Capacity"), T("Capabilities"), T("LastSeen") })" RowTestId="runtime-worker-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-worker-id"] = item.WorkerId.ToString("D"), ["data-presence"] = item.Presence.ToString(), ["data-session-id"] = item.SessionId?.ToString("D") ?? string.Empty })" IdentityLabel="@T("Worker")" StateLabel="@T("Presence")">
         <Identity Context="item">
-<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString()" Href="@WorkerUrl(item)" IconName="server" /></Identity>
-        <State Context="item">
-<StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" /><small>@T($"Enrollment.{item.EnrollmentState}")</small></State>
+<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString()" Href="@WorkerUrl(item)" IconName="server" ><IconBadges><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" IconOnly /></IconBadges><Badges><small>@T($"Enrollment.{item.EnrollmentState}")</small></Badges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></CollectionValue>
             <CollectionValue Label="@T("Version")"><span class="runtime-primary">@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</CollectionValue>

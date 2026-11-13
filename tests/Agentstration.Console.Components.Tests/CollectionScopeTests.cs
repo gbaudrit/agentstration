@@ -40,7 +40,8 @@ public sealed class CollectionScopeTests
         var icon = context.Render<ResourceScopeBadge>(parameters => parameters.Add(value => value.ScopeRef, scope).Add(value => value.IconOnly, true));
         Assert.AreEqual($"Tenant — {longName}", icon.Find("button").GetAttribute("aria-label"));
         Assert.AreEqual($"Tenant — {longName}", icon.Find("[role=tooltip]").TextContent);
-        StringAssert.Contains(icon.Find("use").GetAttribute("href")!, "building-community");
+        Assert.AreEqual("T", icon.Find(".scope-letter").TextContent);
+        Assert.AreEqual("true", icon.Find(".scope-letter").GetAttribute("aria-hidden"));
         var unknown = context.Render<ResourceScopeBadge>(parameters => parameters.Add(value => value.ScopeRef, ResourceScopeRef.Tenant(Guid.NewGuid())).Add(value => value.IconOnly, true));
         Assert.AreEqual("Tenant", unknown.Find("button").GetAttribute("aria-label"));
         Assert.AreEqual(1, provider.Calls);

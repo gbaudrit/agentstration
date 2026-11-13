@@ -15,8 +15,7 @@ else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("Emp
 else
 {
     <CollectionView TItem="DataSourceProfileResource" Items="items" InformationLabels="@(new[] { ExtensionLocalizer["ManagingExtension"].Value })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Versions><CollectionVersion Label="@T("ActiveVersion")" Value="@(item.ActiveVersion)" /><CollectionVersion Label="@T("DraftVersion")" Value="@item.Definition.Version" /></Versions><Badges><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="item"><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" /></Scope>
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Versions><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@ExtensionLocalizer["ManagingExtension"]">@if (Owner(item) is { } owner) {
                 <a href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a><br />

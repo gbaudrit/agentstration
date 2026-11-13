@@ -50,7 +50,7 @@ public sealed partial class FlowDetailsDesignerTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var owner = ResourceScopeRef.Tenant(Guid.NewGuid());
         var rows = Enumerable.Range(1, 40).Select(index => new FlowSummary($"flow-{index}", "Same display name", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
-        { ScopeRef = owner, Namespace = new("team"), ActiveVersion = "1.0.0", DraftRevision = index % 2 == 0 ? 17 : null, IsManaged = true }).ToArray();
+        { ScopeRef = owner, Namespace = new("team"), ActiveVersion = "1.0.0", IsManaged = true }).ToArray();
         var requests = new List<(int Skip, int Take)>();
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { PageLoader = (skip, take) =>
         {
@@ -66,9 +66,9 @@ public sealed partial class FlowDetailsDesignerTests
         StringAssert.Contains(cut.Find("a.resource-name-link").GetAttribute("href")!, "scopeRef=");
         Assert.AreEqual("team/flow-1", cut.Find(".collection-qualified-name code").TextContent);
         Assert.AreEqual("Managed / read-only", cut.Find(".managed-icon-only button").GetAttribute("aria-label"));
-        Assert.HasCount(2, cut.FindAll("tbody tr")[1].QuerySelectorAll(".collection-version-compact"));
-        Assert.AreEqual("r17", cut.Find(".collection-version-draft code").TextContent);
-        Assert.AreEqual("Draft, revision 17", cut.Find(".collection-version-draft .disclosure-trigger").GetAttribute("aria-label"));
+        Assert.HasCount(1, cut.FindAll("tbody tr")[1].QuerySelectorAll(".collection-version-compact"));
+        Assert.IsEmpty(cut.FindAll(".collection-version-draft, .collection-version-indicator"));
+        Assert.AreEqual("1.0.0", cut.Find(".collection-version-compact code").TextContent);
         Assert.HasCount(1, cut.FindAll("tbody tr")[0].QuerySelectorAll(".collection-version-compact"));
         Assert.IsFalse(cut.FindAll(".collection-pager button")[1].HasAttribute("disabled"));
         Assert.IsTrue(cut.FindAll(".collection-pager button")[0].HasAttribute("disabled"));
@@ -105,6 +105,7 @@ public sealed partial class FlowDetailsDesignerTests
         cut.WaitForAssertion(() => Assert.AreEqual("default/flow-20", cut.Find(".collection-qualified-name code").TextContent));
         CollectionAssert.AreEqual(new[] { (0, 20), (20, 20), (20, 20) }, requests);
         Assert.IsEmpty(cut.FindAll(".collection-version-draft"));
-        Assert.AreEqual("Definition version", cut.Find(".collection-version .sr-only").TextContent);
+        Assert.AreEqual("Published version", cut.Find(".collection-version .sr-only").TextContent);
+        Assert.AreEqual("—", cut.Find(".collection-version code").TextContent);
     }
 }

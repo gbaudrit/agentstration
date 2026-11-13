@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/settings/resource-scopes"
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @implements IDisposable
@@ -86,8 +87,7 @@ else
                 {
                     <CollectionView TItem="ResourceScopeInventoryItemResponse" Items="FilteredResources" InformationLabels="@(new string[] { T("Kind"), T("Updated") })" IdentityLabel="@T("Resource")" ItemAttributes="@(resource => new Dictionary<string, object> { ["class"] = "resource-row" })">
         <Identity Context="resource">
-<CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace.Value" Name="@resource.Name" Href="@ResourceUrl(resource)" IconName="layers" /></Identity>
-        <Scope Context="resource"><ResourceScopeBadge ScopeRef="selected.ScopeRef" DisplayName="@selected.DisplayName" /></Scope>
+<CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace.Value" Name="@resource.Name" Href="@ResourceUrl(resource)" IconName="layers" ><IconBadges><ResourceScopeBadge ScopeRef="selected.ScopeRef" DisplayName="@selected.DisplayName" IconOnly /><ManagedResourceBadge IsManaged="@resource.IsManaged" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="resource">
             <CollectionValue Label="@T("Kind")"><span class="pack-kind">@resource.Kind</span></CollectionValue>
             <CollectionValue Label="@T("Updated")"><time datetime="@resource.UpdatedAt.ToString("O")">@resource.UpdatedAt.ToLocalTime().ToString("g")</time></CollectionValue>

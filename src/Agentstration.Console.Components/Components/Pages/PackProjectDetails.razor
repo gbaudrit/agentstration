@@ -211,8 +211,7 @@ else
         {
             <CollectionView TItem="PackProjectBuildResource" Items="builds" InformationLabels="@(new string[] { T("Revision"), T("Created"), T("Artifact") })" ItemAttributes="@((build) => new Dictionary<string, object> { ["class"] = selectedBuild?.Uid == build.Uid ? "selected-build" : string.Empty })" IdentityLabel="@T("Version")">
         <Identity Context="build">
-<CollectionIdentity DisplayName="@build.Definition.Version" Namespace="@build.Namespace.Value" Name="@build.Name" OnOpen="() => PreviewAsync(build)" IconName="package" /></Identity>
-        <Scope Context="build"><ResourceScopeBadge ScopeRef="build.ScopeRef" /></Scope>
+<CollectionIdentity DisplayName="@build.Definition.Version" Namespace="@build.Namespace.Value" Name="@build.Name" OnOpen="() => PreviewAsync(build)" IconName="package" ><IconBadges><ResourceScopeBadge ScopeRef="build.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(build.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="build">
             <CollectionValue Label="@T("Revision")">@build.Definition.ProjectRevision</CollectionValue>
             <CollectionValue Label="@T("Created")">@build.Definition.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>

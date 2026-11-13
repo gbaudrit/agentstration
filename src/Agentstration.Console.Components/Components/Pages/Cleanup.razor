@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/cleanup"
 @rendermode InteractiveServer
 @implements IDisposable
@@ -83,7 +84,7 @@ else if (inventory is not null)
                         <div class="cleanup-row @(selected.Contains(candidate.Key) ? "selected" : null)">
                             <FormCheckbox aria-label="@candidate.DisplayName" Value="@selected.Contains(candidate.Key)" disabled="@deleting" ValueChanged="changed => Select(candidate, (new ChangeEventArgs { Value = changed }).Value is true)" />
                             <span class="cleanup-row-kind"><UiIcon Name="@Icon(candidate.Kind)" /></span>
-                            <CollectionIdentity DisplayName="@candidate.DisplayName" Namespace="@(candidate.Kind is CleanupResourceKind.Agent or CleanupResourceKind.Flow or CleanupResourceKind.Entry ? candidate.Namespace.Value : null)" Name="@candidate.Id" Href="@CandidateUrl(candidate)" IconName="@Icon(candidate.Kind)" /><ResourceScopeBadge ScopeRef="candidate.ScopeRef" />
+                            <CollectionIdentity DisplayName="@candidate.DisplayName" Namespace="@(candidate.Kind is CleanupResourceKind.Agent or CleanupResourceKind.Flow or CleanupResourceKind.Entry ? candidate.Namespace.Value : null)" Name="@candidate.Id" Href="@CandidateUrl(candidate)" IconName="@Icon(candidate.Kind)" ><IconBadges><ResourceScopeBadge ScopeRef="candidate.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(candidate.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
                             <span class="cleanup-row-detail">@KindLabel(candidate.Kind)@if (!string.IsNullOrWhiteSpace(candidate.Detail)) { <small>@candidate.Detail</small> }</span>
                             <StatusBadge Text="@StatusLabel(candidate.Status)" Status="@PlatformDashboardService.ToStatus(candidate.Status)" />
                             <time datetime="@candidate.UpdatedAt.ToString("O")">@FormatDate(candidate.UpdatedAt)</time>

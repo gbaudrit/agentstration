@@ -42,7 +42,8 @@ public sealed class ResourceScopesComponentTests
         Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}']"));
         Assert.HasCount(2, rendered.FindAll("a.resource-name-link"));
         Assert.IsEmpty(rendered.FindAll("td.resource-action"));
-        Assert.HasCount(5, rendered.FindAll(".data-grid thead th"));
+        Assert.HasCount(4, rendered.FindAll(".data-grid thead th"));
+        Assert.HasCount(3, rendered.FindAll(".collection-icon-badges .scope-letter"));
         Assert.IsEmpty(rendered.FindAll(".kind-summary"));
         Assert.HasCount(4, rendered.FindAll("[data-testid='resource-kind-filter'] option"));
         StringAssert.Contains(rendered.Find("[data-testid='resource-kind-filter']").TextContent, "Agent (1)");

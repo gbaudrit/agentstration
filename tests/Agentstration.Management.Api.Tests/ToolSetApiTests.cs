@@ -16,6 +16,43 @@ namespace Agentstration.Management.Tests;
 public sealed class ToolSetApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task CollectionPublicationProjectionKeepsDraftsNamespacesAndExactIdentitiesIndependent()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var scope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var draft = await store.PutExactAsync(scope, ToolSet(scope, "publication-list", "9.0.0", []) with
+        {
+            Definition = new() { DisplayName = "Unpublished changes", Version = "9.0.0", Publish = false }
+        }, null, true, default);
+        var homonym = await store.PutExactAsync(scope, ToolSet(scope, "publication-list", "8.0.0", []) with
+        {
+            Metadata = new() { Name = "publication-list", Namespace = new("other") }
+        }, null, true, default);
+        foreach (var (source, version, date) in new[] { (draft.Value, "1.0.0", 1), (draft.Value, "2.0.0", 2), (homonym.Value, "7.0.0", 3) })
+        {
+            await store.PutExactAsync(scope, new ToolSetVersionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolSetVersion,
+                Metadata = new() { Name = $"publication-list-{date}", Namespace = source.Namespace }, ScopeRef = scope,
+                ToolSetUid = source.Uid, ToolSetName = source.Name, ToolSetGeneration = source.Generation,
+                Version = version, DefinitionHash = "fixture", PublishedAt = DateTimeOffset.UnixEpoch.AddDays(date)
+            }, null, true, default);
+        }
+        var resources = await factory.Services.GetRequiredService<ToolSetService>().ListAsync(default);
+        Assert.AreEqual("2.0.0", resources.Single(value => value.Value.Uid == draft.Value.Uid).Value.PublishedVersion);
+        Assert.AreEqual("7.0.0", resources.Single(value => value.Value.Uid == homonym.Value.Uid).Value.PublishedVersion);
+        Assert.AreEqual("9.0.0", (await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(scope, draft.Value.Namespace, ToolResourceKinds.ToolSet, draft.Value.Name), default))!.Value.Definition.Version);
+        Assert.IsNull((await store.GetExactAsync<ToolSetResource>(ScopedResourceAddress.Create(scope, draft.Value.Namespace, ToolResourceKinds.ToolSet, draft.Value.Name), default))!.Value.PublishedVersion,
+            "The projection must not mutate the stored draft or its ETag.");
+        Assert.IsEmpty(await store.FindLatestToolSetVersionsAsync([], default));
+        Assert.IsEmpty(await store.FindLatestToolSetVersionsAsync([Guid.NewGuid()], default));
+        await Assert.ThrowsExactlyAsync<ArgumentOutOfRangeException>(() => store.FindLatestToolSetVersionsAsync(Enumerable.Range(0, 201).Select(_ => Guid.NewGuid()).ToArray(), default));
+    }
+
+    [TestMethod]
     public async Task ExactToolSetReadsPreserveScopeAndRejectAnUnrelatedWorkspace()
     {
         await using var factory = Factory();

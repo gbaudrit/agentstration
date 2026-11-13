@@ -304,6 +304,21 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         await SaveUpdateAsync(context, cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), string>> ListPublishedVersionsAsync(
+        IReadOnlyCollection<(ResourceScopeRef ScopeRef, FlowId FlowId)> flows, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(flows.Count, 200);
+        if (flows.Count == 0) return new Dictionary<(ResourceScopeRef, FlowId), string>();
+        var keys = flows.Select(flow => $"{flow.ScopeRef.Value}|{flow.FlowId.Namespace.Value}|{flow.FlowId.Value}").Distinct().ToArray();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var publications = await context.Documents.AsNoTracking()
+            .Where(value => value.Kind == VersionKind && keys.Contains(value.ScopeRef + "|" + value.Namespace + "|" + value.FlowId))
+            .GroupBy(value => new { value.ScopeRef, value.Namespace, value.FlowId })
+            .Select(group => group.OrderByDescending(value => value.UpdatedAt).ThenByDescending(value => value.Key).First())
+            .ToArrayAsync(cancellationToken);
+        return publications.ToDictionary(value => (ResourceScopeRef.Parse(value.ScopeRef), new FlowId(value.FlowId, new(value.Namespace))), value => value.Version!);
+    }
+
     public async Task<StoredFlowDraft> CreateDraftAsync(FlowDraft draft, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -320,21 +335,6 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.AsNoTracking().SingleOrDefaultAsync(value => value.Key == DraftKey(workspaceId, ownerScopeRef, flowId), cancellationToken);
         return document is null ? null : ToDraft(document);
-    }
-
-    public async Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), long>> ListDraftRevisionsAsync(
-        WorkspaceId workspaceId, IReadOnlyCollection<(ResourceScopeRef ScopeRef, FlowId FlowId)> flows, CancellationToken cancellationToken)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(flows.Count, 200);
-        if (flows.Count == 0) return new Dictionary<(ResourceScopeRef, FlowId), long>();
-        var keys = flows.Select(flow => DraftKey(workspaceId, flow.ScopeRef, flow.FlowId)).Distinct().ToArray();
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var documents = await context.Documents.AsNoTracking()
-            .Where(value => value.Kind == DraftKind && keys.Contains(value.Key))
-            .ToArrayAsync(cancellationToken);
-        return documents.Select(ToDraft).Select(stored => stored.Value)
-            .Where(draft => draft.WorkspaceId == workspaceId)
-            .ToDictionary(draft => (DraftOwnerScope(draft), draft.FlowId), draft => draft.Revision);
     }
 
     public async Task<StoredFlowDraft> UpdateDraftAsync(FlowDraft draft, string expectedETag, CancellationToken cancellationToken)

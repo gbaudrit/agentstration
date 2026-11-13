@@ -26,11 +26,7 @@ else
 {
     <CollectionView TItem="SourceProviderSummaryResponse" Items="providers ?? []" InformationLabels="@(new string[] { T("Extension"), T("Contribution") })" IdentityLabel="@T("Provider")" StateLabel="@T("Status")">
         <Identity Context="provider">
-<CollectionIdentity DisplayName="@provider.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" /></Identity>
-        <Scope Context="provider">
-<ResourceScopeBadge ScopeRef="@provider.ScopeRef" ShowName /></Scope>
-        <State Context="provider">
-<StatusBadge Text="@StatusLabel(provider.Status)" Status="@ModelManagementUi.Status(provider.Status)" /></State>
+<CollectionIdentity DisplayName="@provider.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" ><IconBadges><ResourceScopeBadge ScopeRef="@provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Status)" Status="@ModelManagementUi.Status(provider.Status)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="provider">
             <CollectionValue Label="@T("Extension")"><a class="text-button" href="/extensions">@provider.ExtensionNamespace/@provider.ExtensionName</a></CollectionValue>
             <CollectionValue Label="@T("Contribution")"><code>@provider.ContributionId</code></CollectionValue>

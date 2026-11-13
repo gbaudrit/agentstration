@@ -189,11 +189,17 @@ else
                                     <ul class="resource-links">
                                         @foreach (var tool in tools)
                                         {
-                                            <li>@if (toolState != "Conflict") { <a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a> } else { <code>@tool.Namespace/@tool.Name</code> }</li>
+                                            <li><CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(toolState != "Conflict" ? ToolUrl(tool) : null)" IconName="wrench">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
+                                                <Badges><small>@T("ContributionKind.tool") · @tool.Definition.ExternalId</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                         @foreach (var resource in resources)
                                         {
-                                            <li>@if (ManagedResourceUrl(resource) is { } url) { <a href="@url"><span><strong>@resource.Name</strong><code>@resource.Namespace/@resource.Name</code></span><span class="extension-resource-meta"><span>@ManagedResourceKindLabel(resource.Kind)</span><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></span></a> }</li>
+                                            <li><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@ManagedResourceUrl(resource)" IconName="layers">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                                <Badges><small>@ManagedResourceKindLabel(resource.Kind)</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                     </ul>
                                 </div>
@@ -218,10 +224,12 @@ else
                     var publications = installation.ManagedResources.Where(resource => resource.Published).ToArray();
                     <article class="resource-section extension-bundle-card" data-testid="extension-bundle-installation" data-bundle-id="@installation.BundleId">
                         <div class="extension-bundle-heading">
-                            <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
-                            <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
+                            <CollectionIdentity DisplayName="@installation.BundleId" Name="@installation.BundleId" IconName="layers" HeadingLevel="3">
+                                <IconBadges><ResourceScopeBadge ScopeRef="installation.ScopeRef" IconOnly /><StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" IconOnly /></IconBadges>
+                                <Badges><small>@T("Bundle")</small></Badges>
+                            </CollectionIdentity>
                         </div>
-                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><ResourceScopeBadge ScopeRef="installation.ScopeRef" /><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
+                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
                         @if (installation.ToolBindings.Count > 0)
                         {
                             <div class="extension-bundle-bindings"><p class="field-label">@T("ToolBindings")</p><div class="extension-bundle-binding-list">@foreach (var binding in installation.ToolBindings) { <a href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)" title="@binding.Value.Name">@binding.Key</a> }</div></div>
@@ -230,10 +238,7 @@ else
                         @if (resources.Length > 0)
                         {
                             <div class="extension-bundle-grid" data-testid="extension-managed-resources"><CollectionView TItem="ExtensionManagedResourceResponse" Items="resources" InformationLabels="@(new string[] { T("Type") })" IdentityLabel="@T("Identity")" ScopeLabel="@T("Scope")" StateLabel="@T("State")">
-        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(resource.Version)" /></Versions><Badges><ManagedResourceBadge IsManaged="true" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="resource">
-<ResourceScopeBadge ScopeRef="resource.ScopeRef" ShowName /></Scope>
-
+        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(resource.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="resource">
             <CollectionValue Label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></CollectionValue>
         </Information>
@@ -247,7 +252,10 @@ else
                                 <ul class="extension-bundle-publications" data-testid="extension-published-versions">
                                     @foreach (var publication in publications)
                                     {
-                                        <li><div><strong>@ManagedResourceKindLabel(publication.Kind)</strong><code>@publication.Namespace/@publication.Name</code></div><div><ResourceScopeBadge ScopeRef="publication.ScopeRef" Compact /><span>@T("Version") <code>@(publication.Version ?? "—")</code></span></div></li>
+                                        <li><CollectionIdentity DisplayName="@ManagedResourceKindLabel(publication.Kind)" Namespace="@publication.Namespace" Name="@publication.Name" IconName="layers">
+                                            <Versions><CollectionVersion Label="@T("Version")" Value="@publication.Version" /></Versions>
+                                            <IconBadges><ResourceScopeBadge ScopeRef="publication.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                        </CollectionIdentity></li>
                                     }
                                 </ul>
                             }

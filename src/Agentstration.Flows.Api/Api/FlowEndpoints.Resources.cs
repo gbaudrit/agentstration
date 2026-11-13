@@ -83,13 +83,13 @@ public static partial class FlowEndpoints
         return Results.Json(ToVersion(stored.Value), statusCode: StatusCodes.Status201Created);
     });
 
-    private static Task<IResult> ListAsync(bool? allNamespaces, int? skip, int? top, FlowService service, FlowDraftService drafts, ICurrentRequestContext requestContext, CancellationToken token) =>
-        ListCoreAsync(allNamespaces is true ? null : ResourceNamespace.Default, skip, top, service, drafts, requestContext, token);
+    private static Task<IResult> ListAsync(bool? allNamespaces, int? skip, int? top, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ListCoreAsync(allNamespaces is true ? null : ResourceNamespace.Default, skip, top, service, requestContext, token);
 
-    private static Task<IResult> ListNamespacedAsync(string @namespace, int? skip, int? top, FlowService service, FlowDraftService drafts, ICurrentRequestContext requestContext, CancellationToken token) =>
-        ListCoreAsync(ResourceNamespace.Parse(@namespace), skip, top, service, drafts, requestContext, token);
+    private static Task<IResult> ListNamespacedAsync(string @namespace, int? skip, int? top, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ListCoreAsync(ResourceNamespace.Parse(@namespace), skip, top, service, requestContext, token);
 
-    private static Task<IResult> ListCoreAsync(ResourceNamespace? @namespace, int? skip, int? top, FlowService service, FlowDraftService drafts, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> ListCoreAsync(ResourceNamespace? @namespace, int? skip, int? top, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>
     {
         var actualSkip = Math.Max(0, skip ?? 0);
         var actualTop = Math.Clamp(top ?? 50, 1, 200);
@@ -102,9 +102,11 @@ public static partial class FlowEndpoints
                 ? "/api/flows?"
                 : $"/api/namespaces/{@namespace.Value.Value}/flows?";
         var next = page.HasMore ? $"{prefix}skip={actualSkip + actualTop}&top={actualTop}" : null;
-        var revisions = await drafts.ListRevisionsAsync(CurrentWorkspace(requestContext), page.Items.Select(item => item.Value).ToArray(), token);
-        return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value,
-            revisions.TryGetValue((item.Value.ScopeRef, item.Value.Id), out var revision) ? revision : null)).ToArray(), next));
+        var publications = await service.ListPublishedVersionsAsync(page.Items.Select(item => item.Value).ToArray(), token);
+        return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value) with
+        {
+            PublishedVersion = item.Value.ActiveVersion ?? publications.GetValueOrDefault((item.Value.ScopeRef, item.Value.Id))
+        }).ToArray(), next));
     });
 
     private static Task<IResult> GetAsync(string id, string? scopeRef, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>

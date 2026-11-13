@@ -29,12 +29,10 @@ else
             @foreach (var item in items)
             {
                 <article role="listitem" class="entry-card @(item.Published is null ? "entry-card-draft" : "entry-card-published")">
-                    <CollectionIdentity DisplayName="@item.Value.DisplayName" Namespace="@item.Value.Id.Namespace.Value" Name="@item.Value.Id.Value" Href="@ConsoleResourceUrls.Entry(item.Value.Id)" IconName="entry" class="resource-name-link entry-card-link"><Badges><ManagedResourceBadge IsManaged="@item.ManagedByPack" /></Badges></CollectionIdentity>
-                    <ResourceScopeBadge Kind="ResourceScopeKind.Workspace" ShowName />
-                    <StatusBadge Text="@(item.Published is null ? T("Draft") : T("PublishedVersion", item.Published.Version))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" />
+                    <CollectionIdentity DisplayName="@item.Value.DisplayName" Namespace="@item.Value.Id.Namespace.Value" Name="@item.Value.Id.Value" Href="@ConsoleResourceUrls.Entry(item.Value.Id)" IconName="entry" class="resource-name-link entry-card-link"><Versions><CollectionVersion Label="@T("PublishedVersionLabel")" Value="@item.Published?.Version.ToString()" /></Versions><IconBadges><ResourceScopeBadge Kind="ResourceScopeKind.Workspace" ShowName IconOnly /><StatusBadge Text="@(item.Published is null ? T("Draft") : T("Published"))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" IconOnly /><ManagedResourceBadge IsManaged="@item.ManagedByPack" IconOnly /></IconBadges></CollectionIdentity>
                     <p class="entry-kind">@T("EntryKind", EnumLabel("Presentation", item.Value.Presentation.Kind))</p>
                     <p class="entry-description">@(string.IsNullOrWhiteSpace(item.Value.Description) ? T("EntryFallbackDescription", ResourceName(item.Value.Binding.ResourceId)) : item.Value.Description)</p>
-                    <p>@EnumLabel("Binding", item.Value.Binding.Kind) <strong>@ResourceName(item.Value.Binding.ResourceId)</strong> · @T("DraftRevisionCompact", item.Value.Revision)</p>
+                    <p>@EnumLabel("Binding", item.Value.Binding.Kind) <strong>@ResourceName(item.Value.Binding.ResourceId)</strong></p>
                     <CollectionActions ResourceName="@($"{item.Value.DisplayName} ({item.Value.Id.Namespace}/{item.Value.Id.Value})")"><a href="@ConsoleResourceUrls.Entry(item.Value.Id)">@T("Configure")</a></CollectionActions>
                 </article>
             }

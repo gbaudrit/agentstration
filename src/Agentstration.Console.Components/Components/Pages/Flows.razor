@@ -27,8 +27,7 @@ else
         </Toolbar>
         <Identity Context="item">
             <CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@DetailsUrl(item)" IconName="workflow" Domain="flow" ShowNamespaceIcon="false">
-                <IconBadges><span class="flow-icon-badges"><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></span></IconBadges>
-                <Indicators><ResourceScopeBadge ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /></Indicators>
+                <IconBadges><span class="flow-icon-badges"><ResourceScopeBadge ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></span></IconBadges>
                 <NameSuffix><span class="flow-kind">@KindLabel(item.Kind)</span></NameSuffix>
             </CollectionIdentity>
         </Identity>
@@ -39,8 +38,7 @@ else
         <Information Context="item">
             <CollectionValue Label="@T("Version")">
                 <div class="flow-versions">
-                    <CollectionVersion Label="@(item.ActiveVersion is not null ? T("ActiveVersion") : item.DraftRevision is not null ? T("NoActiveVersion") : T("DefinitionVersion"))" Value="@(item.ActiveVersion ?? (item.DraftRevision is null ? item.Version : null))" Compact />
-                    @if (item.DraftRevision is { } revision) { <CollectionVersion Label="@F("DraftRevision", revision)" Value="@F("RevisionShort", revision)" Compact IsDraft /> }
+                    <CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" Compact />
                 </div>
             </CollectionValue>
             <CollectionValue Label="@T("Updated")"><time datetime="@item.UpdatedAt.ToString("O")">@item.UpdatedAt.LocalDateTime.ToString("g")</time></CollectionValue>

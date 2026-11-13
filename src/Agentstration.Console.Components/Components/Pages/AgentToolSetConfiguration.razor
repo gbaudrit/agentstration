@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
 <section class="panel form-section agent-tools-panel" data-testid="agent-toolset-configuration">
@@ -14,7 +15,7 @@
             var assignment = Assignment(version);
             <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
-                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(version.Version)" /></Versions></CollectionIdentity><ResourceScopeBadge ScopeRef="version.ScopeRef" />
+                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(version.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="version.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(version.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
 
                 </header>
                 <div class="agent-toolset-assignment">

@@ -16,9 +16,7 @@ else
 {
     <CollectionView TItem="ToolCategoryResource" Items="categories" InformationLabels="@(new string[] { T("DescriptionColumn"), T("Members") })" RowTestId="tool-category-row" IdentityLabel="@T("Category")">
         <Identity Context="category">
-<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@CategoryUrl(category)" IconName="layers"><Badges><ManagedResourceBadge IsManaged="@category.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="category">
-<ResourceScopeBadge ScopeRef="category.ScopeRef" ShowName /></Scope>
+<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@CategoryUrl(category)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="category.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@category.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(category.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="category">
             <CollectionValue Label="@T("DescriptionColumn")">@(category.Definition.Description ?? "—")</CollectionValue>
             <CollectionValue Label="@T("Members")">@category.Definition.Tools.Count</CollectionValue>

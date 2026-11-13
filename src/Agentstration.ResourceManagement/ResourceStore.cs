@@ -15,7 +15,10 @@ public sealed record ResourceInventoryEntry(
     ResourceNamespace Namespace,
     string Kind,
     string Name,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public bool IsManaged { get; init; }
+}
 
 public sealed record ResourceIdentitySnapshot(
     Guid Uid,
@@ -141,6 +144,13 @@ public interface IResourceStore
             if (page.Count < pageSize) return values;
         }
     }
+
+    Task<IReadOnlyDictionary<Guid, string>> FindLatestDataSourceProfileVersionsAsync(IReadOnlyCollection<Guid> profileUids, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This store does not provide Data Source Profile publication projections.");
+
+    // Latest immutable ToolSet publication for an already-visible, bounded set of identities.
+    Task<IReadOnlyDictionary<Guid, string>> FindLatestToolSetVersionsAsync(IReadOnlyCollection<Guid> toolSetUids, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This store does not provide ToolSet publication projections.");
 
     Task<StoredResource<T>> PutAsync<T>(T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource;
     Task<StoredResource<T>> PutExactAsync<T>(ResourceScopeRef scopeRef, T resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken) where T : Resource => throw new NotSupportedException("This store does not support exact-scope writes.");

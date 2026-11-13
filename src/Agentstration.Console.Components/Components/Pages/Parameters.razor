@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/parameters"
 @implements IDisposable
 @inject IParametersClient Client
@@ -15,8 +16,7 @@ else if (Filtered.Count == 0) { <EmptyState Title="@T("NoParameters")" Message="
 else
 {
     <CollectionView TItem="ParameterResource" Items="Filtered" InformationLabels="@(new string[] { T("ValueType"), T("Value") })" RowTestId="parameter-row">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@ResourceUrl(item)" IconName="settings" Domain="neutral" ><Badges><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName /></Scope>
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@ResourceUrl(item)" IconName="settings" Domain="neutral" ><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("ValueType")">@TypeLabel(item.Definition.ValueType)</CollectionValue>
             <CollectionValue Label="@T("Value")"><code>@VisibleValue(item)</code></CollectionValue>

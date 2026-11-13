@@ -15,11 +15,7 @@ else
 {
     <CollectionView TItem="DataSourceResource" Items="items" InformationLabels="@(new string[] { T("Profile") })" IdentityLabel="@T("Name")" StateLabel="@T("State")">
         <Identity Context="item">
-<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database"><Badges><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="item">
-<ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName /></Scope>
-        <State Context="item">
-<StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("Profile")"><code>@item.Definition.Profile.Name</code></CollectionValue>
         </Information>

@@ -16,7 +16,7 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
-    public async Task FlowPageLoadsOneBoundedRequestAndRetainsActiveVersionAndDraftRevision()
+    public async Task FlowPageLoadsOneBoundedRequestAndRetainsActiveVersionAndExactIdentity()
     {
         var owner = ResourceScopeRef.Tenant(Guid.NewGuid());
         var requests = new List<string>();
@@ -25,14 +25,15 @@ public sealed partial class ApiClientTests
             requests.Add(request.RequestUri!.PathAndQuery);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new FlowPageResponse([
                 new FlowSummaryResponse("same-name", "Technical", null, FlowKind.Workflow, "2.0.0", true, "1.0.0", DateTimeOffset.UtcNow)
-                { ScopeRef = owner, Namespace = new("team"), DisplayName = "Friendly", DraftRevision = 17 }
+                { ScopeRef = owner, Namespace = new("team"), DisplayName = "Friendly", PublishedVersion = "1.0.0" }
             ], "/api/flows?allNamespaces=true&skip=40&top=20")) };
         })) { BaseAddress = new("http://localhost") };
         var client = new FlowApiClient(http);
         var page = await client.GetFlowsPageAsync(20, 20, default);
         Assert.IsTrue(page.HasMore);
         Assert.AreEqual("1.0.0", page.Items[0].ActiveVersion);
-        Assert.AreEqual(17L, page.Items[0].DraftRevision);
+        Assert.AreEqual("1.0.0", page.Items[0].PublishedVersion);
+        Assert.AreEqual("team", page.Items[0].Namespace.Value);
         Assert.AreEqual(owner, page.Items[0].ScopeRef);
         Assert.AreEqual("Friendly", page.Items[0].Name);
         CollectionAssert.AreEqual(new[] { "/api/flows?allNamespaces=true&skip=20&top=20" }, requests);

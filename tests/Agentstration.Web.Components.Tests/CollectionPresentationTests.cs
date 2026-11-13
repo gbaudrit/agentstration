@@ -150,8 +150,8 @@ public sealed class CollectionPresentationTests
                     versions.AddAttribute(2, nameof(CollectionVersion.Value), "1.0.0");
                     versions.CloseComponent();
                     versions.OpenComponent<CollectionVersion>(3);
-                    versions.AddAttribute(4, nameof(CollectionVersion.Label), "Draft version");
-                    versions.AddAttribute(5, nameof(CollectionVersion.Value), "2.0.0-preview+" + new string('a', 120));
+                    versions.AddAttribute(4, nameof(CollectionVersion.Label), "Generation");
+                    versions.AddAttribute(5, nameof(CollectionVersion.Value), "123-" + new string('a', 120));
                     versions.CloseComponent();
                 }));
                 builder.CloseComponent();
@@ -161,8 +161,8 @@ public sealed class CollectionPresentationTests
             if (card) await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
             Assert.HasCount(2, cut.FindAll(".collection-identity-text .collection-version"));
             Assert.AreEqual("Active version", cut.FindAll(".collection-version-label")[0].TextContent);
-            Assert.AreEqual("Draft version", cut.FindAll(".collection-version-label")[1].TextContent);
-            Assert.AreEqual("2.0.0-preview+" + new string('a', 120), cut.FindAll(".collection-version code")[1].TextContent);
+            Assert.AreEqual("Generation", cut.FindAll(".collection-version-label")[1].TextContent);
+            Assert.AreEqual("123-" + new string('a', 120), cut.FindAll(".collection-version code")[1].TextContent);
             Assert.AreEqual("team/profile", cut.Find(".collection-qualified-name code").TextContent);
             Assert.AreEqual("/exact-profile?scopeRef=owner", cut.Find("a").GetAttribute("href"));
             Assert.IsEmpty(cut.FindAll("a .collection-version"));
@@ -232,18 +232,16 @@ public sealed class CollectionPresentationTests
     }
 
     [TestMethod]
-    public void CompactVersionReservesTheTrailingMarkerAndKeepsFullAccessibleDraftMeaning()
+    public void CompactVersionShowsPublicationOrDashWithoutDraftControls()
     {
         using var context = Context();
-        var current = context.Render<CollectionVersion>(parameters => parameters.Add(value => value.Label, "Active version").Add(value => value.Value, "12.100.0").Add(value => value.Compact, true));
+        var current = context.Render<CollectionVersion>(parameters => parameters.Add(value => value.Label, "Published version").Add(value => value.Value, "12.100.0").Add(value => value.Compact, true));
         Assert.AreEqual("12.100.0", current.Find("code").TextContent);
-        Assert.IsNotNull(current.Find(".collection-version-indicator"));
-        Assert.IsEmpty(current.FindAll(".disclosure-trigger"));
-        var draft = context.Render<CollectionVersion>(parameters => parameters.Add(value => value.Label, "Draft, revision 17").Add(value => value.Value, "r17").Add(value => value.Compact, true).Add(value => value.IsDraft, true));
-        Assert.AreEqual("r17", draft.Find("code").TextContent);
-        Assert.AreEqual("Draft, revision 17", draft.Find("button").GetAttribute("aria-label"));
-        Assert.AreEqual("Draft, revision 17", draft.Find("[role=tooltip]").TextContent);
-        Assert.IsEmpty(draft.FindAll(".collection-version-label"));
+        Assert.AreEqual("Published version", current.Find(".sr-only").TextContent);
+        Assert.IsEmpty(current.FindAll("button, .collection-version-indicator"));
+        current.Render(parameters => parameters.Add(value => value.Label, "Published version").Add(value => value.Value, (string?)null).Add(value => value.Compact, true));
+        Assert.AreEqual("—", current.Find("code").TextContent);
+        Assert.IsEmpty(current.FindAll("button, .collection-version-indicator"));
     }
 
     private static BunitContext Context()

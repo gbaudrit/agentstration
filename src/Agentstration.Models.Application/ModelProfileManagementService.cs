@@ -135,7 +135,7 @@ public sealed class ModelProfileManagementService(
                 }
                 catch (ResourceReferenceAmbiguousException) { continue; }
                 if (resolved?.Value.Uid == profile.Uid)
-                    result.Add(new(agent.Kind, agent.Namespace, agent.Name, agent.Definition.DisplayName, scope.ScopeRef, scope.DisplayName));
+                    result.Add(new(agent.Kind, agent.Namespace, agent.Name, agent.Definition.DisplayName, scope.ScopeRef, scope.DisplayName) { IsManaged = agent.Governance.IsManaged });
             }
             if (result.Count > 0 || nextOffset is not null)
             {
@@ -222,7 +222,7 @@ public sealed class ModelProfileManagementService(
                         agent.Value.Metadata.Name,
                         agent.Value.Definition.DisplayName,
                         agentScopeRef,
-                        scope.DisplayName));
+                        scope.DisplayName) { IsManaged = agent.Value.Governance.IsManaged });
             }
         }
         return usages.ToDictionary(

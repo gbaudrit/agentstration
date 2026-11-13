@@ -239,7 +239,7 @@ public sealed class PostgreSqlResourceStore(
             ResourceNamespace.Parse(value.Namespace),
             value.Kind,
             value.Name,
-            value.UpdatedAt)).ToArray();
+            value.UpdatedAt) { IsManaged = ReadGovernance(value.Payload).IsManaged }).ToArray();
     }
 
     public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)
@@ -518,6 +518,36 @@ public sealed class PostgreSqlResourceStore(
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
         LoadKindAsync<T>(kind, cancellationToken);
 
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestToolSetVersionsAsync(
+        IReadOnlyCollection<Guid> toolSetUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(toolSetUids, "ToolSetVersion", "toolSetUid", cancellationToken);
+
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestDataSourceProfileVersionsAsync(
+        IReadOnlyCollection<Guid> profileUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(profileUids, "DataSourceProfileRevision", "profileUid", cancellationToken);
+
+    private async Task<IReadOnlyDictionary<Guid, string>> FindLatestPublicationVersionsAsync(
+        IReadOnlyCollection<Guid> resourceUids, string kind, string ownerProperty, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(resourceUids.Count, 200);
+        if (resourceUids.Count == 0) return new Dictionary<Guid, string>();
+        var identities = JsonSerializer.Serialize(resourceUids);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await Scoped(context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM management."ControlPlaneResources" WHERE "Uid" IN (
+                SELECT "Uid" FROM (
+                    SELECT "Uid", ROW_NUMBER() OVER (
+                        PARTITION BY "Payload"::jsonb->>{ownerProperty}
+                        ORDER BY "Payload"::jsonb->>'publishedAt' DESC, "Uid" DESC) AS position
+                    FROM management."ControlPlaneResources" WHERE "Kind" = {kind}
+                        AND "Payload"::jsonb->>{ownerProperty} IN (SELECT jsonb_array_elements_text({identities}::jsonb))) latest
+                WHERE position = 1)
+            """).AsNoTracking()).Include(value => value.Scope).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, documents, cancellationToken);
+        return visible.Select(value => JsonSerializer.Deserialize<JsonElement>(value.Payload))
+            .ToDictionary(value => value.GetProperty(ownerProperty).GetGuid(), value => value.GetProperty("version").GetString()!);
+    }
+
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
         (await LoadKindAsync<AgentRevision>(AgentResourceKinds.AgentRevision, cancellationToken)).SingleOrDefault(value => value.Value.AgentUid == agentUid && value.Value.AgentVersion == generation);
 
@@ -710,7 +740,6 @@ public sealed class PostgreSqlResourceStore(
         requestContext.AccessMode is ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration
             ? Task.FromResult(new[] { target.Id })
             : VisibleScopeIdsAsync(context, target, cancellationToken);
-
 
     private static ResourceScope Map(ResourceScopeRow row) => new(
         row.Id,

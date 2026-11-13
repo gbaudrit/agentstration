@@ -56,7 +56,7 @@ internal sealed class GetModelProfileUsagePageEndpoint : IModelManagementEndpoin
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.ModelProfile, profileName, ModelsApiHttp.Namespace(resourceNamespace)));
             var protector = protection.CreateProtector("ModelProfileUsages.v1", profile.Value.Uid.ToString("D"), search ?? "");
             var page = await service.GetUsagePageAsync(profile.Value, search, ModelCollectionCursor.Read(cursor, protector), cancellationToken);
-            var values = page.Value.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName, value.Namespace.Value, value.ScopeRef, value.ScopeDisplayName)).ToArray();
+            var values = page.Value.Select(value => new ModelProfileUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName, value.Namespace.Value, value.ScopeRef, value.ScopeDisplayName) { IsManaged = value.IsManaged }).ToArray();
             return Results.Ok(new ModelProfileUsagePageResponse(values, page.NextCursor is { } next ? protector.Protect(next) : null, cursor is null && page.NextCursor is null ? values.Length : null));
         });
 }

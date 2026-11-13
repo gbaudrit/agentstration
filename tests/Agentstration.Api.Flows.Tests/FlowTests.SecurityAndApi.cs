@@ -672,8 +672,9 @@ public sealed partial class FlowTests
         var listedDrafts = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=200", JsonOptions);
         Assert.IsNotNull(listedDrafts);
         var listedDraft = listedDrafts.Value.Single(flow => flow.Id == "designer-api-flow");
-        Assert.AreEqual(1L, listedDraft.DraftRevision);
+        Assert.IsFalse(JsonSerializer.SerializeToElement(listedDraft, JsonOptions).TryGetProperty("draftRevision", out _), "The list must not enrich publication metadata with a draft counter.");
         Assert.IsNull(listedDraft.ActiveVersion);
+        Assert.IsNull(listedDraft.PublishedVersion);
         Assert.AreEqual(6, Enum.GetValues<FlowNodeKind>().Count(kind => kind is FlowNodeKind.Input or FlowNodeKind.Agent or FlowNodeKind.Router or FlowNodeKind.Condition or FlowNodeKind.Transform or FlowNodeKind.Output));
 
         using var validationResponse = await client.PostAsync("/api/flows/designer-api-flow/validate", null);
@@ -782,4 +783,3 @@ public sealed partial class FlowTests
         [new FlowNode("input", FlowNodeKind.Input)],
         []);
 }
-

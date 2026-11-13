@@ -82,4 +82,5 @@
   <data name="AcquisitionToolForbidden"><value>Vous n’avez pas l’autorisation de créer un Tool à partir de cette acquisition.</value></data>
   <data name="AcquisitionToolCreateFailed"><value>Le Tool n’a pas pu être créé à partir de cette acquisition.</value></data>
   <data name="Cancel"><value>Annuler</value></data>
-<data name="VersionState.Active"><value>Active</value></data><data name="VersionState.Published"><value>Publiée</value></data></root>
+<data name="VersionState.Active"><value>Active</value></data><data name="VersionState.Published"><value>Publiée</value></data>  <data name="PublishedVersion" xml:space="preserve"><value>Version publiée</value></data>
+</root>

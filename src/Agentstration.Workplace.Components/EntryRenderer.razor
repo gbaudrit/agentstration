@@ -19,8 +19,7 @@
     [Parameter] public string? ResourceHref { get; set; }
     [Parameter] public string? WorkspaceDisplayName { get; set; }
     private RenderFragment ResourceHeader => @<header class="entry-heading">
-        <CollectionIdentity DisplayName="@Definition.DisplayName" Namespace="@Definition.Id.Namespace.Value" Name="@Definition.Id.Value" Href="@ResourceHref" IconName="@(Definition.Presentation.Icon ?? "entry")" HeadingLevel="2" />
-        <ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Definition.WorkspaceId.Value)" DisplayName="@WorkspaceDisplayName" />
+        <CollectionIdentity DisplayName="@Definition.DisplayName" Namespace="@Definition.Id.Namespace.Value" Name="@Definition.Id.Value" Href="@ResourceHref" IconName="@(Definition.Presentation.Icon ?? "entry")" HeadingLevel="2" ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Definition.WorkspaceId.Value)" DisplayName="@WorkspaceDisplayName" IconOnly /></IconBadges></CollectionIdentity>
         @if (Definition.Description is not null) { <p>@Definition.Description</p> }
     </header>;
 

@@ -23,11 +23,7 @@ else
     @if (FilteredTools.Count == 0) { <EmptyState Title="@Shared["NoMatches"]" Message="@Shared["NoMatchesHelp"]" /> }
     <div class="tool-catalog-grid"><CollectionView TItem="ToolResource" Items="PageTools" InformationLabels="@(new string[] { T("Provider"), T("Enabled") })" IdentityLabel="@T("Tool")" StateLabel="@T("Availability")">
         <Identity Context="tool">
-<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><Badges><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="tool">
-<ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName /></Scope>
-        <State Context="tool">
-<StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></State>
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="tool">
             <CollectionValue Label="@T("Provider")">
             @if (ManagingExtension(tool) is { } extension)

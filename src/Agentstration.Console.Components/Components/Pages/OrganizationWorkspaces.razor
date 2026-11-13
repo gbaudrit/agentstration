@@ -46,9 +46,7 @@ else if (structure is not null)
                     <article class="tenant-group" @key="tenant.Id" data-testid="tenant-row" data-tenant-id="@tenant.Id" data-tenant-name="@tenant.Name">
                         <div class="tenant-heading @(currentTenant ? "is-current" : null)">
                             <button class="tenant-toggle" aria-label="@T("ToggleTenant", tenant.DisplayName)" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@($"tenant-{tenant.Id:D}")" @onclick="() => Toggle(tenant.Id)"><span aria-hidden="true">@(expanded ? "▾" : "▸")</span></button>
-                            <CollectionIdentity DisplayName="@tenant.DisplayName" Name="@tenant.Name" Href="@(!currentTenant && ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id) ? ContextUrl($"/tenants/{tenant.Id:D}") : null)" IconName="building" />
-                            <ResourceScopeBadge ScopeRef="@ResourceScopeRef.Tenant(tenant.Id)" DisplayName="@tenant.DisplayName" />
-                            <StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
+                            <CollectionIdentity DisplayName="@tenant.DisplayName" Name="@tenant.Name" Href="@(!currentTenant && ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id) ? ContextUrl($"/tenants/{tenant.Id:D}") : null)" IconName="building" ><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Tenant(tenant.Id)" DisplayName="@tenant.DisplayName" IconOnly /><StatusBadge Text="@T($"Status.{tenant.Status}")" Status="@(tenant.Status == TenantStatus.Active ? UiStatus.Success : UiStatus.Neutral)" IconOnly /></IconBadges></CollectionIdentity>
                             @if (currentTenant) { <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span> }
                             @if (entry.CanCreateWorkspace || !currentTenant && ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && CanOpenTenant(tenant.Id))
                             {
@@ -65,9 +63,7 @@ else if (structure is not null)
                                 {
                                     var currentWorkspace = IsCurrentWorkspace(workspace.Id);
                                     <div class="workspace-row @(currentWorkspace ? "is-current" : null)" data-testid="workspace-row" data-workspace-id="@workspace.Id" data-workspace-name="@workspace.Name">
-                                        <CollectionIdentity DisplayName="@workspace.DisplayName" Name="@workspace.Name" Href="@(!currentWorkspace && workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id) ? ContextUrl($"/workspaces/{workspace.Id:D}") : null)" IconName="layout-grid" />
-                                        <ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(workspace.Id)" DisplayName="@workspace.DisplayName" />
-                                        <StatusBadge Text="@T($"Status.{workspace.Status}")" Status="@(workspace.Status == WorkspaceStatus.Active ? UiStatus.Success : UiStatus.Neutral)" />
+                                        <CollectionIdentity DisplayName="@workspace.DisplayName" Name="@workspace.Name" Href="@(!currentWorkspace && workspace.Status == WorkspaceStatus.Active && CanOpen(workspace.Id) ? ContextUrl($"/workspaces/{workspace.Id:D}") : null)" IconName="layout-grid" ><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(workspace.Id)" DisplayName="@workspace.DisplayName" IconOnly /><StatusBadge Text="@T($"Status.{workspace.Status}")" Status="@(workspace.Status == WorkspaceStatus.Active ? UiStatus.Success : UiStatus.Neutral)" IconOnly /></IconBadges></CollectionIdentity>
                                         @if (currentWorkspace)
                                         {
                                             <span class="current-context" aria-current="true"><UiIcon Name="check" />@T("CurrentContext")</span>

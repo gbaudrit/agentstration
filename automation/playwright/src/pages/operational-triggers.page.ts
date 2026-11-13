@@ -123,7 +123,7 @@ export class OperationalTriggersPage {
     await this.details.waitFor({ state: 'visible' });
     await expect(this.details).toContainText(fixture.triggerDisplayName);
     await expect(this.page.getByTestId(TestIds.triggers.definitionScope)
-      .locator('.resource-scope-badge[title="/instance"]')).toBeVisible();
+      .locator('.resource-owner-icon button[aria-label="Instance"]')).toBeVisible();
 
     await this.open(
       `${consoleUrl}/triggers/${encodeURIComponent(fixture.triggerName)}/edit`,

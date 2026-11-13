@@ -199,7 +199,7 @@ public sealed partial class FlowDetailsDesignerTests
     }
 
     [TestMethod]
-    public void FlowRunGridUsesFlowNameAsDetailsLinkAndPlacesStatusThird()
+    public void FlowRunGridUsesFlowNameAsDetailsLinkAndPreservesExecutionScopeAndStatusMarker()
     {
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -224,7 +224,8 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.AreEqual(strings["Status"].Value, headers[2]);
+        Assert.AreEqual(strings["Started"].Value, headers[2]);
+        Assert.AreEqual(strings["Status.Succeeded"].Value, rendered.Find(".status-icon-only button").GetAttribute("aria-label"));
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("multi-agent-review", link.TextContent.Trim());
         Assert.AreEqual($"/flow-runs/flowrun-review-1?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", link.GetAttribute("href"));

@@ -31,15 +31,14 @@
   <data name="PageSize" xml:space="preserve"><value>Rows per page</value></data>
   <data name="LoadError" xml:space="preserve"><value>Flow definitions could not be loaded.</value></data>
   <data name="Retry" xml:space="preserve"><value>Retry</value></data>
-  <data name="VersionHelp" xml:space="preserve"><value>First line: active version, or the definition version for a legacy definition. The pencil marks an existing draft revision (rN); its publication version is chosen when publishing. A dash means no active version.</value></data>
+  <data name="VersionHelp" xml:space="preserve"><value>Published version, or an em dash when this Flow has not been published.</value></data>
   <data name="ActiveVersion" xml:space="preserve"><value>Active version</value></data>
   <data name="NoActiveVersion" xml:space="preserve"><value>No active version</value></data>
   <data name="DefinitionVersion" xml:space="preserve"><value>Definition version</value></data>
-  <data name="DraftRevision" xml:space="preserve"><value>Draft, revision {0}</value></data>
-  <data name="RevisionShort" xml:space="preserve"><value>r{0}</value></data>
   <data name="Kind.Direct" xml:space="preserve"><value>Direct</value></data>
   <data name="Kind.Routing" xml:space="preserve"><value>Routing</value></data>
   <data name="Kind.Workflow" xml:space="preserve"><value>Workflow</value></data>
   <data name="Kind.Orchestration" xml:space="preserve"><value>Orchestration</value></data>
   <data name="Kind.Composite" xml:space="preserve"><value>Composite</value></data>
+  <data name="PublishedVersion" xml:space="preserve"><value>Published version</value></data>
 </root>

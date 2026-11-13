@@ -38,7 +38,7 @@ public sealed class ModelProfilePickerTests
         Assert.IsFalse(string.IsNullOrEmpty(description));
         var describedRow = rendered.FindAll("[id]").Single(element => element.Id == description);
         StringAssert.Contains(describedRow.TextContent, "Original profile");
-        Assert.AreEqual("/instance", describedRow.QuerySelector(".resource-scope-badge")!.GetAttribute("title"));
+        Assert.AreEqual("/instance", describedRow.QuerySelector(".resource-owner-icon")!.GetAttribute("data-scope-ref"));
         StringAssert.Contains(currentChoice.TextContent, "Selected");
         Assert.IsEmpty(rendered.FindAll(".collection-pager"));
         Assert.IsEmpty(changes);

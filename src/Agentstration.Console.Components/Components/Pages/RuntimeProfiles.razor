@@ -15,8 +15,7 @@ else if (profiles.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T
 else
 {
     <CollectionView TItem="RuntimeProfileSummaryResponse" Items="profiles" InformationLabels="@(new[] { T("Runtime"), T("Session"), T("Streaming"), T("Usage") })">
-        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime"><Badges><ManagedResourceBadge IsManaged="@profile.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="profile"><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" /></Scope>
+        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime"><IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="profile">
             <CollectionValue Label="@T("Runtime")"><code>@profile.Properties.RuntimeType</code></CollectionValue>
             <CollectionValue Label="@T("Session")">@SessionLabel(profile.Properties.Execution.SessionMode)</CollectionValue>

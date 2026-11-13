@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/settings/source-registries"
 @page "/settings/source-registries/new"
 @page "/settings/source-registries/{Name}"
@@ -59,10 +60,7 @@
             <div class="registry-table">
                 <CollectionView TItem="SourceRegistryRegistrationView" Items="registries ?? []" InformationLabels="@(new string[] { T("EndpointType"), T("LastResult"), T("NextRefresh"), T("Enabled") })" ItemAttributes="@((item) => new Dictionary<string, object> { ["class"] = IsOfficial(item) ? "registry-official" : string.Empty })" IdentityLabel="@T("Registry")" StateLabel="@T("Freshness")">
         <Identity Context="item">
-<CollectionIdentity DisplayName="@item.Registration.Definition.DisplayName" Namespace="@item.Registration.Namespace.Value" Name="@item.Registration.Name" Href="@RegistryUrl(item.Registration.Name)" IconName="database"><Badges><ManagedResourceBadge IsManaged="@item.Registration.Governance.IsManaged" /></Badges></CollectionIdentity>@if (IsOfficial(item)) { <span class="registry-kind-note">@T("WellKnownOfficial")</span> }</Identity>
-        <Scope Context="item"><ResourceScopeBadge ScopeRef="item.Registration.ScopeRef" Kind="ResourceScopeKind.Instance" /></Scope>
-        <State Context="item">
-<StatusBadge Text="@ObservedStatus(item.Observed.Definition.Status)" Status="@ObservedTone(item.Observed.Definition.Status)" /><small>@FormatDate(item.Observed.Definition.LastSuccessfulRefreshAt)</small></State>
+<CollectionIdentity DisplayName="@item.Registration.Definition.DisplayName" Namespace="@item.Registration.Namespace.Value" Name="@item.Registration.Name" Href="@RegistryUrl(item.Registration.Name)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.Registration.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@item.Registration.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Registration.ScopeRef, Services))" IconOnly /><StatusBadge Text="@ObservedStatus(item.Observed.Definition.Status)" Status="@ObservedTone(item.Observed.Definition.Status)" IconOnly /></IconBadges><Badges><small>@FormatDate(item.Observed.Definition.LastSuccessfulRefreshAt)</small></Badges></CollectionIdentity>@if (IsOfficial(item)) { <span class="registry-kind-note">@T("WellKnownOfficial")</span> }</Identity>
         <Information Context="item">
             <CollectionValue Label="@T("EndpointType")"><StatusBadge Text="@EndpointType(item)" Status="@(IsOfficial(item) ? UiStatus.Info : UiStatus.Neutral)" /><small>@TrustPolicy(item.Registration.Definition.TrustPolicy)</small></CollectionValue>
             <CollectionValue Label="@T("LastResult")"><strong>@RefreshOutcome(item.Observed.Definition.LastOutcome)</strong>@if (!string.IsNullOrWhiteSpace(item.Observed.Definition.LastErrorMessage)) { <small class="registry-error" title="@item.Observed.Definition.LastErrorMessage">@item.Observed.Definition.LastErrorMessage</small> }</CollectionValue>

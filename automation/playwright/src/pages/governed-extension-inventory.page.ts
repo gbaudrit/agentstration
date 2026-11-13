@@ -54,9 +54,10 @@ export class GovernedExtensionInventoryPage {
       const row = grid.locator('tbody > tr, .collection-card').nth(index);
       await expect(row.locator('.extension-bundle-kind')).toHaveText(kind);
       await expect(row.locator('.collection-qualified-name code')).toHaveText(`${namespace}/qa-managed`);
-      await expect(row.locator('.resource-scope-badge')).toHaveText(text.scope);
+      await expect(row.locator('.resource-owner-icon button')).toHaveAccessibleName(text.scope);
+      await expect(row.locator('.scope-letter')).toHaveText('I');
       await expect(row).toContainText('2.4.0');
-      await expect(row.locator('.managed-resource-badge')).toHaveText(text.managedBadge);
+      await expect(row.locator('.managed-resource-badge button')).toHaveAccessibleName(text.managedBadge);
     }
     for (const href of await grid.locator('a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) this.assertScopedLink(href);
     await expect(grid).toContainText(`${namespace}/qa-managed`);

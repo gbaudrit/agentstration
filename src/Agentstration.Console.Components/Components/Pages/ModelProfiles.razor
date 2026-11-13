@@ -33,9 +33,7 @@ else if (FilteredProfiles.Count == 0)
 else
 {
     <CollectionView TItem="ModelProfileSummaryResponse" Items="FilteredProfiles" InformationLabels="@(new[] { T("Provider"), T("Model"), T("Usage") })">
-        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model"><Badges><ManagedResourceBadge IsManaged="@profile.IsManaged" /></Badges></CollectionIdentity></Identity>
-        <Scope Context="profile"><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" /></Scope>
-        <State Context="profile"><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" /></State>
+        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model"><IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="profile">
             <CollectionValue Label="@T("Provider")">@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</CollectionValue>
             <CollectionValue Label="@T("Model")"><code>@profile.Properties.Model.Name</code></CollectionValue>
@@ -50,7 +48,7 @@ else
 
 @if (deleteConflictUsages.Count > 0)
 {
-    <section class="panel resource-section"><div class="panel-header"><h2>@T("DeleteConflictTitle")</h2></div><p>@T("DeleteConflictMessage", AgentCount(deleteConflictUsages.Count))</p><ul>@foreach (var usage in deleteConflictUsages) { <li><a href="@AgentUrl(usage)">@usage.DisplayName <code>@usage.Name</code></a></li> }</ul></section>
+    <section class="panel resource-section"><div class="panel-header"><h2>@T("DeleteConflictTitle")</h2></div><p>@T("DeleteConflictMessage", AgentCount(deleteConflictUsages.Count))</p><ul>@foreach (var usage in deleteConflictUsages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent"><IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges></CollectionIdentity></li> }</ul></section>
 }
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteDialogTitle")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />

@@ -650,7 +650,8 @@ public sealed class ExtensionsConsoleTests
         Assert.IsEmpty(publications.QuerySelectorAll("a"));
         StringAssert.Contains(publications.TextContent, "crawl4ai-web-acquisition--92521fc3");
         StringAssert.Contains(publications.TextContent, "data-source-profile-revision--abcd");
-        Assert.HasCount(3, publications.QuerySelectorAll(".resource-scope-badge"));
+        Assert.HasCount(3, publications.QuerySelectorAll(".resource-owner-icon .scope-letter"));
+        Assert.IsTrue(publications.QuerySelectorAll(".resource-owner-icon button").All(button => button.GetAttribute("aria-label") == "Instance"));
         Assert.HasCount(3, publications.QuerySelectorAll("span code").Where(value => value.TextContent == "1.0.0"));
     }
 

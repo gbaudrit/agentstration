@@ -24,9 +24,7 @@ else if (providers?.Count == 0)
 else
 {
     <CollectionView TItem="ModelProviderResponse" Items="providers ?? []" InformationLabels="@(new string[] { T("Type"), T("Management"), T("Models") })" >
-        <Identity Context="provider"><CollectionIdentity DisplayName="@provider.Properties.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" Domain="model" /></Identity>
-        <Scope Context="provider"><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName /></Scope>
-        <State Context="provider"><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" /></State>
+        <Identity Context="provider"><CollectionIdentity DisplayName="@provider.Properties.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" Domain="model" ><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="provider">
             <CollectionValue Label="@T("Type")">@provider.Properties.ContributionId</CollectionValue>
             <CollectionValue Label="@T("Management")">@provider.Properties.RegistrationSource</CollectionValue>

@@ -37,9 +37,7 @@ else
             @foreach (var conversation in conversations)
             {
                 <article class="conversation-row" role="listitem" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status">
-                    <CollectionIdentity DisplayName="@conversation.Title" Name="@conversation.Interaction.Id.ToString()" Href="@conversation.Url" IconName="message-circle" data-testid="conversation-row" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status" />
-                    <ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(WorkspaceId)" DisplayName="@ContextState.Current?.WorkspaceDisplayName" />
-                    <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
+                    <CollectionIdentity DisplayName="@conversation.Title" Name="@conversation.Interaction.Id.ToString()" Href="@conversation.Url" IconName="message-circle" data-testid="conversation-row" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status" ><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(WorkspaceId)" DisplayName="@ContextState.Current?.WorkspaceDisplayName" IconOnly /><StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" IconOnly /></IconBadges></CollectionIdentity>
                     <span>@conversation.Entry.DisplayName</span>
                     @if (conversation.Interaction.PendingActionId is not null) { <small class="conversation-pending">@T("NeedsInput")</small> }
                     <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>

@@ -22,7 +22,7 @@ public sealed class ResourceScopeApiService(
                 resource.Namespace,
                 resource.Kind,
                 resource.Name,
-                resource.UpdatedAt)).ToArray())).ToArray());
+                resource.UpdatedAt) { IsManaged = resource.IsManaged }).ToArray())).ToArray());
     }
 
     public async Task<IReadOnlyList<ResourceScopeTargetResponse>> ListTargetsAsync(
