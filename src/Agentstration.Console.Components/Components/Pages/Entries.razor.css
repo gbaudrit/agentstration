@@ -57,12 +57,25 @@
 
 .entry-card {
     position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--surface);
     box-shadow: var(--shadow);
     transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.entry-card-context { min-width: 0; }
+.entry-card-context p { margin: .2rem 0; }
+.entry-card ::deep .collection-action-group { justify-content: flex-end; }
+
+@media (max-width: 1050px) {
+    .entry-card { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
 }
 
 .entry-card::before {

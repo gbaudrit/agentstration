@@ -71,6 +71,29 @@ export class DistributionPage {
     await expect(frame.locator('table')).toBeVisible();
   }
 
+  public async inspectCompactProjectCard(consoleUrl: string, locale: SupportedTestLocale, displayName: string): Promise<void> {
+    await this.open(consoleUrl, '/packs', 'packs');
+    const project = this.page.locator('.pack-resource-list article').filter({ hasText: displayName });
+    await expect(project).toBeVisible();
+    await expect(project.locator('.collection-version-label')).toHaveText(CollectionVersionTextByLocale[locale].targetArchive);
+    await expect(project.locator('.collection-version code')).toHaveText('2.3.4');
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  }
+
+  public async inspectCompactEntryCards(consoleUrl: string, locale: SupportedTestLocale, workspaceId: string): Promise<void> {
+    expect((await this.page.goto(`${consoleUrl}/entries`))?.ok()).toBe(true);
+    const entry = this.page.locator('.entry-card').first();
+    await expect(entry).toBeVisible();
+    await expect(entry.locator('.collection-version-label')).toHaveText(CollectionVersionTextByLocale[locale].active);
+    await expect(entry.locator('.resource-owner-icon')).toHaveAttribute('data-scope-ref', `/workspaces/${workspaceId}`);
+    const configure = entry.locator('.collection-primary-actions').getByRole('link', { name: CollectionVersionTextByLocale[locale].configure, exact: true });
+    await expect(configure).toBeVisible();
+    await expect(configure.locator('xpath=ancestor::details')).toHaveCount(0);
+    await expect(entry.locator('details')).toHaveCount(0);
+    expect(await configure.getAttribute('href')).toBe(await entry.locator('.resource-name-link').getAttribute('href'));
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  }
+
   public async inspectDirectEnrollmentActions(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions?tab=enrollments&context=%2Finstance', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });

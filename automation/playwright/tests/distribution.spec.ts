@@ -43,6 +43,15 @@ for (const variant of [
       }
       await pages.distribution.inspectDirectProfileChoice(product.consoleUrl);
       await capture('profile-primary-choice');
+      const workspaceId = await pages.organizationWorkspaces.selectByName('default');
+      const projectName = `compact-cards-${variant.locale.toLowerCase()}-${variant.theme}`;
+      await pages.distribution.createPackProject(product.consoleUrl, {
+        publisher: 'playwright', name: projectName, version: '2.3.4', displayName: projectName,
+      });
+      await pages.distribution.inspectCompactProjectCard(product.consoleUrl, variant.locale, projectName);
+      await capture('pack-project-card');
+      await pages.distribution.inspectCompactEntryCards(product.consoleUrl, variant.locale, workspaceId);
+      await capture('entry-cards');
     } finally {
       await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
     }
