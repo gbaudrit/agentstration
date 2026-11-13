@@ -3,10 +3,11 @@ import { ProductPages } from '../src/pages/product.pages.js';
 import { withCollectionAssertions } from '../src/journeys/inspect-collections.journey.js';
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { inspectFlowObservability } from '../src/journeys/inspect-flow-observability.journey.js';
-import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
+import { CollectionContractPage, type CollectionObservation } from '../src/pages/collection-contract.page.js';
 import { createPackProject } from '../src/journeys/create-pack-project.journey.js';
 import { importSource } from '../src/journeys/import-source.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
+import { Checkpoints } from '../src/contracts/checkpoints.js';
 
 // The existing observability/Workplace journeys use the seeded Development topology.
 test.use({ authenticationMode: 'Development', collectionCampaign: true });
@@ -26,24 +27,28 @@ test('Workplace populated entry, conversation, task, activity and notifications 
   await authenticateConsole(journeyContext, {});
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const collections = new CollectionContractPage(page);
-  const observations = [];
+  const observations: CollectionObservation[] = [];
+  const record = async (name: string) => {
+    observations.push(await collections.inspect('en-US'));
+    await testInfo.attach(name, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  };
   const workspace = await pages.workplace.openRoot(product.workplaceUrl);
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.workplace.home);
   await pages.workplace.openEntry(product.workplaceUrl, workspace, 'default', 'prepare-report');
   const conversation = await pages.workplace.submitPrompt('Prepare a deterministic collection contract report.');
   const taskId = await pages.workplace.waitForInlineTask();
   await pages.workplace.waitForAgentResponse();
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.workplace.responseCompleted);
   await pages.workplace.openActivity(product.workplaceUrl, workspace.workspaceName);
   await pages.workplace.waitForConversation(conversation.conversationId);
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.collections.workplaceActivity);
   await pages.workplace.showTasks();
   await pages.workplace.waitForTask(taskId);
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.collections.workplaceTasks);
   await pages.workplace.openTask(product.workplaceUrl, workspace.workspaceName, taskId);
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.collections.workplaceTask);
   await pages.workplace.openNotifications(product.workplaceUrl, workspace.workspaceName);
-  observations.push(await collections.inspect('en-US'));
+  await record(Checkpoints.collections.workplaceNotifications);
   await pages.workplace.markFirstNotificationRead();
   await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
 });

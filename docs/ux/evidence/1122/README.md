@@ -1,5 +1,7 @@
 # Reusable collection coverage evidence (#1122)
 
+The gallery and counts below describe a **historical checkpoint**. The current approved compact contract has 116 added cases and 483 total synchronized smoke cases. See the [current compact gallery and CI evidence](compact-all/README.md). Earlier results do not validate the current rollout.
+
 The expanded local campaign passed **115 cases**, with zero failures, skipped or flaky cases. It exercised 98 independent route/tab/alias cases, ten populated domain workflows, four long-owner/homonym variants and three source-inventory checks against parent implementation `1e2c797`. A separate follow-up passed all three strengthened catalog checks after distinguishing three unmounted legacy renderers and explicit host ownership for live shared widgets.
 
 These unedited screenshots are success attachments from the actual executable application. The owner name uses the maximum supported 120 characters; the two Model Profiles share a display/technical name and differ by namespace. Tests verify exact navigation/copy, visible owner type, bounded ellipsis, full hover/focus/tap disclosure, Escape/focus restoration, accessible text and absence of per-row owner-resolution requests.

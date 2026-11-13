@@ -46,6 +46,7 @@ for (const variant of [
           await pages.consoleAdministration.createToken(`collection-menu-${randomUUID().slice(0, 8)}`);
         }
         await inspectCollections(journeyContext, { route, locale: variant.locale });
+        await testInfo.attach('collection-observation', { body: JSON.stringify(await new CollectionContractPage(page).observe(), null, 2), contentType: 'application/json' });
         await testInfo.attach('collection-contract-rendering', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       });
     }

@@ -153,7 +153,18 @@ export class CollectionContractPage {
       if (await menus.count()) await this.inspectMenu(menus.first());
     }
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
-    return { url: this.page.url(), frames: await frames.count(), identities: await identities.count(), menus: await menus.count(), scopes: await scopes.count(), states: await states.count() };
+    return this.observe();
+  }
+
+  public async observe(): Promise<CollectionObservation> {
+    const [frames, identities, menus, scopes, states] = await Promise.all([
+      this.page.locator('.resource-collection:visible').count(),
+      this.page.locator('.collection-identity:visible').count(),
+      this.page.locator('.collection-actions-menu:visible').count(),
+      this.page.locator('.resource-owner-scope:visible').count(),
+      this.page.locator('.status-badge:visible').count(),
+    ]);
+    return { url: this.page.url(), frames, identities, menus, scopes, states };
   }
 
   public async prepareLongOwnerHomonyms(consoleUrl: string): Promise<{ scope: string; owner: string; namespaces: string[] }> {
