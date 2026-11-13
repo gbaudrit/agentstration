@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-slack
+  tags:
+    category: communication
+    vendor: slack
+    product: slack
+definition:
+  displayName: "Slack connection type"
+  description: "Installs the Slack connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

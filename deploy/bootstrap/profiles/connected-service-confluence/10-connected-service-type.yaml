@@ -1,0 +1,53 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: confluence
+  namespace: agentstration.connected-services
+  tags:
+    category: documents
+    vendor: atlassian
+    product: confluence
+definition:
+  displayName: "Confluence Cloud"
+  description: "One Confluence Cloud site and an account authenticated with email and API token. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: baseUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Confluence Cloud site URL, including the required wiki path."
+        - id: email
+          required: true
+          type: string
+          protection: standard
+          description: "Email address of the Atlassian account."
+        - id: apiToken
+          required: true
+          type: string
+          protection: secured
+          description: "Atlassian API token; the consumer implements email/token authentication."
+      exports:
+        - id: baseUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: baseUrl
+        - id: email
+          type: string
+          protection: standard
+          sourceInputId: email
+        - id: apiToken
+          type: string
+          protection: secured
+          sourceInputId: apiToken

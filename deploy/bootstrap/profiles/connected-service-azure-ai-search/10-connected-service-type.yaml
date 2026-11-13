@@ -1,0 +1,44 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: azure-ai-search
+  namespace: agentstration.connected-services
+  tags:
+    category: search
+    vendor: microsoft
+    product: azure
+definition:
+  displayName: "Azure AI Search"
+  description: "One Azure AI Search service authenticated with an API key. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Azure AI Search service endpoint."
+        - id: apiKey
+          required: true
+          type: string
+          protection: secured
+          description: "Query or administration key appropriate to the explicitly authorized operations."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint
+        - id: apiKey
+          type: string
+          protection: secured
+          sourceInputId: apiKey

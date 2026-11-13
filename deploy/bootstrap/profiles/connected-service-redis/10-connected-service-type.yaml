@@ -1,0 +1,69 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: redis
+  namespace: agentstration.connected-services
+  tags:
+    category: database
+    vendor: redis
+    product: redis
+definition:
+  displayName: "Redis"
+  description: "One Redis deployment and ACL principal. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: host
+          required: true
+          type: string
+          protection: standard
+          description: "Redis server DNS name."
+        - id: port
+          required: true
+          type: integer
+          protection: standard
+          description: "Redis server TCP port."
+        - id: userName
+          required: true
+          type: string
+          protection: standard
+          description: "Redis ACL user name, including default when that user is intended."
+        - id: useTls
+          required: true
+          type: boolean
+          protection: standard
+          description: "Whether the consumer must use TLS."
+        - id: password
+          required: true
+          type: string
+          protection: secured
+          description: "Password for the selected Redis ACL user."
+      exports:
+        - id: host
+          type: string
+          protection: standard
+          sourceInputId: host
+        - id: port
+          type: integer
+          protection: standard
+          sourceInputId: port
+        - id: userName
+          type: string
+          protection: standard
+          sourceInputId: userName
+        - id: useTls
+          type: boolean
+          protection: standard
+          sourceInputId: useTls
+        - id: password
+          type: string
+          protection: secured
+          sourceInputId: password

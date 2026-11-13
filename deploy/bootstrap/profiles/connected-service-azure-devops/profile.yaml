@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-azure-devops
+  tags:
+    category: development
+    vendor: microsoft
+    product: azure-devops
+definition:
+  displayName: "Azure DevOps connection type"
+  description: "Installs the Azure DevOps connection contract only. Configure service instances and credentials separately."
+  targetScope: instance
