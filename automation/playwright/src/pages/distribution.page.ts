@@ -47,6 +47,15 @@ export class DistributionPage {
       : route.startsWith('/agents') ? [labels.generation] : [labels.version];
     const assertIdentity = async () => {
       const identity = frame.locator('.collection-identity').first();
+      const icon = identity.locator('.resource-icon');
+      await expect(icon).toHaveCount(1);
+      const border = await icon.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { width: parseFloat(style.borderTopWidth), style: style.borderTopStyle, color: style.borderTopColor };
+      });
+      expect(border.width, 'Every resource family retains a visible icon frame.').toBeGreaterThanOrEqual(1);
+      expect(border.style).toBe('solid');
+      expect(border.color).not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
       await expect(identity.locator('.collection-version-label')).toHaveText(expected);
       await expect.poll(async () => {
         const text = await identity.locator('.collection-identity-text').boundingBox();

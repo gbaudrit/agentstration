@@ -265,7 +265,7 @@
 .resource-domain-flow { --domain-color: var(--color-flow); }
 .resource-domain-model { --domain-color: var(--color-model); }
 .resource-header-identity { max-width: 100%; display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
-.resource-icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border: 1px solid color-mix(in srgb,var(--domain-color) 55%,var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb,var(--domain-color) 10%,var(--surface)); color: var(--domain-color); font-size: 1.2rem; }
+.resource-icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border: 1px solid color-mix(in srgb,var(--domain-color,var(--muted)) 55%,var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb,var(--domain-color,var(--muted)) 10%,var(--surface)); color: var(--domain-color,var(--text)); font-size: 1.2rem; }
 .resource-header .eyebrow { color: var(--domain-color) !important; margin: 0 0 3px; }
 .resource-header h1 { margin: 0; font-size: clamp(1.35rem,2vw,1.8rem); letter-spacing: -.035em; }
 .resource-description { max-width: 760px; margin: var(--space-2) 0 0; color: var(--muted); }
