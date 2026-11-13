@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Agentstration.Models;
 using Microsoft.Extensions.AI;
 
 namespace Agentstration.ModelProviders;
@@ -40,6 +41,14 @@ internal sealed class ResolvedModelChatClient(IChatClient inner, ModelChatClient
         effective.MaxOutputTokens ??= metadata.Generation?.MaxOutputTokens;
         effective.Seed ??= metadata.Generation?.Seed;
         effective.StopSequences ??= metadata.Generation?.StopSequences?.ToList();
+        if (metadata.Reasoning is { Mode: not ReasoningMode.Automatic } reasoning
+            && effective.AdditionalProperties?.ContainsKey("reasoning_enabled") != true)
+        {
+            effective.AdditionalProperties ??= [];
+            effective.AdditionalProperties["reasoning_enabled"] = reasoning.Mode == ReasoningMode.Enabled;
+            if (reasoning is { Mode: ReasoningMode.Enabled, Effort: { } effort })
+                effective.AdditionalProperties.TryAdd("reasoning_effort", effort.ToString().ToLowerInvariant());
+        }
         return effective;
     }
 }

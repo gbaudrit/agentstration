@@ -213,8 +213,24 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
         };
         if (request.Tools is { Count: > 0 })
             options.Tools = request.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(tool.Name, tool.Description, tool.Parameters)).ToList();
+        ApplyReasoning(options, request.Options?.AdditionalOptions);
         ApplyNativeOptions(options, request.Options?.NativeOptions);
         return options;
+    }
+
+    private static void ApplyReasoning(ChatOptions options, IReadOnlyDictionary<string, JsonElement>? additional)
+    {
+        if (additional is null || !additional.TryGetValue("reasoning_enabled", out var enabled)
+            || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return;
+        options.AdditionalProperties ??= [];
+        // Ollama supports boolean thinking and low/medium/high effort on compatible models.
+        // Native think is applied afterwards and takes precedence over generic intent (ADR-0017).
+        options.AdditionalProperties["think"] = enabled.GetBoolean()
+            && additional.TryGetValue("reasoning_effort", out var effort)
+            && effort.ValueKind == JsonValueKind.String
+            && effort.GetString() is "low" or "medium" or "high"
+                ? effort.GetString()
+                : (object)enabled.GetBoolean();
     }
 
     private static void ApplyNativeOptions(ChatOptions options, AepVersionedOptions? nativeOptions)
