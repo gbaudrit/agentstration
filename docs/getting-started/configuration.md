@@ -107,8 +107,10 @@ There are no automatic inference retries.
 The earliest applicable budget wins. Set **both** hops above the expected inference
 duration; allow extra time on the AEP hop for transport and preparation. Increasing
 a token budget does not increase either HTTP budget. Explicit caller cancellation,
-Run/Flow execution deadlines and worker lease cancellation still take precedence;
-raising an HTTP budget does not extend those execution deadlines (see #1011).
+execution deadlines enforced by the Run/Flow path, and worker lease cancellation
+still take precedence. Raising an HTTP budget does not extend or implement an
+execution deadline; direct Run deadline enforcement is tracked separately in
+[#1011](https://github.com/gbaudrit/agentstration/issues/1011).
 
 AEP-hop expiry reports `extension_timeout` with the elapsed budget and AEP
 configuration key. Native Ollama expiry reports `provider_timeout` with the Ollama
