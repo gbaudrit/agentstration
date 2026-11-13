@@ -178,4 +178,47 @@
   <data name="Type.GenericUse" xml:space="preserve"><value>Use générique dans ce contexte</value></data>
   <data name="Type.UseGranted" xml:space="preserve"><value>Use générique accordé</value></data>
   <data name="Type.UseNotGranted" xml:space="preserve"><value>Use générique non accordé</value></data>
+  <data name="Documents.Collections" xml:space="preserve"><value>Collections structurées</value></data>
+  <data name="Documents.CollectionsHelp" xml:space="preserve"><value>Les collections logiques héritent de l’enveloppe du Storage. Leur identité attribuée par le serveur change après recréation. Toute modification impose une réconciliation explicite.</value></data>
+  <data name="Documents.NewUid" xml:space="preserve"><value>Attribué à l’enregistrement</value></data>
+  <data name="Documents.Get" xml:space="preserve"><value>Lire un document</value></data>
+  <data name="Documents.Put" xml:space="preserve"><value>Créer ou remplacer un document</value></data>
+  <data name="Documents.Delete" xml:space="preserve"><value>Supprimer un document</value></data>
+  <data name="Documents.Query" xml:space="preserve"><value>Interroger les documents</value></data>
+  <data name="Documents.Publish" xml:space="preserve"><value>Publier des Snapshots immuables</value></data>
+  <data name="Documents.PageSize" xml:space="preserve"><value>Taille maximale de page</value></data>
+  <data name="Documents.Profiles" xml:space="preserve"><value>Identifiants des profils autorisés (séparés par des virgules)</value></data>
+  <data name="Documents.Schema" xml:space="preserve"><value>JSON Schema des documents</value></data>
+  <data name="Documents.InvalidJson" xml:space="preserve"><value>Saisissez un objet JSON valide.</value></data>
+  <data name="Documents.Remove" xml:space="preserve"><value>Retirer la collection</value></data>
+  <data name="Documents.Add" xml:space="preserve"><value>Ajouter une collection</value></data>
+  <data name="Documents.Access" xml:space="preserve"><value>Accès aux données structurées</value></data>
+  <data name="Documents.AccessHelp" xml:space="preserve"><value>Inspectez les capacités effectives, vérifiez les accès et publiez explicitement un Tool pour l’opération sélectionnée. Les documents saisis ici sont persistés.</value></data>
+  <data name="Documents.Collection" xml:space="preserve"><value>Collection</value></data>
+  <data name="Documents.SelectCollection" xml:space="preserve"><value>Sélectionner une collection</value></data>
+  <data name="Documents.Discover" xml:space="preserve"><value>Inspecter les capacités</value></data>
+  <data name="Documents.Operation" xml:space="preserve"><value>Opération</value></data>
+  <data name="Documents.Profile" xml:space="preserve"><value>Profil de requête</value></data>
+  <data name="Documents.Id" xml:space="preserve"><value>Identifiant du document</value></data>
+  <data name="Documents.Revision" xml:space="preserve"><value>Révision attendue</value></data>
+  <data name="Documents.RevisionHelp" xml:space="preserve"><value>Laissez vide pour créer ; le remplacement et la suppression exigent la révision exacte actuelle.</value></data>
+  <data name="Documents.QueryPayload" xml:space="preserve"><value>Requête (JSON du profil sélectionné)</value></data>
+  <data name="Documents.Value" xml:space="preserve"><value>Document JSON</value></data>
+  <data name="Documents.Run" xml:space="preserve"><value>Exécuter l’opération</value></data>
+  <data name="Documents.Next" xml:space="preserve"><value>Page suivante</value></data>
+  <data name="Documents.ToolVersion" xml:space="preserve"><value>Version du Tool</value></data>
+  <data name="Documents.ToolApproval" xml:space="preserve"><value>Exiger une approbation pour ce Tool</value></data>
+  <data name="Documents.PublishTool" xml:space="preserve"><value>Publier l’opération sélectionnée comme Tool</value></data>
+  <data name="Documents.PublishToolHelp" xml:space="preserve"><value>Le relay fixe la révision du Storage, la collection, les droits et le profil de requête. Affectez explicitement le Tool publié à un agent ou Flow. Une republication exige une nouvelle version.</value></data>
+  <data name="DisplayNameLabel" xml:space="preserve"><value>Nom d’affichage</value></data>
+  <data name="Documents.Error.Query" xml:space="preserve"><value>La requête est invalide ou dépasse le profil sélectionné. Vérifiez les champs déclarés et les opérateurs pris en charge.</value></data>
+  <data name="Documents.Error.Profile" xml:space="preserve"><value>Le profil ou modèle de requête exact est indisponible. Inspectez les capacités et vérifiez la version sélectionnée.</value></data>
+  <data name="Documents.Error.Schema" xml:space="preserve"><value>Le document ne respecte pas le schéma de la collection. Corrigez les champs requis et les types JSON.</value></data>
+  <data name="Documents.Error.Expired" xml:space="preserve"><value>Le curseur ou la requête a expiré ou changé. Relancez la lecture ; vérifiez une écriture incertaine avant de créer une autre mutation.</value></data>
+  <data name="Documents.Error.Exact" xml:space="preserve"><value>Le Storage, la collection ou la publication exacte est indisponible. Vérifiez son identité et ses accès ; une lecture historique ne peut pas changer de version.</value></data>
+  <data name="Documents.Error.Limit" xml:space="preserve"><value>Une limite de requête, de résultat ou de stockage est atteinte. Restreignez la sélection ou réduisez la page.</value></data>
+  <data name="Documents.Error.Conflict" xml:space="preserve"><value>La révision du document ou l’identité de la requête est en conflit. Lisez le document actuel et vérifiez la mutation souhaitée.</value></data>
+  <data name="Documents.Capabilities" xml:space="preserve"><value>Capacités documentaires</value></data>
+  <data name="Documents.RequestPageSize" xml:space="preserve"><value>Taille de page</value></data>
+  <data name="Documents.NoOperations" xml:space="preserve"><value>Aucune opération disponible avec vos droits actuels</value></data>
 </root>

@@ -6,7 +6,10 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Agentstration.Flows.Application;
 
-public sealed record CreateFlowDraftCommand(string Name, string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, string Template, string UpdatedBy = "local-user");
+public sealed record CreateFlowDraftCommand(string Name, string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, string Template, string UpdatedBy = "local-user")
+{
+    public FlowTransformationTemplate? Transformation { get; init; }
+}
 public sealed record UpdateFlowDraftCommand(string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, FlowGraphDefinition Definition, string UpdatedBy);
 
 public sealed class FlowDraftService(IFlowRepository repository, FlowService flows, IFlowDefinitionValidator validator, TimeProvider timeProvider)
@@ -29,7 +32,8 @@ public sealed class FlowDraftService(IFlowRepository repository, FlowService flo
         if (await repository.GetDraftExactAsync(workspaceId, ownerScopeRef, id, cancellationToken) is not null || await repository.GetExactAsync(ownerScopeRef, id, cancellationToken) is not null)
             throw new FlowConcurrencyException($"Flow '{id}' already exists.");
         var now = timeProvider.GetUtcNow();
-        var graph = FlowDraftTemplates.Create(command.Template);
+        var graph = command.Transformation is { } transformation
+            ? FlowDraftTemplates.CreateTransformation(transformation) : FlowDraftTemplates.Create(command.Template);
         var draft = new FlowDraft
         {
             WorkspaceId = workspaceId,
@@ -200,6 +204,33 @@ public static class FlowDraftTemplates
         "conditional" or "conditionalflow" => Conditional(),
         _ => AgentRouting()
     };
+
+    public static FlowGraphDefinition CreateTransformation(FlowTransformationTemplate template)
+    {
+        foreach (var schema in new[] { template.InputSchema, template.OutputSchema })
+            if (!FlowCompositionSchema.IsSupported(schema) || schema.GetRawText().Length > 65_536)
+                throw new FlowValidationException("flow_transformation_contract_invalid", "The transformation requires bounded input and output value schemas.");
+        var input = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new { value = template.InputSchema, parameters = new { type = "object" } },
+            required = new[] { "value", "parameters" },
+            additionalProperties = false
+        });
+        return new()
+        {
+            EntryStep = "input", InputSchema = input, OutputSchema = template.OutputSchema.Clone(),
+            Steps =
+            [
+                new InputFlowStepDefinition { Name = "input", Schema = input },
+                new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement("${input.value}"), Schema = template.OutputSchema.Clone() },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = template.OutputSchema.Clone(), OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") },
+                new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
+            ],
+            Transitions = [new("input-transform", "input", "completed", "transform"), new("transform-output", "transform", "completed", "completed")],
+            Designer = new() { NodePositions = Positions("input", "transform", "completed", "error") }
+        };
+    }
 
     private static FlowGraphDefinition AgentRouting()
     {

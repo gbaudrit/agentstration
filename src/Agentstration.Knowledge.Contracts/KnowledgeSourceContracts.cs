@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge.Contracts;
 
@@ -32,7 +34,7 @@ public static class KnowledgeFlowContracts
     };
 }
 
-public enum KnowledgeSourceOperation { Search, Query, Read }
+public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus, StructuredQuery }
 
 public readonly record struct KnowledgeSourceId(
     string Value,
@@ -58,14 +60,27 @@ public sealed record KnowledgeFlowTarget
     public bool UseActiveVersion { get; init; } = true;
 }
 
+public sealed record KnowledgeOutputStorage(StorageRevisionReference Storage, StorageContentPolicy Rule)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+}
+
 public sealed record KnowledgeSourceProperties
 {
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
     public KnowledgeFlowTarget? RetrievalFlow { get; init; }
+    public JsonElement ProjectionParameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     public IReadOnlyList<KnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public KnowledgeFlowTarget? ProjectionFlow { get; init; }
+    public KnowledgeOutputStorage? Output { get; init; }
+    public KnowledgeProjectionPolicy? Lifecycle { get; init; }
+    public FlowCallReference? Orchestration { get; init; }
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
+        = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
 }
 
 public sealed record KnowledgeDataSourceBinding
@@ -75,8 +90,12 @@ public sealed record KnowledgeDataSourceBinding
     public ResourceReference? AcquisitionTarget { get; init; }
     public KnowledgeFlowTarget? TransformationFlow { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
     public bool Required { get; init; } = true;
     public TimeSpan? MaximumAge { get; init; }
+    public bool RefreshIfNecessary { get; init; }
+    public bool AllowStaleOnRefreshFailure { get; init; }
+    public TimeSpan? MaximumFallbackAge { get; init; }
 }
 
 public sealed record KnowledgeSourceResource : Resource
@@ -107,23 +126,35 @@ public sealed record ResolvedKnowledgeDataSourceBinding
     public required string DataSourceName { get; init; }
     public required Guid DataSourceUid { get; init; }
     public required long DataSourceGeneration { get; init; }
-    public required ResourceScopeRef ProfileScopeRef { get; init; }
-    public required ResourceNamespace ProfileNamespace { get; init; }
-    public required string ProfileName { get; init; }
-    public required Guid ProfileUid { get; init; }
-    public required long ProfileGeneration { get; init; }
-    public required string ProfileVersion { get; init; }
-    public required string ProfileDefinitionHash { get; init; }
-    public required string ProfileDependencyHash { get; init; }
+    public string? DatasetDependencyHash { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResourceScopeRef? ProfileScopeRef { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResourceNamespace? ProfileNamespace { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProfileName { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? ProfileUid { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ProfileGeneration { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProfileVersion { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProfileDefinitionHash { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProfileDependencyHash { get; init; }
 }
 
 public sealed record ResolvedKnowledgeSourceComposition
 {
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<ResolvedKnowledgeDataSourceBinding> DataSources { get; init; } = [];
     public IReadOnlyDictionary<string, ResolvedKnowledgeFlowBinding> TransformationFlows { get; init; }
         = new Dictionary<string, ResolvedKnowledgeFlowBinding>(StringComparer.Ordinal);
+    public ResolvedFlowComposition? ProjectionComposition { get; init; }
+    public IReadOnlyDictionary<string, ResolvedFlowComposition> InputCompositions { get; init; }
+        = new Dictionary<string, ResolvedFlowComposition>();
     public required string DependencyHash { get; init; }
 }
 
@@ -157,7 +188,7 @@ public sealed record KnowledgeSourceToolExposureResource : Resource
     public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public required ResourceReference ToolSet { get; init; }
     public required string ToolSetVersion { get; init; }
     public IReadOnlyList<KnowledgeSourceToolOperationExposure> Operations { get; init; } = [];
@@ -169,7 +200,7 @@ public sealed record CreateKnowledgeSourceRequest(
     string? Namespace = null,
     ResourceScopeRef? ScopeRef = null);
 
-public sealed record PutKnowledgeSourceRequest(KnowledgeSourceProperties Properties);
+public sealed record PutKnowledgeSourceRequest(KnowledgeSourceProperties Properties, bool RebindDependencies = false);
 public sealed record SetKnowledgeSourceEnabledRequest(bool Enabled);
 public sealed record PublishKnowledgeSourceToolExposureRequest
 {
@@ -190,7 +221,7 @@ public enum KnowledgeProjectionState
 }
 
 public enum KnowledgeArtifactDisposition { Intermediate, Diagnostic, Publishable }
-public enum KnowledgeArtifactKind { Staged, Durable }
+public enum KnowledgeArtifactKind { Staged, Durable, Inline }
 
 public sealed record KnowledgeProjectionArtifact
 {
@@ -200,6 +231,7 @@ public sealed record KnowledgeProjectionArtifact
     public string? Name { get; init; }
     public string? MediaType { get; init; }
     public string? Digest { get; init; }
+    public string? ContentBase64 { get; init; }
 }
 
 public sealed record KnowledgeProjectionManifest
@@ -209,14 +241,29 @@ public sealed record KnowledgeProjectionManifest
 
 public sealed record StartKnowledgeProjectionRequest
 {
+    public Guid? ExpectedSourceUid { get; init; }
+    public long? ExpectedSourceGeneration { get; init; }
+    public string? IdempotencyKey { get; init; }
     public IReadOnlyDictionary<string, string> AcquisitionIds { get; init; }
         = new Dictionary<string, string>(StringComparer.Ordinal);
     public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     public string? CorrelationId { get; init; }
 }
 
+public sealed record KnowledgeStorageInput(StorageRevisionReference Storage, string Key,
+    string? Version, long Length, string? Sha256);
+
+public sealed record DirectKnowledgeInput(long Length, string Sha256, DateTimeOffset ExpiresAt, string RequestId);
+public sealed record KnowledgeInputRefreshFailure(string? AcquisitionId, string Code, DateTimeOffset FailedAt);
+
 public sealed record KnowledgeProjectionInputEvidence
 {
+    public KnowledgeStorageInput? StorageInput { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DirectKnowledgeInput? DirectInput { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? InputLeaseId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UsesAcquisitionLifecycle { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public TimeSpan? AcquisitionTimeToLive { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public KnowledgeInputRefreshFailure? RefreshFailure { get; init; }
     public required string BindingName { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }
@@ -235,18 +282,25 @@ public sealed record KnowledgeProjectionInputEvidence
     public IReadOnlyList<KnowledgeProjectionArtifact> AcquiredArtifacts { get; init; } = [];
     public ResolvedKnowledgeFlowBinding? TransformationFlow { get; init; }
     public string? TransformationFlowRunId { get; init; }
+    public ResolvedFlowComposition? TransformationComposition { get; init; }
     public IReadOnlyList<KnowledgeProjectionArtifact> PreparedArtifacts { get; init; } = [];
 }
 
 public sealed record KnowledgeProjectionResource : Resource
 {
+    public string? RequestHash { get; init; }
+    public string? IdempotencyKey { get; init; }
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
+    public IReadOnlyDictionary<string, string> AcquisitionIds { get; init; } = new Dictionary<string, string>();
+    public KnowledgeOutputStorage? Output { get; init; }
     public required Guid KnowledgeSourceUid { get; init; }
     public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
     public required ResourceNamespace KnowledgeSourceNamespace { get; init; }
     public required long KnowledgeSourceGeneration { get; init; }
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedFlowComposition? ProjectionComposition { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeProjectionInputEvidence> Inputs { get; init; } = [];
     public IReadOnlyList<KnowledgeProjectionInputIssue> InputIssues { get; init; } = [];
     public required string ProjectionFlowRunId { get; init; }
@@ -311,10 +365,11 @@ public sealed record KnowledgeArtifactTransformationInput
     public required string TransformationId { get; init; }
 }
 
-public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable }
+public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable, Retired, Retiring }
 
 public sealed record KnowledgeSnapshotArtifact
 {
+    public StoragePublicationReference? Content { get; init; }
     public required string ArtifactId { get; init; }
     public required string ProducerFlowRunId { get; init; }
     public required string ProducerFlowStepId { get; init; }
@@ -327,6 +382,7 @@ public sealed record KnowledgeSnapshotArtifact
 
 public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
 {
+    [JsonIgnore] public DateTimeOffset? ContentRetiredAt { get; init; }
     public required Guid KnowledgeSourceUid { get; init; }
     public ResourceScopeRef? KnowledgeSourceScopeRef { get; init; }
     public required string KnowledgeSourceName { get; init; }
@@ -340,12 +396,15 @@ public sealed record KnowledgeSnapshotResource : Resource, IImmutableResource
     public required ResolvedKnowledgeFlowBinding ProjectionFlow { get; init; }
     public required string ProjectionFlowRunId { get; init; }
     public IReadOnlyList<KnowledgeProjectionInputEvidence> ProjectionInputs { get; init; } = [];
-    public required ResolvedKnowledgeFlowBinding RetrievalFlow { get; init; }
+    public ResolvedKnowledgeFlowBinding? RetrievalFlow { get; init; }
     public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];
 }
 
 public sealed record KnowledgeSnapshotObservedResource : Resource
 {
+    public IReadOnlyList<Guid> RetiringSnapshots { get; init; } = [];
+    public IReadOnlyDictionary<Guid, DateTimeOffset> RetiredSnapshots { get; init; } = new Dictionary<Guid, DateTimeOffset>();
+    public IReadOnlyList<Guid> RetirementPendingSnapshots { get; init; } = [];
     public required Guid KnowledgeSourceUid { get; init; }
     public string? ActiveSnapshotName { get; init; }
     public Guid? ActiveSnapshotUid { get; init; }
@@ -392,6 +451,7 @@ public sealed record ReadKnowledgeRequest
 
 public sealed record KnowledgeRetrievalSnapshotInput
 {
+    public ResourceNamespace Namespace { get; init; }
     public required string Name { get; init; }
     public required Guid Uid { get; init; }
     public IReadOnlyList<KnowledgeSnapshotArtifact> Artifacts { get; init; } = [];

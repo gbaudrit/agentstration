@@ -232,3 +232,25 @@ Use **Proposed** when implementation or repository evidence does not establish a
 204. [ADR-0204 — Data Sources compose operation acquisitions with logical datasets](0204-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
 205. [ADR-0205 — ASP uses scoped progressive content sessions](0205-asp-uses-scoped-progressive-content-sessions.md)
 206. [ADR-0206 — OpenDAL runs in an autonomous ASP extension](0206-opendal-runs-in-an-autonomous-asp-extension.md)
+207. [ADR-0207 — Knowledge publishes retained Storage content](0207-knowledge-publishes-retained-storage-content.md)
+
+208. [ADR-0208 — Produced content remains an Artifact materialized in Storage](0208-produced-content-remains-an-artifact-materialized-in-storage.md)
+209. [ADR-0209 — Knowledge Tools follow the publishing Console scope](0209-knowledge-tools-follow-the-publishing-console-scope.md)
+
+210. [ADR-0210 — Knowledge exposes native Snapshot access Tools](0210-knowledge-exposes-native-snapshot-access-tools.md)
+
+211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)
+
+212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
+
+213. [ADR-0213 — ASP documents use additive capabilities and open query profiles](0213-asp-document-capabilities-and-open-query-profiles.md)
+
+214. [ADR-0214 — Structured queries start with a bounded OData profile](0214-bounded-standard-odata-query-profile.md)
+
+215. [ADR-0215 — Logical document collections remain governed Storage configuration](0215-logical-document-collections-remain-storage-configuration.md)
+
+216. [ADR-0216 — PostgreSQL JSONB uses an autonomous provider-owned layout](0216-postgresql-jsonb-is-an-autonomous-asp-provider.md)
+
+217. [ADR-0217 — Structured Snapshots pin immutable document publications](0217-structured-snapshots-pin-immutable-document-publications.md)
+
+218. [ADR-0218 — Structured storage does not define agent Memory policy](0218-structured-storage-does-not-define-memory-policy.md)

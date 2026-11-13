@@ -13,7 +13,7 @@ namespace Agentstration.Infrastructure.Storage;
 /// <summary>Authorized selectable defaults pin new receipts; the independent Artifact backend remains available.</summary>
 public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourceStore resources,
     IStorageResolver storages, LocalStoragePaths paths, FileSystemDurableArtifactStore historical,
-    ICurrentRequestContext current, IRequestContextScopeFactory scopes) : IArtifactDurableStore
+    ICurrentRequestContext current, IRequestContextScopeFactory scopes, StorageMaterializedArtifactReader materialized) : IArtifactDurableStore
 {
     private const string Prefix = "storage-v1.";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -54,6 +54,22 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
             resource.Uid, resource.Generation, StorageDigests.Binding(resource.Definition));
         _ = await AuthorizeAsync(reference, workspaceId, Operation.Write, cancellationToken);
         return Prefix + Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new Reference(workspaceId.Value, reference, objectId, length, sha256), Json));
+    }
+
+    public async Task<ArtifactStorageMaterialization?> DescribeReferenceAsync(WorkspaceId workspaceId, string reference,
+        CancellationToken cancellationToken)
+    {
+        var value = Parse(reference);
+        if (value is null) return null;
+        var policy = await AuthorizeAsync(value.Storage, workspaceId, Operation.Stat, cancellationToken);
+        var consumer = current.AccessMode switch
+        {
+            ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
+            ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(current.Current.TenantId),
+            _ => ResourceScopeRef.Workspace(workspaceId.Value)
+        };
+        return new(workspaceId, new(value.Storage, new(consumer, value.Storage.Storage.Address), policy),
+            "artifacts/" + value.ObjectId, null, value.Length, value.Sha256);
     }
 
     public async Task ResetAsync(WorkspaceId workspaceId, string opaqueReference, CancellationToken cancellationToken) =>
@@ -106,6 +122,8 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
     private async Task<ReadOnlyMemory<byte>> ReadCoreAsync(WorkspaceId workspaceId, string opaqueReference, long offset,
         int length, CancellationToken cancellationToken)
     {
+        if (ArtifactStorageReferences.Parse(opaqueReference) is { } stored)
+            return await materialized.ReadAsync(workspaceId, stored, offset, length, cancellationToken);
         var target = await ResolveAsync(workspaceId, opaqueReference, Operation.Read, cancellationToken);
         if (target.Policy is { } policy && (length < 1 || length > policy.MaximumReadBytes))
             throw new StorageException("storage_artifact_limit_exceeded", "The Artifact read exceeds the pinned envelope.");
@@ -113,6 +131,11 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
     }
     private async Task<ArtifactBackendStat> StatCoreAsync(WorkspaceId workspaceId, string opaqueReference, CancellationToken cancellationToken)
     {
+        if (ArtifactStorageReferences.Parse(opaqueReference) is { } stored)
+        {
+            _ = await materialized.ReadAsync(workspaceId, stored, 0, Math.Max(1, (int)stored.Length), cancellationToken);
+            return new(stored.Length, stored.Sha256);
+        }
         var target = await ResolveAsync(workspaceId, opaqueReference, Operation.Stat, cancellationToken);
         if (target.Reference is null) return await target.Store.StatAsync(workspaceId, target.Key, cancellationToken);
         await using var fileLock = await LockAsync(target, cancellationToken);
@@ -133,16 +156,23 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
 
     public Task<int> MaximumChunkBytesAsync(WorkspaceId workspaceId, string reference, bool write, CancellationToken cancellationToken) => GuardAsync(async () =>
     {
+        if (ArtifactStorageReferences.Parse(reference) is { } stored)
+        {
+            if (write) throw new ArtifactValidationException("artifact_materialization_immutable", "A produced Artifact cannot be overwritten.");
+            return 65536;
+        }
         var target = await ResolveAsync(workspaceId, reference, write ? Operation.Write : Operation.Read, cancellationToken);
         return target.Policy is null ? ArtifactManagementService.MaximumChunkBytes
             : write ? target.Policy.MaximumWriteBytes : target.Policy.MaximumReadBytes;
     });
 
-    internal static StorageRevisionReference? StorageReference(string reference) => Parse(reference)?.Storage;
+    internal static StorageRevisionReference? StorageReference(string reference) => ArtifactStorageReferences.Parse(reference)?.Target.Storage ?? Parse(reference)?.Storage;
 
     private async Task<Target> ResolveAsync(WorkspaceId workspaceId, string reference,
         Operation operation, CancellationToken cancellationToken)
     {
+        if (ArtifactStorageReferences.Parse(reference) is not null)
+            throw new ArtifactValidationException("artifact_materialization_immutable", "A produced Artifact cannot be overwritten.");
         var value = Parse(reference);
         if (value is null) return new(historical, reference, "", null, null);
         if (value.WorkspaceId != workspaceId.Value || value.ObjectId is not { Length: 64 } || !value.ObjectId.All(char.IsAsciiHexDigit)

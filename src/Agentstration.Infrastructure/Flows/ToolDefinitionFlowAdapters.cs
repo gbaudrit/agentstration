@@ -179,9 +179,12 @@ public sealed class ToolDefinitionExecutor(
             return await ExecuteKnowledgeRetrievalAsync(stored.Value, invocation, sourceName, operation,
                 knowledgeRetrieval, secretInputs, cancellationToken);
 
+        if (invocation.ExecutionContext?.TransientPayloads == true)
+            throw new ToolDefinitionInvocationException("direct_work_item_payload_unsupported",
+                "Direct payloads cannot enter a durable Work Item; compose the child Flow directly.");
         var flowInput = MergeArguments(invocation.Arguments, stored.Value.Definition.FixedArguments);
         var references = invocation.ExecutionContext?.SecretInputs ?? [];
-        if (invocation.ExecutionContext?.HasSensitiveArguments == true && references.Count == 0)
+        if (invocation.ExecutionContext?.HasSensitiveArguments == true && references.Count == 0 && invocation.ExecutionContext.TransientPayloads != true)
             throw new ToolDefinitionInvocationException("tool_definition_protected_input_reference_required",
                 "Protected inputs require durable Secret references.");
         var flowContract = await flowResolver.ResolveAsync(stored.Value.ScopeRef!.Value, stored.Value.Namespace,
@@ -313,6 +316,7 @@ public sealed class ToolDefinitionExecutor(
                 invocation.ExecutionContext?.InvocationId)
             {
                 SecretInputs = invocation.ExecutionContext?.SecretInputs ?? [],
+                TransientPayloads = invocation.ExecutionContext?.TransientPayloads == true,
                 SymbolicRequest = symbolicRequest,
                 ProtectState = value => resolvedInputs?.Protect(value) ?? value
             };
@@ -389,7 +393,7 @@ public sealed class ToolDefinitionExecutor(
     private async Task<StoredResource<ToolDefinitionResource>> ValidateAsync(ToolDefinitionInvocation invocation, CancellationToken cancellationToken)
     {
         var scope = ExecutionScope(invocation);
-        if (invocation.ExecutionContext is { HasSensitiveArguments: true, SecretInputs.Count: 0 })
+        if (invocation.ExecutionContext is { HasSensitiveArguments: true, SecretInputs.Count: 0, TransientPayloads: false })
             throw new ToolDefinitionInvocationException("tool_definition_protected_input_reference_required",
                 "Protected inputs require durable Secret references.");
         var stored = await definitions.GetInvocationAsync(invocation.ToolName, invocation.Namespace, cancellationToken, invocation.DefinitionScopeRef)

@@ -64,6 +64,19 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void PostgreSqlDocumentImplementationRemainsOutsideProductFamilies()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        var references = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.PostgreSql.csproj", StringComparison.Ordinal)).ToArray();
+        CollectionAssert.AreEqual(new[] { appHostProject }, references);
+        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asp", "src", "Agentstration.Asp.Abstractions", "Agentstration.Asp.Abstractions.csproj"));
+        Assert.DoesNotContain("OData", generic, StringComparison.Ordinal);
+        Assert.DoesNotContain("Npgsql", generic, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void OnlyAppHostReferencesTheAutonomousOpenDalExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
@@ -1018,7 +1031,7 @@ public sealed class DependencyTests
         var references = assemblies.SelectMany(assembly => assembly.GetReferencedAssemblies()).Select(reference => reference.Name).ToArray();
         Assert.IsFalse(references.Any(name => name!.Contains("Agentstration.Web", StringComparison.Ordinal)
             || name.Contains("Agentstration.Infrastructure", StringComparison.Ordinal)
-            || name.Contains(".Storage.", StringComparison.Ordinal)
+            || name.Contains(".Storage.", StringComparison.Ordinal) && name != "Agentstration.Storage.Contracts"
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
             || name.Contains("Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)
@@ -1151,8 +1164,8 @@ public sealed class DependencyTests
             .Select(reference => reference.Name)
             .ToArray();
 
-        Assert.IsFalse(references.Any(reference =>
-            forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
+        Assert.IsFalse(references.Any(reference => reference != "Agentstration.Storage.Contracts"
+            && forbidden.Any(value => reference!.Contains(value, StringComparison.Ordinal))));
     }
 
     [TestMethod]

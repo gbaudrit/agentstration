@@ -78,7 +78,7 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
         KnowledgeRetrievalFlowRequest request,
         CancellationToken cancellationToken)
     {
-        var scope = new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId);
+        var scope = new FlowRunScope(request.TenantId, new WorkspaceId(request.WorkspaceId), request.PrincipalId) { LogicalScopeRef = request.LogicalScopeRef };
         var origin = request.Origin switch
         {
             KnowledgeRetrievalInvocationOrigin.Tool => FlowInvocationOrigin.Mcp,
@@ -110,7 +110,8 @@ public sealed class KnowledgeRetrievalFlowGateway(FlowRunService runs) : IKnowle
                 scope)
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
-                SecretInputs = request.ExecutionContext?.SecretInputs ?? []
+                SecretInputs = request.ExecutionContext?.SecretInputs ?? [],
+                TransientPayloads = request.ExecutionContext?.TransientPayloads == true
             }, cancellationToken);
             var completed = await AwaitCompletionAsync(stored.Value.Id, scope, cancellationToken);
             if (completed.Value.Status != FlowRunStatus.Succeeded)
@@ -275,6 +276,7 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
             {
                 var exists = reference.Kind switch
                 {
+                    KnowledgeArtifactKind.Inline => reference.ContentBase64 is { Length: <= 87384 },
                     KnowledgeArtifactKind.Staged => await store.GetExactAsync<StagedArtifactResource>(ScopedResourceAddress.Create(
                         ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default, ArtifactResourceKinds.StagedArtifact,
                         StagedArtifactId.Parse(reference.ArtifactId).ToString()), cancellationToken) is not null,
@@ -370,8 +372,8 @@ public sealed class KnowledgeFlowDeletionGuard(
         && string.Equals(target.Name, flowId.Value, StringComparison.Ordinal)
         && (target.Namespace ?? source.Namespace) == flowId.Namespace;
 
-    private static bool References(ResolvedKnowledgeFlowBinding binding, FlowId flowId) =>
-        string.Equals(binding.Name, flowId.Value, StringComparison.Ordinal)
+    private static bool References(ResolvedKnowledgeFlowBinding? binding, FlowId flowId) =>
+        binding is not null && string.Equals(binding.Name, flowId.Value, StringComparison.Ordinal)
         && binding.Namespace == flowId.Namespace;
 }
 

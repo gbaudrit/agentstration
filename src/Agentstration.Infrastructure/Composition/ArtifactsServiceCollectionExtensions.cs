@@ -18,13 +18,16 @@ internal static class ArtifactsServiceCollectionExtensions
         services.AddSingleton<IArtifactStore>(_ => new FileSystemArtifactStore(Path.Combine(dataDirectory, "artifacts")));
         services.AddSingleton<IArtifactContentStore>(_ => new FileSystemStagedArtifactContentStore(Path.Combine(dataDirectory, "staged-artifacts")));
         services.AddSingleton(_ => new FileSystemDurableArtifactStore(Path.Combine(dataDirectory, "durable-artifacts")));
+        services.AddSingleton<StorageMaterializedArtifactReader>();
         services.AddSingleton<WorkspaceArtifactStorage>();
         services.AddSingleton<IArtifactDurableStore>(provider => provider.GetRequiredService<WorkspaceArtifactStorage>());
         services.AddSingleton<IStorageUsageProvider, ArtifactStorageUsageProvider>();
         services.AddSingleton<IArtifactStagingToolExecutor, ToolSetArtifactStagingExecutor>();
         services.AddSingleton<ArtifactManagementService>();
+        services.AddSingleton<IStoredArtifactRegistrar>(provider => provider.GetRequiredService<ArtifactManagementService>());
         services.AddSingleton<IArtifactContentMaterializationGateway, ArtifactContentMaterializationGateway>();
         services.AddSingleton<DurableArtifactContentReader>();
+        services.AddSingleton<StoredArtifactReconciliationService>();
         services.AddSingleton<ArtifactPlatformResourceProvisioner>();
         services.AddSingleton<KnowledgePlatformResourceProvisioner>();
         services.AddSingleton(new StagedArtifactCleanupOptions());

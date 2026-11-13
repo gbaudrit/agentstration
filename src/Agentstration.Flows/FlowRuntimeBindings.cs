@@ -33,6 +33,8 @@ public sealed record InputResponse(
 
 public sealed record InputRequest
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
     public required ResourceScopeRef ScopeRef { get; init; }
     [JsonIgnore]
     public WorkspaceId WorkspaceId => ScopeRef.Kind == ResourceScopeKind.Workspace

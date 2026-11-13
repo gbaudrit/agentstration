@@ -37,6 +37,11 @@ public interface IFlowDiscoveryPolicy
         CancellationToken cancellationToken);
 }
 
+public interface IFlowUsePolicy
+{
+    Task ValidateAsync(FlowResource flow, string version, ResourceScopeRef consumer, CancellationToken cancellationToken);
+}
+
 public sealed class FlowService(
     IFlowRepository repository,
     TimeProvider timeProvider,
@@ -48,10 +53,19 @@ public sealed class FlowService(
     IFlowDiscoveryPolicy? discoveryPolicy = null,
     IResourceGovernanceContext? governanceContext = null,
     ISecurityAuditWriter? audit = null,
-    IFlowResourceReferenceResolver? resourceReferenceResolver = null)
+    IFlowResourceReferenceResolver? resourceReferenceResolver = null,
+    IFlowUsePolicy? usePolicy = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
+
+    public async Task ValidateUseAsync(ResourceScopeRef owner, FlowId id, string version, ResourceScopeRef consumer, Guid? expectedUid, CancellationToken ct)
+    {
+        var flow = await repository.GetExactAsync(owner, id, ct);
+        if (flow?.Value.Enabled != true || expectedUid is { } uid && flow.Value.Uid != uid)
+            throw new FlowValidationException("flow_composition_child_unavailable", "The exact published Flow is unavailable.");
+        if (usePolicy is not null) await usePolicy.ValidateAsync(flow.Value, version, consumer, ct);
+    }
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 

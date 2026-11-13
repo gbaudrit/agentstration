@@ -12,7 +12,8 @@ public sealed class ArtifactManagementService(
     IAuthorizationService authorization,
     IArtifactStagingToolExecutor staging,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IArtifactDurableStore? durable = null) : IStoredArtifactRegistrar
 {
     public const int MaximumChunkBytes = 256 * 1024;
 
@@ -417,6 +418,76 @@ public sealed class ArtifactManagementService(
             }, cancellationToken);
         await AuditAsync("flow-run-artifact.completed", current, id.ToString(), cancellationToken);
         return created;
+    }
+
+    public async Task<FlowRunArtifactResource> RegisterStoredAsync(RegisterStoredArtifactRequest request,
+        CancellationToken cancellationToken)
+    {
+        var current = await RequireAsync(AuthorizationPermissions.ArtifactsWrite, cancellationToken);
+        var materialization = request.Materialization;
+        if (string.IsNullOrWhiteSpace(request.Identity) || request.Identity.Length > 512
+            || string.IsNullOrWhiteSpace(request.ProducerFlowRunId) || string.IsNullOrWhiteSpace(request.ProducerExecutionId)
+            || request.ProducerUid == Guid.Empty || request.ProducerGeneration < 1
+            || materialization.WorkspaceId.Value != current.WorkspaceId || materialization.Length < 0
+            || materialization.Sha256 is not { Length: 64 } || !materialization.Sha256.All(char.IsAsciiHexDigit))
+            throw Error("artifact_materialization_invalid", "Exact producer, Workspace and content evidence are required.");
+        ValidateMediaType(request.MediaType);
+        var reference = ArtifactStorageReferences.Encode(materialization);
+        var stat = await (durable ?? throw Error("artifact_materialization_unavailable", "Artifact storage is unavailable."))
+            .StatAsync(materialization.WorkspaceId, reference, cancellationToken);
+        if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
+            throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
+        var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
+        var resource = new FlowRunArtifactResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ArtifactResourceKinds.FlowRunArtifact,
+            Metadata = new() { Name = id.ToString() },
+            ScopeRef = ResourceScopeRef.Workspace(current.WorkspaceId),
+            Generation = 1,
+            Status = Succeeded(),
+            WorkspaceId = materialization.WorkspaceId,
+            ArtifactId = id,
+            ProducerResource = request.ProducerResource,
+            ProducerExecutionId = request.ProducerExecutionId,
+            ProducerResourceUid = request.ProducerUid,
+            ProducerResourceGeneration = request.ProducerGeneration,
+            ProducerFlowRunId = request.ProducerFlowRunId,
+            ProducerFlowStepId = request.ProducerFlowStepId ?? string.Empty,
+            Receipt = new()
+            {
+                StorageFlowRunId = string.Empty,
+                OpaqueReference = reference,
+                Materialization = materialization,
+                MediaType = request.MediaType,
+                Length = materialization.Length,
+                Sha256 = materialization.Sha256,
+                Provenance = new Dictionary<string, string> { ["provider"] = "storage", ["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin") }
+            },
+            CreatedAt = timeProvider.GetUtcNow()
+        };
+        var address = new ScopedResourceAddress(resource.ScopeRef.Value, resource.Namespace, resource.Kind, resource.Name);
+        var existing = await store.GetExactAsync<FlowRunArtifactResource>(address, cancellationToken);
+        if (existing is null)
+        {
+            try
+            {
+                var created = await store.CreateImmutableAsync(resource, cancellationToken);
+                await AuditAsync("flow-run-artifact.materialized", current, id.ToString(), cancellationToken);
+                return created.Value;
+            }
+            catch (ResourceConcurrencyException)
+            { existing = await store.GetExactAsync<FlowRunArtifactResource>(address, cancellationToken); }
+        }
+        if (existing is null || existing.Value.ProducerFlowRunId != resource.ProducerFlowRunId
+            || existing.Value.ProducerFlowStepId != resource.ProducerFlowStepId
+            || existing.Value.ProducerResource != resource.ProducerResource
+            || existing.Value.ProducerResourceUid != resource.ProducerResourceUid
+            || existing.Value.ProducerResourceGeneration != resource.ProducerResourceGeneration
+            || existing.Value.ProducerExecutionId != resource.ProducerExecutionId
+            || !SameReceipt(existing.Value.Receipt, resource.Receipt))
+            throw Error("artifact_storage_receipt_conflict", "The Artifact identity already has different producer or materialization evidence.");
+        return existing.Value;
     }
 
     public async Task<IReadOnlyList<StoredResource<FlowRunArtifactResource>>> ListFlowRunArtifactsAsync(CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 <Solution>
+  <Folder Name="/aep/src/" />
   <Folder Name="/asp/">
     <Project Path="asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
     <Project Path="asp/src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
@@ -6,6 +7,12 @@
     <Project Path="asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
     <Project Path="asp/samples/LocalStorage/LocalStorage.csproj" />
     <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/asp/samples/">
+    <Project Path="asp/samples/StructuredDocuments/StructuredDocuments.csproj" />
+  </Folder>
+  <Folder Name="/asp/src/">
+    <Project Path="asp/src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
   </Folder>
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
@@ -20,6 +27,9 @@
   </Folder>
   <Folder Name="/awp/">
     <Project Path="awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
   </Folder>
   <Folder Name="/src/Agents/">
     <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
@@ -190,6 +200,9 @@
     <Project Path="src/Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <Project Path="src/Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />

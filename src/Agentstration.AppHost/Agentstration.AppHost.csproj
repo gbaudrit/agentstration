@@ -1,7 +1,8 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.2.0">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
     <UserSecretsId>Agentstration.AppHost</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
@@ -10,6 +11,7 @@
     <ProjectReference Include="../Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
+    <ProjectReference Include="../Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <ProjectReference Include="../Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />

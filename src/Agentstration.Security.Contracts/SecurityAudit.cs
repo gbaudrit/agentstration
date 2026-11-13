@@ -8,6 +8,7 @@ public enum SecurityAuditOutcome
 
 public static class SecurityAuditActions
 {
+    public const string StorageDocumentAccessed = "storage.document.accessed";
     public const string InstanceBootstrapped = "instance.bootstrapped";
     public const string PlatformAdministratorGranted = "platform-administrator.granted";
     public const string PlatformAdministratorRevoked = "platform-administrator.revoked";
@@ -80,6 +81,8 @@ public static class SecurityAuditActions
     public const string KnowledgeSourceDeleted = "knowledge-source.deleted";
     public const string KnowledgeSnapshotPublished = "knowledge-snapshot.published";
     public const string KnowledgeSnapshotActivated = "knowledge-snapshot.activated";
+    public const string KnowledgeContentAccessed = "knowledge-content.accessed";
+    public const string KnowledgeContentStatusInspected = "knowledge-content.status-inspected";
     public const string KnowledgeRetrievalCompleted = "knowledge-retrieval.completed";
     public const string KnowledgeRetrievalFailed = "knowledge-retrieval.failed";
     public const string ToolSetCreated = "tool-set.created";

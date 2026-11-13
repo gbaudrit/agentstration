@@ -579,8 +579,9 @@ public sealed class ManagedFlowToolExecutor(
                 FlowStepId = request.StepName,
                 CorrelationId = request.CorrelationId,
                 SecretInputs = request.SecretInputs,
-                HasSensitiveArguments = request.SecretInputs.Count > 0,
-                PersistArguments = request.SecretInputs.Count > 0 ? false : null,
+                TransientPayloads = request.TransientPayloads,
+                HasSensitiveArguments = request.TransientPayloads || request.SecretInputs.Count > 0,
+                PersistArguments = request.TransientPayloads || request.SecretInputs.Count > 0 ? false : null,
                 Arguments = request.Arguments.Clone()
             }, cancellationToken);
             return new(

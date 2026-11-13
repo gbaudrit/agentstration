@@ -55,18 +55,18 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Projections)
     {
-        <section class="panel form-section" data-testid="knowledge-projections">
+        <section class="panel form-section" data-testid="knowledge-projections" data-interactive="@(interactive ? "true" : "false")">
             <div class="panel-header"><div><p class="eyebrow">@T("Projection")</p><h2>@T("ProjectionHistory")</h2><p>@T("ProjectionHelp")</p></div><button class="button-primary" type="button" disabled="@(!CanStartProjection)" data-testid="knowledge-start-projection" @onclick="StartProjectionAsync">@T("StartProjection")</button></div>
             <div class="knowledge-projection-parameters"><span>@T("ProjectionParameters")</span><div data-testid="knowledge-projection-parameters"><JsonSchemaInputEditor Schema="ProjectionParametersSchema" Value="projectionParameters" ValueChanged="value => projectionParameters = value" ValidationChanged="state => projectionParametersValid = state.IsValid" Disabled="busy" /></div><small>@T("JsonObjectHelp")</small></div>
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
             else
             {
-                <DataGrid TItem="KnowledgeProjectionResource" Items="projections"><Header><tr><th>@T("Projection")</th><th>@T("State")</th><th>@T("Inputs")</th><th>@T("FlowRun")</th><th>@T("Snapshot")</th><th>@T("Created")</th></tr></Header><Row Context="item"><tr data-testid="knowledge-projection-row"><td><button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></td><td><StatusBadge Text="@T($"ProjectionState.{item.State}")" Status="@ProjectionTone(item.State)" /></td><td>@item.Inputs.Count</td><td><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(item.ProjectionFlowRunId)}")"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a></td><td>@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td></tr></Row></DataGrid>
+                <DataGrid TItem="KnowledgeProjectionResource" Items="projections"><Header><tr><th>@T("Projection")</th><th>@T("State")</th><th>@T("Inputs")</th><th>@T("FlowRun")</th><th>@T("Snapshot")</th><th>@T("Created")</th></tr></Header><Row Context="item"><tr data-testid="knowledge-projection-row"><td><button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></td><td><StatusBadge Text="@T($"ProjectionState.{item.State}")" Status="@ProjectionTone(item.State)" /></td><td>@item.Inputs.Count</td><td>@if (item.State == KnowledgeProjectionState.Failed && item.Inputs.Count == 0) { <span>@T("ProjectionFlowNotStarted")</span> } else { <a class="text-button" href="@FlowRunUrl(item.ProjectionFlowRunId, ResourceScopeRef.Workspace(item.WorkspaceId), item.LogicalScopeRef)"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a> }</td><td>@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td></tr></Row></DataGrid>
                 @if (selectedProjection is { } selected)
                 {
                     <section class="knowledge-projection-provenance" data-testid="knowledge-projection-provenance">
                         <div><p class="eyebrow">@T("Provenance")</p><h3>@selected.Name</h3><p>@T("ProjectionProvenanceHelp")</p></div>
-                        <DataGrid TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("Acquisition")</th><th>@T("Transformation")</th><th>@T("Artifacts")</th></tr></Header><Row Context="input"><tr><td><strong>@input.BindingName</strong></td><td><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></td><td><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small></td><td>@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@($"/flow-runs/{Uri.EscapeDataString(input.TransformationFlowRunId!)}")">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</td><td>@foreach (var artifact in input.PreparedArtifacts) { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> }</td></tr></Row></DataGrid>
+                        <DataGrid TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("Acquisition")</th><th>@T("Transformation")</th><th>@T("Artifacts")</th></tr></Header><Row Context="input"><tr><td><strong>@input.BindingName</strong></td><td><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></td><td><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small>@if (input.DirectInput is not null) { <small data-testid="knowledge-input-direct">@T("DirectInput")</small> }@if (input.RefreshFailure is { } refreshFailure) { <div data-testid="knowledge-input-fallback"><StatusBadge Text="@T("InputFallbackUsed")" Status="UiStatus.Warning" /><small>@T("InputRefreshFailed") <code>@refreshFailure.Code</code></small>@if (refreshFailure.AcquisitionId is { } refreshId) { <small><code title="@refreshId">@ShortIdentifier(refreshId)</code></small> }</div> }</td><td>@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@FlowRunUrl(input.TransformationFlowRunId!, selected.ScopeRef, selected.LogicalScopeRef)">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</td><td>@foreach (var artifact in input.PreparedArtifacts) { @if (artifact.Kind == KnowledgeArtifactKind.Inline) { <code>@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</code> } else { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> } }</td></tr></Row></DataGrid>
                         @foreach (var issue in selected.InputIssues)
                         {
                             <p class="inline-warning"><strong>@issue.BindingName</strong> · @issue.Message <code>@issue.Code</code></p>
@@ -83,18 +83,18 @@ else if (source is not null && readiness is not null)
         @if (snapshots.Count == 0) { <p class="muted">@T("NoSnapshots")</p> }
         else
         {
-            <DataGrid TItem="KnowledgeSnapshotView" Items="snapshots"><Header><tr><th>@T("Snapshot")</th><th>@T("State")</th><th>@T("Published")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="view"><tr data-testid="knowledge-snapshot-row"><td><button class="text-button knowledge-snapshot-link" type="button" title="@view.Snapshot.Name" aria-expanded="@(selectedSnapshot?.Snapshot.Name == view.Snapshot.Name ? "true" : "false")" @onclick="() => selectedSnapshot = view"><code>@view.Snapshot.Name</code></button></td><td><StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></td><td>@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" type="button" @onclick="() => selectedSnapshot = view">@view.Snapshot.Artifacts.Count</button></td><td>@if (CanManage && view.LifecycleState != KnowledgeSnapshotLifecycleState.Active) { <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> }</td></tr></Row></DataGrid>
+            <DataGrid TItem="KnowledgeSnapshotView" Items="snapshots"><Header><tr><th>@T("Snapshot")</th><th>@T("State")</th><th>@T("Published")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="view"><tr data-testid="knowledge-snapshot-row"><td><button class="text-button knowledge-snapshot-link" type="button" title="@view.Snapshot.Name" aria-expanded="@(selectedSnapshot?.Snapshot.Name == view.Snapshot.Name ? "true" : "false")" @onclick="() => selectedSnapshot = view"><code>@view.Snapshot.Name</code></button></td><td><StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></td><td>@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" type="button" @onclick="() => selectedSnapshot = view">@view.Snapshot.Artifacts.Count</button></td><td>@if (CanManage && view.LifecycleState == KnowledgeSnapshotLifecycleState.Superseded) { <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> }</td></tr></Row></DataGrid>
             @if (selectedSnapshot is { } selectedSnapshotView)
             {
                 <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
                     <div><p class="eyebrow">@T("SnapshotDetails")</p><h3>@selectedSnapshotView.Snapshot.Name</h3><p>@T("SnapshotDetailsHelp")</p></div>
                     <dl class="resource-details knowledge-snapshot-provenance">
                         <dt>@T("Projection")</dt><dd><code>@selectedSnapshotView.Snapshot.ProjectionId</code></dd>
-                        <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
+                        <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>
                     <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
-                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("StorageFlow")</th></tr></Header>
-                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td><a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a></td></tr></Row>
+                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("OutputStorage")</th></tr></Header>
+                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact, selectedSnapshotView.Snapshot)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td>@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</td></tr></Row>
                     </DataGrid>
                 </section>
             }
@@ -103,44 +103,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Retrieval)
     {
-        <section class="panel form-section knowledge-retrieval" data-testid="knowledge-retrieval-verification">
-        <div class="panel-header knowledge-retrieval-header"><div><p class="eyebrow">@T("Verification")</p><h2>@T("VerifyRetrieval")</h2><p>@T("RetrievalHelp")</p></div><span class="knowledge-retrieval-icon"><UiIcon Name="search" /></span></div>
-        <div class="knowledge-retrieval-form">
-            <label><span>@T("Operation")</span><select value="@retrievalOperation" data-testid="knowledge-retrieval-operation" @onchange="ChangeRetrievalOperation"><option value="search">@T("Operation.Search")</option><option value="query">@T("Operation.Query")</option><option value="read">@T("Operation.Read")</option></select></label>
-            <label><span>@T(retrievalOperation == "query" ? "Question" : retrievalOperation == "read" ? "ArtifactId" : "SearchText")</span>
-                @if (retrievalOperation == "read")
-                {
-                    <select value="@retrievalText" data-testid="knowledge-retrieval-artifact" @onchange="ChangeRetrievalArtifact"><option value="">@T("SelectArtifact")</option>@foreach (var artifact in RetrievalArtifacts) { <option value="@artifact.ArtifactId">@ArtifactOptionLabel(artifact)</option> }</select>
-                }
-                else
-                {
-                    <input @bind="retrievalText" data-testid="knowledge-retrieval-text" />
-                }
-            </label>
-            <label><span>@T("SnapshotOptional")</span><select value="@retrievalSnapshot" data-testid="knowledge-retrieval-snapshot" @onchange="ChangeRetrievalSnapshot"><option value="">@T("ActiveSnapshot")</option>@foreach (var snapshot in snapshots) { <option value="@snapshot.Snapshot.Name">@snapshot.Snapshot.Name</option> }</select></label>
-            <div class="knowledge-retrieval-actions"><button class="button-primary" type="button" disabled="@(!CanRunRetrieval)" data-testid="knowledge-retrieval-run" @onclick="VerifyRetrievalAsync"><UiIcon Name="play-circle" /><span>@T("RunVerification")</span></button></div>
-        </div>
-        @if (retrievalResult is not null)
-        {
-            <section class="knowledge-retrieval-result" role="status" data-testid="knowledge-retrieval-result">
-                <header><div><p class="eyebrow">@T("Results")</p><h3>@T("VerificationResult", OperationLabel(retrievalResult.Operation), retrievalResult.Items.Count)</h3></div><StatusBadge Text="@T("Completed")" Status="UiStatus.Success" /></header>
-                @if (!string.IsNullOrWhiteSpace(retrievalResult.Answer))
-                {
-                    <div class="knowledge-retrieval-answer"><strong>@T("SynthesizedAnswer")</strong><p>@retrievalResult.Answer</p></div>
-                }
-                <div class="knowledge-retrieval-items">
-                    @foreach (var item in retrievalResult.Items)
-                    {
-                        <article class="knowledge-retrieval-item">
-                            <header><a class="text-button knowledge-artifact-id-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(item.ArtifactId)}")" title="@item.ArtifactId"><code>@item.ArtifactId</code></a><small>@(item.MediaType ?? T("UnknownMediaType"))</small></header>
-                            @if (!string.IsNullOrWhiteSpace(item.Content)) { <pre>@item.Content</pre> }
-                        </article>
-                    }
-                </div>
-                <footer><span>@T("Snapshot") <a href="@SnapshotsUrl">@retrievalResult.SnapshotName</a></span><span>@T("FlowRun") <a href="@FlowRunUrl(retrievalResult.FlowRunId)">@retrievalResult.FlowRunId</a></span></footer>
-            </section>
-        }
-        </section>
+        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" SupportsStructured="@(source?.Definition.Output?.DocumentCollectionUid is not null || snapshots.Any(s => s.Snapshot.Artifacts.Any(a => a.Content?.Document is not null)))" />
     }
     else if (activeTab == DetailsTab.Tools)
     {
@@ -149,14 +112,14 @@ else if (source is not null && readiness is not null)
         @if (exposure is null)
         {
             <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
+            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
             @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
         }
         else
         {
             <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
                 <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
-                <Row Context="operation"><tr><td>@operation.Operation</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
+                <Row Context="operation"><tr><td>@OperationLabel(operation.Operation)</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
             </DataGrid>
             <p class="resource-hint">@T("PinnedSourceHelp")</p>
         }
@@ -192,34 +155,33 @@ else if (source is not null && readiness is not null)
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
     private KnowledgeSnapshotView? selectedSnapshot;
-    private KnowledgeRetrievalResult? retrievalResult;
-    private bool loading = true, busy, failed, requiresApproval, confirmDelete, projectionParametersValid = true;
+    private bool loading = true, busy, failed, requiresApproval, confirmDelete, interactive, projectionParametersValid = true;
     private DetailsTab activeTab;
-    private string version = "1.0.0", retrievalOperation = "search", retrievalText = string.Empty, retrievalSnapshot = string.Empty,
+    private string version = "1.0.0",
         rawYaml = string.Empty;
     private JsonElement projectionParameters = JsonSerializer.SerializeToElement(new { });
     private string? etag, error, message, rawError;
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<DetailsTab> VisibleTabs => [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, .. (CanManage ? [DetailsTab.Access] : Array.Empty<DetailsTab>()), DetailsTab.Yaml];
     private bool CanManage => source is not null && ResourceOwnershipContext.CanManage(source.ScopeRef ?? ResourceScopeRef.Instance, Services);
-    private string ToolSetUrl => exposure is null ? "/tools/sets" : exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
-        ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
-        : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}";
+    private string ToolSetUrl => exposure is null ? "/tools/sets" : ScopedToolUrl(
+        exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
+            ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
+            : $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}?namespace={Uri.EscapeDataString((exposure.ToolSet.Namespace ?? SourceNamespace).Value)}", exposure.ToolSet.ScopeRef);
     private bool IsUnresolvedDraft => source is { Definition.Enabled: false, Composition: null };
-    private bool CanStartProjection => readiness?.Ready == true && projectionParametersValid && !busy;
+    private bool CanStartProjection => interactive && readiness?.Ready == true && projectionParametersValid && !busy;
     private JsonElement? ProjectionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Projection?.InputSchema, "parameters");
     private KnowledgeSnapshotView? ActiveSnapshot => snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active);
-    private KnowledgeSnapshotView? EffectiveRetrievalSnapshot => string.IsNullOrWhiteSpace(retrievalSnapshot)
-        ? snapshots.FirstOrDefault(value => value.LifecycleState == KnowledgeSnapshotLifecycleState.Active)
-        : snapshots.FirstOrDefault(value => value.Snapshot.Name == retrievalSnapshot);
-    private IReadOnlyList<KnowledgeSnapshotArtifact> RetrievalArtifacts => EffectiveRetrievalSnapshot?.Snapshot.Artifacts ?? [];
-    private bool CanRunRetrieval => !busy && !string.IsNullOrWhiteSpace(retrievalText)
-        && (retrievalOperation != "read" || RetrievalArtifacts.Any(value => value.ArtifactId == retrievalText));
     private string SnapshotsUrl => SourceNamespace.IsDefault
         ? $"/knowledge-sources/{Uri.EscapeDataString(Name)}?view=snapshots"
         : $"/knowledge-sources/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(SourceNamespace.Value)}&view=snapshots";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
@@ -343,6 +305,9 @@ else if (source is not null && readiness is not null)
         if (busy) return;
         busy = true; failed = false; message = null;
         try { await action(); message = T(success); await ReloadChildrenAsync(); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
+            || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
+        { failed = true; message = T("OutputStorageInvalid"); }
         catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
         { failed = true; message = T("NativeDatasetProjectionUnavailable"); }
         catch (Exception exception) { failed = true; message = exception.Message; }
@@ -360,38 +325,15 @@ else if (source is not null && readiness is not null)
     private Task StartProjectionAsync() => RunActionAsync(async () =>
     {
         await Client.StartProjectionAsync(SourceNamespace, Name,
-            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone() }, cancellation.Token);
+            new StartKnowledgeProjectionRequest { Parameters = projectionParameters.Clone(), IdempotencyKey = Guid.NewGuid().ToString("N") }, cancellation.Token);
     }, "ProjectionCompleted");
     private Task SelectSnapshotAsync(KnowledgeSnapshotView value) => RunActionAsync(async () => { await Client.SelectActiveSnapshotAsync(SourceNamespace, Name, value.Snapshot.Name, cancellation.Token); }, "SnapshotActivated");
-    private void ChangeRetrievalOperation(ChangeEventArgs arguments)
-    {
-        retrievalOperation = arguments.Value?.ToString() ?? "search";
-        retrievalText = string.Empty;
-        retrievalResult = null;
-    }
-    private void ChangeRetrievalSnapshot(ChangeEventArgs arguments)
-    {
-        retrievalSnapshot = arguments.Value?.ToString() ?? string.Empty;
-        if (retrievalOperation == "read") retrievalText = string.Empty;
-        retrievalResult = null;
-    }
-    private void ChangeRetrievalArtifact(ChangeEventArgs arguments)
-    {
-        retrievalText = arguments.Value?.ToString() ?? string.Empty;
-        retrievalResult = null;
-    }
     private Task ToggleEnabledAsync() => RunActionAsync(async () =>
     {
         var wasEnabled = source!.Definition.Enabled;
         var saved = await Client.SetEnabledAsync(SourceNamespace, Name, !wasEnabled, etag!, cancellation.Token);
         source = saved.Value; etag = saved.ETag; readiness = await Client.GetReadinessAsync(SourceNamespace, Name, cancellation.Token);
     }, source!.Definition.Enabled ? "SourceDisabled" : "SourceEnabled");
-    private Task VerifyRetrievalAsync() => RunActionAsync(async () => retrievalResult = retrievalOperation switch
-    {
-        "query" => await Client.QueryAsync(SourceNamespace, Name, new QueryKnowledgeRequest { Question = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token),
-        "read" => await Client.ReadAsync(SourceNamespace, Name, new ReadKnowledgeRequest { ArtifactId = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token),
-        _ => await Client.SearchAsync(SourceNamespace, Name, new SearchKnowledgeRequest { Query = retrievalText.Trim(), SnapshotName = EmptyToNull(retrievalSnapshot) }, cancellation.Token)
-    }, "VerificationCompleted");
     private async Task DeleteAsync()
     {
         if (busy) return;
@@ -409,9 +351,18 @@ else if (source is not null && readiness is not null)
         : length < 1024 * 1024
             ? $"{length / 1024d:N1} KiB"
             : $"{length / (1024d * 1024d):N1} MiB";
-    private static string FlowRunUrl(string flowRunId) => $"/flow-runs/{Uri.EscapeDataString(flowRunId)}";
-    private static string SnapshotArtifactUrl(KnowledgeSnapshotArtifact value) =>
-        $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
+    private string FlowRunUrl(string flowRunId, ResourceScopeRef? executionScope, ResourceScopeRef? logicalScope = null)
+    {
+        var url = $"/flow-runs/{Uri.EscapeDataString(flowRunId)}";
+        if (executionScope is not null) url += $"?scopeRef={Uri.EscapeDataString(executionScope.Value.Value)}";
+        var context = logicalScope ?? ResourceOwnershipContext.TryGetCurrent(Services);
+        if (context is not null) url += $"{(executionScope is null ? "?" : "&")}context={Uri.EscapeDataString(context.Value.Value)}";
+        return url;
+    }
+    private static string SnapshotArtifactUrl(KnowledgeSnapshotArtifact value, KnowledgeSnapshotResource snapshot) =>
+        value.Content is { } content
+            ? $"/artifacts/durable/{ArtifactStorageReferences.Identity(new(snapshot.ScopeRef!.Value.TargetId!.Value), ArtifactStorageReferences.PublicationIdentity(content))}"
+            : $"/artifacts/durable/{Uri.EscapeDataString(value.ArtifactId)}";
     private static string ArtifactOptionLabel(KnowledgeSnapshotArtifact value) =>
         $"{ShortIdentifier(value.ArtifactId)} · {value.MediaType} · {FormatSize(value.Length)}";
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";
@@ -426,9 +377,16 @@ else if (source is not null && readiness is not null)
     private string ToolUrl(ResourceReference value)
     {
         var address = value.Resolve(SourceNamespace, ToolResourceKinds.Tool);
-        return address.Namespace.IsDefault
+        return ScopedToolUrl(address.Namespace.IsDefault
             ? $"/tools/{Uri.EscapeDataString(address.Name)}"
-            : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}";
+            : $"/tools/{Uri.EscapeDataString(address.Name)}?namespace={Uri.EscapeDataString(address.Namespace.Value)}", value.ScopeRef);
+    }
+    private string ScopedToolUrl(string url, ResourceScopeRef? scope)
+    {
+        if (scope is null) return url;
+        url += $"{(url.Contains('?') ? "&" : "?")}scopeRef={Uri.EscapeDataString(scope.Value.Value)}";
+        var context = ResourceOwnershipContext.TryGetCurrent(Services) ?? scope.Value;
+        return url + $"&context={Uri.EscapeDataString(context.Value)}";
     }
     private string ToolNamespace(ResourceReference value) => value.Resolve(SourceNamespace, ToolResourceKinds.Tool).Namespace.Value;
     private static string TabId(DetailsTab tab) => $"knowledge-source-{tab.ToString().ToLowerInvariant()}-tab";

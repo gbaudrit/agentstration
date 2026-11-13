@@ -1,0 +1,59 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+<section class="panel form-section" data-testid="storage-collections">
+    <div class="panel-header"><h2>@T("Documents.Collections")</h2></div>
+    <p>@T("Documents.CollectionsHelp")</p>
+    @for (var index = 0; index < Value.Count; index++)
+    {
+        var row = index;
+        var collection = Value[row];
+        <fieldset class="form-grid" disabled="@ReadOnly">
+            <label><span>@T("TechnicalName")</span><input value="@collection.Name" maxlength="128" @onchange="e => SetAsync(row, collection with { Name = Text(e) })" /></label>
+            <label><span>@T("DisplayNameLabel")</span><input value="@collection.DisplayName" maxlength="128" @onchange="e => SetAsync(row, collection with { DisplayName = Text(e) })" /></label>
+            <label><span>@T("Uid")</span><code>@(collection.Uid == Guid.Empty ? T("Documents.NewUid") : collection.Uid.ToString())</code></label>
+            <label><span>@T("Enabled")</span><input type="checkbox" checked="@collection.Enabled" @onchange="e => SetAsync(row, collection with { Enabled = Checked(e) })" /></label>
+            <label><span>@T("Documents.Get")</span><input type="checkbox" checked="@collection.Policy.Get" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Get = Checked(e) } })" /></label>
+            <label><span>@T("Documents.Put")</span><input type="checkbox" checked="@collection.Policy.Put" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Put = Checked(e) } })" /></label>
+            <label><span>@T("Documents.Delete")</span><input type="checkbox" checked="@collection.Policy.Delete" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Delete = Checked(e) } })" /></label>
+            <label><span>@T("Documents.Query")</span><input type="checkbox" checked="@collection.Policy.Query" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Query = Checked(e) } })" /></label>
+            <label><span>@T("Documents.Publish")</span><input type="checkbox" checked="@collection.Policy.Publish" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Publish = Checked(e) } })" /></label>
+            <label><span>@T("Documents.PageSize")</span><input type="number" min="1" max="100" value="@collection.Policy.MaximumPageSize" @onchange="e => PageAsync(row, e)" /></label>
+            <label class="form-span-2"><span>@T("Documents.Profiles")</span><input value="@string.Join(',', collection.Policy.QueryProfiles ?? [])" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { QueryProfiles = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) } })" /><small>@string.Join(", ", Capabilities.QueryProfiles.Select(p => p.Id + "/" + p.Version + " (" + p.Encoding + ")"))</small></label>
+            <label class="form-span-2"><span>@T("Documents.Schema")</span><textarea class="form-code-editor" rows="8" @onchange="e => SchemaAsync(row, e)">@(drafts.GetValueOrDefault(row) ?? collection.Schema.GetRawText())</textarea></label>
+            @if (invalid.Contains(row)) { <p role="alert">@T("Documents.InvalidJson")</p> }
+            @if (!ReadOnly) { <button type="button" class="button-danger" @onclick="() => RemoveAsync(row)">@T("Documents.Remove")</button> }
+        </fieldset>
+    }
+    @if (!ReadOnly) { <button type="button" class="button-secondary" disabled="@(Value.Count >= 32)" @onclick="AddAsync" data-testid="storage-collection-add">@T("Documents.Add")</button> }
+</section>
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<StorageDocumentCollection> Value { get; set; } = [];
+    [Parameter, EditorRequired] public StorageDocumentCapabilities Capabilities { get; set; } = null!;
+    [Parameter] public EventCallback<IReadOnlyList<StorageDocumentCollection>> ValueChanged { get; set; }
+    [Parameter] public EventCallback<bool> ValidationChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private readonly Dictionary<int, string> drafts = [];
+    private readonly HashSet<int> invalid = [];
+    private string T(string key) => Localizer[key];
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+    private static bool Checked(ChangeEventArgs e) => e.Value is true;
+    private Task SetAsync(int row, StorageDocumentCollection value) => ValueChanged.InvokeAsync(Value.Select((c, i) => i == row ? value : c).ToArray());
+    private Task AddAsync() => ValueChanged.InvokeAsync([.. Value, new() { Name = "collection-" + (Value.Count + 1), DisplayName = "", Policy = new(Query: Capabilities.Query, QueryProfiles: Capabilities.QueryProfiles.Select(p => p.Id).ToArray()) }]);
+    private async Task RemoveAsync(int row) { drafts.Clear(); invalid.Clear(); await ValidationChanged.InvokeAsync(true); await ValueChanged.InvokeAsync(Value.Where((_, i) => i != row).ToArray()); }
+    private async Task PageAsync(int row, ChangeEventArgs e)
+    {
+        if (int.TryParse(Text(e), out var size)) await SetAsync(row, Value[row] with { Policy = Value[row].Policy with { MaximumPageSize = size } });
+    }
+    private async Task SchemaAsync(int row, ChangeEventArgs e)
+    {
+        drafts[row] = Text(e);
+        try
+        {
+            using var json = JsonDocument.Parse(drafts[row]);
+            if (json.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
+            invalid.Remove(row);
+            await SetAsync(row, Value[row] with { Schema = json.RootElement.Clone() });
+        }
+        catch (JsonException) { invalid.Add(row); }
+        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+    }
+}

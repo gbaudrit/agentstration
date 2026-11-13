@@ -6,6 +6,13 @@ public static class StorageErrorKey
 {
     public static string For(Exception error) => error is AgentstrationApiException api ? api.ProblemTitle switch
     {
+        "storage_documents_invalid_query" or "storage_documents_unsupported_query" => "Documents.Error.Query",
+        "storage_documents_unsupported_capability" => "Documents.Error.Profile",
+        "storage_documents_schema_validation" => "Documents.Error.Schema",
+        "storage_documents_invalid_reference" or "storage_documents_request_expired" => "Documents.Error.Expired",
+        "storage_collection_unavailable" or "storage_revision_stale" or "storage_documents_version_unavailable" => "Documents.Error.Exact",
+        "storage_documents_limit_exceeded" or "storage_documents_capacity_exceeded" => "Documents.Error.Limit",
+        "storage_documents_conflict" or "storage_documents_idempotency_conflict" => "Documents.Error.Conflict",
         "storage_type_in_use" => "Error.TypeInUse",
         "storage_type_version_exists" or "storage_type_version_immutable" => "Error.TypeImmutable",
         "resource_managed" or "resource_governance_authority_required" => "Error.TypeManaged",

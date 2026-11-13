@@ -7,7 +7,11 @@ public sealed record StorageContentPolicy(
     int MaximumWriteBytes = 65536, string? KeyFrom = null, string? KeyBefore = null);
 
 public sealed record StorageContentRequest(
-    StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy);
+    StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+}
 
 public sealed record StorageObject(string Key, string? Version, long Length, string? Sha256, string Reference);
 public sealed record StorageObjectPage(IReadOnlyList<StorageObject> Objects, string? Cursor);
@@ -18,6 +22,9 @@ public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, str
 /// <summary>Each operation reauthorizes an exact Storage. No session is an authorization cache.</summary>
 public interface IStorageContentGateway
 {
+    // Provider-qualified retirement of a producer-owned exact result; never inferred from generic ASP delete.
+    Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
     Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default);
     Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit,
         string? cursor = null, CancellationToken cancellationToken = default);

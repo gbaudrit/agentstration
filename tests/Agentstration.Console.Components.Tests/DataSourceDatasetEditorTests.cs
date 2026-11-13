@@ -18,6 +18,36 @@ namespace Agentstration.Web.Tests;
 public sealed class DataSourceDatasetEditorTests
 {
     [TestMethod]
+    [DataRow("en-US", "Freshness duration (hh:mm:ss)")]
+    [DataRow("fr-FR", "Durée de fraîcheur (hh:mm:ss)")]
+    public async Task DirectModeRequiresExplicitPermissionAndRejectsRetentionWithoutStorage(string cultureName, string expected)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var handler = new DatasetHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        rendered.WaitForElement("[data-testid='dataset-service']");
+        await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
+        await rendered.Find("[data-testid='dataset-operation']").ChangeAsync($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}");
+        await rendered.Find("[data-testid='data-source-display-name']").ChangeAsync("Direct inventory");
+        await rendered.Find("[data-testid='data-source-name']").ChangeAsync("direct-inventory");
+        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        await rendered.Find("[data-testid='dataset-allow-direct']").ChangeAsync(true);
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
+        await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("01:00:00");
+        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsNull(handler.Created);
+        await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("");
+        Assert.IsFalse(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        await rendered.Find("form").SubmitAsync();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
+        Assert.IsNull(handler.Created!.Properties.Dataset!.Storage);
+        Assert.IsTrue(handler.Created.Properties.Dataset.Lifecycle!.AllowDirect);
+        Assert.IsNull(handler.Created.Properties.Dataset.Lifecycle.TimeToLive);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "No configuration")]
     [DataRow("fr-FR", "Sans configuration")]
     public async Task EmptyInputShowsNoArtificialFormAndCreationPinsReviewedOperationAndStorage(string cultureName, string expected)
@@ -51,7 +81,7 @@ public sealed class DataSourceDatasetEditorTests
         await rendered.Find("form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
         Assert.IsNull(handler.Created!.Properties.Profile);
-        Assert.AreEqual(storage.Uid, handler.Created.Properties.Dataset!.Storage.StorageUid);
+        Assert.AreEqual(storage.Uid, handler.Created.Properties.Dataset!.Storage!.StorageUid);
         Assert.AreEqual(operation.Uid, handler.Created.Properties.Dataset.Acquisition.Operation.OperationUid);
         Assert.AreEqual(operation.Generation, handler.Created.Properties.Dataset.Acquisition.Operation.Generation);
         Assert.AreEqual("{}", handler.Created.Properties.Dataset.Acquisition.Parameters.GetRawText());

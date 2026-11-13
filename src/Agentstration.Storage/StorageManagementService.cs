@@ -46,7 +46,12 @@ public sealed class StorageManagementService(
     public async Task<StoredResource<StorageResource>> CreateAsync(StorageResource resource, CancellationToken token)
     {
         var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.Storage);
-        var scoped = resource with { ScopeRef = scope };
+        var scoped = resource with
+        {
+            ScopeRef = scope,
+            Definition = resource.Definition with
+            { Collections = resource.Definition.Collections.Select(c => c with { Uid = Guid.NewGuid() }).ToArray() }
+        };
         return await scopeOperations.WriteAsync(scoped, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
             await ValidateAsync(scoped, ct);
@@ -136,12 +141,16 @@ public sealed class StorageManagementService(
         return new(storage, stored.Value.Definition.Type, stored.Value.Definition.ConnectedService,
             stored.Value.Definition.ConnectedServiceType,
             stored.Value.Definition.Configuration.Clone(), stored.Value.Definition.Envelope.Clone(),
-            stored.Value.Definition.Bindings.ToArray(), version.Capabilities, version.Limits);
+            stored.Value.Definition.Bindings.ToArray(), version.Capabilities, version.Limits, version.Documents, stored.Value.Definition.Collections);
     }
 
     private async Task<StoredResource<StorageResource>> ReplaceAsync(StoredResource<StorageResource> stored,
         StorageProperties definition, string etag, CancellationToken token)
     {
+        var oldIds = stored.Value.Definition.Collections.Select(c => c.Uid).ToHashSet();
+        if (definition.Collections.Any(c => c.Uid != Guid.Empty && !oldIds.Contains(c.Uid)))
+            throw new StorageException("storage_collection_identity_invalid", "New collections must receive a server-owned identity.");
+        definition = definition with { Collections = definition.Collections.Select(c => c.Uid == Guid.Empty ? c with { Uid = Guid.NewGuid() } : c).ToArray() };
         var scope = stored.Value.ScopeRef!.Value;
         return await scopeOperations.WriteAsync(stored.Value, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
@@ -184,6 +193,20 @@ public sealed class StorageManagementService(
             throw new StorageException("storage_provider_unavailable", "The exact Storage provider is unavailable.", 409);
         await StorageValidation.InstanceAsync(version.ConfigurationSchema, definition.Configuration, token);
         await StorageValidation.InstanceAsync(version.EnvelopeSchema, definition.Envelope, token);
+        if (definition.Collections.Count > 32 || definition.Collections.Select(c => c.Name).Distinct(StringComparer.Ordinal).Count() != definition.Collections.Count
+            || definition.Collections.Where(c => c.Uid != Guid.Empty).Select(c => c.Uid).Distinct().Count() != definition.Collections.Count(c => c.Uid != Guid.Empty)
+            || definition.Collections.Count > 0 && version.Documents is null)
+            throw new StorageException("storage_collections_invalid", "Collections require a document-capable Storage and unique bounded identities.");
+        foreach (var collection in definition.Collections)
+        {
+            StorageValidation.Name(collection.Name); StorageValidation.Display(collection.DisplayName, null);
+            StorageValidation.Json(collection.Schema); await StorageValidation.SchemaAsync(collection.Schema, token);
+            var policy = collection.Policy;
+            if (policy.MaximumPageSize is < 1 or > 100 || policy.MaximumDocumentBytes is < 1 or > 65536
+                || policy.MaximumResultBytes is < 65536 or > 196608 || policy.QueryProfiles is not { Count: <= 8 } || policy.Query && policy.QueryProfiles.Count == 0
+                || policy.QueryProfiles.Any(id => !version.Documents!.QueryProfiles.Any(p => p.Id == id)))
+                throw new StorageException("storage_collection_policy_invalid", "The collection requests unsupported query profiles or limits.");
+        }
         foreach (var validator in definitionValidators ?? []) validator.Validate(type, version, definition);
         await ValidateMappingAsync(resource, version, token);
         return version;

@@ -17,6 +17,12 @@ public interface IStoragesClient
     Task<ResourceSnapshot<StorageResource>> CreateAsync(CreateStorageRequest body, CancellationToken token);
     Task<ResourceSnapshot<StorageResource>> UpdateAsync(ScopedResourceAddress address, PutStorageRequest body, string etag, CancellationToken token);
     Task<ResourceSnapshot<StorageResource>> ReconcileAsync(ScopedResourceAddress address, ReconcileStorageRequest body, string etag, CancellationToken token);
+    Task<StorageDocumentDescription> DescribeDocumentsAsync(ScopedResourceAddress address, Guid collection, CancellationToken ct) => throw new NotSupportedException();
+    Task<StorageDocumentPage> QueryDocumentsAsync(ScopedResourceAddress address, Guid collection, StorageDocumentQuery request, CancellationToken ct) => throw new NotSupportedException();
+    Task<StorageDocumentValue> GetDocumentAsync(ScopedResourceAddress address, Guid collection, string id, CancellationToken ct) => throw new NotSupportedException();
+    Task<StorageDocumentValue> PutDocumentAsync(ScopedResourceAddress address, Guid collection, StorageDocumentWrite request, CancellationToken ct) => throw new NotSupportedException();
+    Task<StorageDocumentValue> DeleteDocumentAsync(ScopedResourceAddress address, Guid collection, StorageDocumentDelete request, CancellationToken ct) => throw new NotSupportedException();
+    Task<IReadOnlyList<ResourceReference>> PublishDocumentToolsAsync(ScopedResourceAddress address, Guid collection, StorageDocumentToolPublication request, CancellationToken ct) => throw new NotSupportedException();
     Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token);
 }
 
@@ -81,6 +87,25 @@ public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient, 
 
     public Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token) =>
         ReadSnapshotAsync(HttpMethod.Post, Path(address, "deactivate"), null, etag, token);
+
+    public Task<StorageDocumentDescription> DescribeDocumentsAsync(ScopedResourceAddress address, Guid collection, CancellationToken ct) =>
+        ApiResponse.ReadAsync<StorageDocumentDescription>(httpClient, Path(address, $"collections/{collection:D}/capabilities"), ct);
+    public Task<StorageDocumentValue> GetDocumentAsync(ScopedResourceAddress address, Guid collection, string id, CancellationToken ct) =>
+        ApiResponse.ReadAsync<StorageDocumentValue>(httpClient, Path(address, $"collections/{collection:D}/documents/{Uri.EscapeDataString(id)}"), ct);
+    public Task<StorageDocumentPage> QueryDocumentsAsync(ScopedResourceAddress address, Guid collection, StorageDocumentQuery request, CancellationToken ct) =>
+        DocumentPostAsync<StorageDocumentPage>(address, collection, "query", request, ct);
+    public Task<StorageDocumentValue> PutDocumentAsync(ScopedResourceAddress address, Guid collection, StorageDocumentWrite request, CancellationToken ct) =>
+        DocumentPostAsync<StorageDocumentValue>(address, collection, "documents", request, ct);
+    public Task<StorageDocumentValue> DeleteDocumentAsync(ScopedResourceAddress address, Guid collection, StorageDocumentDelete request, CancellationToken ct) =>
+        DocumentPostAsync<StorageDocumentValue>(address, collection, "delete", request, ct);
+    public Task<IReadOnlyList<ResourceReference>> PublishDocumentToolsAsync(ScopedResourceAddress address, Guid collection, StorageDocumentToolPublication request, CancellationToken ct) =>
+        DocumentPostAsync<IReadOnlyList<ResourceReference>>(address, collection, "tools/publish", request, ct);
+    private async Task<T> DocumentPostAsync<T>(ScopedResourceAddress address, Guid collection, string action, object body, CancellationToken ct)
+    {
+        using var response = await httpClient.PostAsJsonAsync(Path(address, $"collections/{collection:D}/{action}"), body, ct);
+        await ApiResponse.EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<T>(ct) ?? throw new InvalidOperationException("Missing document response.");
+    }
 
     private async Task<IReadOnlyList<T>> ReadPagesAsync<T>(string path, ResourceScopeRef scope, CancellationToken token)
     {

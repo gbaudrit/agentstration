@@ -151,4 +151,9 @@
   <data name="NoOutputContractHelp"><value>Cette étape n’expose actuellement aucun contrat de sortie configurable.</value></data>
   <data name="SelectFlowVersionForContract"><value>Sélectionnez une version de Flow disponible pour consulter son contrat.</value></data>
   <data name="SelectToolForContract"><value>Sélectionnez un Tool disponible pour consulter son contrat.</value></data>
+  <data name="Step.composition" xml:space="preserve"><value>Point de composition</value></data>
+  <data name="CompositionPoint" xml:space="preserve"><value>Nom du point</value></data>
+  <data name="CompositionAllowEmpty" xml:space="preserve"><value>Autoriser une séquence vide (identité)</value></data>
+  <data name="CompositionHelp" xml:space="preserve"><value>La ressource utilisatrice choisit ici une séquence ordonnée de Flows publiés. Chaque Flow reçoit value et ses paramètres enregistrés.</value></data>
+  <data name="InvalidJson" xml:space="preserve"><value>Saisissez un JSON valide.</value></data>
 </root>

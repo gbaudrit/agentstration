@@ -38,12 +38,13 @@ else
     else
     {
         <DataGrid TItem="FlowRunArtifactResource" Items="durable">
-            <Header><tr><th>@T("Artifact")</th><th>@T("FlowRun")</th><th>@T("Step")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("Created")</th></tr></Header>
+            <Header><tr><th>@T("Artifact")</th><th>@T("FlowRun")</th><th>@T("Producer")</th><th>@T("Storage")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("Created")</th></tr></Header>
             <Row Context="item">
                 <tr data-testid="durable-artifact-row">
                     <td><ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></td>
                     <td><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></td>
-                    <td><code>@item.ProducerFlowStepId</code></td>
+                    <td>@if (item.ProducerResource is { } producer) { <a class="text-button" href="@ArtifactResourceLinks.Producer(producer)">@producer.Name</a> }<code>@item.ProducerFlowStepId</code></td>
+                    <td>@if (item.Receipt.Materialization is { } location) { <a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a> }</td>
                     <td>@item.Receipt.MediaType</td>
                     <td>@Size(item.Receipt.Length)</td>
                     <td>@item.CreatedAt.ToLocalTime().ToString("g")</td>

@@ -6,6 +6,7 @@ using Agentstration.Flows.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -18,8 +19,24 @@ using Microsoft.Extensions.Logging;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class KnowledgeSourceEditorTests
+public sealed partial class KnowledgeSourceEditorTests
 {
+    [TestMethod]
+    public async Task PrerenderDisablesNativeContentSelectionUntilInteractive()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub());
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<KnowledgeContentAccess>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            { [nameof(KnowledgeContentAccess.SourceName)] = "agentstration-documentation" }))).ToHtmlString());
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        var fields = document.QuerySelector("[data-testid='knowledge-native-access-fields']")!;
+        Assert.IsTrue(fields.HasAttribute("disabled"));
+        Assert.AreEqual("false", fields.GetAttribute("data-interactive"));
+        Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-retrieval-run']")!.HasAttribute("disabled"));
+    }
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
@@ -71,8 +88,8 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "not available yet")]
-    [DataRow("fr-FR", "n’est pas encore disponible")]
+    [DataRow("en-US", "requires a compatible output Storage")]
+    [DataRow("fr-FR", "nécessite un Storage de sortie compatible")]
     public void UnsupportedNativeProjectionKeepsTheFormInteractiveAndCanBeSavedDisabled(string cultureName, string expected)
     {
         using var culture = new TestCultureScope(cultureName);
@@ -134,7 +151,7 @@ public sealed class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-projection-flow']").HasAttribute("required"));
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
+            Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
             Assert.IsTrue(
@@ -169,12 +186,14 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea")
             .Input("{\"format\":\"markdown\"}");
         rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid='knowledge-binding-refresh']").Change(true);
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.CreatedRequest);
             Assert.HasCount(1, client.CreatedRequest.Properties.DataSources);
+            Assert.IsTrue(client.CreatedRequest.Properties.DataSources[0].RefreshIfNecessary);
             Assert.AreEqual("documentation", client.CreatedRequest.Properties.DataSources[0].DataSource.Name);
             Assert.AreEqual("markdown", client.CreatedRequest.Properties.DataSources[0].Configuration.GetProperty("format").GetString());
             Assert.AreEqual(TimeSpan.FromHours(25) + TimeSpan.FromMinutes(30) + TimeSpan.FromSeconds(45),
@@ -195,7 +214,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']")
             .Change("documents");
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Targeted documentation");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() =>
             Assert.AreEqual("documents", client.CreatedRequest?.Properties.DataSources.Single().AcquisitionTarget?.Name));
@@ -219,7 +238,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNull(client.CreatedRequest);
-            Assert.IsTrue(rendered.Find("button[type='submit']").HasAttribute("disabled"));
+            Assert.IsTrue(rendered.Find("[data-testid=knowledge-source-save]").HasAttribute("disabled"));
             StringAssert.Contains(rendered.Find("[role='alert']").TextContent, "valid JSON object");
         });
     }
@@ -239,7 +258,7 @@ public sealed class KnowledgeSourceEditorTests
         rendered.FindAll("[data-testid='knowledge-source-data-source-bindings'] select")[1]
             .Change($"{FlowClientStub.WorkspaceScope.Value}|default|artifact-transform-builtin|1.0.0");
         rendered.WaitForElement("[data-schema-path='$.format'] input").Input("markdown");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.CreatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
@@ -255,6 +274,7 @@ public sealed class KnowledgeSourceEditorTests
             .Add(component => component.Name, "agentstration-documentation"));
 
         rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-projections']").GetAttribute("data-interactive"));
         rendered.WaitForElement("[data-schema-path='$.locale'] input").Input("fr-FR");
         rendered.Find("[data-testid='knowledge-start-projection']").Click();
 
@@ -288,9 +308,11 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
-    public void EditionPreservesThePersistedSourceConfiguration()
+    [DataRow("en-US", "Update dependencies", "Save and update", "Cancel")]
+    [DataRow("fr-FR", "Mettre à jour les dépendances", "Enregistrer et mettre à jour", "Annuler")]
+    public void EditionPreservesThePersistedSourceConfiguration(string cultureName, string buttonLabel, string confirmLabel, string cancelLabel)
     {
-        using var culture = new TestCultureScope("en-US");
+        using var culture = new TestCultureScope(cultureName);
         var existing = ProjectedSource() with
         {
             Definition = ProjectedSource().Definition with
@@ -310,10 +332,29 @@ public sealed class KnowledgeSourceEditorTests
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
         Assert.AreEqual("49:02:03",
             rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").GetAttribute("value"));
-        rendered.Find("button[type='submit']").Click();
+        var rebind = rendered.Find("[data-testid=knowledge-rebind-dependencies]");
+        Assert.AreEqual("BUTTON", rebind.TagName);
+        Assert.AreEqual(buttonLabel, rebind.TextContent);
+        rebind.Click();
+        var confirmation = rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation]");
+        Assert.IsNull(client.UpdatedRequest);
+        Assert.AreEqual(cancelLabel, confirmation.QuerySelector(".button-secondary")!.TextContent);
+        rendered.Find("[data-testid=knowledge-rebind-confirmation] .button-secondary").Click();
+        Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-rebind-confirmation]"));
+        Assert.IsNull(client.UpdatedRequest);
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
+        Assert.IsFalse(client.UpdatedRequest!.RebindDependencies);
+        var ordinarySave = client.UpdatedRequest;
+        rendered.Find("[data-testid=knowledge-rebind-dependencies]").Click();
+        rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation]");
+        Assert.AreSame(ordinarySave, client.UpdatedRequest);
+        Assert.AreEqual(confirmLabel, rendered.Find("[data-testid=knowledge-rebind-confirmation-confirm]").TextContent);
+        rendered.Find("[data-testid=knowledge-rebind-confirmation-confirm]").Click();
 
         rendered.WaitForAssertion(() => Assert.AreEqual("markdown",
             client.UpdatedRequest?.Properties.DataSources[0].Configuration.GetProperty("format").GetString()));
+        Assert.IsTrue(client.UpdatedRequest!.RebindDependencies);
         Assert.AreEqual(TimeSpan.FromHours(49) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3),
             client.UpdatedRequest?.Properties.DataSources[0].MaximumAge);
     }
@@ -383,6 +424,61 @@ public sealed class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
+    [DataRow("/instance", "en-US", "Flow not started")]
+    [DataRow("/tenants/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "fr-FR", "Flow non démarré")]
+    public async Task KnowledgeHistoryLinksKeepTheExecutionWorkspaceAndDoNotInventAnUnstartedRun(
+        string logicalScope, string cultureName, string notStarted)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var source = ProjectedSource() with { ScopeRef = ResourceScopeRef.Parse(logicalScope) };
+        var client = new KnowledgeClientStub(source);
+        var completed = (await client.StartProjectionAsync(source.Namespace, source.Name, new())).Value with
+        {
+            ScopeRef = DataSourceScope,
+            WorkspaceId = DataSourceScope.TargetId!.Value,
+            LogicalScopeRef = source.ScopeRef
+        };
+        client.Projections.Clear();
+        client.Projections.Add(completed);
+        client.Projections.Add(completed with
+        {
+            Metadata = completed.Metadata with { Name = "projection-unstarted" },
+            State = KnowledgeProjectionState.Failed,
+            ProjectionFlowRunId = "flowrun-never-created",
+            ErrorCode = "data_source_content_version_unavailable"
+        });
+        var snapshot = ExistingSnapshot() with { Snapshot = ExistingSnapshot().Snapshot with { ScopeRef = DataSourceScope } };
+        client.Snapshots = [snapshot];
+        using var context = CreateContext(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new KnowledgeNavigationContext(logicalScope));
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
+        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        var expectedQuery = "?scopeRef=" + Uri.EscapeDataString(DataSourceScope.Value) + "&context=" + Uri.EscapeDataString(logicalScope);
+        rendered.WaitForAssertion(() =>
+        {
+            var rows = rendered.FindAll("[data-testid=knowledge-projection-row]");
+            Assert.HasCount(2, rows);
+            Assert.AreEqual("/flow-runs/" + completed.ProjectionFlowRunId + expectedQuery, rows[0].QuerySelector("a")?.GetAttribute("href"));
+            Assert.IsNull(rows[1].QuerySelector("a"));
+            Assert.Contains(notStarted, rows[1].TextContent);
+        });
+        rendered.Find("[data-testid=knowledge-source-snapshots-tab]").Click();
+        rendered.Find(".knowledge-snapshot-link").Click();
+        rendered.WaitForAssertion(() =>
+        {
+            var links = rendered.FindAll("[data-testid=knowledge-snapshot-details] a[href^='/flow-runs/']");
+            Assert.IsNotEmpty(links);
+            foreach (var link in links) Assert.EndsWith(expectedQuery, link.GetAttribute("href")!);
+        });
+    }
+
+    private sealed class KnowledgeNavigationContext(string scopeRef) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scopeRef;
+        public string AddToUri(string uri) => uri;
+    }
+
+    [TestMethod]
     public void DetailsExposesSnapshotArtifactsForConsultation()
     {
         using var culture = new TestCultureScope("en-US");
@@ -409,15 +505,8 @@ public sealed class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-retrieval-tab']").Click();
         rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("read");
         rendered.WaitForAssertion(() =>
-        {
-            var artifactOption = rendered.Find(
-                "[data-testid='knowledge-retrieval-artifact'] option[value='artifact-0123456789abcdef']");
-            StringAssert.Contains(artifactOption.TextContent, "application/json");
-            Assert.IsTrue(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled"));
-        });
-        rendered.Find("[data-testid='knowledge-retrieval-artifact']").Change("artifact-0123456789abcdef");
-        rendered.WaitForAssertion(() =>
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled")));
+
     }
 
     [TestMethod]
@@ -425,8 +514,9 @@ public sealed class KnowledgeSourceEditorTests
     {
         using var culture = new TestCultureScope("fr-FR");
         var snapshot = ExistingSnapshot();
-        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot],
-            retrievalResult: ExistingRetrievalResult(snapshot)));
+        var client = new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot],
+            retrievalResult: ExistingRetrievalResult(snapshot));
+        using var context = CreateContext(client);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/knowledge-sources/agentstration-documentation?view=retrieval");
 
@@ -437,21 +527,21 @@ public sealed class KnowledgeSourceEditorTests
         {
             Assert.AreEqual("Consultation",
                 rendered.Find("[data-testid='knowledge-source-retrieval-tab']").TextContent);
-            Assert.AreEqual("Rechercher",
-                rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search']").TextContent);
+            Assert.AreEqual("Recherche regex",
+                rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search_regex']").TextContent);
         });
-        rendered.Find("[data-testid='knowledge-retrieval-text']").Change("documentation");
+        rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("search_regex");
+        rendered.Find("[data-testid='knowledge-retrieval-text']").Input("documentation");
         rendered.Find("[data-testid='knowledge-retrieval-run']").Click();
 
         rendered.WaitForAssertion(() =>
         {
             var result = rendered.Find("[data-testid='knowledge-retrieval-result']");
-            StringAssert.Contains(result.TextContent, "Rechercher · 1 résultat(s)");
-            Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef",
-                result.QuerySelector(".knowledge-retrieval-item a")?.GetAttribute("href"));
-            Assert.AreEqual("artifact-0123456789abcdef",
-                result.QuerySelector(".knowledge-retrieval-item a")?.TextContent);
-            Assert.HasCount(1, result.QuerySelectorAll(".knowledge-retrieval-item pre"));
+            Assert.AreEqual("agentstration-documentation", client.NativeSourceName);
+            StringAssert.Contains(result.TextContent, "Contenu prêt");
+            StringAssert.Contains(result.TextContent, "artifact-0123456789abcdef");
+            Assert.HasCount(1, result.QuerySelectorAll("pre"));
+            Assert.HasCount(1, result.QuerySelectorAll("[data-testid='knowledge-read-match']"));
         });
     }
 
@@ -472,7 +562,7 @@ public sealed class KnowledgeSourceEditorTests
                 rendered.Find("[data-testid='knowledge-source-name']").GetAttribute("value"));
             Assert.IsEmpty(rendered.FindAll(".knowledge-edit-action"));
         });
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
         rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
 
         rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
@@ -504,7 +594,7 @@ public sealed class KnowledgeSourceEditorTests
         });
 
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Updated documentation");
-        rendered.Find("button[type='submit']").Click();
+        rendered.Find("[data-testid=knowledge-source-save]").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.UpdatedRequest);
@@ -708,7 +798,8 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class KnowledgeClientStub(KnowledgeSourceResource? source = null, KnowledgeSourceToolExposureResource? exposure = null, IReadOnlyList<KnowledgeSnapshotView>? snapshots = null, KnowledgeRetrievalResult? retrievalResult = null) : IKnowledgeSourcesClient
     {
-        private readonly List<KnowledgeProjectionResource> projections = [];
+        public List<KnowledgeProjectionResource> Projections { get; } = [];
+        public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = snapshots ?? [];
         public bool RejectNativeDataset { get; set; }
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
@@ -752,7 +843,7 @@ public sealed class KnowledgeSourceEditorTests
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
         public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(projections);
+            Task.FromResult<IReadOnlyList<KnowledgeProjectionResource>>(Projections);
         public Task<ResourceSnapshot<KnowledgeProjectionResource>> StartProjectionAsync(ResourceNamespace @namespace, string name, StartKnowledgeProjectionRequest request, CancellationToken cancellationToken = default)
         {
             StartedProjectionRequest = request;
@@ -778,11 +869,25 @@ public sealed class KnowledgeSourceEditorTests
                 CompletedAt = DateTimeOffset.UtcNow,
                 SnapshotName = "snapshot-0123456789abcdef"
             };
-            projections.Add(projection);
+            Projections.Add(projection);
             return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(projection, "\"projection-etag\""));
         }
-        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(snapshots ?? []);
+        public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(Snapshots);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public string? NativeSourceName { get; private set; }
+        public Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default)
+        {
+            NativeSourceName = name;
+            return retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(new KnowledgeAccessResult
+            {
+                State = "ready",
+                SourceUid = retrievalResult.KnowledgeSourceUid,
+                SnapshotId = retrievalResult.SnapshotName,
+                Matches = retrievalResult.Items.Select(item => new KnowledgeRegexMatch(item.ArtifactId,
+                    new(0, 10), new(0, 10), item.Content ?? string.Empty)).ToArray(),
+                EndOfSelection = true
+            });
+        }
         public Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default) =>
             retrievalResult is null ? throw new NotSupportedException() : Task.FromResult(retrievalResult);
         public Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -791,6 +896,9 @@ public sealed class KnowledgeSourceEditorTests
 
     private sealed class FlowClientStub : IFlowApiClient
     {
+        public FlowGraphDefinition? SequenceGraph { get; init; }
+        public CreateFlowDraftRequest? CreatedTransformation { get; private set; }
+        public bool FailCreation { get; init; }
         internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
 
@@ -825,7 +933,7 @@ public sealed class KnowledgeSourceEditorTests
             return Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new(flowId, "1.0.0", null,
                 new WorkflowFlowDefinition("input", [], [], []),
                 new Dictionary<string, string> { [FlowMetadataKeys.Contract] = contract }, DateTimeOffset.UtcNow,
-                new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
+                (flowId == "artifact-transform-builtin" ? SequenceGraph : null) ?? new FlowGraphDefinition { EntryStep = "input", InputSchema = inputSchema })]);
         }
         private static string Contract(string flowId) => flowId switch
         {
@@ -841,7 +949,17 @@ public sealed class KnowledgeSourceEditorTests
         public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowRun> CancelFlowRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public async IAsyncEnumerable<FlowRun> ObserveFlowRunAsync(string runId, [EnumeratorCancellation] CancellationToken cancellationToken) { await Task.CompletedTask; yield break; }
-        public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowDraftResponse> CreateDraftAsync(CreateFlowDraftRequest request, CancellationToken cancellationToken)
+        {
+            if (FailCreation) throw new HttpRequestException("Synthetic rejection.");
+            CreatedTransformation = request;
+            return Task.FromResult(new FlowDraftResponse(new()
+            {
+                WorkspaceId = new(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")), ScopeRef = request.ScopeRef,
+                Id = request.Name + "-draft", FlowId = new(request.Name), DisplayName = request.DisplayName,
+                Definition = new() { EntryStep = "input" }, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            }, "created"));
+        }
         public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowDraftResponse> SaveDraftAsync(string flowId, UpdateFlowDraftRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowValidationResponse> ValidateDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();

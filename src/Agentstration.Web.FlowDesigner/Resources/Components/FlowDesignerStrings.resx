@@ -156,4 +156,9 @@
   <data name="NoOutputContractHelp"><value>This step does not currently expose a configurable output contract.</value></data>
   <data name="SelectFlowVersionForContract"><value>Select an available Flow version to inspect its contract.</value></data>
   <data name="SelectToolForContract"><value>Select an available Tool to inspect its contract.</value></data>
+  <data name="Step.composition" xml:space="preserve"><value>Composition point</value></data>
+  <data name="CompositionPoint" xml:space="preserve"><value>Point name</value></data>
+  <data name="CompositionAllowEmpty" xml:space="preserve"><value>Allow an empty sequence (identity)</value></data>
+  <data name="CompositionHelp" xml:space="preserve"><value>The consuming resource selects an ordered sequence of published Flows here. Each Flow receives value and its saved parameters.</value></data>
+  <data name="InvalidJson" xml:space="preserve"><value>Enter valid JSON.</value></data>
 </root>

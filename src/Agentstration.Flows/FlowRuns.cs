@@ -50,6 +50,8 @@ public readonly record struct FlowRunKey(ResourceScopeRef ScopeRef, string RunId
 [method: JsonConstructor]
 public sealed record FlowRunEvent(ResourceScopeRef ScopeRef, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp)
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
     public FlowRunEvent(WorkspaceId workspaceId, string runId, long sequence, FlowRunEventType type, string? stepId,
         JsonElement? payload, DateTimeOffset timestamp)
         : this(ResourceScopeRef.Workspace(workspaceId.Value), runId, sequence, type, stepId, payload, timestamp) { }
@@ -143,6 +145,10 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
+    [JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
+    public FlowCompositionReceipt? Composition { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public WorkspaceId WorkspaceId { get; init; }

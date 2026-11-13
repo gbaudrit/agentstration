@@ -1,0 +1,70 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<section class="panel form-section" data-testid="source-flow-composition">
+    <h2>@T("CompositionTitle")</h2>
+    <label><span>@T("CompositionOrchestration")</span><select value="@SelectedKey" @onchange="ChangeRootAsync" disabled="@ReadOnly" data-testid="source-orchestration">
+        <option value="">@T("CompositionStandard")</option>
+        @foreach (var option in options) { <option value="@Key(option.Reference)">@option.Label</option> }
+        @if (Orchestration is not null && options.All(option => Key(option.Reference) != SelectedKey)) { <option value="@SelectedKey">@Orchestration.ResourceId · @T("SequenceUnavailable")</option> }
+    </select><small>@T("CompositionBoundaryHelp")</small></label>
+    @if (loadFailed) { <p role="status">@T("SequenceUnavailable")</p> }
+    @foreach (var point in PointNames)
+    {
+        @if (!DeclaredPointNames.Contains(point, StringComparer.Ordinal))
+        { <p role="status">@T("CompositionOrphanHelp") <button type="button" class="text-button" disabled="@ReadOnly" @onclick="() => RemovePointAsync(point)">@T("CompositionRemovePoint")</button></p> }
+        <FlowSequenceEditor @key="point" Title="@point" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" OutputSchema="@DeclaredPoint(point)?.OutputSchema" ReadOnly="ReadOnly" />
+    }
+</section>
+@code {
+    [Parameter] public string Boundary { get; set; } = "acquisition";
+    [Parameter] public string StandardPoint { get; set; } = "transformations";
+    [Parameter] public FlowCallReference? Orchestration { get; set; }
+    [Parameter] public EventCallback<FlowCallReference?> OrchestrationChanged { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Value { get; set; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
+    [Parameter] public EventCallback<IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>>> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly List<Option> options = [];
+    private bool loadFailed;
+    private string SelectedKey => Orchestration is null ? string.Empty : Key(Orchestration);
+    private Option? SelectedOption => Orchestration is null
+        ? options.FirstOrDefault(option => option.IsActive && option.Reference.ScopeRef == ResourceScopeRef.Instance && option.Reference.Namespace == ResourceNamespace.Default && option.Reference.ResourceId == (Boundary == "projection" ? "knowledge-orchestration-builtin" : "data-source-orchestration-builtin"))
+        : options.FirstOrDefault(option => Key(option.Reference) == SelectedKey);
+    private IEnumerable<string> DeclaredPointNames => SelectedOption?.Points.Select(point => point.Point) ?? (Orchestration is null ? [StandardPoint] : []);
+    private FlowCompositionPointStepDefinition? DeclaredPoint(string name) => SelectedOption?.Points.FirstOrDefault(point => point.Point == name);
+    private IEnumerable<string> PointNames => DeclaredPointNames.Concat(Value.Keys.Where(name => name != Boundary)).Distinct(StringComparer.Ordinal);
+    protected override async Task OnInitializedAsync()
+    {
+        if (Services.GetService(typeof(IFlowApiClient)) is not IFlowApiClient flows) return;
+        try
+        {
+            foreach (var summary in (await flows.GetFlowsAsync(cancellation.Token)).Take(200))
+            {
+                var flow = await flows.GetFlowAsync(summary.Namespace, summary.Id, summary.ScopeRef, cancellation.Token);
+                if (!flow.Enabled || flow.ScopeRef is null) continue;
+                foreach (var version in await flows.GetFlowVersionsAsync(flow.Namespace, flow.Id, flow.ScopeRef, cancellation.Token))
+                {
+                    var points = version.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().ToArray() ?? [];
+                    if (points.Count(point => point.Point == Boundary && !point.AllowEmpty) != 1) continue;
+                    options.Add(new(new(flow.Id, FlowCallVersionStrategy.Exact, version.Version, flow.Namespace, flow.ScopeRef),
+                        $"{flow.DisplayName ?? flow.Name} · {flow.ScopeRef} · {version.Version}", points.Where(point => point.Point != Boundary).ToArray(), version.Version == flow.ActiveVersion));
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { loadFailed = true; }
+    }
+    private async Task ChangeRootAsync(ChangeEventArgs args)
+    {
+        var key = args.Value?.ToString();
+        await OrchestrationChanged.InvokeAsync(string.IsNullOrEmpty(key) ? null : options.Single(option => Key(option.Reference) == key).Reference);
+    }
+    private Task RemovePointAsync(string point) => ValueChanged.InvokeAsync(Value.Where(pair => pair.Key != point).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+    private Task SetPointAsync(string point, IReadOnlyList<FlowCompositionCall> calls)
+    { var next = Value.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); next[point] = calls; return ValueChanged.InvokeAsync(next); }
+    private static string Key(FlowCallReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.ResourceId}|{reference.Version}";
+    private string T(string key) => Localizer[key];
+    private sealed record Option(FlowCallReference Reference, string Label, IReadOnlyList<FlowCompositionPointStepDefinition> Points, bool IsActive);
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

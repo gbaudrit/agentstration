@@ -220,6 +220,10 @@ else
                                                 UpdateTransformMappingAsync="UpdateTransformMappingAsync" UpdateTransformSchemaBindingAsync="UpdateTransformSchemaBindingAsync"
                                                 ValidateSchemaDefinitionAsync="ValidateSchemaDefinitionAsync" ValidateSchemaInstanceAsync="ValidateSchemaInstanceAsync" />
                                         }
+                                        else if (SelectedStep is FlowCompositionPointStepDefinition point)
+                                        {
+                                            <FlowCompositionInspector Step="point" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />
+                                        }
                                         else if (SelectedStep is ConditionFlowStepDefinition condition)
                                         {
                                             <FlowConditionInspector Step="condition" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" UpdateSelectedAsync="UpdateSelectedAsync" />
@@ -234,11 +238,11 @@ else
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not OutputFlowStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not OutputFlowStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
                                         }
