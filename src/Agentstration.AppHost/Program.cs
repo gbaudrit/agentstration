@@ -158,11 +158,17 @@ var crawl4AiAllowedPorts = builder.Configuration.GetSection("Crawl4AI:AllowedPor
     .Cast<string>()
     .ToArray();
 
+var aepInferenceTimeout = builder.Configuration["Agentstration:Aep:Inference:Timeout"];
+var ollamaInferenceTimeout = builder.Configuration["Ollama:Inference:Timeout"];
+
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Ollama__Endpoint", parsedOllamaEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
+if (ollamaInferenceTimeout is not null)
+    ollamaExtension.WithEnvironment("Ollama__Inference__Timeout", ollamaInferenceTimeout);
+
 var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_LlamaCpp>("llama-cpp-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
@@ -356,6 +362,8 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
+if (aepInferenceTimeout is not null)
+    console.WithEnvironment("Agentstration__Aep__Inference__Timeout", aepInferenceTimeout);
 if (usePairingCode)
 {
     foreach (var extension in developmentExtensions)
