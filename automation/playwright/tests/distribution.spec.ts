@@ -41,7 +41,7 @@ for (const variant of [
           await capture(`${route.split('?')[0].slice(1)}-table`);
         }
       }
-      await pages.distribution.inspectToolCollectionAlignment(product.consoleUrl);
+      await pages.distribution.inspectToolCollectionAlignment(product.consoleUrl, variant.width === 1440 ? 'columns' : 'stacked');
       await capture('tools');
       if (variant.width === 1440) {
         await pages.distribution.showCollectionTable();
