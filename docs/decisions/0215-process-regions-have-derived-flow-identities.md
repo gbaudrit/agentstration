@@ -27,8 +27,8 @@ its exact owning run/step attempt and the authenticated AWP StepExecution identi
 The Worker supplies bounded keys and descriptors, never a graph or origin. The
 authority derives the region from the accepted snapshot, rejects conflicting replay
 and new admissions after explicit closure, and attaches admitted children immediately
-to the owning step. Empty admission is explicitly closed. Totals are unknown until
-closure. Unit output contracts and aggregate step output contracts remain separate.
+to the owning step. Empty admission is explicitly closed. A producer may declare a
+fixed total; otherwise the total remains unknown until closure. Unit output contracts and aggregate step output contracts remain separate.
 Artifact capabilities remain isolated by their existing owner/attempt/index keys.
 
 The initial general-purpose executor is optional processing on a Transform step:
