@@ -251,7 +251,7 @@ Executable Agent, Tool, Tool-route, child-Flow, repeat and Flow-output steps may
 
 A successful Knowledge projection publishes one atomic `KnowledgeSnapshot` containing only the durable, publishable Artifacts emitted by the projection Flow. Publication validates the exact Knowledge Source generation, projection Flow version and run, Data Source acquisition provenance, artifact lineage, Workspace, and integrity before the immutable write. Publication attempts and the active Snapshot pointer are separate mutable state, so failures, retries, recovery, activation, and supersession never rewrite a published Snapshot. Snapshot queries expose active, superseded, or unavailable state while retaining deterministic history. See ADR-0153 and ADR-0167.
 
-New Data Source `dataset` compositions select an exact Storage, a narrowing logical rule and one saved Operation/parameter binding. Explicitly enabled read-only Operations run through a type-owned, exact durable Flow and the existing AWP worker. Bounded output is written through the neutral Storage gateway under the dataset UID and operational Workspace; content reads reauthorize exact identities and renew references. See [Data Source composition](data-source-composition.md) and ADR-0204. Independently versioned Tool relays are provided by #1044; Knowledge Snapshot adoption remains #1042.
+New Data Source `dataset` compositions select an exact Storage, a narrowing logical rule and one saved Operation/parameter binding. Explicitly enabled read-only Operations run through a type-owned, exact durable Flow and the existing AWP worker. Bounded output is written through the neutral Storage gateway under the dataset UID and operational Workspace; content reads reauthorize exact identities and renew references. See [Data Source composition](data-source-composition.md) and ADR-0204. Independently versioned Tool relays are provided by #1044; native Knowledge Snapshot adoption is implemented by #1042 as described under Retained Knowledge output below.
 
 The existing profile composition remains executable; historical resources, acquisitions and fixed acquisition Tools are preserved. Data Sources remain the governed acquisition boundary. `DataSource` and `DataSourceProfile` support instance, tenant, and Workspace ownership with ancestor-only visibility plus explicit descendant-use grants. Publishing a profile resolves its dependencies from the profile owner scope and immutably pins the exact Flow version and hash and every Tool and provider identity, generation, limit, and policy. A same-scope acquisition Flow needs no descendant grant; an ancestor Flow must authorize `use` for the profile owner through the shared access overlay. Acquisition executes in a consuming Workspace, validates those pins without resolving names again, and records the exact source and active profile revision before starting `datasource.acquisition/v1`. The protected Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope and granted to descendant Workspaces through their tenant; operational acquisition state remains Workspace-isolated. Their underlying Tools remain generic and carry no Knowledge identity. See ADR-0164, ADR-0166, ADR-0167, ADR-0176, ADR-0172, and ADR-0179.
 
@@ -587,3 +587,51 @@ SQLite schema evolution remains reset-only before the first release: existing ge
 - [ADR-0118 — dedicated Workspaces for browser campaign data isolation](../../decisions/0118-browser-campaigns-use-dedicated-workspaces.md)
 - [ADR-0157 — Crawl4AI web acquisition is an AEP Tool Provider](../../decisions/0157-crawl4ai-web-acquisition-is-an-aep-tool-provider.md)
 - [ADR-0161 — Web crawlers produce bounded aggregate content](../../decisions/0161-web-crawlers-produce-bounded-aggregate-content.md)
+
+## Retained Knowledge output
+
+Knowledge composition accepts native Data Source datasets when an exact output
+Storage and narrowing rule are selected. The existing transformation/projection
+Flows execute through Runtime/AWP; Storage preparation and sealing precede
+immutable Snapshot creation and separate activation. The first retained-output
+adapter supports builtin local Storages using a namespace distinct from mutable
+ASP objects. Existing Artifact-only Snapshots remain readable through their
+receipts. Projection request identities and pending evidence support restart
+recovery through the existing worker; current authorization is checked again.
+See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md).
+The [implementation validation report](knowledge-snapshots-validation-2026-11-09.md)
+records the executed chain, required suite results and remaining UX gates.
+
+
+## Produced Artifacts and their Storage materializations
+
+Native acquisitions and retained Knowledge publications register immutable Artifact
+metadata for their physically stored content. Artifacts retain producer revision,
+execution/Flow Run and exact Storage location/integrity evidence. The existing
+catalogue and content materialization Flow serve previews/downloads. The recovery
+worker reconciles missing metadata from earlier native histories under the original
+caller's current permissions, without rewriting immutable Snapshots or origin data.
+See [ADR-0208](../../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
+
+## Resource-bound Flow composition
+
+Published Flows can declare typed composition points. Data Sources and Knowledge
+Sources bind ordered published child Flows and literal parameters to those points.
+Admission expands them into ordinary governed child calls with exact versions,
+resource UIDs and hashes; Flow Run receipts distinguish the immutable template
+from the compiled executable graph. Standard orchestrations preserve source-owned
+acquisition and publication boundaries, per-binding Knowledge preparation and a
+global post-aggregation sequence. See
+[ADR-0211](../../decisions/0211-resource-bound-flow-composition-points.md) and
+[the source composition inventory](data-source-composition.md#configurable-flow-sequences).
+
+## Source freshness and retained history
+
+Native acquisition and Knowledge Snapshot lifecycles are independent opt-in
+policies. Direct read-only acquisitions use bounded ephemeral Flow/runtime payloads;
+retained inputs refresh according to their source TTL. Explicit binding fallback
+records failed refresh evidence and an exact compatible previous input. Snapshot
+access uses its own publication TTL and explicit expired-serving option. Bounded
+history reconciliation preserves active work, read leases and immutable provenance;
+provider-qualified retirement can remain pending. See
+[ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).

@@ -14,6 +14,7 @@
             <button class="button-secondary" type="button" data-testid="connected-service-refresh-discovery" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Discovery.Refresh")</button>
         </div>
     </div>
+    @if (Supported && Service.Definition.Type?.Type.Name == "http-endpoint") { <p>@T("Http.DiscoveryHelp")</p> }
     @if (!Supported) { <p role="status">@T("Discovery.Unsupported")</p> }
     @if (error) { <p class="form-alert form-alert-danger" role="alert">@T("Discovery.Failed")</p> }
     @if (accepted) { <p class="form-alert form-alert-success" role="status">@T("Discovery.Accepted")</p> }

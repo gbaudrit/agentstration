@@ -194,6 +194,56 @@ public sealed class MainLayoutNavigationTests
         });
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReturningToInstanceIgnoresThePendingWorkspaceResponse(bool failWorkspaceLoad)
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
+        var provider = new DelayedNavigationProvider(failWorkspaceLoad);
+        context.Services.AddScoped<IConsoleContextProvider>(_ => provider);
+        var rendered = RenderLayout(context);
+        var state = context.Services.GetRequiredService<ConsoleContextState>();
+        rendered.WaitForAssertion(() => Assert.AreEqual("/instance", state.Current?.SelectedScopeRef));
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        await rendered.InvokeAsync(() => navigation.NavigateTo(
+            $"/agents/assistant?context={Uri.EscapeDataString($"/workspaces/{SwitchingContextProvider.WorkspaceId:D}")}"));
+        rendered.WaitForAssertion(() => Assert.AreEqual(2, provider.CallCount));
+        await rendered.InvokeAsync(() => navigation.NavigateTo("/modelprofiles/shared?context=%2Finstance"));
+        provider.CompleteWorkspace();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(3, provider.CallCount);
+            Assert.AreEqual("/instance", state.Current?.SelectedScopeRef);
+            Assert.IsNull(state.Error);
+            Assert.AreEqual("/instance", rendered.Find("[data-testid='console-shell']").GetAttribute("data-context-scope"));
+        });
+    }
+
+    private sealed class DelayedNavigationProvider(bool failWorkspaceLoad) : IConsoleContextProvider
+    {
+        private readonly SwitchingContextProvider snapshots = new(AllNavigationPermissions);
+        private readonly TaskCompletionSource workspaceCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private ConsoleContextSnapshot? instance;
+        public int CallCount { get; private set; }
+
+        public async Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
+        {
+            var call = ++CallCount;
+            if (call == 1) return instance = await snapshots.GetAsync(cancellationToken);
+            if (call != 2) return instance!;
+            var workspace = await snapshots.GetAsync(cancellationToken);
+            await workspaceCompletion.Task.WaitAsync(cancellationToken);
+            if (failWorkspaceLoad) throw new InvalidOperationException("The previous Workspace request failed.");
+            return workspace;
+        }
+
+        public void CompleteWorkspace() => workspaceCompletion.TrySetResult();
+    }
+
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(
         ["resources/read", "resources/delete", "runs/read", "runs/delete"],
         StringComparer.Ordinal);

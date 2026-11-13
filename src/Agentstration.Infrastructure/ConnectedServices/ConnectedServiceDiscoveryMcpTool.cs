@@ -16,12 +16,13 @@ using Microsoft.Extensions.Configuration;
 namespace Agentstration.Infrastructure.ConnectedServices;
 
 // A Flow can request only its own persisted discovery. All connection authority is server-derived.
-public sealed class ConnectedServiceDiscoveryExecutor(
+internal sealed class ConnectedServiceDiscoveryExecutor(
     ConnectedServiceOperationDiscoveryService discoveries,
     IResourceStore store, ConnectedServiceManagementService services, ConnectedServiceBoundValues boundValues,
     ISecretResolver secrets,
     ICurrentRequestContext current,
-    IHttpClientFactory clients)
+    IHttpClientFactory clients,
+    BuiltinHttpOperationExecutor httpOperations)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -61,6 +62,8 @@ public sealed class ConnectedServiceDiscoveryExecutor(
             ?? throw Error("connected_service_unavailable");
         if (resolved.Uid != discovery.Service.ServiceUid || resolved.Generation != discovery.Service.Generation)
             throw Error("connected_service_revision_changed");
+        if (BuiltinHttpOperation.Owns(type, version))
+            return await httpOperations.DiscoverAsync(service, version, new(consumer, discovery.Address), cancellationToken);
         var manager = type.Governance?.ManagedBy;
         if (manager?.Kind != ResourceManagementAuthorityKind.ExtensionInstallation)
             throw Error("connected_service_discovery_provider_required");
@@ -113,7 +116,7 @@ public sealed class ConnectedServiceDiscoveryExecutor(
     private static ConnectedServiceOperationDiscoveryException Error(string code) => new(code, "Connected Service provider discovery could not be completed.");
 }
 
-public sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryExecutor execution) : IInternalMcpToolHandler
+internal sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryExecutor execution) : IInternalMcpToolHandler
 {
     public const string Name = "connected-service.operations.discover";
     public InternalMcpToolDefinition Definition { get; } = new(Name, Name, null,
@@ -126,6 +129,17 @@ public sealed class ConnectedServiceDiscoveryMcpTool(ConnectedServiceDiscoveryEx
                 discoveryNamespace = new { type = "string", minLength = 1, maxLength = 128 }
             },
             required = new[] { "discoveryId", "discoveryNamespace" },
+            additionalProperties = false
+        }), JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                contract = new { type = "string", @enum = new[] { ConnectedServiceOperationDiscoveryContracts.V1 } },
+                operations = new { type = "array", items = new { type = "object" } },
+                diagnostics = new { type = "array", items = new { type = "object" } }
+            },
+            required = new[] { "contract", "operations", "diagnostics" },
             additionalProperties = false
         }), ExposeThroughMcp: false);
 

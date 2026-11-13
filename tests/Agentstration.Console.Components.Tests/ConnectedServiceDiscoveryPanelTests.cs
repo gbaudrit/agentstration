@@ -28,6 +28,7 @@ public sealed class ConnectedServiceDiscoveryPanelTests
         rendered.WaitForAssertion(() =>
         {
             Assert.Contains(operationsLabel, rendered.Markup);
+            Assert.Contains(cultureName == "fr-FR" ? "Les valeurs d’exemple sont écartées" : "Example values are discarded", rendered.Find("section").TextContent);
             Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-operation-row']"));
             Assert.IsFalse(rendered.Find("[data-testid='connected-service-start-discovery']").HasAttribute("disabled"));
         });
@@ -93,7 +94,10 @@ public sealed class ConnectedServiceDiscoveryPanelTests
             Generation = 3,
             ScopeRef = ResourceScopeRef.Instance,
             Metadata = new() { Name = "fixture" },
-            Definition = new() { DisplayName = "Fixture", Type = null!, Options = JsonSerializer.SerializeToElement(new { }) }
+            Definition = new() { DisplayName = "Fixture", Type = new()
+            {
+                Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "digest"
+            }, Options = JsonSerializer.SerializeToElement(new { }) }
         };
         public ConnectedServiceOperationResource Operation { get; private set; }
         public DiscoveryHandler()

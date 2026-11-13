@@ -1,3 +1,5 @@
+using Agentstration.Web.Components.State;
+using Agentstration.Storage.Contracts;
 using System.Text;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Resources;
@@ -10,6 +12,104 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ArtifactAdministrationComponentTests
 {
+    [TestMethod]
+    [DataRow("/instance")]
+    [DataRow("/tenants/11111111-1111-1111-1111-111111111111")]
+    public void ArtifactDetailsKeepTheAdministrativeContextInContentAndDownloadLinks(string scopeRef)
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        var client = new ArtifactClient("downloadable");
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new ArtifactNavigationContext(scopeRef));
+        var durable = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        durable.WaitForElement("[data-testid=durable-artifact-content-tab]").Click();
+        durable.WaitForAssertion(() => Assert.Contains("context=" + Uri.EscapeDataString(scopeRef),
+            durable.Find("[data-testid=durable-artifact-download]").GetAttribute("href")!));
+        Assert.AreEqual(ResourceScopeRef.Parse(scopeRef), durable.FindComponent<Agentstration.Web.Components.Pages.DurableArtifactContent>().Instance.ContextScope);
+        var staged = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+        staged.WaitForElement("[data-testid=staged-artifact-content-tab]").Click();
+        staged.WaitForAssertion(() => Assert.Contains("context=" + Uri.EscapeDataString(scopeRef),
+            staged.Find("[data-testid=staged-artifact-download]").GetAttribute("href")!));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Input Artifact", "Processing execution")]
+    [DataRow("fr-FR", "Artefact d’entrée", "Exécution du traitement")]
+    public void TransformedArtifactsLinkTheirExactInputAndProcessingRun(string language, string inputLabel, string processingLabel)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        var client = new ArtifactClient("redacted");
+        var inputId = Guid.NewGuid().ToString("N");
+        client.Durable = client.Durable with { Receipt = client.Durable.Receipt with { StorageFlowRunId = string.Empty,
+            Provenance = new Dictionary<string, string> { ["inputArtifactId"] = inputId, ["inputArtifactKind"] = "durable",
+                ["processingRunId"] = "flowrun-processing", ["inputSha256"] = new string('a', 64) } } };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        rendered.WaitForAssertion(() => Assert.Contains(inputLabel, rendered.Markup));
+        Assert.Contains(processingLabel, rendered.Markup);
+        Assert.AreEqual("/artifacts/durable/" + inputId, rendered.Find("[data-testid='artifact-transformation-input']").GetAttribute("href"));
+        Assert.AreEqual("/flow-runs/flowrun-processing", rendered.Find("[data-testid='artifact-processing-run']").GetAttribute("href"));
+    }
+
+    private sealed class ArtifactNavigationContext(string scopeRef) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scopeRef;
+        public string AddToUri(string uri) => uri;
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Producing resource", "Content key")]
+    [DataRow("fr-FR", "Ressource productrice", "Clé du contenu")]
+    public void StoredArtifactShowsItsProducerAndExactStorageWithoutInventingAStagedSource(string cultureName,
+        string producerLabel, string keyLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = new BunitContext();
+        var client = new ArtifactClient("produced content");
+        var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
+        var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "output-storage"),
+            Guid.NewGuid(), 3, "binding-digest");
+        var producer = new ScopedResourceAddress(owner, ResourceNamespace.Default, "DataSource", "source-alpha");
+        var location = new ArtifactStorageMaterialization(client.Durable.WorkspaceId,
+            new(storage, new(owner, producer.Address), new()), "datasets/alpha/acquisition.json", "version-exact",
+            client.Durable.Receipt.Length, client.Durable.Receipt.Sha256);
+        client.Durable = client.Durable with
+        {
+            SourceArtifactId = null,
+            ProducerResource = producer,
+            ProducerExecutionId = "acquisition-alpha",
+            Receipt = client.Durable.Receipt with
+            { StorageFlowRunId = string.Empty, Materialization = location }
+        };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        rendered.WaitForAssertion(() => Assert.Contains(producerLabel, rendered.Markup));
+        Assert.Contains("/data-sources/source-alpha", rendered.Find("[data-testid=artifact-producer-resource]").GetAttribute("href")!);
+        Assert.Contains("/storages/output-storage", rendered.Find("[data-testid=artifact-storage-link]").GetAttribute("href")!);
+        Assert.Contains("acquisition-alpha", rendered.Markup);
+        Assert.IsEmpty(rendered.FindAll("a[href^='/artifacts/staged/']"));
+        rendered.Find("[data-testid=durable-artifact-storage-tab]").Click();
+        Assert.Contains(keyLabel, rendered.Markup);
+        Assert.Contains("datasets/alpha/acquisition.json", rendered.Markup);
+        Assert.Contains("version-exact", rendered.Markup);
+        var list = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
+        list.WaitForElement("[data-testid=durable-artifact-row]");
+        Assert.Contains("source-alpha", list.Markup);
+        Assert.Contains("output-storage", list.Markup);
+    }
+
     [TestMethod]
     public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesTabs()
     {
@@ -299,8 +399,10 @@ public sealed class ArtifactAdministrationComponentTests
         }
 
         public StagedArtifactView Artifact { get; }
-        public FlowRunArtifactResource Durable { get; }
+        public FlowRunArtifactResource Durable { get; set; }
         public int ContentReadCount { get; private set; }
+        public IReadOnlyList<FlowRunArtifactResource>? DurableCatalog { get; set; }
+        public bool RejectDurableCatalog { get; set; }
         public bool HasLocalCopy { get; set; } = true;
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
@@ -331,7 +433,7 @@ public sealed class ArtifactAdministrationComponentTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>([Durable]);
+            RejectDurableCatalog ? throw new HttpRequestException("Catalogue unavailable") : Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>(DurableCatalog ?? [Durable]);
 
         public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default) =>
             Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);

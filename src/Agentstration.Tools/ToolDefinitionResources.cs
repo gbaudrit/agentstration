@@ -216,6 +216,7 @@ public sealed record ToolDefinitionInvocationContext(
     long? AgentGeneration = null,
     bool HasSensitiveArguments = false)
 {
+    public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 

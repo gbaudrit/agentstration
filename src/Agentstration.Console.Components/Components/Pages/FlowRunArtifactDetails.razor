@@ -1,12 +1,15 @@
 @page "/artifacts/durable/{Id}"
 @implements IDisposable
 @inject IArtifactsClient Client
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
 <PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
+<div class="artifact-header">
 <PageHeader Title="@(artifact is null ? Id : ArtifactName(artifact))" Description="@T("DurableDetailsDescription")" TestId="durable-artifact-details">
     <Actions><a class="button-secondary" href="/artifacts">@T("Back")</a></Actions>
 </PageHeader>
+</div>
 
 @if (loading)
 {
@@ -34,26 +37,65 @@ else if (artifact is not null)
                 <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
             </section>
 
+            @if (artifact.Receipt.DataContract is { } contract)
+            {
+                <section class="panel form-section">
+                    <h2>@T("DataContract")</h2>
+                    <p>@T(contract.Validated ? "DataContractValidated" : "DataContractUnvalidated")</p>
+                    <dl class="resource-details durable-artifact-details-grid">
+                        <dt>@T("DataContractOrigin")</dt><dd><code>@contract.Origin</code></dd>
+                        <dt>@T("MediaType")</dt><dd>@contract.MediaType</dd>
+                        <dt>SHA-256</dt><dd><code>@contract.Digest</code></dd>
+                    </dl>
+                    @if (contract.Schema is { } schema) { <pre>@JsonSerializer.Serialize(schema, ContractJson)</pre> }
+                </section>
+            }
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
                 <dl class="resource-details durable-artifact-details-grid">
                     <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)">@artifact.ProducerFlowRunId</a></dd>
-                    <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd>
-                    <dt>@T("SourceArtifact")</dt><dd><a class="text-button" href="@StagedUrl(artifact.SourceArtifactId)">@artifact.SourceArtifactId</a></dd>
+                    @if (!string.IsNullOrEmpty(artifact.ProducerFlowStepId)) { <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd> }
+                    @if (artifact.SourceArtifactId is { } stagedSource) { <dt>@T("SourceArtifact")</dt><dd><a class="text-button" href="@StagedUrl(stagedSource)">@stagedSource</a></dd> }
+                    @if (artifact.Receipt.Provenance.TryGetValue("inputArtifactId", out var inputId))
+                    {
+                        <dt>@T("TransformationInputArtifact")</dt><dd>
+                            @if (Guid.TryParseExact(inputId, "N", out _) && artifact.Receipt.Provenance.GetValueOrDefault("inputArtifactKind") is "staged" or "durable")
+                            { <a class="text-button" data-testid="artifact-transformation-input" href="@($"/artifacts/{artifact.Receipt.Provenance["inputArtifactKind"]}/{Uri.EscapeDataString(inputId)}")">@inputId</a> }
+                            else { <code>@inputId</code> }
+                        </dd>
+                    }
+                    @if (artifact.Receipt.Provenance.TryGetValue("processingRunId", out var processingId))
+                    { <dt>@T("TransformationProcessingRun")</dt><dd><a class="text-button" data-testid="artifact-processing-run" href="@FlowRunUrl(processingId)">@processingId</a></dd> }
+                    @if (artifact.Receipt.Provenance.TryGetValue("inputSha256", out var inputDigest))
+                    { <dt>@T("TransformationInputDigest")</dt><dd><code>@inputDigest</code></dd> }
+                    @if (artifact.ProducerResource is { } producer)
+                    {
+                        <dt>@T("ProducerResource")</dt><dd><a class="text-button" data-testid="artifact-producer-resource" href="@ArtifactResourceLinks.Producer(producer)">@producer.Name</a><small>@producer.ScopeRef · @producer.Namespace @if (artifact.ProducerResourceGeneration is { } generation) { <span>· g@(generation) · @artifact.ProducerResourceUid</span> }</small></dd>
+                        <dt>@T("ProducerExecution")</dt><dd><code>@artifact.ProducerExecutionId</code></dd>
+                    }
+                    @if (artifact.Receipt.Materialization is { } location)
+                    { <dt>@T("Storage")</dt><dd><a class="text-button" data-testid="artifact-storage-link" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a><small>@location.Target.Storage.Storage.ScopeRef · g@(location.Target.Storage.Generation)</small></dd> }
                 </dl>
             </section>
 
         }
         else if (activeTab == DetailsTab.Content)
         {
-            <DurableArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" />
+            <DurableArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
         }
         else
         {
             <section class="panel form-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("Storage")</p><h2>@T("StorageReceipt")</h2><p>@T("StorageReceiptHelp")</p></div></div>
                 <dl class="resource-details durable-artifact-details-grid">
-                    <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd>
+                    @if (!string.IsNullOrEmpty(artifact.Receipt.StorageFlowRunId)) { <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd> }
+                    @if (artifact.Receipt.Materialization is { } location)
+                    {
+                        <dt>@T("Storage")</dt><dd><a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a></dd>
+                        <dt>@T("StorageRevision")</dt><dd><code>@location.Target.Storage.StorageUid · g@(location.Target.Storage.Generation)</code></dd>
+                        <dt>@T("StorageKey")</dt><dd><code>@location.Key</code></dd>
+                        <dt>@T("StorageVersion")</dt><dd><code>@(location.Version ?? T("StorageVersionUnavailable"))</code></dd>
+                    }
                     <dt>@T("MediaType")</dt><dd>@artifact.Receipt.MediaType</dd>
                     <dt>@T("Size")</dt><dd>@SizeInMegabytes(artifact.Receipt.Length) · @ExactSize(artifact.Receipt.Length)</dd>
                     <dt>SHA-256</dt><dd><code>@artifact.Receipt.Sha256</code></dd>
@@ -81,6 +123,7 @@ else if (artifact is not null)
 }
 
 @code {
+    private static readonly JsonSerializerOptions ContractJson = new() { WriteIndented = true };
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;

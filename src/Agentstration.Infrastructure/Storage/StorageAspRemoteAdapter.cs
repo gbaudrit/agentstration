@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -75,6 +76,40 @@ public sealed class StorageAspRemoteAdapter(IResourceStore resources, IStorageRe
             Options: new(request.Key, request.ExpectedVersion is null ? "create" : "replace", request.ExpectedVersion),
             NotAfter: request.NotAfter), cancellationToken);
         return Map(written.Receipt!.Item with { Sha256 = written.Receipt.Sha256 });
+    }
+
+    public async Task<bool> RetireAsync(ProtectedStorageContext context, StorageContentRequest target,
+        StorageTypeResource type, AspAccessContext policy, StorageObject exact, CancellationToken cancellationToken)
+    {
+        await using var lease = await ConnectAsync(context, target, type, policy, cancellationToken);
+        var transfers = lease.Client.Description.Transfers;
+        // Retire the producer-owned value through a conditional empty replacement. ASP v1 offers no generic delete.
+        if (!policy.Policy.CanRead || !policy.Policy.CanWrite || transfers is not { Replace: true, EmptyWrite: true, ETagConditions: true }) return false;
+        var page = await lease.Client.ListAsync(new(Guid.NewGuid().ToString("N"), exact.Key, 1), cancellationToken);
+        var item = page.Objects.SingleOrDefault(value => value.Key == exact.Key);
+        if (item is null || item.Length == 0 && exact.Length > 0) return true;
+        if (item.Length != exact.Length || exact.Version is not null && item.Version != exact.Version || string.IsNullOrEmpty(item.ETag)) return false;
+        AspValidation.Require(item.Length is > 0 and <= 65536 && exact.Sha256 is not null,
+            "version_unavailable", "An exact bounded content receipt is required for retirement.");
+        using var bytes = new MemoryStream();
+        var request = new AspReadBlobRequest(Guid.NewGuid().ToString("N"), Selection: new(item.Reference,
+            PreferredChunkSizeBytes: Math.Min(65536, lease.Client.Description.Policy.MaxReadBytes)), NotAfter: clock.GetUtcNow().AddSeconds(25));
+        while (true)
+        {
+            var chunk = await lease.Client.ReadBlobAsync(request, cancellationToken);
+            AspValidation.Require(chunk.Item.Key == exact.Key && chunk.Item.Length == exact.Length
+                && chunk.Item.ETag == item.ETag && bytes.Length + chunk.ByteLength <= exact.Length,
+                "version_unavailable", "The selected result changed during retirement verification.");
+            await bytes.WriteAsync(Convert.FromBase64String(chunk.ContentBase64), cancellationToken);
+            if (chunk.Final) break;
+            request = new(Guid.NewGuid().ToString("N"), chunk.Sequence + 1, chunk.SessionRef);
+        }
+        AspValidation.Require(bytes.Length == exact.Length && string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes.ToArray())), exact.Sha256,
+            StringComparison.OrdinalIgnoreCase), "version_unavailable", "The result does not match its retained digest.");
+        var replaced = await lease.Client.WriteBlobAsync(new(Guid.NewGuid().ToString("N"), 0, true, string.Empty,
+            Options: new(exact.Key, "replace", IfMatch: item.ETag), NotAfter: clock.GetUtcNow().AddSeconds(25)), cancellationToken);
+        AspValidation.Require(replaced.Receipt is { Item.Length: 0, WrittenBytes: 0 }, "invalid_result", "The provider did not attest empty result retirement.");
+        return true;
     }
 
     private async Task<Lease> ConnectAsync(ProtectedStorageContext context, StorageContentRequest target,

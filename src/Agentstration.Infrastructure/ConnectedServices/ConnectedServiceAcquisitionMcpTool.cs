@@ -14,11 +14,12 @@ using Agentstration.Tools.Mcp;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
 
-public sealed class ConnectedServiceAcquisitionExecutor(
+internal sealed class ConnectedServiceAcquisitionExecutor(
     DataSourceDatasetAcquisitionService acquisitions, IResourceStore store,
     ConnectedServiceManagementService services, ConnectedServiceOperationTypeManagementService operationTypes,
     ConnectedServiceBoundValues boundValues, ISecretResolver secrets, ICurrentRequestContext current,
-    IHttpClientFactory clients)
+    IHttpClientFactory clients,
+    BuiltinHttpOperationExecutor httpOperations)
 {
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -56,6 +57,12 @@ public sealed class ConnectedServiceAcquisitionExecutor(
         var version = type.Definition.Versions.Single(item => item.Version == typeReference.Version);
         var (operationType, operationVersion) = await operationTypes.ResolveExactAsync(operation.Definition.Type,
             operation.Namespace, consumer, cancellationToken);
+        if (BuiltinHttpOperation.Owns(type, version)
+            && BuiltinHttpOperation.IsCore(operationType, BuiltinHttpOperation.TypeName)
+            && operationVersion.Version == BuiltinHttpOperation.Version
+            && operationVersion.Invocation.ProviderOperationId == BuiltinHttpOperation.ProviderOperationId)
+            return await httpOperations.AcquireAsync(service, operation, acquisition.Parameters,
+                new(consumer, operation.Address), cancellationToken);
         var manager = type.Governance?.ManagedBy;
         if (manager?.Kind != ResourceManagementAuthorityKind.ExtensionInstallation
             || operationType.Governance?.ManagedBy != manager
@@ -102,7 +109,7 @@ public sealed class ConnectedServiceAcquisitionExecutor(
     private static DataSourceAcquisitionException Error(string code) => new(code, "Connected Service acquisition could not be completed.");
 }
 
-public sealed class ConnectedServiceAcquisitionMcpTool(ConnectedServiceAcquisitionExecutor execution) : IInternalMcpToolHandler
+internal sealed class ConnectedServiceAcquisitionMcpTool(ConnectedServiceAcquisitionExecutor execution) : IInternalMcpToolHandler
 {
     public const string Name = "connected-service.operations.acquire";
     public InternalMcpToolDefinition Definition { get; } = new(Name, Name, null,
@@ -112,7 +119,7 @@ public sealed class ConnectedServiceAcquisitionMcpTool(ConnectedServiceAcquisiti
             properties = new { acquisitionId = new { type = "string", minLength = 1, maxLength = 128 } },
             required = new[] { "acquisitionId" },
             additionalProperties = false
-        }), ExposeThroughMcp: false);
+        }), JsonSerializer.SerializeToElement(new { }), ExposeThroughMcp: false);
     public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken) =>
         execution.ExecuteAsync(invocation, cancellationToken);
 }

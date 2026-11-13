@@ -18,6 +18,9 @@ public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, str
 /// <summary>Each operation reauthorizes an exact Storage. No session is an authorization cache.</summary>
 public interface IStorageContentGateway
 {
+    // Provider-qualified retirement of a producer-owned exact result; never inferred from generic ASP delete.
+    Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
     Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default);
     Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit,
         string? cursor = null, CancellationToken cancellationToken = default);

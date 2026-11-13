@@ -164,8 +164,10 @@ public sealed partial class ConnectedServiceApiTests : ModelManagementApiTestBas
         Assert.AreEqual(ResourceOriginKind.BuiltIn, type.Governance.Origin.Kind);
         Assert.AreEqual(ResourceManagementAuthorityKind.Core, type.Governance.ManagedBy?.Kind);
         Assert.AreEqual("connected-services.http", type.Governance.ManagedBy?.Reference);
-        var version = type.Definition.Versions.Single();
+        Assert.HasCount(1, type.Definition.Versions);
+        var version = type.Definition.Versions.Single(value => value.Version == type.Definition.PreferredVersion);
         Assert.AreEqual("1.0.0", version.Version);
+        Assert.IsNotNull(version.OperationDiscovery);
         Assert.AreEqual("baseUrl", version.Inputs.Single().Id);
         Assert.AreEqual("baseUrl", version.Exports.Single().SourceInputId);
     }

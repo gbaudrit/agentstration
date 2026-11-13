@@ -72,7 +72,7 @@
 .node-icon .ui-icon{width:17px;height:17px}
 .step-palette{padding-inline:10px}
 .step-palette-group button{font-size:.875rem}
-.step-palette-group:not(.palette-view) button>span:last-child{white-space:nowrap}
+.step-palette-group:not(.palette-view) button>span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere}
 .flow-designer-page .flow-editor-shell{grid-template-columns:190px minmax(0,1fr) 300px}
 .flow-designer-page .flow-editor-shell.split{grid-template-columns:190px minmax(420px,1.2fr) 290px minmax(360px,.8fr)}
 @media(max-width:1600px){.flow-designer-page .flow-editor-shell.split{grid-template-columns:190px minmax(0,1fr) 290px}}
@@ -261,3 +261,35 @@
     .step-settings-tabs{padding:0 10px;overflow-x:auto}
     .step-settings-tabs button{padding-inline:12px;white-space:nowrap}
 }
+
+.flow-port-handle.processing-start,.flow-port-handle.processing-result{top:100%;transform:translate(-50%,-50%)}.flow-port-handle.processing-start{left:30%}.flow-port-handle.processing-result{left:70%}.flow-port-handle.processing-result .diagram-port{background:var(--surface);border-color:var(--primary)}
+
+.port-contract-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 55vh; overflow: auto; font-size: .8rem; }
+
+
+/* Contract information sits beside each anchor without covering its connection surface. */
+.flow-port-inspect{position:absolute;z-index:10;display:grid;place-items:center;width:20px;height:20px;min-height:0;padding:0;border:0;border-radius:4px;background:var(--surface);color:var(--muted);font:italic 700 13px Georgia,serif;line-height:1;cursor:pointer;pointer-events:auto;opacity:0;transition:opacity .12s ease,background .12s ease}
+.flow-node:hover .flow-port-inspect,.flow-node:focus-within .flow-port-inspect,.flow-port-inspect:focus-visible{opacity:1}
+.flow-port-inspect:hover{background:var(--primary-soft);color:var(--primary)}.flow-port-inspect:focus-visible{outline:2px solid var(--primary);outline-offset:1px;background:var(--primary-soft);color:var(--primary)}
+.flow-port-inspect.input{left:20px;top:2px}.flow-port-inspect.output{right:20px;top:2px}
+.flow-port-inspect.processing-start,.flow-port-inspect.processing-result{left:50%;top:-24px;transform:translateX(-50%)}
+.flow-port-handle.output .flow-port-label{right:42px}
+.flow-port-handle.contract-incompatible .diagram-port{background:var(--color-danger);border-color:var(--surface);box-shadow:0 0 0 2px var(--color-danger)}
+.flow-connection-feedback{position:absolute;z-index:25;bottom:12px;left:12px;right:12px;max-width:40rem;padding:10px 14px;border:1px solid var(--color-danger);border-radius:8px;background:var(--surface);color:var(--color-danger);box-shadow:var(--shadow);font-size:.85rem;pointer-events:none}
+@media(hover:none){.flow-port-inspect{opacity:1}}
+@media(min-width:801px){.flow-designer-page{display:flex;flex-direction:column}.flow-designer-page>.designer-toolbar,.flow-designer-page>.designer-focus-toolbar,.flow-designer-page>.designer-feedback{flex:0 0 auto}.flow-designer-page>.flow-editor-shell{flex:1 1 0;min-height:0;height:auto}.flow-designer-page>.validation-dock{flex:0 0 auto}}
+
+.flow-diagram-canvas .flow-node{overflow:visible}
+
+.flow-data-mapping{padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);margin-bottom:24px}
+.mapping-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.mapping-heading h3{margin:0;font-size:1rem;text-transform:none;letter-spacing:normal;color:var(--text)}.mapping-heading p{margin:5px 0 0;color:var(--muted);font-size:.85rem}
+.flow-data-mapping input,.flow-data-mapping textarea{width:100%;box-sizing:border-box}.flow-data-mapping small{display:block;margin-top:7px;color:var(--muted)}
+.agent-contract-reference{padding-top:4px}.agent-contract-reference .step-contract-empty{margin:12px 0}
+
+.mapping-picker{position:relative}.mapping-picker-control{display:flex;align-items:stretch}.mapping-picker-control input{border-radius:7px 0 0 7px!important;min-width:0;font-family:var(--font-mono,monospace);font-size:.85rem}.mapping-picker-toggle{flex:0 0 36px;border:1px solid var(--border);border-left:0;border-radius:0 7px 7px 0;background:var(--surface);color:var(--muted);cursor:pointer}.mapping-picker-toggle .ui-icon{width:16px;height:16px}
+.mapping-picker-options{position:absolute;z-index:50;left:0;right:0;margin:4px 0 0;padding:5px;list-style:none;border:1px solid var(--border);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);max-height:250px;overflow:auto}.mapping-picker-options button{display:grid;gap:3px;width:100%;padding:9px 10px;border:0;border-radius:5px;text-align:left;background:transparent;color:var(--text);cursor:pointer}.mapping-picker-options button:hover,.mapping-picker-options button[aria-selected=true]{background:var(--primary-soft)}.mapping-picker-options code{color:var(--muted);font-size:.75rem;overflow-wrap:anywhere}.mapping-no-options{padding:10px;color:var(--muted);font-size:.85rem}
+
+.open-flow-draft{display:inline-flex;margin-left:10px;font-size:.8rem;padding:5px 10px}.output-mapping-readonly{font-size:.85rem}.output-passthrough-technical code{display:block;border:0;background:transparent;cursor:text;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.flow-designer-page:has(.step-settings-backdrop) .designer-view-controls{visibility:hidden}

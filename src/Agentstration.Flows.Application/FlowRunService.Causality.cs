@@ -100,14 +100,19 @@ public sealed partial class FlowRunService
             run.DefinitionState,
             run.Status,
             run.ParentFlowRunId,
-            parentStepName,
+            run.ProcessOrigin?.OwnerStepName ?? parentStepName,
             run.NestingDepth,
             run.CreatedAt,
             run.StartedAt,
             run.CompletedAt,
             run.Error?.Code,
             agents,
-            ProjectToolCalls(events));
+            ProjectToolCalls(events))
+        {
+            ProcessOrigin = run.ProcessOrigin, ErrorOrigin = run.Error?.Origin,
+            ActiveStepName = run.Steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Running)?.StepName,
+            Processes = run.Steps.Where(step => step.Process is not null).ToDictionary(step => step.StepName, step => step.Process!, StringComparer.Ordinal)
+        };
     }
 
     private static IReadOnlyList<FlowRunToolCall> ProjectToolCalls(IReadOnlyList<FlowRunEvent> events)

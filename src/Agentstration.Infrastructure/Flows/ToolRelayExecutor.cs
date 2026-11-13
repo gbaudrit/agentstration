@@ -120,6 +120,7 @@ public sealed class ToolRelayExecutor(
                 CorrelationId = invocation.CorrelationId,
                 PersistArguments = false,
                 SecretInputs = references,
+                TransientPayloads = execution?.TransientPayloads == true,
                 HasSensitiveArguments = execution?.HasSensitiveArguments == true || relay.Bindings.Any(binding => binding is SecretToolArgumentBinding),
                 Arguments = arguments
             };

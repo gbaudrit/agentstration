@@ -143,6 +143,20 @@ function lifecycleSurface(id: string, component: string, routes: readonly string
 
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
+    id: 'source-content-lifecycle', host: 'console', source: `${consolePages}/DataSourceDatasetEditor.razor`,
+    routes: ['/data-sources/new', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
+    fixtureKeys: ['source-policy-clock', 'native-read-only-operation', 'builtin-storage'],
+    pageObject: 'src/pages/source-policies.page.ts', journey: 'exercise-source-policies',
+    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1116,
+  },
+  {
+    id: 'source-flow-composition', host: 'console', source: `${consolePages}/KnowledgeSourceEditor.razor`,
+    routes: ['/flows/{FlowId}/designer', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
+    fixtureKeys: ['native-read-only-operation', 'composable-transformations', 'builtin-storage'],
+    pageObject: 'src/pages/source-composition.page.ts', journey: 'exercise-source-composition',
+    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1118,
+  },
+  {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
     pageObject: 'src/pages/product.pages.ts', journey: 'authenticate-console',
     specification: 'tests/console-authentication.spec.ts', coverage: 'covered',

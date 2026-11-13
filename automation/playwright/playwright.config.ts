@@ -1,4 +1,7 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, type ReporterDescription } from '@playwright/test';
+
+const reporters: ReporterDescription[] = [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]];
+if (process.env.GITHUB_ACTIONS === 'true') reporters.push(['github']);
 
 export default defineConfig({
   testDir: './tests',
@@ -7,7 +10,7 @@ export default defineConfig({
   retries: 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
-  reporter: [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]],
+  reporter: reporters,
   use: {
     channel: process.env.AGENTSTRATION_PLAYWRIGHT_CHANNEL,
     trace: 'retain-on-failure',

@@ -181,11 +181,12 @@ public sealed class ManagementFlowResourceReferenceResolver(
             : new ResolvedFlowCall(
                 id,
                 published.Value.Version,
-                published.Value.Graph?.InputSchema,
-                published.Value.Graph?.OutputSchema,
+                published.Value.Graph?.ResolveInputSchema(),
+                published.Value.Graph?.ResolveSingleSuccessOutputSchema(out _),
                 published.Value.Graph?.GetOutputs())
             {
-                ScopeRef = published.Value.ScopeRef
+                ScopeRef = published.Value.ScopeRef,
+                OutputMediaType = published.Value.Graph is { } graph ? FlowDataContracts.OutputMediaType(graph) : null
             };
     }
 
@@ -242,11 +243,12 @@ public sealed class ManagementFlowResourceReferenceResolver(
             : new ResolvedFlowCall(
                 id,
                 published.Value.Version,
-                published.Value.Graph?.InputSchema,
-                published.Value.Graph?.OutputSchema,
+                published.Value.Graph?.ResolveInputSchema(),
+                published.Value.Graph?.ResolveSingleSuccessOutputSchema(out _),
                 published.Value.Graph?.GetOutputs())
             {
-                ScopeRef = published.Value.ScopeRef
+                ScopeRef = published.Value.ScopeRef,
+                OutputMediaType = published.Value.Graph is { } graph ? FlowDataContracts.OutputMediaType(graph) : null
             };
     }
 
@@ -549,7 +551,26 @@ public sealed class ManagedFlowToolExecutor(
             ?? throw Error("tool_mapping_invalid", $"Tool resource '{tool.Address}' has no external Tool identity.");
         var schema = tool.Definition.Schema?.Input
             ?? throw Error("tool_schema_missing", $"Tool resource '{tool.Address}' has no input schema.");
-        ValidateArguments(Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(request.Arguments, request.SecretInputs), schema);
+        var outputSchema = tool.Definition.Schema?.Output
+            ?? throw Error("tool_contract_required", $"Tool '{tool.Address}' called directly by a Flow requires explicit input and output schemas.");
+        var inputContract = Agentstration.Schemas.DataContracts.Declared(schema, $"tool:{tool.Address}/input");
+        var businessOutputContract = Agentstration.Schemas.DataContracts.Declared(outputSchema, $"tool:{tool.Address}/structured-output");
+        var invocationOutputSchema = ToolInvocationContracts.OutputSchema(outputSchema, provider.Value.Definition)!.Value;
+        var outputContract = Agentstration.Schemas.DataContracts.Declared(invocationOutputSchema, $"tool:{tool.Address}/output");
+        if (request.Tool.InputSchema is { } pinnedInput && !JsonElement.DeepEquals(pinnedInput, schema)
+            || request.Tool.OutputSchema is { } pinnedOutput && !JsonElement.DeepEquals(pinnedOutput, invocationOutputSchema))
+            throw Error("tool_contract_stale", "The Tool contract changed after this Flow was published. Publish a new Flow version.");
+        if (request.Arguments.ValueKind != JsonValueKind.Object)
+            throw Agentstration.Schemas.DataContracts.Failure("tool_arguments_object_required", "tool-input", inputContract!.Origin, "$", "json_object", "object", request.Arguments.ValueKind.ToString(), request.RunId, request.StepName);
+        var effectiveArguments = Agentstration.Schemas.DataContracts.BindOutputParameter(request.Arguments, schema, businessOutputContract, "tool-input", request.RunId, request.StepName);
+        try { Agentstration.Schemas.DataContracts.Validate(inputContract,
+            effectiveArguments, "tool-input", request.RunId, request.StepName, value => Agentstration.Secrets.Abstractions.SecretInputs.IsReference(value, request.SecretInputs)); }
+        catch (Agentstration.Schemas.DataContractException exception)
+        {
+            var code = exception.Failure.Rule switch { "json_schema_instance_type" => "tool_argument_type_invalid",
+                "json_schema_instance_required" => "tool_argument_required", "json_schema_instance_additional_property" => "tool_argument_unknown", _ => exception.Code };
+            throw new FlowValidationException(code, exception.Message) { ContractFailure = exception.Failure };
+        }
 
         var logicalCallId = $"flow:{request.RunId}:step:{request.StepName}";
         var invocationId = $"{logicalCallId}:attempt:{request.Attempt}";
@@ -579,10 +600,12 @@ public sealed class ManagedFlowToolExecutor(
                 FlowStepId = request.StepName,
                 CorrelationId = request.CorrelationId,
                 SecretInputs = request.SecretInputs,
-                HasSensitiveArguments = request.SecretInputs.Count > 0,
-                PersistArguments = request.SecretInputs.Count > 0 ? false : null,
-                Arguments = request.Arguments.Clone()
+                TransientPayloads = request.TransientPayloads,
+                HasSensitiveArguments = request.TransientPayloads || request.SecretInputs.Count > 0,
+                PersistArguments = request.TransientPayloads || request.SecretInputs.Count > 0 ? false : null,
+                Arguments = effectiveArguments.Clone()
             }, cancellationToken);
+            Agentstration.Schemas.DataContracts.Validate(outputContract, result ?? JsonSerializer.SerializeToElement<object?>(null), "tool-output", request.RunId, request.StepName);
             return new(
                 result?.Clone(),
                 tool.Metadata.Name,
@@ -601,6 +624,14 @@ public sealed class ManagedFlowToolExecutor(
         catch (ToolResolutionException exception)
         {
             throw Error(exception.Code, exception.Message, exception);
+        }
+        catch (Agentstration.Artifacts.Contracts.ArtifactValidationException exception)
+        {
+            throw Error(exception.Code, exception.Message, exception);
+        }
+        catch (ToolSetValidationException exception)
+        {
+            throw Error(exception.Code, $"{exception.Code}: {exception.Message}", exception);
         }
     }
 

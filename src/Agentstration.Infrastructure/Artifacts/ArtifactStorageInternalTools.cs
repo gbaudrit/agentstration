@@ -21,7 +21,7 @@ public sealed class ArtifactStorageWriteMcpTool(
 
     public override InternalMcpToolDefinition Definition { get; } = new(Name, "Persist Artifact to local storage",
         "Deterministically copies sealed staged content to the built-in durable filesystem store and returns a normalized receipt.",
-        Schema(new { type = "object", properties = new { stagedArtifactId = new { type = "string" }, producerFlowRunId = new { type = "string" }, producerFlowStepId = new { type = "string" }, storageFlowRunId = new { type = "string" } }, required = new[] { "stagedArtifactId", "producerFlowRunId", "producerFlowStepId" }, additionalProperties = false }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { stagedArtifactId = new { type = "string" }, producerFlowRunId = new { type = "string" }, producerFlowStepId = new { type = "string" }, storageFlowRunId = new { type = "string" } }, required = new[] { "stagedArtifactId", "producerFlowRunId", "producerFlowStepId" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -51,6 +51,7 @@ public sealed class ArtifactStorageWriteMcpTool(
         {
             StorageFlowRunId = storageFlowRunId,
             OpaqueReference = opaqueReference,
+            Materialization = selectableStorage is null ? null : await selectableStorage.DescribeReferenceAsync(invocation.WorkspaceId, opaqueReference, cancellationToken),
             MediaType = source.Value.MediaType,
             Length = stat.Length,
             Sha256 = stat.Sha256,
@@ -86,7 +87,7 @@ public sealed class ArtifactStorageReadMcpTool(
 
     public override InternalMcpToolDefinition Definition { get; } = new(Name, "Materialize Artifact from local storage",
         "Materializes durable content into a new governed staged Artifact without exposing the durable backend reference.",
-        Schema(new { type = "object", properties = new { flowRunArtifactId = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "flowRunArtifactId" }, additionalProperties = false }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { flowRunArtifactId = new { type = "string" }, binding = new { type = "string" }, expiresAt = new { type = "string" } }, required = new[] { "flowRunArtifactId" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: new("artifact-storage", "Artifact storage", "Storage Flow implementation Tools."), ExposeThroughMcp: false);
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {

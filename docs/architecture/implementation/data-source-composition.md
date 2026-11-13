@@ -278,3 +278,117 @@ The architecture and route framing was approved before UI work. Explicit
 maintainer approval of the implemented UX and a merged implementation PR are
 still required before the reusable integrated scenario in
 [#1033](https://github.com/gbaudrit/agentstration/issues/1033) starts.
+
+## Native Artifacts materialized in Storage
+
+Following ADR-0208, native acquisitions register their confirmed content as
+`FlowRunArtifact` resources and populate the ordinary acquisition manifest. The
+Artifact pins its actual producer resource revision, acquisition/Flow Run and
+Storage revision/key/version/digest. History links to the Artifact catalogue and
+its governed preview/download path. Content stays in the selected Storage.
+Previously produced native content receives missing metadata through bounded,
+authorized reconciliation; origins and stored content are not rewritten.
+
+## Configurable Flow sequences
+
+[ADR-0211](../../decisions/0211-resource-bound-flow-composition-points.md) defines
+resource-owned bindings to typed points inside published Flows. A native dataset
+can select a published orchestration and bind ordered `{ flow, parameters }` calls
+to its declared points. The standard orchestration exposes `transformations` after
+the governed operation acquisition. The reserved `acquisition` point is supplied by
+the server; source configuration cannot replace or bypass it. Only the complete
+successful chain publishes the final dataset result.
+
+Knowledge bindings may each declare `transformations`. The Source's global sequence
+runs at `postAggregate`, after its selected projection Flow has combined the prepared
+inputs. These sequences transform Artifact manifests and carry exact Flow receipts
+into projection provenance. A binding cannot combine the historical single
+`transformationFlow` and its new sequence. An optional binding failure is recorded;
+a required or global failure leaves the previous active Snapshot in place.
+
+At save and admission, ordered child references resolve to published versions with
+exact UID and hash evidence and authorized Use. A Flow Run stores the compiled graph
+and accepted bindings separately from the immutable template hash. Saved parameters
+are literal values. Resuming an accepted invocation retains its exact bindings and
+rejects substitution. The Designer exposes composition-point names, identity policy,
+input/output schemas and mapping; source editors expose declared points, published
+child version selection, parameter entry and reordering in English and French.
+
+
+An empty `postAggregate` sequence preserves the projection manifest. The required
+projection child still executes even when no transformation is configured. Saved
+literal parameters remain bounded to 65,536 JSON characters; values passed between
+composed Flows have a separate limit of 1,048,576 JSON characters. The larger value
+budget accounts for retained content repeated in acquisition evidence and the
+projection manifest. Native content and Storage limits remain independently enforced.
+Child validation failures retain their stable error code through the governed AWP
+error response (HTTP 422), including `flow_composition_value_too_large` for an oversized
+value, rather than surfacing as an unhandled HTTP 500.
+
+
+The Definition editor provides **Create a transformation Flow** alongside adding
+an existing published Flow. It creates a draft in the current owner context,
+prepopulates the `{ value, parameters }` input and output contracts from the point
+(or the previous child's output when appending), and opens the Designer in a new
+tab. Source edits stay in the original tab. The initial transform preserves
+`input.value`; publication uses the ordinary Designer workflow. Refreshing the
+catalog exposes the published version without saving or replacing source edits.
+The empty catalog and loading failures have separate localized explanations.
+The selector resolves input schemas from the canonical Input step as well as the
+graph fallback. `POST /api/flows/drafts` accepts optional `transformation` value
+schemas; the application validates their bounded profile before creating any
+resource and generates the envelope and graph using the existing draft service.
+
+## Independent content lifecycle
+
+Native datasets may explicitly opt into `lifecycle`: `allowDirect`, `timeToLive`,
+`keepHistory` and `historyRetention`. TTL/history require retained input Storage;
+no Storage requires explicit direct permission on the saved read-only Operation.
+Direct payloads cross acquisition, transformations and projection in bounded
+process-local memory. Persisted Flow/runtime records retain redacted metadata and
+opaque tickets, not the content. Restart or expiry refuses the accepted handoff.
+Only final Snapshot publication creates its retained output Artifact.
+
+Knowledge has its own optional `lifecycle`, including Snapshot TTL, history and
+`allowExpiredOnRefreshFailure`. Bindings independently permit an age-bounded stored
+input fallback after a failed refresh. Provenance identifies both the failed
+refresh and exact reused acquisition. Existing binding refresh settings remain
+applicable to datasets without the new lifecycle.
+
+History maintenance uses the existing recovery worker, current authorization,
+conditional retirement claims and exact provider checks. Running projections,
+native input/read leases and conservatively all nonterminal Workspace Flows defer
+retirement. Local providers remove exact content; remote ASP providers may use a
+verified conditional empty replacement when supported, otherwise cleanup remains
+pending. Immutable Snapshots and Artifact provenance remain visible after their
+bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).
+
+
+## Artifact content processing
+
+[ADR-0213](../../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
+adds a distinct `artifactTransform` step to Artifact-manifest transformations. Its
+private process/return region can contain ordinary Agents, Tools, mappings and
+child Flow calls without another published processor. Invocation adaptation belongs
+to the step, not reusable Tool definitions. Content mode supplies bounded UTF-8
+text or JSON; access mode supplies execution-bound input reads/searches and a
+revisioned output draft that can be reread, corrected and completed. The Agent
+chooses its reading strategy. The authority materializes outputs only after all
+processing regions succeed. Exact input lineage and the real producer/Storage
+remain visible in Artifact receipts. Native dataset sequences still receive JSON
+values; this step requires an explicit Artifact manifest rather than silently
+interpreting an arbitrary dataset object as a file.
+
+See the [authoring and content-access reference](../../reference/artifact-transformations.md)
+for mappings, operation contracts, publication behavior and current bounds. The
+reusable browser scenario is tracked separately by #1145, pending UX validation
+and implementation merge.
+
+
+Effective processing contracts follow [ADR-0214](../../decisions/0214-effective-data-contracts-follow-flow-invocations.md).
+The authority derives invocation instructions from accepted contracts before the
+model gateway; Worker-local ChatOptions do not override authoritative Agent
+instructions. The existing Schemas handler validates bounded nullable types and
+compositions as well as ordinary object contracts. Retained Artifact receipts and
+direct handoffs keep concrete content evidence; Flow Run diagnostics preserve
+causal contract failures across child executions.

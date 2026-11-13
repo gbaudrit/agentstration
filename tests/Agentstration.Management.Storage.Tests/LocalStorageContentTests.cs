@@ -26,6 +26,20 @@ public sealed class LocalStorageContentTests
     public void Cleanup() { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
 
     [TestMethod]
+    public async Task RetirementRejectsReplacedContentAndKeepsTheExactWriteReceipt()
+    {
+        var store = Store(); var access = Access(store); var request = Write("retirement");
+        var original = await Provider.WriteAsync(store, access, request, default);
+        var exact = new StorageObject(original.Key, original.Version, original.Length, original.Sha256, "opaque");
+        var replacement = await Provider.WriteAsync(store, access, Write("replace", value: "new content", version: original.Version), default);
+        Assert.AreEqual("version_unavailable", (await Assert.ThrowsAsync<AspException>(() => Provider.RetireAsync(store, access, exact, default))).Code);
+        Assert.AreEqual(replacement, await Provider.StatAsync(store, access, replacement.Key, replacement.Version, default));
+        Assert.IsTrue(await Provider.RetireAsync(store, access, new(replacement.Key, replacement.Version, replacement.Length, replacement.Sha256, "opaque"), default));
+        Assert.AreEqual(original, await Provider.WriteAsync(store, access, request, default));
+        Assert.IsEmpty((await Provider.ListAsync(store, access, "notes/", null, 100, default)).Objects);
+    }
+
+    [TestMethod]
     public async Task ContentAndExactWriteReceiptsSurviveProviderRestart()
     {
         var store = Store(); var access = Access(store); var request = Write("create");

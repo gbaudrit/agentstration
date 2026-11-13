@@ -7,18 +7,18 @@ namespace Agentstration.Infrastructure.Flows;
 public sealed class RootFlowTargetResolver(FlowService flows) : IRootFlowTargetResolver
 {
     public Task<ResolvedRootFlowTarget> ResolveAsync(FlowRunScope scope, FlowReference target,
-        System.Text.Json.JsonElement input, IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference> secretInputs,
-        CancellationToken cancellationToken) => ResolveAsync(scope, target,
-            Agentstration.Secrets.Abstractions.SecretInputs.ForTypeValidation(input, secretInputs), cancellationToken);
+        System.Text.Json.JsonElement input, CancellationToken cancellationToken) =>
+        ResolveAsync(scope, target, input, [], cancellationToken);
 
     public async Task<ResolvedRootFlowTarget> ResolveAsync(
         FlowRunScope scope,
         FlowReference target,
         System.Text.Json.JsonElement input,
+        IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference> secretInputs,
         CancellationToken cancellationToken)
     {
         var resolved = await flows.ResolveAsync(scope.AccessScopeRef, target, target.FlowId.Namespace, cancellationToken);
-        FlowRunService.ValidateInput(resolved.Graph?.InputSchema, input);
+        FlowRunService.ValidateInput(resolved.Graph?.ResolveInputSchema(), input, secretInputs);
         return new(new FlowReference(resolved.FlowId, resolved.Version, false, resolved.FlowId.Namespace, resolved.ScopeRef));
     }
 }
