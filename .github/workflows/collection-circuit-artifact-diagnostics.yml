@@ -13,7 +13,9 @@ jobs:
       - name: Read the failed browser artifact
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download 43472011196 --repo gbaudrit/agentstration --name browser-ux-evidence-mobile-chromium-3-1 --dir evidence
+        run: |
+          gh run download 43472011196 --repo gbaudrit/agentstration --name browser-ux-evidence-mobile-chromium-3-1 --dir evidence/coverage
+          gh run download 43473539140 --repo gbaudrit/agentstration --name browser-ux-evidence-mobile-chromium-3-1 --dir evidence/promotion
       - name: Extract circuit exception blocks only
         shell: python
         run: |
