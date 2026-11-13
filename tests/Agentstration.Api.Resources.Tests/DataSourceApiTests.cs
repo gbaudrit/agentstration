@@ -504,6 +504,11 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         Assert.AreEqual(publications[0].Value.DefinitionHash, publications[1].Value.DefinitionHash);
         Assert.HasCount(1, await profiles.ListRevisionsAsync(
             ResourceNamespace.Default, "concurrent", workspace, default));
+        var listed = (await profiles.ListAsync(default)).Single(value => value.Value.Name == "concurrent");
+        Assert.IsNull(listed.Value.ActiveVersion);
+        Assert.AreEqual("1.0.0", listed.Value.PublishedVersion, "An inactive publication must not be presented as an unpublished draft.");
+        Assert.IsNull((await profiles.GetAsync(ResourceNamespace.Default, "concurrent", workspace, default))!.Value.PublishedVersion,
+            "Publication projection must not mutate the stored draft.");
     }
 
     [TestMethod]
@@ -861,7 +866,6 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             ResourceScopeKind.Tenant => ControlPlaneAccessMode.TenantAdministration,
             _ => ControlPlaneAccessMode.Workspace
         }, invocation.Mode);
-
 
         if (scopeKind != ResourceScopeKind.Workspace)
         {

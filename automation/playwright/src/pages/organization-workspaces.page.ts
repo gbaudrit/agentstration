@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { OrganizationStructureTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
@@ -20,6 +21,7 @@ export class OrganizationWorkspacesPage {
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Organization workspaces page returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.locator(`[data-testid="${TestIds.organizationWorkspaces.structure}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    await revealCollectionAction(this.page.getByTestId(TestIds.organizationWorkspaces.openCreate));
     await this.page.getByTestId(TestIds.organizationWorkspaces.openCreate).click();
     await this.page.getByTestId(TestIds.organizationWorkspaces.createForm).waitFor({ state: 'visible' });
   }
@@ -73,16 +75,18 @@ export class OrganizationWorkspacesPage {
 
   public async expandTenant(name: string, locale: SupportedTestLocale): Promise<void> {
     const row = this.tenant(name);
-    const toggle = row.getByRole('button', { expanded: true });
-    if (await toggle.count()) await toggle.click();
+    const toggle = row.locator('.tenant-toggle');
+    if (await toggle.getAttribute('aria-expanded') === 'true') await toggle.click();
     await expect(row.locator('.tenant-toggle')).toHaveAttribute('aria-expanded', 'false');
-    await row.getByRole('button', { expanded: false }).click();
+    await toggle.click();
     await expect(row.locator('.tenant-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(row.getByText(OrganizationStructureTextByLocale[locale].empty, { exact: true })).toBeVisible();
   }
 
   public async beginWorkspace(tenant: WorkspaceDefinition, locale: SupportedTestLocale): Promise<void> {
-    await this.tenant(tenant.name).getByTestId(TestIds.organizationWorkspaces.openCreate).click();
+    const command = this.tenant(tenant.name).getByTestId(TestIds.organizationWorkspaces.openCreate);
+    await revealCollectionAction(command);
+    await command.click();
     await expect(this.createForm.locator('h2')).toBeFocused();
     await expect(this.createForm.locator('.parent-context')).toContainText(OrganizationStructureTextByLocale[locale].parentTenant);
     await expect(this.createForm.locator('.parent-context strong')).toHaveText(tenant.displayName);
@@ -113,8 +117,9 @@ export class OrganizationWorkspacesPage {
   }
 
   public async openTenantLink(definition: WorkspaceDefinition, id: string, locale: SupportedTestLocale): Promise<void> {
-    const link = this.tenant(definition.name).getByRole('link', { name: OrganizationStructureTextByLocale[locale].openTenant(definition.displayName), exact: true });
+    const link = this.tenant(definition.name).getByRole('link', { name: OrganizationStructureTextByLocale[locale].openTenant(definition.displayName), exact: true, includeHidden: true });
     await expect(link).toHaveAttribute('href', `/settings/organization/structure?context=${encodeURIComponent(`/tenants/${id}`)}`);
+    await revealCollectionAction(link);
     await Promise.all([this.waitForContextNavigation(`/tenants/${id}`), link.click()]);
     await this.assertCurrent(this.tenant(definition.name).locator('.tenant-heading'), locale);
     await expect(this.page.getByTestId(TestIds.organizationWorkspaces.tenantRow)).toHaveCount(1);
@@ -122,8 +127,9 @@ export class OrganizationWorkspacesPage {
   }
 
   public async openWorkspaceLink(definition: WorkspaceDefinition, id: string, locale: SupportedTestLocale): Promise<void> {
-    const link = this.row(definition.name).getByRole('link', { name: OrganizationStructureTextByLocale[locale].openWorkspace(definition.displayName), exact: true });
+    const link = this.row(definition.name).getByRole('link', { name: OrganizationStructureTextByLocale[locale].openWorkspace(definition.displayName), exact: true, includeHidden: true });
     await expect(link).toHaveAttribute('href', `/settings/organization/structure?context=${encodeURIComponent(`/workspaces/${id}`)}`);
+    await revealCollectionAction(link);
     await Promise.all([this.waitForContextNavigation(`/workspaces/${id}`), link.click()]);
     await this.assertWorkspaceContext(definition.name, locale);
   }
@@ -225,7 +231,7 @@ export class OrganizationWorkspacesPage {
     const row = this.page.getByTestId(TestIds.organizationWorkspaces.tenantRow);
     const name = await row.getAttribute('data-tenant-name');
     if (!name) throw new Error('Tenant name missing.');
-    const displayName = await row.locator('.tenant-toggle strong').innerText();
+    const displayName = await row.locator(':scope > .tenant-heading > .collection-identity .resource-name-link, :scope > .tenant-heading > .collection-identity strong').innerText();
     await this.assertTenantContext(name, locale);
     return { name, displayName };
   }
@@ -243,7 +249,7 @@ export class OrganizationWorkspacesPage {
     const row = this.page.getByTestId(TestIds.organizationWorkspaces.tenantRow);
     const name = await row.getAttribute('data-tenant-name');
     if (!name) throw new Error('Tenant name missing.');
-    return { name, displayName: await row.locator('.tenant-toggle strong').innerText() };
+    return { name, displayName: await row.locator(':scope > .tenant-heading > .collection-identity .resource-name-link, :scope > .tenant-heading > .collection-identity strong').innerText() };
   }
 
   public async submitInaccessibleWorkspace(definition: WorkspaceDefinition, originalScope: string): Promise<void> {
@@ -392,6 +398,7 @@ export class OrganizationWorkspacesPage {
 
   private async waitForContextNavigation(scopeRef: string): Promise<void> {
     await this.page.waitForURL(url => url.searchParams.get('context') === scopeRef, { waitUntil: 'domcontentloaded' });
-    await this.page.getByTestId(TestIds.console.shell).waitFor({ state: 'visible' });
+    // Context navigation reloads the document; wait beyond its prerendered shell.
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
   }
 }

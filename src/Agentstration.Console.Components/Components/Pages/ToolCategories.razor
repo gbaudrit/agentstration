@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/categories"
 @inject IToolCategoriesClient Categories
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
@@ -13,10 +14,16 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (categories.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="ToolCategoryResource" Items="categories">
-        <Header><tr><th>@T("Category")</th><th>@T("DescriptionColumn")</th><th>@T("Members")</th><th></th></tr></Header>
-        <Row Context="category"><tr data-testid="tool-category-row"><td><span class="resource-name-with-scope"><strong>@category.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="category.ScopeRef" Compact /></span><code>@category.Name</code></td><td>@(category.Definition.Description ?? "—")</td><td>@category.Definition.Tools.Count</td><td><a class="text-button" href="@CategoryUrl(category.Name)">@T("Manage")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="ToolCategoryResource" Items="categories" InformationLabels="@(new string[] { T("DescriptionColumn"), T("Members") })" RowTestId="tool-category-row" IdentityLabel="@T("Category")">
+        <Identity Context="category">
+<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@CategoryUrl(category)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="category.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@category.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(category.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="category">
+            <CollectionValue Label="@T("DescriptionColumn")">@(category.Definition.Description ?? "—")</CollectionValue>
+            <CollectionValue Label="@T("Members")">@category.Definition.Tools.Count</CollectionValue>
+        </Information>
+        <Actions Context="category">
+<CollectionActions ResourceName="@($"{category.Definition.DisplayName} ({category.Namespace}/{category.Name}, {category.ScopeRef})")"><a class="text-button" href="@CategoryUrl(category)">@T("Manage")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -30,5 +37,5 @@ else
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
     }
-    private static string CategoryUrl(string name) => $"/tools/categories/{Uri.EscapeDataString(name)}";
+    private string CategoryUrl(ToolCategoryResource value) => ResourceOwnershipContext.Resource(Services, "/tools/categories", value.Name, value.Namespace, value.ScopeRef);
 }

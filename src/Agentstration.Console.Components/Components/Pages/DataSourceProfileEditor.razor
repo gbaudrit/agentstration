@@ -36,8 +36,8 @@ else
                 else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
                 <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
                 <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="version" required /></FormField>
-                <FormField Label="@T("Flow")" Required="true"><ClearableSelect TValue="string" @bind-Value="flowKey" required><option value="">@T("Select")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</ClearableSelect></FormField>
-                <FormField Label="@T("DiscoveryFlow")"><ClearableSelect TValue="string" @bind-Value="discoveryFlowKey"><option value="">@T("None")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.ActiveVersion ?? flow.Version ?? "—")</option> }</ClearableSelect></FormField>
+                <FormField Label="@T("Flow")" Required="true"><ClearableSelect TValue="string" @bind-Value="flowKey" required><option value="">@T("Select")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></FormField>
+                <FormField Label="@T("DiscoveryFlow")"><ClearableSelect TValue="string" @bind-Value="discoveryFlowKey"><option value="">@T("None")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></FormField>
                 <FormField Label="@T("Schema")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="14" @bind-Value="schemaJson"></ClearableText></ChildContent></FormField>
                 <FormField Label="@T("ToolBindings")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="toolBindingsJson"></ClearableText></ChildContent></FormField>
                 <FormField Label="@T("DiscoveryToolBindings")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="discoveryToolBindingsJson"></ClearableText></ChildContent></FormField>
@@ -51,7 +51,17 @@ else
     else if (tab == Tab.Revisions)
     {
         <section class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><FormGrid><FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" /></FormField></FormGrid>@if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></FormActions> }
-        @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <DataGrid TItem="DataSourceProfileRevisionResource" Items="revisions"><Header><tr><th>@T("Version")</th><th>@T("Created")</th><th>@T("State")</th><th></th></tr></Header><Row Context="revision"><tr><td><code>@revision.Version</code></td><td>@revision.PublishedAt.ToLocalTime().ToString("g")</td><td>@(revision.Version == profile!.ActiveVersion ? T("Activate") : "-")</td><td>@if (CanManage && revision.Version != profile.ActiveVersion) { <button class="text-button" type="button" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button> }</td></tr></Row></DataGrid> }</fieldset></section>
+        @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <CollectionView TItem="DataSourceProfileRevisionResource" Items="revisions" InformationLabels="@(new string[] { T("Created") })" IdentityLabel="@T("Version")" StateLabel="@T("State")">
+        <Identity Context="revision">
+<code>@revision.Version</code></Identity>
+        <State Context="revision">
+<StatusBadge Text="@T(revision.Version == profile!.ActiveVersion ? "VersionState.Active" : "VersionState.Published")" Status="@(revision.Version == profile!.ActiveVersion ? UiStatus.Success : UiStatus.Neutral)" /></State>
+        <Information Context="revision">
+            <CollectionValue Label="@T("Created")">@revision.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="revision">
+@if (CanManage && revision.Version != profile!.ActiveVersion) { <CollectionActions ResourceName="@(revision.Version)"> <button class="text-button" type="button" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button> </CollectionActions> }</Actions>
+    </CollectionView> }</fieldset></section>
     }
     else if (tab == Tab.Access && CanManageAccess)
     {

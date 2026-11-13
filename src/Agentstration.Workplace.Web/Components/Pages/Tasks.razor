@@ -38,20 +38,14 @@ else
                 }
                 else
                 {
-                    <div class="conversation-cards">
+                    <div class="conversation-cards" role="list">
                         @foreach (var conversation in conversations)
                         {
-                            <a class="conversation-list-card" href="@ConversationUrl(conversation.Id)" data-testid="workplace-conversation-card" data-conversation-id="@conversation.Id">
-                                <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-chatbot" /></span>
-                                <span class="conversation-copy">
-                                    <strong>@ConversationTitle(conversation)</strong>
-                                    <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
-                                </span>
-                                <span class="conversation-meta">
-                                    <span class="conversation-status">@ConversationStatus(conversation.Status)</span>
-                                    <span class="resume-label">@T("Resume") <span aria-hidden="true">→</span></span>
-                                </span>
-                            </a>
+                            <article class="conversation-list-card" role="listitem">
+                                <CollectionIdentity DisplayName="@ConversationTitle(conversation)" Name="@conversation.Id.ToString()" Href="@ConversationUrl(conversation.Id)" IconName="message-chatbot" data-testid="workplace-conversation-card" data-conversation-id="@conversation.Id" ><IconBadges><ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" IconOnly /><StatusBadge Text="@ConversationStatus(conversation.Status)" Status="@ConversationTone(conversation.Status)" IconOnly /></IconBadges></CollectionIdentity>
+                                <small>@T("Updated") @conversation.LastActivityAt.LocalDateTime.ToString("g")</small>
+                                <CollectionActions ResourceName="@ConversationTitle(conversation)"><a href="@ConversationUrl(conversation.Id)">@T("Resume")</a></CollectionActions>
+                            </article>
                         }
                     </div>
                 }
@@ -81,13 +75,15 @@ else
                 }
                 else
                 {
-                    <div class="task-cards">
+                    <div class="task-cards" role="list">
                         @foreach (var task in FilteredTasks)
                         {
-                            <a class="task-list-card" href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")" data-testid="workplace-task-card" data-task-id="@task.Id">
-                                <div><TaskStatusBadge Value="task.Status" /><h3>@task.Title</h3></div>
+                            <article class="task-list-card" role="listitem">
+                                <CollectionIdentity DisplayName="@task.Title" Name="@task.Id.ToString()" Href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")" IconName="tasks" data-testid="workplace-task-card" data-task-id="@task.Id" ><IconBadges><ResourceScopeBadge Kind="Agentstration.Resources.ResourceScopeKind.Workspace" DisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" IconOnly /></IconBadges></CollectionIdentity>
+                                <TaskStatusBadge Value="task.Status" />
                                 <small>@T("Updated") @task.UpdatedAt.LocalDateTime.ToString("g")</small>
-                            </a>
+                                <CollectionActions ResourceName="@task.Title"><a href="@($"/w/{Uri.EscapeDataString(WorkspaceName)}/tasks/{task.Id}")">@T("Task")</a></CollectionActions>
+                            </article>
                         }
                     </div>
                 }
@@ -122,7 +118,7 @@ else
         try
         {
             var workspace = await Api.GetWorkspaceAsync(WorkspaceName, default);
-            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName, workspace.Id);
 
             var dashboardTask = Api.GetDefaultDashboardAsync(WorkspaceName, default);
             var conversationsTask = Api.ListInteractionsAsync(WorkspaceName, 50, default);
@@ -160,6 +156,14 @@ else
         InteractionStatus.Cancelled => T("TaskStatus.Cancelled"),
         InteractionStatus.Failed => T("TaskStatus.Failed"),
         _ => status.ToString()
+    };
+
+    private static Agentstration.Web.Components.Models.UiStatus ConversationTone(InteractionStatus value) => value switch
+    {
+        InteractionStatus.Completed => Agentstration.Web.Components.Models.UiStatus.Success,
+        InteractionStatus.Failed or InteractionStatus.Cancelled => Agentstration.Web.Components.Models.UiStatus.Danger,
+        InteractionStatus.Processing or InteractionStatus.ConvertedToTask => Agentstration.Web.Components.Models.UiStatus.Info,
+        _ => Agentstration.Web.Components.Models.UiStatus.Neutral
     };
 
     private string TaskStatusLabel(WorkTaskStatus value) => value switch

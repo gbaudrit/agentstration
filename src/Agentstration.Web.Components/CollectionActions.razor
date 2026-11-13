@@ -1,0 +1,49 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<div class="collection-action-group" role="group" aria-label="@Shared["ActionsFor", ResourceName]" @onclick:stopPropagation="true">
+    @if (Primary is not null) { <div class="collection-primary-actions">@Primary</div> }
+    @if (SecondaryContent is not null)
+    {
+        <details class="collection-actions-menu" @ref="root">
+            <summary class="button-secondary" aria-label="@Shared["ActionsFor", ResourceName]">@Shared["CollectionActions"] <UiIcon Name="chevron-down" /></summary>
+            <div class="collection-actions-panel" popover="manual">@SecondaryContent</div>
+        </details>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public string ResourceName { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Primary { get; set; }
+    [Parameter] public RenderFragment? Secondary { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private RenderFragment? SecondaryContent => Secondary ?? ChildContent;
+    private ElementReference root;
+    private IJSObjectReference? module;
+    private ElementReference? attachedRoot;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (SecondaryContent is null)
+        {
+            if (module is not null && attachedRoot is { } previous)
+            {
+                await module.InvokeVoidAsync("releaseActions", previous);
+                attachedRoot = null;
+            }
+            return;
+        }
+        if (attachedRoot?.Id == root.Id) return;
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+        if (attachedRoot is { } replaced) await module.InvokeVoidAsync("releaseActions", replaced);
+        await module.InvokeVoidAsync("attachActions", root);
+        attachedRoot = root;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { if (attachedRoot is { } attached) await module.InvokeVoidAsync("releaseActions", attached); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+}

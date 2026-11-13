@@ -10,6 +10,7 @@ namespace Agentstration.Web.Console;
 
 public sealed record AgentSummary(string Id, string Name, string Type, string Version, string Status, IReadOnlyList<string> Capabilities, string Runtime, DateTimeOffset LastActivity, string ModelProfile = "Not configured")
 {
+    public bool IsManaged { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
@@ -38,14 +39,38 @@ public sealed record DeploymentSummary(
 public sealed record WorkSummary(Guid Id, string Title, string Type, string Status, string Priority, string Owner, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record FlowSummary(string Id, string Name, string Kind, string Version, string Status, int Steps, int ActiveExecutions, DateTimeOffset UpdatedAt)
 {
+    public string? PublishedVersion { get; init; }
+    public bool IsManaged { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? ActiveVersion { get; init; }
     public string DetailsUrl => ConsoleResourceUrls.Flow(new FlowId(Id, Namespace), ScopeRef);
 }
 
+public sealed record FlowSummaryPage(IReadOnlyList<FlowSummary> Items, bool HasMore);
+
 public static class ConsoleResourceUrls
 {
+    public static string WithOwnerScope(string url, ResourceScopeRef? scopeRef)
+    {
+        if (scopeRef is not { } owner) return url;
+        var question = url.IndexOf('?');
+        var query = question < 0 ? new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>()
+            : Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(url[question..].Split('#')[0]);
+        var additions = new Dictionary<string, string?>();
+        if (!query.ContainsKey("scopeRef")) additions["scopeRef"] = owner.Value;
+        if (!query.ContainsKey("context")) additions["context"] = owner.Value;
+        return Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(url, additions);
+    }
+
+    public static string Resource(string collection, string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef, ResourceScopeRef? contextScopeRef = null)
+    {
+        var path = $"{collection}/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+        return scopeRef is { } owner
+            ? $"{path}&scopeRef={Uri.EscapeDataString(owner.Value)}&context={Uri.EscapeDataString((contextScopeRef ?? owner).Value)}"
+            : path;
+    }
+
     public static string Agent(
         ResourceNamespace @namespace,
         string name,

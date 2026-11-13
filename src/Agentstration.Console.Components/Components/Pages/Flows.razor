@@ -1,28 +1,96 @@
 @page "/flows"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IFlowApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
 <PageTitle>@T("PageTitle")</PageTitle>
-<div data-testid="flow-observability-flows">
+<div class="flow-compact-list" data-testid="flow-observability-flows" aria-busy="@loading.ToString().ToLowerInvariant()" data-interactive="@interactive.ToString().ToLowerInvariant()">
 <PageHeader Title="@T("Flows")" Description="@T("Description")">
     <Actions><a class="button-primary" href="/flows/new">@T("NewFlow")</a><a class="button-secondary" href="/flow-runs">@T("ViewAllRuns")</a></Actions>
 </PageHeader>
 <nav class="section-tabs" aria-label="@T("FlowSections")"><a class="active" href="/flows">@T("Definitions")</a><a href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
-@if (items is null) { <LoadingState /> }
-else if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+
+@if (error) { <div role="alert" class="flow-list-error">@T("LoadError") <button type="button" class="button-secondary" disabled="@(loading || !interactive)" @onclick="() => LoadPageAsync(requestedPage, requestedSize)">@T("Retry")</button></div> }
+@if (items is null) { @if (loading) { <LoadingState /> } }
 else
 {
-    <DataGrid TItem="FlowSummary" Items="items">
-        <Header><tr><th>@T("Flow")</th><th>@T("Scope")</th><th>@T("Status")</th><th>@T("Namespace")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Updated")</th></tr></Header>
-        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@item.DetailsUrl">@item.Name</a></strong><code>@item.Id</code></td><td><ResourceScopeBadge Kind="@(item.ScopeRef?.Kind ?? ResourceScopeKind.Workspace)" Compact /></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
-    </DataGrid>
+    @if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
+    <CollectionView TItem="FlowSummary" Items="items" Compact InformationLabels="@(new[] { T("Version"), T("Updated") })">
+        <Toolbar>
+<div class="flow-list-controls">
+    <FormField Id="flow-page-size" Label="@T("PageSize")">
+        <ClearableSelect TValue="int" Value="@pageSize" ValueChanged="ChangePageSizeAsync" ValueExpression="() => pageSize" AllowClear="false" disabled="@(loading || !interactive)">
+            @foreach (var size in new[] { 20, 50, 100 }) { <option value="@size">@size</option> }
+        </ClearableSelect>
+    </FormField>
+</div>
+        </Toolbar>
+        <Identity Context="item">
+            <CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@DetailsUrl(item)" IconName="workflow" Domain="flow" ShowNamespaceIcon="false">
+                <IconBadges><span class="flow-icon-badges"><ResourceScopeBadge ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></span></IconBadges>
+                <NameSuffix><span class="flow-kind">@KindLabel(item.Kind)</span></NameSuffix>
+            </CollectionIdentity>
+        </Identity>
+        <InformationHeader>
+            <th scope="col"><span class="flow-version-heading">@T("Version") <ValueDisclosure Value="@T("VersionHelp")" IconName="info-circle" /></span></th>
+            <th scope="col">@T("Updated")</th>
+        </InformationHeader>
+        <Information Context="item">
+            <CollectionValue Label="@T("Version")">
+                <div class="flow-versions">
+                    <CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" Compact />
+                </div>
+            </CollectionValue>
+            <CollectionValue Label="@T("Updated")"><time datetime="@item.UpdatedAt.ToString("O")">@item.UpdatedAt.LocalDateTime.ToString("g")</time></CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")"><a href="@DetailsUrl(item)">@T("Open")</a></CollectionActions></Actions>
+    </CollectionView>
+    <CollectionPager Page="@(page)" HasMore="@hasMore" Busy="@(loading || !interactive)" PageChanged="ChangePageAsync" />
 }
 </div>
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary>? items;
-    protected override async Task OnInitializedAsync() => items = await Client.GetFlowsAsync(cancellation.Token);
+    private int page = 1;
+    private int pageSize = 20;
+    private int requestedPage = 1;
+    private int requestedSize = 20;
+    private bool interactive;
+    private bool hasMore;
+    private bool loading;
+    private bool error;
+    protected override Task OnInitializedAsync() => LoadPageAsync(1, pageSize);
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+    }
+    private Task ChangePageAsync(int value) => loading || value < 1 || (value > page && !hasMore) ? Task.CompletedTask : LoadPageAsync(value, pageSize);
+    private Task ChangePageSizeAsync(int value) => loading || value is not (20 or 50 or 100) ? Task.CompletedTask : LoadPageAsync(1, value);
+    private async Task LoadPageAsync(int targetPage, int targetSize)
+    {
+        requestedPage = targetPage;
+        requestedSize = targetSize;
+        loading = true;
+        error = false;
+        try
+        {
+            var result = await Client.GetFlowsPageAsync(checked((targetPage - 1) * targetSize), targetSize, cancellation.Token);
+            items = result.Items;
+            hasMore = result.HasMore;
+            page = targetPage;
+            pageSize = targetSize;
+        }
+        catch (OperationCanceledException) { error = !cancellation.IsCancellationRequested; }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException)
+        {
+            error = true;
+        }
+        finally { loading = false; }
+    }
+    private string DetailsUrl(FlowSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
     private string T(string key) => Localizer[key];
+    private string F(string key, params object[] values) => Localizer[key, values];
     private string StatusLabel(string value) { var localized = Localizer[$"Status.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
+    private string KindLabel(string value) { var localized = Localizer[$"Kind.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

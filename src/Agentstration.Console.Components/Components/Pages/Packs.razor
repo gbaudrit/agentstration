@@ -40,19 +40,17 @@ else
     }
     else
     {
-        <DataGrid TItem="InstalledPackResource" Items="packs">
-            <Header><tr><th>@T("Pack")</th><th>@T("Purpose")</th><th>@T("Audience")</th><th>@T("Version")</th><th>@T("Status")</th><th>@T("Resources")</th><th>@T("Installed")</th><th></th></tr></Header>
-            <Row Context="pack"><tr class="@(IsSelected(pack) ? "selected-pack" : null)">
-                <td><span class="resource-name-with-scope"><strong>@DisplayName(pack)</strong><ResourceScopeBadge ScopeRef="pack.ScopeRef" Compact /></span><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></td>
-                <td><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></td>
-                <td>@AudienceLabel(pack.Definition.Audience)</td>
-                <td><code>@pack.Definition.Version</code></td>
-                <td><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" /></td>
-                <td>@pack.Definition.ManagedResources.Count</td>
-                <td><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></td>
-                <td><button class="text-button" @onclick="() => SelectAsync(pack)">@T("Inspect")</button></td>
-            </tr></Row>
-        </DataGrid>
+        <CollectionView TItem="InstalledPackResource" Items="packs" InformationLabels="@(new string[] { T("Purpose"), T("Audience"), T("Resources"), T("Installed") })" ItemAttributes="@((pack) => new Dictionary<string, object> { ["class"] = IsSelected(pack) ? "selected-pack" : string.Empty })" IdentityLabel="@T("Pack")" StateLabel="@T("Status")">
+        <Identity Context="pack"><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => SelectAsync(pack)" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@(pack.Definition.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="pack.ScopeRef" IconOnly /><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(pack.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></Identity>
+        <Information Context="pack">
+            <CollectionValue Label="@T("Purpose")"><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></CollectionValue>
+            <CollectionValue Label="@T("Audience")">@AudienceLabel(pack.Definition.Audience)</CollectionValue>
+            <CollectionValue Label="@T("Resources")">@pack.Definition.ManagedResources.Count</CollectionValue>
+            <CollectionValue Label="@T("Installed")"><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></CollectionValue>
+        </Information>
+        <Actions Context="pack">
+<CollectionActions ResourceName="@(DisplayName(pack))"><button class="text-button" @onclick="() => SelectAsync(pack)">@T("Inspect")</button></CollectionActions></Actions>
+    </CollectionView>
     }
 
     @if (selected is not null)
@@ -114,7 +112,7 @@ else
                 <div class="pack-resource-list">
                     @foreach (var resource in selected.Value.Definition.ManagedResources)
                     {
-                        <article><span class="pack-kind">@resource.Kind</span><div><strong>@resource.Name</strong><small>@resource.Path</small></div>@if (DefinitionFormUrl(resource) is { } formUrl) { <a class="text-button" href="@formUrl">@T("Form")</a> }</article>
+                        <article><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace.Value" Name="@resource.Name" Href="@(DefinitionFormUrl(resource) is { } target ? ConsoleResourceUrls.WithOwnerScope(target, selected.Value.ScopeRef) : null)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="selected.Value.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(selected.Value.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@resource.Kind</span><small>@resource.Path</small>@if (DefinitionFormUrl(resource) is { } formUrl) { <CollectionActions ResourceName="@resource.Name"><a class="text-button" href="@ConsoleResourceUrls.WithOwnerScope(formUrl, selected.Value.ScopeRef)">@T("Form")</a></CollectionActions> }</article>
                     }
                 </div>
             }
@@ -129,7 +127,7 @@ else
             <div class="pack-resource-list">
                 @foreach (var project in projects)
                 {
-                    <article><span class="pack-kind">@T("Project")</span><div><strong>@project.Definition.DisplayName</strong><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @project.Definition.Version · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small></div><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></article>
+                    <article><CollectionIdentity DisplayName="@(project.Definition.DisplayName ?? project.Definition.PackName)" Namespace="@project.Namespace.Value" Name="@project.Name" Href="@($"/pack-projects/{project.Uid:D}")" IconName="package"><Versions><CollectionVersion Label="@T("TargetArchiveVersion")" Value="@(project.Definition.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="project.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(project.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@T("Project")</span><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small><CollectionActions ResourceName="@(project.Definition.DisplayName ?? project.Definition.PackName)"><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></CollectionActions></article>
                 }
             </div>
         </section>

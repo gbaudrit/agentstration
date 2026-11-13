@@ -7,7 +7,12 @@ export default defineConfig({
   retries: 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
-  reporter: [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]],
+  reporter: [
+    ['list'],
+    ...(process.env.CI ? [['github'] as const] : []),
+    ['html', { open: 'never' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
   use: {
     channel: process.env.AGENTSTRATION_PLAYWRIGHT_CHANNEL,
     trace: 'retain-on-failure',

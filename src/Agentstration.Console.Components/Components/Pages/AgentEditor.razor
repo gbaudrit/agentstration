@@ -40,7 +40,6 @@ else
         @if (selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
         <ResourcePageTabs Items="PageTabs" Value="@CurrentPage" ValueChanged="SelectPage" PanelId="agent-page-panel" IdPrefix="agent-page" Label="@T("AgentSections")" />
 
-
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -71,12 +70,11 @@ else
         @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
         {
             <FormSection Title="@T("PinnedToolSetAssignments")" Eyebrow="@T("ActiveRevision")" Description="@T("PinnedToolSetAssignmentsHelp")" TestId="agent-active-toolsets"><Actions><code>@activeRevision.Metadata.Name</code></Actions><ChildContent>
-                <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
-                @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
-                {
-                    <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
-                }
-                </tbody></table></div>
+                <CollectionView TItem="ResolvedAgentToolSetAssignment" Items="activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal).ToArray()" InformationLabels="@(new[] { T("DefinitionHash"), T("EffectiveMembers") })">
+                    <Identity Context="assignment"><CollectionIdentity DisplayName="@assignment.ToolSetName" Namespace="@assignment.ToolSetNamespace.Value" Name="@assignment.ToolSetName" Href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(assignment.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="assignment.ToolSetScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(assignment.ToolSetScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+                    <Information Context="assignment"><CollectionValue Label="@T("DefinitionHash")"><code>@assignment.DefinitionHash</code></CollectionValue><CollectionValue Label="@T("EffectiveMembers")">@string.Join(", ", assignment.Members)</CollectionValue></Information>
+                    <Actions Context="assignment"><CollectionActions ResourceName="@assignment.ToolSetName"><a href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)">@T("InspectToolSet")</a></CollectionActions></Actions>
+                </CollectionView>
             </ChildContent></FormSection>
         }
         <FormSection Title="@T("Behavior")"><dl class="resource-details">
@@ -89,7 +87,6 @@ else
                     <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@if (agentModel.Resolved.Provider is { } provider) { <a class="resource-name-link" href="@ProviderUrl(agentModel)">@(provider.DisplayName ?? provider.Name)</a> } else { @T("NotResolved") }</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>}</article>
                 </div>
             </ChildContent></FormSection>
-
 
         <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
         </div>
@@ -164,7 +161,6 @@ else
                 <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
             </FormGrid>
         </section>
-
 
         <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
                 <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>

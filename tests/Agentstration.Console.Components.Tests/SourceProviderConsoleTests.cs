@@ -19,7 +19,7 @@ public sealed class SourceProviderConsoleTests
     public void CreationFromTenantExtensionPrefillsItsScopeAndSourceContribution()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISourceProvidersClient>(new StubSourceProvidersClient());
         context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient());
@@ -46,7 +46,7 @@ public sealed class SourceProviderConsoleTests
     public void ListShowsConfiguredProviderAndObservedStatus()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISourceProvidersClient>(new StubSourceProvidersClient(includeProvider: true));
 
@@ -56,7 +56,7 @@ public sealed class SourceProviderConsoleTests
         {
             StringAssert.Contains(rendered.Markup, "Git Source Provider");
             StringAssert.Contains(rendered.Markup, "Available");
-            Assert.AreEqual("/sourceproviders/git-local?namespace=default&scopeRef=%2Finstance", rendered.Find("a.text-link").GetAttribute("href"));
+            Assert.AreEqual("/sourceproviders/git-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", rendered.Find("a.text-link").GetAttribute("href"));
         });
     }
 

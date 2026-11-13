@@ -1,0 +1,660 @@
+{
+  "stats": {
+    "startTime": "2026-11-13T08:23:44.363Z",
+    "duration": 292089.277,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "captures": [
+    {
+      "file": "data-source-profiles-en-US-dark.png",
+      "sha256": "45dbfc9b96c160b4f471ffd18105785032f53c5b6011959a273bee09fb100419",
+      "checkpoint": "data-source-profiles",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "data-source-profiles-table-en-US-dark.png",
+      "sha256": "836a19764e0184a226a1d00869f62e7a102e5d8f755686f9cd6ecd1c4560e5f8",
+      "checkpoint": "data-source-profiles-table",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-en-US-dark.png",
+      "sha256": "c0f7c336b8f06444ca993f7962548dd2886edeb50f36ffa02d142fe6a13ffd10",
+      "checkpoint": "flows",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-table-en-US-dark.png",
+      "sha256": "e4fa049f6eb96b0b6db22531edc31ab31b2c7f02c6677f70257f9eace161ee64",
+      "checkpoint": "flows-table",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-en-US-dark.png",
+      "sha256": "d733043359d1e11593f2181b2510981fba5561e35ebdd43aa57303e071d519a7",
+      "checkpoint": "agents",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-table-en-US-dark.png",
+      "sha256": "01652413dce1a43774d4557dc8da2d021fca4186546d72757247ff88906b98c6",
+      "checkpoint": "agents-table",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-en-US-dark.png",
+      "sha256": "0aa88f233359f4c2172101fcab79e8cc640ad1a49710279878d67c999918910d",
+      "checkpoint": "extensions",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-table-en-US-dark.png",
+      "sha256": "7de180bca82522c8a0aab79e6a2f22c98c74b8d9679b492b528ac9b0b5010bf6",
+      "checkpoint": "extensions-table",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "profile-primary-choice-en-US-dark.png",
+      "sha256": "2f3c0305cb37a1242cdf6f68c9f2d08e449408e0a036d99c1fb3bccf37ea4502",
+      "checkpoint": "profile-primary-choice",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "pack-project-card-en-US-dark.png",
+      "sha256": "b3e82b48d6ad38677741e12d097d535503bcd4e0fdc144a4682b8b4f80f82142",
+      "checkpoint": "pack-project-card",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "entry-cards-en-US-dark.png",
+      "sha256": "ec66da40e4c25bdbe56c147ea8fee9ea65804cbeffcd86bc7bff037bc85c4a48",
+      "checkpoint": "entry-cards",
+      "test": "collection version identity and primary choice en-US dark desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "data-source-profiles-en-US-light.png",
+      "sha256": "4387e9f5bf1bc6452f8765d156b57a698cc1042a3333e79bdbc21de1fd176d3b",
+      "checkpoint": "data-source-profiles",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "data-source-profiles-table-en-US-light.png",
+      "sha256": "79de0c141e8f0588498f88a563f7dcea98330e1f4e246504c7452e303439cc33",
+      "checkpoint": "data-source-profiles-table",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-en-US-light.png",
+      "sha256": "209823150d534d38deafbfda5b3e5536bb47638eaa8066f3b7892a3dfe3e5f3d",
+      "checkpoint": "flows",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-table-en-US-light.png",
+      "sha256": "92886759f13075bb65478675bf6e2d936c99f0abd866660f0ddb47cc25ec3e29",
+      "checkpoint": "flows-table",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-en-US-light.png",
+      "sha256": "f1391eebcb0a09f47633f1f9e6a03d88308ee73d6a7e58dec3dc70e0a0cbeda2",
+      "checkpoint": "agents",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-table-en-US-light.png",
+      "sha256": "3ac191d866835b6d698dc38089839fb4ffda4580bb7a60459937eae0af96c01c",
+      "checkpoint": "agents-table",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-en-US-light.png",
+      "sha256": "5f4e0851b45c4fa58b354ddfa65c265de9afddf40f5e9b4f32fcf4d753a6585a",
+      "checkpoint": "extensions",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-table-en-US-light.png",
+      "sha256": "f0ea50525b67490b318a7aca47aa14b82bfe405422a783f0a70e7093ca18174b",
+      "checkpoint": "extensions-table",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "profile-primary-choice-en-US-light.png",
+      "sha256": "f3ca404717bde99c17662c09b70d284e16b2a946eb1ed7567bee5c8b99c3de6d",
+      "checkpoint": "profile-primary-choice",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "pack-project-card-en-US-light.png",
+      "sha256": "d604ecb7735b5aa592509fcce1e1a1bc90d941004cbbda57c1b9523bc0208587",
+      "checkpoint": "pack-project-card",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "entry-cards-en-US-light.png",
+      "sha256": "f74751d507a34b09ea814159cda09b5f53dd254fd409a586123bef3ee8cb33fa",
+      "checkpoint": "entry-cards",
+      "test": "collection version identity and primary choice en-US light desktop @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "data-source-profiles-fr-FR-dark.png",
+      "sha256": "3db47ad9888fc248e33b773745900661f57f94613918146a7de65481bc752fe2",
+      "checkpoint": "data-source-profiles",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-fr-FR-dark.png",
+      "sha256": "b22feb8f66f35787fc71bdd0088e3881981ae9d6b3fec72b13f6a2281fd99477",
+      "checkpoint": "flows",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-fr-FR-dark.png",
+      "sha256": "74a9385d06bae58c299f079f6d29e1fb476d4085a6e98a5ead4457f2af863d4e",
+      "checkpoint": "agents",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-fr-FR-dark.png",
+      "sha256": "a3f2b845c444f28863c71aab9f9421809ffbbfbed21b85eeea8bb6e13e1729fc",
+      "checkpoint": "extensions",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "profile-primary-choice-fr-FR-dark.png",
+      "sha256": "31194ca324b9b5f21c50048e284fe97eaadba4880d99a74dab4aed30ea59abbe",
+      "checkpoint": "profile-primary-choice",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "pack-project-card-fr-FR-dark.png",
+      "sha256": "1942b7a136251dd6d039e0fbfa8fedbb2a333ee4b8d2ee55b3061275d6de5540",
+      "checkpoint": "pack-project-card",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "entry-cards-fr-FR-dark.png",
+      "sha256": "e33db6a5b940f8a4fc26fcfe32b829dc13bce94541d62bde2bfda8f3e11ae911",
+      "checkpoint": "entry-cards",
+      "test": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "data-source-profiles-fr-FR-light.png",
+      "sha256": "a89218ba7ea2cd6eff8596681644eff30e818372a0f82c763eaa98d281a27182",
+      "checkpoint": "data-source-profiles",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "flows-fr-FR-light.png",
+      "sha256": "eccf594f7b04e75c93d112a97d5c0d2e75f290cadaf784f1f67ebe8f25c7868b",
+      "checkpoint": "flows",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "agents-fr-FR-light.png",
+      "sha256": "4bb408df7342c3f255fe706c8403db4b87809b748ba70b8233a9ccb37bd347cf",
+      "checkpoint": "agents",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "extensions-fr-FR-light.png",
+      "sha256": "f757e7783024df714ace581531897e4c293b5ff3cc83b24c059d7592d24ccc36",
+      "checkpoint": "extensions",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "profile-primary-choice-fr-FR-light.png",
+      "sha256": "f247eb3d1c7fee18fea0afdb65ebbc984898dbe92f3a731efb9e9bad2e9eb78c",
+      "checkpoint": "profile-primary-choice",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "pack-project-card-fr-FR-light.png",
+      "sha256": "652a3ff83cdcb4fac7148b2742ee0b1ed4d9f6b77d8b423b52c770c2c2e4bf6d",
+      "checkpoint": "pack-project-card",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    },
+    {
+      "file": "entry-cards-fr-FR-light.png",
+      "sha256": "c9222fee167b8f3aa350169d36acb3d4750a7c7a885af7afcf6724c5087400e3",
+      "checkpoint": "entry-cards",
+      "test": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "specification": "automation/playwright/tests/distribution.spec.ts",
+      "status": "passed",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "local executable; unedited Playwright success attachment"
+    }
+  ]
+}

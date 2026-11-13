@@ -47,7 +47,7 @@ else
         </fieldset>
         @if (CanManage) { <FormActions Busy="@saving"><a class="button-secondary" href="/runtimeprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="runtime-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfileAction") : T("SaveChanges"))</button></FormActions> }
     </EditForm>
-    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Deployments")</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><strong>@usage.Name</strong> · @usage.Environment</li> }</ul></section> }
+    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Deployments")</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.Name" Name="@usage.ResourceId" IconName="activity" /><small>@usage.Environment</small></li> }</ul></section> }
     }
 }
 

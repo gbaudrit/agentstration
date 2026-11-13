@@ -1,5 +1,19 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.FlowRunsStrings> Localizer
-<DataGrid TItem="FlowRun" Items="Runs"><Header><tr><th>@T("Flow")</th><th>@T("Started")</th><th>@T("Status")</th><th>@T("Duration")</th><th>@T("Version")</th><th>@T("Deployment")</th><th>@T("Trigger")</th><th>@T("StartedBy")</th></tr></Header><Row Context="run"><tr><td><strong><a class="resource-name-link" href="@RunUrl(run)">@run.FlowId.Value</a></strong><br/><code>@ShortId(run.Id)</code></td><td>@(run.StartedAt?.LocalDateTime.ToString("g") ?? T("Pending"))</td><td><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></td><td>@Duration(run)</td><td>@run.FlowVersion</td><td>@(run.DeploymentResourceId ?? "—")</td><td>@TriggerLabel(run.Trigger)</td><td>@(run.StartedBy ?? "—")</td></tr></Row></DataGrid>
+<CollectionView TItem="FlowRun" Items="Runs" InformationLabels="@(new string[] { T("Started"), T("Duration"), T("Version"), T("Deployment"), T("Trigger"), T("StartedBy") })" IdentityLabel="@T("Flow")" StateLabel="@T("Status")">
+        <Identity Context="run">
+<CollectionIdentity DisplayName="@run.FlowId.Value" Name="@run.Id" Href="@RunUrl(run)" IconName="workflow" ><IconBadges><StatusBadge Text="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Scope Context="run"><ResourceScopeBadge ScopeRef="run.ExecutionScopeRef" /></Scope>
+        <Information Context="run">
+            <CollectionValue Label="@T("Started")">@(run.StartedAt?.LocalDateTime.ToString("g") ?? T("Pending"))</CollectionValue>
+            <CollectionValue Label="@T("Duration")">@Duration(run)</CollectionValue>
+            <CollectionValue Label="@T("Version")">@run.FlowVersion</CollectionValue>
+            <CollectionValue Label="@T("Deployment")">@(run.DeploymentResourceId ?? "—")</CollectionValue>
+            <CollectionValue Label="@T("Trigger")">@TriggerLabel(run.Trigger)</CollectionValue>
+            <CollectionValue Label="@T("StartedBy")">@(run.StartedBy ?? "—")</CollectionValue>
+        </Information>
+        <Actions Context="run"><CollectionActions ResourceName="@run.Id"><a href="@RunUrl(run)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
 @code {
     [Parameter,EditorRequired] public IReadOnlyList<FlowRun> Runs {get;set;}=[];
     private string T(string key, params object[] arguments) => Localizer[key, arguments];

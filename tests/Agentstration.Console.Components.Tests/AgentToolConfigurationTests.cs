@@ -12,7 +12,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public void ScopedProviderAndToolNamesRenderWithoutCatalogCollision()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceScope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var instanceProvider = Provider("paired", "Instance extension", ResourceScopeRef.Instance);
@@ -39,7 +39,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public void ToolsAreGroupedByMcpWithCatalogAndProviderNavigation()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
@@ -69,7 +69,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public async Task SelectionReturnsTheCompleteAgentToolSet()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         IReadOnlyList<string>? selected = null;
 
@@ -93,7 +93,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public async Task CategoryRepresentsPartialSelectionAndFlattensBulkActionToToolIds()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         IReadOnlyList<string>? selected = null;
         var tools = new[]
@@ -128,7 +128,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public void ToolSetGrantedToolIsCheckedReadOnlyAndKeepsItsProvenance()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<AgentToolConfiguration>(parameters => parameters
@@ -154,7 +154,7 @@ public sealed class AgentToolConfigurationTests
     [TestMethod]
     public async Task CategoryBulkActionDoesNotPersistToolSetGrantedToolsAsIndividualReferences()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         IReadOnlyList<string>? selected = null;
         var tools = new[]

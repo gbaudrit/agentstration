@@ -82,12 +82,9 @@ else
                     @foreach (var usage in usages)
                     {
                         <li class="model-profile-usage-card" data-testid="model-profile-usage">
-                            <a href="@AgentUrl(usage)">
-                                <span class="model-profile-usage-icon" aria-hidden="true"><TablerIcon Name="robot" /></span>
-                                <span class="model-profile-usage-identity"><strong>@usage.DisplayName</strong><code>@usage.Namespace/@usage.Name</code></span>
-                                <span class="model-profile-usage-scope"><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact />@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <small>@usage.ScopeDisplayName</small> }</span>
-                                <span class="model-profile-usage-arrow" aria-hidden="true">→</span>
-                            </a>
+                            <CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent">
+                                <IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges>
+                            </CollectionIdentity>
                         </li>
                     }
                 </ul>
@@ -201,7 +198,17 @@ else
             }
             else
             {
-                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>@T("Capability")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Adapter")</th><th>@T("Effective")</th><th>@T("Values")</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
+                <CollectionView TItem="ModelCapabilityResponse" Items="resolution.Capabilities" InformationLabels="@(new string[] { T("Provider"), T("Model"), T("Adapter"), T("Effective"), T("Values") })" IdentityLabel="@T("Capability")">
+        <Identity Context="capability">
+<strong>@capability.Name</strong></Identity>
+        <Information Context="capability">
+            <CollectionValue Label="@T("Provider")">@SupportLabel(capability.ProviderSupport)</CollectionValue>
+            <CollectionValue Label="@T("Model")">@SupportLabel(capability.ModelSupport)</CollectionValue>
+            <CollectionValue Label="@T("Adapter")">@SupportLabel(capability.AdapterSupport)</CollectionValue>
+            <CollectionValue Label="@T("Effective")"><strong>@SupportLabel(capability.EffectiveSupport)</strong></CollectionValue>
+            <CollectionValue Label="@T("Values")">@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</CollectionValue>
+        </Information>
+    </CollectionView>
             }
             @if (resolution?.Incompatibilities is { Count: > 0 })
             {

@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/sourceproviders/new"
 @page "/sourceproviders/{Name}"
 @implements IDisposable
@@ -39,7 +40,7 @@ else
                 var optionSets = OptionSets(selected);
                 <h3>@T("OptionContracts")</h3>
                 @if (optionSets.Count == 0) { <p>@T("NoOptionContracts")</p> }
-                else { <ul class="resource-links">@foreach (var optionSet in optionSets) { <li><span><strong>@optionSet.Id</strong><code>@optionSet.PreferredVersion · @optionSet.Scope</code></span></li> }</ul> }
+                else { <ul class="resource-links">@foreach (var optionSet in optionSets) { <li><CollectionIdentity DisplayName="@optionSet.Id" Name="@optionSet.Id" IconName="adjustments" /><code>@optionSet.PreferredVersion · @optionSet.Scope</code></li> }</ul> }
             }
             @if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")">@T("LastChecked", status.CheckedAt.ToLocalTime().ToString("g")) — @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> · @status.Details</span> }</p> }
         </ChildContent></FormSection>
@@ -48,7 +49,7 @@ else
 
     @if (!IsNew && usages.Count > 0)
     {
-        <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@UsageCount(usages.Count)</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@SourceUrl(usage)"><strong>@usage.Publisher/@usage.SourceName</strong><code>@usage.BindingName</code></a></li> }</ul></section>
+        <section class="panel resource-section"><div class="panel-header"><h2>@T("Usages")</h2><span>@UsageCount(usages.Count)</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@($"{usage.Publisher}/{usage.SourceName}")" Name="@($"{usage.Publisher}/{usage.SourceName}")" Href="@SourceUrl(usage)" IconName="package" ><IconBadges><ResourceScopeBadge ScopeRef="usage.SourceScopeRef" IconOnly /></IconBadges></CollectionIdentity><code>@usage.BindingName</code><CollectionActions ResourceName="@($"{usage.Publisher}/{usage.SourceName}")"><a href="@SourceUrl(usage)">@Shared["OpenItem"]</a></CollectionActions></li> }</ul></section>
     }
 }
 

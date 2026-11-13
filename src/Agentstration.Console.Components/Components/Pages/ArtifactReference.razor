@@ -1,17 +1,7 @@
-@if (Href is not null)
-{
-    <a class="artifact-reference" href="@Href" title="@Identifier">
-        <strong>@Name</strong>
-        <small><span>@IdentifierLabel</span><code>@Identifier</code></small>
-    </a>
-}
-else
-{
-    <span class="artifact-reference" title="@Identifier">
-        <strong>@Name</strong>
-        <small><span>@IdentifierLabel</span><code>@Identifier</code></small>
-    </span>
-}
+<div class="artifact-reference">
+    <CollectionIdentity DisplayName="@Name" Name="@Identifier" Href="@Href" IconName="document" title="@Identifier" />
+    <span class="sr-only">@IdentifierLabel</span>
+</div>
 
 @code {
     [Parameter] public string? Href { get; set; }

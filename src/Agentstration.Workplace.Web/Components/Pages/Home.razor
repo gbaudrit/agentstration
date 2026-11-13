@@ -80,11 +80,11 @@ else
                 }
                 @if (featuredEntries.Count > 0)
                 {
-                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">@T("Featured")</p><h2>@T("FeaturedTools")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <section class="featured-entries"><div class="section-heading"><div><p class="eyebrow">@T("Featured")</p><h2>@T("FeaturedTools")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in featuredEntries){<StandardEntryContainer><EntryRenderer ResourceHref="@EntryStartUrl(entry)" WorkspaceDisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" Definition="@ToDefinition(entry)" Role="DashboardItemRole.Featured" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
                 }
                 @if (standardEntries.Count > 0)
                 {
-                    <section class="standard-entries"><div class="section-heading"><div><p class="eyebrow">@T("Shortcuts")</p><h2>@T("OtherWaysToStart")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
+                    <section class="standard-entries"><div class="section-heading"><div><p class="eyebrow">@T("Shortcuts")</p><h2>@T("OtherWaysToStart")</h2></div></div><div class="standard-entry-grid">@foreach(var entry in standardEntries){<StandardEntryContainer><EntryRenderer ResourceHref="@EntryStartUrl(entry)" WorkspaceDisplayName="@WorkplaceContext.Current?.WorkspaceDisplayName" Definition="@ToDefinition(entry)" Role="DashboardItemRole.Standard" OnSubmit="values => SubmitAsync(entry, values)" Disabled="busy" Busy="busy" /></StandardEntryContainer>}</div></section>
                 }
             }
             else

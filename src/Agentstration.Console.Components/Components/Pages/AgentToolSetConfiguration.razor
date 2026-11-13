@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
 <section class="panel form-section agent-tools-panel" data-testid="agent-toolset-configuration">
@@ -14,8 +15,8 @@
             var assignment = Assignment(version);
             <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
-                    <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
-                    <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
+                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(version.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="version.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(version.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
+
                 </header>
                 <div class="agent-toolset-assignment">
                     <FormCheckbox id="@FullInputId(version)" Value="@(assignment is not null)" ValueChanged="changed => ToggleFullAsync(version, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
@@ -37,6 +38,7 @@
                         </div>
                     </div>
                 }
+            <CollectionActions ResourceName="@version.ToolSetName"><a href="@ToolSetUrl(version)">@T("InspectToolSet")</a></CollectionActions>
             </article>
         }
         </div>

@@ -24,7 +24,7 @@ public sealed class DataSourceEditorTests
     public void DetailsExposeOperationalOverviewAndConsistentForms()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
@@ -81,7 +81,7 @@ public sealed class DataSourceEditorTests
     public async Task AcquisitionToolUsesSavedRecipeAndSelectsOnePublishableArtifact(bool canWrite)
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var acquisition = Acquisition with
         {
             Target = Target,
@@ -151,7 +151,7 @@ public sealed class DataSourceEditorTests
     public void AcquisitionOpensFormattedArtifactsOnDemandInTheSameTab(bool hasLocalCopy)
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var json = JsonSerializer.Serialize(new { Result = new { items = new[] { 1, 2 }, text = new string('a', 47_000) } });
         var artifacts = new ArtifactAdministrationComponentTests.ArtifactClient(json, mediaType: "application/vnd.example+json")
         {
@@ -226,7 +226,7 @@ public sealed class DataSourceEditorTests
     {
         using var culture = new TestCultureScope("en-US");
         var client = new SourceClientStub();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(client);
@@ -248,7 +248,7 @@ public sealed class DataSourceEditorTests
     public void DiscoveryTabShowsGovernedChoicesAndStaleTargets()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(targeted: true));
@@ -271,7 +271,7 @@ public sealed class DataSourceEditorTests
     public void HistoryFailureKeepsDefinitionAndYamlLoaded(string cultureName, string expectedMessage)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(historyFails: true));
@@ -292,7 +292,7 @@ public sealed class DataSourceEditorTests
     [TestMethod]
     public void ReadinessKeepsPinnedProfileSelectableWhenCatalogueOmitsIt()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
@@ -550,7 +550,7 @@ public sealed class DataSourceEditorTests
 
     private static BunitContext DiscoveryContext(SourceClientStub client, TimeProvider clock)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(clock);
         context.Services.AddSingleton<IDataSourcesClient>(client);

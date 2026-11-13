@@ -113,4 +113,4 @@
 <data name="SaveBeforeApply"><value>Enregistrez vos modifications avant d’appliquer la configuration.</value></data>
 <data name="YamlFormInvalid"><value>Le formulaire contient des valeurs incomplètes ou invalides. Ce YAML reste en lecture seule et conserve la dernière définition valide. Corrigez les champs dans Définition pour le modifier ou l’enregistrer.</value></data>
 <data name="YamlNeedsValidForm"><value>Complétez les champs invalides dans Définition avant d’ouvrir le YAML.</value></data>
-</root>
+<data name="InspectTool" xml:space="preserve"><value>Consulter</value></data></root>

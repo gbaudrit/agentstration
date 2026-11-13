@@ -55,7 +55,7 @@ else if (page is not null)
         @foreach (var source in page.Value)
         {
             <article class="panel discovered-source">
-                <header><div><p class="eyebrow">@source.Publisher / @source.Name</p><h2>@(source.DisplayName ?? source.Name)</h2><p>@(source.Description ?? T("NoDescription"))</p></div><StatusBadge Text="@F("VersionCount", source.Versions.Count)" Status="UiStatus.Info" /></header>
+                <header><div><CollectionIdentity DisplayName="@(source.DisplayName ?? source.Name)" Name="@($"{source.Publisher}/{source.Name}")" IconName="database" /><p>@(source.Description ?? T("NoDescription"))</p></div><span>@F("VersionCount", source.Versions.Count)</span></header>
                 @foreach (var version in source.Versions)
                 {
                     <section class="discovered-version @(version.Conflicted ? "conflicted" : null)">
@@ -65,7 +65,7 @@ else if (page is not null)
                             @foreach (var observation in version.Observations)
                             {
                                 <article class="observation-card">
-                                    <header><div><strong>@observation.RegistrationDisplayName</strong><small><code>@observation.RegistrationName / @observation.Selection.CatalogName</code></small></div>@if (observation.IsCatalogLatest) { <StatusBadge Text="@T("ShardLatest")" Status="UiStatus.Info" /> }</header>
+                                    <header><div><strong>@observation.RegistrationDisplayName</strong><small><code>@observation.RegistrationName/@observation.Selection.CatalogName</code></small></div>@if (observation.IsCatalogLatest) { <StatusBadge Text="@T("ShardLatest")" Status="UiStatus.Info" /> }</header>
                                     <div class="evidence-grid" aria-label="@T("IndependentEvidence")">
                                         <span><small>@T("RegistryOriginTrust")</small><strong>@TrustPolicy(observation.TrustPolicy)</strong><small>@OriginClassification(observation.OriginClassification)</small></span>
                                         <span><small>@T("PublisherEvidence")</small><strong>@PublisherStatus(ParsePublisherStatus(observation.Publisher.Status))</strong><small>@observation.Publisher.Name</small></span>
@@ -74,7 +74,7 @@ else if (page is not null)
                                     </div>
                                     <dl class="resource-details compact"><dt>@T("Freshness")</dt><dd>@ObservedStatus(observation.Freshness) · @FormatDate(observation.FetchedAt)</dd><dt>@T("ManifestDigest")</dt><dd><code>@observation.ManifestDigest</code></dd><dt>@T("IndexDigest")</dt><dd><code>@Short(observation.IndexDigest)</code></dd><dt>@T("ShardDigest")</dt><dd><code>@Short(observation.CatalogDigest)</code></dd></dl>
                                     @if (SelectionWarning(version, observation) is { } warning) { <p class="inline-warning">@warning</p> }
-                                    <button class="button-primary" disabled="@(!CanSelect(version, observation) || importing)" @onclick="() => Select(version, observation)">@T("SelectExactVersion")</button>
+                                    <CollectionActions ResourceName="@($"{source.Publisher}/{source.Name} {version.Version} ({observation.RegistrationDisplayName})")"><button class="button-primary" disabled="@(!CanSelect(version, observation) || importing)" @onclick="() => Select(version, observation)">@T("SelectExactVersion")</button></CollectionActions>
                                 </article>
                             }
                         </div>

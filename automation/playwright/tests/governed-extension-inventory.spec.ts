@@ -17,6 +17,13 @@ for (const locale of ['en-US', 'fr-FR'] as const) {
           await checkpoint.page.screenshot({ path, fullPage: true });
           await testInfo.attach(checkpoint.name, { path, contentType: 'image/png' });
         } }, { locale, ...credentials });
+        for (const theme of ['dark', 'light'] as const) {
+          await pages.ensureTheme(theme);
+          await pages.distribution.inspectDirectEnrollmentActions(product.consoleUrl);
+          const path = testInfo.outputPath(`enrollment-primary-actions-${theme}.png`);
+          await page.screenshot({ path, fullPage: true });
+          await testInfo.attach(`enrollment-primary-actions-${theme}`, { path, contentType: 'image/png' });
+        }
         completed = true;
       } finally {
         if (completed) await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');

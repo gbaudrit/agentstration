@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/cleanup"
 @rendermode InteractiveServer
 @implements IDisposable
@@ -5,6 +6,7 @@
 @inject ConsoleContextState ContextState
 @inject NotificationState Notifications
 @inject TimeProvider TimeProvider
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<CleanupStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
@@ -79,14 +81,15 @@ else if (inventory is not null)
                 <div class="cleanup-list">
                     @foreach (var candidate in visible)
                     {
-                        <label class="cleanup-row @(selected.Contains(candidate.Key) ? "selected" : null)">
-                            <FormCheckbox Value="@selected.Contains(candidate.Key)" disabled="@deleting" ValueChanged="changed => Select(candidate, (new ChangeEventArgs { Value = changed }).Value is true)" />
+                        <div class="cleanup-row @(selected.Contains(candidate.Key) ? "selected" : null)">
+                            <FormCheckbox aria-label="@candidate.DisplayName" Value="@selected.Contains(candidate.Key)" disabled="@deleting" ValueChanged="changed => Select(candidate, (new ChangeEventArgs { Value = changed }).Value is true)" />
                             <span class="cleanup-row-kind"><UiIcon Name="@Icon(candidate.Kind)" /></span>
-                            <span class="cleanup-row-main"><strong>@candidate.DisplayName</strong><code>@CandidateAddress(candidate)</code></span>
+                            <CollectionIdentity DisplayName="@candidate.DisplayName" Namespace="@(candidate.Kind is CleanupResourceKind.Agent or CleanupResourceKind.Flow or CleanupResourceKind.Entry ? candidate.Namespace.Value : null)" Name="@candidate.Id" Href="@CandidateUrl(candidate)" IconName="@Icon(candidate.Kind)" ><IconBadges><ResourceScopeBadge ScopeRef="candidate.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(candidate.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
                             <span class="cleanup-row-detail">@KindLabel(candidate.Kind)@if (!string.IsNullOrWhiteSpace(candidate.Detail)) { <small>@candidate.Detail</small> }</span>
                             <StatusBadge Text="@StatusLabel(candidate.Status)" Status="@PlatformDashboardService.ToStatus(candidate.Status)" />
                             <time datetime="@candidate.UpdatedAt.ToString("O")">@FormatDate(candidate.UpdatedAt)</time>
-                        </label>
+                        <CollectionActions ResourceName="@($"{candidate.DisplayName} ({candidate.Namespace}/{candidate.Id}, {candidate.ScopeRef})")"><a href="@CandidateUrl(candidate)">@Shared["OpenItem"]</a></CollectionActions>
+                        </div>
                     }
                 </div>
             }
@@ -133,6 +136,20 @@ else if (inventory is not null)
 }
 
 @code {
+    private static string CandidateUrl(CleanupCandidate candidate)
+    {
+        var path = candidate.Kind switch
+        {
+            CleanupResourceKind.Agent => ConsoleResourceUrls.Agent(candidate.Namespace, candidate.Id),
+            CleanupResourceKind.Flow => ConsoleResourceUrls.Flow(new FlowId(candidate.Id, candidate.Namespace)),
+            CleanupResourceKind.Entry => ConsoleResourceUrls.Entry(new EntryId(candidate.Id, candidate.Namespace)),
+            CleanupResourceKind.FlowRun => $"/flow-runs/{Uri.EscapeDataString(candidate.Id)}",
+            CleanupResourceKind.Task => $"/tasks/{Uri.EscapeDataString(candidate.Id)}",
+            _ => $"/runs/{Uri.EscapeDataString(candidate.Id)}"
+        };
+        return candidate.ScopeRef is { } owner ? $"{path}?scopeRef={Uri.EscapeDataString(owner.Value)}&context={Uri.EscapeDataString(owner.Value)}" : path;
+    }
+
     private sealed record CleanupFailure(CleanupCandidate Candidate, string Message, string ErrorId);
     private sealed record CleanupSummary(string Kind, int Count);
     private sealed record CleanupGroupView(string Kind, IReadOnlyList<CleanupCandidate> Candidates);

@@ -1,5 +1,9 @@
 @page "/account/pat"
 @model Agentstration.Web.Pages.Account.PatModel
+@using Agentstration.Web.Components
+@using Agentstration.Web.Components.Models
+@using Agentstration.Resources
+@inject IStringLocalizer<SharedFormStrings> Shared
 @{
     ViewData["Title"] = Auth["PersonalAccessTokens"];
 }
@@ -80,22 +84,27 @@
     }
     else
     {
-        <div class="token-list">
+        <div class="token-list" role="list">
             @foreach (var token in Model.Tokens)
             {
                 var status = Model.Status(token);
-                <article class="token-row" data-testid="pat-token-row">
+                <article class="token-row" role="listitem" data-testid="pat-token-row">
                     <div>
-                        <strong>@token.Name</strong>
+                        <div class="collection-identity"><component type="typeof(ResourceIcon)" render-mode="Static" param-IconName='"key"' /><strong>@token.Name</strong></div>
+                        <component type="typeof(ResourceScopeBadge)" render-mode="Static" param-ScopeRef="ResourceScopeRef.Workspace(token.WorkspaceId)" param-DisplayName="Model.Workspaces.FirstOrDefault(workspace => workspace.Id == token.WorkspaceId)?.DisplayName" />
+                        <component type="typeof(StatusBadge)" render-mode="Static" param-Text='@(Auth[$"TokenStatus.{status}"].Value)' param-Status='@(status == "Active" ? UiStatus.Success : UiStatus.Neutral)'  />
                         <code>@token.TokenPrefix…</code>
-                        <small>@Auth[$"TokenStatus.{status}"] · @Auth["ExpiresAt", token.ExpiresAt.ToLocalTime().ToString("g")] · @Auth["LastUsed", token.LastUsedAt?.ToLocalTime().ToString("g") ?? Auth["Never"]]</small>
+                        <small>@Auth["ExpiresAt", token.ExpiresAt.ToLocalTime().ToString("g")] · @Auth["LastUsed", token.LastUsedAt?.ToLocalTime().ToString("g") ?? Auth["Never"]]</small>
                     </div>
                     @if (status == "Active")
                     {
+                        <details class="collection-actions-menu">
+                            <summary class="button-secondary" aria-label="@Shared["ActionsFor", token.Name]">@Shared["CollectionActions"]</summary>
+                            <div class="collection-actions-panel" popover="manual">
                         <form method="post" asp-page-handler="Revoke">
                             <input type="hidden" name="tokenId" value="@token.Id" />
                             <button type="submit" class="danger-action" data-testid="pat-revoke">@Auth["Revoke"]</button>
-                        </form>
+                        </form></div></details>
                     }
                 </article>
             }
@@ -104,3 +113,5 @@
 </section>
 
 <a href="/account/security" class="auth-back-link">← @Auth["AccountSecurity"]</a>
+
+<script type="module" src="/_content/Agentstration.Web.Components/collection-static.js"></script>

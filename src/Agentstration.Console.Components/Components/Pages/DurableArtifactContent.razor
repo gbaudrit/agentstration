@@ -62,12 +62,13 @@ else
         }
         else
         {
-            <DataGrid TItem="FlowRunArtifactMaterialization" Items="materializations">
-                <Header><tr><th>@T("State")</th><th>@T("FlowRun")</th><th>@T("Artifact")</th><th>@T("Expires")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
-                <Row Context="item"><tr>
-                    <td>@MaterializationStatus(item.Status)</td>
-                    <td><a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></td>
-                    <td>
+            <CollectionView TItem="FlowRunArtifactMaterialization" Items="materializations" InformationLabels="@(new string[] { T("Artifact"), T("Expires") })" IdentityLabel="@T("FlowRun")" StateLabel="@T("State")">
+        <Identity Context="item">
+<a class="text-button" href="@FlowRunUrl(item.FlowRunId)"><code>@item.FlowRunId</code></a></Identity>
+        <State Context="item">
+@MaterializationStatus(item.Status)</State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Artifact")">
                         @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } stagedArtifactId })
                         {
                             <a class="text-button" href="@StagedUrl(stagedArtifactId)"><code>@stagedArtifactId</code></a>
@@ -76,16 +77,14 @@ else
                         {
                             <span class="muted">@T("MaterializationUnavailable")</span>
                         }
-                    </td>
-                    <td>@FormatDate(item.StagedArtifactExpiresAt)</td>
-                    <td>
-                        @if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId })
-                        {
+                    </CollectionValue>
+            <CollectionValue Label="@T("Expires")">@FormatDate(item.StagedArtifactExpiresAt)</CollectionValue>
+        </Information>
+        <Actions Context="item">
+@if (item is { StagedArtifactAvailable: true, StagedArtifactId: { } downloadableArtifactId }) { <CollectionActions ResourceName="@(item.FlowRunId)">
                             <a class="icon-button" href="@DownloadUrl(downloadableArtifactId)" download data-enhance-nav="false" aria-label="@T("DownloadMaterializedArtifact")" title="@T("DownloadMaterializedArtifact")" data-testid="durable-artifact-history-download"><UiIcon Name="download" /></a>
-                        }
-                    </td>
-                </tr></Row>
-            </DataGrid>
+                        </CollectionActions> }</Actions>
+    </CollectionView>
         }
     </ChildContent></FormSection>
 }

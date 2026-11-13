@@ -40,7 +40,7 @@ public sealed class ContextualValueCreatorTests
     public void ParameterCreatorWorksWithoutAModelProviderConsumer()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new ParameterClient(scope);
@@ -68,7 +68,7 @@ public sealed class ContextualValueCreatorTests
     [TestMethod]
     public void ParameterCreatorSubmitsDerivedNameAndDisplayNameThroughExistingContract()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new ParameterClient(scope);
@@ -103,8 +103,8 @@ public sealed class ContextualValueCreatorTests
         foreach (var testCase in cases)
         {
             using var culture = new TestCultureScope("fr-FR");
-            using var context = new BunitContext();
-        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+            using var context = new BunitContext().WithCollectionPresentation();
+            context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
             var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
             var client = new ParameterClient(scope);
             context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -141,7 +141,7 @@ public sealed class ContextualValueCreatorTests
     public void SecretCreatorWritesValueOnceAndReturnsExactReference()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new SecretClient(scope);

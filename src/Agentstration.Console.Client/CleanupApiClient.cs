@@ -23,7 +23,8 @@ public sealed record CleanupCandidate(
     DateTimeOffset UpdatedAt,
     string? Detail = null)
 {
-    public string Key => $"{Kind}:{Namespace.Value}:{Id}";
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public string Key => ScopeRef is { } owner ? $"{Kind}:{owner.Value}:{Namespace.Value}:{Id}" : $"{Kind}:{Namespace.Value}:{Id}";
 }
 
 public sealed record CleanupInventory(
@@ -71,13 +72,13 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
     public Task DeleteAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken) =>
         candidate.Kind switch
         {
-            CleanupResourceKind.RuntimeRun => DeleteWithCurrentETagAsync(RuntimeClient, RuntimeRunPath(candidate.Id), cancellationToken),
-            CleanupResourceKind.FlowRun => DeleteWithCurrentETagAsync(FlowClient, FlowRunPath(candidate.Id), cancellationToken),
-            CleanupResourceKind.Task => DeleteWithCurrentETagAsync(WorkClient, TaskPath(candidate.Id), cancellationToken),
+            CleanupResourceKind.RuntimeRun => DeleteWithCurrentETagAsync(RuntimeClient, WithScope(RuntimeRunPath(candidate.Id), candidate.ScopeRef), cancellationToken),
+            CleanupResourceKind.FlowRun => DeleteWithCurrentETagAsync(FlowClient, WithScope(FlowRunPath(candidate.Id), candidate.ScopeRef), cancellationToken),
+            CleanupResourceKind.Task => DeleteWithCurrentETagAsync(WorkClient, WithScope(TaskPath(candidate.Id), candidate.ScopeRef), cancellationToken),
             CleanupResourceKind.Entry => DeleteEntryAsync(candidate, options, cancellationToken),
-            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, FlowPath(candidate.Namespace, candidate.Id)
-                + (options.DeleteSystemManagedFlows ? "?deleteSystemManaged=true" : string.Empty), cancellationToken),
-            CleanupResourceKind.Agent => DeleteWithCurrentETagAsync(ManagementClient, AgentPath(candidate.Namespace, candidate.Id), cancellationToken),
+            CleanupResourceKind.Flow => DeleteWithCurrentETagAsync(FlowClient, WithScope(FlowPath(candidate.Namespace, candidate.Id)
+                + (options.DeleteSystemManagedFlows ? "?deleteSystemManaged=true" : string.Empty), candidate.ScopeRef), cancellationToken),
+            CleanupResourceKind.Agent => DeleteWithCurrentETagAsync(ManagementClient, WithScope(AgentPath(candidate.Namespace, candidate.Id), candidate.ScopeRef), cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };
 
@@ -99,7 +100,7 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 run.Properties.Agent.Namespace,
                 run.Status.State.ToString(),
                 run.Status.CompletedAt ?? run.Status.CreatedAt,
-                run.Properties.Agent.ResourceId))
+                run.Properties.Agent.ResourceId) { ScopeRef = run.ExecutionScopeRef })
             .ToArray();
     }
 
@@ -121,7 +122,7 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 run.FlowId.Namespace,
                 run.Status.ToString(),
                 run.CompletedAt ?? run.CreatedAt,
-                run.FlowVersion))
+                run.FlowVersion) { ScopeRef = run.ExecutionScopeRef })
             .ToArray();
     }
 
@@ -137,7 +138,7 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 entry.Value.Id.Namespace,
                 entry.Published is null ? "Draft" : "Published",
                 entry.Value.UpdatedAt,
-                entry.Value.Binding.ResourceId))
+                entry.Value.Binding.ResourceId) { ScopeRef = ResourceScopeRef.Workspace(entry.Value.WorkspaceId.Value) })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
@@ -168,7 +169,7 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 ResourceNamespace.Default,
                 task.Status.ToString(),
                 task.UpdatedAt,
-                task.EntryId))
+                task.EntryId) { ScopeRef = ResourceScopeRef.TryParse(task.WorkspaceId, out var taskScope) ? taskScope : null })
             .ToArray();
     }
 
@@ -190,7 +191,7 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 flow.Namespace,
                 flow.Enabled ? "Active" : "Disabled",
                 flow.UpdatedAt,
-                flow.ActiveVersion ?? flow.Version))
+                flow.ActiveVersion ?? flow.Version) { ScopeRef = flow.ScopeRef })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
@@ -212,16 +213,20 @@ public sealed class CleanupApiClient(IConsoleContextHttpClientFactory httpClient
                 agent.Namespace,
                 agent.Status.ProvisioningState.ToString(),
                 agent.Status.Conditions.Select(condition => condition.LastTransitionTime).OfType<DateTimeOffset>().DefaultIfEmpty(DateTimeOffset.MinValue).Max(),
-                agent.Definition.ModelProfile.ResourceId))
+                agent.Definition.ModelProfile.ResourceId) { ScopeRef = agent.ScopeRef })
             .OrderBy(candidate => candidate.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
+
+    private static string WithScope(string path, ResourceScopeRef? scope) => scope is { } owner
+        ? $"{path}{(path.Contains('?') ? "&" : "?")}scopeRef={Uri.EscapeDataString(owner.Value)}"
+        : path;
 
     private async Task DeleteEntryAsync(CleanupCandidate candidate, CleanupDeletionOptions options, CancellationToken cancellationToken)
     {
         var query = $"?removeDashboardReferences={options.RemoveDashboardReferences.ToString().ToLowerInvariant()}&closeInteractions={options.CloseInteractions.ToString().ToLowerInvariant()}";
         using var response = await httpClientFactory.CreateClient(WorkClient)
-            .DeleteAsync(EntryPath(candidate.Namespace, candidate.Id) + query, cancellationToken);
+            .DeleteAsync(WithScope(EntryPath(candidate.Namespace, candidate.Id) + query, candidate.ScopeRef), cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
     }
 

@@ -114,7 +114,7 @@ public sealed class WorkOperationsComponentTests
 
         Assert.AreEqual("Créer un agent", agents["CreateAgent"].Value);
         Assert.AreEqual("Définissez, publiez et exploitez des ressources d’agents spécialisés.", agents["Description"].Value);
-        Assert.AreEqual("Gen", agents["GenerationHeader"].Value);
+        Assert.AreEqual("Génération", agents["GenerationHeader"].Value);
         Assert.AreEqual("1 déployé(s)", agents["DeployedCount", 1].Value);
         Assert.AreEqual("Déployé", agents["StatusDeployed"].Value);
         Assert.AreEqual("Prêt", deployments["Status.Ready"].Value);
@@ -189,7 +189,7 @@ public sealed class WorkOperationsComponentTests
 
     private static BunitContext CreateContext()
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

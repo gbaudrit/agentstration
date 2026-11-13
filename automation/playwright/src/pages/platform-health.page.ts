@@ -27,12 +27,12 @@ export class PlatformHealthPage {
 
   public async expectOperational(): Promise<void> {
     await this.expectStatus(text.operational);
-    await expect(this.indicator.locator('.health-success')).toBeVisible();
+    await expect(this.indicator.locator('.status-success')).toBeVisible();
   }
 
   public async expectPartiallyUnavailable(): Promise<void> {
     await this.expectStatus(text.partiallyUnavailable);
-    await expect(this.indicator.locator('.health-danger')).toBeVisible();
+    await expect(this.indicator.locator('.status-danger')).toBeVisible();
   }
 
   private async expectStatus(status: string): Promise<void> {

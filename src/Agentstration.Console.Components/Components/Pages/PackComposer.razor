@@ -70,9 +70,9 @@ else
                         var selectable = item.Availability == PackCompositionAvailability.Selectable;
                             <div class="composer-resource @(!selectable ? "unavailable" : null)" data-resource-kind="@item.Resource.Kind" data-resource-name="@item.Resource.Name">
                             <div class="composer-resource-main">
-                                <div class="composer-resource-heading"><span class="composer-kind">@item.Resource.Kind</span><strong>@item.DisplayName</strong></div>
+                                <div class="composer-resource-heading"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@item.Resource.Namespace" Name="@item.Resource.Name" IconName="package" /><span class="composer-kind">@item.Resource.Kind</span></div>
                                 <div class="composer-resource-copy">
-                                    <small><code>@item.Resource.Namespace/@item.Resource.Name</code>@if (!string.IsNullOrWhiteSpace(item.Version)) { <text> · @item.Version</text> }</small>
+                                    <small>@if (!string.IsNullOrWhiteSpace(item.Version)) { <text> · @item.Version</text> }</small>
                                     @if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }
                                     @if (!string.IsNullOrWhiteSpace(item.AvailabilityReason)) { <small class="composer-reason">@item.AvailabilityReason</small> }
                                 </div>
@@ -121,9 +121,9 @@ else
                             var remainsRequired = IsRequiredByOtherSelection(resource);
                             <div class="composer-selected-resource explicit" @key="resource.Resource.Address">
                                 <div class="composer-resource-main">
-                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-heading"><CollectionIdentity DisplayName="@resource.DisplayName" Namespace="@resource.Resource.Namespace" Name="@resource.Resource.Name" IconName="package" /><span class="composer-kind">@resource.Resource.Kind</span></div>
                                     <div class="composer-resource-copy">
-                                        <small>@T("ExplicitSelection") · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        <small>@T("ExplicitSelection")</small>
                                         @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
                                         @if (remainsRequired) { <small class="composer-inclusion-reason">@InclusionReason(resource)</small> }
                                     </div>
@@ -148,9 +148,9 @@ else
                         {
                             <div class="composer-selected-resource dependency" @key="resource.Resource.Address">
                                 <div class="composer-resource-main">
-                                    <div class="composer-resource-heading"><span class="composer-kind">@resource.Resource.Kind</span><strong>@resource.DisplayName</strong></div>
+                                    <div class="composer-resource-heading"><CollectionIdentity DisplayName="@resource.DisplayName" Namespace="@resource.Resource.Namespace" Name="@resource.Resource.Name" IconName="package" /><span class="composer-kind">@resource.Resource.Kind</span></div>
                                     <div class="composer-resource-copy">
-                                        <small>@T("RequiredDependency") · <code>@resource.Resource.Namespace/@resource.Resource.Name</code></small>
+                                        <small>@T("RequiredDependency")</small>
                                         @if (!string.IsNullOrWhiteSpace(resource.Path)) { <small>@resource.Path</small> }
                                         <small class="composer-inclusion-reason">@InclusionReason(resource)</small>
                                     </div>

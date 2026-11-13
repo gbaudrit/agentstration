@@ -232,7 +232,7 @@ public sealed class SqliteResourceStore(
             ResourceNamespace.Parse(value.Namespace),
             value.Kind,
             value.Name,
-            value.UpdatedAt)).ToArray();
+            value.UpdatedAt) { IsManaged = ReadGovernance(value.Payload).IsManaged }).ToArray();
     }
 
     public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)
@@ -517,6 +517,40 @@ public sealed class SqliteResourceStore(
 
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
         LoadKindAsync<T>(kind, cancellationToken);
+
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestToolSetVersionsAsync(
+        IReadOnlyCollection<Guid> toolSetUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(toolSetUids, "ToolSet", "ToolSetVersion", "toolSetUid", cancellationToken);
+
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestDataSourceProfileVersionsAsync(
+        IReadOnlyCollection<Guid> profileUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(profileUids, "DataSourceProfile", "DataSourceProfileRevision", "profileUid", cancellationToken);
+
+    private async Task<IReadOnlyDictionary<Guid, string>> FindLatestPublicationVersionsAsync(
+        IReadOnlyCollection<Guid> resourceUids, string parentKind, string kind, string ownerProperty, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(resourceUids.Count, 200);
+        if (resourceUids.Count == 0) return new Dictionary<Guid, string>();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var parents = await Scoped(context.Documents.AsNoTracking()).Include(value => value.Scope)
+            .Where(value => value.Kind == parentKind && resourceUids.Contains(value.Uid)).ToArrayAsync(cancellationToken);
+        var visibleParents = await FilterDiscoverableAsync(context, parents, cancellationToken);
+        if (visibleParents.Length == 0) return new Dictionary<Guid, string>();
+        var identities = JsonSerializer.Serialize(visibleParents.Select(value => value.Uid));
+        // This is publication metadata of the authorized parent, not a grant to the version resource itself.
+        var documents = await Scoped(context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM ControlPlaneResources WHERE Uid IN (
+                SELECT Uid FROM (
+                    SELECT Uid, ROW_NUMBER() OVER (
+                        PARTITION BY json_extract(Payload, {"$." + ownerProperty})
+                        ORDER BY json_extract(Payload, '$.publishedAt') DESC, Uid DESC) AS Position
+                    FROM ControlPlaneResources WHERE Kind = {kind}
+                        AND json_extract(Payload, {"$." + ownerProperty}) IN (SELECT value FROM json_each({identities})))
+                WHERE Position = 1)
+            """).AsNoTracking()).Include(value => value.Scope).ToArrayAsync(cancellationToken);
+        return documents.Select(value => JsonSerializer.Deserialize<JsonElement>(value.Payload))
+            .ToDictionary(value => value.GetProperty(ownerProperty).GetGuid(), value => value.GetProperty("version").GetString()!);
+    }
 
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentRevision>($"""

@@ -263,12 +263,12 @@ else
                 <article class="panel form-section">
                     <div class="panel-header"><div><p class="eyebrow">@T("DependsOn")</p><h2>@T("ExecutionResources")</h2></div><StatusBadge Text="@dependencies.Count.ToString()" Status="UiStatus.Neutral" /></div>
                     @if (dependencies.Count == 0) { <p class="entry-empty-copy">@T("DependenciesAfterPublication")</p> }
-                    else { <div class="entry-card-list">@foreach (var dependency in dependencies) { <article class="entry-usage-card"><strong>@FriendlyResourceName(dependency.ResourceId)</strong><span>@dependency.ResourceType · @FriendlyRelationship(dependency.Relationship)</span><details><summary>@T("ResourceId")</summary><code>@dependency.ResourceId</code></details></article> }</div> }
+                    else { <div class="entry-card-list">@foreach (var dependency in dependencies) { <article class="entry-usage-card"><CollectionIdentity DisplayName="@FriendlyResourceName(dependency.ResourceId)" Name="@dependency.ResourceId" IconName="layers" /><span>@dependency.ResourceType · @FriendlyRelationship(dependency.Relationship)</span><details><summary>@T("ResourceId")</summary><code>@dependency.ResourceId</code></details></article> }</div> }
                 </article>
                 <article class="panel form-section">
                     <div class="panel-header"><div><p class="eyebrow">@T("UsedBy")</p><h2>@T("PublishedDashboards")</h2></div><StatusBadge Text="@PublishedUsages.Count.ToString()" Status="UiStatus.Neutral" /></div>
                     @if (PublishedUsages.Count == 0) { <p class="entry-empty-copy">@T("NotUsedByDashboard")</p> }
-                    else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><strong>@usage.Published!.DisplayName</strong><span>@EnumLabel("Role", reference.Role) · @T("Position", reference.Order + 1)</span><details><summary>@T("DashboardResourceId")</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
+                    else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><CollectionIdentity DisplayName="@usage.Published!.DisplayName" Name="@usage.Published.Id.Value" IconName="layout-grid" /><span>@EnumLabel("Role", reference.Role) · @T("Position", reference.Order + 1)</span><details><summary>@T("DashboardResourceId")</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
                 </article>
             </section>
         }

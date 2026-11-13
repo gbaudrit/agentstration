@@ -13,7 +13,9 @@
 .pack-source-heading .text-button { flex: 0 0 auto; }
 .pack-source-provenance .pack-facts { margin-top: 0; }
 .pack-resource-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.pack-resource-list article { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pack-resource-list article { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pack-resource-list article ::deep > .collection-identity { flex: 1 1 16rem; min-width: 0; }
+.pack-resource-list article ::deep > .collection-action-group { flex: 0 0 auto; margin-left: auto; }
 .pack-resource-list article > div { min-width: 0; flex: 1; }
 .pack-resource-list strong, .pack-resource-list small { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pack-resource-list small { margin-top: 3px; color: var(--muted); }

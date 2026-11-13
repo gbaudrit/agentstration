@@ -93,10 +93,14 @@ else
                 @if (versions.Count == 0) { <p class="muted">@T("NoPublishedVersions")</p> }
                 else
                 {
-                    <DataGrid TItem="SchemaVersionResource" Items="versions.OrderByDescending(value => value.PublishedAt).ToArray()">
-                        <Header><tr><th>@T("Version")</th><th>@T("PublishedAt")</th><th>@T("DefinitionHash")</th></tr></Header>
-                        <Row Context="version"><tr><td><a class="text-button" href="@VersionUrl(version.Version)" data-testid="schema-version-link"><code>@version.Version</code></a></td><td>@version.PublishedAt.ToLocalTime().ToString("g")</td><td><code>@version.DefinitionHash</code></td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="SchemaVersionResource" Items="versions.OrderByDescending(value => value.PublishedAt).ToArray()" InformationLabels="@(new string[] { T("PublishedAt"), T("DefinitionHash") })" IdentityLabel="@T("Version")">
+        <Identity Context="version">
+<a class="text-button" href="@VersionUrl(version.Version)" data-testid="schema-version-link"><code>@version.Version</code></a></Identity>
+        <Information Context="version">
+            <CollectionValue Label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("DefinitionHash")"><code>@version.DefinitionHash</code></CollectionValue>
+        </Information>
+    </CollectionView>
                     @if (selectedVersion is not null)
                     {
                         <section class="schema-version-details" data-testid="schema-version-details">

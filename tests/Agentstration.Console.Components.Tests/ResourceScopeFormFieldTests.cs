@@ -14,7 +14,7 @@ public sealed class ResourceScopeFormFieldTests
     public void CompactBadgeKeepsScopeAsInlineMetadata()
     {
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<ResourceScopeBadge>(parameters => parameters
@@ -32,7 +32,7 @@ public sealed class ResourceScopeFormFieldTests
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);
         var workspace = new ResourceScopeTargetResponse(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceScopeKind.Workspace, "Default", true);
         ResourceScopeRef? selected = null;
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient([tenant, workspace]));
 

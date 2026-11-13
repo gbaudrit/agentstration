@@ -12,7 +12,8 @@
     "test:fixtures": "node --import tsx --test src/fixtures/reserved-ports.test.ts",
     "test:smoke": "playwright test --grep @smoke",
     "capture": "tsx cli/capture.ts",
-    "coverage:report": "node --import tsx cli/coverage.ts"
+    "coverage:report": "node --import tsx cli/coverage.ts",
+    "test:components": "node --import tsx --test src/components/*.test.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

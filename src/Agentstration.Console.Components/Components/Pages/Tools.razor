@@ -21,16 +21,22 @@ else
         <span role="status">@Shared["LoadedResults", tools.Count]</span>
     </ResourceToolbar>
     @if (FilteredTools.Count == 0) { <EmptyState Title="@Shared["NoMatches"]" Message="@Shared["NoMatchesHelp"]" /> }
-    <div class="tool-catalog-grid"><DataGrid TItem="ToolResource" Items="PageTools">
-        <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td data-label="@T("Tool")"><div class="tool-catalog-identity"><span class="tool-catalog-icon" aria-hidden="true"><UiIcon Name="wrench" /></span><div><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></div></div></td><td data-label="@T("Provider")">
+    <div class="tool-catalog-grid"><CollectionView TItem="ToolResource" Items="PageTools" InformationLabels="@(new string[] { T("Provider"), T("Enabled") })" IdentityLabel="@T("Tool")" StateLabel="@T("Availability")">
+        <Identity Context="tool">
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="tool">
+            <CollectionValue Label="@T("Provider")">
             @if (ManagingExtension(tool) is { } extension)
             {
                 <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
             }
             else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
-            </td><td data-label="@T("Availability")"><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td data-label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
-    </DataGrid></div>
+            </CollectionValue>
+            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
+        </Information>
+        <Actions Context="tool">
+<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></CollectionActions></Actions>
+    </CollectionView></div>
     <CollectionPager Page="@(page)" Total="@FilteredTools.Count" HasMore="@(page * 20 < FilteredTools.Count)" PageChanged="value => page = value" />
 }
 

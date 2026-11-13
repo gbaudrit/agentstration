@@ -58,7 +58,10 @@ jobs:
             shards: 2
           - project: mobile-chromium
             shard: 1
-            shards: 1
+            shards: 2
+          - project: mobile-chromium
+            shard: 2
+            shards: 2
           - project: locale-contracts
             shard: 1
             shards: 1
@@ -119,7 +122,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test browser host port reservations
         working-directory: automation/playwright
-        run: npm run test:fixtures
+        run: npm run test:fixtures && npm run test:components
       - name: Run browser UX smoke tests
         working-directory: automation/playwright
         env:

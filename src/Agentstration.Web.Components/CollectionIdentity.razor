@@ -1,0 +1,42 @@
+<div class="collection-identity">
+    @if (IconBadges is not null)
+    {
+        <span class="collection-family-icon"><ResourceIcon IconName="@IconName" Domain="@Domain" /><span class="collection-icon-badges">@IconBadges</span></span>
+    }
+    else { <ResourceIcon IconName="@IconName" Domain="@Domain" /> }
+    @if (Indicators is not null) { <div class="collection-identity-indicators">@Indicators</div> }
+    <div class="collection-identity-text">
+        <div class="collection-name-heading" role="@(HeadingLevel is null ? null : "heading")" aria-level="@HeadingLevel">
+        @if (Href is not null) { <a class="resource-name-link" href="@Href" title="@DisplayName" @attributes="LinkAttributes">@DisplayName</a> }
+        else if (OnOpen.HasDelegate) { <button type="button" class="resource-name-link collection-identity-button" title="@DisplayName" @onclick="OnOpen" @attributes="LinkAttributes">@DisplayName</button> }
+        else { <strong title="@DisplayName">@DisplayName</strong> }
+        @NameSuffix
+        </div>
+        @if (Name is not null)
+        {
+            <div class="collection-qualified-name">@if (ShowNamespaceIcon && Namespace is not null) { <UiIcon Name="folder" /> }<CopyableValue Value="@(Namespace is null ? Name : $"{Namespace}/{Name}")" /></div>
+        }
+        @if (Versions is not null)
+        {
+            <div class="collection-identity-versions">@Versions</div>
+        }
+        @Badges
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public EventCallback OnOpen { get; set; }
+    [Parameter] public int? HeadingLevel { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? LinkAttributes { get; set; }
+    [Parameter] public string IconName { get; set; } = "layers";
+    [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public RenderFragment? Versions { get; set; }
+    [Parameter] public RenderFragment? Badges { get; set; }
+    [Parameter] public bool ShowNamespaceIcon { get; set; }
+    [Parameter] public RenderFragment? Indicators { get; set; }
+    [Parameter] public RenderFragment? NameSuffix { get; set; }
+    [Parameter] public RenderFragment? IconBadges { get; set; }
+}

@@ -58,6 +58,8 @@ public sealed record DataSourceProfileProperties
 
 public sealed record DataSourceProfileResource : Resource
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PublishedVersion { get; init; }
     public DataSourceProfileProperties Definition { get; init; } = null!;
     public string? ActiveVersion { get; init; }
 }
