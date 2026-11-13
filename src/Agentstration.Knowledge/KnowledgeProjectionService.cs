@@ -1,17 +1,17 @@
-using Agentstration.Schemas;
 using System.Collections.Concurrent;
-using System.Threading.Channels;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Channels;
 using Agentstration.Flows;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
-using Agentstration.Storage;
+using Agentstration.Schemas;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage;
 
 namespace Agentstration.Knowledge;
 
@@ -553,7 +553,7 @@ public sealed class KnowledgeProjectionService(
                     Compositions = sequence?.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()
                 }, cancellationToken);
                 if (run.State != KnowledgeProjectionState.Succeeded)
-                    throw Error("knowledge_projection_transformation_failed",
+                    throw Error(run.ErrorCode ?? "knowledge_projection_transformation_failed",
                         $"Transformation for binding '{binding.Name}' failed: {run.ErrorMessage ?? run.State.ToString()}.");
                 var manifest = ParseManifest(run.Output, $"transformation '{binding.Name}'");
                 await InWorkspaceAsync(() => artifactReferences.ValidateAsync(context.WorkspaceId, manifest.Artifacts, cancellationToken));
