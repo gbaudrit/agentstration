@@ -3,7 +3,7 @@
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
-    <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
+    <FormField Label="@T("TransformMapping")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" data-testid="transform-mapping" Disabled="@ReadOnly" Value="@JsonText(Step.Mapping)" ValueChanged="changed => UpdateTransformMappingAsync.InvokeAsync(new ChangeEventArgs { Value = changed })"></ClearableText></ChildContent></FormField>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {

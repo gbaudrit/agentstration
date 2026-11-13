@@ -59,12 +59,12 @@ else
             {
                 <EditForm Model="form" OnValidSubmit="SaveAsync">
                     <DataAnnotationsValidator /><ValidationSummary />
-                    <div class="form-grid">
+                    <FormGrid>
                         <ResourceIdentityFields @bind-DisplayName="form.DisplayName" TechnicalName="@registration.Value.Name" IsNew="false" />
-                        <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" /></label>
-                        <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /></label>
-                        <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-                    </div>
+                        <FormField Label="@T("AepEndpoint")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Endpoint" /></ChildContent></FormField>
+                        <FormField Label="@T("ExpectedExtensionId")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.ExpectedExtensionId" /></ChildContent></FormField>
+                        <label class="checkbox-field"><FormCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
+                    </FormGrid>
                     <div class="panel-actions"><button class="button-primary" type="submit" disabled="@saving">@T("SaveChanges")</button><button class="button-secondary" type="button" @onclick="() => editing = false" disabled="@saving">@T("Cancel")</button></div>
                 </EditForm>
             }
@@ -82,10 +82,16 @@ else
                 @if (item.Connections.Count > 0)
                 {
                     <div class="panel-header"><div><h3>@T("Connections")</h3><p>@T("Connections.Description")</p></div><span>@T("ConnectionCount", item.Connections.Count)</span></div>
-                    <DataGrid TItem="ExtensionInventoryConnectionResponse" Items="item.Connections">
-                        <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Origin")</th><th>@T("Availability")</th></tr></Header>
-                        <Row Context="connection"><tr><td><strong>@connection.DisplayName</strong><br /><code>@connection.RegistrationNamespace/@connection.RegistrationName</code></td><td><a href="@connection.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@connection.Endpoint</a></td><td>@SourceLabel(connection.Source)</td><td><StatusBadge Text="@StatusLabel(connection.AvailabilityStatus)" Status="@ModelManagementUi.Status(connection.AvailabilityStatus)" /></td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="ExtensionInventoryConnectionResponse" Items="item.Connections" InformationLabels="@(new string[] { T("Endpoint"), T("Origin") })" IdentityLabel="@T("Registration")" StateLabel="@T("Availability")">
+        <Identity Context="connection">
+<strong>@connection.DisplayName</strong><br /><code>@connection.RegistrationNamespace/@connection.RegistrationName</code></Identity>
+        <State Context="connection">
+<StatusBadge Text="@StatusLabel(connection.AvailabilityStatus)" Status="@ModelManagementUi.Status(connection.AvailabilityStatus)" /></State>
+        <Information Context="connection">
+            <CollectionValue Label="@T("Endpoint")"><a href="@connection.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@connection.Endpoint</a></CollectionValue>
+            <CollectionValue Label="@T("Origin")">@SourceLabel(connection.Source)</CollectionValue>
+        </Information>
+    </CollectionView>
                 }
                 <div class="panel-actions">
                     @if (CanEditRegistration)
@@ -183,11 +189,17 @@ else
                                     <ul class="resource-links">
                                         @foreach (var tool in tools)
                                         {
-                                            <li>@if (toolState != "Conflict") { <a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a> } else { <code>@tool.Namespace/@tool.Name</code> }</li>
+                                            <li><CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(toolState != "Conflict" ? ToolUrl(tool) : null)" IconName="wrench">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
+                                                <Badges><small>@T("ContributionKind.tool") · @tool.Definition.ExternalId</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                         @foreach (var resource in resources)
                                         {
-                                            <li>@if (ManagedResourceUrl(resource) is { } url) { <a href="@url"><span><strong>@resource.Name</strong><code>@resource.Namespace/@resource.Name</code></span><span class="extension-resource-meta"><span>@ManagedResourceKindLabel(resource.Kind)</span><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></span></a> }</li>
+                                            <li><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@ManagedResourceUrl(resource)" IconName="layers">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                                <Badges><small>@ManagedResourceKindLabel(resource.Kind)</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                     </ul>
                                 </div>
@@ -212,10 +224,12 @@ else
                     var publications = installation.ManagedResources.Where(resource => resource.Published).ToArray();
                     <article class="resource-section extension-bundle-card" data-testid="extension-bundle-installation" data-bundle-id="@installation.BundleId">
                         <div class="extension-bundle-heading">
-                            <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
-                            <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
+                            <CollectionIdentity DisplayName="@installation.BundleId" Name="@installation.BundleId" IconName="layers" HeadingLevel="3">
+                                <IconBadges><ResourceScopeBadge ScopeRef="installation.ScopeRef" IconOnly /><StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" IconOnly /></IconBadges>
+                                <Badges><small>@T("Bundle")</small></Badges>
+                            </CollectionIdentity>
                         </div>
-                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><ResourceScopeBadge ScopeRef="installation.ScopeRef" /><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
+                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
                         @if (installation.ToolBindings.Count > 0)
                         {
                             <div class="extension-bundle-bindings"><p class="field-label">@T("ToolBindings")</p><div class="extension-bundle-binding-list">@foreach (var binding in installation.ToolBindings) { <a href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)" title="@binding.Value.Name">@binding.Key</a> }</div></div>
@@ -223,16 +237,12 @@ else
                         @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
                         @if (resources.Length > 0)
                         {
-                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><DataGrid TItem="ExtensionManagedResourceResponse" Items="resources">
-                                <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
-                                <Row Context="resource"><tr>
-                                    <td data-label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></td>
-                                    <td data-label="@T("Identity")">@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
-                                    <td data-label="@T("Scope")"><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
-                                    <td data-label="@T("Version")"><code>@(resource.Version ?? "—")</code></td>
-                                    <td data-label="@T("State")"><StatusBadge Text="@T("ManagedReadOnly")" Status="UiStatus.Neutral" /></td>
-                                </tr></Row>
-                            </DataGrid></div>
+                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><CollectionView TItem="ExtensionManagedResourceResponse" Items="resources" InformationLabels="@(new string[] { T("Type") })" IdentityLabel="@T("Identity")" ScopeLabel="@T("Scope")" StateLabel="@T("State")">
+        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(resource.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="resource">
+            <CollectionValue Label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></CollectionValue>
+        </Information>
+    </CollectionView></div>
                         }
                         else { <p>@T("NoManagedResources")</p> }
                         <details class="extension-bundle-evidence" data-testid="extension-technical-details"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl>
@@ -242,7 +252,10 @@ else
                                 <ul class="extension-bundle-publications" data-testid="extension-published-versions">
                                     @foreach (var publication in publications)
                                     {
-                                        <li><div><strong>@ManagedResourceKindLabel(publication.Kind)</strong><code>@publication.Namespace/@publication.Name</code></div><div><ResourceScopeBadge ScopeRef="publication.ScopeRef" Compact /><span>@T("Version") <code>@(publication.Version ?? "—")</code></span></div></li>
+                                        <li><CollectionIdentity DisplayName="@ManagedResourceKindLabel(publication.Kind)" Namespace="@publication.Namespace" Name="@publication.Name" IconName="layers">
+                                            <Versions><CollectionVersion Label="@T("Version")" Value="@publication.Version" /></Versions>
+                                            <IconBadges><ResourceScopeBadge ScopeRef="publication.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                        </CollectionIdentity></li>
                                     }
                                 </ul>
                             }
@@ -260,10 +273,15 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("OptionContracts")</p><h2>@T("OptionContracts")</h2><p>@T("OptionContracts.Description")</p></div><span>@T("SetCount", item.Extension?.OptionSets.Count ?? 0)</span></div>
             @if (item.Extension?.OptionSets.Count > 0)
             {
-                <DataGrid TItem="ExtensionOptionSetResponse" Items="item.Extension.OptionSets">
-                    <Header><tr><th>@T("OptionSet")</th><th>@T("Target")</th><th>@T("Preferred")</th><th>@T("SupportedVersions")</th></tr></Header>
-                    <Row Context="optionSet"><tr><td><code>@optionSet.Id</code></td><td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td><td>@optionSet.PreferredVersion</td><td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@JsonSerializer.Serialize(version.Schema, IndentedJsonOptions)</pre></details></div> }</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExtensionOptionSetResponse" Items="item.Extension.OptionSets" InformationLabels="@(new string[] { T("Target"), T("Preferred"), T("SupportedVersions") })" IdentityLabel="@T("OptionSet")">
+        <Identity Context="optionSet">
+<code>@optionSet.Id</code></Identity>
+        <Information Context="optionSet">
+            <CollectionValue Label="@T("Target")">@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</CollectionValue>
+            <CollectionValue Label="@T("Preferred")">@optionSet.PreferredVersion</CollectionValue>
+            <CollectionValue Label="@T("SupportedVersions")">@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@JsonSerializer.Serialize(version.Schema, IndentedJsonOptions)</pre></details></div> }</CollectionValue>
+        </Information>
+    </CollectionView>
             }
             else { <p class="inline-warning">@(item.AvailabilityStatus == "available" ? T("NoVersionedOptionContract") : T("ContractsUnavailable"))</p> }
         </section>
@@ -275,10 +293,16 @@ else
             <div class="panel-header"><div><p class="eyebrow">@T("PersistedUsage")</p><h2>@T("PersistedUsage")</h2><p>@T("PersistedUsage.Description")</p></div><span>@T("ProfileCount", item.Extension?.Usages.Count ?? 0)</span></div>
             @if (item.Extension?.Usages.Count > 0)
             {
-                <DataGrid TItem="ExtensionOptionUsageResponse" Items="item.Extension.Usages">
-                    <Header><tr><th>@T("ModelProfile")</th><th>@T("Contract")</th><th>@T("Status")</th><th>@T("Diagnostics")</th></tr></Header>
-                    <Row Context="usage"><tr><td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td><td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code> }</td><td><StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />@if (MigrationTarget(item.Extension, usage) is { } targetVersion) { <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button> }</td><td>@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExtensionOptionUsageResponse" Items="item.Extension.Usages" InformationLabels="@(new string[] { T("Contract"), T("Diagnostics") })" IdentityLabel="@T("ModelProfile")" StateLabel="@T("Status")">
+        <Identity Context="usage">
+<a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></Identity>
+        <State Context="usage">
+<StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />@if (MigrationTarget(item.Extension, usage) is { } targetVersion) { <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button> }</State>
+        <Information Context="usage">
+            <CollectionValue Label="@T("Contract")">@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code> }</CollectionValue>
+            <CollectionValue Label="@T("Diagnostics")">@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</CollectionValue>
+        </Information>
+    </CollectionView>
             }
             else { <p>@T("NoPersistedUsage")</p> }
         </section>

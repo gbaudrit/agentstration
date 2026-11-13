@@ -1,15 +1,13 @@
 @namespace Agentstration.Web.Components
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
 
-<label>
-    <span>@Localizer["ResourceScope.Label"] <HelpTooltip Text="@Localizer["ResourceScope.Help"]" /></span>
-    <select data-testid="resource-scope-picker" value="@(Value?.Value ?? string.Empty)" @onchange="ChangeAsync" disabled="@Disabled">
+<FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft="true"><ChildContent><ClearableSelect AllowClear="false" TValue="string" data-testid="resource-scope-picker" Value="@Convert.ToString(Value?.Value ?? string.Empty, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" ValueChanged="changed => ChangeAsync(new ChangeEventArgs { Value = changed })">
         @foreach (var target in Targets)
         {
             <option value="@target.ScopeRef.Value" disabled="@(!target.CanWrite)">@Label(target)</option>
         }
-    </select>
-</label>
+    </ClearableSelect>
+</ChildContent></FormField>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ResourceScopeTargetResponse> Targets { get; set; } = [];

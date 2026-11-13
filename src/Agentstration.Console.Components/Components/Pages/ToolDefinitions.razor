@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/definitions"
 @inject IToolDefinitionsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
@@ -13,10 +14,16 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (definitions.Count == 0) { <EmptyState Title="@T("DefinitionsEmptyTitle")" Message="@T("DefinitionsEmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="ToolDefinitionResource" Items="definitions">
-        <Header><tr><th>@T("Tool")</th><th>@T("FlowImplementation")</th><th>@T("Enabled")</th><th>@T("RequiresApproval")</th><th></th></tr></Header>
-        <Row Context="definition"><tr><td><span class="resource-name-with-scope"><strong>@definition.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="definition.ScopeRef" Compact /></span><code>@PublicName(definition)</code></td><td><code>@Flow(definition)</code></td><td>@BooleanLabel(definition.Definition.Enabled)</td><td>@BooleanLabel(definition.Definition.RequiresApproval)</td><td><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView StateLabel="@T("Enabled")" TItem="ToolDefinitionResource" Items="definitions" InformationLabels="@(new string[] { T("FlowImplementation"), T("RequiresApproval") })" IdentityLabel="@T("Tool")">
+        <Identity Context="definition">
+<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@EditUrl(definition)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="definition.ScopeRef" ShowName IconOnly /><StatusBadge Text="@BooleanLabel(definition.Definition.Enabled)" Status="@(definition.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@definition.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(definition.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="definition">
+            <CollectionValue Label="@T("FlowImplementation")"><code>@Flow(definition)</code></CollectionValue>
+            <CollectionValue Label="@T("RequiresApproval")">@BooleanLabel(definition.Definition.RequiresApproval)</CollectionValue>
+        </Information>
+        <Actions Context="definition">
+<CollectionActions ResourceName="@($"{definition.Definition.DisplayName} ({definition.Namespace}/{definition.Name}, {definition.ScopeRef})")"><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -29,5 +36,5 @@ else
     private async Task LoadAsync() { loading=true;error=null;try{definitions=await Client.GetAsync(default);}catch(Exception ex){error=ex.Message;}finally{loading=false;} }
     private static string PublicName(ToolDefinitionResource value) => value.Namespace.IsDefault ? value.Name : $"{value.Namespace.Value}.{value.Name}";
     private static string Flow(ToolDefinitionResource value) => $"{value.Definition.Flow.Namespace ?? value.Namespace}/{value.Definition.Flow.Name}:{(value.Definition.Flow.UseActiveVersion ? "active" : value.Definition.Flow.Version)}";
-    private static string EditUrl(ToolDefinitionResource value) => $"/tools/definitions/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    private string EditUrl(ToolDefinitionResource value) => ResourceOwnershipContext.Resource(Services, "/tools/definitions", value.Name, value.Namespace, value.ScopeRef);
 }

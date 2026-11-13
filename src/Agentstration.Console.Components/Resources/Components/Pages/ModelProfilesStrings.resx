@@ -38,4 +38,7 @@
   <data name="DeleteMessage"><value>Delete model profile '{0}'? This action cannot be undone.</value></data>
   <data name="DeletedNotification"><value>Model profile deleted</value></data>
   <data name="Scope"><value>Scope</value></data>
+<data name="Status.Available" xml:space="preserve"><value>Available</value></data>
+<data name="Status.Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+<data name="Status.Incompatible" xml:space="preserve"><value>Incompatible</value></data>
 </root>

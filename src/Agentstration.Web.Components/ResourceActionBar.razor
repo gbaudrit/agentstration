@@ -1,0 +1,14 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<div class="resource-action-bar" role="group" aria-label="@Shared["ResourceActions"]">
+    @if (Primary is not null) { <div class="resource-action-primary">@Primary</div> }
+    @ChildContent
+    @if (MoreActions is not null)
+    {
+        <details class="resource-more-actions"><summary class="button-secondary">@Shared["MoreActions"]</summary><div class="resource-more-actions-menu">@MoreActions</div></details>
+    }
+</div>
+@code {
+    [Parameter] public RenderFragment? Primary { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? MoreActions { get; set; }
+}

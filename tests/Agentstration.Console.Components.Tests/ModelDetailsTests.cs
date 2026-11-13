@@ -19,7 +19,7 @@ public sealed class ModelDetailsTests
     public async Task PageShowsFriendlyEffectiveSummaryAndCanonicalObservedYaml()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var models = new FakeModelsClient(ModelObservationState.Available);
         var providers = new FakeProvidersClient(includeEffectiveModel: true);
@@ -48,12 +48,12 @@ public sealed class ModelDetailsTests
 
         var yaml = rendered.Find("[data-testid='model-yaml'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
-        Assert.IsTrue(yaml.TextContent.Contains($"name: {FakeModelsClient.ResourceName}", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("externalId: gpt-5", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("support: unknown", StringComparison.Ordinal));
-        Assert.IsTrue(yaml.TextContent.Contains("maxOutputTokens: 16000", StringComparison.Ordinal));
-        Assert.IsFalse(yaml.TextContent.Contains("maxOutputTokens: 8000", StringComparison.Ordinal));
-        Assert.IsFalse(yaml.TextContent.Contains("specificationOverride", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains($"name: {FakeModelsClient.ResourceName}", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("externalId: gpt-5", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("support: unknown", StringComparison.Ordinal));
+        Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("maxOutputTokens: 16000", StringComparison.Ordinal));
+        Assert.IsFalse((yaml.GetAttribute("value") ?? string.Empty).Contains("maxOutputTokens: 8000", StringComparison.Ordinal));
+        Assert.IsFalse((yaml.GetAttribute("value") ?? string.Empty).Contains("specificationOverride", StringComparison.Ordinal));
 
         await rendered.Find("[data-testid='copy-model-yaml']").ClickAsync(new());
 
@@ -66,7 +66,7 @@ public sealed class ModelDetailsTests
     public void DisappearedModelRemainsInspectableWithActionableExplanation()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Missing));
         context.Services.AddSingleton<IModelProvidersClient>(new FakeProvidersClient(includeEffectiveModel: false));
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -85,7 +85,7 @@ public sealed class ModelDetailsTests
     public async Task OverrideEditorAddsExactModelOverrideAndPreservesProviderState()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var providers = new FakeProvidersClient(includeEffectiveModel: true, includeOverride: false);
         context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
         context.Services.AddSingleton<IModelProvidersClient>(providers);
@@ -121,7 +121,7 @@ public sealed class ModelDetailsTests
     public async Task AvailableDetailAutomaticallyEnablesUnknownParentSupport()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var providers = new FakeProvidersClient(includeEffectiveModel: true, includeOverride: false, toolsUnknown: true);
         context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available, toolsUnknown: true));
         context.Services.AddSingleton<IModelProvidersClient>(providers);
@@ -151,7 +151,7 @@ public sealed class ModelDetailsTests
     public async Task OverrideEditorRemovesOnlyExactModelOverride()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var providers = new FakeProvidersClient(includeEffectiveModel: true);
         context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
         context.Services.AddSingleton<IModelProvidersClient>(providers);
@@ -174,7 +174,7 @@ public sealed class ModelDetailsTests
     public async Task OverrideEditorSurfacesConcurrencyConflictWithoutOverwritingProvider()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var providers = new FakeProvidersClient(includeEffectiveModel: true) { FailWithConcurrency = true };
         context.Services.AddSingleton<IModelsClient>(new FakeModelsClient(ModelObservationState.Available));
         context.Services.AddSingleton<IModelProvidersClient>(providers);
@@ -197,7 +197,7 @@ public sealed class ModelDetailsTests
     public void FrenchCatalogKeepsEquivalentModelDetailMeaning()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var localizer = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings>>();
 

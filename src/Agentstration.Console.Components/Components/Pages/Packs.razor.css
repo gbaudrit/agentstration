@@ -13,7 +13,9 @@
 .pack-source-heading .text-button { flex: 0 0 auto; }
 .pack-source-provenance .pack-facts { margin-top: 0; }
 .pack-resource-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.pack-resource-list article { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pack-resource-list article { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pack-resource-list article ::deep > .collection-identity { flex: 1 1 16rem; min-width: 0; }
+.pack-resource-list article ::deep > .collection-action-group { flex: 0 0 auto; margin-left: auto; }
 .pack-resource-list article > div { min-width: 0; flex: 1; }
 .pack-resource-list strong, .pack-resource-list small { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pack-resource-list small { margin-top: 3px; color: var(--muted); }
@@ -37,7 +39,7 @@
 .pack-binding-editor p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
 .pack-binding-editor label { display: grid; gap: 6px; }
 .pack-binding-editor label > span { color: var(--muted); font-size: .72rem; font-weight: 700; }
-.pack-binding-editor select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); }
+.pack-binding-editor ::deep select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); }
 .pack-binding-copy { display: flex; align-items: center; gap: 10px; }
 .pack-binding-copy > div { min-width: 0; }
 .pack-binding-copy strong, .pack-binding-copy small { display: block; }
@@ -49,7 +51,7 @@
 .pack-source-recovery p { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
 .pack-source-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: #fff; font-weight: 800; }
 .pack-source-picker { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 14px; border: 1px dashed var(--primary); border-radius: 8px; background: var(--surface); color: var(--primary); font-size: .8rem; font-weight: 700; cursor: pointer; }
-.pack-source-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.pack-source-picker ::deep input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .pack-success { margin: 16px 0 0; padding: 10px 12px; border-radius: 8px; background: rgba(31,168,104,.12); color: #1b9560; font-size: .8rem; }
 @media (max-width: 820px) { .pack-metrics { grid-template-columns: repeat(3, minmax(140px, 1fr)); } }
 @media (max-width: 620px) { .pack-metrics { grid-template-columns: 1fr; } .pack-detail-actions { align-items: flex-end; flex-direction: column; } .pack-facts { grid-template-columns: 1fr; } .pack-facts dd { margin-bottom: 8px; } .pack-source-heading { align-items: flex-start; flex-direction: column; } }

@@ -19,7 +19,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
 
@@ -34,7 +34,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -53,7 +53,7 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
         var reopened = context.Render<VaultEditor>(parameters => parameters
             .Add(component => component.Name, "shared"));
-        reopened.WaitForAssertion(() => Assert.AreEqual("Default", reopened.Find(".grant-target-identity strong").TextContent));
+        reopened.WaitForAssertion(() => Assert.AreEqual("Default", reopened.Find(".grant-target-identity .disclosure-trigger").TextContent));
     }
 
     [TestMethod]
@@ -62,7 +62,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -83,7 +83,7 @@ public sealed class VaultGrantPersistenceTests
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, workspace);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISecretsClient>(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
@@ -98,8 +98,88 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
     }
 
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ClearingSecretKeyMarksMetadataDirtyAndRequiredValidationPreventsSave(string locale)
+    {
+        using var culture = new TestCultureScope(locale);
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        var editor = context.Render<SecretEditor>(parameters => parameters.Add(component => component.Name, "credential"));
+        var input = editor.WaitForElement("[data-testid='secret-vault-key']");
+        var field = input.Closest(".form-field")!;
+        Assert.AreEqual(input.Id, field.QuerySelector("label")!.GetAttribute("for"));
+        Assert.IsTrue(input.GetAttribute("aria-describedby")!.Contains("-help", StringComparison.Ordinal));
+        field.QuerySelector("button.field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("[data-testid='secret-vault-key']").GetAttribute("value"));
+        Assert.HasCount(1, editor.FindAll(".unsaved-changes-bar"));
+        editor.Find("form").Submit();
+
+        Assert.AreEqual(0, client.SecretMetadataSaves);
+        Assert.AreEqual("credential", client.SavedSecret.Definition.Key);
+        Assert.HasCount(1, editor.FindAll(".validation-errors li"));
+        editor.Find(".unsaved-changes-bar .button-secondary").Click();
+        editor.WaitForAssertion(() => Assert.AreEqual("credential", editor.Find("[data-testid='secret-vault-key']").GetAttribute("value")));
+        Assert.IsEmpty(editor.FindAll(".unsaved-changes-bar"));
+        Assert.IsEmpty(editor.FindAll(".validation-errors li"));
+    }
+
+    [TestMethod]
+    public void ClearingWriteOnlyReplacementDisablesItsSaveWithoutDeletingStoredValue()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid())) { ValueConfigured = true };
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        var editor = context.Render<SecretEditor>(parameters => parameters.Add(component => component.Name, "credential"));
+        editor.WaitForElement("section.resource-section .button-primary").Click();
+        editor.Find("input[type='password']").Input("unsaved-replacement");
+        editor.Find("input[type='password']").Closest(".form-field")!.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("input[type='password']").GetAttribute("value"));
+        Assert.IsTrue(editor.Find("section.resource-section .button-primary").HasAttribute("disabled"));
+        Assert.AreEqual(0, client.ValueWrites);
+        Assert.AreEqual(0, client.ValueDeletes);
+        Assert.AreEqual(0, client.SecretMetadataSaves);
+    }
+
+    [TestMethod]
+    public void ClearingVaultDisplayNameMarksDraftDirtyAndDiscardRestoresItsIdentity()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        var editor = context.Render<VaultEditor>(parameters => parameters.Add(component => component.Name, "shared"));
+        editor.WaitForElement("[data-testid='vault-display-name']").Closest(".form-field")!.QuerySelector(".field-clear")!.Click();
+        Assert.HasCount(1, editor.FindAll(".unsaved-changes-bar"));
+        editor.Find("form").Submit();
+        Assert.AreEqual("Shared", client.Saved.Definition.DisplayName);
+        editor.Find(".unsaved-changes-bar .button-secondary").Click();
+        editor.WaitForAssertion(() => Assert.AreEqual("Shared", editor.Find("[data-testid='vault-display-name']").GetAttribute("value")));
+        Assert.AreEqual("shared", editor.Find("[data-testid='vault-name']").GetAttribute("value"));
+        Assert.IsEmpty(editor.FindAll(".unsaved-changes-bar"));
+    }
+
     private sealed class StubSecretsClient(ResourceScopeRef tenant, ResourceScopeRef workspace) : ISecretsClient
     {
+        public bool ValueConfigured { get; init; }
+        public int SecretMetadataSaves { get; private set; }
+        public int ValueWrites { get; private set; }
+        public int ValueDeletes { get; private set; }
         public ResourceScopeRef? LastVaultConsumerScope { get; private set; }
         public VaultResource Saved { get; private set; } = new()
         {
@@ -145,16 +225,19 @@ public sealed class VaultGrantPersistenceTests
         public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>
-            Task.FromResult(new ResourceSnapshot<SecretResponse>(new(SavedSecret, "Missing", false), "\"1\""));
+            Task.FromResult(new ResourceSnapshot<SecretResponse>(new(SavedSecret, ValueConfigured ? "Configured" : "Missing", ValueConfigured), "\"1\""));
         public Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResource>> UpdateSecretAsync(string name, PutSecretRequest request, string etag, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResource>> UpdateSecretAsync(string name, ResourceScopeRef scopeRef, PutSecretRequest request, string etag, CancellationToken token)
         {
+            SecretMetadataSaves++;
             SavedSecret = SavedSecret with { Definition = request.Properties };
             return Task.FromResult(new ResourceSnapshot<SecretResource>(SavedSecret, "\"2\""));
         }
-        public Task SetSecretValueAsync(string name, string value, CancellationToken token) => throw new NotSupportedException();
-        public Task DeleteSecretValueAsync(string name, CancellationToken token) => throw new NotSupportedException();
+        public Task SetSecretValueAsync(string name, string value, CancellationToken token) { ValueWrites++; return Task.CompletedTask; }
+        public Task SetSecretValueAsync(string name, ResourceScopeRef scopeRef, string value, CancellationToken token) { ValueWrites++; return Task.CompletedTask; }
+        public Task DeleteSecretValueAsync(string name, CancellationToken token) { ValueDeletes++; return Task.CompletedTask; }
+        public Task DeleteSecretValueAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) { ValueDeletes++; return Task.CompletedTask; }
         public Task DeleteSecretAsync(string name, string etag, CancellationToken token) => throw new NotSupportedException();
         public Task<SecretUsagesResponse> GetSecretUsagesAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<SecretUsagesResponse> GetSecretUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>

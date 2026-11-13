@@ -10,9 +10,11 @@
 @inject IToolSetsClient ToolSetsClient
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
+<UnsavedNavigationGuard IsDirty="@isDirty" HasUnsavedChanges="@(() => isDirty)" />
 <PageTitle>@(IsNew ? T("CreateAgent") : Name) · Agentstration</PageTitle>
 
 @if (IsNew)
@@ -30,72 +32,101 @@ else
 {
     @if (!IsNew)
     {
-        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
+        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" TechnicalName="@model.Name" Namespace="@AgentResourceNamespace.Value" Name="@(savedResource?.Definition.DisplayName ?? model.DisplayName)" Description="@(savedResource?.Definition.Description ?? model.Description)" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
+            <Metadata><ResourceScopeBadge ScopeRef="selectedScope" Compact /><span>@T("Generation", generation)</span></Metadata>
+            <PrimaryActions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }</PrimaryActions>
+            <Actions>@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)" title="@(isDirty ? T("SaveBeforeApply") : null)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
         </ResourceHeader>
         @if (selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span>@if (CanManage) { <button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button> }<button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
-        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
-                <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
-        </StateComparison>
-        @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
-        {
-            <section class="panel form-section" data-testid="agent-active-toolsets">
-                <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
-                <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
-                @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
-                {
-                    <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
-                }
-                </tbody></table></div>
-            </section>
-        }
+        <ResourcePageTabs Items="PageTabs" Value="@CurrentPage" ValueChanged="SelectPage" PanelId="agent-page-panel" IdPrefix="agent-page" Label="@T("AgentSections")" />
+
     }
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToApply")</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
     }
-    @if (!string.IsNullOrWhiteSpace(successMessage))
+    <PageNotification Message="@successMessage" OnDismiss="() => successMessage = null" />
+    @if (!IsNew && !overviewMode && !accessMode && !IsStateSynchronized && !isDirty)
     {
-        <div class="form-alert form-alert-success" role="status">@successMessage</div>
+        <div class="form-alert form-alert-warning" role="status">@T("CurrentGenerationNotActive")</div>
+    }
+    @if (HasRawDraft && !sourceMode)
+    {
+        <div class="form-alert form-alert-warning" role="status"><span>@Shared["YamlConflict"]</span><button class="text-button" type="button" @onclick="ShowSource">@T("Yaml")</button><button class="text-button" type="button" @onclick="DiscardRawDraft">@Shared["DiscardYaml"]</button></div>
     }
     @if (IsNew)
     {
         <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
     }
 
-    @if (CanManage && accessMode && selectedScope is { } ownerScope)
+    <div id="agent-page-panel" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? "agent-page-" + CurrentPage : null)">
+    @if (!IsNew && overviewMode && savedResource is not null)
+    {
+        <div class="resource-overview" data-testid="agent-overview">
+        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" RuntimeUrl="@ActiveRuntimeUrl" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
+                <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
+        </StateComparison>
+        @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
+        {
+            <FormSection Title="@T("PinnedToolSetAssignments")" Eyebrow="@T("ActiveRevision")" Description="@T("PinnedToolSetAssignmentsHelp")" TestId="agent-active-toolsets"><Actions><code>@activeRevision.Metadata.Name</code></Actions><ChildContent>
+                <CollectionView TItem="ResolvedAgentToolSetAssignment" Items="activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal).ToArray()" InformationLabels="@(new[] { T("DefinitionHash"), T("EffectiveMembers") })">
+                    <Identity Context="assignment"><CollectionIdentity DisplayName="@assignment.ToolSetName" Namespace="@assignment.ToolSetNamespace.Value" Name="@assignment.ToolSetName" Href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(assignment.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="assignment.ToolSetScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(assignment.ToolSetScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+                    <Information Context="assignment"><CollectionValue Label="@T("DefinitionHash")"><code>@assignment.DefinitionHash</code></CollectionValue><CollectionValue Label="@T("EffectiveMembers")">@string.Join(", ", assignment.Members)</CollectionValue></Information>
+                    <Actions Context="assignment"><CollectionActions ResourceName="@assignment.ToolSetName"><a href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)">@T("InspectToolSet")</a></CollectionActions></Actions>
+                </CollectionView>
+            </ChildContent></FormSection>
+        }
+        <FormSection Title="@T("Behavior")"><dl class="resource-details">
+            <dt>@T("Handler")</dt><dd>@savedResource.Definition.Handler</dd>
+            <dt>@T("Instructions")</dt><dd class="resource-text">@savedResource.Definition.Instructions</dd>
+        </dl></FormSection>
+            <FormSection Title="@T("DeclaredAndResolved")"><Actions>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</Actions><ChildContent>
+                <div class="declaration-resolution-grid">
+                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@if (agentModel is not null) { <a class="resource-name-link" href="@ProfileUrl(agentModel)">@(agentModel.Declared.ModelProfile.DisplayName ?? savedResource.Definition.ModelProfile.Name)</a> } else { @savedResource.Definition.ModelProfile.Name }</dd><dt>@T("Name")</dt><dd><code>@savedResource.Definition.ModelProfile.Name</code></dd></dl></article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@if (agentModel.Resolved.Provider is { } provider) { <a class="resource-name-link" href="@ProviderUrl(agentModel)">@(provider.DisplayName ?? provider.Name)</a> } else { @T("NotResolved") }</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>}</article>
+                </div>
+            </ChildContent></FormSection>
+
+        <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
+        </div>
+    }
+    else if (CanManage && accessMode && selectedScope is { } ownerScope)
     {
         <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="AgentResourceNamespace" Kind="@AgentResourceKinds.Agent" Name="@model.Name" Generation="generation" Governance="governance" />
     }
     else if (sourceMode)
     {
-        <section class="panel form-section" data-testid="agent-yaml-editor">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
+        <FormSection Title="@T("AgentYaml")" Eyebrow="@T("RawResource")" Description="@T("AgentYamlHelp")" TestId="agent-yaml-editor"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
-            @if (CanManage) { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div> }
-        </section>
+            @if (invalidInput || rawUsesSavedDefinition)
+            {
+                <div class="form-alert form-alert-info" role="status" data-testid="agent-yaml-form-warning"><span>@T("YamlFormInvalid")</span><button type="button" class="text-button" @onclick="ShowDefinition">@Shared["Edit"]</button></div>
+            }
+            <FormField Label="@T("ResourceManifest")" Class="agent-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="28" @bind-Value="rawYaml" ReadOnly="@(!CanEditRaw)" Disabled="@saving"></ClearableText></ChildContent></FormField>
+            @if (CanManage) { <FormActions Busy="@saving"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@(saving || !CanEditRaw)">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(saving || !CanEditRaw)">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></FormActions> }
+        </ChildContent></FormSection>
 
     }
-    else
+    @if (definitionVisited || toolsVisited || contractsVisited)
     {
-    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
-        <DataAnnotationsValidator />
+    <div class="resource-editor-view" hidden="@(overviewMode || sourceMode || accessMode)">
+    <EditForm @key="model" Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
+        <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         <ValidationSummary />
-        <fieldset class="resource-definition-fields" disabled="@(!CanManage)" data-testid="agent-definition-fields">
+        <fieldset class="resource-definition-fields" disabled="@(!CanManage || saving || HasRawDraft)" data-testid="agent-definition-fields">
 
-        @if (toolsMode)
+        @if (toolsVisited)
         {
+            <div class="resource-editor-view" hidden="@(!toolsMode)">
             <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
             <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
+            </div>
         }
-        else if (contractsMode)
+        @if (contractsVisited)
         {
-            <section class="panel form-section" data-testid="agent-contracts-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+            <div class="resource-editor-view" hidden="@(!contractsMode)">
+            <FormSection Title="@T("InvocationContracts")" Eyebrow="@T("Contracts")" Description="@T("InvocationContractsHelp")" TestId="agent-contracts-section"><ChildContent>
                 <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
                     OutputLabel="@T("OutputContract")" TestId="agent-contract">
                     <InputContent>
@@ -107,75 +138,76 @@ else
                             Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
                     </OutputContent>
                 </ContractDirectionTabs>
-            </section>
-        }
-        else
-        {
-        <section class="panel form-section" id="definition" data-testid="agent-identity-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
-            <div class="form-grid">
-                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
-                <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" data-testid="agent-handler" /><ValidationMessage For="() => model.Handler" /></label>
-                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
+            </ChildContent></FormSection>
             </div>
+        }
+        @if (definitionVisited)
+        {
+        <div class="resource-editor-view" hidden="@(toolsMode || contractsMode)">
+        <section class="panel form-section" id="definition" data-testid="agent-identity-section">
+            <div class="panel-header"><h2>@T("Identity")</h2></div>
+            <FormGrid>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
+                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
+                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="agent-description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
+            </FormGrid>
             @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
         </section>
 
         <section class="panel form-section" data-testid="agent-behavior-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="agent-description" /></label>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
-                <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /><ValidationMessage For="() => model.Instructions" /></label>
-            </div>
+            <div class="panel-header"><h2>@T("Behavior")</h2></div>
+            <FormGrid>
+                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
+            </FormGrid>
         </section>
 
-        @if (!IsNew)
-        {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
-                <div class="declaration-resolution-grid">
-                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>@T("Name")</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
-                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
-                </div>
-            </section>
-        }
+        <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+        </FormSection>
+        <FormSection Title="@T("Execution")" TestId="agent-runtime-section">
+                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
+        </FormSection>
 
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("Tags")</h2></div></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>
-            </div>
-        </section>
+        <FormSection Title="@T("Tags")" TestId="agent-labels-section">
+            <LabelsEditor @bind-Value="model.Tags" />
+        </FormSection>
+        </div>
         }
 
         </fieldset>
         @if (CanManage && IsNew)
         {
-            <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
+            <FormActions Busy="@saving"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></FormActions>
         }
         else if (CanManage)
         {
             <UnsavedChangesBar IsVisible="@isDirty">
-                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
+                <Actions><button class="text-button" type="button" data-testid="agent-discard" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
             </UnsavedChangesBar>
         }
     </EditForm>
+    </div>
     }
+    </div>
 }
 
 @code {
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "context")] public string? ContextScopeRef { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
 
     private readonly CancellationTokenSource cancellation = new();
+    private string? loadedKey;
     private AgentEditorModel? model;
+    private AgentResource? savedResource;
+    private bool overviewMode;
+    private bool definitionVisited, toolsVisited, contractsVisited;
     private IReadOnlyList<ToolResource> catalogTools = [];
     private IReadOnlyList<ToolProviderResource> catalogProviders = [];
     private IReadOnlyList<ToolCategoryResource> catalogCategories = [];
@@ -196,7 +228,22 @@ else
     private long generation;
     private bool loading = true;
     private bool saving;
-    private bool isDirty;
+    private bool invalidInput;
+    private string savedFingerprint = string.Empty;
+    private string rawBaseline = string.Empty;
+    private string rawModelFingerprint = string.Empty;
+    private bool rawInitialized;
+    private bool rawUsesSavedDefinition;
+    private bool CanEditRaw => CanManage && !invalidInput && !rawUsesSavedDefinition;
+    private bool HasRawDraft => rawInitialized && rawYaml != rawBaseline;
+    private void ScopeChanged(ResourceScopeRef? value)
+    {
+        var initializing = IsNew && selectedScope is null && Fingerprint == savedFingerprint;
+        selectedScope = value;
+        if (initializing) savedFingerprint = Fingerprint;
+    }
+    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
+    private bool isDirty => model is not null && CanManage && (Fingerprint != savedFingerprint || HasRawDraft || invalidInput);
     private bool applyRuntimeOnSubmit = true;
     private bool sourceMode;
     private bool toolsMode;
@@ -225,14 +272,21 @@ else
         _ => T("NotDeployed")
     };
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
+    private string? ActiveRuntimeUrl => activeRevision is null ? null : ConsoleResourceUrls.RuntimeProfile(ResourceAddress.Create(
+        activeRevision.Definition.RuntimeProfileNamespace,
+        RuntimeProfileResourceKinds.RuntimeProfile, activeRevision.Definition.RuntimeProfileName));
     private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
     private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
-    private string RuntimeProfileValue => model is null ? string.Empty :
+    private string RuntimeProfileValue => model is null || string.IsNullOrWhiteSpace(model.RuntimeProfileName) ? string.Empty :
         $"{model.RuntimeProfileScopeRef?.Value ?? string.Empty}|{model.RuntimeProfileNamespace}|{model.RuntimeProfileName}";
     private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
     protected override async Task OnParametersSetAsync()
     {
+        var contextScope = ContextScopeRef ?? ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? ScopeRefValue;
+        var key = $"{AgentResourceNamespace.Value}|{Name}|{ScopeRefValue ?? contextScope}|{contextScope}";
+        if (loadedKey == key) return;
+        loadedKey = key;
         loading = true;
         errorMessage = null;
         try
@@ -270,6 +324,7 @@ else
                     Navigation.NavigateTo(ConsoleResourceUrls.Agent(AgentResourceNamespace, Name!, snapshot.Value.ScopeRef), replace: true);
                     return;
                 }
+                savedResource = snapshot.Value;
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 selectedScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
@@ -280,7 +335,10 @@ else
                 await LoadAgentModelAsync(Name!);
                 await LoadReadinessAsync(Name!, generation);
             }
-            isDirty = false;
+            savedFingerprint = Fingerprint;
+            rawInitialized = false;
+            overviewMode = !IsNew;
+            definitionVisited = IsNew; toolsVisited = false; contractsVisited = false; invalidInput = false;
         }
         catch (AgentstrationApiException exception)
         {
@@ -300,33 +358,69 @@ else
 
     private Task ModelProfileChanged(string value)
     {
-        if (model is not null) { model.ModelProfileName = value; isDirty = true; }
+        if (model is not null) { model.ModelProfileName = value;  }
         return Task.CompletedTask;
     }
 
     private Task ModelProfileSelectionChanged(ModelProfileSummaryResponse? profile)
     {
-        if (model is not null && profile is not null && model.SelectModelProfile(profile)) isDirty = true;
+        if (model is not null && profile is not null) model.SelectModelProfile(profile);
         return Task.CompletedTask;
     }
 
-    private void MarkDirty(EventArgs _) { if (CanManage) isDirty = true; }
-    private void ShowDefinition() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, false);
-    private void ShowContracts() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, true, false);
-    private void ShowTools() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, true, false, false);
-    private void ShowAccess() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, true);
+    private void MarkDirty(EventArgs _) { }
+    private string CurrentPage => overviewMode ? "overview" : sourceMode ? "yaml" : toolsMode ? "tools" : contractsMode ? "contracts" : accessMode ? "access" : "edit";
+    private IReadOnlyList<ResourcePageTab> PageTabs => new ResourcePageTab[] {
+        new("overview", Shared["Overview"], "agent-overview-tab"),
+        new("edit", Shared["Edit"], "agent-edit-tab"),
+        new("contracts", T("Contracts"), "agent-contracts-tab"),
+        new("tools", T("Tools"), "agent-tools-tab")
+    }.Concat(CanManage ? new[] { new ResourcePageTab("access", T("Access"), "agent-access-tab") } : []).Append(new("yaml", T("Yaml"), "agent-source-tab")).ToArray();
+    private void SelectPage(string page)
+    {
+        switch (page) { case "overview": overviewMode = true; sourceMode = toolsMode = contractsMode = accessMode = false; break; case "yaml": ShowSource(); break; case "tools": ShowTools(); break; case "contracts": ShowContracts(); break; case "access": ShowAccess(); break; default: ShowDefinition(); break; }
+    }
+    private void ShowDefinition() { definitionVisited = true; overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, false); }
+    private void ShowContracts() { contractsVisited = true; overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, true, false); }
+    private void ShowTools() { toolsVisited = true; overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, true, false, false); }
+    private void ShowAccess() { overviewMode = false; (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, true); }
+    private AgentResourceRequest SavedRequest() => new()
+    {
+        ApiVersion = savedResource!.ApiVersion, Kind = savedResource.Kind,
+        Metadata = savedResource.Metadata, Definition = savedResource.Definition, ScopeRef = savedResource.ScopeRef
+    };
+    private void InitializeRawYaml(AgentResourceRequest request, bool savedDefinition)
+    {
+        rawYaml = ResourceManifestSerializer.ToYaml(request);
+        rawBaseline = rawYaml;
+        rawModelFingerprint = Fingerprint;
+        rawInitialized = true;
+        rawUsesSavedDefinition = savedDefinition;
+    }
     private void ShowSource()
     {
+        overviewMode = false;
         if (model is null) return;
         rawError = null;
-        try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
-        catch (Exception exception) { rawError = exception.Message; }
+        try
+        {
+            if (!rawInitialized || !HasRawDraft && (rawModelFingerprint != Fingerprint || rawUsesSavedDefinition != invalidInput))
+            {
+                if (invalidInput && savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+                else InitializeRawYaml(model.ToRequest(), false);
+            }
+        }
+        catch (ArgumentException)
+        {
+            if (savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+            else rawError = T("YamlNeedsValidForm");
+        }
         (sourceMode, toolsMode, contractsMode, accessMode) = (true, false, false, false);
     }
 
     private bool ApplyRawYaml()
     {
-        if (!CanManage || model is null) return false;
+        if (!CanEditRaw || model is null) return false;
         rawError = null;
         try
         {
@@ -335,10 +429,12 @@ else
             if (!string.Equals(request.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", AgentResourceKinds.Agent));
             if (request.Metadata.Namespace != AgentResourceNamespace) throw new ArgumentException(T("AgentNamespaceImmutable"));
             if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
-            model = AgentEditorModel.FromRequest(request);
-            _ = model.ToRequest();
+            var parsedModel = AgentEditorModel.FromRequest(request);
+            _ = parsedModel.ToRequest();
+            model = parsedModel;
             rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
-            isDirty = true;
+            rawBaseline = rawYaml;
+            rawModelFingerprint = Fingerprint;
             successMessage = T("YamlApplied");
             return true;
         }
@@ -411,7 +507,7 @@ else
         if (model is not null)
         {
             model.ToolNames = string.Join(Environment.NewLine, values);
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -420,7 +516,7 @@ else
         if (model is not null)
         {
             model.ToolSets = values;
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -430,7 +526,7 @@ else
         {
             model.InputSchemaBinding = value.Binding;
             model.InputSchema = value.EffectiveContent?.Clone();
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -440,7 +536,7 @@ else
         {
             model.OutputSchemaBinding = value.Binding;
             model.OutputSchema = value.EffectiveContent?.Clone();
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -451,7 +547,15 @@ else
         await Task.WhenAll(tasks);
         return tasks.SelectMany(task => task.Result).ToArray();
     }
-    private Task DiscardAsync() => OnParametersSetAsync();
+    private void DiscardAsync()
+    {
+        if (saving || savedResource is null) return;
+        model = AgentEditorModel.FromResource(savedResource);
+        selectedScope = savedResource.ScopeRef;
+        rawInitialized = rawUsesSavedDefinition = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
+        invalidInput = false; savedFingerprint = Fingerprint;
+    }
+    private void DiscardRawDraft() { rawInitialized = false; ShowSource(); }
 
     private static string ResourceName(string name) => name;
     private static string ProfileUrl(AgentModelResponse value)
@@ -462,12 +566,13 @@ else
     private void RuntimeProfileChanged(ChangeEventArgs args)
     {
         if (!CanManage || model is null) return;
+        if (string.IsNullOrEmpty(args.Value?.ToString())) { model.RuntimeProfileName = string.Empty; model.RuntimeProfileScopeRef = null; return; }
         var parts = args.Value?.ToString()?.Split('|', 3);
         if (parts is not { Length: 3 }) return;
         model.RuntimeProfileScopeRef = string.IsNullOrWhiteSpace(parts[0]) ? null : ResourceScopeRef.Parse(parts[0]);
         model.RuntimeProfileNamespace = parts[1];
         model.RuntimeProfileName = parts[2];
-        isDirty = true;
+
     }
 
     private static string RuntimeProfileValueFor(RuntimeProfileSummaryResponse profile) =>
@@ -507,7 +612,8 @@ else
 
     private async Task SaveAsync(bool applyRuntime)
     {
-        if (!CanManage || model is null) return;
+        if (!CanManage || model is null || saving) return;
+        if (HasRawDraft) { ShowSource(); return; }
         saving = true;
         errorMessage = null;
         errorId = null;
@@ -522,8 +628,12 @@ else
             generation = snapshot.Value.Generation;
             governance = snapshot.Value.Governance;
             provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
+            selectedScope = snapshot.Value.ScopeRef;
+            successMessage = T("GenerationSavedWithoutDeployment", generation);
+            savedResource = snapshot.Value;
             model = AgentEditorModel.FromResource(snapshot.Value);
-            isDirty = false;
+            savedFingerprint = Fingerprint;
+            rawInitialized = false;
             if (applyRuntime)
             {
                 var activation = snapshot.Value.ScopeRef is { } scopeRef

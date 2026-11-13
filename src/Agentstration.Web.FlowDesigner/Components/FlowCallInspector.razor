@@ -13,7 +13,7 @@
                     <a class="inspector-resource-link" href="@FlowUrl(selectedFlow)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
                 }
             </div>
-            <input id="flow-call-reference" data-testid="flow-call-reference" disabled="@ReadOnly" list="flow-targets" value="@SelectionValue" @onchange="UpdateFlowTargetAsync" />
+            <ClearableText UpdateOnInput="false" id="flow-call-reference" data-testid="flow-call-reference" Disabled="@ReadOnly" list="flow-targets" Value="@SelectionValue" ValueChanged="changed => UpdateFlowTargetAsync.InvokeAsync(new ChangeEventArgs { Value = changed })" />
             <datalist id="flow-targets">
                 @if (SelectedFlow is null)
                 {
@@ -30,15 +30,15 @@
             <p class="inspector-resource-id">@T("FlowId") <code>@referencedFlow.Name</code></p>
         }
     </div>
-    <label>@T("VersionStrategy")<select data-testid="flow-call-version-strategy" disabled="@ReadOnly" value="@Step.Flow.VersionStrategy" @onchange="UpdateFlowVersionStrategyAsync">
+    <FormField Label="@T("VersionStrategy")"><ChildContent><ClearableSelect TValue="string" data-testid="flow-call-version-strategy" disabled="@ReadOnly" Value="@Convert.ToString(Step.Flow.VersionStrategy, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateFlowVersionStrategyAsync.InvokeAsync(new ChangeEventArgs { Value = changed })">
             <option value="@FlowCallVersionStrategy.Active">@T("VersionStrategy.Active")</option>
             <option value="@FlowCallVersionStrategy.Exact">@T("VersionStrategy.Exact")</option>
-    </select></label>
+    </ClearableSelect></ChildContent></FormField>
     @if (Step.Flow.VersionStrategy == FlowCallVersionStrategy.Exact)
     {
-        <label>@T("ExactVersion")<select data-testid="flow-call-exact-version" disabled="@ReadOnly" value="@Step.Flow.Version" @onchange="UpdateFlowExactVersionAsync">
+        <FormField Label="@T("ExactVersion")"><ChildContent><ClearableSelect TValue="string" data-testid="flow-call-exact-version" disabled="@ReadOnly" Value="@Convert.ToString(Step.Flow.Version, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateFlowExactVersionAsync.InvokeAsync(new ChangeEventArgs { Value = changed })">
                 @foreach (var version in FlowVersions) { <option value="@version.Version">@version.Version</option> }
-        </select></label>
+        </ClearableSelect></ChildContent></FormField>
     }
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
@@ -85,7 +85,7 @@
                 </aside>
             }
             <fieldset class="flow-mapping-editor"><legend>@T("InputMapping")</legend>
-                <label class="flow-checkbox-field"><input data-testid="flow-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(Step.InputMapping)" @onchange="UpdateFlowTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                <label class="flow-checkbox-field"><FormCheckbox data-testid="flow-pass-transition-output" disabled="@ReadOnly" Value="@PassesIncomingTransitionOutput(Step.InputMapping)" ValueChanged="changed => UpdateFlowTransitionPassthroughAsync.InvokeAsync(new ChangeEventArgs { Value = changed })" />@T("PassIncomingTransitionOutput")</label>
                 <small>@T("PassIncomingTransitionOutputHelp")</small>
                 @if (!PassesIncomingTransitionOutput(Step.InputMapping)
                 && SelectedFlowVersion.InputSchema is { ValueKind: JsonValueKind.Object } inputSchema
@@ -95,7 +95,7 @@
                     @foreach (var property in inputProperties.EnumerateObject())
                     {
                         var propertyName = property.Name;
-                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(Step.InputMapping, propertyName)" @onchange="e => UpdateFlowMappingAsync(propertyName, e)" /></label>
+                        <FormField Label="@propertyName"><ChildContent><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@MappingValue(Step.InputMapping, propertyName)" ValueChanged="changed => UpdateFlowMappingAsync(propertyName, new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
                     }
                 }
             </fieldset>

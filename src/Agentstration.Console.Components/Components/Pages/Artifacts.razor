@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/artifacts"
 @inject IArtifactsClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
@@ -13,23 +14,23 @@ else if (!showDurable)
     @if (staged.Count == 0) { <EmptyState Title="@T("NoStaged")" Message="@T("NoStagedHelp")" /> }
     else
     {
-        <DataGrid TItem="StagedArtifactView" Items="staged">
-            <Header><tr><th>@T("Artifact")</th><th>@T("Producer")</th><th>@T("State")</th><th>@T("Size")</th><th>@T("Expires")</th></tr></Header>
-            <Row Context="item">
-                <tr data-testid="staged-artifact-row">
-                    <td><ArtifactReference Href="@StagedUrl(item)" Name="@item.FileName" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></td>
-                    <td><ArtifactReference Href="@ProducerUrl(item.Producer)" Name="@item.Producer.Kind.ToString()" Identifier="@ProducerIdentity(item.Producer)" IdentifierLabel="@T("Identifier")" /></td>
-                    <td>
+        <CollectionView TItem="StagedArtifactView" Items="staged" InformationLabels="@(new string[] { T("Producer"), T("Size"), T("Expires") })" RowTestId="staged-artifact-row" IdentityLabel="@T("Artifact")" StateLabel="@T("State")">
+        <Identity Context="item">
+<ArtifactReference Href="@StagedUrl(item)" Name="@item.FileName" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></Identity>
+        <State Context="item">
+
                         <span class="artifact-status">
                             <StatusBadge Text="@T($"Status.{item.Status}")" Status="@Tone(item.Status)" />
                             <HelpTooltip Text="@T($"StatusHelp.{item.Status}")" OpenToLeft />
                         </span>
-                    </td>
-                    <td>@Size(item.Length)</td>
-                    <td>@item.ExpiresAt.ToLocalTime().ToString("g")</td>
-                </tr>
-            </Row>
-        </DataGrid>
+                    </State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Producer")"><ArtifactReference Href="@ProducerUrl(item.Producer)" Name="@item.Producer.Kind.ToString()" Identifier="@ProducerIdentity(item.Producer)" IdentifierLabel="@T("Identifier")" /></CollectionValue>
+            <CollectionValue Label="@T("Size")">@Size(item.Length)</CollectionValue>
+            <CollectionValue Label="@T("Expires")">@item.ExpiresAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.FileName"><a href="@StagedUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
     }
 }
 else
@@ -37,19 +38,18 @@ else
     @if (durable.Count == 0) { <EmptyState Title="@T("NoDurable")" Message="@T("NoDurableHelp")" /> }
     else
     {
-        <DataGrid TItem="FlowRunArtifactResource" Items="durable">
-            <Header><tr><th>@T("Artifact")</th><th>@T("FlowRun")</th><th>@T("Step")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("Created")</th></tr></Header>
-            <Row Context="item">
-                <tr data-testid="durable-artifact-row">
-                    <td><ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></td>
-                    <td><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></td>
-                    <td><code>@item.ProducerFlowStepId</code></td>
-                    <td>@item.Receipt.MediaType</td>
-                    <td>@Size(item.Receipt.Length)</td>
-                    <td>@item.CreatedAt.ToLocalTime().ToString("g")</td>
-                </tr>
-            </Row>
-        </DataGrid>
+        <CollectionView TItem="FlowRunArtifactResource" Items="durable" InformationLabels="@(new string[] { T("FlowRun"), T("Step"), T("MediaType"), T("Size"), T("Created") })" RowTestId="durable-artifact-row" IdentityLabel="@T("Artifact")">
+        <Identity Context="item">
+<ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("FlowRun")"><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></CollectionValue>
+            <CollectionValue Label="@T("Step")"><code>@item.ProducerFlowStepId</code></CollectionValue>
+            <CollectionValue Label="@T("MediaType")">@item.Receipt.MediaType</CollectionValue>
+            <CollectionValue Label="@T("Size")">@Size(item.Receipt.Length)</CollectionValue>
+            <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@DurableName(item)"><a href="@DurableUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
     }
 }
 

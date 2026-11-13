@@ -63,8 +63,8 @@ public sealed class ResourceIdentityFieldsTests
             .Add(value => value.TechnicalNameTestId, "technical"));
 
         var labels = rendered.FindAll("label");
-        Assert.IsNotNull(labels[0].QuerySelector("[data-testid='display']"));
-        Assert.IsNotNull(labels[1].QuerySelector("[data-testid='technical']"));
+        Assert.IsNotNull(rendered.Find($"#{labels[0].GetAttribute("for")}"));
+        Assert.IsNotNull(rendered.Find($"#{labels[1].GetAttribute("for")}"));
         Assert.IsTrue(rendered.Find("[data-testid='technical']").HasAttribute("readonly"));
         Assert.IsTrue(rendered.Find("[data-testid='technical']").HasAttribute("disabled"));
 

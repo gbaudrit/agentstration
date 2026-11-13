@@ -26,7 +26,7 @@
 .profile-error { margin:0; color:#c83b48; font-size:.82rem; }
 .profile-language { display:grid; gap:8px; padding-top:24px; border-top:1px solid var(--border); }
 .profile-language p { margin:0; color:var(--muted); }
-.profile-language select { width:min(100%,320px); }
+.profile-language ::deep select { width:min(100%,320px); }
 .account-security-panel { display:grid; gap:12px; }
 .account-security-panel .button-secondary { justify-self:start; margin-top:8px; text-decoration:none; }
 @media(max-width:920px){.profile-settings-layout{grid-template-columns:1fr}.theme-options{grid-template-columns:repeat(3,minmax(140px,1fr));overflow-x:auto}}

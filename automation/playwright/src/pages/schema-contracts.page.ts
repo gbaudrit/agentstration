@@ -1,4 +1,5 @@
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
+import { AgentEditorPage } from './agent-editor.page.js';
 import { TestIds } from '../contracts/test-ids.js';
 
 interface ContractFixtures {
@@ -96,7 +97,8 @@ export class SchemaContractsPage {
   }
 
   public async exerciseAgentBindings(consoleUrl: string, fixtures: ContractFixtures): Promise<void> {
-    await this.open(`${consoleUrl}/agents/${encodeURIComponent(fixtures.agentName)}?namespace=default`, TestIds.agentEditor.form);
+    await this.open(`${consoleUrl}/agents/${encodeURIComponent(fixtures.agentName)}?namespace=default`, TestIds.agentEditor.overview);
+    await new AgentEditorPage(this.page).openEdit();
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.schemaContracts.agentTab).click();
     await expect(this.page.getByTestId(TestIds.schemaContracts.agentSection)).toBeVisible();

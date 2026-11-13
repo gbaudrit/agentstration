@@ -16,7 +16,7 @@
                 <details class="tool-picker" @key="ToolPickerRevision" @onkeydown="HandleToolPickerKeyDown">
                     <summary class="tool-picker-trigger"><UiIcon Name="wrench" /><span>@(SelectedTool?.DisplayName ?? T("CurrentToolUnavailable"))</span><UiIcon Name="chevron-down" /></summary>
                     <div class="tool-picker-menu">
-                        <div class="tool-picker-search"><UiIcon Name="search" /><input aria-label="@T("SearchTools")" placeholder="@T("SearchTools")" value="@ToolSearch" @oninput="e => ToolSearchChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" /></div>
+                        <div class="tool-picker-search"><UiIcon Name="search" /><ClearableText aria-label="@T("SearchTools")" placeholder="@T("SearchTools")" Value="@ToolSearch" ValueChanged="changed => ToolSearchChanged.InvokeAsync((new ChangeEventArgs { Value = changed }).Value?.ToString() ?? string.Empty)" /></div>
                         <div class="tool-picker-options">
                             @foreach (var item in VisibleTools)
                             {
@@ -49,7 +49,7 @@
         @if (SelectedTool is { } selectedTool)
         {
             <fieldset class="flow-mapping-editor"><legend>@T("ArgumentsMapping")</legend>
-                <label class="flow-checkbox-field"><input data-testid="tool-pass-transition-output" type="checkbox" disabled="@ReadOnly" checked="@PassesIncomingTransitionOutput(Step.ArgumentsMapping)" @onchange="UpdateToolTransitionPassthroughAsync" />@T("PassIncomingTransitionOutput")</label>
+                <label class="flow-checkbox-field"><FormCheckbox data-testid="tool-pass-transition-output" disabled="@ReadOnly" Value="@PassesIncomingTransitionOutput(Step.ArgumentsMapping)" ValueChanged="changed => UpdateToolTransitionPassthroughAsync.InvokeAsync(new ChangeEventArgs { Value = changed })" />@T("PassIncomingTransitionOutput")</label>
                 <small>@T("PassIncomingTransitionOutputHelp")</small>
                 @if (!PassesIncomingTransitionOutput(Step.ArgumentsMapping)
                 && selectedTool.InputSchema.ValueKind == JsonValueKind.Object
@@ -59,7 +59,7 @@
                     @foreach (var property in toolProperties.EnumerateObject())
                     {
                         var propertyName = property.Name;
-                        <label>@propertyName<input disabled="@ReadOnly" value="@MappingValue(Step.ArgumentsMapping, propertyName)" @onchange="e => UpdateToolMappingAsync(propertyName, e)" /></label>
+                        <FormField Label="@propertyName"><ChildContent><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@MappingValue(Step.ArgumentsMapping, propertyName)" ValueChanged="changed => UpdateToolMappingAsync(propertyName, new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
                     }
                 }
             </fieldset>

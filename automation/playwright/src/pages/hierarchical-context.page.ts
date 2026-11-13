@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { AgentEditorPage } from './agent-editor.page.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExpectedText } from '../locales/expected-text.js';
 import { LoginPage } from './login.page.js';
@@ -190,6 +191,7 @@ export class HierarchicalContextPage {
       { waitUntil: 'domcontentloaded' },
     );
     expect(response?.status()).toBe(200);
+    await new AgentEditorPage(this.page).openEdit();
     await this.page.locator(
       `[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`,
     ).waitFor({ state: 'visible' });

@@ -7,15 +7,22 @@ export class ResourceScopesPage {
 
   public get inventory() { return this.page.getByTestId(TestIds.distribution.resourceScopes); }
   private get detail() { return this.inventory.locator('.scope-detail'); }
-  private get rows() { return this.detail.locator('tr.resource-row'); }
+  private get rows() { return this.detail.locator('tr.resource-row, .collection-card.resource-row'); }
   private get kinds() { return this.page.getByTestId(TestIds.resourceScopes.kind); }
   private get count() { return this.page.getByTestId(TestIds.resourceScopes.count); }
   private get search() { return this.detail.locator('input[type="search"]'); }
 
   public async open(consoleUrl: string, scopeRef?: string): Promise<void> {
     const shell = this.page.getByTestId(TestIds.console.shell);
-    if (!scopeRef) await expect(shell).toHaveAttribute('data-context-scope', /^\/(instance|tenants\/|workspaces\/)/);
-    const scope = scopeRef ?? (await shell.getAttribute('data-context-scope'))!;
+    let scope = scopeRef;
+    if (!scope) {
+      await expect(async () => {
+        const current = await shell.getAttribute('data-context-scope');
+        expect(current).toMatch(/^\/(instance|tenants\/|workspaces\/)/);
+        scope = current!;
+      }).toPass();
+    }
+    if (!scope) throw new Error("The Console did not expose an active resource scope.");
     await this.page.goto(`${consoleUrl}/settings/resource-scopes?context=${encodeURIComponent(scope)}`);
     await expect(shell).toHaveAttribute('data-context-scope', scope);
     await expect(shell).toHaveAttribute('data-preferences-ready', 'true');
@@ -71,8 +78,8 @@ export class ResourceScopesPage {
     expect(total).toBeGreaterThan(1);
     await expect(this.count).toHaveText(text.count(total, total));
     const baseline = await this.rows.evaluateAll(rows => rows.map(row => ({
-      name: row.querySelector('td:first-child a, td:first-child strong')!.textContent!.trim(),
-      kind: row.querySelector('td:nth-child(2)')!.textContent!.trim(),
+      name: row.querySelector('.collection-identity a, .collection-identity strong')!.textContent!.trim(),
+      kind: row.querySelector('.pack-kind')!.textContent!.trim(),
     })));
     const kinds = [...new Set(baseline.map(row => row.kind))];
     expect(kinds.length).toBeGreaterThan(1);
@@ -91,7 +98,7 @@ export class ResourceScopesPage {
     const combined = matches.filter(row => row.name.toLowerCase().includes(query.toLowerCase()));
     await expect(this.rows).toHaveCount(combined.length);
     await expect(this.count).toHaveText(text.count(combined.length, total));
-    for (const row of await this.rows.all()) await expect(row.locator('td').nth(1)).toHaveText(kind);
+    for (const row of await this.rows.all()) await expect(row.locator('.pack-kind')).toHaveText(kind);
     await this.search.fill('fr816-no-matching-resource');
     await expect(this.rows).toHaveCount(0);
     await expect(this.count).toHaveText(text.count(0, total));
@@ -101,11 +108,19 @@ export class ResourceScopesPage {
     await this.kinds.selectOption('');
     await expect(this.rows).toHaveCount(total);
     await expect(this.count).toHaveText(text.count(total, total));
-    const nonLink = this.rows.filter({ has: this.page.locator('td:first-child strong') });
+    const nonLink = this.rows.filter({ has: this.page.locator('.collection-identity strong') });
     expect(await nonLink.count()).toBeGreaterThan(0);
     for (const row of await nonLink.all()) await expect(row.getByRole('link')).toHaveCount(0);
-    await expect(this.detail.locator('thead th')).toHaveCount(4);
-    for (const row of await this.rows.all()) expect(await row.getByRole('link').count()).toBeLessThanOrEqual(1);
+    if (await this.detail.locator('table').count() > 0) await expect(this.detail.locator('thead th')).toHaveCount(4);
+    const owner = (await this.detail.locator('.scope-reference').innerText()).trim();
+    const marker = owner.startsWith('/workspaces/') ? 'W' : owner.startsWith('/tenants/') ? 'T' : 'I';
+    for (const row of await this.rows.all()) {
+      const scope = row.locator('.collection-icon-badges .resource-owner-icon');
+      await expect(scope).toHaveAttribute('data-scope-ref', owner);
+      await expect(scope.locator('.scope-letter')).toHaveText(marker);
+      await expect(scope.getByRole('button')).toHaveAccessibleName(/.+/);
+    }
+    for (const row of await this.rows.all()) expect(await row.getByRole('link').count()).toBeLessThanOrEqual(2);
   }
 
   public async assertResponsiveStyles(): Promise<void> {

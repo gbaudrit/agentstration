@@ -22,7 +22,7 @@ public sealed class ToolDefinitionConsoleTests
     [TestMethod]
     public void DefinitionsPageListsFlowBackedMcpTools()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolDefinitionsClient>(new DefinitionClient());
 
@@ -40,7 +40,7 @@ public sealed class ToolDefinitionConsoleTests
     public void EditorLoadsReadOnlyContractsWhenAFlowIsSelected()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolDefinitionsClient>(new DefinitionClient());
         var flows = new FlowClient();

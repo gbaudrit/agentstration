@@ -14,22 +14,19 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("EmptyProfiles")"><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a></EmptyState> }
 else
 {
-    <DataGrid TItem="DataSourceProfileResource" Items="items">
-        <Header><tr><th>@T("Name")</th><th>@ExtensionLocalizer["ManagingExtension"]</th><th>@T("ActiveVersion")</th><th>@T("DraftVersion")</th><th>@T("Scope")</th><th>@T("State")</th><th></th></tr></Header>
-        <Row Context="item"><tr>
-            <td><strong><a class="resource-name-link" href="@Url(item)">@item.Definition.DisplayName</a></strong><code>@item.Namespace/@item.Name</code></td>
-            <td>@if (Owner(item) is { } owner) {
+    <CollectionView TItem="DataSourceProfileResource" Items="items" InformationLabels="@(new[] { ExtensionLocalizer["ManagingExtension"].Value })">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Versions><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@ExtensionLocalizer["ManagingExtension"]">@if (Owner(item) is { } owner) {
                 <a href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a><br />
                 <code>@owner.Installation.ExtensionId</code><span> · @owner.Installation.ExtensionVersion</span><br />
                 <span>@ExtensionLocalizer["Bundle"]: @owner.Installation.BundleId · @owner.Installation.BundleVersion</span>
             } else if (item.Governance.Origin.Kind == ResourceOriginKind.Extension) {
                 <span>@item.Governance.Origin.Reference · @item.Governance.Origin.Version</span>
-            } else { <span>—</span> }</td>
-            <td><code>@(item.ActiveVersion ?? "—")</code></td><td><code>@item.Definition.Version</code></td>
-            <td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td>@T(item.Governance.IsManaged ? "ManagedReadOnly" : "Editable")</td>
-            <td><a class="text-button" href="@Url(item)">@T("Open")</a></td>
-        </tr></Row>
-    </DataGrid>
+            } else { <span>—</span> }</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a href="@Url(item)">@T("Open")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {

@@ -1,3 +1,4 @@
+@using Agentstration.Resources
 @page "/settings/organization"
 @inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
@@ -24,7 +25,7 @@ else
             <div class="panel-header"><h2>@T("Workspaces")</h2></div>
             @foreach (var workspace in view.Workspaces)
             {
-                <p><strong>@workspace.DisplayName</strong><br /><small>@workspace.Name · @workspace.Id</small></p>
+                <article><CollectionIdentity DisplayName="@workspace.DisplayName" Name="@workspace.Name" IconName="workspace" ><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(workspace.Id)" DisplayName="@workspace.DisplayName" IconOnly /></IconBadges></CollectionIdentity><small>@workspace.Id</small></article>
             }
         </article>
     </section>
@@ -33,10 +34,10 @@ else
         @foreach (var member in view.Members)
         {
             <article>
-                <p><strong>@member.Principal.DisplayName</strong> <StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></p>
+                <CollectionIdentity DisplayName="@member.Principal.DisplayName" IconName="users" /><p><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></p>
                 @foreach (var role in member.Roles)
                 {
-                    <p><span>@role.Role.DisplayName</span><br /><small>@role.Scope</small></p>
+                    <p><strong>@role.Role.DisplayName</strong><br /><small>@role.Scope</small></p>
                 }
             </article>
         }

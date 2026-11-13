@@ -53,9 +53,9 @@
     letter-spacing: .07em;
     text-transform: uppercase;
 }
-.workspace-picker select,
-.workspace-entry-config select,
-.workspace-entry-config input {
+.workspace-picker ::deep select,
+.workspace-entry-config ::deep select,
+.workspace-entry-config ::deep input {
     width: 100%;
     height: 38px;
     padding: 0 12px;
@@ -65,9 +65,9 @@
     color: var(--text);
     box-shadow: var(--field-shadow,none);
 }
-.workspace-picker select:focus-visible,
-.workspace-entry-config select:focus-visible,
-.workspace-entry-config input:focus-visible {
+.workspace-picker ::deep select:focus-visible,
+.workspace-entry-config ::deep select:focus-visible,
+.workspace-entry-config ::deep input:focus-visible {
     outline: 0;
     border-color: var(--primary);
     background: var(--surface);
@@ -90,7 +90,7 @@
 .workspace-settings .panel-header > div,
 .workspace-composition .panel-header > div { min-width: 0; }
 .workspace-settings-fields { grid-template-columns: 1fr; gap: 16px; }
-.workspace-settings-fields textarea { min-height: 108px; }
+.workspace-settings-fields ::deep textarea { min-height: 108px; }
 .workspace-settings-fields label > small { line-height: 1.4; }
 .dashboard-icon-field {
     display: grid;
@@ -128,7 +128,7 @@
     background: var(--surface-2);
     cursor: pointer;
 }
-.form-grid .dashboard-default-toggle input[type="checkbox"] {
+.form-grid .dashboard-default-toggle ::deep input[type="checkbox"] {
     flex: 0 0 auto;
     width: 18px;
     height: 18px;
@@ -193,7 +193,7 @@
 }
 .workspace-entry-row.excluded { background: var(--surface-2); }
 .workspace-entry-toggle { gap: 12px; min-width: 0; cursor: pointer; }
-.workspace-entry-toggle input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+.workspace-entry-toggle ::deep input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
 .workspace-entry-toggle span { min-width: 0; gap: 4px; }
 .workspace-entry-toggle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
 .workspace-entry-toggle small,

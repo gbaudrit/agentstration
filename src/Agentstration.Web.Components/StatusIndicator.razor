@@ -1,7 +1,4 @@
-<span class="status-indicator status-@Status.ToString().ToLowerInvariant()" role="status" aria-label="@Text">
-    <span class="status-dot" aria-hidden="true"></span>
-    <span>@Text</span>
-</span>
+<span class="status-indicator" role="status" aria-label="@Text"><StatusBadge Text="@Text" Status="@Status" /></span>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;

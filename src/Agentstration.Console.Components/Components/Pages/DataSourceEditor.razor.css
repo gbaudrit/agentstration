@@ -19,7 +19,7 @@
     cursor: pointer;
 }
 
-.data-source-choice input {
+.data-source-choice ::deep input {
     width: 1.05rem !important;
     min-height: 1.05rem !important;
     margin: 0;
@@ -60,7 +60,7 @@
     min-width: 0;
 }
 
-.form-field-wide select {
+.form-field-wide ::deep select {
     min-width: 0;
     max-width: 100%;
 }
@@ -79,7 +79,7 @@
     font-weight: 700;
 }
 
-.data-source-parameters textarea {
+.data-source-parameters ::deep textarea {
     box-sizing: border-box;
     width: 100%;
     min-height: 9rem;

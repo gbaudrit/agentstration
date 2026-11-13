@@ -1,0 +1,59 @@
+@typeparam TValue
+@using Microsoft.AspNetCore.Components.Forms
+@inherits InputSelect<TValue>
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+<span class="clearable-field">
+    @RenderInput
+    @if (CanClear)
+    {
+        <FieldClearButton Label="@(Field?.Label is { } label ? Localizer["ClearField", label] : Localizer["ClearValue"])" OnClear="ClearAsync" />
+    }
+</span>
+
+@code {
+    [Parameter] public bool AllowClear { get; set; } = true;
+    public ClearableSelect() { ValueExpression = () => Value!; }
+    [CascadingParameter] private FormFieldPresentation? Field { get; set; }
+    private RenderFragment RenderInput => builder => base.BuildRenderTree(builder);
+    private bool CanClear => AllowClear && (EditContext is not null || default(TValue) is null) && !typeof(TValue).IsArray && !string.IsNullOrEmpty(CurrentValueAsString)
+        && !(AdditionalAttributes?.TryGetValue("disabled", out var value) == true && value is not false);
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        DisplayName = Field?.Label ?? DisplayName;
+        if (EditContext is not null && default(TValue) is not null)
+        {
+            var children = ChildContent;
+            ChildContent = builder =>
+            {
+                builder.OpenElement(0, "option"); builder.AddAttribute(1, "value", string.Empty);
+                builder.AddContent(2, Localizer["SelectValue"].Value); builder.CloseElement(); builder.AddContent(3, children);
+            };
+        }
+        if (Field is null) return;
+        var attributes = AdditionalAttributes is null ? new Dictionary<string, object>() : new(AdditionalAttributes);
+        attributes.TryAdd("id", Field.Id);
+        if (Field.Required) attributes.TryAdd("aria-required", "true");
+        if (Field.DescriptionId is { } descriptionId) attributes.TryAdd("aria-describedby", descriptionId);
+        AdditionalAttributes = attributes;
+    }
+    protected override bool TryParseValueFromString(string? value, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out TValue result, [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out string? validationErrorMessage)
+    {
+        if (string.IsNullOrEmpty(value) && default(TValue) is not null)
+        {
+            result = default;
+            validationErrorMessage = Localizer["SelectionRequired", DisplayName ?? FieldIdentifier.FieldName];
+            return false;
+        }
+        var valid = base.TryParseValueFromString(value, out result, out validationErrorMessage);
+        if (!valid) validationErrorMessage = Localizer["SelectionRequired", DisplayName ?? FieldIdentifier.FieldName];
+        return valid;
+    }
+    private async Task ClearAsync()
+    {
+        if (!CanClear) return;
+        CurrentValueAsString = string.Empty;
+        if (Element is { } element) await element.FocusAsync();
+    }
+}

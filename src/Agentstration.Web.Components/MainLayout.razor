@@ -13,7 +13,7 @@
 @inject IConsoleNavigationContext NavigationContext
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
-<div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
+<div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-theme="@(Preferences.IsDarkTheme ? "dark" : "light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
     <aside class="sidebar" aria-label="@T("MainNavigation")" data-testid="console-sidebar">
         <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
             <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
@@ -134,7 +134,7 @@
         <aside class="notification-panel" aria-label="@T("Notifications")" data-testid="console-notifications-panel">
             <header><div><p class="eyebrow">@T("Activity")</p><h2>@T("Notifications")</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="@T("CloseNotifications")">×</button></header>
             @if (Notifications.Items.Count == 0) { <EmptyState Title="@T("AllQuiet")" Message="@T("OperationalNotices")" /> }
-            else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><StatusIndicator Text="@item.Title" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
+            else { <button class="text-button" @onclick="Notifications.MarkAllRead">@T("MarkAllRead")</button>@foreach (var item in Notifications.Items) { <article class="notification-item"><strong>@item.Title</strong><StatusBadge Text="@T($"NotificationTone.{item.Status}")" Status="@item.Status" /><p>@item.Message</p><time datetime="@item.Timestamp.ToString("O")">@item.Timestamp.LocalDateTime.ToString("g")</time></article> } }
         </aside>
     }
 

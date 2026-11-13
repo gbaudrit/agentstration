@@ -41,7 +41,7 @@
     else if (Action is RequestInputAction input)
     {
         <div class="input-response">
-            <textarea @bind="text" placeholder="@Localizer["YourResponse"]" aria-label="@Localizer["YourResponse"]" disabled="@(Busy || submitting)"></textarea>
+            <ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="text" placeholder="@Localizer["YourResponse"]" aria-label="@Localizer["YourResponse"]" Disabled="@(Busy || submitting)"></ClearableText>
             <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting)" @onclick="() => SubmitInput(input)">@(submitting ? Localizer["Continuing"] : Localizer["Continue"])</button>
         </div>
     }

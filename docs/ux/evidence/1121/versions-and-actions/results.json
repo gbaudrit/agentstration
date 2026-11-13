@@ -1,0 +1,127 @@
+{
+  "description": "Actual executable application after merged form unification #1129: version metadata and configurable primary/secondary actions.",
+  "sourceSnapshot": "04f7dfe (implementation) including a60d76e (#1129)",
+  "statistics": {
+    "startTime": "2026-11-11T11:39:25.257Z",
+    "duration": 340162.078,
+    "expected": 9,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "local AEP extensions expose inventory and detail states @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 5545,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice en-US dark desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 14917,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice en-US light desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 14410,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 19230,
+      "captures": []
+    },
+    {
+      "title": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 17187,
+      "captures": []
+    },
+    {
+      "title": "governed extension inventory en-US desktop @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 44013,
+      "captures": [
+        "enrollment-primary-actions-en-US-desktop-dark.png",
+        "enrollment-primary-actions-en-US-desktop-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory en-US mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 46907,
+      "captures": [
+        "enrollment-primary-actions-en-US-mobile-dark.png",
+        "enrollment-primary-actions-en-US-mobile-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory fr-FR mobile @responsive @smoke",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 43706,
+      "captures": [
+        "enrollment-primary-actions-fr-FR-mobile-dark.png",
+        "enrollment-primary-actions-fr-FR-mobile-light.png"
+      ]
+    },
+    {
+      "title": "governed extension inventory fr-FR desktop @locale @smoke",
+      "project": "locale-contracts",
+      "status": "passed",
+      "durationMs": 45416,
+      "captures": [
+        "enrollment-primary-actions-fr-FR-desktop-dark.png",
+        "enrollment-primary-actions-fr-FR-desktop-light.png"
+      ]
+    }
+  ],
+  "captures": [
+    "agents-en-US-dark.png",
+    "agents-en-US-light.png",
+    "agents-fr-FR-dark.png",
+    "agents-fr-FR-light.png",
+    "agents-table-en-US-dark.png",
+    "agents-table-en-US-light.png",
+    "data-source-profiles-en-US-dark.png",
+    "data-source-profiles-en-US-light.png",
+    "data-source-profiles-fr-FR-dark.png",
+    "data-source-profiles-fr-FR-light.png",
+    "data-source-profiles-table-en-US-dark.png",
+    "data-source-profiles-table-en-US-light.png",
+    "enrollment-primary-actions-en-US-desktop-dark.png",
+    "enrollment-primary-actions-en-US-desktop-light.png",
+    "enrollment-primary-actions-en-US-mobile-dark.png",
+    "enrollment-primary-actions-en-US-mobile-light.png",
+    "enrollment-primary-actions-fr-FR-desktop-dark.png",
+    "enrollment-primary-actions-fr-FR-desktop-light.png",
+    "enrollment-primary-actions-fr-FR-mobile-dark.png",
+    "enrollment-primary-actions-fr-FR-mobile-light.png",
+    "extensions-en-US-dark.png",
+    "extensions-en-US-light.png",
+    "extensions-fr-FR-dark.png",
+    "extensions-fr-FR-light.png",
+    "extensions-table-en-US-dark.png",
+    "extensions-table-en-US-light.png",
+    "flows-en-US-dark.png",
+    "flows-en-US-light.png",
+    "flows-fr-FR-dark.png",
+    "flows-fr-FR-light.png",
+    "flows-table-en-US-dark.png",
+    "flows-table-en-US-light.png",
+    "profile-primary-choice-en-US-dark.png",
+    "profile-primary-choice-en-US-light.png",
+    "profile-primary-choice-fr-FR-dark.png",
+    "profile-primary-choice-fr-FR-light.png"
+  ]
+}

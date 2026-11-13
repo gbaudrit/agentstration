@@ -669,6 +669,12 @@ public sealed partial class FlowTests
         var draft = await createdResponse.Content.ReadFromJsonAsync<FlowDraftResponse>(JsonOptions);
         Assert.IsNotNull(draft);
         Assert.AreEqual(1L, draft.Value.Revision);
+        var listedDrafts = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows?allNamespaces=true&top=200", JsonOptions);
+        Assert.IsNotNull(listedDrafts);
+        var listedDraft = listedDrafts.Value.Single(flow => flow.Id == "designer-api-flow");
+        Assert.IsFalse(JsonSerializer.SerializeToElement(listedDraft, JsonOptions).TryGetProperty("draftRevision", out _), "The list must not enrich publication metadata with a draft counter.");
+        Assert.IsNull(listedDraft.ActiveVersion);
+        Assert.IsNull(listedDraft.PublishedVersion);
         Assert.AreEqual(6, Enum.GetValues<FlowNodeKind>().Count(kind => kind is FlowNodeKind.Input or FlowNodeKind.Agent or FlowNodeKind.Router or FlowNodeKind.Condition or FlowNodeKind.Transform or FlowNodeKind.Output));
 
         using var validationResponse = await client.PostAsync("/api/flows/designer-api-flow/validate", null);
@@ -714,6 +720,8 @@ public sealed partial class FlowTests
         Assert.AreEqual(HttpStatusCode.Created, publishResponse.StatusCode);
         var version = await publishResponse.Content.ReadFromJsonAsync<FlowVersionResponse>(JsonOptions);
         Assert.AreEqual("Initial designer release", version!.ReleaseNotes);
+        var retainedDraft = await client.GetFromJsonAsync<FlowDraftResponse>("/api/flows/designer-api-flow/draft", JsonOptions);
+        Assert.AreEqual(2L, retainedDraft!.Value.Revision, "Publishing preserves the draft revision counter.");
         Assert.IsNotNull(version.Graph);
         Assert.AreNotEqual(replaced.Value.DefinitionHash, version.DefinitionHash,
             "Publishing must hash the graph after Agent references are pinned to immutable generations.");
@@ -775,4 +783,3 @@ public sealed partial class FlowTests
         [new FlowNode("input", FlowNodeKind.Input)],
         []);
 }
-

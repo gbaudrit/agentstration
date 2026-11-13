@@ -11,6 +11,6 @@
     margin: 0;
 }
 
-.acquired-artifacts select {
+.acquired-artifacts ::deep select {
     max-width: 100%;
 }

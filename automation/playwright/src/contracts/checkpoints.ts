@@ -1,4 +1,23 @@
 export const Checkpoints = {
+  collections: {
+    contract: 'collections-contract-verified',
+    workplaceActivity: 'collections-workplace-activity',
+    workplaceTasks: 'collections-workplace-tasks',
+    workplaceTask: 'collections-workplace-task',
+    workplaceNotifications: 'collections-workplace-notifications',
+  },
+  flowCollection: { table: 'flows-compact-table', cards: 'flows-compact-cards', managed: 'flows-compact-managed', inherited: 'flows-compact-inherited' },
+  sharedForms: {
+    editorCleared: 'shared-form-editor-cleared',
+    requiredSelection: 'shared-form-required-selection-invalid',
+    workplaceCleared: 'shared-form-workplace-cleared',
+    nativeBootstrap: 'shared-form-native-bootstrap',
+    nativeAccount: 'shared-form-native-account',
+    administration: 'shared-form-administration',
+    contextual: 'shared-form-contextual-values',
+    inspector: 'shared-form-flow-inspector',
+    dynamic: 'shared-form-dynamic-values',
+  },
   organizationStructure: {
     instance: 'organization-structure-instance',
     tenantCreated: 'organization-structure-tenant-created',

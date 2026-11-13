@@ -118,9 +118,25 @@ public sealed class CleanupConsoleTests
         Assert.AreEqual("/api/namespaces/team-a/flows/flow-1", handler.Requests.Single(request => request.Method == HttpMethod.Delete).Path);
     }
 
+    [TestMethod]
+    public async Task CleanupHomonymsKeepDistinctSelectionsAndUseTheSameOwnerForEtagAndDelete()
+    {
+        var handler = new RecordingHandler();
+        var client = Client(handler);
+        var api = new CleanupApiClient(new TestHttpClientFactory(new Dictionary<string, HttpClient> { [CleanupApiClient.ManagementClient] = client }));
+        var first = Inventory().Agents.Single() with { ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")) };
+        var second = first with { ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")) };
+        Assert.AreNotEqual(first.Key, second.Key);
+        await api.DeleteAsync(first, new(false, false, false), default);
+        Assert.HasCount(2, handler.Requests);
+        Assert.AreEqual(handler.Requests[0].Path, handler.Requests[1].Path);
+        StringAssert.EndsWith(handler.Requests[1].Path, "scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        Assert.AreEqual("\"current\"", handler.Requests[1].IfMatch);
+    }
+
     private static BunitContext CreateContext(params string[] permissions)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddSingleton<IConsoleContextProvider>(new TestContextProvider(permissions));
         context.Services.AddAgentstrationWebComponents();
         return context;

@@ -83,14 +83,17 @@ public sealed record ModelProfileSummaryPropertiesResponse(
     ModelReasoningOptions Reasoning,
     ModelOutputOptions Output,
     string Status,
-    int UsageCount);
+    int? UsageCount);
 
 public sealed record ModelProfileSummaryResponse(
     string Id,
     string Name,
     ModelProfileSummaryPropertiesResponse Properties,
     string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null)
+{
+    public bool IsManaged { get; init; }
+}
 
 public sealed record ModelProfileUsageResponse(
     string ResourceType,
@@ -99,7 +102,10 @@ public sealed record ModelProfileUsageResponse(
     string DisplayName,
     string Namespace,
     ResourceScopeRef ScopeRef,
-    string ScopeDisplayName);
+    string ScopeDisplayName)
+{
+    public bool IsManaged { get; init; }
+}
 public sealed record ModelProfileUsagesResponse(IReadOnlyList<ModelProfileUsageResponse> Value, int Count);
 
 public sealed record ModelProfileIdentityResponse(
@@ -143,3 +149,6 @@ public sealed record AgentModelResponse(
     ResolvedAgentModelResponse Resolved,
     string Status,
     IReadOnlyList<string> Warnings);
+
+public sealed record ModelProfileLookupPageResponse(IReadOnlyList<ModelProfileSummaryResponse> Value, string? NextCursor);
+public sealed record ModelProfileUsagePageResponse(IReadOnlyList<ModelProfileUsageResponse> Value, string? NextCursor, int? Count = null);

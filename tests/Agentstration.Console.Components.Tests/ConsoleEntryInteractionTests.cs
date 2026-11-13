@@ -193,7 +193,7 @@ public sealed class ConsoleEntryInteractionTests
         bool includeEntry = true,
         IReadOnlyList<EntryResponse>? explicitEntries = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddAgentstrationWebComponents();

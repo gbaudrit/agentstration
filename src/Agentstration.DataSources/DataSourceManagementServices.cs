@@ -29,8 +29,18 @@ public sealed class DataSourceProfileService(
 {
     public const int MaximumConfigurationSchemaBytes = 64 * 1024;
 
-    public Task<IReadOnlyList<StoredResource<DataSourceProfileResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<DataSourceProfileResource>(DataSourceResourceKinds.DataSourceProfile, cancellationToken);
+    public async Task<IReadOnlyList<StoredResource<DataSourceProfileResource>>> ListAsync(CancellationToken cancellationToken)
+    {
+        var resources = await store.ListAllAsync<DataSourceProfileResource>(DataSourceResourceKinds.DataSourceProfile, cancellationToken);
+        var latest = new Dictionary<Guid, string>();
+        foreach (var batch in resources.Where(value => value.Value.ActiveVersion is null).Select(value => value.Value.Uid).Distinct().Chunk(200))
+            foreach (var publication in await store.FindLatestDataSourceProfileVersionsAsync(batch, cancellationToken))
+                latest.Add(publication.Key, publication.Value);
+        return resources.Select(stored => stored with
+        {
+            Value = stored.Value with { PublishedVersion = stored.Value.ActiveVersion ?? latest.GetValueOrDefault(stored.Value.Uid) }
+        }).ToArray();
+    }
 
     public Task<StoredResource<DataSourceProfileResource>?> GetAsync(
         ResourceNamespace @namespace,

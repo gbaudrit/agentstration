@@ -31,18 +31,19 @@ public sealed class ResourceScopesComponentTests
             new(ResourceScopeRef.Tenant(tenantId), ResourceScopeKind.Tenant, "Development", ResourceScopeRef.Instance, false, []),
             new(workspaceScope, ResourceScopeKind.Workspace, "Default", ResourceScopeRef.Tenant(tenantId), true, resources)
         ]);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
         var strings = context.Services.GetRequiredService<IStringLocalizer<ResourceScopesStrings>>();
 
         var rendered = context.Render<ResourceScopes>();
 
-        Assert.IsNotNull(rendered.Find("a[href='/namespaces/team-a/agents/support%20agent']"));
-        Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}']"));
+        Assert.IsNotNull(rendered.Find($"a[href='/namespaces/team-a/agents/support%20agent?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}']"));
+        Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}']"));
         Assert.HasCount(2, rendered.FindAll("a.resource-name-link"));
         Assert.IsEmpty(rendered.FindAll("td.resource-action"));
         Assert.HasCount(4, rendered.FindAll(".data-grid thead th"));
+        Assert.HasCount(3, rendered.FindAll(".collection-icon-badges .scope-letter"));
         Assert.IsEmpty(rendered.FindAll(".kind-summary"));
         Assert.HasCount(4, rendered.FindAll("[data-testid='resource-kind-filter'] option"));
         StringAssert.Contains(rendered.Find("[data-testid='resource-kind-filter']").TextContent, "Agent (1)");
@@ -63,7 +64,7 @@ public sealed class ResourceScopesComponentTests
         [
             new(workspaceScope, ResourceScopeKind.Workspace, "Isolated workspace", null, true, [])
         ]);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
 
@@ -89,7 +90,7 @@ public sealed class ResourceScopesComponentTests
             new(workspaceScope, ResourceScopeKind.Workspace, "Visible workspace", tenantScope, false,
             [new(Guid.NewGuid(), ResourceNamespace.Default, AgentResourceKinds.AgentRevision, "workspace-revision", DateTimeOffset.UtcNow)])
         ]);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Models;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
@@ -107,7 +108,7 @@ public sealed class SqliteResourceStore(
     TimeProvider timeProvider,
     ICurrentRequestContext requestContext,
     IResourceGovernanceContext governanceContext,
-    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver
+    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver, IModelProfileLookupQueries, IAgentProfileUsageQueries
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -231,7 +232,86 @@ public sealed class SqliteResourceStore(
             ResourceNamespace.Parse(value.Namespace),
             value.Kind,
             value.Name,
-            value.UpdatedAt)).ToArray();
+            value.UpdatedAt) { IsManaged = ReadGovernance(value.Payload).IsManaged }).ToArray();
+    }
+
+    public async Task<AgentProfileUsageWindow> FindProfileCandidatesAsync(ResourceScopeRef scopeRef, string profileName, string? search, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        var connection = (Microsoft.Data.Sqlite.SqliteConnection)context.Database.GetDbConnection();
+        connection.CreateFunction<string?, string?, bool>("agentstration_contains", static (text, needle) =>
+            string.IsNullOrEmpty(needle) || text?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true, isDeterministic: true);
+        var searchValue = search ?? string.Empty;
+        FormattableString sql = $"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {AgentResourceKinds.Agent}
+              AND json_extract(Payload, '$.definition.modelProfile.name') = {profileName}
+              AND (agentstration_contains(Name, {searchValue}) OR agentstration_contains(Namespace, {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.displayName'), {searchValue}))
+            """;
+        var candidates = await context.Documents.FromSqlInterpolated(sql).AsNoTracking().Where(value => value.ScopeId == scope.Id)
+            .Include(value => value.Scope).OrderBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<AgentResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ModelProfileLookupResult> LookupProfilesAsync(string? search, string? provider, string? ownerKind, int offset, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        var connection = (Microsoft.Data.Sqlite.SqliteConnection)context.Database.GetDbConnection();
+        connection.CreateFunction<string?, string?, bool>("agentstration_contains", static (text, needle) =>
+            string.IsNullOrEmpty(needle) || text?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true, isDeterministic: true);
+        var searchValue = search ?? string.Empty;
+        var providerValue = provider ?? string.Empty;
+        FormattableString sql = $"""
+            SELECT * FROM ControlPlaneResources
+            WHERE Kind = {ModelResourceKinds.ModelProfile}
+              AND (agentstration_contains(Name, {searchValue}) OR agentstration_contains(Namespace, {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.displayName'), {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.provider.name'), {searchValue})
+                OR agentstration_contains(json_extract(Payload, '$.definition.model.name'), {searchValue}))
+              AND agentstration_contains(json_extract(Payload, '$.definition.provider.name'), {providerValue})
+            """;
+        var query = Scoped(context.Documents.FromSqlInterpolated(sql).AsNoTracking());
+        if (!string.IsNullOrEmpty(ownerKind))
+        {
+            var normalizedKind = ownerKind.ToLowerInvariant();
+            query = query.Where(value => value.Scope.Kind == normalizedKind);
+        }
+        var candidates = await query.Include(value => value.Scope).OrderBy(value => value.ScopeId)
+            .ThenBy(value => value.Namespace).ThenBy(value => value.Name).Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(DeserializeValue<ModelProfileResource>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
+    }
+
+    public async Task<ResourceDiscoveryWindow<T>> ListDiscoveryWindowAsync<T>(string kind, ResourceScopeRef? exactScope, int offset, int take, CancellationToken cancellationToken) where T : Resource
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 100);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var query = exactScope is null ? Scoped(context.Documents.AsNoTracking()) : context.Documents.AsNoTracking();
+        if (exactScope is { } scopeRef)
+        {
+            var scope = await RequireScopeAsync(context, scopeRef, cancellationToken);
+            await EnsureCanReadAsync(context, scope, cancellationToken);
+            query = query.Where(value => value.ScopeId == scope.Id);
+        }
+        var candidates = await query.Where(value => value.Kind == kind).Include(value => value.Scope)
+            .OrderBy(value => value.ScopeId).ThenBy(value => value.Namespace).ThenBy(value => value.Name)
+            .Skip(offset).Take(take).ToArrayAsync(cancellationToken);
+        var visible = await FilterDiscoverableAsync(context, candidates, cancellationToken);
+        return new(visible.Select(Deserialize<T>).ToArray(), candidates.Length == take ? checked(offset + candidates.Length) : null);
     }
 
     public async Task<IReadOnlyList<StoredResource<T>>> ListAsync<T>(string kind, int skip, int take, CancellationToken cancellationToken) where T : Resource
@@ -437,6 +517,40 @@ public sealed class SqliteResourceStore(
 
     public Task<IReadOnlyList<StoredResource<T>>> ListAllAsync<T>(string kind, CancellationToken cancellationToken) where T : Resource =>
         LoadKindAsync<T>(kind, cancellationToken);
+
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestToolSetVersionsAsync(
+        IReadOnlyCollection<Guid> toolSetUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(toolSetUids, "ToolSet", "ToolSetVersion", "toolSetUid", cancellationToken);
+
+    public Task<IReadOnlyDictionary<Guid, string>> FindLatestDataSourceProfileVersionsAsync(
+        IReadOnlyCollection<Guid> profileUids, CancellationToken cancellationToken) =>
+        FindLatestPublicationVersionsAsync(profileUids, "DataSourceProfile", "DataSourceProfileRevision", "profileUid", cancellationToken);
+
+    private async Task<IReadOnlyDictionary<Guid, string>> FindLatestPublicationVersionsAsync(
+        IReadOnlyCollection<Guid> resourceUids, string parentKind, string kind, string ownerProperty, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(resourceUids.Count, 200);
+        if (resourceUids.Count == 0) return new Dictionary<Guid, string>();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var parents = await Scoped(context.Documents.AsNoTracking()).Include(value => value.Scope)
+            .Where(value => value.Kind == parentKind && resourceUids.Contains(value.Uid)).ToArrayAsync(cancellationToken);
+        var visibleParents = await FilterDiscoverableAsync(context, parents, cancellationToken);
+        if (visibleParents.Length == 0) return new Dictionary<Guid, string>();
+        var identities = JsonSerializer.Serialize(visibleParents.Select(value => value.Uid));
+        // This is publication metadata of the authorized parent, not a grant to the version resource itself.
+        var documents = await Scoped(context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM ControlPlaneResources WHERE Uid IN (
+                SELECT Uid FROM (
+                    SELECT Uid, ROW_NUMBER() OVER (
+                        PARTITION BY json_extract(Payload, {"$." + ownerProperty})
+                        ORDER BY json_extract(Payload, '$.publishedAt') DESC, Uid DESC) AS Position
+                    FROM ControlPlaneResources WHERE Kind = {kind}
+                        AND json_extract(Payload, {"$." + ownerProperty}) IN (SELECT value FROM json_each({identities})))
+                WHERE Position = 1)
+            """).AsNoTracking()).Include(value => value.Scope).ToArrayAsync(cancellationToken);
+        return documents.Select(value => JsonSerializer.Deserialize<JsonElement>(value.Payload))
+            .ToDictionary(value => value.GetProperty(ownerProperty).GetGuid(), value => value.GetProperty("version").GetString()!);
+    }
 
     public async Task<StoredResource<AgentRevision>?> FindRevisionAsync(Guid agentUid, long generation, CancellationToken cancellationToken) =>
         (await LoadFilteredAsync<AgentRevision>($"""
@@ -752,6 +866,8 @@ public static class SqliteResourceManagementServiceCollectionExtensions
         services.AddDbContextFactory<ResourceManagementDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IResourceStore, SqliteResourceStore>();
         services.AddSingleton<IAgentResourceQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IModelProfileLookupQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
+        services.AddSingleton<IAgentProfileUsageQueries>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (SqliteResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceAccessPolicyStore, SqliteResourceAccessPolicyStore>();
         services.AddSingleton<ITriggerOccurrenceStore, SqliteTriggerOccurrenceStore>();

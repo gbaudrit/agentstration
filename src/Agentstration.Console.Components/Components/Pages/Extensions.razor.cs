@@ -95,7 +95,7 @@ public partial class Extensions
     protected override void OnInitialized()
     {
         _ = RefreshCountdownAsync();
-        initialLoad = LoadAsync();
+        initialLoad = InitializeAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -117,7 +117,17 @@ public partial class Extensions
         }
     }
 
-    protected override void OnParametersSet()
+    private async Task InitializeAsync()
+    {
+        if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
+            await context.EnsureLoadedAsync(cancellation.Token);
+        SelectRequestedTab();
+        await LoadAsync();
+    }
+
+    protected override void OnParametersSet() => SelectRequestedTab();
+
+    private void SelectRequestedTab()
     {
         activeTab = RequestedTab?.ToLowerInvariant() switch
         {

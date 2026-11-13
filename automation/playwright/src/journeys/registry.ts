@@ -1,3 +1,7 @@
+import { inspectCollections, type InspectCollectionsInput } from './inspect-collections.journey.js';
+import { exerciseSharedForm, type ExerciseSharedFormInput } from './exercise-shared-form.journey.js';
+import { exerciseFormAdapter, type ExerciseFormAdapterInput } from './exercise-form-adapter.journey.js';
+import { exerciseFormWorkflow, type ExerciseFormWorkflowInput } from './exercise-form-workflow.journey.js';
 import { exerciseOrganizationStructure, type ExerciseOrganizationStructureInput } from './exercise-organization-structure.journey.js';
 import { inspectAcquisitionFailure } from './inspect-acquisition-failure.journey.js';
 import { administerGovernedToolSets } from './administer-governed-toolsets.journey.js';
@@ -50,6 +54,9 @@ import { inspectResourceScopes, type InspectResourceScopesInput } from './inspec
 import { inspectGovernedExtensionInventory, type InspectGovernedExtensionInventoryInput } from './inspect-governed-extension-inventory.journey.js';
 
 export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>> = {
+  'exercise-shared-form': (context, input) => exerciseSharedForm(context, input as unknown as ExerciseSharedFormInput),
+  'exercise-form-adapter': (context, input) => exerciseFormAdapter(context, input as unknown as ExerciseFormAdapterInput),
+  'exercise-form-workflow': (context, input) => exerciseFormWorkflow(context, input as unknown as ExerciseFormWorkflowInput),
   'inspect-governed-extension-inventory': (context, input) => inspectGovernedExtensionInventory(context, input as InspectGovernedExtensionInventoryInput),
   'administer-governed-toolsets': (context, input) => administerGovernedToolSets(context, input),
   'administer-governed-knowledge': (context, input) => administerGovernedKnowledge(context, input),
@@ -66,6 +73,7 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'create-pack-project': (context, input) => createPackProject(context, input as unknown as CreatePackProjectInput),
   'inspect-flow-observability': (context, input) => inspectFlowObservability(context, input as unknown as InspectFlowObservabilityInput),
   'inspect-console-administration': (context, input) => inspectConsoleAdministration(context, input as unknown as InspectConsoleAdministrationInput),
+  'inspect-collections': (context, input) => inspectCollections(context, input as unknown as InspectCollectionsInput),
   'inspect-resource-administration': (context, input) => inspectResourceAdministration(context, input as unknown as InspectResourceAdministrationInput),
   'exercise-model-administration': (context, input) => exerciseModelAdministration(context, input as unknown as ExerciseModelAdministrationInput),
   'exercise-descendant-secrets': (context, input) => exerciseDescendantSecrets(context, input as unknown as ExerciseDescendantSecretsInput),

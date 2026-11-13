@@ -15,6 +15,37 @@ namespace Agentstration.Management.Tests;
 public sealed class ControlPlaneStoreHardeningTests
 {
     [TestMethod]
+    public async Task DiscoveryWindowDoesNotDeserializeResourcesOutsideItsBound()
+    {
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        for (var index = 0; index < 26; index++)
+        {
+            await fixture.Store.PutAsync(new ExtensionResource
+            {
+                ApiVersion = "extensions.agentstration.io/v1",
+                Kind = "CollectionProbe",
+                Metadata = new ResourceMetadata { Name = $"item-{index:D3}" },
+                Definition = new ExtensionDefinition("local")
+            }, null, true, default);
+        }
+        await using (var connection = new SqliteConnection($"Data Source={fixture.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE ControlPlaneResources SET Payload = @payload WHERE Kind = 'CollectionProbe' AND Name = 'item-025'";
+            command.Parameters.AddWithValue("@payload", """{"apiVersion":"extensions.agentstration.io/v1","kind":"CollectionProbe","metadata":{"name":"item-025"},"definition":42}""");
+            Assert.AreEqual(1, await command.ExecuteNonQueryAsync());
+        }
+
+        var first = await fixture.Store.ListDiscoveryWindowAsync<ExtensionResource>("CollectionProbe", null, 0, 20, default);
+        Assert.HasCount(20, first.Value);
+        Assert.AreEqual(20, first.NextOffset);
+        var next = await fixture.Store.ListDiscoveryWindowAsync<ExtensionResource>("CollectionProbe", null, first.NextOffset!.Value, 5, default);
+        CollectionAssert.AreEqual(new[] { "item-020", "item-021", "item-022", "item-023", "item-024" }, next.Value.Select(item => item.Value.Name).ToArray());
+        Assert.AreEqual(25, next.NextOffset);
+    }
+
+    [TestMethod]
     public void ScopeReferencesUseCanonicalStablePaths()
     {
         var tenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -534,6 +565,7 @@ public sealed class ControlPlaneStoreHardeningTests
         IAgentResourceQueries queries) : IAsyncDisposable
     {
         public IResourceStore Store { get; } = store;
+        public string DatabasePath => Path.Combine(directory, "management.db");
         public IAgentResourceQueries Queries { get; } = queries;
         public IResourceScopeResolver ScopeResolver => Provider.GetRequiredService<IResourceScopeResolver>();
         public IResourceAccessPolicyStore PolicyStore => Provider.GetRequiredService<IResourceAccessPolicyStore>();
