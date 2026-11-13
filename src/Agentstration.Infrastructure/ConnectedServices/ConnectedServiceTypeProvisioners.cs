@@ -7,6 +7,7 @@ using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
 
@@ -14,10 +15,11 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner(
     ConnectedServiceTypeManagementService types,
     ConnectedServiceOperationTypeManagementService operationTypes,
     FlowService flows,
+    IResourceStore store,
     IResourceGovernanceContext governance)
 {
     public const string HttpTypeName = "http-endpoint";
-    public const string HttpTypeVersion = "1.1.0";
+    public const string HttpTypeVersion = "1.0.0";
     private static readonly JsonElement HttpSchema = JsonSerializer.SerializeToElement(new
     {
         type = "object",
@@ -60,6 +62,31 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner(
                 TypeUid = operationType.Uid, Version = operationVersion.Version, SchemaDigest = operationVersion.SchemaDigest
             }]
         };
+        var httpVersion = new ConnectedServiceTypeVersionDescriptor(
+            HttpTypeVersion,
+            AepSchemaDigest.Compute(HttpSchema),
+            HttpSchema,
+            [new("baseUrl", true, ConnectedServiceValueType.Text,
+                ConnectedServiceValueProtection.Standard, "uri",
+                "The absolute base URL of the remote HTTP system.")],
+            [new("baseUrl", ConnectedServiceValueType.Text,
+                ConnectedServiceValueProtection.Standard, "uri",
+                "The absolute base URL of the remote HTTP system.", "baseUrl")]) { OperationDiscovery = discovery };
+        // Maintainer-approved correction of the unreleased 1.0.0 baseline only.
+        // Keep identity, policies, references and other observed preview versions intact.
+        if (existingService is not null && BuiltinHttpOperation.IsCore(existingService.Value, HttpTypeName)
+            && existingService.Value.Definition.Versions.SingleOrDefault(item => item.Version == HttpTypeVersion) is { } previous
+            && previous.OperationDiscovery is null
+            && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(previous),
+                JsonSerializer.SerializeToElement(httpVersion with { OperationDiscovery = null })))
+        {
+            existingService = await store.PutExactAsync(ResourceScopeRef.Instance, existingService.Value with
+            {
+                Generation = checked(existingService.Value.Generation + 1),
+                Definition = existingService.Value.Definition with
+                { Versions = existingService.Value.Definition.Versions.Select(item => item.Version == HttpTypeVersion ? httpVersion : item).ToArray() }
+            }, existingService.ETag, false, cancellationToken);
+        }
         _ = await types.SynchronizeManagedAsync(new ConnectedServiceTypeResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -79,29 +106,7 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner(
                 Description = "A remote HTTP system identified by an exact base URL.",
                 PreferredVersion = HttpTypeVersion,
                 UsePolicy = existingService?.Value.Definition.UsePolicy ?? new(),
-                Versions =
-                [
-                    new(
-                        "1.0.0",
-                        AepSchemaDigest.Compute(HttpSchema),
-                        HttpSchema,
-                        [new("baseUrl", true, ConnectedServiceValueType.Text,
-                            ConnectedServiceValueProtection.Standard, "uri",
-                            "The absolute base URL of the remote HTTP system.")],
-                        [new("baseUrl", ConnectedServiceValueType.Text,
-                            ConnectedServiceValueProtection.Standard, "uri",
-                            "The absolute base URL of the remote HTTP system.", "baseUrl")]),
-                    new(
-                        HttpTypeVersion,
-                        AepSchemaDigest.Compute(HttpSchema),
-                        HttpSchema,
-                        [new("baseUrl", true, ConnectedServiceValueType.Text,
-                            ConnectedServiceValueProtection.Standard, "uri",
-                            "The absolute base URL of the remote HTTP system.")],
-                        [new("baseUrl", ConnectedServiceValueType.Text,
-                            ConnectedServiceValueProtection.Standard, "uri",
-                            "The absolute base URL of the remote HTTP system.", "baseUrl")]) { OperationDiscovery = discovery }
-                ]
+                Versions = [httpVersion]
             }
         }, cancellationToken);
     }

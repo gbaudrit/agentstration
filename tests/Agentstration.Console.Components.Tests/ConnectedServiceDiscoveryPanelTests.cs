@@ -96,7 +96,7 @@ public sealed class ConnectedServiceDiscoveryPanelTests
             Metadata = new() { Name = "fixture" },
             Definition = new() { DisplayName = "Fixture", Type = new()
             {
-                Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.1.0", SchemaDigest = "digest"
+                Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "digest"
             }, Options = JsonSerializer.SerializeToElement(new { }) }
         };
         public ConnectedServiceOperationResource Operation { get; private set; }

@@ -13,8 +13,8 @@ enough information to describe a GET operation without probing the remote system
 
 ## Decision
 
-Add `http-endpoint@1.1.0` alongside the unchanged `1.0.0` descriptor. The new version
-pins a Core-owned discovery Flow and `http-get@1.0.0` operation type. Discovery uses
+Keep the unreleased builtin at `http-endpoint@1.0.0`, as explicitly requested by
+the maintainer before the first delivery. This baseline pins a Core-owned discovery Flow and `http-get@1.0.0` operation type. Discovery uses
 the existing durable run, authorized internal Tool, validated manifest and operation
 reconciliation lifecycle. It requires no extension and performs no network request.
 
@@ -42,9 +42,11 @@ are supported as UTF-8 text. The result is a JSON envelope with `mediaType` and
 is content acquisition, not RSS parsing or output-schema inference. The existing
 dataset pipeline stores and registers its result; Knowledge behavior is unchanged.
 
-Existing consumers remain pinned to their selected type version. Adopting the new
-service version is explicit; no service or Data Source is automatically upgraded.
-Provisioning preserves existing use policies and does not create access grants.
+Initialization version 7 corrects the exact earlier metadata-only Core-owned
+`1.0.0` descriptor in place. This narrow prerelease correction preserves its UID,
+use policies, configured consumers and other retained preview versions. Generic
+version immutability remains unchanged; no consumer reference is repinned and no
+access grant is created. The HTTP and JSON content limits are unchanged.
 
 ## Consequences
 

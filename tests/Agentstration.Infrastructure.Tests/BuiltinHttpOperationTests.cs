@@ -113,7 +113,7 @@ public sealed class BuiltinHttpOperationTests
             Definition = new() { DisplayName = "HTTP", Type = new()
             {
                 Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(),
-                Version = "1.1.0", SchemaDigest = "digest"
+                Version = "1.0.0", SchemaDigest = "digest"
             }, Options = JsonSerializer.SerializeToElement(new { }) }
         };
         var type = new ConnectedServiceOperationTypeReference

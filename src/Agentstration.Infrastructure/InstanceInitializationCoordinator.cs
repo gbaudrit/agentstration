@@ -15,7 +15,7 @@ public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
     // Publish builtin HTTP discovery/acquisition adapters after projecting their exact Tool contracts.
-    public int TargetVersion { get; set; } = 6;
+    public int TargetVersion { get; set; } = 7;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

@@ -19,7 +19,7 @@ standard `baseUrl` input is also exposed as a standard `baseUrl` export.
 
 ### Discover a GET operation from an HTTP URL
 
-The preferred builtin version, `http-endpoint@1.1.0`, supports discovery without an
+The preferred builtin version, `http-endpoint@1.0.0`, supports discovery without an
 OpenAPI contract or an extension. Set `baseUrl` to a complete example request URL:
 
 ```text
@@ -53,14 +53,13 @@ JSON, XML, RSS, Atom, HTML, Markdown and plain text. Its JSON result contains
 RSS contents are not parsed into articles by discovery or this acquisition adapter.
 Knowledge Sources continue to consume Data Sources through their existing flows.
 
-Startup initialization version 6 installs the additive HTTP operation types and Flows.
-The original `http-endpoint@1.0.0` remains unchanged and has no operation discovery.
-Existing services keep their exact version pin. To adopt discovery, explicitly
-select `1.1.0` through the service API (or create a new service using the preferred
-version), then rediscover and configure consumers. Updating a bound Parameter to
-a different endpoint or query structure requires explicit rediscovery and consumer
-reconciliation; historical operations are never silently redirected. Existing
-scope/use permissions still apply; provisioning creates no additional grants.
+The builtin remains at version `1.0.0`: this corrects the unreleased baseline and
+introduces no separately published service version. Startup initialization version 7
+reconciles the earlier metadata-only builtin descriptor while preserving its UID,
+use policies, configured services and historical preview evidence. Consumers are
+not repinned automatically. Updating a bound Parameter to a different endpoint or
+query structure still requires explicit rediscovery and consumer reconciliation.
+Provisioning creates no additional access grants.
 
 See [ADR-0219](../decisions/0219-builtin-http-discovery-derives-request-shape-from-example-urls.md).
 

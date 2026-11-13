@@ -26,6 +26,40 @@ namespace Agentstration.Management.Tests;
 public sealed partial class ConnectedServiceApiTests
 {
     [TestMethod]
+    public async Task UnreleasedHttpBaselineGainsDiscoveryWithoutReplacingItsIdentityOrUsePolicy()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var context = await GetBootstrapContextAsync(factory);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        using var core = factory.Services.GetRequiredService<IResourceGovernanceContext>()
+            .Push(ResourceGovernance.Core("connected-services.http", "1.0.0"));
+        var address = new ScopedResourceAddress(ResourceScopeRef.Instance, ResourceNamespace.Default,
+            ConnectedServiceResourceKinds.ConnectedServiceType, "http-endpoint");
+        var current = (await store.GetExactAsync<ConnectedServiceTypeResource>(address, default))!;
+        var legacy = current.Value with
+        {
+            Definition = current.Value.Definition with
+            {
+                UsePolicy = new() { Grants = [new(ResourceScopeRef.Workspace(context.WorkspaceId))] },
+                Versions = [current.Value.Definition.Versions.Single() with { OperationDiscovery = null }]
+            }
+        };
+        _ = await store.PutExactAsync(ResourceScopeRef.Instance, legacy, current.ETag, false, default);
+        var provisioner = factory.Services.GetRequiredService<ConnectedServicePlatformResourceProvisioner>();
+        await provisioner.EnsureAsync(default);
+        var reconciled = (await store.GetExactAsync<ConnectedServiceTypeResource>(address, default))!;
+        Assert.AreEqual(legacy.Uid, reconciled.Value.Uid);
+        Assert.AreEqual("1.0.0", reconciled.Value.Definition.PreferredVersion);
+        Assert.HasCount(1, reconciled.Value.Definition.Versions);
+        Assert.IsNotNull(reconciled.Value.Definition.Versions.Single().OperationDiscovery);
+        Assert.IsTrue(reconciled.Value.Definition.UsePolicy.Grants.SequenceEqual(legacy.Definition.UsePolicy.Grants));
+        await provisioner.EnsureAsync(default);
+        Assert.AreEqual(reconciled.ETag, (await store.GetExactAsync<ConnectedServiceTypeResource>(address, default))!.ETag);
+    }
+
+    [TestMethod]
     [DataRow("instance")]
     [DataRow("workspace")]
     public async Task BuiltinHttpDiscoveryAndAcquisitionUseOnlyIndependentDatasetParameters(string ownerKind)
@@ -54,7 +88,7 @@ public sealed partial class ConnectedServiceApiTests
                 ResourceNamespace.Default, ConnectedServiceResourceKinds.ConnectedServiceType, "http-endpoint"), default))!.Value;
             if (owner != ResourceScopeRef.Instance)
             {
-                using var core = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("connected-services.http", "1.1.0"));
+                using var core = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("connected-services.http", "1.0.0"));
                 // Explicit fixture grants: production provisioning must preserve access decisions.
                 var typeStored = (await store.GetExactAsync<ConnectedServiceTypeResource>(new(type.ScopeRef!.Value,
                     type.Namespace, type.Kind, type.Name), default))!;

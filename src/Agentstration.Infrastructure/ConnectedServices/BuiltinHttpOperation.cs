@@ -52,7 +52,7 @@ internal static class BuiltinHttpOperation
 
     internal static bool Owns(ConnectedServiceTypeResource type, ConnectedServiceTypeVersionDescriptor version) =>
         IsCore(type, ConnectedServicePlatformResourceProvisioner.HttpTypeName)
-        && version.Version == ConnectedServicePlatformResourceProvisioner.HttpTypeVersion;
+        && version.OperationDiscovery?.Flow.Flow.Name == DiscoveryFlowName;
 
     internal static bool IsCore(Resource resource, string name) => resource.Name == name
         && resource.Namespace == ResourceNamespace.Default && resource.ScopeRef == ResourceScopeRef.Instance
