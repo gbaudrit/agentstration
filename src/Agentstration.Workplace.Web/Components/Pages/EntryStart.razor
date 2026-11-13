@@ -57,7 +57,7 @@ else if (entry is not null)
         try
         {
             var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token);
-            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName, workspace.Id);
             entry = await Api.GetEntryAsync(new EntryId(EntryName, Agentstration.Resources.ResourceNamespace.Parse(EntryNamespace)), lifetime.Token);
         }
         catch when (!lifetime.IsCancellationRequested)

@@ -1,7 +1,7 @@
 {
   "stats": {
-    "startTime": "2026-11-13T08:35:16.769Z",
-    "duration": 86959.129,
+    "startTime": "2026-11-13T09:01:19.996Z",
+    "duration": 57406.851,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,
@@ -10,13 +10,13 @@
   "captures": [
     {
       "file": "workplace-home.png",
-      "sha256": "82aa1264aac1e669fcc7489663b806ea637d6c8a2ee09187e150f1077829d68b",
+      "sha256": "878dbad8b3c483263164acaec08fa954cbe848bee52a03fdc982728b73fdf4bd",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "workplace-home",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 2030
@@ -24,13 +24,13 @@
     },
     {
       "file": "workplace-response-completed.png",
-      "sha256": "3aebb8968997db3218f9e4dd3957b2c90b63234bef78ca88fdb8578f11e1fabb",
+      "sha256": "366a98e65a1f61bc0e76170b1f2a9ed2b72492c2687b3a67461a0eea59b613bf",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "workplace-response-completed",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 1021
@@ -38,13 +38,13 @@
     },
     {
       "file": "collections-workplace-activity.png",
-      "sha256": "cca2f12c586093576cf9c4b6c9beda8db06c25cebaf3f7462432cddf05352891",
+      "sha256": "5a9779f868ef58ed65deae25f0d33bd51320e394441809647a8c0b4e08f0ad36",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "collections-workplace-activity",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 1000
@@ -52,13 +52,13 @@
     },
     {
       "file": "collections-workplace-tasks.png",
-      "sha256": "15a482ad56a4d499d95e7eeb9cf132820bccbe2e9babb555d1a9b5c7e60b38ae",
+      "sha256": "d8e6d6b858157c629f01284e2d015705c009cc3b63472f9486e4a1205b64662a",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "collections-workplace-tasks",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 1000
@@ -66,13 +66,13 @@
     },
     {
       "file": "collections-workplace-task.png",
-      "sha256": "eb658d93d5d7a6a4971df30c8e7c29fa9bc0fe18347fe8520480a69427043119",
+      "sha256": "66b0c8c1d469269a6ef95bbceebcaba216b11bf606b28d67ece4e5adbbca06ce",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "collections-workplace-task",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 1301
@@ -80,13 +80,13 @@
     },
     {
       "file": "collections-workplace-notifications.png",
-      "sha256": "5472de74bbebd34865909f855acd39be39620fc3d78dcbb002abb7971065f482",
+      "sha256": "d937ba53f69995880396ac12622ebf98986736dcf7ced900caed91ff6e506fe4",
       "test": "Workplace populated entry, conversation, task, activity and notifications share applicable contracts @collections @smoke",
       "checkpoint": "collections-workplace-notifications",
       "status": "passed",
-      "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+      "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
       "browser": "Chromium 154.0.8037.57",
-      "source": "Local final executable; unedited success attachment",
+      "source": "Real executable; unedited local success attachment after exact-owner correction",
       "captureSize": {
         "width": 1440,
         "height": 1000
@@ -95,52 +95,96 @@
   ],
   "observations": [
     {
-      "url": "http://127.0.0.1:34415/w/default/d/home",
+      "url": "http://127.0.0.1:45523/w/default/d/home",
       "frames": 0,
       "identities": 4,
       "menus": 3,
       "scopes": 4,
-      "states": 0
+      "states": 0,
+      "ownerLabels": [
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        },
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        },
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        },
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        }
+      ]
     },
     {
-      "url": "http://127.0.0.1:34415/w/default/d/home/conversations/d29ed308-2a82-4fd0-b87c-4cfe399cff70",
+      "url": "http://127.0.0.1:45523/w/default/d/home/conversations/d051d496-49c2-4547-9865-42e67c7bf3d2",
       "frames": 0,
       "identities": 1,
       "menus": 1,
       "scopes": 1,
-      "states": 1
+      "states": 1,
+      "ownerLabels": [
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        }
+      ]
     },
     {
-      "url": "http://127.0.0.1:34415/w/default/tasks",
+      "url": "http://127.0.0.1:45523/w/default/tasks",
       "frames": 0,
       "identities": 1,
       "menus": 1,
       "scopes": 1,
-      "states": 1
+      "states": 1,
+      "ownerLabels": [
+        {
+          "scopeRef": null,
+          "name": "Workspace — Default workspace"
+        }
+      ]
     },
     {
-      "url": "http://127.0.0.1:34415/w/default/tasks",
+      "url": "http://127.0.0.1:45523/w/default/tasks",
       "frames": 0,
       "identities": 1,
       "menus": 1,
       "scopes": 1,
-      "states": 1
+      "states": 1,
+      "ownerLabels": [
+        {
+          "scopeRef": null,
+          "name": "Workspace — Default workspace"
+        }
+      ]
     },
     {
-      "url": "http://127.0.0.1:34415/w/default/tasks/3e3f5424-42ed-9ced-6b8b-3a85787af805",
+      "url": "http://127.0.0.1:45523/w/default/tasks/71ff9280-883b-39e3-e8e9-7f9614babb22",
       "frames": 0,
       "identities": 0,
       "menus": 0,
       "scopes": 0,
-      "states": 1
+      "states": 1,
+      "ownerLabels": []
     },
     {
-      "url": "http://127.0.0.1:34415/w/default/notifications",
+      "url": "http://127.0.0.1:45523/w/default/notifications",
       "frames": 0,
       "identities": 1,
       "menus": 1,
       "scopes": 1,
-      "states": 1
+      "states": 1,
+      "ownerLabels": [
+        {
+          "scopeRef": "/workspaces/525f9329-99c7-4747-ab1d-4585d0b798c7",
+          "name": "Workspace — Default workspace"
+        }
+      ]
     }
-  ]
+  ],
+  "ownerVerification": "Every present Workplace owner uses the exact permitted Workspace ID/name; focus opens the full panel, Escape dismisses it and preserves focus."
 }

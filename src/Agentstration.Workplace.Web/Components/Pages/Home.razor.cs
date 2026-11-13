@@ -88,7 +88,7 @@ public partial class Home
             }
 
             workspace = await Api.GetWorkspaceAsync(workspaceName, lifetime.Token);
-            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName, workspace.Id);
             dashboards = await Api.ListDashboardsAsync(workspaceName, lifetime.Token);
             if (string.IsNullOrWhiteSpace(DashboardName))
             {

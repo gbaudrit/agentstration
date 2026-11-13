@@ -10,6 +10,33 @@ namespace Agentstration.Web.Tests;
 public sealed class CollectionScopeTests
 {
     [TestMethod]
+    public void WorkplaceOwnerNamesRequireTheExactAuthorizedWorkspaceAndFollowContextChanges()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var state = new WorkplaceContextState();
+        context.Services.AddSingleton(state);
+        var ownerId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var badge = context.Render<ResourceScopeBadge>(parameters => parameters
+            .Add(value => value.ScopeRef, ResourceScopeRef.Workspace(ownerId))
+            .Add(value => value.IconOnly, true));
+        Assert.AreEqual("Workspace", badge.Find("button").GetAttribute("aria-label"));
+
+        state.SetWorkspace("other", "Other authorized workspace", workspaceId: otherId);
+        badge.WaitForAssertion(() => Assert.AreEqual("Workspace", badge.Find("button").GetAttribute("aria-label")));
+        state.SetWorkspace("owner", "Authorized owner name", workspaceId: ownerId);
+        badge.WaitForAssertion(() => Assert.AreEqual("Workspace — Authorized owner name", badge.Find("button").GetAttribute("aria-label")));
+        Assert.AreEqual("Workspace — Authorized owner name", badge.Find("[role=tooltip]").TextContent);
+
+        state.SetWorkspace("other", "Other authorized workspace", workspaceId: otherId);
+        badge.WaitForAssertion(() => Assert.AreEqual("Workspace", badge.Find("button").GetAttribute("aria-label")));
+        Assert.IsFalse(badge.Markup.Contains("Authorized owner name", StringComparison.Ordinal));
+        Assert.IsFalse(badge.Markup.Contains("Other authorized workspace", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task LongNamesUseTheAuthorizedSnapshotAndDoNotFetchPerBadge()
     {
         var tenant = Guid.NewGuid();

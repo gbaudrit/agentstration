@@ -75,5 +75,26 @@
     ],
     "maintainerUXAcceptance": "pending",
     "merged": false
+  },
+  "workplaceOwnerFollowup": {
+    "productCommit": "7db199ff6deebdaf468718bcf7e69d008ecaf2c2",
+    "restore": "passed",
+    "build": {
+      "result": "passed",
+      "warnings": 0,
+      "errors": 0
+    },
+    "fast": {
+      "passed": 994,
+      "failed": 0,
+      "skipped": 0
+    },
+    "browser": {
+      "populatedWorkplace": 1,
+      "result": "passed",
+      "fullAuthorizedOwnerNames": true,
+      "focusEscapeAndFocusRestoration": true
+    },
+    "scope": "Exact authorized owner names from the shared Workplace snapshot; no additional product requests. The baseline full Integration results above remain attributed to their source; current delivery checks are recorded in the PR."
   }
 }
