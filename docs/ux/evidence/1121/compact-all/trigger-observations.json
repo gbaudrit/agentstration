@@ -1,0 +1,156 @@
+{
+  "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+  "observedCI": "https://github.com/gbaudrit/agentstration/actions/runs/43398340322/job/131794820354",
+  "originalSymptom": "The unchanged operational Trigger journey could not find trigger-enable after navigation. Original log and trace remain in that CI artifact.",
+  "deterministicRegression": {
+    "before": {
+      "authorized": "failed: enable command remained absent after the shared permission request completed",
+      "unauthorized": "passed: no command"
+    },
+    "after": {
+      "passed": 2,
+      "failed": 0
+    },
+    "sharedPermissionRequests": 1,
+    "confirmationOpeningDoesNotSave": true
+  },
+  "build": {
+    "result": "passed",
+    "warnings": 0,
+    "errors": 0
+  },
+  "fast": {
+    "passed": 996,
+    "failed": 0,
+    "skipped": 0
+  },
+  "maintainedBrowserRepeats": {
+    "passed": 3,
+    "failed": 0,
+    "stats": {
+      "startTime": "2026-11-13T09:32:32.274Z",
+      "duration": 197571.056,
+      "expected": 3,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "populatedContract": {
+    "passed": 1,
+    "stats": {
+      "startTime": "2026-11-13T09:35:51.584Z",
+      "duration": 64620.981,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "captures": [
+    {
+      "file": "trigger-permissions-operational-triggers-editor.png",
+      "sha256": "0a6d28cd87b00c02dc8471cd9d2a360203652acb4f3788167d37d0c67a35b878",
+      "test": "populated collection contract: Trigger occurrences and operational ownership @collections @smoke",
+      "checkpoint": "operational-triggers-editor",
+      "status": "passed",
+      "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Real executable; unedited local success attachment after shared-permission readiness correction",
+      "captureSize": {
+        "width": 1440,
+        "height": 1727
+      }
+    },
+    {
+      "file": "trigger-permissions-operational-triggers-created.png",
+      "sha256": "a07777ed8085e6cdc917f7260aee8cc54fc7b914f4e43b642060d29e06eb419d",
+      "test": "populated collection contract: Trigger occurrences and operational ownership @collections @smoke",
+      "checkpoint": "operational-triggers-created",
+      "status": "passed",
+      "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Real executable; unedited local success attachment after shared-permission readiness correction",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "trigger-permissions-operational-triggers-submitted.png",
+      "sha256": "80b96094d1d163b041163a39cc1ac01e5ec7fb5751900e472a9efd0fcec72264",
+      "test": "populated collection contract: Trigger occurrences and operational ownership @collections @smoke",
+      "checkpoint": "operational-triggers-submitted",
+      "status": "passed",
+      "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Real executable; unedited local success attachment after shared-permission readiness correction",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "trigger-permissions-operational-triggers-isolation.png",
+      "sha256": "9eb8fe45431be078a20d52db9539f3fd9b035cecb080591f4a4c001867d7e262",
+      "test": "populated collection contract: Trigger occurrences and operational ownership @collections @smoke",
+      "checkpoint": "operational-triggers-isolation",
+      "status": "passed",
+      "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+      "browser": "Chromium 154.0.8037.57",
+      "source": "Real executable; unedited local success attachment after shared-permission readiness correction",
+      "captureSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  ],
+  "observations": [
+    {
+      "url": "http://127.0.0.1:34965/triggers/new?context=%2Finstance",
+      "frames": 0,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 0,
+      "states": 1,
+      "ownerLabels": []
+    },
+    {
+      "url": "http://127.0.0.1:34965/triggers/instance-flow-schedule?context=%2Finstance",
+      "frames": 0,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 1,
+      "states": 2,
+      "ownerLabels": []
+    },
+    {
+      "url": "http://127.0.0.1:34965/triggers/instance-flow-schedule?context=%2Finstance",
+      "frames": 1,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 1,
+      "states": 3,
+      "ownerLabels": []
+    },
+    {
+      "url": "http://127.0.0.1:34965/flow-runs?context=%2Fworkspaces%2F8a374b80-ac93-4d31-bbc0-c7ec4a27373f",
+      "frames": 0,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 0,
+      "states": 1,
+      "ownerLabels": []
+    },
+    {
+      "url": "http://127.0.0.1:34965/triggers/new?context=%2Ftenants%2Fc01d0b35-93cd-448a-b057-521148b1f7ef",
+      "frames": 0,
+      "identities": 0,
+      "menus": 0,
+      "scopes": 0,
+      "states": 1,
+      "ownerLabels": []
+    }
+  ],
+  "scope": "Await the existing shared context before loading/rendering Trigger details. Permission guards, confirmations, ETags, browser assertions, retry policy and timeouts are unchanged."
+}

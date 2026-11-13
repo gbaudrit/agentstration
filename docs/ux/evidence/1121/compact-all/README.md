@@ -1,6 +1,6 @@
 # Approved compact all-list evidence (#1121)
 
-These **92 unedited screenshots** come from the actual SQLite/offline application and its disposable browser fixtures. They supersede the earlier first-wave, all-list and Flow-prototype galleries for this compact presentation. No generated image, mock DOM, image manipulation or production demonstration resource is used.
+These **96 unedited screenshots** come from the actual SQLite/offline application and its disposable browser fixtures. They supersede the earlier first-wave, all-list and Flow-prototype galleries for this compact presentation. No generated image, mock DOM, image manipulation or production demonstration resource is used.
 
 The baseline product source for the Console and CI captures is `44058e720b118545a19a73bb08a3f9c20552ec05`. The six Workplace captures are refreshed on `7db199ff6deebdaf468718bcf7e69d008ecaf2c2`: the shared context now carries the authorized Workspace ID, so task/artifact/notification markers resolve the real name only for that exact owner. No extra product request is added. A component regression rejects mismatching owner IDs and follows context changes; all **994 Fast tests** pass on that follow-up. The four maintained local version/action variants passed on that source: Chromium **154.0.8037.57**, English desktop **1440 × 1000**, French mobile **390 × 844**, both themes. The local browser differs from CI's pinned Playwright browser because its download host is unavailable in this environment. CI uses Playwright **1.63.0** with its pinned Chromium. Captures store original bytes and SHA-256 hashes in the JSON indexes below.
 
@@ -76,3 +76,15 @@ All **98 route/tab/alias cases** (49 English desktop dark + 49 French mobile lig
 The [271-active surface matrix](../../../collection-surfaces-1121.json) records 71 shared-frame and 200 specialized functional collections, four separate unmounted legacy renderers and 114 audited repeated-item sources. It records immutable source-blob provenance, applicable route evidence and existing populated-domain specifications per surface. Functional collections are not routes or raw loops. Every specialized renderer has a domain-specific treatment; retaining a useful tree, timeline, message history or native selector is an adaptation decision.
 
 A route screenshot can show an empty host and does not establish a populated embedded interaction. Domain journeys do not instantiate every possible adapter state, permission combination or variant cross-product. Source/component/API checks, the common presentation contract and family regressions complement these screenshots; they are not maintainer UX acceptance. Optional external integrations remain reported separately in the delivery validation. Both issues remain open and both PRs remain drafts.
+
+
+## Trigger permission readiness follow-up
+
+The final-head implementation run exposed an absent Enable command after detail navigation. A deterministic component regression reproduces the same lifecycle defect: when shared permissions arrive after the resource, the authorized command stays absent. The unauthorized case correctly remains without a command. Trigger details now await the existing shared context before loading; layout/page requests remain deduplicated to one. Opening confirmation still makes no save.
+
+On product `0219023627de7e05b750e5f400e936dee3764174`, both regression cases pass, the full **996-test Fast lane** passes, the maintained Trigger journey passes **three consecutive repetitions**, and its populated contract case passes. No browser assertion, timeout or retry was relaxed. [Raw results and exact-source observations](trigger-observations.json). These four additional unedited checkpoints retain the baseline captures above with their original provenance:
+
+- [operational-triggers-editor](trigger-permissions-operational-triggers-editor.png)
+- [operational-triggers-created](trigger-permissions-operational-triggers-created.png)
+- [operational-triggers-submitted](trigger-permissions-operational-triggers-submitted.png)
+- [operational-triggers-isolation](trigger-permissions-operational-triggers-isolation.png)
