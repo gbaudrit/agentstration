@@ -96,5 +96,55 @@
       "focusEscapeAndFocusRestoration": true
     },
     "scope": "Exact authorized owner names from the shared Workplace snapshot; no additional product requests. The baseline full Integration results above remain attributed to their source; current delivery checks are recorded in the PR."
+  },
+  "triggerPermissionReadinessFollowup": {
+    "productCommit": "0219023627de7e05b750e5f400e936dee3764174",
+    "observedCI": "https://github.com/gbaudrit/agentstration/actions/runs/43398340322/job/131794820354",
+    "deterministicRegression": {
+      "before": {
+        "authorized": "failed: enable command remained absent after the shared permission request completed",
+        "unauthorized": "passed: no command"
+      },
+      "after": {
+        "passed": 2,
+        "failed": 0
+      },
+      "sharedPermissionRequests": 1,
+      "confirmationOpeningDoesNotSave": true
+    },
+    "build": {
+      "result": "passed",
+      "warnings": 0,
+      "errors": 0
+    },
+    "fast": {
+      "passed": 996,
+      "failed": 0,
+      "skipped": 0
+    },
+    "maintainedBrowserRepeats": {
+      "passed": 3,
+      "failed": 0,
+      "stats": {
+        "startTime": "2026-11-13T09:32:32.274Z",
+        "duration": 197571.056,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    "populatedContract": {
+      "passed": 1,
+      "stats": {
+        "startTime": "2026-11-13T09:35:51.584Z",
+        "duration": 64620.981,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    "scope": "Await the existing shared context before loading/rendering Trigger details. Permission guards, confirmations, ETags, browser assertions, retry policy and timeouts are unchanged."
   }
 }
