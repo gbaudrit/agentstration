@@ -1,6 +1,8 @@
 # Reusable collection coverage (#1122)
 
-This coverage change is a separate draft stacked on the implementation of #1121. The maintainer explicitly requested that stack before merge. This is permission to prepare and test the draft; implemented UX acceptance and both merges remain pending. Both issues stay open.
+This coverage remains a separate draft in #1132 for #1122. Implementation #1123 was squash-merged into `ux/unification-formulaires` as `d08ebe55848e7d0996e8ebda5bcccdd7a049c8ef` on 2026-11-13. The maintainer authorized post-merge realignment and a separate promotion PR toward `main`. Coverage now starts from that integration commit, replacing its historical pre-merge stack. Both issues remain open; coverage acceptance and merge are still maintainer decisions.
+
+Before this documentation update, the reconstructed coverage commit `0fd4ac4c` has exactly the same complete file tree as the previously validated `a2ba6bd8`. Only the 28 coverage files differ from the squash-merged implementation. The old stack is preserved by its published commit references and a dedicated local backup branch. TypeScript and all seven catalog checks pass after realignment; new exact-head CI results are maintained in #1132. The promotion branch additionally retains the newer `main` changes rather than replacing them with the older integration snapshot.
 
 The [adoption inventory](all-list-adoption-1121.md) is the closure scope, including its embedded and specialized renderers. Route rendering and populated interactions are separate evidence:
 
@@ -29,7 +31,7 @@ Merged form unification #1129 (`a60d76e`) is incorporated through the implementa
 
 Merged #1130 (`4d93297`) is incorporated through implementation #1123. Both shared-form and collection locale expectations, checkpoints, Test IDs, journey registrations and worker fixture options are retained. Product source and existing capture rendering are unchanged. The shared theme helper now reads the theme attribute through Playwright so authentication/culture navigation cannot destroy a manually evaluated JavaScript context; the failing French dark pending-response scenario passes three consecutive local repetitions. All 16 targeted local form/version/action cases passed without skips or flakes.
 
-The combined mobile CI shard completed its 111 tests successfully but exceeded the existing 25-minute job limit during post-job cleanup. Mobile execution is therefore split into **three shards**, alongside three desktop shards and one locale shard. This adds execution capacity without changing the 478 cases, one worker per shard, retry policy, assertions, per-test timeouts or the 25-minute job limit. Current-head CI evidence is maintained in draft #1132 and issues #1121/#1122. UX acceptance and both merges remain pending.
+The combined mobile CI shard completed its 111 tests successfully but exceeded the existing 25-minute job limit during post-job cleanup. Mobile execution is therefore split into **three shards**, alongside three desktop shards and one locale shard. This adds execution capacity without changing the 478 cases, one worker per shard, retry policy, assertions, per-test timeouts or the 25-minute job limit. These counts and the former merge gate describe that pre-merge checkpoint. Current-head CI evidence is maintained in draft #1132 and issues #1121/#1122; the implementation merge is recorded above.
 
 ### Current approved compact adoption across all collections
 
