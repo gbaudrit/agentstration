@@ -144,6 +144,12 @@ else
                 </div>
                 <SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="acquisitionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
                 @if (lifecycleEnabled && string.IsNullOrEmpty(storageKey) && (!string.IsNullOrWhiteSpace(acquisitionTtl) || keepHistory)) { <p class="form-alert form-alert-danger" role="alert">@T("LifecycleStorageRequired")</p> }
+                <ReusableSchemaBindingEditor Title="@T("AcquisitionOutputSchema")" TestId="dataset-acquisition-schema"
+                    Binding="@acquisitionOutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
+                    ValueChanged="value => acquisitionOutputBinding = value.Binding" />
+                <ReusableSchemaBindingEditor Title="@T("ProjectedOutputSchema")" TestId="dataset-output-schema"
+                    Binding="@outputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
+                    ValueChanged="value => outputBinding = value.Binding" />
                 <SourceFlowCompositionEditor @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
             </fieldset>
         </EditForm>
@@ -169,7 +175,9 @@ else
                             else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
                             @if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button><small>@Localizer["DatasetBytes", item.Content.Length]</small> }
                             @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
-                            @if (item.ErrorCode is not null) { <span role="status">@T("DatasetExecutionFailed") <code>@item.ErrorCode</code></span> }
+                            @if (item.ErrorCode is not null) { <span role="status">@T("DatasetExecutionFailed") <code>@item.ErrorCode</code>
+                                @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
+                            </span> }
                         </td><td data-label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></td></tr>
                     </Row></DataGrid>
                 }
@@ -350,6 +358,8 @@ else
                 acquisitionTtl = LifecycleDuration.Format(saved.Lifecycle?.TimeToLive);
                 keepHistory = saved.Lifecycle?.KeepHistory == true;
                 historyRetention = LifecycleDuration.Format(saved.Lifecycle?.HistoryRetention);
+                acquisitionOutputBinding = saved.Acquisition.OutputSchemaBinding;
+                outputBinding = saved.OutputSchemaBinding;
                 orchestration = saved.Orchestration;
                 compositionPoints = saved.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
                 if (saved.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["transformations"] = saved.Transformations };
@@ -412,6 +422,7 @@ else
         return new() { AllowDirect = allowDirect, TimeToLive = lifecycleEnabled ? ttl : null,
             KeepHistory = lifecycleEnabled && keepHistory, HistoryRetention = lifecycleEnabled && keepHistory ? retention : null };
     }
+    private SchemaBinding? acquisitionOutputBinding, outputBinding;
     private FlowCallReference? orchestration;
     private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync() => await RunAsync(async () =>
@@ -426,7 +437,7 @@ else
             new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
         var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = prefix };
         var definition = new DataSourceProperties { DisplayName = displayName.Trim(), Description = description, Enabled = enabled,
-            Dataset = new(storageReference, rule, new(operationReference, parameters)) { DocumentCollectionUid = documentCollectionUid == Guid.Empty ? null : documentCollectionUid, Orchestration = orchestration, Compositions = compositionPoints, Lifecycle = LifecycleSelection() } };
+            Dataset = new(storageReference, rule, new(operationReference, parameters) { OutputSchemaBinding = acquisitionOutputBinding }) { DocumentCollectionUid = documentCollectionUid == Guid.Empty ? null : documentCollectionUid, OutputSchemaBinding = outputBinding, Orchestration = orchestration, Compositions = compositionPoints, Lifecycle = LifecycleSelection() } };
         var saved = IsNew ? await Client.CreateAsync(new(technicalName, definition, resourceNamespace, scope), cancellation.Token)
             : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
         source = saved.Value; etag = saved.ETag; savedOperation = operation ?? savedOperation; savedServiceKey = serviceKey; activeTab = DatasetTab.Overview;

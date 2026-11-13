@@ -189,4 +189,6 @@
   <data name="DatasetDocumentHelp" xml:space="preserve"><value>Each acquired JSON object is retained in an immutable publication. Use a transformation Flow to normalize other result shapes.</value></data>
   <data name="DatasetDocumentRequired" xml:space="preserve"><value>Select an enabled collection allowing read, query and immutable publication. If none is available, configure one on the Storage.</value></data>
   <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
+  <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Adopted operation response schema</value></data>
+  <data name="ProjectedOutputSchema" xml:space="preserve"><value>Adopted projection output schema</value></data>
 </root>

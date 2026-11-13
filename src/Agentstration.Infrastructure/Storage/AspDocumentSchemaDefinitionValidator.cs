@@ -1,4 +1,5 @@
 using Agentstration.Asp.Abstractions;
+using Agentstration.Asp.OData;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
 
@@ -14,7 +15,15 @@ public sealed class AspDocumentSchemaDefinitionValidator : IStorageDefinitionVal
         if (!ValidatesDocumentSchemas(version)) return;
         for (var index = 0; index < definition.Collections.Count; index++)
         {
-            try { DocumentModel.ValidateSchema(definition.Collections[index].Schema); }
+            try
+            {
+                var collection = definition.Collections[index];
+                DocumentModel.ValidateSchema(collection.Schema);
+                AspValidation.Require(DocumentModel.Type(DocumentSchema.Normalize(collection.Schema)) is null or "object",
+                    "unsupported_schema", "Collection documents must be JSON objects.");
+                if (collection.Policy.QueryProfiles?.Contains(ODataDocumentProfile.Id, StringComparer.Ordinal) == true)
+                    _ = new ODataDocumentProfile(collection.Schema);
+            }
             catch (AspException exception)
             {
                 throw new StorageException("storage_collection_schema_invalid", "The collection schema is incompatible with the ASP document profile.")

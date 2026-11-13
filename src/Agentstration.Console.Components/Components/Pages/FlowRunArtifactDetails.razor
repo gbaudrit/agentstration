@@ -41,12 +41,19 @@ else if (artifact is not null)
             {
                 <section class="panel form-section">
                     <h2>@T("DataContract")</h2>
-                    <p>@T(contract.Validated ? "DataContractValidated" : "DataContractUnvalidated")</p>
+                    <p>@T(contract.Validated ? contract.HasStructuralConstraints ? "DataContractValidated" : "DataContractGenericValidated" : "DataContractUnvalidated")</p>
                     <dl class="resource-details durable-artifact-details-grid">
                         <dt>@T("DataContractOrigin")</dt><dd><code>@contract.Origin</code></dd>
                         <dt>@T("MediaType")</dt><dd>@contract.MediaType</dd>
                         <dt>SHA-256</dt><dd><code>@contract.Digest</code></dd>
                     </dl>
+                    @if (contract.SchemaEvidence is { } evidence)
+                    {
+                        <p><a href="@($"/schemas/{Uri.EscapeDataString(evidence.Name)}?scopeRef={Uri.EscapeDataString(evidence.ScopeRef.Value)}&namespace={Uri.EscapeDataString(evidence.Namespace.Value)}&view=versions&version={Uri.EscapeDataString(evidence.Version)}")">@evidence.Namespace/@evidence.Name · @evidence.Version</a></p>
+                        <p class="schema-evidence"><code>@evidence.SchemaUid · @evidence.SchemaPath</code></p>
+                        <p class="schema-evidence">@T("DataContractParentHash") <code>@evidence.ParentDefinitionHash</code></p>
+                        <p class="schema-evidence">@T("DataContractSelectedHash") <code>@evidence.DefinitionHash</code></p>
+                    }
                     @if (contract.Schema is { } schema) { <pre>@JsonSerializer.Serialize(schema, ContractJson)</pre> }
                 </section>
             }

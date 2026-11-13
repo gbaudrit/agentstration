@@ -18,8 +18,24 @@
             <label><span>@T("Documents.Publish")</span><input type="checkbox" checked="@collection.Policy.Publish" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Publish = Checked(e) } })" /></label>
             <label><span>@T("Documents.PageSize")</span><input type="number" min="1" max="100" value="@collection.Policy.MaximumPageSize" @onchange="e => PageAsync(row, e)" /></label>
             <label class="form-span-2"><span>@T("Documents.Profiles")</span><input value="@string.Join(',', collection.Policy.QueryProfiles ?? [])" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { QueryProfiles = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) } })" /><small>@string.Join(", ", Capabilities.QueryProfiles.Select(p => p.Id + "/" + p.Version + " (" + p.Encoding + ")"))</small></label>
+            @if (collection.SchemaBinding?.Reference is not null)
+            {
+                <div class="form-span-2">
+                    <ReusableSchemaBindingEditor Title="@T("Documents.Schema")" TestId="@($"collection-{row}-schema")"
+                        Binding="@collection.SchemaBinding" ReadOnly="@ReadOnly" ValueChanged="value => BindingAsync(row, value)" />
+                    @if (collection.SchemaSnapshot is { } snapshot)
+                    {
+                        <details><summary>@T("Documents.Schema")</summary><pre>@JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true })</pre></details>
+                    }
+                    @if (!ReadOnly) { <button type="button" class="button-secondary" @onclick="() => InlineAsync(row)">@T("Documents.UseInlineSchema")</button> }
+                </div>
+            }
+            else
+            {
             <label class="form-span-2"><span>@T("Documents.Schema")</span><textarea class="form-code-editor" rows="8" @onchange="e => SchemaAsync(row, e)">@(drafts.GetValueOrDefault(row) ?? collection.Schema.GetRawText())</textarea></label>
             @if (invalid.Contains(row)) { <p role="alert">@T("Documents.InvalidJson")</p> }
+                @if (!ReadOnly) { <button type="button" class="button-secondary" @onclick="() => SharedAsync(row)">@T("Documents.UseSharedSchema")</button> }
+            }
             @if (!ReadOnly) { <button type="button" class="button-danger" @onclick="() => RemoveAsync(row)">@T("Documents.Remove")</button> }
         </fieldset>
     }
@@ -43,6 +59,25 @@
     {
         if (int.TryParse(Text(e), out var size)) await SetAsync(row, Value[row] with { Policy = Value[row].Policy with { MaximumPageSize = size } });
     }
+    private async Task SharedAsync(int row)
+    {
+        invalid.Add(row);
+        await SetAsync(row, Value[row] with { SchemaBinding = new() { Reference = new() { Name = "", Version = "" } }, SchemaSnapshot = null });
+        await ValidationChanged.InvokeAsync(false);
+    }
+    private async Task InlineAsync(int row)
+    {
+        invalid.Remove(row); drafts.Remove(row);
+        await SetAsync(row, Value[row] with { SchemaBinding = null, SchemaSnapshot = null });
+        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+    }
+    private async Task BindingAsync(int row, SchemaBindingEditorValue value)
+    {
+        if (value.Binding is null || value.EffectiveContent is null) invalid.Add(row); else invalid.Remove(row);
+        await SetAsync(row, Value[row] with { SchemaBinding = value.Binding,
+            Schema = value.EffectiveContent ?? Value[row].Schema, SchemaSnapshot = null });
+        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+    }
     private async Task SchemaAsync(int row, ChangeEventArgs e)
     {
         drafts[row] = Text(e);
@@ -51,7 +86,7 @@
             using var json = JsonDocument.Parse(drafts[row]);
             if (json.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
             invalid.Remove(row);
-            await SetAsync(row, Value[row] with { Schema = json.RootElement.Clone() });
+            await SetAsync(row, Value[row] with { Schema = json.RootElement.Clone(), SchemaBinding = null, SchemaSnapshot = null });
         }
         catch (JsonException) { invalid.Add(row); }
         await ValidationChanged.InvokeAsync(invalid.Count == 0);

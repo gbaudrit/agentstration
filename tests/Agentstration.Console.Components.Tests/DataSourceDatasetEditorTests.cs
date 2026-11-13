@@ -60,6 +60,7 @@ public sealed class DataSourceDatasetEditorTests
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
+        context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
         context.Services.AddSingleton<IConnectedServicesClient>(new ConnectedServicesApiClient(http));
@@ -295,6 +296,7 @@ public sealed class DataSourceDatasetEditorTests
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
+        context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
         context.Services.AddSingleton<IConnectedServicesClient>(new ConnectedServicesApiClient(http));
@@ -457,6 +459,7 @@ public sealed class DataSourceDatasetEditorTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/schemas") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { value = Array.Empty<object>() }) };
             object body;
             if (request.Method == HttpMethod.Post && path == "/api/datasources")
             {

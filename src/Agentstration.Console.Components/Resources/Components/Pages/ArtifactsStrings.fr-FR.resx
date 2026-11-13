@@ -53,4 +53,7 @@
   <data name="DataContractValidated" xml:space="preserve"><value>Validé sur le contenu publié.</value></data>
   <data name="DataContractUnvalidated" xml:space="preserve"><value>Contrat disponible ; aucune preuve de validation du contenu.</value></data>
   <data name="DataContractOrigin" xml:space="preserve"><value>Origine du contrat</value></data>
+<data name="DataContractGenericValidated" xml:space="preserve"><value>JSON valide accepté par un contrat générique. La structure métier n’est pas vérifiée.</value></data>
+<data name="DataContractParentHash" xml:space="preserve"><value>Empreinte du Schema parent :</value></data>
+<data name="DataContractSelectedHash" xml:space="preserve"><value>Empreinte du schéma sélectionné :</value></data>
 </root>

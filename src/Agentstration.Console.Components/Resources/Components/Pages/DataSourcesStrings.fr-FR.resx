@@ -189,4 +189,6 @@
   <data name="DatasetDocumentHelp" xml:space="preserve"><value>Chaque objet JSON acquis est conservé dans une publication immuable. Utilisez un Flow de transformation pour normaliser les autres formes de résultat.</value></data>
   <data name="DatasetDocumentRequired" xml:space="preserve"><value>Sélectionnez une collection activée autorisant la lecture, les requêtes et la publication immuable. Si aucune n’est disponible, configurez-en une dans le Storage.</value></data>
   <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
+  <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Schéma adopté pour la réponse de l’opération</value></data>
+  <data name="ProjectedOutputSchema" xml:space="preserve"><value>Schéma adopté pour la sortie de projection</value></data>
 </root>

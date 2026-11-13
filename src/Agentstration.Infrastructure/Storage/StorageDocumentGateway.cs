@@ -21,7 +21,7 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         var capabilities = context.Documents!;
         var model = AspDocumentValidation.Digest(collection.Schema);
         return new(capabilities, From(policy), capabilities.QueryProfiles.Where(p => policy.QueryProfiles!.Contains(p.Id, StringComparer.Ordinal))
-            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model);
+            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model) { SchemaSnapshot = collection.SchemaSnapshot };
     }
     public Task<StorageDocumentValue> GetAsync(StorageDocumentTarget target, string id, string? revision, CancellationToken ct) =>
         ExecuteAsync(target, "get", async (client, token) => Value(await client.GetAsync(new(Guid.NewGuid().ToString("N"), id, revision), token)), ct);
@@ -47,7 +47,8 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
             var profile = client.Description.QueryProfiles.FirstOrDefault()
                 ?? throw new AspException("unsupported_capability", "Structured publication needs an implemented query profile.");
             return new StorageDocumentPublicationReference(target with { Publication = publication.Id }, new(publication.Id, publication.Digest, publication.Count, publication.SchemaDigest),
-                new(profile.Reference.Id, profile.Reference.Version, profile.Reference.Encoding, profile.Reference.ModelDigest));
+                new(profile.Reference.Id, profile.Reference.Version, profile.Reference.Encoding, profile.Reference.ModelDigest))
+            { SchemaSnapshot = (await DescribeAsync(target, token)).SchemaSnapshot };
         }, ct);
     public Task SealAsync(StorageDocumentPublicationReference reference, CancellationToken ct) => PublicationAsync(reference, "seal", ct);
     public Task ValidatePublicationAsync(StorageDocumentPublicationReference reference, CancellationToken ct) => PublicationAsync(reference, "inspect", ct);

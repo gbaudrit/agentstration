@@ -330,7 +330,8 @@ public sealed class KnowledgeSnapshotArtifactResolver(IResourceStore store)
                 artifact.Value.Receipt.MediaType,
                 artifact.Value.Receipt.Length,
                 artifact.Value.Receipt.Sha256,
-                new Dictionary<string, string>(artifact.Value.Receipt.Provenance, StringComparer.Ordinal)));
+                new Dictionary<string, string>(artifact.Value.Receipt.Provenance, StringComparer.Ordinal))
+            { DataContract = artifact.Value.Receipt.DataContract });
         }
         return result;
     }

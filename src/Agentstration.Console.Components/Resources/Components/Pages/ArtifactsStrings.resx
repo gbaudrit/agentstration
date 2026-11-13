@@ -53,4 +53,7 @@
   <data name="DataContractValidated" xml:space="preserve"><value>Validated against the published content.</value></data>
   <data name="DataContractUnvalidated" xml:space="preserve"><value>Contract available; no content validation evidence.</value></data>
   <data name="DataContractOrigin" xml:space="preserve"><value>Contract origin</value></data>
+<data name="DataContractGenericValidated" xml:space="preserve"><value>Valid JSON accepted by a generic contract. The business structure is not verified.</value></data>
+<data name="DataContractParentHash" xml:space="preserve"><value>Parent Schema hash:</value></data>
+<data name="DataContractSelectedHash" xml:space="preserve"><value>Selected schema hash:</value></data>
 </root>

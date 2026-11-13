@@ -230,4 +230,6 @@
   <data name="Error.Schema.Keyword" xml:space="preserve"><value>This keyword is outside the supported document schema profile:</value></data>
   <data name="Error.Schema.Limit" xml:space="preserve"><value>The schema exceeds its depth or expansion limit.</value></data>
   <data name="Error.Schema.Invalid" xml:space="preserve"><value>Check the type, structure and bounds at this schema location.</value></data>
+<data name="Documents.UseSharedSchema" xml:space="preserve"><value>Select a published Schema</value></data>
+<data name="Documents.UseInlineSchema" xml:space="preserve"><value>Use an inline schema</value></data>
 </root>

@@ -4,6 +4,8 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Storage;
 
@@ -19,7 +21,7 @@ public sealed class StorageManagementService(
     IAuthorizationService authorization,
     IPlatformAuthorizationService platformAuthorization,
     TimeProvider timeProvider,
-    IEnumerable<IStorageDefinitionValidator>? definitionValidators = null) : IStorageResolver
+    IEnumerable<IStorageDefinitionValidator>? definitionValidators = null, ISchemaBindingResolver? schemaBindings = null) : IStorageResolver
 {
     public async Task<IReadOnlyList<StoredResource<StorageResource>>> ListAsync(
         ResourceScopeRef scope, int skip, int take, CancellationToken token)
@@ -54,6 +56,7 @@ public sealed class StorageManagementService(
         };
         return await scopeOperations.WriteAsync(scoped, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
+            scoped = await AdoptSchemasAsync(scoped, ct);
             await ValidateAsync(scoped, ct);
             return await store.PutExactAsync(scope, scoped with
             {
@@ -154,7 +157,8 @@ public sealed class StorageManagementService(
         var scope = stored.Value.ScopeRef!.Value;
         return await scopeOperations.WriteAsync(stored.Value, scope, AuthorizationPermissions.ResourcesWrite, async ct =>
         {
-            var changed = stored.Value with { Definition = definition };
+            var changed = await AdoptSchemasAsync(stored.Value with { Definition = definition }, ct);
+            definition = changed.Definition;
             Shape(changed);
             if (!definition.Enabled || StorageDigests.Binding(stored.Value.Definition) != StorageDigests.Binding(definition))
                 await EnsureUnusedAsync(stored.Value, ct);
@@ -165,6 +169,29 @@ public sealed class StorageManagementService(
                 ObservedState = Ready(definition)
             }, etag, false, ct);
         }, token);
+    }
+
+    private async Task<StorageResource> AdoptSchemasAsync(StorageResource resource, CancellationToken token)
+    {
+        var collections = new List<StorageDocumentCollection>();
+        foreach (var collection in resource.Definition.Collections)
+        {
+            if (collection.SchemaBinding is not { } binding)
+            { collections.Add(collection with { SchemaSnapshot = null }); continue; }
+            if (schemaBindings is null) throw new StorageException("schema_resolver_unavailable", "Schema binding resolution is unavailable.");
+            try
+            {
+                var snapshot = await schemaBindings.ResolveAsync($"$.collections[{collection.Name}].schema", binding,
+                    new(resource.ScopeRef!.Value, resource.Namespace, SchemaFormatIds.JsonSchema), token);
+                if (snapshot.Dialect is { } dialect && dialect != BuiltinJsonSchemaFormatHandler.Draft202012)
+                    throw new StorageException("schema_dialect_incompatible", "The document validator does not support the selected dialect.");
+                var effective = JsonSchemaSelection.Select(snapshot.Content);
+                collections.Add(collection with { Schema = effective, SchemaSnapshot = snapshot });
+            }
+            catch (SchemaBindingResolutionException exception) { throw new StorageException(exception.Code, exception.Message); }
+            catch (SchemaSelectionException exception) { throw new StorageException(exception.Code, "The effective document schema is unsupported."); }
+        }
+        return resource with { Definition = resource.Definition with { Collections = collections } };
     }
 
     private async Task<StorageTypeVersionDescriptor> ValidateAsync(StorageResource resource, CancellationToken token)

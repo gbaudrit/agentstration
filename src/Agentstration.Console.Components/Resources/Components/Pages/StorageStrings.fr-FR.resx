@@ -230,4 +230,6 @@
   <data name="Error.Schema.Keyword" xml:space="preserve"><value>Ce mot-clé ne fait pas partie du profil de schéma documentaire pris en charge :</value></data>
   <data name="Error.Schema.Limit" xml:space="preserve"><value>Le schéma dépasse sa limite de profondeur ou d’expansion.</value></data>
   <data name="Error.Schema.Invalid" xml:space="preserve"><value>Vérifiez le type, la structure et les bornes à cet emplacement du schéma.</value></data>
+<data name="Documents.UseSharedSchema" xml:space="preserve"><value>Sélectionner un Schema publié</value></data>
+<data name="Documents.UseInlineSchema" xml:space="preserve"><value>Utiliser un schéma inline</value></data>
 </root>

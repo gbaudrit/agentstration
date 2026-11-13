@@ -502,6 +502,7 @@ public sealed class DataSourceManagementService(
     {
         var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(DataSourceResourceKinds.DataSource);
         var desired = resource with { ScopeRef = scope, Generation = 1, Uid = Guid.NewGuid() };
+        if (datasets is not null) desired = await datasets.AdoptSchemasAsync(desired, cancellationToken);
         var readiness = await ValidateAndResolveAsync(desired, false, cancellationToken);
         desired = PinProfile(desired, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(desired, scope, AuthorizationPermissions.ResourcesWrite,
@@ -518,6 +519,7 @@ public sealed class DataSourceManagementService(
         var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), Definition = definition };
         if ((existing.Value.Definition.Dataset is null) != (definition.Dataset is null))
             throw Error("data_source_composition_mode_fixed", "Create a separate Data Source to change its composition mode.");
+        if (datasets is not null) updated = await datasets.AdoptSchemasAsync(updated, cancellationToken);
         var readiness = await ValidateAndResolveAsync(updated, false, cancellationToken);
         updated = PinProfile(updated, readiness) with { Status = Status(readiness) };
         var stored = await scopeOperations.WriteAsync(updated, scope, AuthorizationPermissions.ResourcesWrite,
