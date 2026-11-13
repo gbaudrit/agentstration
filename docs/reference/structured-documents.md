@@ -91,9 +91,19 @@ Discovery states the subset. Sorting and grouping require declared scalar fields
 sum requires a declared number. An optional document JSON Schema builds the model.
 The bounded supported schema keywords are `type`, `properties`, `required`,
 boolean `additionalProperties`, `items`, `minimum`, `maximum`, `minLength`,
-`maxLength`, `minItems`, `maxItems`, `enum` and annotations. One type plus optional
-`null` is supported. Remote references and unsupported schema features fail
-explicitly; validation never fetches a schema from a supplied URL.
+`maxLength`, `minItems`, `maxItems`, `enum`, local `$defs`/`$ref`, nullable `anyOf`,
+asserted `date-time`/`uri` formats and annotations. One type plus optional `null`
+is supported, including `anyOf` with one typed branch and one unconstrained null
+branch. Reference siblings are limited to annotations. References must be local
+JSON Pointers; remote references, cycles and unsupported unions fail explicitly.
+Schemas are bounded to 64 KiB, eight expansion levels and 2,048 expanded nodes.
+Validation uses JsonSchema.Net without remote resolution. The original schema
+remains stored and hashed; expansion is only an internal validation/query model.
+This ASP profile does not change the separate Schema-family contracts attached
+to acquired Artifacts. Shared Schema discovery/adoption across OpenAPI, Artifacts
+and collections is tracked separately in [#1172](https://github.com/gbaudrit/agentstration/issues/1172).
+Invalid collection definitions return
+`storage_collection_schema_invalid` with bounded `validationIssues` paths/codes.
 
 Missing values compare as null. `eq null` matches missing and explicit null;
 `ge`/`le` are true for two nulls, and other ordered null comparisons are false.
@@ -180,6 +190,38 @@ inspect effective capabilities, verify operations and explicitly publish a Tool.
 All UI labels are available in en-US and fr-FR. An expired or uncertain mutation
 retains its original identity for an explicit retry; changing the draft creates
 a new request. Documents entered in the verification screen are persisted.
+
+Document-only Storages require an explicit collection in both source editors.
+The forms explain missing read/query/publication rights or an empty collection
+catalog and link to the Storage definition before allowing submission.
+
+## Structured acquisitions and document granularity
+
+A Data Source dataset can explicitly pin `documentCollectionUid` alongside its
+exact Storage revision. An acquired JSON object is canonicalized, stored in its
+own immutable publication and registered as an Artifact with the existing
+acquisition contract/provenance. Publication identity includes the source and
+acquisition UIDs. Exact reads and retention retirement reuse that publication;
+later acquisitions cannot replace historical results. This path requires an
+enabled collection permitting read/query/publication, with current grants and
+the existing dataset read/write intent. Content-backed acquisitions retain their
+existing behavior. Non-object results need explicit normalization and are refused.
+
+For an OpenAPI acquisition returning `{ "total_count": 88, "results": [...] }`,
+the complete response is one document. Its collection schema can describe nested
+objects, arrays and local definitions. `results/any(a:a/status eq 'EN COURS')`
+selects complete response documents containing a matching alert; it does not
+flatten, trim or count individual array entries. JSON strings retain the profile's
+string comparison semantics even when their date-time format is validated.
+
+Publishing one document per array element requires an explicit normalization
+processor producing a multi-Artifact manifest. The current standard Flow catalog
+does not yet provide a turnkey deterministic operation for that split. Generic
+mapping, Artifact processing and array batches alone do not provide it. The
+structured acquisition/schema corrections do not add this separate operation or
+infer completeness of the OpenAPI acquisition's Artifact contract. The builtin
+HTTP acquisition has a different output envelope (`mediaType` and textual
+`content`); consumers must use the actual operation's output shape.
 
 ## Structured Knowledge
 

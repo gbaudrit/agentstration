@@ -82,7 +82,7 @@ else
         <EditForm Model="this" OnValidSubmit="SaveAsync" FormName="data-source-dataset-definition" id="data-source-dataset-definition">
             <fieldset class="resource-definition-fields" disabled="@(busy || !CanManage || !interactive)" data-testid="dataset-definition-fields" data-interactive="@(interactive ? "true" : "false")">
                 <div class="dataset-form-toolbar"><h2>@T("Definition")</h2><div class="form-actions">
-                    <button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !HasOperationSelection || (!allowDirect && string.IsNullOrEmpty(storageKey)) || !LifecycleValid || enabled && (!parametersValid || AcquisitionIssue is not null || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation))">@T("Save")</button>
+                    <button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !DocumentCollectionValid || !HasOperationSelection || (!allowDirect && string.IsNullOrEmpty(storageKey)) || !LifecycleValid || enabled && (!parametersValid || AcquisitionIssue is not null || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation))">@T("Save")</button>
                     @if (source is not null) { <button class="button-secondary" type="button" @onclick="CancelDefinitionAsync">@T("DatasetCancel")</button> }
                     else { <a class="button-secondary" href="/data-sources/new">@T("DatasetLegacyProfile")</a> }
                 </div></div>
@@ -126,12 +126,20 @@ else
                     </div></section>
                     <section class="panel form-section"><h2>@T("DatasetDestination")</h2><div class="form-grid">
                 <label class="checkbox-field form-field-wide"><input type="checkbox" @bind="allowDirect" data-testid="dataset-allow-direct" /><span>@T("DirectPermission")</span><small>@T("DirectPermissionHelp")</small></label>
-                <label class="form-field-wide"><span>@T("DatasetStorage")</span><select @bind="storageKey" data-testid="dataset-storage" required="@(!allowDirect)">
+                <label class="form-field-wide"><span>@T("DatasetStorage")</span><select @bind="storageKey" @bind:after="() => documentCollectionUid = Guid.Empty" data-testid="dataset-storage" required="@(!allowDirect)">
                     <option value="">@T(allowDirect ? "DirectInput" : "Select")</option>
                     @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef · @storage.Namespace/@storage.Name · @storage.Generation</option> }
                     @if (source?.Definition.Dataset is { } saved && storages.All(value => StorageKey(value) != storageKey)) { <option value="@storageKey">@saved.Storage?.Storage · @T("DatasetPinnedUnavailable")</option> }
                 </select><small>@T("DatasetStorageHelp")</small></label>
-                <label class="form-field-wide"><span>@T("DatasetPrefix")</span><input @bind="prefix" maxlength="256" data-testid="dataset-prefix" /><small>@T("DatasetPrefixHelp")</small></label>
+                @if (!RequiresDocumentCollection && documentCollectionUid == Guid.Empty)
+                {
+                    <label class="form-field-wide"><span>@T("DatasetPrefix")</span><input @bind="prefix" maxlength="256" data-testid="dataset-prefix" /><small>@T("DatasetPrefixHelp")</small></label>
+                }
+                    @if (SelectedStorage is { } documentStorage && (RequiresDocumentCollection || documentStorage.Definition.Collections.Count > 0))
+                    {
+                        <label class="form-field-wide"><span>@T("DatasetDocumentCollection")</span><select @bind="documentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</select><small>@T("DatasetDocumentHelp")</small></label>
+                        @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "&view=definition")">@T("DatasetConfigureStorage")</a></p> }
+                    }
                     </div><p class="dataset-note"><UiIcon Name="layers" />@T(allowDirect && string.IsNullOrEmpty(storageKey) ? "DirectPermissionHelp" : "DatasetIsolatedContent")</p></section>
                 </div>
                 <SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="acquisitionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
@@ -257,6 +265,16 @@ else
     private void CloseContent() { preview = null; contentAcquisitionKey = ""; }
     private JsonElement parameters = JsonSerializer.SerializeToElement(new { });
     private IReadOnlyList<StorageResource> storages = [];
+    private IReadOnlyList<StorageTypeResource> storageTypes = [];
+    private Guid documentCollectionUid;
+    private StorageResource? SelectedStorage => storages.FirstOrDefault(s => StorageKey(s) == storageKey);
+    private bool RequiresDocumentCollection => SelectedStorage?.Definition.Type is { } type && storageTypes
+        .FirstOrDefault(t => t.Uid == type.TypeUid)?.Definition.Versions.FirstOrDefault(v => v.Version == type.Version)
+        is { Documents: not null } version && (!version.Capabilities.List || !version.Capabilities.Read || !version.Capabilities.Write);
+    private static bool CompatibleDocumentCollection(StorageDocumentCollection c) => c.Enabled && c.Policy.Get && c.Policy.Query && c.Policy.Publish;
+    private bool DocumentCollectionValid => SelectedStorage is null && source?.Definition.Dataset?.DocumentCollectionUid is { } savedCollection
+        && documentCollectionUid == savedCollection || (documentCollectionUid == Guid.Empty ? !RequiresDocumentCollection
+        : SelectedStorage?.Definition.Collections.Any(c => c.Uid == documentCollectionUid && CompatibleDocumentCollection(c)) == true);
     private IReadOnlyList<ConnectedServiceOperationResource> operations = [];
     private IReadOnlyList<ConnectedServiceResource> connectedServices = [];
     private IReadOnlyList<ConnectedServiceOperationTypeResource> operationTypes = [];
@@ -336,6 +354,7 @@ else
                 compositionPoints = saved.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
                 if (saved.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["transformations"] = saved.Transformations };
                 prefix = saved.Rule.Prefix; parameters = saved.Acquisition.Parameters.Clone();
+                documentCollectionUid = saved.DocumentCollectionUid ?? Guid.Empty;
                 storageKey = saved.Storage is { } savedStorage ? $"{savedStorage.StorageUid}:{savedStorage.Generation}:{savedStorage.BindingDigest}" : string.Empty;
                 operationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}";
             }
@@ -362,7 +381,13 @@ else
         operationTypes = await Operations.GetTypesAsync(cancellation.Token);
         operations = SelectedService is { } selectedService
             ? await Operations.GetForServiceAsync(selectedService, cancellation.Token) : [];
-        if (scope is { } owner) storages = await Storages.GetStoragesAsync(owner, cancellation.Token);
+        if (scope is { } owner)
+        {
+            var storagesTask = Storages.GetStoragesAsync(owner, cancellation.Token);
+            var typesTask = Storages.GetTypesAsync(owner, cancellation.Token);
+            await Task.WhenAll(storagesTask, typesTask);
+            storages = await storagesTask; storageTypes = await typesTask;
+        }
         if (source is not null)
         {
             readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, scope!.Value, cancellation.Token);
@@ -370,7 +395,7 @@ else
         }
     }
     private async Task RefreshAsync() => await RunAsync(RefreshCoreAsync);
-    private async Task ChangeScopeAsync(ResourceScopeRef? value) { scope = value; storageKey = ""; serviceKey = ""; ResetOperation(); await RefreshAsync(); }
+    private async Task ChangeScopeAsync(ResourceScopeRef? value) { scope = value; storageKey = ""; documentCollectionUid = Guid.Empty; serviceKey = ""; ResetOperation(); await RefreshAsync(); }
     private async Task ChangeServiceAsync(ChangeEventArgs value) { serviceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
     private void ResetOperation() { operationKey = ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
     private void ChangeOperation(ChangeEventArgs value) { operationKey = value.Value?.ToString() ?? ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
@@ -391,7 +416,7 @@ else
     private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync() => await RunAsync(async () =>
     {
-        if (!LifecycleValid || !HasOperationSelection || enabled && (AcquisitionIssue is not null || !parametersValid
+        if (!LifecycleValid || !DocumentCollectionValid || !HasOperationSelection || enabled && (AcquisitionIssue is not null || !parametersValid
             || SelectedOperation?.Enabled != true || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation)) return;
         var storage = storages.SingleOrDefault(item => StorageKey(item) == storageKey);
         var operation = SelectedOperation;
@@ -401,7 +426,7 @@ else
             new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
         var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = prefix };
         var definition = new DataSourceProperties { DisplayName = displayName.Trim(), Description = description, Enabled = enabled,
-            Dataset = new(storageReference, rule, new(operationReference, parameters)) { Orchestration = orchestration, Compositions = compositionPoints, Lifecycle = LifecycleSelection() } };
+            Dataset = new(storageReference, rule, new(operationReference, parameters)) { DocumentCollectionUid = documentCollectionUid == Guid.Empty ? null : documentCollectionUid, Orchestration = orchestration, Compositions = compositionPoints, Lifecycle = LifecycleSelection() } };
         var saved = IsNew ? await Client.CreateAsync(new(technicalName, definition, resourceNamespace, scope), cancellation.Token)
             : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
         source = saved.Value; etag = saved.ETag; savedOperation = operation ?? savedOperation; savedServiceKey = serviceKey; activeTab = DatasetTab.Overview;

@@ -43,5 +43,8 @@ public sealed record StorageAspBindingDescriptor(string Profile, string McpServe
 /// <summary>Pure provider-owned validation in addition to the immutable JSON schemas. Never resolves values or performs I/O.</summary>
 public interface IStorageDefinitionValidator
 {
+    bool ValidatesDocumentSchemas(StorageTypeVersionDescriptor version) => false;
     void Validate(StorageTypeResource type, StorageTypeVersionDescriptor version, StorageProperties definition);
 }
+
+public sealed record StorageValidationIssue(string Path, string Code, string? Keyword = null);

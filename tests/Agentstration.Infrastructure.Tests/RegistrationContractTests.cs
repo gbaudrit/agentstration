@@ -37,6 +37,7 @@ public sealed class RegistrationContractTests
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapResourceHandler)] = (20, ServiceLifetime.Scoped),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),

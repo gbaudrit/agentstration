@@ -242,6 +242,11 @@ the standalone protocol SDKs, optional OData grammar and Npgsql. Content operati
 and local defaults retain their existing contracts. Query relays fix exact
 Storage/collection/profile pins. Knowledge composes immutable document publications
 and canonical Artifact materializations with its existing Snapshot lifecycle.
+Data Sources can also pin a document collection for JSON-object acquisitions:
+each acquisition owns an immutable publication, exact Artifact evidence and
+producer-governed retention. Collection-schema validation follows the selected
+ASP profile through the existing Storage definition validator boundary; it does
+not alter generic Schema resources or the acquisition's declared output contract.
 
 [Structured documents](../../reference/structured-documents.md) specifies the
 capabilities, query subset, operator setup, Console/API behavior and deterministic

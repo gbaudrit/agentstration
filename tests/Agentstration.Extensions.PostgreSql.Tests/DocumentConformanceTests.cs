@@ -147,14 +147,14 @@ public sealed partial class DocumentConformanceTests
         public McpClient Mcp { get; private set; } = null!;
         public AspDocumentClient Client { get; private set; } = null!;
         public StructuredSampleAccess Access => Factory.Services.GetRequiredService<StructuredSampleAccess>();
-        public static async Task<Host> StartAsync(bool postgres, IAspDocumentProvider? fixture = null, string? profileId = null)
+        public static async Task<Host> StartAsync(bool postgres, IAspDocumentProvider? fixture = null, string? profileId = null, JsonElement? schema = null)
         {
-            IAspDocumentProvider provider = fixture ?? new MemoryDocumentProvider(Schema, TimeProvider.System);
+            IAspDocumentProvider provider = fixture ?? new MemoryDocumentProvider(schema ?? Schema, TimeProvider.System);
             if (postgres)
             {
                 var connection = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASP_POSTGRES");
                 if (string.IsNullOrWhiteSpace(connection)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASP_POSTGRES for the dedicated real PostgreSQL lane.");
-                var postgresProvider = new PostgreSqlDocumentProvider(connection, Schema); await postgresProvider.InitializeAsync(CancellationToken.None);
+                var postgresProvider = new PostgreSqlDocumentProvider(connection, schema ?? Schema); await postgresProvider.InitializeAsync(CancellationToken.None);
                 // Each case gets a unique physical StoreId via a provider-only partition wrapper.
                 provider = new PartitionProvider(postgresProvider, Guid.NewGuid().ToString("N"));
             }

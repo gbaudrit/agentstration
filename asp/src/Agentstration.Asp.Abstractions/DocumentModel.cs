@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Json.Schema;
 
 namespace Agentstration.Asp.Abstractions;
 
@@ -7,6 +8,7 @@ public static class DocumentModel
 {
     public static void ValidateSchema(JsonElement schema, int depth = 0)
     {
+        if (depth == 0) schema = DocumentSchema.Normalize(schema);
         AspValidation.Require(depth <= 8 && schema.ValueKind == JsonValueKind.Object, "invalid_schema", "Invalid document schema shape.");
         AspDocumentValidation.ValidateJson(schema);
         if (schema.TryGetProperty("type", out var declared))
@@ -21,7 +23,7 @@ public static class DocumentModel
         {
             AspValidation.Require(property.Name is "type" or "properties" or "required" or "additionalProperties" or "items"
                 or "minimum" or "maximum" or "minLength" or "maxLength" or "minItems" or "maxItems" or "enum"
-                or "title" or "description" or "$schema", "unsupported_schema", "Unsupported document schema keyword.");
+                or "title" or "description" or "$schema" or "format", "unsupported_schema", "Unsupported document schema keyword.");
             if (property.Name == "properties")
             {
                 AspValidation.Require(property.Value.ValueKind == JsonValueKind.Object && property.Value.EnumerateObject().Count() <= 64,
@@ -61,48 +63,17 @@ public static class DocumentModel
     }
     public static void Validate(JsonElement schema, JsonElement value, int depth = 0)
     {
-        if (depth == 0) ValidateSchema(schema);
         AspValidation.Require(depth <= 8, "limit_exceeded", "Document schema depth exceeded.");
-        if (schema.TryGetProperty("type", out var type))
+        var normalized = DocumentSchema.Normalize(schema);
+        ValidateSchema(normalized);
+        try
         {
-            var nullable = type.ValueKind == JsonValueKind.String ? type.GetString() == "null"
-                : type.EnumerateArray().Any(t => t.GetString() == "null");
-            var valid = value.ValueKind == JsonValueKind.Null && nullable || Type(schema) switch
-            {
-                "object" => value.ValueKind == JsonValueKind.Object,
-                "array" => value.ValueKind == JsonValueKind.Array,
-                "string" => value.ValueKind == JsonValueKind.String,
-                "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
-                "null" => value.ValueKind == JsonValueKind.Null,
-                "number" => value.ValueKind == JsonValueKind.Number,
-                "integer" => value.ValueKind == JsonValueKind.Number && decimal.Truncate(value.GetDecimal()) == value.GetDecimal(),
-                _ => false
-            };
-            AspValidation.Require(valid, "schema_validation", "The document does not match the declared type.");
+            var compiled = JsonSchema.Build(normalized, new BuildOptions
+            { SchemaRegistry = new SchemaRegistry { Fetch = (_, _) => throw new AspException("unsupported_schema", "Remote schema resolution is forbidden.") } });
+            var result = compiled.Evaluate(value, new EvaluationOptions { RequireFormatValidation = true });
+            AspValidation.Require(result.IsValid, "schema_validation", "The document does not satisfy its declared schema.");
         }
-        if (schema.TryGetProperty("enum", out var allowed))
-            AspValidation.Require(allowed.EnumerateArray().Any(v => JsonElement.DeepEquals(v, value)), "schema_validation", "The value is outside its enumeration.");
-        if (value.ValueKind == JsonValueKind.Object)
-        {
-            if (schema.TryGetProperty("required", out var required))
-                foreach (var field in required.EnumerateArray()) AspValidation.Require(value.TryGetProperty(field.GetString()!, out _), "schema_validation", "A required document property is missing.");
-            var hasProperties = schema.TryGetProperty("properties", out var properties);
-            foreach (var field in value.EnumerateObject())
-            {
-                if (hasProperties && properties.TryGetProperty(field.Name, out var child)) Validate(child, field.Value, depth + 1);
-                else AspValidation.Require(!schema.TryGetProperty("additionalProperties", out var additional) || additional.ValueKind != JsonValueKind.False,
-                    "schema_validation", "The document contains an undeclared property.");
-            }
-        }
-        if (value.ValueKind == JsonValueKind.Array)
-        {
-            Bounds(schema, "minItems", "maxItems", value.GetArrayLength());
-            if (schema.TryGetProperty("items", out var items)) foreach (var item in value.EnumerateArray()) Validate(items, item, depth + 1);
-        }
-        if (value.ValueKind == JsonValueKind.String) Bounds(schema, "minLength", "maxLength", value.GetString()!.EnumerateRunes().Count());
-        if (value.ValueKind == JsonValueKind.Number) Bounds(schema, "minimum", "maximum", value.GetDecimal());
+        catch (JsonSchemaException)
+        { throw new AspException("invalid_schema", "The document schema cannot be evaluated."); }
     }
-    private static void Bounds(JsonElement schema, string min, string max, decimal actual) =>
-        AspValidation.Require((!schema.TryGetProperty(min, out var minimum) || actual >= minimum.GetDecimal())
-            && (!schema.TryGetProperty(max, out var maximum) || actual <= maximum.GetDecimal()), "schema_validation", "The value exceeds its schema bounds.");
 }

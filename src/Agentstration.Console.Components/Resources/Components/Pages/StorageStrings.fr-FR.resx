@@ -221,4 +221,13 @@
   <data name="Documents.Capabilities" xml:space="preserve"><value>Capacités documentaires</value></data>
   <data name="Documents.RequestPageSize" xml:space="preserve"><value>Taille de page</value></data>
   <data name="Documents.NoOperations" xml:space="preserve"><value>Aucune opération disponible avec vos droits actuels</value></data>
+  <data name="Error.CollectionSchema" xml:space="preserve"><value>Le schéma d’une collection est invalide ou dépasse le profil documentaire pris en charge.</value></data>
+  <data name="Error.SchemaHelp" xml:space="preserve"><value>Corrigez les champs signalés dans le schéma de la collection, puis enregistrez à nouveau.</value></data>
+  <data name="Error.Schema.ReferenceUnsupported" xml:space="preserve"><value>Seules les références locales bornées et non récursives sont prises en charge :</value></data>
+  <data name="Error.Schema.ReferenceInvalid" xml:space="preserve"><value>La référence locale au schéma est invalide ou introuvable :</value></data>
+  <data name="Error.Schema.Union" xml:space="preserve"><value>Utilisez un schéma typé et null pour cette union nullable :</value></data>
+  <data name="Error.Schema.Format" xml:space="preserve"><value>Les formats validés pris en charge sont date-time et uri :</value></data>
+  <data name="Error.Schema.Keyword" xml:space="preserve"><value>Ce mot-clé ne fait pas partie du profil de schéma documentaire pris en charge :</value></data>
+  <data name="Error.Schema.Limit" xml:space="preserve"><value>Le schéma dépasse sa limite de profondeur ou d’expansion.</value></data>
+  <data name="Error.Schema.Invalid" xml:space="preserve"><value>Vérifiez le type, la structure et les bornes à cet emplacement du schéma.</value></data>
 </root>

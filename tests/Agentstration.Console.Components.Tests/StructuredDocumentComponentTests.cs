@@ -1,4 +1,5 @@
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Console;
 using Agentstration.Web.Components.Pages;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,25 @@ public sealed class StructuredDocumentComponentTests
         Assert.IsTrue(values[0].Schema.TryGetProperty("properties", out _));
         page.Find("[data-testid=storage-collection-add]").Click();
         Assert.AreEqual(Guid.Empty, values[^1].Uid, "Only the server allocates a new collection identity.");
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "A collection schema is invalid", "Only bounded, nonrecursive local references")]
+    [DataRow("fr-FR", "Le schéma d’une collection est invalide", "Seules les références locales bornées et non récursives")]
+    public void CollectionSchemaFailureIdentifiesTheFieldAndActionWithoutRefreshAdvice(string culture, string title, string action)
+    {
+        using var currentCulture = new TestCultureScope(culture);
+        using var context = new BunitContext();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        var error = new AgentstrationApiException("hidden diagnostic", "fixture-error", System.Net.HttpStatusCode.UnprocessableEntity,
+            "storage_collection_schema_invalid")
+        { ValidationIssues = [new("/definition/collections/0/schema/$defs/item/$ref", "unsupported_schema", "$ref")] };
+        var page = context.Render<StorageError>(p => p.Add(c => c.Error, error));
+        Assert.Contains(title, page.Markup);
+        Assert.Contains(action, page.Markup);
+        Assert.Contains("/definition/collections/0/schema/$defs/item/$ref", page.Markup);
+        Assert.DoesNotContain("hidden diagnostic", page.Markup);
+        Assert.DoesNotContain("Error.RefreshHelp", page.Markup);
     }
 
 }

@@ -30,8 +30,30 @@ public sealed partial class DataSourceDatasetTests
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(inputs.Context);
         using var client = factory.CreateClient(); SelectConsoleContext(client, Owner);
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, postgres);
-        var input = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
-            Source("structured-json-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "structured" })), default);
+        var inputDraft = Source("structured-json-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "structured" }));
+        inputDraft = inputDraft with
+        {
+            Definition = inputDraft.Definition with
+            { Dataset = inputDraft.Definition.Dataset! with { Storage = storage.Reference, DocumentCollectionUid = storage.Collection } }
+        };
+        var invalidCollection = inputDraft with
+        {
+            Definition = inputDraft.Definition with
+            { Dataset = inputDraft.Definition.Dataset! with { DocumentCollectionUid = Guid.NewGuid() } }
+        };
+        var invalid = await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceValidationException>(() =>
+            factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(invalidCollection, default));
+        Assert.AreEqual("data_source_document_collection_unavailable", invalid.Code);
+        var privateCollection = storage.Storage.Definition.Collections.Single(c => c.Name == "private").Uid;
+        invalidCollection = inputDraft with
+        {
+            Definition = inputDraft.Definition with
+            { Dataset = inputDraft.Definition.Dataset! with { DocumentCollectionUid = privateCollection } }
+        };
+        invalid = await Assert.ThrowsAsync<Agentstration.DataSources.DataSourceValidationException>(() =>
+            factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(invalidCollection, default));
+        Assert.AreEqual("data_source_document_publication_required", invalid.Code);
+        var input = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(inputDraft, default);
         var contentContract = DataContracts.Declared(StructuredStorageFixture.Json("""
             {"type":"object","required":["status","value"],"properties":{"status":{"type":"string"},"value":{"type":"number"}}}
             """), "structured-projection", "application/json")!;
@@ -123,5 +145,9 @@ public sealed partial class DataSourceDatasetTests
 
         Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact => artifact.Content?.Document is not null)));
         Assert.HasCount(1, await factory.Services.GetRequiredService<DataSourceAcquisitionService>().ListAsync(input.Value.Namespace, input.Value.Name, Owner, default));
+        var acquisition = (await factory.Services.GetRequiredService<DataSourceAcquisitionService>().ListAsync(input.Value.Namespace, input.Value.Name, Owner, default)).Single();
+        Assert.IsNotNull(acquisition.Publication?.Document, "JSON acquisition must itself be retained in the selected document Storage.");
+        var acquired = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
+        Assert.AreEqual(acquisition.Content!.Sha256, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Convert.FromBase64String(acquired.ContentBase64))));
     }
 }

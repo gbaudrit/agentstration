@@ -6,6 +6,7 @@ public static class StorageErrorKey
 {
     public static string For(Exception error) => error is AgentstrationApiException api ? api.ProblemTitle switch
     {
+        "storage_collection_schema_invalid" => "Error.CollectionSchema",
         "storage_documents_invalid_query" or "storage_documents_unsupported_query" => "Documents.Error.Query",
         "storage_documents_unsupported_capability" => "Documents.Error.Profile",
         "storage_documents_schema_validation" => "Documents.Error.Schema",

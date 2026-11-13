@@ -4,6 +4,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="JsonSchema.Net" Version="8.0.5" />
     <PackageVersion Include="Apache.OpenDAL" Version="0.3.1" />
     <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
     <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />

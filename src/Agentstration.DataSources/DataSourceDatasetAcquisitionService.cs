@@ -19,7 +19,8 @@ public sealed class DataSourceDatasetAcquisitionService(
     IDataSourceAcquisitionFlowGateway flows,
     IStorageContentGateway content,
     TimeProvider clock,
-    IStoredArtifactRegistrar artifacts, IDataSourceHistoryMaintenance? history = null)
+    IStoredArtifactRegistrar artifacts, IDataSourceHistoryMaintenance? history = null,
+    DataSourceDocumentStorage? documentStorage = null)
 {
     private readonly DataSourceExecutionContext execution = new(current, scopes);
     private readonly SemaphoreSlim admission = new(1, 1);
@@ -192,6 +193,7 @@ public sealed class DataSourceDatasetAcquisitionService(
         StorageObject? result = null;
         DataSourceAcquisitionManifest? manifest = acquisition.Manifest;
         DirectDataSourceResult? directResult = acquisition.DirectResult;
+        var publication = acquisition.Publication;
         if (state == DataSourceAcquisitionState.Succeeded)
         {
             try
@@ -199,7 +201,8 @@ public sealed class DataSourceDatasetAcquisitionService(
                 await ValidateExecutionAsync(acquisition, cancellationToken);
                 if (run.Output is not { } output) throw Invalid("data_source_output_missing", "The operation returned no content.");
                 DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset!.OutputSchema, output);
-                var bytes = JsonSerializer.SerializeToUtf8Bytes(output);
+                var bytes = acquisition.Dataset.Definition.DocumentCollectionUid is null
+                    ? JsonSerializer.SerializeToUtf8Bytes(output) : DataSourceDocumentStorage.Encode(output);
                 if (acquisition.Dataset.Definition.Storage is null)
                 {
                     if (bytes.Length > DataSourceDatasetCompositionService.MaximumValueBytes)
@@ -211,15 +214,10 @@ public sealed class DataSourceDatasetAcquisitionService(
                     var target = DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope);
                     if (bytes.Length > target.Policy.MaximumWriteBytes)
                         throw Invalid("data_source_output_too_large", "The operation output exceeds the dataset limit.");
-                    var key = $"{acquisition.Dataset.Partition}{acquisition.WorkspaceId:N}/{acquisition.Name}.json";
-                    // Each acquisition writes a unique immutable key. Check a recovered write before retrying it.
-                    var page = await content.ListAsync(target, key, 1, cancellationToken: cancellationToken);
-                    result = page.Objects.SingleOrDefault(item => item.Key == key);
                     var digest = Digest(bytes);
-                    if (result is not null && result.Sha256 != digest)
-                        throw Invalid("data_source_content_conflict", "The acquired content identity conflicts with an existing write.");
-                    if (result is null)
+                    if (target.DocumentCollectionUid is not null)
                     {
+                        if (documentStorage is null) throw Invalid("data_source_document_storage_unavailable", "Structured acquisition storage is unavailable.");
                         if (acquisition.WriteNotAfter is null)
                         {
                             var writing = acquisition with { Generation = checked(acquisition.Generation + 1), WriteNotAfter = clock.GetUtcNow().AddMinutes(4) };
@@ -235,13 +233,42 @@ public sealed class DataSourceDatasetAcquisitionService(
                                 return await SynchronizeAsync(latest ?? stored, cancellationToken);
                             }
                         }
-                        if (acquisition.WriteNotAfter <= clock.GetUtcNow())
-                            throw Invalid("data_source_write_outcome_unknown", "The publication deadline expired without a confirmed content receipt.");
-                        result = await content.WriteAsync(target, new(acquisition.Name, acquisition.WriteNotAfter!.Value,
-                            key, Convert.ToBase64String(bytes)), cancellationToken);
+                        publication = await documentStorage.PrepareAsync(acquisition, target, output, bytes, cancellationToken);
+                        result = new(publication.Key, publication.Version, publication.Length, publication.Sha256, string.Empty);
+                    }
+                    else
+                    {
+                        var key = $"{acquisition.Dataset.Partition}{acquisition.WorkspaceId:N}/{acquisition.Name}.json";
+                        // Each acquisition writes a unique immutable key. Check a recovered write before retrying it.
+                        var page = await content.ListAsync(target, key, 1, cancellationToken: cancellationToken);
+                        result = page.Objects.SingleOrDefault(item => item.Key == key);
+                        if (result is not null && result.Sha256 != digest)
+                            throw Invalid("data_source_content_conflict", "The acquired content identity conflicts with an existing write.");
+                        if (result is null)
+                        {
+                            if (acquisition.WriteNotAfter is null)
+                            {
+                                var writing = acquisition with { Generation = checked(acquisition.Generation + 1), WriteNotAfter = clock.GetUtcNow().AddMinutes(4) };
+                                try
+                                {
+                                    stored = await execution.InWorkspaceAsync(() => store.PutExactAsync(writing.ScopeRef!.Value, writing, stored.ETag, false, cancellationToken));
+                                    acquisition = stored.Value;
+                                }
+                                catch (ResourceConcurrencyException)
+                                {
+                                    var latest = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceAcquisitionResource>(
+                                        new(acquisition.ScopeRef!.Value, acquisition.Namespace, acquisition.Kind, acquisition.Name), cancellationToken));
+                                    return await SynchronizeAsync(latest ?? stored, cancellationToken);
+                                }
+                            }
+                            if (acquisition.WriteNotAfter <= clock.GetUtcNow())
+                                throw Invalid("data_source_write_outcome_unknown", "The publication deadline expired without a confirmed content receipt.");
+                            result = await content.WriteAsync(target, new(acquisition.Name, acquisition.WriteNotAfter!.Value,
+                                key, Convert.ToBase64String(bytes)), cancellationToken);
+                        }
                     }
                     var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId), target,
-                        result.Key, result.Version, bytes.Length, digest);
+                        result.Key, result.Version, bytes.Length, digest, publication);
                     var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
                         "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
                         new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
@@ -281,6 +308,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             Generation = checked(acquisition.Generation + 1),
             State = state,
             Content = result,
+            Publication = state == DataSourceAcquisitionState.Succeeded ? publication : null,
             DirectResult = state == DataSourceAcquisitionState.Succeeded ? directResult : null,
             Manifest = state == DataSourceAcquisitionState.Succeeded ? manifest : null,
             CompletedAt = Terminal(state) ? clock.GetUtcNow() : null,
@@ -375,6 +403,15 @@ public sealed class DataSourceDatasetAcquisitionService(
         if (acquisition.ContentRetiredAt is not null || acquisition.Content is not { } item || acquisition.State != DataSourceAcquisitionState.Succeeded)
             throw Invalid("data_source_content_unavailable", "The acquisition has no published content.");
         var target = DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope);
+        if (acquisition.Publication is { } publication)
+        {
+            if (documentStorage is null || publication.Target.Storage != target.Storage
+                || publication.Target.DocumentCollectionUid != target.DocumentCollectionUid
+                || publication.Key != item.Key || publication.Version != item.Version
+                || publication.Length != item.Length || publication.Sha256 != item.Sha256)
+                throw ContentVersionUnavailable();
+            return await documentStorage.ReadAsync(publication with { Target = target }, item, offset, maximumBytes, cancellationToken);
+        }
         // References are short-lived and subject-bound. Renew from the recorded key after authorization.
         var page = await content.ListAsync(target, item.Key, 1, cancellationToken: cancellationToken);
         var currentItem = page.Objects.SingleOrDefault(value => value.Key == item.Key);
@@ -433,7 +470,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             throw Invalid("data_source_access_denied", "Artifact reconciliation requires the original acquisition caller.");
         _ = await ReadAsync(acquisition, 0, 1, cancellationToken);
         var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId),
-            DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope), item.Key, item.Version, item.Length, digest);
+            DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope), item.Key, item.Version, item.Length, digest, acquisition.Publication);
         var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
             "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
             new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),

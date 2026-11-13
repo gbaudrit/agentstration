@@ -200,7 +200,9 @@ public sealed class StorageManagementService(
         foreach (var collection in definition.Collections)
         {
             StorageValidation.Name(collection.Name); StorageValidation.Display(collection.DisplayName, null);
-            StorageValidation.Json(collection.Schema); await StorageValidation.SchemaAsync(collection.Schema, token);
+            StorageValidation.Json(collection.Schema);
+            if (!(definitionValidators ?? []).Any(v => v.ValidatesDocumentSchemas(version)))
+                await StorageValidation.SchemaAsync(collection.Schema, token);
             var policy = collection.Policy;
             if (policy.MaximumPageSize is < 1 or > 100 || policy.MaximumDocumentBytes is < 1 or > 65536
                 || policy.MaximumResultBytes is < 65536 or > 196608 || policy.QueryProfiles is not { Count: <= 8 } || policy.Query && policy.QueryProfiles.Count == 0

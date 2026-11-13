@@ -16,6 +16,8 @@ A query profile is an open `(id, version, encoding)` reference plus an exact doc
 
 Document get/conditional put/conditional delete and query use independent rights. Publication preparation/sealing/inspection/retirement is separately qualified. Unsupported operations fail explicitly, preserving the canonical MCP mapping. Patch and Search remain absent.
 
+The ASP document profile owns its bounded document-schema subset. Storage management delegates collection-schema validation to the registered profile validator through its existing definition-validation boundary; generic configuration/envelope schemas and acquisition Artifact contracts retain their existing Schema-family behavior. Local nonrecursive `$defs`/`$ref`, typed nullable `anyOf`, and asserted `date-time`/`uri` formats are supported. A bounded expanded model feeds typed query discovery while the original schema remains the persisted, digest-bearing identity. Instance validation uses the standard JsonSchema.Net implementation with remote resolution disabled. Invalid collection schemas carry bounded field paths and keyword codes for localized Console diagnostics.
+
 ## Consequences
 
 A provider can implement documents without query, or add other declared query profiles later. PostgreSQL never enters the generic contracts. Future JSONPath or governed relational profiles need their own semantics and authorization review. Existing content contribution digests and absent optional fields retain their original wire representation.

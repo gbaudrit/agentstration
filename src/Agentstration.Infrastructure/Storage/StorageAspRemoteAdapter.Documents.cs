@@ -68,6 +68,7 @@ public sealed partial class StorageAspRemoteAdapter
             var client = await AspDocumentClient.ConnectAsync(connection, mapping.ToolPrefix, effective.Store, effective.Selection, ct);
             AspValidation.Require(client.Description.ProviderId == mapping.ProviderId && client.Description.ProviderVersion == mapping.ProviderVersion
                 && StorageDigests.Schema(client.Description.ConfigurationSchema) == version.SchemaDigest
+                && client.Description.SchemaDigest == AspDocumentValidation.Digest(declarations.Single().Schema)
                 && AspDocumentValidation.IsNarrower(client.Description.Policy, effective.Policy), "invalid_result", "The document provider changed identity/schema or widened policy.");
             return await execute(client, ct);
         }

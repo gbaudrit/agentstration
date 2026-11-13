@@ -183,4 +183,10 @@
   <data name="SequenceOpenVersion" xml:space="preserve"><value>Open this Flow version</value></data>
   <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations before publication</value></data>
   <data name="BeforePublicationHelp" xml:space="preserve"><value>These transformations process the results gathered from all input sources before the Snapshot is created and published.</value></data>
+  <data name="DatasetDocumentCollection" xml:space="preserve"><value>Acquisition document collection</value></data>
+  <data name="DatasetDocumentSelect" xml:space="preserve"><value>Select a collection</value></data>
+  <data name="DatasetContentStorage" xml:space="preserve"><value>Content storage (no document collection)</value></data>
+  <data name="DatasetDocumentHelp" xml:space="preserve"><value>Each acquired JSON object is retained in an immutable publication. Use a transformation Flow to normalize other result shapes.</value></data>
+  <data name="DatasetDocumentRequired" xml:space="preserve"><value>Select an enabled collection allowing read, query and immutable publication. If none is available, configure one on the Storage.</value></data>
+  <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
 </root>

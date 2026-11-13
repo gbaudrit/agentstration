@@ -24,7 +24,7 @@ public sealed class ODataDocumentProfile
     {
         DocumentModel.ValidateSchema(schema);
         Schema = schema.Clone();
-        root = BuildType(schema, "Document", 0);
+        root = BuildType(DocumentSchema.Normalize(schema), "Document", 0);
         Descriptor = new(new(Id, Version, Encoding, AspDocumentValidation.Digest(schema)),
             "OData 4.01 URL conventions; Data Aggregation 4.0",
             ["filter", "orderby", "select", "any", "all", "in", "count", "sum", "min", "max", "groupby", "unicode-codepoint-order"],

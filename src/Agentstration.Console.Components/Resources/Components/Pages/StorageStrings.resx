@@ -221,4 +221,13 @@
   <data name="Documents.Capabilities" xml:space="preserve"><value>Document capabilities</value></data>
   <data name="Documents.RequestPageSize" xml:space="preserve"><value>Page size</value></data>
   <data name="Documents.NoOperations" xml:space="preserve"><value>No operation is available with your current rights</value></data>
+  <data name="Error.CollectionSchema" xml:space="preserve"><value>A collection schema is invalid or exceeds the supported document profile.</value></data>
+  <data name="Error.SchemaHelp" xml:space="preserve"><value>Correct the indicated collection schema fields, then save again.</value></data>
+  <data name="Error.Schema.ReferenceUnsupported" xml:space="preserve"><value>Only bounded, nonrecursive local references are supported:</value></data>
+  <data name="Error.Schema.ReferenceInvalid" xml:space="preserve"><value>The local schema reference is invalid or missing:</value></data>
+  <data name="Error.Schema.Union" xml:space="preserve"><value>Use a typed schema plus null for this nullable union:</value></data>
+  <data name="Error.Schema.Format" xml:space="preserve"><value>Supported asserted formats are date-time and uri:</value></data>
+  <data name="Error.Schema.Keyword" xml:space="preserve"><value>This keyword is outside the supported document schema profile:</value></data>
+  <data name="Error.Schema.Limit" xml:space="preserve"><value>The schema exceeds its depth or expansion limit.</value></data>
+  <data name="Error.Schema.Invalid" xml:space="preserve"><value>Check the type, structure and bounds at this schema location.</value></data>
 </root>

@@ -75,7 +75,7 @@
   <data name="OutputStorage" xml:space="preserve"><value>Snapshot output Storage</value></data>
   <data name="ArtifactOutputDefault" xml:space="preserve"><value>Existing Artifact publication</value></data>
   <data name="PinnedOutputStorage" xml:space="preserve"><value>Saved exact Storage revision</value></data>
-  <data name="OutputStorageHelp" xml:space="preserve"><value>Select an independent output Storage supporting retained publications. The local implementation is supported.</value></data>
+  <data name="OutputStorageHelp" xml:space="preserve"><value>Select a Storage supporting retained Snapshots. Document storage also requires a collection allowing read, query and publication.</value></data>
   <data name="OutputPrefix" xml:space="preserve"><value>Output prefix</value></data>
   <data name="OutputPrefixHelp" xml:space="preserve"><value>A relative prefix within the selected Storage envelope. End directory prefixes with /.</value></data>
   <data name="RefreshIfNecessary" xml:space="preserve"><value>Refresh acquisitions if necessary</value></data>
@@ -151,4 +151,7 @@
   <data name="ProjectionFailed" xml:space="preserve"><value>Projection did not succeed: {0}</value></data>
   <data name="ProjectionAccepted" xml:space="preserve"><value>Projection accepted. Progress will refresh automatically.</value></data>
   <data name="FlowRunNewTab" xml:space="preserve"><value>Open Flow Run {0} in a new tab.</value></data>
+  <data name="StructuredOutputSelect" xml:space="preserve"><value>Select a collection</value></data>
+  <data name="StructuredOutputRequired" xml:space="preserve"><value>This document Storage requires an enabled collection allowing read, query and immutable publication. Configure one on the Storage, then select it here.</value></data>
+  <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
 </root>

@@ -101,6 +101,9 @@ public sealed record DataSourceDatasetProperties(
     StorageRevisionReference? Storage, StorageContentPolicy Rule,
     DataSourceOperationAcquisitionBinding Acquisition)
 {
+    /// <summary>Explicit structured acquisition target; null retains the content profile.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
     public DataSourceAcquisitionPolicy? Lifecycle { get; init; }
     public FlowCallReference? Orchestration { get; init; }
     public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
@@ -397,6 +400,8 @@ public sealed record DataSourceAcquisitionResource : Resource
     public ResolvedDataSourceAcquisitionComposition? Composition { get; init; }
     public ResolvedDataSourceDataset? Dataset { get; init; }
     public StorageObject? Content { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public StoragePublicationReference? Publication { get; init; }
     public DirectDataSourceResult? DirectResult { get; init; }
     public DateTimeOffset? ContentRetiredAt { get; init; }
     public DateTimeOffset? ContentRetiringAt { get; init; }

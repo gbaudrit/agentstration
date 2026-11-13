@@ -12,7 +12,8 @@ public sealed class DataSourceDatasetCompositionService(
     ConnectedServiceOperationService operations,
     IStorageResolver storage,
     IStorageContentGateway content,
-    IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null)
+    IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
+    DataSourceDocumentStorage? documentStorage = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
     internal const int MaximumValueBytes = 64 * 1024;
@@ -38,11 +39,19 @@ public sealed class DataSourceDatasetCompositionService(
         {
             var consumerContext = new StorageResolutionContext(consumer, source.Address);
             var target = await storage.ResolveAsync(inputStorage, consumerContext, cancellationToken);
-            if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
-                || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
-                throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
-            var effective = definition.Rule with { Prefix = partition };
-            await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+            if (definition.DocumentCollectionUid is not null)
+            {
+                if (documentStorage is null) throw Invalid("data_source_document_storage_unavailable", "Structured acquisition storage is unavailable.");
+                await documentStorage.ValidateAsync(inputStorage, consumerContext, definition, cancellationToken);
+            }
+            else
+            {
+                if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
+                    || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
+                    throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
+                var effective = definition.Rule with { Prefix = partition };
+                await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+            }
         }
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
@@ -76,6 +85,8 @@ public sealed class DataSourceDatasetCompositionService(
 
     public static void ValidateLifecycle(DataSourceDatasetProperties definition)
     {
+        if (definition.DocumentCollectionUid is { } collection && (collection == Guid.Empty || definition.Storage is null))
+            throw Invalid("data_source_document_collection_required", "Structured acquisition requires an exact Storage and collection.");
         var policy = definition.Lifecycle;
         if (definition.Storage is null && policy?.AllowDirect != true)
             throw Invalid("data_source_direct_permission_required", "Direct acquisition requires explicit permission.");
@@ -104,7 +115,8 @@ public sealed class DataSourceDatasetCompositionService(
         var dataset = acquisition.Dataset!;
         return new(dataset.Definition.Storage ?? throw Invalid("data_source_content_unavailable", "This acquisition has no retained input Storage."),
             new(consumer, ResourceAddress.Create(acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName)),
-            dataset.Definition.Rule with { Prefix = dataset.Partition });
+            dataset.Definition.Rule with { Prefix = dataset.Partition })
+        { DocumentCollectionUid = dataset.Definition.DocumentCollectionUid };
     }
 
     public static void ValidateValue(JsonElement schema, JsonElement value)
