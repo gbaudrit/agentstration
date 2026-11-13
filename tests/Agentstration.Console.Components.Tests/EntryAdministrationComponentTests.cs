@@ -69,6 +69,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.Markup.Contains("Prompt Entry", StringComparison.Ordinal));
         Assert.AreEqual("1", rendered.Find(".collection-version code").TextContent);
         Assert.AreEqual("Published", rendered.Find(".status-icon-only button").GetAttribute("aria-label"));
+        Assert.AreEqual($"/workspaces/{client.EntryDrafts[0].Value.WorkspaceId.Value:D}", rendered.Find(".resource-owner-icon").GetAttribute("data-scope-ref"));
         Assert.IsFalse(rendered.Markup.Contains("Draft r", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Configure", StringComparison.Ordinal));
         Assert.AreEqual("/entries/prepare-report", rendered.Find(".entry-card-link").GetAttribute("href"));
