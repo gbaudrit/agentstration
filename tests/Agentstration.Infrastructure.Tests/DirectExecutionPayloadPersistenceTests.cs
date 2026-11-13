@@ -45,6 +45,25 @@ public sealed class DirectExecutionPayloadPersistenceTests
         clock.Now += DirectExecutionPayloadPersistence.Lifetime;
         Assert.IsNotNull(cache.Store(original with { Timestamp = clock.Now }).TransientPayloadTicket);
     }
+    [TestMethod]
+    public void ProcessingDraftsShareAdmissionCapacityWithoutEvictingOrReplacingAcceptedContent()
+    {
+        var clock = new Clock();
+        var cache = new DirectExecutionPayloadPersistence(clock);
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var content = new string('x', 4 * 1024 * 1024);
+        for (var index = 0; index < 15; index++) cache.StoreProcessing(scope, "draft-" + index, content, clock.Now + DirectExecutionPayloadPersistence.Lifetime);
+        cache.StoreProcessing(scope, "draft-0", "accepted", clock.Now + DirectExecutionPayloadPersistence.Lifetime);
+        var oversized = new string('y', 9 * 1024 * 1024);
+        var full = Assert.ThrowsExactly<FlowValidationException>(() => cache.StoreProcessing(scope, "draft-0", oversized, clock.Now + DirectExecutionPayloadPersistence.Lifetime));
+        Assert.AreEqual("direct_content_capacity", full.Code);
+        Assert.AreEqual("accepted", cache.GetProcessing<string>(scope, "draft-0"));
+        Assert.IsNull(cache.GetProcessing<string>(ResourceScopeRef.Workspace(Guid.NewGuid()), "draft-0"));
+        Assert.IsNull(new DirectExecutionPayloadPersistence(clock).GetProcessing<string>(scope, "draft-0"));
+        clock.Now += DirectExecutionPayloadPersistence.Lifetime;
+        Assert.IsNull(cache.GetProcessing<string>(scope, "draft-0"));
+    }
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);

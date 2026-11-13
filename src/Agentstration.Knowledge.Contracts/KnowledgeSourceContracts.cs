@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge.Contracts;
@@ -225,6 +226,7 @@ public enum KnowledgeArtifactKind { Staged, Durable, Inline }
 
 public sealed record KnowledgeProjectionArtifact
 {
+    public ResolvedDataContract? DataContract { get; init; }
     public required string ArtifactId { get; init; }
     public required KnowledgeArtifactKind Kind { get; init; }
     public required KnowledgeArtifactDisposition Disposition { get; init; }
@@ -369,6 +371,7 @@ public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable, R
 
 public sealed record KnowledgeSnapshotArtifact
 {
+    public ResolvedDataContract? DataContract { get; init; }
     public StoragePublicationReference? Content { get; init; }
     public required string ArtifactId { get; init; }
     public required string ProducerFlowRunId { get; init; }

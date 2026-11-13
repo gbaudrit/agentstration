@@ -1,4 +1,4 @@
-# ADR-0215: Logical document collections remain governed Storage configuration
+# ADR-0222: Logical document collections remain governed Storage configuration
 
 ## Status
 

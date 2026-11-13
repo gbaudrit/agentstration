@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Agentstration.Schemas;
 using System.Security.Claims;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
@@ -10,6 +12,7 @@ namespace Agentstration.Runtime.Api.Api;
 
 public static class AwpRuntimeWorkerEndpoints
 {
+    private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     public static IEndpointRouteBuilder MapAwpRuntimeWorkerEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var awp = endpoints.MapGroup(AwpProtocol.BasePath)
@@ -59,6 +62,10 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/flow-tools/invoke", InvokeFlowToolAsync)
             .Produces<AwpEnvelope<AwpInvokeFlowToolResponse>>()
             .WithSummary("Invoke the Tool declared by an assigned Flow step through governance and audit hooks");
+        awp.MapPost("/assignments/artifact-processing", ProcessArtifactAsync)
+            .Produces<AwpEnvelope<AwpProcessArtifactResponse>>()
+            .WithName("AwpProcessArtifact")
+            .WithSummary("Prepare, finalize or abort content processing for an assigned Artifact transformation step");
         awp.MapPost("/assignments/flow-artifacts/capture", CaptureFlowArtifactAsync)
             .Produces<AwpEnvelope<AwpCaptureFlowArtifactResponse>>()
             .WithSummary("Capture a governed Artifact declared by an assigned Flow step");
@@ -71,6 +78,9 @@ public static class AwpRuntimeWorkerEndpoints
         awp.MapPost("/assignments/artifacts/get", GetArtifactAsync)
             .Produces<AwpEnvelope<AwpArtifactResponse>>()
             .WithSummary("Read an assignment Artifact through its opaque identity");
+        awp.MapPost("/assignments/process/close", CloseProcessAsync)
+            .Produces<AwpEnvelope<AwpCloseProcessResponse>>()
+            .WithSummary("Close work-unit admission for an assigned process-capable step");
         awp.MapPost("/assignments/child-flows", CreateChildFlowAsync)
             .Produces<AwpEnvelope<AwpChildFlowResponse>>()
             .WithSummary("Create or recover a child Flow declared by the assigned Flow snapshot");
@@ -326,7 +336,7 @@ public static class AwpRuntimeWorkerEndpoints
         ValidateCommand(identity, request.Context, dispatch);
         var result = await assignments.CompleteAsync(ToProof(request.Context), new RuntimeAssignmentTerminalCommand(
             RuntimeAssignmentTerminalOutcome.Failed, request.CommandId.Value, Error: request.Failure.Message,
-            ErrorCode: request.Failure.Code), cancellationToken);
+            ErrorCode: request.Failure.Code, ErrorDetails: request.Failure.Details is { } details && details.GetRawText().Length <= 8192 ? details.GetRawText() : null), cancellationToken);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpTerminalResponse(now, ToContract(result.RunState),
             result.Assignment.ExecutionEvents.LastOrDefault()?.AttemptEventSequence ?? 0));
@@ -432,6 +442,21 @@ public static class AwpRuntimeWorkerEndpoints
                 result.Route.Route)));
     }, principal);
 
+    private static async Task<IResult> ProcessArtifactAsync(
+        AwpEnvelope<AwpProcessArtifactRequest> envelope, ClaimsPrincipal principal,
+        RuntimeWorkerDispatchService dispatch, RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider, CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload
+            ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The Artifact processing request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        var result = await execution.ProcessArtifactAsync(ToProof(request.Context), request.StepExecutionId.Value,
+            request.Index, request.Action, request.Arguments, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpProcessArtifactResponse(now, result));
+    }, principal);
+
     private static async Task<IResult> CaptureFlowArtifactAsync(
         AwpEnvelope<AwpCaptureFlowArtifactRequest> envelope,
         ClaimsPrincipal principal,
@@ -509,6 +534,18 @@ public static class AwpRuntimeWorkerEndpoints
         return Envelope(envelope.MessageId, now, ToContract(now, artifact));
     }, principal);
 
+    private static async Task<IResult> CloseProcessAsync(AwpEnvelope<AwpCloseProcessRequest> envelope,
+        ClaimsPrincipal principal, RuntimeWorkerDispatchService dispatch, RuntimeWorkerExecutionService execution,
+        TimeProvider timeProvider, CancellationToken cancellationToken) => await ExecuteAsync(async identity =>
+    {
+        ValidateEnvelope(envelope.ProtocolVersion, envelope.MessageId);
+        var request = envelope.Payload ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The process request is required.");
+        ValidateCommand(identity, request.Context, dispatch);
+        await execution.CloseProcessAsync(ToProof(request.Context), request.StepExecutionId.Value, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        return Envelope(envelope.MessageId, now, new AwpCloseProcessResponse(now));
+    }, principal);
+
     private static async Task<IResult> CreateChildFlowAsync(
         AwpEnvelope<AwpCreateChildFlowRequest> envelope,
         ClaimsPrincipal principal,
@@ -522,10 +559,16 @@ public static class AwpRuntimeWorkerEndpoints
             ?? throw new RuntimeWorkerDispatchException(AwpErrorCodes.InvalidRequest, "The child Flow request is required.");
         ValidateCommand(identity, request.Context, dispatch);
         var child = await execution.CreateOrGetChildFlowAsync(ToProof(request.Context), request.StepExecutionId.Value,
-            request.Input, request.Purpose, request.Iteration, cancellationToken);
+            request.Input, request.Purpose, request.Iteration, cancellationToken,
+            request.ProcessUnit is { } unit ? new(unit.Key, unit.Ordinal, unit.Descriptor, unit.TotalUnits) : null);
         var now = timeProvider.GetUtcNow();
         return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output,
-            child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material)));
+            child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material))
+        {
+            FlowId = child.FlowId, FlowNamespace = child.FlowNamespace, FlowVersion = child.FlowVersion,
+            OutputName = child.OutputName, Outcome = child.Outcome, ErrorCode = child.ErrorCode,
+            ErrorMessage = child.ErrorMessage, ErrorDetails = child.ErrorDetails, ErrorOrigin = child.ErrorOrigin
+        });
     }, principal);
 
     private static async Task<IResult> ExecuteAsync<T>(
@@ -560,9 +603,13 @@ public static class AwpRuntimeWorkerEndpoints
         {
             return Problem(StatusCodes.Status409Conflict, exception.Code, exception.Message);
         }
+        catch (DataContractException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message, exception.Failure);
+        }
         catch (RuntimeGovernedOperationException exception)
         {
-            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message);
+            return Problem(StatusCodes.Status422UnprocessableEntity, exception.Code, exception.Message, exception.ContractFailure);
         }
     }
 
@@ -743,7 +790,9 @@ public static class AwpRuntimeWorkerEndpoints
             flow.CorrelationId,
             checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
         {
-            FlowScopeRef = flow.FlowScopeRef
+            FlowScopeRef = flow.FlowScopeRef,
+            ProcessOrigin = flow.ProcessOrigin,
+            ContractContext = flow.ContractContext is null ? null : JsonSerializer.SerializeToElement(flow.ContractContext, ContractJson)
         },
         _ => throw new ArgumentOutOfRangeException(nameof(material))
     };
@@ -780,6 +829,9 @@ public static class AwpRuntimeWorkerEndpoints
         }).ToArray())
     {
         AgentNamespace = agent.AgentNamespace.ToString(),
+        InputSchema = agent.InputSchema,
+        OutputSchema = agent.OutputSchema,
+        OutputContract = agent.OutputContract is null ? null : JsonSerializer.SerializeToElement(agent.OutputContract, ContractJson),
         ModelProfileScopeRef = agent.ModelProfileScopeRef?.ToString(),
         RuntimeProfileName = agent.RuntimeProfileName,
         RuntimeProfileNamespace = agent.RuntimeProfileNamespace.ToString()
@@ -823,7 +875,7 @@ public static class AwpRuntimeWorkerEndpoints
         _ => AwpTerminalState.Failed
     };
 
-    private static IResult Problem(int status, string code, string message) =>
+    private static IResult Problem(int status, string code, string message, DataContractFailure? contractFailure = null) =>
         Results.Problem(statusCode: status, title: message,
-            extensions: new Dictionary<string, object?> { ["code"] = code });
+            extensions: new Dictionary<string, object?> { ["code"] = code, ["contractFailure"] = contractFailure });
 }

@@ -1,4 +1,4 @@
-# ADR-0217: Structured Snapshots pin immutable document publications
+# ADR-0224: Structured Snapshots pin immutable document publications
 
 ## Status
 

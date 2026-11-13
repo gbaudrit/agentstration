@@ -70,7 +70,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
                     DisplayName = "Test source",
                     ExternalId = handler.Definition.Name,
                     Provider = new(AgentstrationToolProvider.Name, owner),
-                    Schema = new() { Input = handler.Definition.InputSchema },
+                    Schema = new() { Input = handler.Definition.InputSchema, Output = handler.Definition.OutputSchema },
                     Discovery = new() { Available = true, FirstSeenAt = DateTimeOffset.UnixEpoch, LastSeenAt = DateTimeOffset.UnixEpoch }
                 }
             }, null, true, default);
@@ -253,6 +253,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
                 DisplayName = "Secret Flow",
                 Publish = true,
                 InputSchema = flowSchema,
+                OutputSchema = handler.Definition.OutputSchema,
                 Flow = new() { Name = "secret-consumer", Version = "1.0.0", UseActiveVersion = false }
             }
         }, null, true, default);
@@ -568,7 +569,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         public int Calls { get; private set; }
         public string? LastSecret { get; private set; }
         public InternalMcpToolDefinition Definition { get; } = new("relay-test.source", "Test source", null,
-            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string","minLength":1},"opaque":{"type":"object"}},"required":["store","query"],"additionalProperties":false}"""));
+            Json("""{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},"query":{"type":"string"},"accessCode":{"type":"string","minLength":1},"opaque":{"type":"object"}},"required":["store","query"],"additionalProperties":false}"""), Json("""{"type":"object"}"""));
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -169,6 +169,11 @@ and current policies without resolving Secrets or probing the physical database.
 they are not automatically granted. Draft and published document relays appear
 as Storage dependencies and prevent destructive deactivation or rebinding. Query/write/delete rights are independently
 restricted. Relay-fixed arguments cannot be replaced by caller JSON or the LLM.
+Document Tools and the structured Knowledge query Tool explicitly declare an
+object output contract. Published Flows pin that contract through the existing
+Tool contract resolver; query-language and document-model pins remain independent.
+Republish structured relays from earlier integration builds before using them
+directly from a Flow, then republish consuming Flows to pin the new contract.
 
 The Storage editor declares collections and their rights/schema. Storage details
 inspect effective capabilities, verify operations and explicitly publish a Tool.
@@ -218,9 +223,9 @@ inconclusive; the deterministic memory path still executes. The separate reusabl
 UX journey [#1158](https://github.com/gbaudrit/agentstration/issues/1158) remains
 blocked until maintainer UX approval and merge, as required by `AGENTS.md`.
 
-See ADRs [0213](../decisions/0213-asp-document-capabilities-and-open-query-profiles.md),
-[0214](../decisions/0214-bounded-standard-odata-query-profile.md),
-[0215](../decisions/0215-logical-document-collections-remain-storage-configuration.md),
-[0216](../decisions/0216-postgresql-jsonb-is-an-autonomous-asp-provider.md),
-[0217](../decisions/0217-structured-snapshots-pin-immutable-document-publications.md)
-and [0218](../decisions/0218-structured-storage-does-not-define-memory-policy.md).
+See ADRs [0220](../decisions/0220-asp-document-capabilities-and-open-query-profiles.md),
+[0221](../decisions/0221-bounded-standard-odata-query-profile.md),
+[0222](../decisions/0222-logical-document-collections-remain-storage-configuration.md),
+[0223](../decisions/0223-postgresql-jsonb-is-an-autonomous-asp-provider.md),
+[0224](../decisions/0224-structured-snapshots-pin-immutable-document-publications.md)
+and [0225](../decisions/0225-structured-storage-does-not-define-memory-policy.md).

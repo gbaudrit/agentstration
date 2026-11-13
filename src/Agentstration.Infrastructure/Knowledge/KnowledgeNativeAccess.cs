@@ -93,7 +93,9 @@ public abstract class KnowledgeAccessMcpTool(KnowledgeAccessService access, Know
     public InternalMcpToolDefinition Definition => new(KnowledgeAccessSchemas.ToolName(Operation),
         "Knowledge " + KnowledgeAccessSchemas.Route(Operation),
         "Native governed Knowledge Snapshot access. Source identity is fixed by its published relay Tool.",
-        KnowledgeAccessSchemas.Envelope(Operation), InitialCategory: KnowledgeBuiltinSchemas.Category, ExposeThroughMcp: false);
+        KnowledgeAccessSchemas.Envelope(Operation),
+        OutputSchema: Operation == KnowledgeSourceOperation.StructuredQuery ? JsonSerializer.SerializeToElement(new { type = "object" }) : null,
+        InitialCategory: KnowledgeBuiltinSchemas.Category, ExposeThroughMcp: false);
     private sealed record Source(string Name, string Namespace, string ScopeRef, Guid Uid);
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {

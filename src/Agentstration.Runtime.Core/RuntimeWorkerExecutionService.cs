@@ -227,6 +227,18 @@ public sealed class RuntimeWorkerExecutionService(
             step.StepDefinitionId, arguments, lease.Token);
     }
 
+    public async Task<JsonElement> ProcessArtifactAsync(RuntimeAssignmentOwnershipProof proof,
+        Guid stepExecutionId, int index, string action, JsonElement arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.GetRawText().Length > 1_048_576 || action is not ("open" or "prepare" or "finish" or "abort"))
+            throw new RuntimeExecutionMaterialException("artifact_processing_request_invalid", "The Artifact processing request is invalid or too large.");
+        var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
+        var step = AuthorizedFlowStep(authorization, stepExecutionId, "Artifact processing");
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
+        return await operations.ProcessArtifactAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
+            step.StepDefinitionId, index, action, arguments, lease.Token);
+    }
+
     public async Task<RuntimeGovernedFlowArtifact> CaptureFlowArtifactAsync(
         RuntimeAssignmentOwnershipProof proof,
         Guid stepExecutionId,
@@ -276,7 +288,7 @@ public sealed class RuntimeWorkerExecutionService(
         JsonElement input,
         string purpose,
         int? iteration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, RuntimeProcessUnit? processUnit = null)
     {
         var authorization = await AuthorizeSideEffectAsync(proof, cancellationToken);
         if (authorization.Assignment.TargetKind != RuntimeAssignmentTargetKind.FlowRun)
@@ -284,11 +296,21 @@ public sealed class RuntimeWorkerExecutionService(
         var step = authorization.Assignment.StepExecutions.SingleOrDefault(value => value.Id == stepExecutionId)
             ?? throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The child Flow does not reference an authorized StepExecution.");
         using var lease = await CreateLeaseGuardAsync(proof, authorization, cancellationToken);
-        var child = await operations.CreateOrGetChildFlowAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
-            step.StepDefinitionId, input, purpose, iteration, lease.Token);
+        var child = await operations.AdmitProcessUnitAsync(proof.ExecutionScopeRef, proof.WorkspaceId, step.FlowRunId,
+            step.StepDefinitionId, step.Id, input, purpose, iteration, processUnit, lease.Token);
         await assignments.RegisterChildFlowAsync(proof, child.RunId, lease.Token);
-        var material = await materials.ResolveFlowRunAsync(authorization.Assignment, child.RunId, lease.Token);
+        var terminal = child.Status is "Succeeded" or "Failed" or "Cancelled" or "TimedOut";
+        var material = terminal && authorization.Assignment.ExecutionMaterialVersion != RuntimeExecutionMaterialVersions.V1
+            ? null : await materials.ResolveFlowRunAsync(authorization.Assignment, child.RunId, lease.Token);
         return child with { Material = material };
+    }
+
+    public async Task CloseProcessAsync(RuntimeAssignmentOwnershipProof proof, Guid stepExecutionId, CancellationToken token)
+    {
+        var authorization = await AuthorizeSideEffectAsync(proof, token);
+        var step = AuthorizedFlowStep(authorization, stepExecutionId, "Process admission closure");
+        using var lease = await CreateLeaseGuardAsync(proof, authorization, token);
+        await operations.CloseProcessAsync(proof.ExecutionScopeRef, step.FlowRunId, step.StepDefinitionId, lease.Token);
     }
 
     private async Task<(RuntimeAssignmentAuthorization Authorization, RuntimeExecutionMaterial Material, RuntimeExecutionAgentMaterial Agent)>

@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,13 +28,51 @@ public sealed partial class FlowRunService
         JsonElement input,
         string purpose,
         int? iteration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        InvocationDataContracts? contractContext = null,
+        FlowProcessUnit? processUnit = null, Guid? ownerStepExecutionId = null)
     {
         var parent = await repository.GetRunExactAsync(executionScopeRef, parentRunId, cancellationToken)
             ?? throw new FlowRunNotFoundException(parentRunId);
         var step = parent.Value.DefinitionSnapshot.Graph?.Steps.SingleOrDefault(value =>
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
             ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition was not found.");
+        if (purpose is "artifactProcessing" or "process" && step.Region() is { } region
+            && (purpose != "artifactProcessing" || step is ArtifactTransformFlowStepDefinition)
+            && iteration is >= 0 && iteration < region.MaximumUnits)
+        {
+            var unit = processUnit ?? new FlowProcessUnit($"unit-{iteration.Value}", iteration.Value);
+            if (unit.Ordinal != iteration.Value || string.IsNullOrWhiteSpace(unit.Key) || unit.Key.Length > 128
+                || unit.Key.Any(char.IsControl) || unit.Descriptor is { Length: > 256 } || unit.Descriptor?.Any(char.IsControl) == true
+                || unit.TotalUnits is { } total && (total > region.MaximumUnits || total <= unit.Ordinal))
+                throw new FlowValidationException("process_unit_invalid", "A process unit requires a bounded key, ordinal and descriptor.");
+            var body = FlowProcessGraph.Extract(parent.Value.DefinitionSnapshot.Graph!, step);
+            var version = parent.Value.DefinitionSnapshot with { Graph = body, DefinitionHash = FlowDefinitionHash.Compute(body) };
+            var inlineCall = new FlowCallStepDefinition { Name = step.Name,
+                Flow = new(parent.Value.FlowId.Value, FlowCallVersionStrategy.Exact, parent.Value.FlowVersion,
+                    parent.Value.FlowId.Namespace, version.ScopeRef) };
+            var processAttempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
+            var definition = new FlowProcessDefinitionOrigin(parent.Value.FlowId, parent.Value.DefinitionSnapshot.ScopeRef,
+                parent.Value.FlowVersion, parent.Value.DefinitionSnapshotId ?? DefinitionSnapshotIdentity(parent.Value.DefinitionSnapshot),
+                parent.Value.DefinitionHash ?? FlowDefinitionHash.Compute(parent.Value.DefinitionSnapshot.Graph!),
+                step.Name, step.DisplayName, region.Key, version.DefinitionHash!);
+            var origin = new FlowProcessRunOrigin(definition, parent.Value.Id, step.Name, processAttempt,
+                ownerStepExecutionId, unit.Key, unit.Ordinal, unit.Descriptor);
+            // Preserve existing Artifact child URLs and scoped capability identity.
+            var childId = ChildFlowRunId(parent.Value, stepDefinitionId + (step is ArtifactTransformFlowStepDefinition ? "-artifact" : ":process"), processAttempt, iteration);
+            var priorAdmission = parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Process;
+            if (priorAdmission is { Closed: true } && priorAdmission.Attempt == processAttempt
+                && !priorAdmission.Units.Any(value => value.Key == unit.Key && value.Ordinal == unit.Ordinal))
+                throw new FlowValidationException("process_admission_closed", "Process work-unit admission is closed for this step attempt.");
+            await ReserveDescendantAsync(parent.Value, childId, cancellationToken);
+            await AdmitProcessUnitAsync(parent.Value, region, origin, childId, unit.TotalUnits,
+                purpose == "process" || processUnit is not null, cancellationToken);
+            var processingContext = step is ArtifactTransformFlowStepDefinition artifact
+                ? new FlowArtifactProcessingContext(parent.Value.Id, artifact.Name, processAttempt, iteration.Value, artifact.Mode == ArtifactProcessingMode.Access)
+                : null;
+            return await EnsureChildFlowRunAsync(parent.Value, inlineCall, input, childId, cancellationToken, version,
+                processingContext, contractContext ?? (step is TransformFlowStepDefinition ? new InvocationDataContracts() : null), origin);
+        }
         var call = purpose switch
         {
             "flowCall" when step is FlowCallStepDefinition flowCall && iteration is null => flowCall,
@@ -47,7 +86,7 @@ public sealed partial class FlowRunService
         var attempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
         var identity = purpose == "artifactStorage" ? $"{stepDefinitionId}:artifact-storage" : stepDefinitionId;
         var childRunId = ChildFlowRunId(parent.Value, identity, attempt, iteration);
-        return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken);
+        return await EnsureChildFlowRunAsync(parent.Value, call, input, childRunId, cancellationToken, ownerStepName: stepDefinitionId, artifactStorage: purpose == "artifactStorage");
     }
 
     private static FlowCallStepDefinition RepeatCall(RepeatFlowStepDefinition repeat) => new()
@@ -118,12 +157,22 @@ public sealed partial class FlowRunService
         FlowCallStepDefinition call,
         JsonElement input,
         string childRunId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        FlowVersion? inlineVersion = null,
+        FlowArtifactProcessingContext? processingContext = null,
+        InvocationDataContracts? contractContext = null,
+        FlowProcessRunOrigin? processOrigin = null, string? ownerStepName = null, bool artifactStorage = false)
     {
         var existing = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
         if (existing is not null)
         {
             ValidateChildIdentity(parent, call, existing.Value, childRunId);
+            if (inlineVersion is not null && (existing.Value.DefinitionHash != inlineVersion.DefinitionHash
+                || existing.Value.ArtifactProcessing != processingContext || !CompatibleProcessOrigin(existing.Value, processOrigin, processingContext)
+                || !JsonElement.DeepEquals(existing.Value.Input, input)))
+                throw new FlowValidationException(processingContext is null ? "process_child_conflict" : "artifact_processing_child_conflict",
+                    "The accepted processing child cannot change its graph, context or input.");
+            await AttachChildAsync(parent.Scope.ScopeRef, parent.Id, ownerStepName ?? call.Name, existing.Value.Id, artifactStorage, cancellationToken);
             return existing;
         }
 
@@ -131,19 +180,21 @@ public sealed partial class FlowRunService
         if (depth > executionOptions.MaximumNestingDepth)
             throw new FlowValidationException("flow_nesting_depth_exceeded", $"Nested Flow depth exceeds the configured limit of {executionOptions.MaximumNestingDepth}.");
         var rootRunId = parent.RootFlowRunId ?? parent.Id;
-        if (await CountDescendantsAsync(parent, rootRunId, cancellationToken) >= executionOptions.MaximumDescendantRuns)
-            throw new FlowValidationException("flow_descendant_limit_exceeded", $"The root Flow Run already has the configured limit of {executionOptions.MaximumDescendantRuns} descendants.");
+        await ReserveDescendantAsync(parent, childRunId, cancellationToken);
 
         var targetId = call.Flow.Resolve(parent.FlowId.Namespace);
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
-        var resolved = await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
+        var resolved = inlineVersion ?? await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
             call.Flow.ScopeRef, cancellationToken);
         if (call.CompositionPoint is not null && flowDefinitions is not null)
             await flowDefinitions.ValidateUseAsync(resolved.ScopeRef, targetId, resolved.Version, parent.Scope.AccessScopeRef, call.Flow.ResourceUid, cancellationToken);
         if (call.Flow.DefinitionHash is { } expected && expected != resolved.DefinitionHash)
             throw new FlowValidationException("flow_composition_child_changed", "The accepted child Flow no longer matches its exact version.");
+        var outputExpectation = DataContracts.Declared(resolved.Graph?.ResolveSingleSuccessOutputSchema(out _), $"flow:{resolved.FlowId}/output", resolved.Graph is { } outputGraph ? FlowDataContracts.OutputMediaType(outputGraph) : null)
+            ?? contractContext?.ExpectedOutput ?? (inlineVersion is null ? parent.ContractContext?.ExpectedOutput : null);
+        input = DataContracts.BindOutputParameter(input, resolved.Graph?.ResolveInputSchema(), outputExpectation, "flow-input", parent.Id, call.Name);
         if (call.CompositionPoint is not null && resolved.Graph?.InputSchema is { } contract)
-            FlowCompositionSchema.ValidateValue(contract, SecretInputs.ForTypeValidation(input, parent.SecretInputs));
+            FlowCompositionSchema.ValidateValue(contract, input, isProtectedString: value => SecretInputs.IsReference(value, parent.SecretInputs));
         if (call.CompositionParameters is { } parameters && (!input.TryGetProperty("parameters", out var actualParameters)
             || !JsonElement.DeepEquals(parameters, actualParameters)))
             throw new FlowValidationException("flow_composition_parameters_changed", "Accepted composition parameters cannot be replaced.");
@@ -151,7 +202,7 @@ public sealed partial class FlowRunService
             : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), parent.Scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
-        ValidateInput(resolved.Graph?.InputSchema, SecretInputs.ForTypeValidation(input, parent.SecretInputs));
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), input, parent.SecretInputs);
         var now = timeProvider.GetUtcNow();
         var child = new FlowRun
         {
@@ -161,6 +212,10 @@ public sealed partial class FlowRunService
             FlowVersion = resolved.Version,
             Composition = composed.Receipt,
             TransientPayloads = parent.TransientPayloads,
+            ProcessOrigin = processOrigin,
+            ArtifactProcessing = processingContext ?? parent.ArtifactProcessing,
+            ContractContext = contractContext ?? (resolved.Graph?.ResolveInputSchema() is null ? FlowDataContracts.ChildContext(parent.DefinitionSnapshot.Graph, call.Name, parent.ContractContext) : null),
+            RuntimeBindings = inlineVersion is null ? [] : parent.RuntimeBindings,
             DefinitionState = FlowDefinitionState.Published,
             DefinitionHash = resolved.DefinitionHash,
             DefinitionScopeRef = resolved.ScopeRef,
@@ -194,10 +249,14 @@ public sealed partial class FlowRunService
             var recovered = await repository.GetRunExactAsync(parent.Scope.ScopeRef, childRunId, cancellationToken);
             if (recovered is null) throw;
             created = recovered;
+            if (inlineVersion is not null && (created.Value.DefinitionHash != inlineVersion.DefinitionHash
+                || !CompatibleProcessOrigin(created.Value, processOrigin, processingContext) || !JsonElement.DeepEquals(created.Value.Input, input)))
+                throw new FlowValidationException("process_child_conflict", "The admitted process unit cannot change its definition, identity or input.");
             ValidateChildIdentity(parent, call, created.Value, childRunId);
             return created;
         }
 
+        await AttachChildAsync(parent.Scope.ScopeRef, parent.Id, ownerStepName ?? call.Name, child.Id, artifactStorage, cancellationToken);
         RunsCreated.Add(1, new KeyValuePair<string, object?>("flow.definition.state", child.DefinitionState.ToString()));
         try
         {
@@ -211,28 +270,6 @@ public sealed partial class FlowRunService
             await queue.EnqueueAsync(new(child.Id, child.Scope), cancellationToken);
         }
         return created;
-    }
-
-    private async Task<int> CountDescendantsAsync(
-        FlowRun parent,
-        string rootRunId,
-        CancellationToken cancellationToken)
-    {
-        const int pageSize = 200;
-        var count = 0;
-        for (var skip = 0; ; skip += pageSize)
-        {
-            var keys = await repository.ListRunKeysAsync(skip, pageSize, cancellationToken);
-            foreach (var key in keys.Where(key => key.ScopeRef == parent.Scope.ScopeRef))
-            {
-                var run = await repository.GetRunExactAsync(parent.Scope.ScopeRef, key.RunId, cancellationToken);
-                if (run?.Value.RootFlowRunId == rootRunId
-                    && run.Value.Scope == parent.Scope
-                    && ++count >= executionOptions.MaximumDescendantRuns)
-                    return count;
-            }
-            if (keys.Count < pageSize) return count;
-        }
     }
 
     private static void ValidateChildIdentity(FlowRun parent, FlowCallStepDefinition call, FlowRun child, string expectedChildRunId)

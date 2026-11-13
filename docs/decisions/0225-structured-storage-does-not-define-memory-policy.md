@@ -1,4 +1,4 @@
-# ADR-0218: Structured storage does not define agent Memory policy
+# ADR-0225: Structured storage does not define agent Memory policy
 
 ## Status
 

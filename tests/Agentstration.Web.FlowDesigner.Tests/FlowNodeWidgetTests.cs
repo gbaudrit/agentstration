@@ -65,6 +65,25 @@ public sealed class FlowNodeWidgetTests
     }
 
     [TestMethod]
+    public void PortInformationKeepsLockedConnectionHandlesAndOpensTheRequestedPort()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.ComponentFactories.AddStub<PortRenderer>();
+        string? requested = null;
+        var interactions = new FlowNodeInteractionContext(_ => Task.CompletedTask,
+            (step, port) => { requested = step + ":" + port; return Task.CompletedTask; }, (_, port) => "fixed " + port);
+        var node = new FlowDiagramNode(new("analyze", "agent", "Analyze", new(0, 0), null, ["success"])) { Locked = true };
+        var rendered = context.Render<CascadingValue<FlowNodeInteractionContext>>(parameters => parameters
+            .Add(component => component.Value, interactions)
+            .AddChildContent<FlowNodeWidget>(child => child.Add(component => component.Node, node)));
+        Assert.HasCount(2, rendered.FindAll(".flow-port-handle"));
+        Assert.AreEqual("fixed input", rendered.Find(".flow-port-handle.input").GetAttribute("title"));
+        rendered.Find(".flow-port-inspect.input").Click();
+        Assert.AreEqual("analyze:input", requested);
+    }
+
+    [TestMethod]
     public void SettingsButtonRequestsConfigurationForItsStep()
     {
         using var context = new BunitContext();

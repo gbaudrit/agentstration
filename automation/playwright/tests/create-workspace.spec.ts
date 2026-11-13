@@ -19,8 +19,8 @@ test('an administrator can create and select a campaign workspace @smoke', async
   }, workspace);
 
   const shell = page.getByTestId(TestIds.console.shell);
-  await expect(shell).toHaveAttribute('data-workspace-id', /^[0-9a-f-]{36}$/i);
   await expect(shell).toHaveAttribute('data-workspace-name', workspace.name);
+  await expect(shell).toHaveAttribute('data-workspace-id', /^[0-9a-f-]{36}$/i);
   await pages.organizationWorkspaces.selectTenantForWorkspace(workspace.name);
   await pages.organizationWorkspaces.open(product.consoleUrl);
   await expect(page.getByTestId(TestIds.organizationWorkspaces.create)).toHaveAccessibleName(

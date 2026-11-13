@@ -1,4 +1,4 @@
-# ADR-0216: PostgreSQL JSONB uses an autonomous provider-owned layout
+# ADR-0223: PostgreSQL JSONB uses an autonomous provider-owned layout
 
 ## Status
 

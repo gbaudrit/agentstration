@@ -224,7 +224,7 @@ public static class FlowDraftTemplates
             [
                 new InputFlowStepDefinition { Name = "input", Schema = input },
                 new TransformFlowStepDefinition { Name = "transform", Mapping = JsonSerializer.SerializeToElement("${input.value}"), Schema = template.OutputSchema.Clone() },
-                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = template.OutputSchema.Clone(), OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") },
+                new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = template.OutputSchema.Clone(), OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                 new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }
             ],
             Transitions = [new("input-transform", "input", "completed", "transform"), new("transform-output", "transform", "completed", "completed")],

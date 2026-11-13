@@ -1,4 +1,4 @@
-# ADR-0214: Structured queries start with a bounded OData profile
+# ADR-0221: Structured queries start with a bounded OData profile
 
 ## Status
 

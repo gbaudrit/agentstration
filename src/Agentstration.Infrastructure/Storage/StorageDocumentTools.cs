@@ -19,7 +19,7 @@ public abstract class StorageDocumentMcpTool(IStorageDocumentGateway gateway, IC
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
     public InternalMcpToolDefinition Definition => new("storage.documents." + Operation, "Structured documents " + Operation,
         "Governed structured collection access. A published relay fixes the exact Storage, collection, policy and query profile. No physical destination or SQL is accepted.",
-        Schema(Operation), ExposeThroughMcp: false);
+        Schema(Operation), JsonSerializer.SerializeToElement(new { type = "object" }), ExposeThroughMcp: false);
 
     internal static JsonElement Schema(string operation)
     {
@@ -40,7 +40,7 @@ public abstract class StorageDocumentMcpTool(IStorageDocumentGateway gateway, IC
             if (operation == "get") properties["revision"] = new JsonObject { ["type"] = "string", ["maxLength"] = 128 };
             else
             {
-                properties["notAfter"] = new JsonObject { ["type"] = "string", ["format"] = "date-time" };
+                properties["notAfter"] = new JsonObject { ["type"] = "string", ["maxLength"] = 64, ["description"] = "ISO 8601 deadline with an explicit UTC or numeric offset; validated by the document operation." };
                 properties["expectedRevision"] = new JsonObject { ["type"] = "string", ["maxLength"] = 128 };
                 required.Add("notAfter");
                 if (operation == "put") { properties["value"] = new JsonObject { ["type"] = "object" }; required.Add("value"); }

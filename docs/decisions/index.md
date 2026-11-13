@@ -243,14 +243,22 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
 
-213. [ADR-0213 — ASP documents use additive capabilities and open query profiles](0213-asp-document-capabilities-and-open-query-profiles.md)
+213. [ADR-0213 — Artifact transformations own scoped content processing](0213-artifact-transformations-own-scoped-content-processing.md)
 
-214. [ADR-0214 — Structured queries start with a bounded OData profile](0214-bounded-standard-odata-query-profile.md)
+214. [ADR-0214 — Effective data contracts follow Flow invocations](0214-effective-data-contracts-follow-flow-invocations.md)
 
-215. [ADR-0215 — Logical document collections remain governed Storage configuration](0215-logical-document-collections-remain-storage-configuration.md)
+215. [ADR-0215 — Process regions have derived Flow identities](0215-process-regions-have-derived-flow-identities.md)
 
-216. [ADR-0216 — PostgreSQL JSONB uses an autonomous provider-owned layout](0216-postgresql-jsonb-is-an-autonomous-asp-provider.md)
+219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)
 
-217. [ADR-0217 — Structured Snapshots pin immutable document publications](0217-structured-snapshots-pin-immutable-document-publications.md)
+220. [ADR-0220 — ASP documents use additive capabilities and open query profiles](0220-asp-document-capabilities-and-open-query-profiles.md)
 
-218. [ADR-0218 — Structured storage does not define agent Memory policy](0218-structured-storage-does-not-define-memory-policy.md)
+221. [ADR-0221 — Structured queries start with a bounded OData profile](0221-bounded-standard-odata-query-profile.md)
+
+222. [ADR-0222 — Logical document collections remain governed Storage configuration](0222-logical-document-collections-remain-storage-configuration.md)
+
+223. [ADR-0223 — PostgreSQL JSONB uses an autonomous provider-owned layout](0223-postgresql-jsonb-is-an-autonomous-asp-provider.md)
+
+224. [ADR-0224 — Structured Snapshots pin immutable document publications](0224-structured-snapshots-pin-immutable-document-publications.md)
+
+225. [ADR-0225 — Structured storage does not define agent Memory policy](0225-structured-storage-does-not-define-memory-policy.md)

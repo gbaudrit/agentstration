@@ -140,4 +140,15 @@
   <data name="Operation.StructuredQuery" xml:space="preserve"><value>Interroger les documents structurés</value></data>
   <data name="StructuredQueryPayload" xml:space="preserve"><value>Requête structurée (JSON)</value></data>
   <data name="StructuredQueryHelp" xml:space="preserve"><value>Nécessite un Storage documentaire et un profil de requête compatibles. Pour OData, utilisez par exemple {"$filter":"status eq 'degraded'"}. Les Snapshots historiques conservent leur Storage et leur modèle d’origine.</value></data>
+  <data name="ProjectionStarting" xml:space="preserve"><value>Démarrage de la projection…</value></data>
+  <data name="ProjectionRunning" xml:space="preserve"><value>Projection en cours…</value></data>
+  <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquisition des sources de données…</value></data>
+  <data name="ProjectionPreparing" xml:space="preserve"><value>Préparation des entrées et des transformations…</value></data>
+  <data name="ProjectionPublishing" xml:space="preserve"><value>Publication du Snapshot…</value></data>
+  <data name="ProjectionStepProgress" xml:space="preserve"><value>{0} étape(s) terminée(s) sur {1}.</value></data>
+  <data name="ProjectionElapsed" xml:space="preserve"><value>Durée : {0}</value></data>
+  <data name="ProjectionRefreshUnavailable" xml:space="preserve"><value>Le suivi n’a pas pu être actualisé. Le traitement peut continuer ; réessayez l’actualisation.</value></data>
+  <data name="ProjectionFailed" xml:space="preserve"><value>La projection n’a pas abouti : {0}</value></data>
+  <data name="ProjectionAccepted" xml:space="preserve"><value>Projection acceptée. Le suivi s’actualise automatiquement.</value></data>
+  <data name="FlowRunNewTab" xml:space="preserve"><value>Afficher l’exécution de Flow {0} dans un nouvel onglet.</value></data>
 </root>

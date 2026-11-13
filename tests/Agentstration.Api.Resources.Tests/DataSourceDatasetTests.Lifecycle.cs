@@ -2,6 +2,8 @@ using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using System.Text;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
@@ -244,7 +246,9 @@ public sealed partial class DataSourceDatasetTests
     }
 
     [TestMethod]
-    public async Task DirectAndStoredInputsPublishTogetherWithoutPersistingTheDirectExecutionPayload()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task DirectAndStoredInputsPublishTogetherWithoutPersistingTheDirectExecutionPayload(bool transformDirect)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -263,6 +267,23 @@ public sealed partial class DataSourceDatasetTests
             Definition = storedDefinition.Definition with
             { Dataset = storedDefinition.Definition.Dataset! with { Lifecycle = new() { TimeToLive = TimeSpan.FromHours(1) } } }
         }, default);
+        if (transformDirect)
+        {
+            var flows = factory.Services.GetRequiredService<FlowService>();
+            var contract = (await flows.GetVersionExactAsync(Owner, new("knowledge-projection-builtin"), "1.0.0", default))!.Value.Graph!.OutputSchema!.Value;
+            var inputContract = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = contract, parameters = new { type = "object" } }, required = new[] { "value", "parameters" }, additionalProperties = false });
+            var graph = new FlowGraphDefinition { EntryStep = "input", InputSchema = inputContract, OutputSchema = contract,
+                Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputContract },
+                    new ArtifactTransformFlowStepDefinition { Name = "process" },
+                    new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { dataset = "${input.content.dataset}", transformed = true }) },
+                    new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = contract, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+                    new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],
+                Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
+                    new("return", "body", "completed", "process"), new("done", "process", "completed", "completed"), new("fail", "process", "error", "error")] };
+            await flows.CreateExactAsync(Owner, new("direct-artifact-transform", null, "1.0.0", true,
+                new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input), new("completed", FlowNodeKind.Output)], [new("input", "completed")], ["completed"]), Graph: graph), ResourceNamespace.Default, default);
+            await flows.PublishVersionExactAsync(Owner, new("direct-artifact-transform"), "1.0.0", true, default);
+        }
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -275,12 +296,24 @@ public sealed partial class DataSourceDatasetTests
                 Output = new(fixture.Storage, new(Write: true)),
                 Lifecycle = new(),
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
-                DataSources = [new() { Name = "direct", DataSource = new(direct.Value.Name, Owner) }, new() { Name = "stored", DataSource = new(stored.Value.Name, Owner) }]
+                DataSources = [new() { Name = "direct", DataSource = new(direct.Value.Name, Owner), Transformations = transformDirect ? [new() { Flow = new("direct-artifact-transform", ScopeRef: Owner) }] : [] }, new() { Name = "stored", DataSource = new(stored.Value.Name, Owner) }]
             }
         }, default);
         var projections = factory.Services.GetRequiredService<KnowledgeProjectionService>();
         var first = await projections.StartAsync(new(knowledge.Value.Name, ScopeRef: Owner), new(), default);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, first.Value.State, first.Value.ErrorMessage);
+        if (transformDirect)
+        {
+            var snapshot = await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetAsync(new(first.Value.SnapshotName!), default);
+            var published = factory.Services.GetRequiredService<IStoragePublicationGateway>();
+            var contents = new List<string>();
+            foreach (var artifact in snapshot.Snapshot.Artifacts)
+            {
+                var bytes = await published.ReadAsync(artifact.Content!, 0, 65536, default);
+                contents.Add(Encoding.UTF8.GetString(bytes.Span));
+            }
+            Assert.IsTrue(contents.Any(value => value.Contains("\"transformed\":true", StringComparison.Ordinal)), "Only the final transformed content must be published.");
+        }
         var directEvidence = first.Value.Inputs.Single(value => value.BindingName == "direct");
         Assert.IsNotNull(directEvidence.DirectInput);
         Assert.IsNull(directEvidence.StorageInput);

@@ -1094,6 +1094,7 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             _ = await PutToolAsync(store, scope, "route-fetch", provider.Value,
                 new ToolSchema
                 {
+                    Output = JsonSerializer.SerializeToElement(new { type = "object" }),
                     Input = JsonSerializer.SerializeToElement(new
                     {
                         type = "object",

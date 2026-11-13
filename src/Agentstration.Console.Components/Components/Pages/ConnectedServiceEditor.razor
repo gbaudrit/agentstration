@@ -30,6 +30,7 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
     </section>
     @if (SelectedVariant is { } current)
     {
+        @if (IsHttpUrlDiscovery) { <p class="form-alert form-alert-info">@T("Http.DiscoveryHelp")</p> }
         <section class="panel form-section"><div class="panel-header"><h2>@T("Options")</h2></div><JsonSchemaInputEditor Schema="current.Version.Schema" Value="model.Options" ValueChanged="value => model.Options = value" ValidationChanged="state => optionsValid = state.IsValid" Disabled="busy" /></section>
         <section class="panel form-section"><div class="panel-header"><div><h2>@T("Bindings")</h2><p>@T("Bindings.Description")</p></div></div>
             @if (current.Version.Inputs.Count == 0) { <p>@T("NoInputs")</p> }
@@ -99,9 +100,12 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
     private void VariantChanged(ChangeEventArgs args) { selectedVariantKey = args.Value?.ToString() ?? string.Empty; model.Options = JsonSerializer.SerializeToElement(new { }); model.Bindings.Clear(); PrepareBindings(); }
     private void PrepareBindings() { if (SelectedVariant is not { } variant) return; foreach (var input in variant.Version.Inputs) if (model.Bindings.All(value => value.InputId != input.Id)) model.Bindings.Add(new() { InputId = input.Id, Kind = input.Protection == ConnectedServiceValueProtection.Standard ? ConnectedServiceBindingKind.Literal : ConnectedServiceBindingKind.Secret }); }
     private ConnectedServiceBindingEditorModel Binding(ConnectedServiceInputDescriptor input) => model.Bindings.Single(value => value.InputId == input.Id);
-    private static ValueBindingRequirement RequirementModel(ConnectedServiceInputDescriptor input) => new(
+    private bool IsHttpUrlDiscovery => SelectedVariant is { } variant
+        && variant.Type.ScopeRef == ResourceScopeRef.Instance && variant.Type.Namespace == ResourceNamespace.Default
+        && variant.Type.Name == "http-endpoint" && variant.Version.OperationDiscovery is not null;
+    private ValueBindingRequirement RequirementModel(ConnectedServiceInputDescriptor input) => new(
         input.Id, input.Required, ValueType(input.Type), input.Protection == ConnectedServiceValueProtection.Secured,
-        input.Description, input.Format);
+        IsHttpUrlDiscovery && input.Id == "baseUrl" ? T("Http.SampleUrlHelp") : input.Description, input.Format);
     private static IReadOnlyList<ValueBindingSourceKind> BindingSources(ConnectedServiceInputDescriptor input) =>
         input.Protection == ConnectedServiceValueProtection.Secured ? [ValueBindingSourceKind.Secret]
         : input.Type == ConnectedServiceValueType.Text ? [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret]

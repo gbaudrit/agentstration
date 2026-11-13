@@ -31,7 +31,7 @@ public sealed class DurableArtifactReadContentMcpTool(
             },
             required = new[] { "artifactId" },
             additionalProperties = false
-        }), InitialCategory: new("artifacts", "Artifacts", "Governed Artifact content access."));
+        }), OutputSchema: Schema(new { type = "object" }), InitialCategory: new("artifacts", "Artifacts", "Governed Artifact content access."));
 
     protected override async Task<JsonElement?> ExecuteCoreAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {

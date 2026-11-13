@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -36,6 +37,13 @@ public sealed class StructuredStorageExecutionTests : ResourceManagementApiTestB
         var exposure = product.Services.GetRequiredService<IStorageDocumentToolExposure>();
         var writer = (await exposure.PublishAsync(target, new("1.0.0", ["put"]), default)).Single();
         var reader = (await exposure.PublishAsync(target, new("1.0.0", ["query"], profile), default)).Single();
+        var contracts = product.Services.GetRequiredService<IFlowToolContractResolver>();
+        foreach (var tool in new[] { writer, reader })
+        {
+            var pinned = await contracts.ResolveAsync(owner, tool.Namespace ?? ResourceNamespace.Default,
+                new(tool.Name, tool.Namespace, tool.ScopeRef), default);
+            Assert.AreEqual("object", pinned.OutputSchema!.Value.GetProperty("type").GetString());
+        }
         var agents = product.Services.GetRequiredService<AgentManagementService>();
         var runs = new Dictionary<string, string>(StringComparer.Ordinal);
         var runtime = product.Services.GetRequiredService<RuntimeRunService>();

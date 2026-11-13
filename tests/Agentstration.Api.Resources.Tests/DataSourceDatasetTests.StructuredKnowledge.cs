@@ -2,11 +2,13 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Agentstration.DataSources;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Storage.Contracts;
 using Agentstration.Tools.Contracts;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +32,9 @@ public sealed partial class DataSourceDatasetTests
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, postgres);
         var input = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
             Source("structured-json-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "structured" })), default);
+        var contentContract = DataContracts.Declared(StructuredStorageFixture.Json("""
+            {"type":"object","required":["status","value"],"properties":{"status":{"type":"string"},"value":{"type":"number"}}}
+            """), "structured-projection", "application/json")!;
         async Task<Agentstration.ConnectedServices.Contracts.ConnectedServiceDiscoveryFlowReference> Normalize(string name, int value) =>
             await PublishAsync(factory.Services, name, KnowledgeFlowContracts.ArtifactTransformation, JsonSerializer.SerializeToElement(new
             {
@@ -39,6 +44,7 @@ public sealed partial class DataSourceDatasetTests
                     kind = "inline",
                     disposition = "publishable",
                     mediaType = "application/json",
+                    dataContract = contentContract,
                     contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(
                         JsonSerializer.Serialize(new { status = "degraded", value })))
                 }).ToArray()
@@ -76,6 +82,10 @@ public sealed partial class DataSourceDatasetTests
         var exposure = await factory.Services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(id, "1.0.0", false, default);
         Assert.HasCount(4, exposure.Value.Operations);
         var queryTool = exposure.Value.Operations.Single(o => o.Operation == KnowledgeSourceOperation.StructuredQuery).Tool;
+        var pinnedTool = await factory.Services.GetRequiredService<IFlowToolContractResolver>().ResolveAsync(
+            queryTool.ScopeRef ?? Owner, queryTool.Namespace ?? ResourceNamespace.Default,
+            new(queryTool.Name, queryTool.Namespace, queryTool.ScopeRef), default);
+        Assert.AreEqual("object", pinnedTool.OutputSchema!.Value.GetProperty("type").GetString());
         using var toolCall = await client.PostAsJsonAsync($"/api/tools/{queryTool.Name}/run?scopeRef=/instance",
             new RunToolRequest(JsonSerializer.SerializeToElement(new { request = new { snapshotId = a, query = new { } } }), ToolRunMode.Execute));
         Assert.IsTrue(toolCall.IsSuccessStatusCode, await toolCall.Content.ReadAsStringAsync());
@@ -108,6 +118,9 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(84, grouped.DocumentPage.Groups.Single().GetProperty("Total").GetInt32());
         var snapshots = await factory.Services.GetRequiredService<KnowledgeSnapshotService>().ListAsync(id, default);
         Assert.HasCount(2, snapshots);
+        Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact =>
+            artifact.DataContract is { Validated: true, MediaType: "application/json" } contract && contract.Digest == contentContract.Digest)));
+
         Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact => artifact.Content?.Document is not null)));
         Assert.HasCount(1, await factory.Services.GetRequiredService<DataSourceAcquisitionService>().ListAsync(input.Value.Namespace, input.Value.Name, Owner, default));
     }

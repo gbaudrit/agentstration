@@ -146,3 +146,29 @@ Storage supports exact retirement; supported remote ASP stores use a conditional
 empty replacement, while unsupported/revoked providers remain pending. Provider
 backups and object version history have their own retention settings. Existing
 resources without lifecycle keep legacy binding freshness rules.
+
+
+## Artifact data-contract evidence
+
+A manifest entry may include `dataContract` for the content it references. This is
+separate from the Flow's manifest schema. Dataset acquisitions retain their exact
+validated output schema. Artifact processing and Snapshot publication preserve
+concrete evidence after validating content. See
+[effective data contracts](artifact-transformations.md#effective-data-contracts).
+
+## Asynchronous projection launch
+
+`POST /api/knowledgesources/{name}/projections` returns `202 Accepted`, the durable
+projection resource, `Location` and `ETag` after authorization, source/dependency
+admission and persistence. It does not wait for acquisition, Agent execution or
+Snapshot publication. Supply an `idempotencyKey` and reuse it after a lost response;
+a changed request with the same identity is rejected. Poll the returned resource or
+Source projection history for the authoritative terminal state.
+
+Each Workspace admits at most 32 pending/running projections; admission returns 429
+when that bound is reached. A bounded wake-up accelerates the existing recoverable pending-resource scan. A lost
+wake-up or server restart does not lose admission. The worker restores the original
+caller and exact scope and refuses changed accepted Source generation. Projection
+execution uses the same application use case as recovery. Console monitoring replaces
+an earlier communication failure with the persisted model/contract execution error;
+a launch timeout does not imply that its Flow failed or should be submitted twice.

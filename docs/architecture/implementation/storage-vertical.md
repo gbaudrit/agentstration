@@ -245,5 +245,5 @@ and canonical Artifact materializations with its existing Snapshot lifecycle.
 
 [Structured documents](../../reference/structured-documents.md) specifies the
 capabilities, query subset, operator setup, Console/API behavior and deterministic
-verticals. ADR-0213 through ADR-0218 supplement the #1032 decisions. Memory #1156
+verticals. ADR-0220 through ADR-0225 supplement the #1032 decisions. Memory #1156
 and the reusable UX scenario #1158 remain deferred under their recorded conditions.

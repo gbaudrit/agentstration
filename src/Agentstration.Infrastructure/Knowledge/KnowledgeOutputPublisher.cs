@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
@@ -6,6 +7,7 @@ using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Knowledge;
@@ -31,6 +33,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
         var result = new List<KnowledgeSnapshotArtifact>();
         foreach (var item in manifest.Artifacts)
         {
+            var contract = item.DataContract;
             ReadOnlyMemory<byte> bytes;
             var mediaType = item.MediaType ?? "application/octet-stream";
             if (item.Kind == KnowledgeArtifactKind.Inline)
@@ -55,6 +58,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                     StringComparison.OrdinalIgnoreCase))
                     throw new KnowledgeProjectionException("knowledge_output_integrity", "The durable Artifact content differs from its receipt.");
                 mediaType = artifact.Receipt.MediaType;
+                contract = artifact.Receipt.DataContract ?? contract;
             }
             var digest = Convert.ToHexStringLower(SHA256.HashData(bytes.Span));
             if (item.Digest is { } expected && !string.Equals(expected.Replace("sha256:", "", StringComparison.OrdinalIgnoreCase), digest, StringComparison.OrdinalIgnoreCase))
@@ -74,11 +78,18 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 digest = Convert.ToHexStringLower(SHA256.HashData(encoded));
                 mediaType = "application/json";
             }
-            else reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
+            if (contract is not null)
+            {
+                var concrete = DataContracts.Declared(contract.Schema, contract.Origin, contract.MediaType)!;
+                _ = DataContracts.ReadText(concrete, Encoding.UTF8.GetString(bytes.Span), "snapshot-output", projection.ProjectionFlowRunId);
+                contract = concrete with { DeclaredMode = contract.DeclaredMode, Validated = true };
+            }
+            if (output.DocumentCollectionUid is null) reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
             result.Add(new()
             {
                 ArtifactId = item.ArtifactId,
                 Content = reference,
+                DataContract = contract,
                 Length = bytes.Length,
                 Sha256 = digest,
                 MediaType = mediaType,
@@ -153,7 +164,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                         projection.ProjectionFlowRunId, new(source.ScopeRef!.Value, source.Namespace, source.Kind, source.Name),
                         projection.Name, item.MediaType, new(new(projection.WorkspaceId), reference.Target,
                             reference.Key, reference.Version, reference.Length, reference.Sha256, reference),
-                        ProducerUid: source.Uid, ProducerGeneration: source.Generation), cancellationToken);
+                        ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract), cancellationToken);
                 catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });
             }
         }
