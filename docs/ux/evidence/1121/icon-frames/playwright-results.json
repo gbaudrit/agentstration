@@ -1,0 +1,452 @@
+{
+  "config": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/agentstration-1121-validation/automation/playwright/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "local-icon-frame.config.ts",
+      "tests/distribution.spec.ts",
+      "--grep",
+      "collection version identity and primary choice"
+    ],
+    "configFile": "/workspace/agentstration-1121-validation/automation/playwright/local-icon-frame.config.ts",
+    "rootDir": "/workspace/agentstration-1121-validation/automation/playwright/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/tmp/1121-icon-frames-final/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop-chromium",
+        "name": "desktop-chromium",
+        "testDir": "/workspace/agentstration-1121-validation/automation/playwright/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/tmp/1121-icon-frames-final/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-chromium",
+        "name": "mobile-chromium",
+        "testDir": "/workspace/agentstration-1121-validation/automation/playwright/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/tmp/1121-icon-frames-final/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "locale-contracts",
+        "name": "locale-contracts",
+        "testDir": "/workspace/agentstration-1121-validation/automation/playwright/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/tmp/1121-icon-frames-final/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "distribution.spec.ts",
+      "file": "distribution.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "collection version identity and primary choice en-US dark desktop @smoke",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chromium",
+              "projectName": "desktop-chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 39930,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T12:58:11.753Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "data-source-profiles",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/data-source-profiles-3a843cdea120c3f69fc4e8fbea346aa01becd620.png"
+                    },
+                    {
+                      "name": "data-source-profiles-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/data-source-profiles-table-f19fee8c177706d4a6a9d1a855844549031a144d.png"
+                    },
+                    {
+                      "name": "flows",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/flows-91c0f589ac93279276c90cfa5d166a7a5516c24c.png"
+                    },
+                    {
+                      "name": "flows-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/flows-table-c96e4e7fd0582dcad7e4c8253ef266aed7578e58.png"
+                    },
+                    {
+                      "name": "agents",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/agents-8d6b3928cddafcb96d1fe7a688c1f4bbb35d0b5a.png"
+                    },
+                    {
+                      "name": "agents-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/agents-table-acce0bbc98db94a550673b7b947f3c3da5963c19.png"
+                    },
+                    {
+                      "name": "extensions",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/extensions-1f201915ebdbbf85095fc07646ad0f437c87ccc3.png"
+                    },
+                    {
+                      "name": "extensions-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/extensions-table-7e44f143a9cf977b632a3d29e12dab637117f0cf.png"
+                    },
+                    {
+                      "name": "profile-primary-choice",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/profile-primary-choice-db3112c140c0c264a7499c5daf431b09ddcdbcf7.png"
+                    },
+                    {
+                      "name": "pack-project-card",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/pack-project-card-e9a3b8508aace43155b728f93358731b12a71ff6.png"
+                    },
+                    {
+                      "name": "entry-cards",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-3ecc6-ce-en-US-dark-desktop-smoke-desktop-chromium/attachments/entry-cards-d1de4e61e1a49e77a0f73c21fa5c2e939d6d4ac7.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "50fea97024d96f5f2763-34264f241d69ea9d58f6",
+          "file": "distribution.spec.ts",
+          "line": 23,
+          "column": 3
+        },
+        {
+          "title": "collection version identity and primary choice en-US light desktop @smoke",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chromium",
+              "projectName": "desktop-chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 34151,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T12:59:12.570Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "data-source-profiles",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/data-source-profiles-ec1a408ae0286137e1bd4f0f0c7b6f3433df95f9.png"
+                    },
+                    {
+                      "name": "data-source-profiles-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/data-source-profiles-table-82ac4e197d4a2921d30564955f531a52cff780bc.png"
+                    },
+                    {
+                      "name": "flows",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/flows-c3650c2f83d334c7ff09fb33420409ac2af8617c.png"
+                    },
+                    {
+                      "name": "flows-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/flows-table-5dd8a231566973db3511a9473c775625e47a46ef.png"
+                    },
+                    {
+                      "name": "agents",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/agents-a746cd03582a6e72f662ba2f294a9a4e72ffc292.png"
+                    },
+                    {
+                      "name": "agents-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/agents-table-db5635df891e9a4be45aa0bc86ecf03a59fa7636.png"
+                    },
+                    {
+                      "name": "extensions",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/extensions-0495908eac2d206f5c6adf3a98786d9428486deb.png"
+                    },
+                    {
+                      "name": "extensions-table",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/extensions-table-f9821be516a6cbf1ffeffe327045fc9f3ef34f62.png"
+                    },
+                    {
+                      "name": "profile-primary-choice",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/profile-primary-choice-513fca2679e65b69e24dab8fbf35ac7f745fdbaa.png"
+                    },
+                    {
+                      "name": "pack-project-card",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/pack-project-card-06f3e01aeeffca0952c5034e88c77472b1fcb28d.png"
+                    },
+                    {
+                      "name": "entry-cards",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-32c39-e-en-US-light-desktop-smoke-desktop-chromium/attachments/entry-cards-f8bdee26f47c2cc928e3db5776910be491117d6c.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "50fea97024d96f5f2763-c489f78130e8eb2b1476",
+          "file": "distribution.spec.ts",
+          "line": 23,
+          "column": 3
+        },
+        {
+          "title": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+          "ok": true,
+          "tags": [
+            "responsive",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 38851,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T12:59:48.021Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "data-source-profiles",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/data-source-profiles-518554521d3659122376a41a9013a91bf48342e5.png"
+                    },
+                    {
+                      "name": "flows",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/flows-77856ffe9f8572f9bd678f7fcaca9e20ead71be8.png"
+                    },
+                    {
+                      "name": "agents",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/agents-b837f5aeb6ca7d1a32040c4131b824be95c19bcf.png"
+                    },
+                    {
+                      "name": "extensions",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/extensions-aaec39520a59ba77907bb3b4a3739529fba11343.png"
+                    },
+                    {
+                      "name": "profile-primary-choice",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/profile-primary-choice-f32b99b1e590e450edeec2963746f4f1cf9fcaeb.png"
+                    },
+                    {
+                      "name": "pack-project-card",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/pack-project-card-e21f7387154f5a11dadabd6ec9267abd195b9408.png"
+                    },
+                    {
+                      "name": "entry-cards",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-0128e-ark-mobile-responsive-smoke-mobile-chromium/attachments/entry-cards-60db7fb0bf81939c47ae11196ef53cd960a1159e.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "50fea97024d96f5f2763-fbf0c7be8cc175a279b4",
+          "file": "distribution.spec.ts",
+          "line": 23,
+          "column": 3
+        },
+        {
+          "title": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+          "ok": true,
+          "tags": [
+            "responsive",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 28100,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T13:00:49.311Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "data-source-profiles",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/data-source-profiles-735ec160a5aebf440f62ebbba9f3cbd9b14993f9.png"
+                    },
+                    {
+                      "name": "flows",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/flows-328691a83df16b416b5f1fd57d9675ea493d9d87.png"
+                    },
+                    {
+                      "name": "agents",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/agents-f30db7999deb5d7724fc3c58d8e18bc8150f372b.png"
+                    },
+                    {
+                      "name": "extensions",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/extensions-e28c319af97253ce1657c560cd0d3c738485079e.png"
+                    },
+                    {
+                      "name": "profile-primary-choice",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/profile-primary-choice-ccb645928f89af8b524b39d843d4a15db2e1c997.png"
+                    },
+                    {
+                      "name": "pack-project-card",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/pack-project-card-a77f37237443c20da5e7795ceae18bd8ccf897dc.png"
+                    },
+                    {
+                      "name": "entry-cards",
+                      "contentType": "image/png",
+                      "path": "/tmp/1121-icon-frames-final/test-results/distribution-collection-ve-7dbb3-ght-mobile-responsive-smoke-mobile-chromium/attachments/entry-cards-66af9a60d7c05e6176c23876969c5f05ff4f2fa7.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "50fea97024d96f5f2763-42c5ad711a77a6bf6c4d",
+          "file": "distribution.spec.ts",
+          "line": 23,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-13T12:58:10.763Z",
+    "duration": 187762.328,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
