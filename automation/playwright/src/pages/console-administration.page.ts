@@ -1,4 +1,5 @@
-import { expect, type Page } from '@playwright/test';
+import { revealCollectionAction } from './collection-actions.js';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
 import type { ExpectedText } from '../locales/expected-text.js';
@@ -100,13 +101,25 @@ export class ConsoleAdministrationPage {
     await expect(this.page.locator(`.topbar-actions a[href="/settings/profile"]`)).toHaveAttribute('aria-label', expected.profile);
   }
 
-  public async createAndRevokeToken(name: string): Promise<void> {
+  public async createToken(name: string): Promise<Locator> {
     await fillAndCommit(this.page.getByTestId(TestIds.consoleAdministration.patName), name);
     const permission = this.page.getByTestId(TestIds.consoleAdministration.patPermission).first();
     if (!await permission.isChecked()) await permission.check();
     await this.page.getByTestId(TestIds.consoleAdministration.patCreate).click();
     const row = this.page.getByTestId(TestIds.consoleAdministration.patTokenRow).filter({ hasText: name });
     await row.waitFor({ state: 'visible' });
+    return row;
+  }
+
+  public async createAndRevokeToken(name: string): Promise<void> {
+    const row = await this.createToken(name);
+    const trigger = row.locator('.collection-actions-menu > summary');
+    await trigger.focus();
+    await trigger.press('ArrowDown');
+    await expect(row.getByTestId(TestIds.consoleAdministration.patRevoke)).toBeFocused();
+    await this.page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await revealCollectionAction(row.getByTestId(TestIds.consoleAdministration.patRevoke));
     await row.getByTestId(TestIds.consoleAdministration.patRevoke).click();
     await row.getByTestId(TestIds.consoleAdministration.patRevoke).waitFor({ state: 'detached' });
   }

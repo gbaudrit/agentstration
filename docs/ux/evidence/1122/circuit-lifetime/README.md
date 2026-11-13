@@ -1,0 +1,11 @@
+# Collection Actions module lifetime regression (#1121 / #1122)
+
+The first post-squash coverage run failed the French mobile governed-extension inventory case. The first main-promotion run failed its English mobile counterpart. Both original server artifacts contain the same `ObjectDisposedException`: `CollectionActions.OnAfterRenderAsync` invokes `attachActions` on an already disposed `JSObjectReference` at line 37. The page-health guard correctly reports the circuit failure.
+
+The session cannot download the 60MB artifacts through its restricted storage-network policy. An isolated diagnostic branch therefore reads the existing artifacts on GitHub and extracts only circuit exception blocks. [Diagnostic run](https://github.com/gbaudrit/agentstration/actions/runs/43477865204), [small original extract](https://github.com/gbaudrit/agentstration/actions/runs/43477865204/artifacts/14064570105), [archived extract bytes](server-exceptions.txt) and [source/hash observations](observations.json) retain the provenance. The diagnostic workflow is separate from both product PRs.
+
+Six unchanged local French mobile repetitions passed **before the fix** with detailed errors enabled; they did not rule out this race. Two controlled component tests then failed before the correction: disposal released a module while menu updates were pending, and disposal did not wait for an outstanding import. [Raw failing results](component-red.txt).
+
+CollectionActions now orders its interop updates and waits for them before releasing the module. Disposal prevents new attachments, and the attached element reference is captured before the interop await. A late import is released exactly once. A third regression confirms that interop failure on a live component still reaches the renderer. All **91 component-project tests pass**, including the three lifecycle cases. [Raw passing results](component-green.txt).
+
+The browser health guard, assertions, retries, timeouts, commands, permissions and focus behavior are unchanged. New full-head validation is reported in #1132 and #1174. These archived stacks establish the cause of the two cited runs; the older historical circuit shutdown had no matching preserved stack and is not retrospectively attributed to this defect.

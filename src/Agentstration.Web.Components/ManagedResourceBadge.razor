@@ -1,0 +1,7 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@if (IsManaged || IsReadOnly) { <span class="managed-resource-badge @(IconOnly ? "managed-icon-only" : null)">@if (IconOnly) { <ValueDisclosure Value="@Shared[IsManaged ? "ManagedReadOnly" : "InheritedReadOnly"]" IconName="lock" /> } else { <UiIcon Name="lock" /> @Shared[IsManaged ? "ManagedReadOnly" : "InheritedReadOnly"] }</span> }
+@code {
+    [Parameter] public bool IsManaged { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public bool IconOnly { get; set; }
+}

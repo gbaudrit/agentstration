@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/agent-instances"
 @page "/deployments"
 @implements IDisposable
@@ -19,19 +20,22 @@ else if (items.Count == 0)
 else
 {
     <section data-testid="runtime-agent-instances-list">
-    <DataGrid TItem="AgentInstanceResponse" Items="items">
-        <Header><tr><th>@T("Agent")</th><th>@T("Run")</th><th>@T("Execution")</th><th>@T("Worker")</th><th>@T("RuntimeProfile")</th><th>@T("Started")</th><th>@T("LastActivity")</th><th>@T("Lease")</th></tr></Header>
-        <Row Context="item"><tr id="@InstanceAnchor(item)" data-testid="runtime-agent-instance-row" data-instance-id="@item.InstanceId" data-agent-name="@item.AgentName" data-agent-generation="@item.AgentGeneration" data-revision-id="@item.RevisionId" data-run-kind="@item.RunKind" data-run-id="@item.RunId" data-worker-id="@item.WorkerId.ToString("D")">
-            <td><a class="resource-name-link" href="@AgentUrl(item)">@item.AgentName</a><br /><small><code>@item.AgentNamespace.Value</code> · @T("Generation", item.AgentGeneration)</small></td>
-            <td><a class="text-button" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"RunKind.{item.RunKind}")</small></td>
-            <td>@(item.ParticipantId ?? "—")<br /><small>@T("Turns", item.TurnCount)</small></td>
-            <td><a class="text-button" href="@WorkerUrl(item)">@Short(item.WorkerId)</a><br /><small>@Short(item.WorkerSessionId)</small></td>
-            <td>@item.RuntimeProfile<br /><small><code>@item.RevisionId</code></small></td>
-            <td>@item.StartedAt.LocalDateTime.ToString("g")</td>
-            <td>@item.LastActivityAt.LocalDateTime.ToString("g")</td>
-            <td>@item.LeaseExpiresAt.LocalDateTime.ToString("T")</td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="AgentInstanceResponse" Items="items" InformationLabels="@(new string[] { T("Agent"), T("Run"), T("Execution"), T("Worker"), T("RuntimeProfile"), T("Started"), T("LastActivity"), T("Lease") })" RowTestId="runtime-agent-instance-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["id"] = InstanceAnchor(item), ["data-instance-id"] = item.InstanceId, ["data-agent-name"] = item.AgentName, ["data-agent-generation"] = item.AgentGeneration, ["data-revision-id"] = item.RevisionId, ["data-run-kind"] = item.RunKind, ["data-run-id"] = item.RunId, ["data-worker-id"] = item.WorkerId.ToString("D") })" IdentityLabel="@T("AgentInstance")" ScopeLabel="@T("ExecutionScope")">
+        <Identity Context="item">
+<CollectionIdentity DisplayName="@item.AgentName" Name="@item.InstanceId" Href="@RunUrl(item)" IconName="agent" /></Identity>
+        <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ExecutionScopeRef" /></Scope>
+        <Information Context="item">
+            <CollectionValue Label="@T("Agent")"><a href="@AgentUrl(item)">@item.AgentNamespace.Value/@item.AgentName</a><small>@T("Generation", item.AgentGeneration)</small></CollectionValue>
+            <CollectionValue Label="@T("Run")"><a class="text-button instance-run-link" href="@RunUrl(item)">@item.RunId</a><br /><small>@T($"RunKind.{item.RunKind}")</small></CollectionValue>
+            <CollectionValue Label="@T("Execution")">@(item.ParticipantId ?? "—")<br /><small>@T("Turns", item.TurnCount)</small></CollectionValue>
+            <CollectionValue Label="@T("Worker")"><a class="text-button" href="@WorkerUrl(item)">@Short(item.WorkerId)</a><br /><small>@Short(item.WorkerSessionId)</small></CollectionValue>
+            <CollectionValue Label="@T("RuntimeProfile")">@item.RuntimeProfile<br /><small><code>@item.RevisionId</code></small></CollectionValue>
+            <CollectionValue Label="@T("Started")">@item.StartedAt.LocalDateTime.ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("LastActivity")">@item.LastActivityAt.LocalDateTime.ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Lease")">@item.LeaseExpiresAt.LocalDateTime.ToString("T")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.InstanceId"><a href="@RunUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
     </section>
 }
 
@@ -42,9 +46,13 @@ else
     protected override async Task OnInitializedAsync() => items = await Client.GetAgentInstancesAsync(cancellation.Token);
     private static string InstanceAnchor(AgentInstanceResponse item) => $"agent-instance-{Uri.EscapeDataString(item.InstanceId)}";
     private static string WorkerUrl(AgentInstanceResponse item) => $"/settings/runtime-workers/{item.WorkerId:D}";
-    private static string RunUrl(AgentInstanceResponse item) => item.RunKind == nameof(RuntimeAssignmentTargetKind.FlowRun)
-        ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}"
-        : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+    private static string RunUrl(AgentInstanceResponse item)
+    {
+        var path = item.RunKind == nameof(RuntimeAssignmentTargetKind.FlowRun)
+            ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}"
+            : $"/runs/{Uri.EscapeDataString(item.RunId)}";
+        return item.ExecutionScopeRef is { } scope ? $"{path}?scopeRef={Uri.EscapeDataString(scope.Value)}" : path;
+    }
     private static string AgentUrl(AgentInstanceResponse item) => item.AgentNamespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(item.AgentName)}"
         : $"/namespaces/{Uri.EscapeDataString(item.AgentNamespace.Value)}/agents/{Uri.EscapeDataString(item.AgentName)}";

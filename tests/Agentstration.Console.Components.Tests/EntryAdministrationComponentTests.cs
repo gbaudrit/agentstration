@@ -67,7 +67,10 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("1 total", rendered.FindAll(".entry-catalog-summary span")[0].TextContent.Trim());
         Assert.AreEqual("1 published", rendered.FindAll(".entry-catalog-summary span")[1].TextContent.Trim());
         Assert.IsTrue(rendered.Markup.Contains("Prompt Entry", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Published v1", StringComparison.Ordinal));
+        Assert.AreEqual("1", rendered.Find(".collection-version code").TextContent);
+        Assert.AreEqual("Published", rendered.Find(".status-icon-only button").GetAttribute("aria-label"));
+        Assert.AreEqual($"/workspaces/{client.EntryDrafts[0].Value.WorkspaceId.Value:D}", rendered.Find(".resource-owner-icon").GetAttribute("data-scope-ref"));
+        Assert.IsFalse(rendered.Markup.Contains("Draft r", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Configure", StringComparison.Ordinal));
         Assert.AreEqual("/entries/prepare-report", rendered.Find(".entry-card-link").GetAttribute("href"));
     }
@@ -135,7 +138,7 @@ public sealed class EntryAdministrationComponentTests
     [TestMethod]
     public async Task EntryEditorRawYamlUsesTheSameEditableDraftAndSavePath()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
@@ -144,7 +147,7 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
 
         var editor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
-        Assert.IsTrue(editor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        Assert.IsTrue(editor.Closest(".entry-yaml-field") is not null);
         var yaml = editor.GetAttribute("value") ?? editor.TextContent;
         Assert.IsTrue(yaml.Contains("kind: Entry", StringComparison.Ordinal));
         Assert.IsTrue(yaml.Contains("suggestions:", StringComparison.Ordinal));
@@ -237,7 +240,7 @@ public sealed class EntryAdministrationComponentTests
         await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
         var yamlEditor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
         Assert.IsTrue(yamlEditor.HasAttribute("readonly"));
-        Assert.IsTrue(yamlEditor.ParentElement!.ClassList.Contains("entry-yaml-field"));
+        Assert.IsTrue(yamlEditor.Closest(".entry-yaml-field") is not null);
         Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save YAML", StringComparison.Ordinal)));
         var workplaceLink = rendered.FindAll("a").Single(value => value.TextContent.Contains("Use in Workplace", StringComparison.Ordinal));
         Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));
@@ -432,11 +435,37 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("/settings/organization/structure", rendered.Find("a.button-primary").GetAttribute("href"));
     }
 
+    [TestMethod]
+    public void ClearingDescriptionKeepsTheSelectedBindingAndDoesNotPublishOrSaveImplicitly()
+    {
+        using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var client = new FakeEntryAdministrationApiClient();
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var editor = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "prepare-report"));
+        editor.WaitForElement("[data-testid='entry-tab-definition']").Click();
+        editor.Find("[data-testid='entry-description']").Input("Unsaved description");
+        var selected = editor.Find("[data-testid='target-resource']").GetAttribute("value");
+        var description = editor.Find("[data-testid='entry-description']");
+        var field = description.Closest(".form-field")!;
+        Assert.AreEqual(description.Id, field.QuerySelector("label")!.GetAttribute("for"));
+        field.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("[data-testid='entry-description']").GetAttribute("value"));
+        Assert.AreEqual(selected, editor.Find("[data-testid='target-resource']").GetAttribute("value"));
+        Assert.IsNull(client.SavedEntry);
+        editor.Find("[data-testid='entry-save-draft']").Click();
+        editor.WaitForAssertion(() => Assert.IsNotNull(client.SavedEntry));
+        var saved = client.SavedEntry;
+        Assert.IsNotNull(saved);
+        Assert.IsNull(saved.Description);
+    }
+
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
 
     private static BunitContext CreateContext()
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

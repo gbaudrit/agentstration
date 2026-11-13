@@ -62,7 +62,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         StringAssert.Contains(mapping.TextContent, "Incoming transition output");
         Assert.AreEqual("object", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value.GetProperty("type").GetString());
         rendered.Find("[data-testid='step-settings-tab-configuration']").Click();
-        rendered.FindAll(".flow-inspector input").Single(element => element.ParentElement!.TextContent.Contains("Error details expression", StringComparison.Ordinal)).Change("${transition.output.details}");
+        rendered.Find("[data-testid=output-error-details]").Change("${transition.output.details}");
 
         var output = context.Services.GetRequiredService<FlowEditorStore>().State.Resource!.Definition.Steps.OfType<OutputFlowStepDefinition>().Single();
         Assert.AreEqual(JsonValueKind.String, output.OutputMapping?.ValueKind);

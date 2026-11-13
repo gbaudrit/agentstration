@@ -64,4 +64,5 @@
   <data name="AcquisitionImplementationHelp"><value>This Tool reuses the target and parameters from its acquisition template.</value></data>
   <data name="AcquisitionTemplate"><value>Acquisition template</value></data>
   <data name="AcquisitionOutput"><value>Output artifact</value></data>
+  <data name="TimeoutRange"><value>Timeout must be between 1 and 900 seconds.</value></data>
 </root>

@@ -14,6 +14,56 @@ test('local AEP extensions expose inventory and detail states @smoke', async ({ 
   await pages.distribution.open(product.consoleUrl, `/extensions/enrollment/${randomUUID()}`, 'extensionDetails');
 });
 
+for (const variant of [
+  { locale: 'en-US', theme: 'dark', width: 1440 },
+  { locale: 'en-US', theme: 'light', width: 1440 },
+  { locale: 'fr-FR', theme: 'dark', width: 390 },
+  { locale: 'fr-FR', theme: 'light', width: 390 },
+] as const) {
+  test(`collection version identity and primary choice ${variant.locale} ${variant.theme} ${variant.width === 390 ? 'mobile @responsive' : 'desktop'} @smoke`, async ({ page, product }, testInfo) => {
+    const pages = new ProductPages(page);
+    await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+    await pages.distribution.openFirstExtensionDetails(product.consoleUrl);
+    try {
+      await page.setViewportSize({ width: variant.width, height: variant.width === 390 ? 844 : 1000 });
+      await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
+      await pages.ensureTheme(variant.theme);
+      const capture = async (name: string) => {
+        const path = testInfo.outputPath(`${name}-${variant.locale}-${variant.theme}.png`);
+        await page.screenshot({ path, fullPage: true });
+        await testInfo.attach(name, { path, contentType: 'image/png' });
+      };
+      for (const route of ['/data-source-profiles', '/flows', '/agents', '/extensions?tab=catalog&context=%2Finstance']) {
+        await pages.distribution.inspectVersionPlacement(product.consoleUrl, route, variant.locale);
+        await capture(route.split('?')[0].slice(1));
+        if (variant.width === 1440) {
+          await pages.distribution.showCollectionTable();
+          await capture(`${route.split('?')[0].slice(1)}-table`);
+        }
+      }
+      await pages.distribution.inspectToolCollectionAlignment(product.consoleUrl, variant.width === 1440 ? 'columns' : 'stacked');
+      await capture('tools');
+      if (variant.width === 1440) {
+        await pages.distribution.showCollectionTable();
+        await capture('tools-table');
+      }
+      await pages.distribution.inspectDirectProfileChoice(product.consoleUrl);
+      await capture('profile-primary-choice');
+      const workspaceId = await pages.organizationWorkspaces.selectByName('default');
+      const projectName = `compact-cards-${variant.locale.toLowerCase()}-${variant.theme}`;
+      await pages.distribution.createPackProject(product.consoleUrl, {
+        publisher: 'playwright', name: projectName, version: '2.3.4', displayName: projectName,
+      });
+      await pages.distribution.inspectCompactProjectCard(product.consoleUrl, variant.locale, projectName);
+      await capture('pack-project-card');
+      await pages.distribution.inspectCompactEntryCards(product.consoleUrl, variant.locale, workspaceId);
+      await capture('entry-cards');
+    } finally {
+      await pages.consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
+    }
+  });
+}
+
 test('the local Git extension can back an explicitly configured Source Provider @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };

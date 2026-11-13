@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { fillAndCommit } from './controls.js';
 import { TestIds } from '../contracts/test-ids.js';
 import { GovernedInventoryTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
@@ -47,15 +48,16 @@ export class GovernedExtensionInventoryPage {
     await expect(installation.locator('.extension-bundle-meta > span').filter({ hasText: text.bundleVersion })).toContainText('2.4.0');
     await expect(installation.locator('.extension-bundle-meta > span').filter({ hasText: text.extensionVersion })).toContainText('9.0.0');
     const grid = installation.getByTestId(TestIds.governedInventory.resources);
-    await expect(grid.locator('tbody tr')).toHaveCount(3);
+    await expect(grid.locator('tbody > tr, .collection-card')).toHaveCount(3);
     await expect(grid.locator('a')).toHaveCount(3);
     for (const [index, kind] of text.kinds.entries()) {
-      const cells = grid.locator('tbody tr').nth(index).locator('td');
-      await expect(cells.nth(0)).toHaveText(kind);
-      await expect(cells.nth(1)).toHaveText(`${namespace}/qa-managed`);
-      await expect(cells.nth(2)).toHaveText(text.scope);
-      await expect(cells.nth(3)).toHaveText('2.4.0');
-      await expect(cells.nth(4)).toHaveText(text.managed);
+      const row = grid.locator('tbody > tr, .collection-card').nth(index);
+      await expect(row.locator('.extension-bundle-kind')).toHaveText(kind);
+      await expect(row.locator('.collection-qualified-name code')).toHaveText(`${namespace}/qa-managed`);
+      await expect(row.locator('.resource-owner-icon button')).toHaveAccessibleName(text.scope);
+      await expect(row.locator('.scope-letter')).toHaveText('I');
+      await expect(row).toContainText('2.4.0');
+      await expect(row.locator('.managed-resource-badge button')).toHaveAccessibleName(text.managedBadge);
     }
     for (const href of await grid.locator('a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) this.assertScopedLink(href);
     await expect(grid).toContainText(`${namespace}/qa-managed`);
@@ -125,7 +127,7 @@ export class GovernedExtensionInventoryPage {
     await this.navigate(`${consoleUrl}/data-source-profiles/qa-managed?${query}`);
     await expect(this.managed).toBeVisible();
     await this.navigate(`${consoleUrl}/data-source-profiles?context=%2Finstance`);
-    const profileRow = this.page.locator('tr').filter({ has: this.page.locator("a[href^='/data-source-profiles/qa-managed?']") });
+    const profileRow = this.page.locator('tbody tr, .collection-card').filter({ has: this.page.locator("a.resource-name-link[href^='/data-source-profiles/qa-managed?']") });
     await expect(profileRow).toContainText('Governed inventory fixture');
     await expect(profileRow).toContainText('9.0.0');
     await expect(profileRow).toContainText('2.4.0');
@@ -158,7 +160,10 @@ export class GovernedExtensionInventoryPage {
     await this.page.locator("a[href^='/extensions/qa-managed?']").click();
     await this.navigate(`${consoleUrl}/tools?context=%2Finstance`);
     const owners = this.page.locator("a[href^='/extensions/qa-managed?']");
-    await expect(owners).toHaveCount(4);
+    await expect(async () => {
+      await fillAndCommit(this.page.getByRole('search').getByRole('searchbox'), 'qa-managed');
+      await expect(owners).toHaveCount(4);
+    }).toPass();
     for (const owner of await owners.all()) {
       await expect(owner).toHaveText('Governed inventory fixture');
       this.assertScopedLink(await owner.getAttribute('href'));

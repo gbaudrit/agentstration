@@ -123,7 +123,7 @@ public partial class Packs
 
     private void CloseInstall()
     {
-        if (installing) return;
+        if (installing || previewing) return;
         installOpen = false;
     }
 

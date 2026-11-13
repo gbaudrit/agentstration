@@ -4,10 +4,8 @@
         <span class="icon-picker-selection-copy"><small>@SelectedLabel</small><strong>@SelectedName</strong></span>
         <button type="button" class="text-button" disabled="@(Disabled || string.IsNullOrEmpty(Value))" @onclick="ClearAsync">@ClearLabel</button>
     </div>
-    <label class="icon-picker-search">
-        <span>@SearchLabel</span>
-        <input type="search" value="@query" placeholder="@SearchPlaceholder" disabled="@Disabled" autocomplete="off" @oninput="Search" />
-    </label>
+    <FormField Label="@SearchLabel" Class="icon-picker-search"><ChildContent><ClearableText Type="search" Value="@query" placeholder="@SearchPlaceholder" Disabled="@Disabled" autocomplete="off" ValueChanged="changed => Search(new ChangeEventArgs { Value = changed })" />
+    </ChildContent></FormField>
     @if (results.Names.Count == 0)
     {
         <p class="icon-picker-empty" role="status">@NoResultsLabel</p>

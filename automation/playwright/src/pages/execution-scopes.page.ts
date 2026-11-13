@@ -281,7 +281,7 @@ export class ExecutionScopesPage {
 
   public async recoverFlowRunThroughWorkspaceList(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
     await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
-    const link = this.page.locator(`a[href^="/flow-runs/${evidence.flowRunId}?"]`);
+    const link = this.page.locator(`a.resource-name-link[href^="/flow-runs/${evidence.flowRunId}?"]`);
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute(
       'href',
@@ -500,7 +500,7 @@ export class ExecutionScopesPage {
     await this.grantDescendantUse(consoleUrl, flow, tenantScope);
   }
 
-  private async grantDescendantUse(consoleUrl: string, resource: ResourceIdentityWire, tenantScope: string): Promise<void> {
+  public async grantDescendantUse(consoleUrl: string, resource: ResourceIdentityWire, tenantScope: string): Promise<void> {
     const url = `${consoleUrl}/api/resource-access-policies/${resource.uid}`;
     const contextHeaders = { 'X-Agentstration-Context': '/instance' };
     const current = await this.page.request.get(url, { headers: contextHeaders });

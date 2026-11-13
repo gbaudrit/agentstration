@@ -1,62 +1,74 @@
+@inject IServiceProvider Services
 @implements IDisposable
 @inject IModelProfilesClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilePickerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<div class="model-profile-picker">
-    <label>
-        <span>@T("SearchModelProfiles")</span>
-        <input value="@search" @oninput="SearchChanged" placeholder="@T("SearchPlaceholder")" aria-label="@T("SearchModelProfiles")" />
-    </label>
-    @if (loading)
+<div class="model-profile-picker" data-testid="model-profile-picker">
+    <h3 class="model-profile-label" id="@labelId">@T("ModelProfile")</h3>
+    <section class="model-summary-card model-profile-summary" role="group" aria-labelledby="@labelId">
+        <div class="model-profile-summary-header">
+            <div class="model-profile-identity">
+                <span class="model-profile-symbol" aria-hidden="true"><UiIcon Name="layers" /></span>
+                <div class="model-profile-copy">
+                    @if (selected is not null)
+                    {
+                        <div class="model-profile-name"><strong><a class="resource-name-link" href="@ProfileUrl(selected)">@selected.Properties.DisplayName</a></strong><ResourceScopeBadge ScopeRef="@selected.ScopeRef" Compact /></div>
+                        <code>@selected.ScopeRef · @selected.Namespace/@selected.Name</code>
+                    }
+                    else
+                    {
+                        <strong>@(string.IsNullOrWhiteSpace(Value) ? T("SelectModelProfile") : Shared["Unavailable"])</strong>
+                        @if (!string.IsNullOrWhiteSpace(Value)) { <code>@ScopeRef · @Namespace/@Value</code> }
+                        else { <small>@T("SelectionHint")</small> }
+                    }
+                </div>
+            </div>
+            <div class="model-profile-summary-actions">
+                <button type="button" class="button-secondary model-profile-toggle" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@catalogId" @onclick="ToggleCatalog" @ref="toggle" data-testid="model-profile-toggle">
+                    <UiIcon Name="search" /><span>@(expanded ? T("CloseChoices") : string.IsNullOrWhiteSpace(Value) ? T("BrowseProfiles") : T("ChangeProfile"))</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Value)) { <FieldClearButton Label="@Shared["ClearField", T("ModelProfile")]" OnClear="ClearAsync" /> }
+            </div>
+        </div>
+        @if (selected is not null)
+        {
+            <div class="model-profile-summary-details">
+                <dl class="model-profile-facts">
+                    <div><dt>@T("Provider")</dt><dd><a class="resource-name-link" href="@ProviderUrl(selected)">@(selected.Properties.Provider.DisplayName ?? selected.Properties.Provider.Name)</a></dd></div>
+                    <div><dt>@T("Model")</dt><dd><code>@selected.Properties.Model.Name</code></dd></div>
+                </dl>
+                <div class="model-profile-summary-footer"><StatusBadge Text="@StatusLabel(selected.Properties.Status)" Status="@ModelManagementUi.Status(selected.Properties.Status)" /></div>
+            </div>
+        }
+    </section>
+    @if (expanded)
     {
-        <LoadingState Message="@T("Loading")" />
-    }
-    else if (error is not null)
-    {
-        <div class="form-alert form-alert-danger" role="alert">@error.Message <button type="button" class="text-button" @onclick="LoadAsync">@T("Retry")</button></div>
-    }
-    else if (filtered.Count == 0)
-    {
-        <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
-    }
-    else
-    {
-        <label>
-            <span>@T("ModelProfile")</span>
-            <select value="@CurrentValue" @onchange="SelectAsync" aria-label="@T("ModelProfile")" data-testid="model-profile-select">
-                <option value="">@T("SelectModelProfile")</option>
-                @foreach (var profile in filtered)
+        <section class="resource-reference-results model-profile-catalog" id="@catalogId" aria-labelledby="@catalogTitleId" data-testid="model-profile-catalog">
+            <div class="model-profile-catalog-heading"><h4 id="@catalogTitleId">@T("SelectModelProfile")</h4><p>@T("CatalogHint")</p></div>
+            <div class="model-profile-filters">
+                <FormField Label="@T("SearchModelProfiles")"><ClearableText Type="search" Value="@search" ValueChanged="SearchChanged" placeholder="@T("SearchPlaceholder")" @ref="searchInput" data-testid="model-profile-search" /></FormField>
+                <FormField Label="@Shared["ProviderName"]"><ClearableText Value="@provider" ValueChanged="ProviderChanged" data-testid="model-profile-provider-filter" /></FormField>
+                <FormField Label="@Shared["Scope"]"><ClearableSelect TValue="string" Value="@ownerKind" ValueChanged="OwnerKindChanged" ValueExpression="() => ownerKind"><option value="">@Shared["All"]</option>@foreach (var kind in Enum.GetValues<ResourceScopeKind>()) { <option value="@kind">@T($"Scope.{kind}")</option> }</ClearableSelect></FormField>
+            </div>
+            @if (loading) { <LoadingState Message="@T("Loading")" /> }
+            else if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@Shared["LookupError"] <code>@error.ErrorId</code> <button type="button" class="text-button" @onclick="() => LoadAsync(false)">@T("Retry")</button></div> }
+            else
+            {
+                @if (profiles.Count == 0) { <p class="model-profile-empty" role="status">@Shared[nextCursor is not null ? "ContinueSearch" : "NoMatchesPage"]</p> }
+                <div class="model-profile-choices" role="list">
+                @foreach (var profile in profiles)
                 {
-                    <option value="@ProfileValue(profile)" disabled="@ModelManagementUi.IsInvalid(profile)">@OptionLabel(profile)</option>
+                    var isSelected = IsSelected(profile);
+                    <article role="listitem" class="resource-reference-choice model-profile-choice @(isSelected ? "is-selected" : null)" @key="ProfileValue(profile)">
+                        <div class="model-profile-choice-copy" id="@(catalogId + "-" + ProfileValue(profile))"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@ProfileUrl(profile)" IconName="layers" Domain="model"><IconBadges><ResourceScopeBadge ScopeRef="@profile.ScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@ModelManagementUi.Status(profile.Properties.Status)" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><small>@profile.Properties.Provider.Name <span aria-hidden="true">/</span> @profile.Properties.Model.Name</small></div>
+                        <div class="model-profile-choice-actions"><CollectionActions ResourceName="@profile.Properties.DisplayName"><Primary><button class="button-secondary" type="button" disabled="@(isSelected || ModelManagementUi.IsInvalid(profile))" aria-describedby="@(catalogId + "-" + ProfileValue(profile))" data-testid="model-profile-choice" data-profile="@ProfileValue(profile)" @onclick="() => ChooseAsync(profile)">@if (isSelected) { <UiIcon Name="check" /> }<span>@(isSelected ? T("Selected") : Shared["Choose"])</span></button></Primary></CollectionActions></div>
+                    </article>
                 }
-            </select>
-        </label>
-    }
-
-    @if (Selected is not null)
-    {
-        <article class="model-summary-card">
-            <div><p class="eyebrow">@T("SelectedModelProfile")</p><span class="resource-name-with-scope"><strong>@Selected.Properties.DisplayName</strong><ResourceScopeBadge ScopeRef="@Selected.ScopeRef" Compact /></span><code>@Selected.Namespace/@Selected.Name</code></div>
-            <dl class="compact-details">
-                <dt>@T("Scope")</dt><dd><code>@(Selected.ScopeRef?.Value ?? T("Scope.Unknown"))</code></dd>
-                <dt>@T("Provider")</dt><dd>@(Selected.Properties.Provider.DisplayName ?? Selected.Properties.Provider.Name)</dd>
-                <dt>@T("Model")</dt><dd>@Selected.Properties.Model.Name</dd>
-                <dt>@T("Status")</dt><dd><StatusBadge Text="@StatusLabel(Selected.Properties.Status)" Status="@ModelManagementUi.Status(Selected.Properties.Status)" /></dd>
-            </dl>
-            <a class="text-button" href="@ProfileUrl(Selected)">@T("ViewModelProfile") →</a>
-            @if (string.Equals(Selected.Properties.Status, "providerUnavailable", StringComparison.OrdinalIgnoreCase))
-            {
-                <p class="inline-warning">@T("ProviderUnavailableMessage")</p>
+                </div>
             }
-            else if (string.Equals(Selected.Properties.Status, "modelUnavailable", StringComparison.OrdinalIgnoreCase))
-            {
-                <p class="inline-warning">@T("ModelUnavailableMessage")</p>
-            }
-        </article>
-    }
-    else if (!loading)
-    {
-        <p class="resource-hint">@T("Hint")</p>
+            @if (page > 0 || nextCursor is not null) { <CollectionPager Page="@(page + 1)" HasMore="@(nextCursor is not null)" Busy="@(loading || error is not null)" PageChanged="ChangePageAsync" /> }
+        </section>
     }
 </div>
 
@@ -67,82 +79,119 @@
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<ModelProfileSummaryResponse?> SelectedChanged { get; set; }
     [Parameter] public bool SelectFirstWhenMissing { get; set; }
-
     private readonly CancellationTokenSource cancellation = new();
+    private readonly CancellationToken lifetimeToken;
+    private bool disposed;
+    public ModelProfilePicker() => lifetimeToken = cancellation.Token;
+    private CancellationTokenSource? pendingLookup;
+    private readonly string labelId = $"profile-label-{Guid.NewGuid():N}";
+    private readonly string catalogTitleId = $"profile-choices-{Guid.NewGuid():N}";
+    private ElementReference toggle;
+    private bool focusToggle;
+    private readonly string catalogId = $"profiles-{Guid.NewGuid():N}";
+    private readonly List<string?> cursors = [null];
     private IReadOnlyList<ModelProfileSummaryResponse> profiles = [];
-    private IReadOnlyList<ModelProfileSummaryResponse> filtered = [];
+    private ModelProfileSummaryResponse? selected;
     private AgentstrationApiException? error;
-    private string search = string.Empty;
-    private bool loading;
-    private string CurrentValue => Selected is { } selected ? ProfileValue(selected) : string.Empty;
-    private ModelProfileSummaryResponse? Selected
+    private ClearableText? searchInput;
+    private string search = string.Empty, provider = string.Empty, ownerKind = string.Empty;
+    private string? nextCursor, observedSelection;
+    private int page, version;
+    private bool loading, initialized, expanded, publishing, focusSearch;
+    private string SelectionKey => $"{ScopeRef}|{Namespace}|{Value}";
+    protected override async Task OnParametersSetAsync()
     {
-        get
+        if (disposed || publishing || initialized && observedSelection == SelectionKey) return;
+        var requestedSelection = SelectionKey;
+        observedSelection = SelectionKey;
+        if (!initialized)
         {
-            var matches = profiles.Where(item =>
-                string.Equals(item.Name, Value, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(item.Namespace, ResourceNamespace.Parse(Namespace).Value, StringComparison.Ordinal)
-                && (ScopeRef is null || item.ScopeRef == ScopeRef)).ToArray();
-            return matches.Length == 1 ? matches[0] : null;
+            initialized = true;
+            expanded = string.IsNullOrEmpty(Value) || SelectFirstWhenMissing;
+            await LoadAsync(true);
+        }
+        if (disposed || requestedSelection != SelectionKey || observedSelection != requestedSelection) return;
+        var matches = profiles.Where(item => item.Name == Value && item.Namespace == Namespace && (ScopeRef is null || item.ScopeRef == ScopeRef)).Take(2).ToArray();
+        selected = ScopeRef is not null && matches.Length == 1 ? matches[0] : null;
+        if (selected is null && !string.IsNullOrEmpty(Value))
+        {
+            try
+            {
+                var choice = await Client.FindModelProfileChoiceAsync(ResourceNamespace.Parse(Namespace), Value, ScopeRef, lifetimeToken);
+                if (disposed || requestedSelection != SelectionKey || observedSelection != requestedSelection) return;
+                selected = choice;
+            }
+            catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { return; }
+            catch (AgentstrationApiException) { }
+        }
+        if (selected is null && SelectFirstWhenMissing && profiles.FirstOrDefault(item => !ModelManagementUi.IsInvalid(item)) is { } first && !hasPublishedInitialSelection)
+            await ChooseAsync(first);
+        else if (!hasPublishedInitialSelection)
+        {
+            hasPublishedInitialSelection = true;
         }
     }
-
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    private async Task LoadAsync()
+    private bool hasPublishedInitialSelection;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        loading = true;
-        error = null;
+        if (!disposed && focusToggle) { focusToggle = false; await toggle.FocusAsync(); }
+        if (!disposed && focusSearch && searchInput is not null) { focusSearch = false; await searchInput.FocusAsync(); }
+    }
+    private async Task ChooseAsync(ModelProfileSummaryResponse profile)
+    {
+        if (ModelManagementUi.IsInvalid(profile)) return;
+        selected = profile; publishing = true; hasPublishedInitialSelection = true;
+        try { await ValueChanged.InvokeAsync(profile.Name); await SelectedChanged.InvokeAsync(profile); }
+        finally { publishing = false; observedSelection = SelectionKey; }
+        expanded = false; focusToggle = true;
+    }
+    private void ToggleCatalog() { expanded = !expanded; focusSearch = expanded; }
+    private bool IsSelected(ModelProfileSummaryResponse profile) => selected is not null && ProfileValue(selected) == ProfileValue(profile);
+    private async Task ClearAsync()
+    {
+        selected = null; publishing = true; hasPublishedInitialSelection = true;
+        try { await ValueChanged.InvokeAsync(string.Empty); await SelectedChanged.InvokeAsync(null); }
+        finally { publishing = false; observedSelection = SelectionKey; }
+        expanded = true; focusSearch = true;
+    }
+    private async Task SearchChanged(string? value) { search = value ?? string.Empty; await LoadAsync(true); }
+    private async Task ProviderChanged(string? value) { provider = value ?? string.Empty; await LoadAsync(true); }
+    private async Task OwnerKindChanged(string value) { ownerKind = value; await LoadAsync(true); }
+    private async Task ChangePageAsync(int value)
+    {
+        if (loading) return;
+        if (value > page + 1 && nextCursor is { } next) { if (cursors.Count == page + 1) cursors.Add(next); else cursors[page + 1] = next; }
+        page = Math.Clamp(value - 1, 0, cursors.Count - 1);
+        await LoadAsync(false);
+    }
+    private async Task LoadAsync(bool reset)
+    {
+        if (disposed) return;
+        if (reset) { page = 0; cursors.Clear(); cursors.Add(null); nextCursor = null; }
+        var requestVersion = ++version;
+        pendingLookup?.Cancel(); pendingLookup?.Dispose();
+        var currentRequest = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
+        pendingLookup = currentRequest;
+        loading = true; error = null;
         try
         {
-            profiles = await Client.GetModelProfilesAsync(null, null, null, cancellation.Token);
-            ApplyFilter();
-            var selected = Selected;
-            if (selected is null && SelectFirstWhenMissing)
-            {
-                selected = profiles.FirstOrDefault(profile => !ModelManagementUi.IsInvalid(profile));
-                if (selected is not null) await ValueChanged.InvokeAsync(selected.Name);
-            }
-            await SelectedChanged.InvokeAsync(selected);
+            var response = await Client.LookupModelProfilesAsync(search, provider, ownerKind, cursors[page], currentRequest.Token);
+            if (requestVersion != version) return;
+            profiles = response.Value; nextCursor = response.NextCursor;
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (currentRequest.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) { if (requestVersion == version) error = exception; }
+        finally { if (requestVersion == version) loading = false; if (ReferenceEquals(pendingLookup, currentRequest)) pendingLookup = null; currentRequest.Dispose(); }
     }
-
-    private void SearchChanged(ChangeEventArgs args)
-    {
-        search = args.Value?.ToString() ?? string.Empty;
-        ApplyFilter();
-    }
-
-    private void ApplyFilter() => filtered = ModelManagementUi.FilterProfiles(profiles, search);
-
-    private async Task SelectAsync(ChangeEventArgs args)
-    {
-        var value = args.Value?.ToString() ?? string.Empty;
-        var selected = profiles.FirstOrDefault(item => string.Equals(ProfileValue(item), value, StringComparison.Ordinal));
-        if (selected is not null && ModelManagementUi.IsInvalid(selected)) return;
-        await ValueChanged.InvokeAsync(selected?.Name ?? string.Empty);
-        await SelectedChanged.InvokeAsync(selected);
-    }
-
     private string T(string key) => Localizer[key];
     private string StatusLabel(string? status) { var key = $"Status.{status ?? "unknown"}"; var localized = Localizer[key]; return localized.ResourceNotFound ? ModelManagementUi.Label(status) : localized.Value; }
-    private string OptionLabel(ModelProfileSummaryResponse item) =>
-        $"{item.Properties.DisplayName} — {ScopeLabel(item)} · {item.Namespace}/{item.Name} · {item.Properties.Provider.Name} / {item.Properties.Model.Name} · {StatusLabel(item.Properties.Status)}";
-
-    private string ScopeLabel(ModelProfileSummaryResponse item) =>
-        item.ScopeRef is null ? T("Scope.Unknown") : T($"Scope.{item.ScopeRef.Value.Kind}");
-
     private static string ProfileValue(ModelProfileSummaryResponse item) =>
         $"{item.ScopeRef?.Value ?? string.Empty}|{item.Namespace}|{item.Name}";
 
+    private static string ProviderUrl(ModelProfileSummaryResponse item) =>
+        $"/modelproviders/{Uri.EscapeDataString(item.Properties.Provider.ResourceId)}?namespace={Uri.EscapeDataString(item.Properties.Provider.Namespace)}";
     private static string ProfileUrl(ModelProfileSummaryResponse item) =>
         ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name), item.ScopeRef);
 
-    public void Dispose()
-    {
-        cancellation.Cancel();
-        cancellation.Dispose();
-    }
+    public void Dispose() { if (disposed) return; disposed = true; version++; pendingLookup?.Cancel(); cancellation.Cancel(); cancellation.Dispose(); }
 }

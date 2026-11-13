@@ -13,7 +13,7 @@
                     <a class="inspector-resource-link" href="@AgentUrl(selectedAgent)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenAgentInNewTab")"><UiIcon Name="external-link" />@T("OpenAgent")</a>
                 }
             </div>
-            <select id="flow-agent-reference" disabled="@ReadOnly" value="@SelectionValue" @onchange="UpdateAgentAsync">
+            <ClearableSelect TValue="string" id="flow-agent-reference" disabled="@ReadOnly" Value="@Convert.ToString(SelectionValue, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateAgentAsync.InvokeAsync(new ChangeEventArgs { Value = changed })">
                 <option value="${steps.route-request.output.selectedAgent}">@T("RouterOutput")</option>
                 @if (SelectedAgent is null && !Step.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal))
                 {
@@ -22,7 +22,7 @@
                         : T("UnavailableReference", ResourceIdentity(Step.Agent.ScopeRef, Step.Agent.Namespace ?? Namespace, Step.Agent.ResourceId)))</option>
                 }
                 @foreach (var item in Agents) { <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(Localizer, item.DisplayName, item.Namespace, item.ScopeRef)</option> }
-            </select>
+            </ClearableSelect>
         </div>
         @if (SelectedAgent is { } referencedAgent)
         {

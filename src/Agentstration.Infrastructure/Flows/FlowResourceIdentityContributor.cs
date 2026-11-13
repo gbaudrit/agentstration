@@ -31,7 +31,8 @@ public sealed class FlowResourceIdentityContributor(IFlowRepository flows) : IRe
                 stored.Value.Id.Namespace,
                 FlowResourceKinds.Flow,
                 stored.Value.Id.Value,
-                stored.UpdatedAt)));
+                stored.UpdatedAt)
+            { IsManaged = stored.Value.Governance.IsManaged }));
             if (!page.HasMore) return result;
             skip += page.Items.Count;
         }

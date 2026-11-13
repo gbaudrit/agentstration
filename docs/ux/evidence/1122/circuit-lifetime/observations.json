@@ -1,0 +1,37 @@
+{
+  "diagnosticRun": "https://github.com/gbaudrit/agentstration/actions/runs/43477865204",
+  "diagnosticArtifact": 14064570105,
+  "failedCoverage": {
+    "head": "0851d5cfe476b061a6da527e1cf51f23fa089d36",
+    "run": 43472011196,
+    "locale": "fr-FR"
+  },
+  "failedPromotion": {
+    "head": "35b20cb9fb91a6e97d083aef93e90c07095369bc",
+    "run": 43473539140,
+    "locale": "en-US"
+  },
+  "before": {
+    "lifecycleCases": 2,
+    "failed": 2
+  },
+  "after": {
+    "componentProjectPassed": 91,
+    "failed": 0,
+    "newLifecycleCases": 3
+  },
+  "preFixBrowserRepetitions": {
+    "locale": "fr-FR",
+    "passed": 6,
+    "failed": 0
+  },
+  "sha256": {
+    "README.md": "739198280ab5d0596f704d9419a4c806431a1100e3583d8fa6fa118cfd8f3f95",
+    "component-red.txt": "6b31ef9e5d9bb86a45c7ff45a72a80824449811fc13ac06a57db8a13ac29ff82",
+    "server-exceptions.txt": "40c7c8ed2614ec353f769d68811c3b72a58bb45a7b8f34981b4838ea8e261c3f",
+    "component-green.txt": "4c140e3035ddd07bf35fa168c5061e671125793990663a211a69f556866e5d14"
+  },
+  "componentBlobBefore": "e0a72f2cc8c4034ff8b3dabc6b36415c6e2b0d25",
+  "componentBlobAfter": "5e979fbe90c31ed72804e522f28835fab9de9225",
+  "regressionTestBlob": "7ab7018b3ee2465183165e7b81867bd210fa8bf9"
+}

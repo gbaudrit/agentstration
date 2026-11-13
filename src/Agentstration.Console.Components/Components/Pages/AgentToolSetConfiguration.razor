@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
 <section class="panel form-section agent-tools-panel" data-testid="agent-toolset-configuration">
@@ -14,11 +15,11 @@
             var assignment = Assignment(version);
             <article class="agent-toolset-card @(assignment is not null ? "selected" : null)" data-toolset="@version.ToolSetName" data-version="@version.Version" data-scope="@version.ScopeRef?.Value">
                 <header class="agent-toolset-header">
-                    <div class="agent-toolset-identity"><span class="agent-toolset-icon" aria-hidden="true"><TablerIcon Name="layers" /></span><div><span class="agent-toolset-kind">@T("PublishedToolSet")</span><h3>@version.ToolSetName</h3><code>@version.Namespace/@version.ToolSetName:@version.Version</code></div></div>
-                    <a class="text-button" href="@ToolSetUrl(version)">@T("InspectToolSet") →</a>
+                    <CollectionIdentity DisplayName="@version.ToolSetName" HeadingLevel="3" Namespace="@version.Namespace.Value" Name="@version.ToolSetName" Href="@ToolSetUrl(version)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(version.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="version.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(version.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
+
                 </header>
                 <div class="agent-toolset-assignment">
-                    <input id="@FullInputId(version)" type="checkbox" checked="@(assignment is not null)" @onchange="args => ToggleFullAsync(version, (bool)args.Value!)" />
+                    <FormCheckbox id="@FullInputId(version)" Value="@(assignment is not null)" ValueChanged="changed => ToggleFullAsync(version, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                     <label for="@FullInputId(version)"><strong>@T(assignment?.Members.Count == 0 ? "AllMembers" : "SelectedMembers")</strong><small>@T("PinnedVersionHelp", version.Version)</small></label>
                 </div>
                 @if (assignment is not null)
@@ -30,13 +31,14 @@
                         {
                             var selected = assignment.Members.Count == 0 || assignment.Members.Contains(member.ToolName, StringComparer.Ordinal);
                             <label class="agent-toolset-member" for="@MemberInputId(version, member)">
-                                <input id="@MemberInputId(version, member)" type="checkbox" checked="@selected" @onchange="args => ToggleMemberAsync(version, member.ToolName, (bool)args.Value!)" />
+                                <FormCheckbox id="@MemberInputId(version, member)" Value="@selected" ValueChanged="changed => ToggleMemberAsync(version, member.ToolName, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />
                                 <span><strong>@member.ToolName</strong><small><code>@member.Capability · @member.Route</code><span>@member.ProviderName</span></small></span>
                             </label>
                         }
                         </div>
                     </div>
                 }
+            <CollectionActions ResourceName="@version.ToolSetName"><a href="@ToolSetUrl(version)">@T("InspectToolSet")</a></CollectionActions>
             </article>
         }
         </div>

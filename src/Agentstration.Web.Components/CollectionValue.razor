@@ -1,0 +1,13 @@
+@if (Card)
+{
+    <div class="collection-value"><dt>@Label</dt><dd>@ChildContent</dd></div>
+}
+else
+{
+    <td>@ChildContent</td>
+}
+@code {
+    [CascadingParameter(Name = "CollectionCard")] public bool Card { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

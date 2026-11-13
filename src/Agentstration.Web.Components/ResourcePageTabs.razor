@@ -1,0 +1,27 @@
+<div class="resource-tabs" role="tablist" aria-label="@Label">
+    @for (var index = 0; index < Items.Count; index++)
+    {
+        var position = index;
+        var item = Items[index];
+        <button @key="item.Key" @ref="buttons[position]" id="@(IdPrefix + "-" + item.Key)" type="button" role="tab" aria-selected="@((Value == item.Key).ToString().ToLowerInvariant())" aria-controls="@PanelId" tabindex="@(Value == item.Key ? 0 : -1)" class="@(Value == item.Key ? "active" : null)" data-testid="@item.TestId" @onclick="() => ValueChanged.InvokeAsync(item.Key)" @onkeydown="args => KeyDown(args, position)">@item.Label</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ResourcePageTab> Items { get; set; } = [];
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string PanelId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string IdPrefix { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    private ElementReference[] buttons = [];
+    protected override void OnParametersSet() { if (buttons.Length != Items.Count) buttons = new ElementReference[Items.Count]; }
+    private async Task KeyDown(KeyboardEventArgs args, int index)
+    {
+        if (args.AltKey || args.CtrlKey || args.MetaKey) return;
+        var next = args.Key switch { "ArrowRight" => (index + 1) % Items.Count, "ArrowLeft" => (index + Items.Count - 1) % Items.Count, "Home" => 0, "End" => Items.Count - 1, _ => -1 };
+        if (next < 0) return;
+        await ValueChanged.InvokeAsync(Items[next].Key);
+        await buttons[next].FocusAsync();
+    }
+}

@@ -12,9 +12,10 @@ const definition: ExerciseModelAdministrationInput = {
   runtimeDisplayName: 'Playwright runtime',
 };
 
-test('model provider, model profile, and runtime profile complete their lifecycle @smoke', async ({ page, product }) => {
+test('model provider, model profile, and runtime profile complete their lifecycle with explicit resource contexts @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await exerciseModelAdministration({ ...product, pages, checkpoint: ignoreCheckpoints }, definition);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(url =>
     url.pathname === '/modelproviders' && url.searchParams.get('context') === '/instance');
 });

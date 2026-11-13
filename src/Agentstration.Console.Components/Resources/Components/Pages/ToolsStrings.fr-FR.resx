@@ -64,4 +64,5 @@
   <data name="AcquisitionImplementationHelp"><value>Ce Tool reprend la cible et les paramètres de l’acquisition de référence.</value></data>
   <data name="AcquisitionTemplate"><value>Acquisition de référence</value></data>
   <data name="AcquisitionOutput"><value>Artefact de sortie</value></data>
+  <data name="TimeoutRange"><value>Le délai doit être compris entre 1 et 900 secondes.</value></data>
 </root>

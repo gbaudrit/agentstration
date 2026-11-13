@@ -13,6 +13,7 @@ using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Bunit.JSInterop;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -21,10 +22,64 @@ namespace Agentstration.Web.Tests;
 public sealed class ExtensionsConsoleTests
 {
     [TestMethod]
+    public async Task DirectEnrollmentNavigationWaitsForPermissionsBeforeLoadingCommands()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var snapshot = new TaskCompletionSource<ConsoleContextSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var state = new ConsoleContextState(new DeferredContextProvider(snapshot.Task));
+        context.Services.AddSingleton(state);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions?tab=enrollments");
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        Assert.AreEqual(0, client.EnrollmentCalls);
+        snapshot.SetResult(await new WritableContextProvider().GetAsync(default));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("true", rendered.Find("[data-testid='extensions-tab-enrollments']").GetAttribute("aria-selected"));
+            Assert.HasCount(2, rendered.FindAll(".enrollment-management-actions .collection-primary-actions button"));
+            Assert.HasCount(1, rendered.FindAll(".enrollment-management-actions .collection-actions-panel button"));
+            Assert.AreEqual(1, client.EnrollmentCalls);
+        });
+    }
+
+    [TestMethod]
+    public async Task ToolCatalogRefreshKeepsAFilteredPageReadableAfterResourcesAreRemoved()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var tools = new BundleToolsClient
+        {
+            Catalog = Enumerable.Range(0, 26).Select(index => BundleToolsClient.Tool($"catalog.{index:D2}")).ToArray()
+        };
+        context.Services.AddSingleton<IToolsClient>(tools);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Tools>();
+        rendered.WaitForAssertion(() => Assert.HasCount(20, rendered.FindAll("tbody tr")));
+        rendered.Find("input[type='search']").Input("catalog");
+        await rendered.FindAll(".collection-pager button")[1].ClickAsync(new());
+        rendered.WaitForAssertion(() => Assert.HasCount(6, rendered.FindAll("tbody tr")));
+        tools.Catalog = tools.Catalog.Take(4).ToArray();
+        await rendered.FindAll("header button").Single(button => button.TextContent.Trim() == "Refresh").ClickAsync(new());
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(4, rendered.FindAll("tbody tr"));
+            Assert.AreEqual("catalog", rendered.Find("input[type='search']").GetAttribute("value"));
+            Assert.IsTrue(rendered.Find(".collection-pager button").HasAttribute("disabled"));
+        });
+    }
+
+    [TestMethod]
     public async Task ExtensionSectionsUseAccessibleTabs()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -69,7 +124,8 @@ public sealed class ExtensionsConsoleTests
     public async Task EnrollmentModeDisabledByConfigurationIsVisibleButLocked()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(
             configured: false,
@@ -97,7 +153,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ActivePairingRefreshesEnrollmentStateAutomatically()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<bool>("agentstrationEnrollment.postAndOpen", _ => true).SetResult(true);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -117,7 +174,9 @@ public sealed class ExtensionsConsoleTests
             _ = card.QuerySelector(".enrollment-status") ?? throw new AssertFailedException("The enrollment status stack is missing.");
             _ = card.QuerySelector(".enrollment-action-layout") ?? throw new AssertFailedException("The enrollment action layout is missing.");
             Assert.AreEqual("Enrôler l’extension", card.QuerySelector("button.button-primary")?.TextContent.Trim());
-            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", card.QuerySelector("a.text-button")?.GetAttribute("href"));
+            Assert.IsNull(card.QuerySelector(".enrollment-actions details"), "Enrollment commands must be directly available.");
+            StringAssert.Contains(card.QuerySelector(".collection-identity-versions")!.TextContent, "1.0.0");
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", card.QuerySelector("a.resource-name-link")?.GetAttribute("href"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/']"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/aep/enrollment/pair']"));
         });
@@ -142,7 +201,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ConfiguredModelProviderContributionKeepsAnAccessibleAction()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -165,7 +225,8 @@ public sealed class ExtensionsConsoleTests
     public async Task DiscoveredModelProviderContributionOffersConfiguration()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -188,7 +249,8 @@ public sealed class ExtensionsConsoleTests
     public async Task BundleContributionShowsLinkedToolSetProfileAndFlowResources()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -218,7 +280,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ExtensionInventoryShowsEnrollmentAndAvailabilitySeparately()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -243,7 +306,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ExtensionDetailsExposeEnrollmentInformationAndLinks()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -272,7 +336,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ExtensionDetailsConfirmUnenrollmentAndRefreshItsState()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -305,7 +370,8 @@ public sealed class ExtensionsConsoleTests
     public async Task PairingCodeEnrollmentIsNotStartedFromTheInventoryWithoutAScopeChoice()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -330,7 +396,8 @@ public sealed class ExtensionsConsoleTests
     public async Task AvailableEnrollmentOffersUnenrollmentAfterCredentialRevocation()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -344,11 +411,13 @@ public sealed class ExtensionsConsoleTests
 
         var actions = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button");
         Assert.HasCount(3, actions);
+        Assert.HasCount(2, rendered.FindAll(".enrollment-management-actions .collection-primary-actions button"));
+        Assert.HasCount(1, rendered.FindAll(".enrollment-management-actions .collection-actions-panel button"));
         Assert.AreEqual("Renouveler l’identifiant", actions[0].TextContent.Trim());
-        Assert.AreEqual("Révoquer l’identifiant", actions[1].TextContent.Trim());
-        Assert.AreEqual("Désenrôler", actions[2].TextContent.Trim());
+        Assert.AreEqual("Désenrôler", actions[1].TextContent.Trim());
+        Assert.AreEqual("Révoquer l’identifiant", actions[2].TextContent.Trim());
 
-        await actions[2].ClickAsync(new());
+        await actions[1].ClickAsync(new());
         var dialog = rendered.Find("[role='alertdialog']");
         StringAssert.Contains(dialog.TextContent, "L’identifiant actuel sera invalidé");
         await dialog.QuerySelector("button.button-danger")!.ClickAsync(new());
@@ -360,7 +429,8 @@ public sealed class ExtensionsConsoleTests
     public async Task UnpairedEnrollmentLooksPendingAndShowsTheScopeSelectorAgain()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeExtensionsClient(configured: false, availableEnrollment: true);
         context.Services.AddSingleton<IExtensionsClient>(client);
@@ -371,7 +441,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
-        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
 
@@ -388,7 +458,8 @@ public sealed class ExtensionsConsoleTests
     public async Task EnrollmentSummaryCountsOnlyItemsInTheQueue()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, availableEnrollment: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -398,7 +469,7 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
-        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button")[2];
+        var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
         await rendered.Find("[data-testid='extensions-tab-summary']").ClickAsync(new());
@@ -416,7 +487,8 @@ public sealed class ExtensionsConsoleTests
     public async Task SourceProviderContributionOffersExplicitConfigurationFromInventory()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: false, source: true));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
@@ -439,7 +511,8 @@ public sealed class ExtensionsConsoleTests
     public void ToolCatalogLinksReadableExtensionWithoutDisplayingPairingIdentity(string cultureName)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -477,7 +550,8 @@ public sealed class ExtensionsConsoleTests
         string cultureName, string state, string label, bool hasToolLink)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient(state));
@@ -500,7 +574,8 @@ public sealed class ExtensionsConsoleTests
     [DataRow(false)]
     public void ExactScopedToolProviderKeepsManagedContentReadOnlyAndOrdinaryContentEditable(bool managed)
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new BundleToolsClient(managedProvider: managed);
         context.Services.AddSingleton<IToolsClient>(client);
@@ -523,7 +598,8 @@ public sealed class ExtensionsConsoleTests
     public async Task DegradedBundleKeepsItsEvidenceWithoutOfferingResourceNavigation(string cultureName, string label, string technicalDetails)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient(ExtensionBundleInstallationState.Degraded));
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -551,7 +627,8 @@ public sealed class ExtensionsConsoleTests
     public async Task BundleInventoryKeepsPublicationsInTechnicalDetailsWithoutLinks(string cultureName, string publicationsLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -573,7 +650,8 @@ public sealed class ExtensionsConsoleTests
         Assert.IsEmpty(publications.QuerySelectorAll("a"));
         StringAssert.Contains(publications.TextContent, "crawl4ai-web-acquisition--92521fc3");
         StringAssert.Contains(publications.TextContent, "data-source-profile-revision--abcd");
-        Assert.HasCount(3, publications.QuerySelectorAll(".resource-scope-badge"));
+        Assert.HasCount(3, publications.QuerySelectorAll(".resource-owner-icon .scope-letter"));
+        Assert.IsTrue(publications.QuerySelectorAll(".resource-owner-icon button").All(button => button.GetAttribute("aria-label") == "Instance"));
         Assert.HasCount(3, publications.QuerySelectorAll("span code").Where(value => value.TextContent == "1.0.0"));
     }
 
@@ -666,7 +744,8 @@ public sealed class ExtensionsConsoleTests
             Tool("web.fetch"), Tool("web.crawl"), Tool("content.extract"), Tool("content.read"), Tool("content.delete")
         ];
 
-        private IReadOnlyList<ToolResource> Values => state switch
+        public IReadOnlyList<ToolResource>? Catalog { get; set; }
+        private IReadOnlyList<ToolResource> Values => Catalog ?? (state switch
         {
             "missing" => Tools.Where(value => value.Definition.ExternalId != "web.crawl").ToArray(),
             "conflict" => [.. Tools, Tool("web.crawl") with { Metadata = new ResourceMetadata { Name = "duplicate-crawl" } }],
@@ -676,7 +755,7 @@ public sealed class ExtensionsConsoleTests
                 { Discovery = value.Definition.Discovery! with { Available = false } }
             }).ToArray(),
             _ => Tools
-        };
+        });
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(ResourceScopeRef contextScope, string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(Values);
         public ResourceScopeRef? RequestedProviderScope { get; private set; }
@@ -710,7 +789,7 @@ public sealed class ExtensionsConsoleTests
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        private static ToolResource Tool(string externalId) => new()
+        public static ToolResource Tool(string externalId) => new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.Tool,
@@ -859,6 +938,11 @@ public sealed class ExtensionsConsoleTests
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> CreateRegistrationAsync(CreateExtensionRegistrationRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace @namespace, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task DeleteRegistrationAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class DeferredContextProvider(Task<ConsoleContextSnapshot> snapshot) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => snapshot.WaitAsync(cancellationToken);
     }
 
     private sealed class WritableContextProvider : IConsoleContextProvider

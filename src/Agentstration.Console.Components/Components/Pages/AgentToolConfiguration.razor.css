@@ -208,23 +208,23 @@
     transform: translateY(-1px);
 }
 
-.agent-tool-option:has(input:checked) {
+.agent-tool-option:has(::deep input:checked) {
     border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
     background: color-mix(in srgb, var(--primary-soft) 58%, var(--surface));
     box-shadow: inset 3px 0 var(--primary), 0 6px 16px color-mix(in srgb, var(--primary) 9%, transparent);
 }
 
-.agent-tool-option:has(input:disabled) {
+.agent-tool-option:has(::deep input:disabled) {
     opacity: .62;
 }
 
-.agent-tool-option.inherited:has(input:disabled) {
+.agent-tool-option.inherited:has(::deep input:disabled) {
     opacity: 1;
     border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
     background: color-mix(in srgb, var(--primary-soft) 48%, var(--surface));
 }
 
-.agent-tool-option input {
+.agent-tool-option ::deep input {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -342,3 +342,5 @@
         grid-template-columns: 1fr;
     }
 }
+
+.agent-tool-option { grid-template-columns: 20px minmax(0, 1fr) auto; }

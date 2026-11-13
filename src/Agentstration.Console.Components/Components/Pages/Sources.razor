@@ -50,17 +50,17 @@ else if (detail is null)
                 <button class="text-button @(importMode == "url" ? "active" : null)" type="button" @onclick='() => SetImportMode("url")'>@T("FromUrl")</button>
                 <button class="text-button @(importMode == "yaml" ? "active" : null)" type="button" @onclick='() => SetImportMode("yaml")' data-testid="source-import-yaml-mode">@T("PasteYaml")</button>
             </div>
-            <div class="form-grid">
+            <FormGrid>
                 <ResourceScopeFormField ResourceKind="@SourceResourceKinds.Source" @bind-Value="importScope" Disabled="@busy" />
                 @if (importMode == "url")
                 {
-                    <label class="form-wide"><span>@T("ManifestUrl")</span><input @bind="importUrl" type="url" placeholder="https://example.org/source.yaml" disabled="@busy" /></label>
+                    <FormField Label="@T("ManifestUrl")" Class="form-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="importUrl" Type="url" placeholder="https://example.org/source.yaml" Disabled="@busy" /></ChildContent></FormField>
                 }
                 else
                 {
-                    <label class="form-wide"><span>@T("ManifestYaml")</span><textarea @bind="importYaml" rows="13" spellcheck="false" disabled="@busy" data-testid="source-import-yaml"></textarea></label>
+                    <FormField Label="@T("ManifestYaml")" Class="form-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="importYaml" rows="13" spellcheck="false" Disabled="@busy" data-testid="source-import-yaml"></ClearableText></ChildContent></FormField>
                 }
-            </div>
+            </FormGrid>
             <div class="panel-actions"><button class="button-primary" disabled="@(!CanImport || busy)" @onclick="ImportAsync" data-testid="source-import-submit">@(busy ? T("Importing") : T("Import"))</button><button class="button-secondary" disabled="@busy" @onclick="() => importing = false">@T("Cancel")</button></div>
         </section>
     }
@@ -71,9 +71,8 @@ else if (detail is null)
         <MetricCard Label="@T("Healthy")" Value="@(sources?.Count(IsHealthy).ToString() ?? "0")" Detail="@T("LastImportSucceeded")" Status="UiStatus.Success" />
     </section>
 
-    <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("Distribution")</p><h2>@T("AvailableSources")</h2><p>@T("AvailableSourcesDescription")</p></div><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("Refresh")</button></div>
-        <label class="source-search"><span>@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label>
+    <FormSection Title="@T("AvailableSources")" Eyebrow="@T("Distribution")" Description="@T("AvailableSourcesDescription")"><Actions><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("Refresh")</button></Actions><ChildContent>
+        <FormField Label="@T("Search")" Class="source-search"><ChildContent><ClearableText @bind-Value="search" placeholder="@T("SearchPlaceholder")" /></ChildContent></FormField>
         @if (FilteredSources.Count == 0)
         {
             <EmptyState Title="@T("NoSources")" Message="@T("NoSourcesMessage")" />
@@ -81,20 +80,19 @@ else if (detail is null)
         else
         {
             <div class="source-table">
-                <DataGrid TItem="SourceConsoleListItem" Items="FilteredSources">
-                    <Header><tr><th>@T("Source")</th><th>@T("OwnershipScope")</th><th>@T("Origin")</th><th>@T("LatestImport")</th><th>@T("Health")</th><th></th></tr></Header>
-                    <Row Context="item"><tr data-testid="source-row" data-source-publisher="@item.Source.Source.Definition.Publisher" data-source-name="@item.Source.Source.Name">
-                        <td><a class="resource-name-link" href="@SourceUrl(item)">@item.Source.Configuration.Definition.DisplayName</a><br /><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></td>
-                        <td><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" Compact /></td>
-                        <td>@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</td>
-                        <td><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></td>
-                        <td><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" /></td>
-                        <td><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></td>
-                    </tr></Row>
-                </DataGrid>
+                <CollectionView TItem="SourceConsoleListItem" Items="FilteredSources" InformationLabels="@(new string[] { T("Origin"), T("LatestImport") })" RowTestId="source-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-source-publisher"] = item.Source.Source.Definition.Publisher, ["data-source-name"] = item.Source.Source.Name })" IdentityLabel="@T("Source")" StateLabel="@T("Health")">
+        <Identity Context="item">
+<CollectionIdentity DisplayName="@item.Source.Configuration.Definition.DisplayName" Namespace="@item.Source.Source.Namespace.Value" Name="@item.Source.Source.Name" Href="@SourceUrl(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" IconOnly /><ManagedResourceBadge IsManaged="@item.Source.Source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("Origin")">@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</CollectionValue>
+            <CollectionValue Label="@T("LatestImport")"><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></CollectionValue>
+        </Information>
+        <Actions Context="item">
+<CollectionActions ResourceName="@(item.Source.Configuration.Definition.DisplayName)"><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></CollectionActions></Actions>
+    </CollectionView>
             </div>
         }
-    </section>
+    </ChildContent></FormSection>
 }
 else
 {
@@ -119,7 +117,7 @@ else
         <section class="source-detail-grid">
         <article class="panel">
             <div class="panel-header"><div><p class="eyebrow">@T("LocalConfiguration")</p><h2>@T("DisplayName")</h2><p>@T("DisplayNameDescription")</p></div></div>
-            <label><span>@T("DisplayName")</span><input @bind="displayName" disabled="@busy" /></label>
+            <FormField Label="@T("DisplayName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="displayName" Disabled="@busy" /></ChildContent></FormField>
             <div class="panel-actions"><button class="button-primary" disabled="@(busy || string.IsNullOrWhiteSpace(displayName))" @onclick="SaveDisplayNameAsync">@T("Save")</button></div>
         </article>
         <article class="panel">
@@ -153,21 +151,19 @@ else
     else if (activeTab == PageTab.Versions)
     {
 
-        <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("ImmutableHistory")</p><h2>@T("Versions")</h2><p>@T("VersionHistoryDescription")</p></div></div>
+        <FormSection Title="@T("Versions")" Eyebrow="@T("ImmutableHistory")" Description="@T("VersionHistoryDescription")"><ChildContent>
         <div class="version-strip">
             @foreach (var version in detail.Versions)
             {
                 <button type="button" class="version-card @(version.Uid == detail.SelectedVersion.Uid ? "selected" : null)" @onclick="() => SelectVersion(version.Uid)"><strong>@version.Definition.Version</strong><small>@version.Definition.ImportedAt.ToLocalTime().ToString("g")</small><code>@Short(version.Definition.ManifestDigest)</code></button>
             }
         </div>
-        </section>
+        </ChildContent></FormSection>
     }
     else if (activeTab == PageTab.Bindings)
     {
 
-        <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("ProviderRouting")</p><h2>@T("Bindings")</h2><p>@T("BindingsDescription")</p></div><StatusBadge Text="@(detail.Bindings.Ready ? T("Ready") : T("NeedsConfiguration"))" Status="@(detail.Bindings.Ready ? UiStatus.Success : UiStatus.Warning)" /></div>
+        <FormSection Title="@T("Bindings")" Eyebrow="@T("ProviderRouting")" Description="@T("BindingsDescription")"><Actions><StatusBadge Text="@(detail.Bindings.Ready ? T("Ready") : T("NeedsConfiguration"))" Status="@(detail.Bindings.Ready ? UiStatus.Success : UiStatus.Warning)" /></Actions><ChildContent>
         @if (detail.Bindings.Bindings.Count == 0) { <p>@T("NoBindings")</p> }
         else
         {
@@ -180,30 +176,30 @@ else
                             <span class="binding-identity"><span class="binding-icon" aria-hidden="true"><UiIcon Name="database" /></span><strong>@binding.Name</strong></span>
                             <span class="binding-channels">@foreach (var channel in binding.Channels) { <code>@channel</code> }</span>
                         </header>
-                        <label><span class="sr-only">@T("SelectProvider")</span><select value="@BindingValue(binding)" @onchange="args => SetBinding(binding, args)" disabled="@busy"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }@foreach (var candidate in CompatibleProviderCandidates(binding.TargetKind)) { <option value="@CandidateValue(candidate)">@F("DiscoveredProvider", candidate.DisplayName, candidate.ContributionId)</option> }</select></label>
+                        <FormField Label="@T("SelectProvider")"><LabelContent><span class="sr-only">@T("SelectProvider")</span></LabelContent><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(BindingValue(binding), System.Globalization.CultureInfo.InvariantCulture)" disabled="@busy" ValueChanged="changed => SetBinding(binding, new ChangeEventArgs { Value = changed })"><option value="">@T("SelectProvider")</option>@foreach (var provider in CompatibleProviders(binding.TargetKind)) { <option value="@ProviderValue(provider.Value)">@provider.Value.Definition.DisplayName — @provider.Value.Namespace/@provider.Value.Name</option> }@foreach (var candidate in CompatibleProviderCandidates(binding.TargetKind)) { <option value="@CandidateValue(candidate)">@F("DiscoveredProvider", candidate.DisplayName, candidate.ContributionId)</option> }</ClearableSelect></ChildContent></FormField>
                         @if (binding.Issues.Count > 0) { <small class="inline-warning">@string.Join(" ", binding.Issues.Select(value => value.Message))</small> }
                     </article>
                 }
             </div>
             <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveBindingsAsync">@T("SaveBindings")</button></div>
         }
-        </section>
+        </ChildContent></FormSection>
     }
     else if (activeTab == PageTab.Scheduling)
     {
-        <section class="panel">
-        <div class="panel-header"><div><p class="eyebrow">@T("Automation")</p><h2>@T("RefreshScheduling")</h2><p>@T("RefreshSchedulingDescription")</p></div></div>
+        <EditForm Model="sourceRefresh" OnValidSubmit="SaveRefreshPolicyAsync" FormName="source-refresh-policy"><ValidationSummary />
+        <FormSection Title="@T("RefreshScheduling")" Eyebrow="@T("Automation")" Description="@T("RefreshSchedulingDescription")"><ChildContent>
         <div class="refresh-policy-grid">
             <article class="refresh-policy-card">
-                <header><div><h3>@T("SourceDefinitionRefresh")</h3><p>@T("SourceDefinitionRefreshDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="sourceRefresh.Enabled" disabled="@(busy || detail.Source.Configuration.Definition.Origin is null)" /><span>@T("Enabled")</span></label></header>
+                <header><div><h3>@T("SourceDefinitionRefresh")</h3><p>@T("SourceDefinitionRefreshDescription")</p></div><label class="switch-field"><FormCheckbox @bind-Value="sourceRefresh.Enabled" disabled="@(busy || detail.Source.Configuration.Definition.Origin is null)" /><span>@T("Enabled")</span></label></header>
                 @if (detail.Source.Configuration.Definition.Origin is null) { <p class="inline-warning">@T("PastedSourceCannotSchedule")</p> }
                 <p class="refresh-observed">@F("LastSourceRefreshStatus", detail.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g"), ImportOutcome(detail.Source.Observed.Definition.LastOutcome))</p>
                 @if (detail.Source.Observed.Definition.ErrorMessage is { } sourceRefreshError) { <p class="inline-warning">@RefreshError(detail.Source.Observed.Definition.ErrorCode, sourceRefreshError)</p> }
-                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="sourceRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="sourceRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="sourceRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="sourceRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="sourceRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="sourceRefresh.JitterSeconds" disabled="@busy" /></label></div>
+                <div class="refresh-policy-fields"><FormField Label="@T("IntervalMinutes")"><ChildContent><ClearableNumber min="1" max="10080" @bind-Value="sourceRefresh.IntervalMinutes" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("TimeoutSeconds")"><ChildContent><ClearableNumber min="1" max="300" @bind-Value="sourceRefresh.TimeoutSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumAttempts")"><ChildContent><ClearableNumber min="1" max="10" @bind-Value="sourceRefresh.MaximumAttempts" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("InitialBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="3600" @bind-Value="sourceRefresh.InitialBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="86400" @bind-Value="sourceRefresh.MaximumBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("JitterSeconds")"><ChildContent><ClearableNumber min="0" max="3600" @bind-Value="sourceRefresh.JitterSeconds" disabled="@busy" /></ChildContent></FormField></div>
             </article>
             <article class="refresh-policy-card">
-                <header><div><h3>@T("ChannelRefreshDefaults")</h3><p>@T("ChannelRefreshDefaultsDescription")</p></div><label class="switch-field"><input type="checkbox" @bind="channelRefresh.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label></header>
-                <div class="refresh-policy-fields"><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="channelRefresh.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="channelRefresh.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="channelRefresh.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="channelRefresh.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="channelRefresh.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="channelRefresh.JitterSeconds" disabled="@busy" /></label></div>
+                <header><div><h3>@T("ChannelRefreshDefaults")</h3><p>@T("ChannelRefreshDefaultsDescription")</p></div><label class="switch-field"><FormCheckbox @bind-Value="channelRefresh.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label></header>
+                <div class="refresh-policy-fields"><FormField Label="@T("IntervalMinutes")"><ChildContent><ClearableNumber min="1" max="10080" @bind-Value="channelRefresh.IntervalMinutes" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("TimeoutSeconds")"><ChildContent><ClearableNumber min="1" max="300" @bind-Value="channelRefresh.TimeoutSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumAttempts")"><ChildContent><ClearableNumber min="1" max="10" @bind-Value="channelRefresh.MaximumAttempts" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("InitialBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="3600" @bind-Value="channelRefresh.InitialBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="86400" @bind-Value="channelRefresh.MaximumBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("JitterSeconds")"><ChildContent><ClearableNumber min="0" max="3600" @bind-Value="channelRefresh.JitterSeconds" disabled="@busy" /></ChildContent></FormField></div>
             </article>
         </div>
         @if (detail.SelectedVersion.Definition.PublishedDefinition.Channels.Count > 0)
@@ -212,14 +208,15 @@ else
             @foreach (var channel in detail.SelectedVersion.Definition.PublishedDefinition.Channels)
             {
                 var editor = channelRefreshOverrides[channel.Name];
-                <article class="channel-override-card"><header><strong>@channel.Name</strong><label class="switch-field"><input type="checkbox" @bind="editor.Custom" disabled="@busy" /><span>@T("CustomPolicy")</span></label></header>
-                @if (editor.Custom) { <div class="refresh-policy-fields compact"><label class="switch-field"><input type="checkbox" @bind="editor.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label><label><span>@T("IntervalMinutes")</span><input type="number" min="1" max="10080" @bind="editor.IntervalMinutes" disabled="@busy" /></label><label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="300" @bind="editor.TimeoutSeconds" disabled="@busy" /></label><label><span>@T("MaximumAttempts")</span><input type="number" min="1" max="10" @bind="editor.MaximumAttempts" disabled="@busy" /></label><label><span>@T("InitialBackoffSeconds")</span><input type="number" min="1" max="3600" @bind="editor.InitialBackoffSeconds" disabled="@busy" /></label><label><span>@T("MaximumBackoffSeconds")</span><input type="number" min="1" max="86400" @bind="editor.MaximumBackoffSeconds" disabled="@busy" /></label><label><span>@T("JitterSeconds")</span><input type="number" min="0" max="3600" @bind="editor.JitterSeconds" disabled="@busy" /></label></div> }
+                <article class="channel-override-card"><header><strong>@channel.Name</strong><label class="switch-field"><FormCheckbox @bind-Value="editor.Custom" disabled="@busy" /><span>@T("CustomPolicy")</span></label></header>
+                @if (editor.Custom) { <div class="refresh-policy-fields compact"><label class="switch-field"><FormCheckbox @bind-Value="editor.Enabled" disabled="@busy" /><span>@T("Enabled")</span></label><FormField Label="@T("IntervalMinutes")"><ChildContent><ClearableNumber min="1" max="10080" @bind-Value="editor.IntervalMinutes" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("TimeoutSeconds")"><ChildContent><ClearableNumber min="1" max="300" @bind-Value="editor.TimeoutSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumAttempts")"><ChildContent><ClearableNumber min="1" max="10" @bind-Value="editor.MaximumAttempts" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("InitialBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="3600" @bind-Value="editor.InitialBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("MaximumBackoffSeconds")"><ChildContent><ClearableNumber min="1" max="86400" @bind-Value="editor.MaximumBackoffSeconds" disabled="@busy" /></ChildContent></FormField><FormField Label="@T("JitterSeconds")"><ChildContent><ClearableNumber min="0" max="3600" @bind-Value="editor.JitterSeconds" disabled="@busy" /></ChildContent></FormField></div> }
                 </article>
             }
             </div>
         }
-        <div class="panel-actions"><button class="button-primary" disabled="@busy" @onclick="SaveRefreshPolicyAsync">@T("SaveScheduling")</button></div>
-        </section>
+        <div class="panel-actions"><button class="button-primary" disabled="@busy" type="submit">@T("SaveScheduling")</button></div>
+        </ChildContent></FormSection>
+        </EditForm>
     }
     @if (activeTab == PageTab.Overview)
     {
@@ -230,7 +227,7 @@ else
         @foreach (var channel in DisplayedChannels)
         {
             <article class="channel-card">
-                <header><div>@if (detail.Channels.Count > 1) { <label class="channel-selector"><span>@T("Channel")</span><select value="@selectedChannelName" @onchange="SelectChannel" aria-label="@T("SelectChannel")">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</select></label> } else { <h3>@channel.Definition.Name</h3> }<p>@F("ChannelContract", channel.Definition.Provider.Binding, channel.Definition.Configuration.OptionSet, channel.Definition.Configuration.Version)</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
+                <header><div>@if (detail.Channels.Count > 1) { <FormField Label="@T("Channel")" Class="channel-selector"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(selectedChannelName, System.Globalization.CultureInfo.InvariantCulture)" aria-label="@T("SelectChannel")" ValueChanged="changed => SelectChannel(new ChangeEventArgs { Value = changed })">@foreach (var option in detail.Channels) { <option value="@option.Definition.Name">@option.Definition.Name</option> }</ClearableSelect></ChildContent></FormField> } else { <h3>@channel.Definition.Name</h3> }<p>@F("ChannelContract", channel.Definition.Provider.Binding, channel.Definition.Configuration.OptionSet, channel.Definition.Configuration.Version)</p></div><div class="channel-actions"><StatusBadge Text="@CompatibilityLabel(channel.Status.Compatibility.Status)" Status="@CompatibilityTone(channel.Status.Compatibility.Status)" /><button class="button-secondary" disabled="@(busy || channel.Status.Compatibility.Status != SourceChannelCompatibilityStatus.Compatible || !detail.Bindings.Ready)" @onclick="() => RefreshChannelAsync(channel.Definition.Name)">@T("RefreshChannel")</button></div></header>
                 <dl class="resource-details channel-details">
                     <dt>@T("Provider")</dt><dd>@if (channel.CurrentSnapshot is { } providerSnapshot) { <a class="text-link" href="@SourceProviderUrl(providerSnapshot.Definition.Provider)">@providerSnapshot.Definition.Provider.Namespace/@providerSnapshot.Definition.Provider.Name</a><small>@F("ProviderGeneration", providerSnapshot.Definition.Provider.ContributionId, providerSnapshot.Definition.Provider.Generation)</small> } else { @T("PendingMaterialization") }</dd>
                     <dt>@T("Compatibility")</dt><dd>@CompatibilityLabel(channel.Status.Compatibility.Status)</dd>
@@ -251,7 +248,7 @@ else
                 }
                 @if (channel.Catalogs.Count > 0)
                 {
-                    <div class="catalog-toolbar"><h4>@T("Catalogs")</h4><label><span>@T("ContentLanguage")</span><select value="@catalogLocale" @onchange="ChangeLocaleAsync">@foreach (var locale in AvailableCatalogLocales(channel)) { <option value="@locale">@LocaleLabel(channel, locale)</option> }</select></label></div>
+                    <div class="catalog-toolbar"><h4>@T("Catalogs")</h4><FormField Label="@T("ContentLanguage")"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(catalogLocale, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => ChangeLocaleAsync(new ChangeEventArgs { Value = changed })">@foreach (var locale in AvailableCatalogLocales(channel)) { <option value="@locale">@LocaleLabel(channel, locale)</option> }</ClearableSelect></ChildContent></FormField></div>
                     @foreach (var catalog in channel.Catalogs)
                     {
                         <section class="catalog-card"><div><strong>@catalog.DisplayName</strong><small><code>@catalog.Provenance.CatalogKind/@catalog.Provenance.CatalogName</code> · @catalog.Provenance.CatalogPath</small>@if (catalog.Description is not null) { <p>@catalog.Description</p> }</div>
@@ -281,7 +278,7 @@ else
             <p>@T("DeleteSourceDescription")</p>
             <div class="source-delete-retention" role="note">@T("DeleteSourceRetainsPacks")</div>
             @if (deleteError is not null) { <p class="error-panel" role="alert">@deleteError</p> }
-            <div class="dialog-actions"><button class="button-secondary" disabled="@deletingSource" @onclick="CloseDeleteSource">@T("Cancel")</button><button class="button-danger" disabled="@deletingSource" @onclick="DeleteSourceAsync">@(deletingSource ? T("DeletingSource") : T("ConfirmDeleteSource"))</button></div>
+            <FormActions Class="dialog-actions"><button class="button-secondary" disabled="@deletingSource" @onclick="CloseDeleteSource">@T("Cancel")</button><button class="button-danger" disabled="@deletingSource" @onclick="DeleteSourceAsync">@(deletingSource ? T("DeletingSource") : T("ConfirmDeleteSource"))</button></FormActions>
         </section>
     </div>
 }
@@ -306,14 +303,14 @@ else
                     <section class="source-pack-bindings"><h3>@T("PackBindingsTitle")</h3><p>@T("PackBindingsHelp")</p>
                     @foreach (var binding in packPreview.Bindings)
                     {
-                        <label class="source-pack-binding"><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span><select value="@PackBindingValue(binding.Name)" @onchange="args => SetPackBindingAsync(binding.Name, args)"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.Parameter) { @foreach (var item in packParameters) { <option value="@BindingValue(item.Name, item.Namespace, item.ScopeRef)">@item.Definition.DisplayName — @item.ScopeRef · @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</select></label>
+                        <FormField Label="@BindingKindLabel(binding.TargetKind)" Class="source-pack-binding"><LabelContent><span class="source-pack-binding-heading"><span><strong>@BindingKindLabel(binding.TargetKind)</strong><small><code>@binding.Name</code></small></span><StatusBadge Text="@(binding.Required ? T("Required") : T("Optional"))" Status="@(binding.Required ? UiStatus.Info : UiStatus.Neutral)" /></span></LabelContent><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(PackBindingValue(binding.Name), System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => SetPackBindingAsync(binding.Name, new ChangeEventArgs { Value = changed })"><option value="">@F("SelectPackBindingTarget", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>@if (binding.TargetKind == PackBindingTargetKind.ModelProfile) { @foreach (var item in packModelProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ModelProvider) { @foreach (var item in packModelProviders) { <option value="@BindingValue(item.Name, ResourceNamespace.Default)">@item.Properties.DisplayName — default/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.RuntimeProfile) { @foreach (var item in packRuntimeProfiles) { <option value="@BindingValue(item.Name, ResourceNamespace.Parse(item.Namespace))">@item.Properties.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.ExtensionRegistration) { @foreach (var item in packExtensions) { <option value="@BindingValue(item.Name, item.Namespace)">@item.Definition.DisplayName — @item.Namespace/@item.Name</option> } } else if (binding.TargetKind == PackBindingTargetKind.Parameter) { @foreach (var item in packParameters) { <option value="@BindingValue(item.Name, item.Namespace, item.ScopeRef)">@item.Definition.DisplayName — @item.ScopeRef · @item.Namespace/@item.Name</option> } } else { @foreach (var item in packSecrets) { <option value="@BindingValue(item.Resource.Name, item.Resource.Namespace)">@item.Resource.Definition.DisplayName — @item.Resource.Namespace/@item.Resource.Name</option> } }</ClearableSelect></ChildContent></FormField>
                     }
                     </section>
                 }
-                @if (packPreview.AlreadyInstalled) { <label class="replace-pack"><input type="checkbox" checked="@replacePack" @onchange="SetReplacePackAsync" /> @T("ReplaceInstalledPack")</label> }
+                @if (packPreview.AlreadyInstalled) { <label class="replace-pack"><FormCheckbox Value="@replacePack" ValueChanged="changed => SetReplacePackAsync(new ChangeEventArgs { Value = changed })" /> @T("ReplaceInstalledPack")</label> }
                 <section class="source-pack-resources"><header><strong>@PackResourceCount(packPreview.Resources.Count)</strong></header><div>@foreach (var resource in packPreview.Resources) { <article><span><strong>@resource.Name</strong><small>@resource.Kind</small></span><StatusBadge Text="@T($"Change.{resource.Change}")" Status="@ChangeTone(resource.Change)" /></article> }</div></section>
             }
-            <div class="dialog-actions"><button class="button-secondary" @onclick="ClosePackPreview">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstallPack)" @onclick="InstallPackAsync">@(packInstalling ? T("InstallingPack") : reinstallPack ? T("ConfirmReinstallPack") : T("ConfirmInstallPack"))</button></div>
+            <FormActions Class="dialog-actions"><button class="button-secondary" @onclick="ClosePackPreview">@T("Cancel")</button><button class="button-primary" disabled="@(!CanInstallPack)" @onclick="InstallPackAsync">@(packInstalling ? T("InstallingPack") : reinstallPack ? T("ConfirmReinstallPack") : T("ConfirmInstallPack"))</button></FormActions>
         </section>
     </div>
 }

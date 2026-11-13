@@ -36,4 +36,9 @@
   <data name="TenantAdministration" xml:space="preserve"><value>Administration du Tenant</value></data>
   <data name="ConfirmContextChange" xml:space="preserve"><value>Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?</value></data>
   <data name="ContextChangeFailed" xml:space="preserve"><value>Échec du changement de contexte</value></data>
+<data name="NotificationTone.Success" xml:space="preserve"><value>Réussite</value></data>
+<data name="NotificationTone.Warning" xml:space="preserve"><value>Avertissement</value></data>
+<data name="NotificationTone.Danger" xml:space="preserve"><value>Erreur</value></data>
+<data name="NotificationTone.Info" xml:space="preserve"><value>Information</value></data>
+<data name="NotificationTone.Neutral" xml:space="preserve"><value>Notification</value></data>
 </root>

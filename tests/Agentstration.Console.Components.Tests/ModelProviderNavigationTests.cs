@@ -27,6 +27,32 @@ public sealed partial class ModelProviderNavigationTests
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
 
     [TestMethod]
+    public async Task LeavingModelProfileDuringUsageLoadingCancelsTheRemainingLoad()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(out _);
+        var response = new TaskCompletionSource<ModelProfileUsagesResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var profiles = new ExistingModelProfilesClient { PendingUsages = response.Task };
+        context.Services.AddSingleton<IModelProfilesClient>(profiles);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance");
+        var rendered = context.Render<ObservedModelProfileEditor>(parameters => parameters
+            .Add(value => value.Name, "shared-reasoning"));
+        var completion = rendered.Instance.ParameterCompletion;
+        Assert.IsFalse(completion.IsCompleted);
+        await context.DisposeComponentsAsync();
+        response.SetResult(new([], 0));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => completion);
+        Assert.IsNull(profiles.RequestedResolutionContextScope);
+    }
+
+    private sealed class ObservedModelProfileEditor : ModelProfileEditor
+    {
+        public Task ParameterCompletion { get; private set; } = Task.CompletedTask;
+        protected override Task OnParametersSetAsync() => ParameterCompletion = base.OnParametersSetAsync();
+    }
+
+    [TestMethod]
     public void ProviderDetailsOffersModelProfileCreationWithProviderContext()
     {
         using var culture = new TestCultureScope("en-US");
@@ -47,7 +73,7 @@ public sealed partial class ModelProviderNavigationTests
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
                 discoveredModelLink.GetAttribute("href"));
             Assert.AreEqual(
-                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models",
+                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models&context=%2Finstance",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
             CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Access" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
@@ -424,7 +450,7 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(7, rendered.FindAll(".metric-help").Count);
             Assert.IsTrue(rendered.FindAll(".metric-help").All(element => element.GetAttribute("tabindex") == "0"));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").All(element => element.GetAttribute("role") == "tooltip"));
-            Assert.IsTrue(rendered.FindAll("label > span").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
+            Assert.IsTrue(rendered.FindAll(".form-field label").Any(element => element.TextContent.StartsWith("Seed", StringComparison.Ordinal)));
             Assert.IsFalse(rendered.Markup.Contains("Graine", StringComparison.Ordinal));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("variabilité des réponses", StringComparison.Ordinal)));
             Assert.IsTrue(rendered.FindAll(".metric-tooltip").Any(element => element.TextContent.Contains("visible depuis ce périmètre", StringComparison.Ordinal)));
@@ -450,6 +476,10 @@ public sealed partial class ModelProviderNavigationTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
         });
+        Assert.AreEqual("true", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
+        rendered.Find("[data-testid='model-profile-edit-tab']").Click();
+        Assert.AreEqual("true", rendered.Find("#model-profile-page-edit").GetAttribute("aria-selected"));
+        Assert.AreEqual("false", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
         rendered.Find("[data-testid='model-profile-review-usages']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -486,7 +516,7 @@ public sealed partial class ModelProviderNavigationTests
         using var context = CreateContext(out var providers);
         context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}");
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}&tab=edit");
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
@@ -536,7 +566,8 @@ public sealed partial class ModelProviderNavigationTests
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProvidersClient>(providers);
@@ -782,6 +813,7 @@ public sealed partial class ModelProviderNavigationTests
 
     private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
     {
+        public Task<ModelProfileUsagesResponse>? PendingUsages { get; init; }
         public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
         public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
         public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
@@ -825,7 +857,7 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             string profileName,
-            CancellationToken cancellationToken) => Task.FromResult(hasUsages
+            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(hasUsages
                 ? Usages
                 : new ModelProfileUsagesResponse([], 0));
 

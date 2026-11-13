@@ -41,7 +41,7 @@ public sealed class ConsoleConversationsTests
         var rows = rendered.WaitForElements("[data-testid='conversation-row']", 2);
         Assert.AreEqual("assistant", rows[0].GetAttribute("data-entry-name"));
         Assert.AreEqual("WaitingForUser", rows[0].GetAttribute("data-status"));
-        StringAssert.Contains(rows[0].TextContent, "Needs your input");
+        StringAssert.Contains(rows[0].Closest("article")!.TextContent, "Needs your input");
         Assert.AreEqual("report", rows[1].GetAttribute("data-entry-name"));
         Assert.IsFalse(rendered.Markup.Contains("must not leak", StringComparison.Ordinal));
         Assert.AreEqual(WorkspaceId, client.ListWorkspaceId);
@@ -110,7 +110,7 @@ public sealed class ConsoleConversationsTests
         out InteractionClient interactionClient,
         IReadOnlySet<string>? permissions = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddAgentstrationWebComponents();

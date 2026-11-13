@@ -73,6 +73,10 @@ public sealed class FlowService(
 
     public Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) => repository.GetAsync(workspaceId, id, cancellationToken);
     public Task<StoredFlow?> GetExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken) => repository.GetExactAsync(scopeRef, id, cancellationToken);
+    public Task<IReadOnlyDictionary<(ResourceScopeRef ScopeRef, FlowId FlowId), string>> ListPublishedVersionsAsync(
+        IReadOnlyCollection<FlowResource> visibleFlows, CancellationToken cancellationToken) =>
+        repository.ListPublishedVersionsAsync(visibleFlows.Select(flow => (flow.ScopeRef, flow.Id)).ToArray(), cancellationToken);
+
     public Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, int skip, int take, CancellationToken cancellationToken) => repository.ListExactAsync(scopeRef, skip, take, cancellationToken);
     public Task<FlowPage> ListExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, int skip, int take, CancellationToken cancellationToken) => repository.ListExactAsync(scopeRef, @namespace, skip, take, cancellationToken);
     public Task<FlowPage> ListAsync(WorkspaceId workspaceId, int skip, int take, CancellationToken cancellationToken) => ListAsync(workspaceId, ResourceNamespace.Default, skip, take, cancellationToken);
@@ -129,7 +133,8 @@ public sealed class FlowService(
             var offset = 0;
             while (values.Count(value => value.Value.ScopeRef == scopeRef) < targetCount)
             {
-                var pageSize = Math.Min(200, targetCount - offset);
+                // The offset includes hidden records; only discovered records fill the visible page.
+                var pageSize = Math.Min(200, targetCount - values.Count(value => value.Value.ScopeRef == scopeRef));
                 var page = @namespace is null
                     ? await repository.ListExactAsync(scopeRef, offset, pageSize, cancellationToken)
                     : await repository.ListExactAsync(scopeRef, @namespace.Value, offset, pageSize, cancellationToken);

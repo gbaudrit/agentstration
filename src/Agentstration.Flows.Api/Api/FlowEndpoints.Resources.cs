@@ -102,7 +102,12 @@ public static partial class FlowEndpoints
                 ? "/api/flows?"
                 : $"/api/namespaces/{@namespace.Value.Value}/flows?";
         var next = page.HasMore ? $"{prefix}skip={actualSkip + actualTop}&top={actualTop}" : null;
-        return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value)).ToArray(), next));
+        var publications = await service.ListPublishedVersionsAsync(page.Items.Select(item => item.Value)
+            .Where(item => item.ActiveVersion is null).ToArray(), token);
+        return Results.Ok(new FlowPageResponse(page.Items.Select(item => ToSummary(item.Value) with
+        {
+            PublishedVersion = item.Value.ActiveVersion ?? publications.GetValueOrDefault((item.Value.ScopeRef, item.Value.Id))
+        }).ToArray(), next));
     });
 
     private static Task<IResult> GetAsync(string id, string? scopeRef, HttpResponse response, FlowService service, ICurrentRequestContext requestContext, CancellationToken token) => ExecuteAsync(async () =>

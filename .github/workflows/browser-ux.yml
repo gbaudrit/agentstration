@@ -52,13 +52,22 @@ jobs:
         include:
           - project: desktop-chromium
             shard: 1
-            shards: 2
+            shards: 3
           - project: desktop-chromium
             shard: 2
-            shards: 2
+            shards: 3
+          - project: desktop-chromium
+            shard: 3
+            shards: 3
           - project: mobile-chromium
             shard: 1
-            shards: 1
+            shards: 3
+          - project: mobile-chromium
+            shard: 2
+            shards: 3
+          - project: mobile-chromium
+            shard: 3
+            shards: 3
           - project: locale-contracts
             shard: 1
             shards: 1
@@ -117,6 +126,9 @@ jobs:
       - name: Install Chromium
         working-directory: automation/playwright
         run: npx playwright install --with-deps chromium
+      - name: Test browser host port reservations
+        working-directory: automation/playwright
+        run: npm run test:fixtures && npm run test:components
       - name: Run browser UX smoke tests
         working-directory: automation/playwright
         env:

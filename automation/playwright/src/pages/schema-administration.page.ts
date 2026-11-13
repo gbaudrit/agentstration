@@ -29,7 +29,7 @@ export class SchemaAdministrationPage {
       await this.page.getByTestId(TestIds.schemaAdministration.displayName).blur();
       await expect(this.page.getByTestId(TestIds.schemaAdministration.name)).toHaveValue(name, { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await this.definition().getByLabel('Namespace').fill(namespace);
+    await this.definition().getByRole('textbox', { name: 'Namespace', exact: true }).fill(namespace);
     const scope = this.page.getByTestId(TestIds.schemaAdministration.scopePicker);
     await scope.selectOption({ index: await this.workspaceOptionIndex(scope) });
     const scopeRef = await scope.inputValue();
@@ -62,7 +62,7 @@ export class SchemaAdministrationPage {
     await this.page.getByTestId(TestIds.schemaAdministration.detailsLink).click();
     await expect(this.page.getByTestId(TestIds.schemaAdministration.overview)).toBeVisible();
     await this.page.getByTestId(TestIds.schemaAdministration.definitionTab).click();
-    await this.definition().getByLabel('Description').fill('Reusable browser-tested contract.');
+    await this.definition().getByRole('textbox', { name: 'Description' }).fill('Reusable browser-tested contract.');
     await this.page.getByTestId(TestIds.schemaAdministration.save).click();
     await expect(this.page.locator('.form-alert-success[role="status"]').filter({ hasText: /saved/i })).toBeVisible();
 

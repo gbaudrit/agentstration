@@ -1,6 +1,7 @@
 @using Agentstration.Web.Console
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
 <span class="realtime-status state-@State.ToString().ToLowerInvariant()"><span aria-hidden="true">●</span> @Label</span>
 @code {
     [Parameter] public WorkOperationsRealtimeState State { get; set; }
-    private string Label => State switch { WorkOperationsRealtimeState.Live => "Live", WorkOperationsRealtimeState.Reconnecting => "Reconnecting", WorkOperationsRealtimeState.Connecting => "Connecting", _ => "Offline" };
+    private string Label => State switch { WorkOperationsRealtimeState.Live => Localizer["Realtime.Live"], WorkOperationsRealtimeState.Reconnecting => Localizer["Realtime.Reconnecting"], WorkOperationsRealtimeState.Connecting => Localizer["Realtime.Connecting"], _ => Localizer["Realtime.Offline"] };
 }

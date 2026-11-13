@@ -53,7 +53,7 @@ export class GovernedKnowledgePage {
     await expect(this.page.getByText(`agentstration.io/knowledge-source=${knowledge}`, { exact: false })).toBeVisible();
     await this.page.goto(`${consoleUrl}/tools/sets?context=${encodeURIComponent(scope)}`);
     await expect(this.page.getByTestId(TestIds.resourceAdministration.toolSets)).toBeVisible();
-    await this.page.getByTestId(TestIds.governedKnowledge.toolSetRow).filter({ hasText: exposure.toolSet.name }).getByRole('link').click();
+    await this.page.getByTestId(TestIds.governedKnowledge.toolSetRow).filter({ hasText: exposure.toolSet.name }).locator('.resource-name-link').click();
     await expect(this.publishedTools).toBeVisible();
   }
 
@@ -91,6 +91,7 @@ export class GovernedKnowledgePage {
     for (const member of excluded) await card.getByRole('checkbox', { name: member, exact: false }).uncheck();
     await expect(card.getByRole('checkbox', { name: selected, exact: false })).toBeChecked();
     await editor.createAndDeploy(agentName);
+    await editor.openOverview();
     const pinned = this.pinnedAssignment;
     await expect(pinned).toContainText(text.activeHelp);
     await expect(pinned).toContainText(exposure.toolSet.name);
