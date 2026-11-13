@@ -111,7 +111,15 @@ export class ResourceScopesPage {
     const nonLink = this.rows.filter({ has: this.page.locator('.collection-identity strong') });
     expect(await nonLink.count()).toBeGreaterThan(0);
     for (const row of await nonLink.all()) await expect(row.getByRole('link')).toHaveCount(0);
-    if (await this.detail.locator('table').count() > 0) await expect(this.detail.locator('thead th')).toHaveCount(5);
+    if (await this.detail.locator('table').count() > 0) await expect(this.detail.locator('thead th')).toHaveCount(4);
+    const owner = (await this.detail.locator('.scope-reference').innerText()).trim();
+    const marker = owner.startsWith('/workspaces/') ? 'W' : owner.startsWith('/tenants/') ? 'T' : 'I';
+    for (const row of await this.rows.all()) {
+      const scope = row.locator('.collection-icon-badges .resource-owner-icon');
+      await expect(scope).toHaveAttribute('data-scope-ref', owner);
+      await expect(scope.locator('.scope-letter')).toHaveText(marker);
+      await expect(scope.getByRole('button')).toHaveAccessibleName(/.+/);
+    }
     for (const row of await this.rows.all()) expect(await row.getByRole('link').count()).toBeLessThanOrEqual(2);
   }
 
