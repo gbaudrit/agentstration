@@ -79,6 +79,55 @@ export class DistributionPage {
     await expect(frame.locator('table')).toBeVisible();
   }
 
+  public async inspectToolCollectionAlignment(consoleUrl: string, layout: 'columns' | 'stacked'): Promise<void> {
+    expect((await this.page.goto(`${consoleUrl}/tools`))?.ok()).toBe(true);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const frame = this.page.locator('.resource-collection').first();
+    await this.showCollectionTable();
+    const row = frame.locator('tbody tr').first();
+    await expect(row.locator('.collection-identity')).toBeVisible();
+    await expect(row.locator(':scope > td')).toHaveCount(4);
+    await expect(row).toHaveCSS('display', layout === 'columns' ? 'table-row' : 'grid');
+    if (layout === 'columns') {
+      await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
+        if (cells.length !== 4 || cells.some(cell => !cell.isConnected)) return Infinity;
+        return Math.max(...cells.map(cell => {
+          const range = document.createRange();
+          range.selectNodeContents(cell);
+          const content = cell.firstElementChild?.getBoundingClientRect() ?? range.getBoundingClientRect();
+          const bounds = cell.getBoundingClientRect();
+          return Math.abs(content.y + content.height / 2 - bounds.y - bounds.height / 2);
+        }));
+      }), { message: 'Resource identity, provider, enabled value and actions share each row’s vertical center.' }).toBeLessThan(2);
+    } else {
+      await expect(frame.locator('thead')).toBeHidden();
+      await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
+        const bounds = cells.map(cell => cell.getBoundingClientRect());
+        return cells.length === 4 && cells.every((cell, index) => cell.isConnected
+          && bounds[index].height > 0 && (index === 0 || bounds[index].top >= bounds[index - 1].bottom));
+      }), { message: 'Mobile preserves the ordered identity, provider, enabled value and action blocks.' }).toBe(true);
+    }
+    const assertChevron = async () => {
+      const trigger = frame.locator('.collection-actions-menu > summary').first();
+      await expect(trigger).toBeVisible();
+      await expect.poll(() => trigger.evaluate(element => {
+        const icon = element.querySelector('svg')!.getBoundingClientRect();
+        const button = element.getBoundingClientRect();
+        return Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2);
+      }), { message: 'The Actions chevron stays centered vertically inside its button.' }).toBeLessThan(1);
+      await trigger.focus();
+      await trigger.press('ArrowDown');
+      await expect(frame.locator('.collection-actions-panel a').first()).toBeFocused();
+      await this.page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+      await expect(trigger.locator('..')).not.toHaveAttribute('open', '');
+    };
+    await assertChevron();
+    await frame.locator('.collection-view-switch button').nth(1).click();
+    await assertChevron();
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+
   public async inspectCompactProjectCard(consoleUrl: string, locale: SupportedTestLocale, displayName: string): Promise<void> {
     await this.open(consoleUrl, '/packs', 'packs');
     const project = this.page.locator('.pack-resource-list article').filter({ hasText: displayName });

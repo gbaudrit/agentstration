@@ -14,6 +14,8 @@ The [complete matrix](all-list-adoption-1121.md) and [surface manifest](collecti
 
 ## Evidence
 
+Collection table cells center identities, business values and actions vertically within each row. The Actions label and chevron share an inline flex alignment. Flow compact rows and the active Source Registry/Runtime Worker adapters inherit this rule; responsive stacked layouts keep their native reading order. Before/after multiline Resource Plan diffs keep their top-aligned comparison semantics.
+
 Every ResourceIcon retains its existing rounded outer frame, including neutral families without a declared domain color. The shared CSS supplies a theme-aware neutral fallback; colored families retain their color. The Agent outer frame is presentation CSS, separate from the robot head in the SVG. No second frame is added. [Real follow-up captures](evidence/1121/icon-frames/README.md) cover neutral Profiles and colored Agents in both themes and desktop/mobile views.
 
 Earlier [Flow screenshots](evidence/1121/flows-compact/README.md) and test totals describe the previous prototype, including rN and large glyphs. They do not validate this rollout. The [current all-list compact gallery](evidence/1121/compact-all/README.md) includes all four Flow pagination/inheritance variants and their unedited table/card/managed/inherited captures. [Final validation](evidence/1121/compact-all/validation.json) records the exact tested product source. The normal implementation/coverage merge gate remains unchanged under the maintainer’s explicit exception allowing stacked draft preparation.

@@ -41,6 +41,12 @@ for (const variant of [
           await capture(`${route.split('?')[0].slice(1)}-table`);
         }
       }
+      await pages.distribution.inspectToolCollectionAlignment(product.consoleUrl, variant.width === 1440 ? 'columns' : 'stacked');
+      await capture('tools');
+      if (variant.width === 1440) {
+        await pages.distribution.showCollectionTable();
+        await capture('tools-table');
+      }
       await pages.distribution.inspectDirectProfileChoice(product.consoleUrl);
       await capture('profile-primary-choice');
       const workspaceId = await pages.organizationWorkspaces.selectByName('default');
