@@ -35,7 +35,7 @@ for (const scenario of cases) {
   test(`populated collection contract: ${scenario.name} @collections @smoke`, async ({ page, product }, testInfo) => {
     test.setTimeout(420_000);
     const observations = await withCollectionAssertions(
-      { ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, scenario.run, {},
+      { ...product, pages: new ProductPages(page), checkpoint: async checkpoint => { await testInfo.attach(checkpoint.name, { body: await checkpoint.page.screenshot({ fullPage: true }), contentType: 'image/png' }); } }, scenario.run, {},
     );
     expect(observations.length).toBeGreaterThan(0);
     await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });

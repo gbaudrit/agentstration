@@ -5,6 +5,7 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { inspectFlowObservability } from '../src/journeys/inspect-flow-observability.journey.js';
 import { CollectionContractPage } from '../src/pages/collection-contract.page.js';
 import { createPackProject } from '../src/journeys/create-pack-project.journey.js';
+import { importSource } from '../src/journeys/import-source.journey.js';
 import { authenticateConsole } from '../src/journeys/authenticate-console.journey.js';
 
 // The existing observability/Workplace journeys use the seeded Development topology.
@@ -13,7 +14,7 @@ test.use({ authenticationMode: 'Development', collectionCampaign: true });
 test('populated collection contract: tasks, Flow executions, events and Agent runs @collections @smoke', async ({ page, product }, testInfo) => {
   test.setTimeout(420_000);
   const observations = await withCollectionAssertions(
-    { ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, inspectFlowObservability, {},
+    { ...product, pages: new ProductPages(page), checkpoint: async checkpoint => { await testInfo.attach(checkpoint.name, { body: await checkpoint.page.screenshot({ fullPage: true }), contentType: 'image/png' }); } }, inspectFlowObservability, {},
   );
   expect(observations.length).toBeGreaterThan(0);
   await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
@@ -49,8 +50,17 @@ test('Workplace populated entry, conversation, task, activity and notifications 
 
 test('populated collection contract: Pack resource selection and build history @collections @smoke', async ({ page, product }, testInfo) => {
   const observations = await withCollectionAssertions(
-    { ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, createPackProject,
+    { ...product, pages: new ProductPages(page), checkpoint: async checkpoint => { await testInfo.attach(checkpoint.name, { body: await checkpoint.page.screenshot({ fullPage: true }), contentType: 'image/png' }); } }, createPackProject,
     { publisher: 'playwright', name: 'collection-contract', version: '1.0.0', displayName: 'Collection contract' },
+  );
+  expect(observations.length).toBeGreaterThan(0);
+  await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });
+});
+
+test('populated collection contract: Source versions, bindings and channels @collections @smoke', async ({ page, product }, testInfo) => {
+  const observations = await withCollectionAssertions(
+    { ...product, pages: new ProductPages(page), checkpoint: async checkpoint => { await testInfo.attach(checkpoint.name, { body: await checkpoint.page.screenshot({ fullPage: true }), contentType: 'image/png' }); } }, importSource,
+    { publisher: 'playwright', name: 'collection-source', displayName: 'Collection source' },
   );
   expect(observations.length).toBeGreaterThan(0);
   await testInfo.attach('collection-observations', { body: JSON.stringify(observations, null, 2), contentType: 'application/json' });

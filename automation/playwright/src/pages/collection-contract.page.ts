@@ -78,6 +78,8 @@ export class CollectionContractPage {
         await expect(version.locator('xpath=ancestor::a')).toHaveCount(0);
         await expect(version.locator('xpath=ancestor::*[contains(@class, "collection-identity-text")]')).toHaveCount(1);
       }
+      await expect(identity.locator('.collection-qualified-name > svg')).toHaveCount(0);
+      await expect(identity.locator('.collection-version-draft, .collection-version-indicator')).toHaveCount(0);
       const code = identity.locator('.collection-qualified-name code');
       if (await code.count()) {
         expect(await code.textContent()).not.toMatch(/\s\/|\/\s/);
@@ -103,6 +105,15 @@ export class CollectionContractPage {
         expect(text.scopeTypes.some(type => name === type || name?.startsWith(`${type} — `))).toBe(true);
         await expect(button).toHaveAccessibleName(name!);
         await expect(scope.locator('[role=tooltip]')).toHaveText(name!);
+        const letter = scope.locator('.scope-letter');
+        await expect(letter).toHaveText(/^[ITW]$/);
+        await expect(letter).toHaveAttribute('aria-hidden', 'true');
+        const visual = await letter.boundingBox();
+        const target = await button.boundingBox();
+        expect(visual!.width).toBeGreaterThanOrEqual(10);
+        expect(visual!.width).toBeLessThanOrEqual(12);
+        expect(target!.width).toBeGreaterThanOrEqual(24);
+        expect(target!.height).toBeGreaterThanOrEqual(24);
         continue;
       }
       const kind = scope.locator('.resource-scope-badge');
@@ -172,21 +183,23 @@ export class CollectionContractPage {
     const row = this.page.locator('.resource-collection tbody > tr, .collection-card').filter({ hasText: `${fixture.namespaces[0]}/same-profile` });
     const scope = row.locator('.resource-owner-scope');
     const disclosure = scope.locator('.disclosure-trigger');
-    await expect(scope.locator('.resource-scope-badge')).toBeVisible();
-    await expect(disclosure).toHaveAccessibleName(fixture.owner);
-    await expect(disclosure).toHaveText(fixture.owner);
-    expect(await disclosure.evaluate(element => element.scrollWidth > element.clientWidth)).toBeTruthy();
+    const fullName = `${CollectionTextByLocale['en-US'].scopeTypes[1]} — ${fixture.owner}`;
+    await expect(scope.locator('.scope-letter')).toHaveText('T');
+    await expect(disclosure).toHaveAccessibleName(fullName);
+    await expect(disclosure).toHaveAttribute('title', fullName);
+    const marker = await scope.locator('.scope-letter').boundingBox();
+    expect(marker!.width).toBeLessThanOrEqual(12);
     await disclosure.focus();
-    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fixture.owner);
+    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fullName);
     await this.page.keyboard.press('Escape');
     await expect(disclosure).toBeFocused();
     await expect(this.page.locator('.full-value-panel:popover-open')).toHaveCount(0);
     await disclosure.hover();
-    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fixture.owner);
+    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fullName);
     await this.page.keyboard.press('Escape');
     if (touch) {
       await disclosure.tap();
-      await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fixture.owner);
+      await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(fullName);
       await this.page.keyboard.press('Escape');
     }
     const requests: string[] = [];
@@ -203,6 +216,7 @@ export class CollectionContractPage {
         expect(url.searchParams.get('scopeRef')).toBe(fixture.scope);
         expect(url.searchParams.get('context')).toBe(fixture.scope);
         const before = this.page.url();
+        await identity.locator('.copy-value').focus();
         await identity.locator('.copy-value').click();
         await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`${namespace}/same-profile`);
         expect(this.page.url()).toBe(before);
@@ -224,9 +238,9 @@ export class CollectionContractPage {
   }
 
   public async showOwnerDisclosure(owner: string, touch: boolean): Promise<void> {
-    const trigger = this.page.getByRole('button', { name: owner, exact: true }).first();
+    const trigger = this.page.getByRole('button', { name: `${CollectionTextByLocale['en-US'].scopeTypes[1]} — ${owner}`, exact: true }).first();
     if (touch) await trigger.tap(); else await trigger.focus();
-    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(owner);
+    await expect(this.page.locator('.full-value-panel:popover-open')).toHaveText(`${CollectionTextByLocale['en-US'].scopeTypes[1]} — ${owner}`);
   }
 
   public async inspectMenu(menu: Locator): Promise<void> {

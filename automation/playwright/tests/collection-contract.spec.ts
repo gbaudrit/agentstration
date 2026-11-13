@@ -34,7 +34,7 @@ for (const variant of [
         await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
     });
     for (const route of routes) {
-      test(`collection contract ${route} ${variant.tag} @collections @smoke`, async ({ page, product, context }) => {
+      test(`collection contract ${route} ${variant.tag} @collections @smoke`, async ({ page, product, context }, testInfo) => {
         const pages = new ProductPages(page);
         const journeyContext = { ...product, pages, checkpoint: ignoreCheckpoints };
         await authenticateConsole(journeyContext, {});
@@ -46,6 +46,7 @@ for (const variant of [
           await pages.consoleAdministration.createToken(`collection-menu-${randomUUID().slice(0, 8)}`);
         }
         await inspectCollections(journeyContext, { route, locale: variant.locale });
+        await testInfo.attach('collection-contract-rendering', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       });
     }
   });
