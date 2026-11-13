@@ -59,7 +59,7 @@
 .resource-collection .data-grid th:nth-child(2) { width: 13rem; }
 .resource-collection .data-grid th:last-child { width: 8rem; }
 .resource-collection .data-grid th { white-space: normal; }
-.resource-collection .data-grid td { vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
+.resource-collection .data-grid td { vertical-align: middle; white-space: normal; overflow-wrap: anywhere; }
 .resource-collection .data-grid .text-button { white-space: normal; }
 .collection-identity-cell .collection-identity { width: clamp(12rem, 17vw, 17rem); }
 .collection-identity { display: flex; gap: .65rem; align-items: flex-start; min-width: 0; }
@@ -85,7 +85,7 @@
 .collection-action-group, .collection-primary-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
 .collection-primary-actions > :is(button, a), .collection-action-group > .collection-actions-menu > summary { white-space: normal; }
 .collection-actions-menu { display: inline-block; }
-.collection-actions-menu > summary { list-style: none; cursor: pointer; }
+.collection-actions-menu > summary { display: inline-flex; align-items: center; gap: .3rem; list-style: none; cursor: pointer; }
 .collection-actions-menu > summary::-webkit-details-marker { display: none; }
 .collection-actions-panel, .full-value-panel { position: fixed; inset: auto; margin: 0; padding: .4rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); box-shadow: var(--shadow); max-width: calc(100vw - 1rem); }
 .collection-actions-panel { min-width: 11rem; }
@@ -114,7 +114,7 @@
 .flow-compact-list .data-grid th:nth-child(2) { width: 10rem; }
 .flow-compact-list .data-grid th:nth-child(3) { width: 12rem; }
 .flow-compact-list .data-grid th:last-child { width: 8rem; }
-.flow-compact-list .data-grid td { padding-block: .35rem; vertical-align: top; }
+.flow-compact-list .data-grid td { padding-block: .35rem; }
 .flow-compact-list .collection-identity-cell .collection-identity { width: 100%; }
 .collection-identity { align-items: center; gap: .4rem; }
 .flow-compact-list .collection-identity-indicators { display: flex; align-items: center; gap: .15rem; flex: 0 0 auto; }
