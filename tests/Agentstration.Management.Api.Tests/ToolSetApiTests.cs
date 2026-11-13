@@ -5,6 +5,7 @@ using Agentstration.Agents;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
@@ -15,6 +16,47 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class ToolSetApiTests : ModelManagementApiTestBase
 {
+    [TestMethod]
+    public async Task InheritedPublicationMetadataUsesParentDiscoveryAndDoesNotDiscloseDeniedParents()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        var identities = new List<Guid>();
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
+        {
+            foreach (var name in new[] { "visible-publication", "denied-publication" })
+            {
+                var parent = await store.PutExactAsync(ResourceScopeRef.Instance,
+                    ToolSet(ResourceScopeRef.Instance, name, "9.0.0", []), null, true, default);
+                identities.Add(parent.Value.Uid);
+                await store.PutExactAsync(ResourceScopeRef.Instance, new ToolSetVersionResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolSetVersion,
+                    Metadata = new() { Name = $"{name}-1.0.0" }, ScopeRef = ResourceScopeRef.Instance,
+                    ToolSetUid = parent.Value.Uid, ToolSetName = name, ToolSetGeneration = parent.Value.Generation,
+                    Version = "1.0.0", DefinitionHash = "fixture", PublishedAt = DateTimeOffset.UnixEpoch
+                }, null, true, default);
+                if (name == "visible-publication")
+                    await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+                        new(new(parent.Value.Uid, ResourceScopeRef.Instance, parent.Value.Namespace,
+                            ToolResourceKinds.ToolSet, parent.Value.Generation),
+                            [new(workspace, [ResourceAccessAction.Discover])]), null, default);
+            }
+        }
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context))
+        {
+            var publications = await store.FindLatestToolSetVersionsAsync(identities, default);
+            Assert.HasCount(1, publications);
+            Assert.AreEqual("1.0.0", publications[identities[0]]);
+            Assert.IsFalse(publications.ContainsKey(identities[1]));
+            var rows = await factory.Services.GetRequiredService<ToolSetService>().ListAsync(default);
+            Assert.AreEqual("1.0.0", rows.Single(value => value.Value.Uid == identities[0]).Value.PublishedVersion);
+            Assert.IsFalse(rows.Any(value => value.Value.Uid == identities[1]));
+        }
+    }
+
     [TestMethod]
     public async Task CollectionPublicationProjectionKeepsDraftsNamespacesAndExactIdentitiesIndependent()
     {

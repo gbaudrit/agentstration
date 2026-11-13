@@ -520,19 +520,24 @@ public sealed class PostgreSqlResourceStore(
 
     public Task<IReadOnlyDictionary<Guid, string>> FindLatestToolSetVersionsAsync(
         IReadOnlyCollection<Guid> toolSetUids, CancellationToken cancellationToken) =>
-        FindLatestPublicationVersionsAsync(toolSetUids, "ToolSetVersion", "toolSetUid", cancellationToken);
+        FindLatestPublicationVersionsAsync(toolSetUids, "ToolSet", "ToolSetVersion", "toolSetUid", cancellationToken);
 
     public Task<IReadOnlyDictionary<Guid, string>> FindLatestDataSourceProfileVersionsAsync(
         IReadOnlyCollection<Guid> profileUids, CancellationToken cancellationToken) =>
-        FindLatestPublicationVersionsAsync(profileUids, "DataSourceProfileRevision", "profileUid", cancellationToken);
+        FindLatestPublicationVersionsAsync(profileUids, "DataSourceProfile", "DataSourceProfileRevision", "profileUid", cancellationToken);
 
     private async Task<IReadOnlyDictionary<Guid, string>> FindLatestPublicationVersionsAsync(
-        IReadOnlyCollection<Guid> resourceUids, string kind, string ownerProperty, CancellationToken cancellationToken)
+        IReadOnlyCollection<Guid> resourceUids, string parentKind, string kind, string ownerProperty, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThan(resourceUids.Count, 200);
         if (resourceUids.Count == 0) return new Dictionary<Guid, string>();
-        var identities = JsonSerializer.Serialize(resourceUids);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var parents = await Scoped(context.Documents.AsNoTracking()).Include(value => value.Scope)
+            .Where(value => value.Kind == parentKind && resourceUids.Contains(value.Uid)).ToArrayAsync(cancellationToken);
+        var visibleParents = await FilterDiscoverableAsync(context, parents, cancellationToken);
+        if (visibleParents.Length == 0) return new Dictionary<Guid, string>();
+        var identities = JsonSerializer.Serialize(visibleParents.Select(value => value.Uid));
+        // This is publication metadata of the authorized parent, not a grant to the version resource itself.
         var documents = await Scoped(context.Documents.FromSqlInterpolated($"""
             SELECT * FROM management."ControlPlaneResources" WHERE "Uid" IN (
                 SELECT "Uid" FROM (
@@ -543,8 +548,7 @@ public sealed class PostgreSqlResourceStore(
                         AND "Payload"::jsonb->>{ownerProperty} IN (SELECT jsonb_array_elements_text({identities}::jsonb))) latest
                 WHERE position = 1)
             """).AsNoTracking()).Include(value => value.Scope).ToArrayAsync(cancellationToken);
-        var visible = await FilterDiscoverableAsync(context, documents, cancellationToken);
-        return visible.Select(value => JsonSerializer.Deserialize<JsonElement>(value.Payload))
+        return documents.Select(value => JsonSerializer.Deserialize<JsonElement>(value.Payload))
             .ToDictionary(value => value.GetProperty(ownerProperty).GetGuid(), value => value.GetProperty("version").GetString()!);
     }
 
