@@ -1,6 +1,6 @@
 export const TestIds = {
   transformationFunctions: {
-    catalogue: 'transformation-functions', row: 'transformation-function-row', nativeKindCreate: 'function-native-kind-create',
+    catalogue: 'transformation-functions', row: 'transformation-function-row',
     editor: 'transformation-function-editor', name: 'function-name', kind: 'function-kind', implementation: 'function-implementation', save: 'function-save',
     sequenceAdd: 'function-sequence-add', sequenceTarget: 'function-sequence-target', transform: 'transform-function', foreachCollection: 'foreach-collection',
   },

@@ -1,7 +1,0 @@
-apiVersion: agentstration.io/v1
-kind: BootstrapProfile
-metadata:
-  name: native-functions
-definition:
-  displayName: Native transformation functions
-  targetScope: workspace

@@ -19,6 +19,7 @@ internal static class FunctionsServiceCollectionExtensions
         services.AddSingleton<NativeFunctionExecutionContext>();
         services.AddSingleton<INativeFunctionExecutionContext>(provider => provider.GetRequiredService<NativeFunctionExecutionContext>());
         services.AddSingleton<TransformationFunctionService>();
+        services.AddSingleton<Agentstration.Infrastructure.Functions.NativeFunctionPlatformResourceProvisioner>();
         services.AddSingleton<ITransformationFunctionResolver>(provider => provider.GetRequiredService<TransformationFunctionService>());
         return services;
     }

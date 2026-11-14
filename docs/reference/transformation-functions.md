@@ -2,7 +2,9 @@
 
 Transformation functions are reusable scoped resources. The initial execution kind is native .NET code. Scripts, remote engines and custom DLL loading are not implemented.
 
-Apply the `native-functions` Workspace bootstrap profile to declare a native FunctionKind and the initial functions, or declare resources under `/function-kinds` and `/transformation-functions`. Each function selects a registered implementation/version. Published versions cannot be rewritten; add a version and explicitly select it in consumers. Disabling a function or kind blocks further invocations under current authorization.
+The platform automatically provisions the standard native FunctionKind and five TransformationFunctions at Instance scope during startup, including when file Bootstrap is disabled. They are marked `builtIn`, managed by Core (`functions.native`), and read-only in the Console. No file profile or manual Bootstrap action is required. Tenants and their descendant Workspaces inherit Discover/Use grants; the catalogue is not copied into each Workspace. Startup reconciliation preserves resource identities and immutable versions and refuses to adopt a user resource at a reserved builtin identity.
+
+Inspect the catalogue under `/function-kinds` and `/transformation-functions`. Standard function resource names use the established `-builtin` suffix, for example `json-select-builtin` and `artifact-explode-builtin`; implementation identifiers remain `json.select` and `artifact.explode`. Additional user-defined functions can select a registered implementation/version through the resource API, Console or generic Bootstrap handlers. Published versions cannot be rewritten; add a version and explicitly select it in consumers. Disabling a user-managed function or kind blocks further invocations under current authorization.
 
 | Implementation | Business input | Output |
 | --- | --- | --- |

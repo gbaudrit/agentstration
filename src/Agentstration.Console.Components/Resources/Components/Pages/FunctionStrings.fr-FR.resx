@@ -7,8 +7,8 @@
   <data name="Loading" xml:space="preserve"><value>Chargement des fonctions…</value></data>
   <data name="Kinds" xml:space="preserve"><value>Types de fonctions</value></data>
   <data name="Functions" xml:space="preserve"><value>Fonctions</value></data>
-  <data name="CreateNativeKind" xml:space="preserve"><value>Déclarer le type natif dans cette portée</value></data>
-  <data name="Native" xml:space="preserve"><value>Natif</value></data>
+  <data name="BuiltIn" xml:space="preserve"><value>Intégré</value></data>
+  <data name="BuiltInHelp" xml:space="preserve"><value>Cette fonction intégrée est provisionnée automatiquement au niveau Instance et gérée par la plateforme. Sa définition est en lecture seule.</value></data>
   <data name="Empty" xml:space="preserve"><value>Aucune fonction déclarée dans cette portée.</value></data>
   <data name="EditorHelp" xml:space="preserve"><value>Sélectionnez une implémentation native. Les versions publiées sont immuables.</value></data>
   <data name="Name" xml:space="preserve"><value>Nom technique</value></data>

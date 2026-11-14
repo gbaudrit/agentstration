@@ -10,6 +10,7 @@
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <PageHeader Title="@T("Title")" Description="@T("EditorHelp")" TestId="transformation-function-editor" />
+@if (original?.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <p role="note">@T("BuiltInHelp")</p> }
 @if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
@@ -52,7 +53,7 @@ else
     private bool enabled = true, loading = true, busy, interactive;
     private Exception? error;
     private ResourceScopeRef? Owner => ScopeRef is null ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
-    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
+    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || !original.Governance.IsManaged && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
     private NativeFunctionDescriptor? Selected => implementations.FirstOrDefault(item => ImplementationKey(item) == implementationKey);
     private string T(string key) => Localizer[key];
     private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
@@ -83,7 +84,7 @@ else
     protected override void OnAfterRender(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } }
     private async Task SaveAsync()
     {
-        if (busy || !interactive || Owner is not { } owner || Selected is not { } selected) return;
+        if (!CanEdit || busy || !interactive || Owner is not { } owner || Selected is not { } selected) return;
         busy = true; error = null;
         try
         {

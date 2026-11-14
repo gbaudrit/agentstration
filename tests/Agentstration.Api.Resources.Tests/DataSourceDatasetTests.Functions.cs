@@ -3,8 +3,6 @@ using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Functions;
-using Agentstration.Functions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
@@ -24,15 +22,6 @@ public sealed partial class DataSourceDatasetTests
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var inputs = await PrepareAsync(factory.Services);
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(inputs.Context);
-        var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
-        await functions.PutKindAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind,
-            ScopeRef = Owner, Metadata = new() { Name = "native" }, Definition = new("Native", [new("1.0.0", "native", NativeFunctionKindContract.DefinitionSchema)]) }, null, true, default);
-        await functions.PutAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-            ScopeRef = Owner, Metadata = new() { Name = "explode" }, Definition = new("Explode", [new("1.0.0", new("native", "1.0.0", Owner),
-                JsonSerializer.SerializeToElement(new { implementation = new { id = "artifact.explode", version = "1.0.0" } }))]) }, null, true, default);
-        await functions.PutAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-            ScopeRef = Owner, Metadata = new() { Name = "select" }, Definition = new("Select", [new("1.0.0", new("native", "1.0.0", Owner),
-                JsonSerializer.SerializeToElement(new { implementation = new { id = "json.select", version = "1.0.0" } }))]) }, null, true, default);
         var input = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(Source("function-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "functions" })), default);
         var untouched = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(Source("untouched-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "untouched" })), default);
         var batch = JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "batch", kind = "inline", disposition = "publishable", mediaType = "application/json",
@@ -48,7 +37,7 @@ public sealed partial class DataSourceDatasetTests
                 Steps = useFunction
                     ? [new InputFlowStepDefinition { Name = "input", Schema = schema },
                         new TransformFlowStepDefinition { Name = "batch", Mapping = output },
-                        new TransformFlowStepDefinition { Name = "select", Function = new("select", "1.0.0", Owner), Schema = manifestSchema,
+                        new TransformFlowStepDefinition { Name = "select", Function = new("json-select-builtin", "1.0.0", Owner), Schema = manifestSchema,
                             Mapping = JsonSerializer.SerializeToElement(new { value = "${transition.output}", path = "" }) },
                         new OutputFlowStepDefinition { Name = "output", Schema = manifestSchema, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }]
                     : [new InputFlowStepDefinition { Name = "input", Schema = schema }, new OutputFlowStepDefinition { Name = "output", Schema = manifestSchema, OutputMapping = output }],
@@ -60,7 +49,7 @@ public sealed partial class DataSourceDatasetTests
         }
         var normalize = await ValueFlow("normalize-value", batch, useFunction: true);
         var identity = await ValueFlow("identity-value", JsonSerializer.SerializeToElement("${input.value}"));
-        var explode = new FlowCompositionCall { Function = new("explode", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
+        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
             { path = "/results", itemSchema = new { type = "object", properties = new { id = new { type = "string" } }, required = new[] { "id" } } }) };
         var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
         var bindings = new List<KnowledgeDataSourceBinding> { new() { Name = "selected", DataSource = new(input.Value.Name, Owner), RefreshIfNecessary = true,
