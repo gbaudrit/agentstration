@@ -40,6 +40,15 @@ Data Source. Discovery is not offered from the Data Source. A changed reference 
 explicitly; refresh does not rewrite saved pins. Existing profile resources,
 discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
 
+When transformations are configured, the governed acquisition boundary uses the
+selected Operation's validated output schema if its adapter Flow has no declared
+success schema (for example the dynamic OpenAPI adapter). The schema is pinned
+in the accepted composition. A declared adapter schema still takes precedence;
+ordinary transformation Flows must declare their own output contracts. The
+boundary validates its result before the transformation sequence executes.
+
+Standard DataSource orchestration version `1.2.0` accepts any acquired business JSON value and any transformed JSON value. The acquisition request remains an object envelope. This also supports existing OpenAPI operations whose response schema lists all JSON types. `json.select` can therefore store an array or scalar directly. The Operation output schema is pinned separately and still validates the raw acquired response. Transformed output is validated against the final composition contract and bounded to 64 KiB before storage. This produces one stored JSON content; Artifact fan-out remains a separate Knowledge publication operation. Failed composition responses retain `data_source_composition_invalid` and expose `compositionErrorCode` for HTTP and Console diagnosis.
+
 The integration baseline includes StorageType administration and scoped generic
 grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
 the merged `local@1.0.0` contract and current Storage/StorageType Use decisions;
@@ -367,7 +376,8 @@ bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-e
 ## Artifact content processing
 
 [ADR-0213](../../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
-adds a distinct `artifactTransform` step to Artifact-manifest transformations. Its
+introduced Artifact-manifest processing; [ADR-0233](../../decisions/0233-native-function-catalogue-and-explicit-iteration.md)
+names its explicit iteration step `foreachArtifacts`. Its
 private process/return region can contain ordinary Agents, Tools, mappings and
 child Flow calls without another published processor. Invocation adaptation belongs
 to the step, not reusable Tool definitions. Content mode supplies bounded UTF-8
@@ -384,6 +394,17 @@ for mappings, operation contracts, publication behavior and current bounds. The
 reusable browser scenario is tracked separately by #1145, pending UX validation
 and implementation merge.
 
+Native transformation functions can be selected directly in ordinary Transform
+steps and mixed with published Flows in source sequences. A Knowledge binding
+transforms only its selected DataSource; `postAggregate` transforms the combined
+projection manifest before Snapshot publication. The same parameter editor serves
+both locations. `artifact.explode` selects an array or object by JSON Pointer and
+returns multiple independently publishable items. A processing branch may return
+that manifest: all children are validated and prepared before registration,
+without storing an intermediate batch Artifact. Direct handoffs stay transient
+until final publication. See the [function reference](../../reference/transformation-functions.md)
+for contracts, bootstrap declarations and bounds.
+
 
 Effective processing contracts follow [ADR-0214](../../decisions/0214-effective-data-contracts-follow-flow-invocations.md).
 The authority derives invocation instructions from accepted contracts before the
@@ -392,3 +413,5 @@ instructions. The existing Schemas handler validates bounded nullable types and
 compositions as well as ordinary object contracts. Retained Artifact receipts and
 direct handoffs keep concrete content evidence; Flow Run diagnostics preserve
 causal contract failures across child executions.
+
+OpenAPI acquisition schema discovery recognizes `application/json` with media-type parameters such as `charset=utf-8`, including case variants and local schema references. Conflicting JSON representations are rejected rather than silently choosing one. Existing Operation revisions remain pinned; rediscovery is explicit. Contract mismatch diagnostics include the composition point, boundary, template/version and JSON type summaries, without invocation values or schema defaults.

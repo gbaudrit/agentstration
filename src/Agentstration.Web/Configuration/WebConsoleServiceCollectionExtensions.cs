@@ -93,6 +93,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ConnectedServicesApiClient, IConnectedServicesClient>(services, configured.ManagementApi);
         AddClient<ConnectedServiceOperationsApiClient, IConnectedServiceOperationsClient>(services, configured.ManagementApi);
         AddClient<StoragesApiClient, IStoragesClient>(services, configured.ManagementApi);
+        AddClient<TransformationFunctionsApiClient, ITransformationFunctionsClient>(services, configured.ManagementApi);
         AddClient<StoragesApiClient, IStorageTypesClient>(services, configured.ManagementApi);
         AddClient<SchemasApiClient, ISchemasClient>(services, configured.ManagementApi);
         AddClient<ResourceScopeInventoryApiClient, IResourceScopeInventoryClient>(services, configured.ManagementApi);

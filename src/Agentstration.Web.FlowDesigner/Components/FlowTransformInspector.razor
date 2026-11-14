@@ -1,16 +1,17 @@
+@using Agentstration.Web.FlowDesigner.Backend
+@using Agentstration.Functions.Contracts
 @using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
-    <label>@T("TransformProcessing")<select data-testid="transform-process-mode" disabled="@ReadOnly" value="@(Step.Processing?.Partition.ToString() ?? "None")" @onchange="ProcessChangedAsync"><option value="None">@T("TransformProcessing.None")</option><option value="Batches">@T("TransformProcessing.Batches")</option><option value="TextChunks">@T("TransformProcessing.TextChunks")</option></select></label>
-    @if (Step.Processing is { } processing)
-    {
-        <p class="muted">@T("TransformProcessing.Help")</p>
-        <label>@T("TransformProcessing.UnitSize")<input type="number" min="1" max="65536" disabled="@ReadOnly" value="@processing.UnitSize" @onchange="e => ProcessLimitAsync(e, 0)" /></label>
-        <label>@T("TransformProcessing.MaximumUnits")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@processing.MaximumUnits" @onchange="e => ProcessLimitAsync(e, 1)" /></label>
-        <label>@T("ProcessConcurrency")<input type="number" min="1" max="16" disabled="@ReadOnly" value="@processing.MaximumConcurrency" @onchange="e => ProcessLimitAsync(e, 2)" /></label>
-    }
+    <label>@T("TransformFunction")<select value="@(Step.Function is null ? string.Empty : FunctionKey(Step.Function))" @onchange="SelectFunctionAsync" disabled="@ReadOnly" data-testid="transform-function">
+        <option value="">@T("TransformMappingOnly")</option>
+        @if (Step.Function is { } saved && Functions.All(choice => FunctionKey(choice.Function.Reference) != FunctionKey(saved))) { <option value="@FunctionKey(saved)">@saved.Name · @saved.Version</option> }
+        @foreach (var choice in Functions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
+    </select></label>
+    @if (SelectedFunction is { } function)
+    { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
     <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
@@ -39,6 +40,7 @@
 }
 
 @code {
+    [Parameter] public IReadOnlyList<FlowDesignerFunction> Functions { get; set; } = [];
     [Parameter, EditorRequired] public TransformFlowStepDefinition Step { get; set; } = default!;
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
@@ -51,11 +53,15 @@
     [Parameter] public Func<ValidateSchemaDefinitionRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaDefinitionAsync { get; set; }
     [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaInstanceAsync { get; set; }
 
-    private Task ProcessChangedAsync(ChangeEventArgs args) => Enum.TryParse<FlowProcessPartition>(args.Value?.ToString(), out var mode)
-        ? Changed.InvokeAsync(Step with { Processing = (Step.Processing ?? new()) with { Partition = mode } })
-        : Changed.InvokeAsync(Step with { Processing = null });
-    private Task ProcessLimitAsync(ChangeEventArgs args, int field) => int.TryParse(args.Value?.ToString(), out var value) && Step.Processing is { } process
-        ? Changed.InvokeAsync(Step with { Processing = field switch { 0 => process with { UnitSize = value }, 1 => process with { MaximumUnits = value }, _ => process with { MaximumConcurrency = value } } })
-        : Task.CompletedTask;
+    private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
+    private FlowDesignerFunction? SelectedFunction => Step.Function is { } reference
+        ? Functions.FirstOrDefault(choice => FunctionKey(choice.Function.Reference) == FunctionKey(reference)) : null;
+    private Task SelectFunctionAsync(ChangeEventArgs args)
+    {
+        if (ReadOnly) return Task.CompletedTask;
+        var selected = Functions.FirstOrDefault(choice => FunctionKey(choice.Function.Reference) == args.Value?.ToString());
+        return Changed.InvokeAsync(Step with { Function = selected?.Function.Reference, FunctionInputSchema = selected?.Function.InputSchema, Schema = selected?.Function.OutputSchema,
+            Mapping = selected is null ? Step.Mapping : JsonSerializer.SerializeToElement(new { value = "${transition.output}" }) });
+    }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
 }

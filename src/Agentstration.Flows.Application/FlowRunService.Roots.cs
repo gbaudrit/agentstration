@@ -137,13 +137,25 @@ public sealed partial class FlowRunService
             for (var index = 0; index < calls.Count; index++)
             {
                 var requested = point.Value[index]; var pinned = calls[index];
-                if (requested.Flow.ResourceId != pinned.Flow.ResourceId
-                    || requested.Flow.Namespace is { } ns && ns != pinned.Flow.Namespace
-                    || requested.Flow.ScopeRef is { } scope && scope != pinned.Flow.ScopeRef
-                    || requested.Flow.VersionStrategy == FlowCallVersionStrategy.Exact && requested.Flow.Version != pinned.Flow.Version
-                    || requested.Flow.ResourceUid is { } uid && uid != pinned.Flow.ResourceUid
-                    || requested.Flow.DefinitionHash is { } hash && hash != pinned.Flow.DefinitionHash
-                    || requested.PassInputDirectly != pinned.PassInputDirectly || !JsonElement.DeepEquals(requested.Parameters, pinned.Parameters))
+                if (requested.Function is not null || pinned.Function is not null)
+                {
+                    if (requested.Flow is not null || pinned.Flow is not null || requested.Function is not { } requestedFunction || pinned.Function is not { } pinnedFunction
+                        || requestedFunction.Name != pinnedFunction.Name || requestedFunction.Version != pinnedFunction.Version
+                        || requestedFunction.ScopeRef is { } functionScope && functionScope != pinnedFunction.ScopeRef
+                        || requestedFunction.Namespace is { } functionNamespace && functionNamespace != pinnedFunction.Namespace
+                        || requestedFunction.Uid is { } functionUid && functionUid != pinnedFunction.Uid
+                        || requestedFunction.Digest is { } functionDigest && functionDigest != pinnedFunction.Digest)
+                        throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another function composition.");
+                }
+                else if (requested.Flow is not { } requestedFlow || pinned.Flow is not { } pinnedFlow
+                    || requestedFlow.ResourceId != pinnedFlow.ResourceId
+                    || requestedFlow.Namespace is { } ns && ns != pinnedFlow.Namespace
+                    || requestedFlow.ScopeRef is { } scope && scope != pinnedFlow.ScopeRef
+                    || requestedFlow.VersionStrategy == FlowCallVersionStrategy.Exact && requestedFlow.Version != pinnedFlow.Version
+                    || requestedFlow.ResourceUid is { } uid && uid != pinnedFlow.ResourceUid
+                    || requestedFlow.DefinitionHash is { } hash && hash != pinnedFlow.DefinitionHash)
+                    throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
+                if (requested.PassInputDirectly != pinned.PassInputDirectly || !JsonElement.DeepEquals(requested.Parameters, pinned.Parameters))
                     throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
             }
         }

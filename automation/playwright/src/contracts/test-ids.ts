@@ -1,14 +1,20 @@
 export const TestIds = {
+  transformationFunctions: {
+    description: 'function-description', descriptionInput: 'function-description-input',
+    catalogue: 'transformation-functions', row: 'transformation-function-row',
+    editor: 'transformation-function-editor', name: 'function-name', kind: 'function-kind', implementation: 'function-implementation', save: 'function-save',
+    sequenceAdd: 'function-sequence-add', sequenceTarget: 'function-sequence-target', transform: 'transform-function', foreachCollection: 'foreach-collection',
+  },
   flowMapping: { editor: 'flow-data-mapping', value: 'agent-input-mapping', json: 'agent-input-mapping-json', outputValue: 'output-value-mapping', outputJson: 'output-value-mapping-json', useIncoming: 'output-use-transition' },
   artifactProcessing: {
     outputMediaType: 'artifact-output-media-type',
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
-    palette: 'flow-palette-artifactTransform', mode: 'artifact-processing-mode',
+    palette: 'flow-palette-foreachArtifacts', mode: 'artifact-processing-mode',
     startPort: 'artifact-processing-start-port', resultPort: 'artifact-processing-result-port',
     manifestMapping: 'artifact-manifest-mapping', inputMapping: 'artifact-input-mapping', resultMapping: 'artifact-result-mapping',
   },
   sourcePolicies: {
-    pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code',
+    pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code', compositionError: 'dataset-composition-error-code',
     definitionFields: 'dataset-definition-fields', service: 'dataset-service', operation: 'dataset-operation',
     storage: 'dataset-storage', direct: 'dataset-allow-direct', lifecycle: 'source-lifecycle-editor',
     enable: 'lifecycle-enable', ttl: 'lifecycle-ttl', history: 'lifecycle-history', retention: 'lifecycle-retention',
@@ -240,6 +246,8 @@ export const TestIds = {
     knowledgeSourceTransformationConfiguration: 'knowledge-source-transformation-configuration',
     knowledgeSourceSave: 'knowledge-source-save',
     knowledgeSourcePublishTools: 'knowledge-publish-tools',
+    knowledgeExposureVersion: 'knowledge-tool-exposure-version',
+    knowledgeExposureCurrentVersion: 'knowledge-tool-exposure-current-version',
     knowledgeOutputStorage: 'knowledge-output-storage',
     knowledgeOutputCollection: 'knowledge-output-collection',
     knowledgeDocumentQueryResult: 'knowledge-document-query-result',

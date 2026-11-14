@@ -104,7 +104,7 @@ public sealed partial class FlowTests
         var graph = ImplicitProcessGraph();
         graph = graph with
         {
-            Steps = graph.Steps.Select(step => step.Name == "partition" ? (FlowStepDefinition)new ArtifactTransformFlowStepDefinition
+            Steps = graph.Steps.Select(step => step.Name == "partition" ? (FlowStepDefinition)new ForeachArtifactsFlowStepDefinition
                 { Name = "partition", Mode = ArtifactProcessingMode.Access } : step.Name == "body" ? new FlowCallStepDefinition
                 { Name = "body", Flow = new("named-child", FlowCallVersionStrategy.Exact, "1.0.0") } : step).ToArray(),
             Transitions = graph.Transitions.Select(edge => edge.FromStep == "body" ? edge with { Event = "completed" } : edge).ToArray()
@@ -130,7 +130,7 @@ public sealed partial class FlowTests
     {
         EntryStep = "input",
         Steps = [new InputFlowStepDefinition { Name = "input" },
-            new TransformFlowStepDefinition { Name = "partition", Processing = new() { MaximumUnits = 16, MaximumConcurrency = 4 } },
+            new ForeachFlowStepDefinition { Name = "partition", Partition = new() { MaximumUnits = 16, MaximumConcurrency = 4 } },
             new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement("${input}") },
             new TransformFlowStepDefinition { Name = "correct", Mapping = JsonSerializer.SerializeToElement("${transition.output}") },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }],

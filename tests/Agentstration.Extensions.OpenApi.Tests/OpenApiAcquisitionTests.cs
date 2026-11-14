@@ -14,6 +14,48 @@ namespace Agentstration.Extensions.OpenApi.Tests;
 
 public sealed partial class OpenApiExtensionTests
 {
+    [TestMethod]
+    [DataRow("application/json; charset=utf-8", "200")]
+    [DataRow("Application/JSON; charset=UTF-8", "200")]
+    [DataRow("application/json; charset=utf-8", "default")]
+    public async Task DiscoveryResolvesReferencedJsonResponseSchemasWithMediaTypeParameters(string mediaType, string status)
+    {
+        var contract = """
+            {"openapi":"3.1.0","info":{"title":"Records","version":"1"},"paths":{"/items":{"get":{"operationId":"getItems",
+            "responses":{"STATUS":{"description":"Records","content":{"MEDIA":{"schema":{"$ref":"#/components/schemas/records"}}}}}}}},
+            "components":{"schemas":{"records":{"type":"object","properties":{"results":{"type":"array","items":{"type":"object"}}},"required":["results"]}}}}
+            """.Replace("STATUS", status, StringComparison.Ordinal).Replace("MEDIA", mediaType, StringComparison.Ordinal);
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "json-charset", default);
+        var operation = discovery.Operations.Single();
+        var output = operation.Definition.GetProperty("outputSchema");
+        Assert.AreEqual(JsonValueKind.String, output.GetProperty("type").ValueKind, output.GetRawText());
+        Assert.AreEqual("object", output.GetProperty("type").GetString());
+        Assert.AreEqual("array", output.GetProperty("properties").GetProperty("results").GetProperty("type").GetString());
+        Assert.AreEqual("results", output.GetProperty("required")[0].GetString());
+    }
+
+    [TestMethod]
+    [DataRow("application/json; charset=utf-8")]
+    [DataRow("Application/JSON")]
+    public async Task DiscoveryPinsConflictingJsonRepresentationsAsDistinctChoicesWithoutDroppingSchemas(string otherMedia)
+    {
+        var contract = AcquisitionContract.Replace("\"application/json\":{\"schema\":{\"type\":\"object\"}}",
+            "\"application/json\":{\"schema\":{\"type\":\"object\"}},\"" + otherMedia + "\":{\"schema\":{\"type\":\"array\"}}", StringComparison.Ordinal);
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "ambiguous-json", default);
+        var operations = discovery.Operations.Where(item => item.Definition.GetProperty("operationId").GetString() == "getItems").ToArray();
+        Assert.HasCount(2, operations);
+        Assert.AreEqual(2, operations.Select(item => item.ExternalId).Distinct(StringComparer.Ordinal).Count());
+        foreach (var operation in operations)
+        {
+            var selected = operation.Definition.GetProperty("responseShape").GetProperty("x-agentstration-response");
+            var media = selected.GetProperty("mediaType").GetString();
+            Assert.AreEqual(media == "application/json" ? "object" : "array", operation.Definition.GetProperty("outputSchema").GetProperty("type").GetString());
+            Assert.IsTrue(JsonElement.DeepEquals(selected.GetProperty("nativeDefinition"), operation.Definition.GetProperty("outputSchema")));
+        }
+    }
+
     private const string AcquisitionContract = """
         {"openapi":"3.1.0","info":{"title":"Items","version":"1"},"paths":{
           "/items":{"get":{"operationId":"getItems","parameters":[{"in":"query","name":"dataset","required":true,"schema":{"type":"string"}}],
@@ -68,6 +110,7 @@ public sealed partial class OpenApiExtensionTests
 
     [TestMethod]
     [DataRow("valid", null)]
+    [DataRow("parameterized-media", null)]
     [DataRow("changed-contract", "openapi_contract_digest_mismatch")]
     [DataRow("foreign-contract", "openapi_connection_origin_denied")]
     [DataRow("foreign-server", "openapi_connection_origin_denied")]
@@ -78,6 +121,7 @@ public sealed partial class OpenApiExtensionTests
     {
         var businessCalls = 0;
         var current = AcquisitionContract;
+        if (scenario == "parameterized-media") current = current.Replace("\"application/json\":", "\"application/json; charset=utf-8\":", StringComparison.Ordinal);
         var service = Service((request, _) =>
         {
             Assert.AreEqual("Bearer synthetic-acquisition-token", request.Headers.Authorization?.ToString());
@@ -127,7 +171,7 @@ public sealed partial class OpenApiExtensionTests
             var failure = await Assert.ThrowsAsync<Agentstration.Aep.AspNetCore.AepServerException>(() => provider.AcquireAsync(request, default));
             Assert.AreEqual(expected, failure.Code);
         }
-        Assert.AreEqual(scenario is "valid" or "credential-reflection" or "response-status-mismatch" ? 1 : 0, businessCalls);
+        Assert.AreEqual(scenario is "valid" or "parameterized-media" or "credential-reflection" or "response-status-mismatch" ? 1 : 0, businessCalls);
     }
 
     [TestMethod]

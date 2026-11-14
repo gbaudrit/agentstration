@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -309,7 +310,8 @@ public sealed partial class OpenApiService
         foreach (var response in responses.Where(p => p.Key == "default" || p.Key.Length == 3 && p.Key[0] == '2'))
         {
             if (Resolve(response.Value)?["content"] is not JsonObject content) continue;
-            foreach (var media in content.Where(p => p.Key.Equals("application/json", StringComparison.OrdinalIgnoreCase) || p.Key.EndsWith("+json", StringComparison.OrdinalIgnoreCase)))
+            foreach (var media in content.Where(p => ResponseMediaTypeOf(p.Key) is { } type
+                && (type.Equals("application/json", StringComparison.OrdinalIgnoreCase) || type.EndsWith("+json", StringComparison.OrdinalIgnoreCase))))
             {
                 var native = media.Value?["schema"];
                 var location = $"/paths/{Escape(operation.Path)}/{operation.Method.ToLowerInvariant()}/responses/{Escape(response.Key)}/content/{Escape(media.Key)}/schema";
@@ -340,6 +342,8 @@ public sealed partial class OpenApiService
         }
         return node;
     }
+
+    private static string? ResponseMediaTypeOf(string? value) => MediaTypeHeaderValue.TryParse(value, out var media) ? media.MediaType : null;
 
     private static string SourcePath(JsonNode node)
     {

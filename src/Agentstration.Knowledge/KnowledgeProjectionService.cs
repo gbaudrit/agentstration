@@ -762,6 +762,8 @@ public sealed class KnowledgeProjectionService(
                 MediaType = Optional(entry, "mediaType"),
                 Digest = Optional(entry, "digest"),
                 ContentBase64 = Optional(entry, "contentBase64"),
+                Provenance = entry.TryGetProperty("provenance", out var provenance) && provenance.ValueKind == JsonValueKind.Object
+                    ? provenance.Deserialize<Dictionary<string, string>>(FlowContractJsonOptions) ?? [] : new Dictionary<string, string>(),
                 DataContract = entry.TryGetProperty("dataContract", out var contract) && contract.ValueKind == JsonValueKind.Object ? contract.Deserialize<ResolvedDataContract>(FlowContractJsonOptions) : null
             });
         }

@@ -11,6 +11,70 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public async Task CompositionDiagnosticsIdentifyTheFailingBoundaryWithoutCopyingInputValues()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var union = JsonSerializer.Deserialize<JsonElement>("""{"type":["object","array","string","number","boolean","null"]}""");
+        var child = CompositionChild() with { OutputSchema = union };
+        child = child with { Steps = child.Steps.Select(step => step is OutputFlowStepDefinition output ? output with { Schema = union } : step).ToArray() };
+        await CreatePublishedGraphAsync(fixture, "union-output", child);
+        var parent = await CreatePublishedGraphAsync(fixture, "typed-boundary", CompositionTemplate());
+        var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
+        var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => new FlowCompositionService(fixture.Service).ResolveAsync(template,
+            new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = [new() { Flow = new("union-output"),
+                Parameters = JsonSerializer.SerializeToElement(new { label = "private-instance-value" }) }] }, TestScope.AccessScopeRef, default));
+        Assert.AreEqual("flow_composition_contract_incompatible", error.Code);
+        Assert.IsNotNull(error.CompositionDiagnostic);
+        Assert.AreEqual("prepare", error.CompositionDiagnostic.Point);
+        Assert.AreEqual("output", error.CompositionDiagnostic.Boundary);
+        Assert.AreEqual("1.0.0", error.CompositionDiagnostic.Version);
+        Assert.AreEqual("object|array|string|number|boolean|null", error.CompositionDiagnostic.ActualType);
+        Assert.AreEqual("object", error.CompositionDiagnostic.ExpectedType);
+        Assert.DoesNotContain("private-instance-value", JsonSerializer.Serialize(error.CompositionDiagnostic));
+    }
+
+    [TestMethod]
+    [DataRow(false, false, false)]
+    [DataRow(false, true, false)]
+    [DataRow(true, false, false)]
+    [DataRow(true, true, false)]
+    [DataRow(true, true, true)]
+    public async Task OnlyGovernedBoundaryCallsCanSupplyAnUndeclaredOperationOutputContract(bool direct, bool supplyContract, bool declareIncompatibleOutput)
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var child = CompositionChild() with { OutputSchema = declareIncompatibleOutput ? JsonSerializer.SerializeToElement(new { type = "array" }) : null };
+        child = child with
+        {
+            Steps = [child.Steps.OfType<InputFlowStepDefinition>().Single(),
+                new TransformFlowStepDefinition { Name = "read", Schema = JsonSerializer.SerializeToElement(new { }), Mapping = JsonSerializer.SerializeToElement(new { acquired = true }) },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") }],
+            Transitions = [new("input-read", "input", "completed", "read"), new("read-output", "read", "completed", "output")]
+        };
+        await CreatePublishedGraphAsync(fixture, "dynamic-operation", child);
+        var parent = await CreatePublishedGraphAsync(fixture, "dynamic-boundary", CompositionTemplate());
+        var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
+        var bindings = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+        {
+            ["prepare"] = [new() { Flow = new("dynamic-operation")
+                { OutputSchema = supplyContract ? JsonSerializer.SerializeToElement(new { type = "object" }) : null },
+                PassInputDirectly = direct,
+                Parameters = direct ? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { label = "literal" }) }]
+        };
+        var compiler = new FlowCompositionService(fixture.Service);
+        if (direct && supplyContract && !declareIncompatibleOutput)
+        {
+            var compiled = await compiler.ResolveAsync(template, bindings, TestScope.AccessScopeRef, default);
+            Assert.IsNotNull(compiled.Receipt!.Bindings["prepare"].Single().Flow!.OutputSchema);
+            Assert.IsTrue(compiled.Definition.Graph!.Steps.OfType<TransformFlowStepDefinition>().Any(step => step.Name == "extensions" && step.Schema is not null));
+        }
+        else
+        {
+            var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => compiler.ResolveAsync(template, bindings, TestScope.AccessScopeRef, default));
+            Assert.AreEqual("flow_composition_contract_incompatible", error.Code);
+        }
+    }
+
+    [TestMethod]
     [DataRow(65_537, true)]
     [DataRow(1_048_576, true)]
     [DataRow(1_048_577, false)]
@@ -51,8 +115,8 @@ public sealed partial class FlowTests
         var runs = Service(fixture, new TestFlowRunQueue());
         var input = JsonSerializer.SerializeToElement(new { article = "valid" });
         var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "validation", input, TestScope, default);
-        var gateway = new RuntimeWorkerOperationGateway(null!, null!, null!, null!, null!, null!, null!, null!, runs,
-            TimeProvider.System, null!, NullLogger<RuntimeWorkerOperationGateway>.Instance);
+        var gateway = new RuntimeWorkerOperationGateway(null!, null!, null!, null!, fixture.Repository, null!, null!, null!, runs,
+            TimeProvider.System, new Agentstration.Identity.CurrentRequestContext(), NullLogger<RuntimeWorkerOperationGateway>.Instance);
         var error = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => gateway.CreateOrGetChildFlowAsync(
             TestScope.ScopeRef, TestScope.WorkspaceId, root.Value.Id, "analyze", JsonSerializer.SerializeToElement(new { article = 42 }), "flowCall", null, default));
         Assert.AreEqual("flow_input_type_invalid", error.Code);
@@ -91,7 +155,7 @@ public sealed partial class FlowTests
         var accepted = await compiler.ResolveAsync(template, new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = calls }, TestScope.AccessScopeRef, default);
         var pinned = accepted.Receipt!.Bindings["prepare"];
         Assert.HasCount(2, pinned);
-        Assert.IsTrue(pinned.All(call => call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact && call.Flow.Version == "1.0.0" && call.Flow.ResourceUid is not null && call.Flow.DefinitionHash is not null));
+        Assert.IsTrue(pinned.All(call => call.Flow is { VersionStrategy: FlowCallVersionStrategy.Exact, Version: "1.0.0", ResourceUid: not null, DefinitionHash: not null }));
         var generated = accepted.Definition.Graph!.Steps.OfType<FlowCallStepDefinition>().ToArray();
         Assert.HasCount(2, generated);
         Assert.AreEqual("${input.keepLiteral}", generated[0].CompositionParameters?.GetProperty("label").GetString());
@@ -105,7 +169,7 @@ public sealed partial class FlowTests
         var resumed = await compiler.ResolveAsync(template, accepted.Receipt.Bindings, TestScope.AccessScopeRef, default);
         Assert.AreEqual(accepted.Receipt.ExecutableHash, resumed.Receipt!.ExecutableHash);
         var next = await compiler.ResolveAsync(template, new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = calls }, TestScope.AccessScopeRef, default);
-        Assert.AreEqual("2.0.0", next.Receipt!.Bindings["prepare"][0].Flow.Version);
+        Assert.AreEqual("2.0.0", next.Receipt!.Bindings["prepare"][0].Flow!.Version);
     }
 
     [TestMethod]
@@ -156,6 +220,24 @@ public sealed partial class FlowTests
         Assert.IsFalse(FlowCompositionSchema.IsSupported(JsonSerializer.SerializeToElement(new { type = new[] { "string", "null" } })));
         Assert.IsFalse(FlowCompositionSchema.IsSupported(JsonSerializer.SerializeToElement(new { type = "string", not = new { type = "string" } })));
         Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(JsonSerializer.SerializeToElement(new { type = "string", pattern = "^[a-z]+$" }), JsonSerializer.SerializeToElement("42")));
+    }
+
+    [TestMethod]
+    public void UnconstrainedOutputTargetsAndNativeParameterValuesRetainRuntimeValidation()
+    {
+        var any = JsonSerializer.SerializeToElement(new { });
+        var objectSchema = JsonSerializer.SerializeToElement(new { type = "object" });
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(objectSchema, any));
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(any, any));
+        Assert.IsFalse(FlowCompositionSchema.IsAssignable(any, objectSchema));
+        var openApiObject = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":["object","array","string","number","boolean","null"]},"number":{"type":"integer","format":"int64"}}}""");
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(openApiObject, objectSchema));
+        Assert.IsFalse(FlowCompositionSchema.IsAssignable(openApiObject, JsonSerializer.Deserialize<JsonElement>("""{"type":"object","required":["missing"]}""")));
+        var parameters = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"equals":{}},"required":["equals"],"additionalProperties":false}""");
+        var value = JsonSerializer.SerializeToElement(new { equals = new { active = true } });
+        Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(parameters, value));
+        FlowCompositionSchema.ValidateValue(parameters, value, allowDynamicSchema: true);
+        Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(parameters, any, allowDynamicSchema: true));
     }
 
     private static FlowGraphDefinition CompositionTemplate()

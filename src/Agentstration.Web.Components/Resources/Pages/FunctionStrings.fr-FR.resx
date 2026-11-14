@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Title" xml:space="preserve"><value>Fonctions de transformation</value></data>
+  <data name="Description" xml:space="preserve"><value>Fonctions natives réutilisables avec contrats et versions exacts.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Create" xml:space="preserve"><value>Créer une fonction</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement des fonctions…</value></data>
+  <data name="Kinds" xml:space="preserve"><value>Types de fonctions</value></data>
+  <data name="Functions" xml:space="preserve"><value>Fonctions</value></data>
+  <data name="BuiltIn" xml:space="preserve"><value>Intégré</value></data>
+  <data name="BuiltInHelp" xml:space="preserve"><value>Cette fonction intégrée est provisionnée automatiquement au niveau Instance et gérée par la plateforme. Sa définition est en lecture seule.</value></data>
+  <data name="Empty" xml:space="preserve"><value>Aucune fonction déclarée dans cette portée.</value></data>
+  <data name="EditorHelp" xml:space="preserve"><value>Sélectionnez une implémentation native. Les versions publiées sont immuables.</value></data>
+  <data name="Name" xml:space="preserve"><value>Nom technique</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Nom affiché</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Activée</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Kind" xml:space="preserve"><value>Type de fonction</value></data>
+  <data name="SelectKind" xml:space="preserve"><value>Sélectionner un type</value></data>
+  <data name="Implementation" xml:space="preserve"><value>Implémentation native</value></data>
+  <data name="SelectImplementation" xml:space="preserve"><value>Sélectionner une implémentation</value></data>
+  <data name="InputSchema" xml:space="preserve"><value>Contrat d’entrée</value></data>
+  <data name="OutputSchema" xml:space="preserve"><value>Contrat de sortie</value></data>
+  <data name="ImmutableHelp" xml:space="preserve"><value>Choisissez une nouvelle version pour changer l’implémentation. Les versions existantes restent disponibles.</value></data>
+  <data name="Save" xml:space="preserve"><value>Enregistrer</value></data>
+  <data name="Back" xml:space="preserve"><value>Retour aux fonctions</value></data>
+<data name="Error" xml:space="preserve"><value>Impossible de charger ou d’enregistrer la fonction. Vérifiez sa portée, son implémentation native et sa version immuable.</value></data>
+<data name="Details" xml:space="preserve"><value>Détails techniques</value></data>
+<data name="Enable"><value>Activer</value></data>
+<data name="Disable"><value>Désactiver</value></data>
+  <data name="FunctionDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="Native.json.select.Description" xml:space="preserve"><value>Extrait une valeur JSON au chemin JSON Pointer indiqué. Retourne l’objet, le tableau ou la valeur simple sélectionnée comme une seule valeur. Un chemin vide sélectionne la racine ; un chemin absent provoque un échec.</value></data>
+  <data name="Native.json.project.Description" xml:space="preserve"><value>Construit un objet en sélectionnant et en renommant des propriétés d’une valeur JSON. Chaque paire name/path crée une propriété de sortie. Les tableaux sélectionnés restent des tableaux dans cet objet.</value></data>
+  <data name="Native.collection.filter.Description" xml:space="preserve"><value>Conserve les éléments du tableau dont la valeur au chemin JSON Pointer est égale à la valeur JSON fournie. Préserve l’ordre d’entrée. Un chemin vide compare les éléments entiers ; un chemin absent provoque un échec.</value></data>
+  <data name="Native.collection.distinct.Description" xml:space="preserve"><value>Supprime les doublons du tableau en utilisant comme clé la valeur au chemin JSON Pointer indiqué. Conserve la première occurrence et l’ordre d’entrée. Un chemin vide compare les éléments entiers.</value></data>
+  <data name="Native.artifact.explode.Description" xml:space="preserve"><value>Lit le contenu JSON des artefacts et prépare un artefact publiable par élément de tableau ou valeur d’objet au chemin JSON Pointer indiqué. Attend un manifeste d’artefacts ou un objet contenant une propriété content. arrayItems conserve l’ordre du tableau ; objectValues trie les noms des propriétés. Le stockage intervient ensuite dans le pipeline de publication. itemSchema valide chaque enfant ; maximumOutputs vaut 100 par défaut.</value></data>
+  <data name="JsonPointerRootHelp" xml:space="preserve"><value>Un chemin JSON Pointer vide ("") sélectionne la racine JSON. Le bouton « Utiliser un texte vide » permet d’enregistrer explicitement cette valeur.</value></data>
+</root>

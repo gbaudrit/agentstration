@@ -30,7 +30,8 @@ public partial class FlowDesigner
             "router" => new RouterFlowStepDefinition { Name = name, DisplayName = "Router" },
             "condition" => new ConditionFlowStepDefinition { Name = name, DisplayName = "Condition", Left = "${input.prompt}", Right = "" },
             "composition" => new FlowCompositionPointStepDefinition { Name = name, Point = name, DisplayName = T("Step.composition"), InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
-            "artifactTransform" => new ArtifactTransformFlowStepDefinition { Name = name, DisplayName = T("Step.artifactTransform"),
+            "foreach" => new ForeachFlowStepDefinition { Name = name, DisplayName = T("Step.foreach"), ItemsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
+            "foreachArtifacts" => new ForeachArtifactsFlowStepDefinition { Name = name, DisplayName = T("Step.foreachArtifacts"),
                 ArtifactsMapping = JsonSerializer.SerializeToElement("${transition.output}") },
             "transform" => new TransformFlowStepDefinition { Name = name, DisplayName = "Transform", Mapping = JsonSerializer.SerializeToElement(new { }) },
             "output" => new OutputFlowStepDefinition { Name = name, DisplayName = "Output", OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
@@ -44,7 +45,7 @@ public partial class FlowDesigner
         }
         var errorEvent = step switch
         {
-            AgentFlowStepDefinition or ToolFlowStepDefinition or ArtifactTransformFlowStepDefinition => "error",
+            AgentFlowStepDefinition or ToolFlowStepDefinition or ForeachArtifactsFlowStepDefinition or ForeachFlowStepDefinition => "error",
             FlowCallStepDefinition selectedCall => ResolveFlowVersion(selectedCall, callVersions ?? [])?.NamedOutputs
                 .FirstOrDefault(output => output.Outcome == FlowOutputOutcome.Error)?.Name,
             _ => null

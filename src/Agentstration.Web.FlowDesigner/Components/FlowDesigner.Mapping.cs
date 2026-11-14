@@ -18,7 +18,7 @@ public partial class FlowDesigner
             if (name == SelectedStep.Name || !ancestors.Add(name)) continue;
             foreach (var edge in graph.Transitions.Where(edge => edge.ToStep == name)) queue.Enqueue(edge.FromStep);
         }
-        foreach (var owner in graph.Steps.OfType<ArtifactTransformFlowStepDefinition>().Where(owner => ancestors.Contains(owner.Name)))
+        foreach (var owner in graph.Steps.OfType<ForeachArtifactsFlowStepDefinition>().Where(owner => ancestors.Contains(owner.Name)))
         {
             try
             {

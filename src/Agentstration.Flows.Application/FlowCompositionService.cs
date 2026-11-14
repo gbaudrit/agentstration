@@ -16,16 +16,19 @@ public sealed class FlowCompositionService(FlowService flows)
     public async Task<CompiledFlowComposition> ResolveAsync(FlowVersion template,
         IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, ResourceScopeRef consumer, CancellationToken ct)
     {
+        var templateHash = template.DefinitionHash ?? (template.Graph is { } templateGraph ? FlowDefinitionHash.Compute(templateGraph) : FlowDefinitionHash.Compute(template.Definition));
+        template = await flows.CompileFunctionsAsync(template, consumer, ct);
         var points = template.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().ToArray() ?? [];
         if (points.Length == 0)
         {
             if (bindings.Count != 0) throw Error("flow_composition_point_unknown");
-            return new(template, null);
+            return new(template, (template.DefinitionHash ?? templateHash) == templateHash ? null : new(templateHash, template.DefinitionHash!, new Dictionary<string, IReadOnlyList<FlowCompositionCall>>()));
         }
         if (points.Select(p => p.Point).Distinct(StringComparer.Ordinal).Count() != points.Length
             || bindings.Keys.Any(name => !points.Any(point => point.Point == name))) throw Error("flow_composition_point_unknown");
         var selected = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(StringComparer.Ordinal);
         var replacements = new Dictionary<string, IReadOnlyList<FlowStepDefinition>>(StringComparer.Ordinal);
+        var producedSchemas = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var addedTransitions = new List<FlowTransitionDefinition>();
         var total = 0;
         foreach (var point in points)
@@ -38,10 +41,50 @@ public sealed class FlowCompositionService(FlowService flows)
             var nodes = new List<FlowStepDefinition>();
             var previousSchema = point.InputSchema;
             var mapping = point.InputMapping ?? JsonSerializer.SerializeToElement("${transition.output}");
+            // Keep guarantees already established by an earlier governed point. A generic JSON
+            // boundary must not erase the Operation contract before a typed transformation Flow.
+            if (IsUnconstrained(previousSchema) && mapping.ValueKind == JsonValueKind.String
+                && mapping.GetString() is { } referenceMapping && referenceMapping.StartsWith("${steps.", StringComparison.Ordinal)
+                && referenceMapping.EndsWith(".output}", StringComparison.Ordinal)
+                && producedSchemas.TryGetValue(referenceMapping[8..^8], out var produced)) previousSchema = produced;
             foreach (var call in configured)
             {
                 if (call.Parameters.ValueKind != JsonValueKind.Object || call.Parameters.GetRawText().Length > FlowCompositionSchema.MaximumParametersLength) throw Error("flow_composition_parameters_invalid");
-                var child = await ResolveCallAsync(call.Flow, consumer, template.FlowId.Namespace, ct);
+                if (call.Function is { } functionReference)
+                {
+                    if (call.Flow is not null || call.PassInputDirectly || call.Parameters.TryGetProperty("value", out _)) throw Error("flow_composition_function_ambiguous");
+                    var function = await flows.ResolveFunctionAsync(functionReference with { Namespace = functionReference.Namespace ?? template.FlowId.Namespace }, consumer, ct);
+                    JsonElement arguments;
+                    JsonElement? functionParameters = null;
+                    if (function.InputSchema.TryGetProperty("properties", out var functionProperties) && functionProperties.TryGetProperty("value", out var functionValue))
+                    {
+                        if (!FunctionValueCompatible(previousSchema, functionValue)) throw Error("flow_composition_function_input_incompatible");
+                        FlowCompositionSchema.ValidateValue(Agentstration.Functions.Contracts.FunctionInvocationSchemas.Parameters(function.InputSchema), call.Parameters, allowDynamicSchema: true);
+                        arguments = JsonSerializer.SerializeToElement(new { value = mapping.Clone() });
+                        functionParameters = call.Parameters.Clone();
+                    }
+                    else
+                    {
+                        if (call.Parameters.EnumerateObject().Any() || !FunctionValueCompatible(previousSchema, function.InputSchema)) throw Error("flow_composition_contract_incompatible");
+                        arguments = mapping.Clone();
+                    }
+                    var functionName = $"cp-{Hash(point.Name)[..12]}-{calls.Count + 1:D2}";
+                    if (template.Graph!.Steps.Any(step => step.Name == functionName)) throw Error("flow_composition_step_conflict");
+                    calls.Add(call with { Function = function.Reference, Parameters = call.Parameters.Clone() });
+                    nodes.Add(FlowService.FunctionStep(functionName, function, arguments, point.DisplayName, parameters: functionParameters));
+                    addedTransitions.Add(new($"{functionName}-next", functionName, "success", point.Name));
+                    if (nodes.Count > 1)
+                    {
+                        var priorName = nodes[^2].Name;
+                        var priorIndex = addedTransitions.FindIndex(t => t.FromStep == priorName);
+                        addedTransitions[priorIndex] = addedTransitions[priorIndex] with { ToStep = functionName };
+                    }
+                    mapping = JsonSerializer.SerializeToElement("${steps." + functionName + ".output}");
+                    previousSchema = function.OutputSchema;
+                    continue;
+                }
+                var reference = call.Flow ?? throw Error("flow_composition_target_required");
+                var child = await ResolveCallAsync(reference, consumer, template.FlowId.Namespace, ct);
                 await RejectCyclesAsync(child, consumer, [Key(template)], 0, ct);
                 if (child.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().Any(p => !p.AllowEmpty) == true)
                     throw Error("flow_composition_child_binding_required");
@@ -51,23 +94,30 @@ public sealed class FlowCompositionService(FlowService flows)
                 {
                     if (call.Parameters.EnumerateObject().Any()) throw Error("flow_composition_parameters_invalid");
                     if (!previousSchema.TryGetProperty("type", out var sourceType) || !inputSchema.TryGetProperty("type", out var targetType)
-                        || !JsonElement.DeepEquals(sourceType, targetType)) throw Error("flow_composition_contract_incompatible");
+                        || !JsonElement.DeepEquals(sourceType, targetType)) throw Incompatible(template, point, "flowInput", previousSchema, inputSchema);
                     input = mapping.Clone();
                 }
                 else
                 {
                     if (!inputSchema.TryGetProperty("properties", out var properties) || !properties.TryGetProperty("value", out var value)
-                        || !properties.TryGetProperty("parameters", out var parameters)
-                        || !FlowCompositionSchema.IsAssignable(previousSchema, value)) throw Error("flow_composition_contract_incompatible");
+                        || !properties.TryGetProperty("parameters", out var parameters)) throw Incompatible(template, point, "flowInputEnvelope", previousSchema, inputSchema);
+                    if (!FlowCompositionSchema.IsAssignable(previousSchema, value)) throw Incompatible(template, point, "flowInput", previousSchema, value);
                     FlowCompositionSchema.ValidateValue(parameters, call.Parameters);
                     input = mapping.Clone();
                 }
                 var outputs = child.Graph!.GetOutputs().Where(output => output.Outcome == FlowOutputOutcome.Success).ToArray();
-                if (outputs.Length != 1 || outputs[0].Schema is not { } outputSchema) throw Error("flow_composition_output_ambiguous");
+                if (outputs.Length != 1) throw Error("flow_composition_output_ambiguous");
+                // Dynamic acquisition adapters infer only the generic acquisition Tool contract.
+                // Use the governed Operation contract unless the adapter explicitly declares one.
+                // Ordinary transformation Flows still use their own resolved output schema.
+                var declaredOutput = child.Graph.Steps.OfType<OutputFlowStepDefinition>()
+                    .Single(output => output.Name == outputs[0].Name).Schema ?? child.Graph.OutputSchema;
+                var outputSchema = (call.PassInputDirectly && (declaredOutput is null || IsUnconstrained(declaredOutput.Value)) ? reference.OutputSchema : null) ?? outputs[0].Schema
+                    ?? throw Error("flow_composition_output_ambiguous");
                 var resource = await flows.GetExactAsync(child.ScopeRef, child.FlowId, ct) ?? throw Error("flow_composition_child_unavailable");
                 var exact = call with
                 {
-                    Flow = call.Flow with
+                    Flow = reference with
                     {
                         VersionStrategy = FlowCallVersionStrategy.Exact,
                         Version = child.Version,
@@ -102,7 +152,8 @@ public sealed class FlowCompositionService(FlowService flows)
                 mapping = JsonSerializer.SerializeToElement("${steps." + name + ".output}");
                 previousSchema = outputSchema;
             }
-            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Error("flow_composition_contract_incompatible");
+            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
+            producedSchemas[point.Name] = IsUnconstrained(point.OutputSchema) ? previousSchema.Clone() : point.OutputSchema.Clone();
             nodes.Add(new TransformFlowStepDefinition
             {
                 Name = point.Name,
@@ -124,8 +175,37 @@ public sealed class FlowCompositionService(FlowService flows)
         };
         var hash = FlowDefinitionHash.Compute(graph);
         return new(template with { Graph = graph, DefinitionHash = hash },
-            new(template.DefinitionHash ?? FlowDefinitionHash.Compute(template.Graph), hash, selected));
+            new(templateHash, hash, selected));
     }
+    // Function value constraints are checked on the actual value by the authority. Check known structure here.
+    private static bool FunctionValueCompatible(JsonElement output, JsonElement input)
+    {
+        if (IsUnconstrained(output) || IsUnconstrained(input)) return true;
+        if (input.TryGetProperty("anyOf", out var alternatives)) return alternatives.EnumerateArray().Any(candidate => FunctionValueCompatible(output, candidate));
+        if (!output.TryGetProperty("type", out var actual) || !input.TryGetProperty("type", out var expected)) return false;
+        if (actual.ValueKind != JsonValueKind.String || expected.ValueKind != JsonValueKind.String) return false;
+        if (!JsonElement.DeepEquals(actual, expected)) return actual.GetString() == "integer" && expected.GetString() == "number";
+        if (expected.GetString() == "array" && input.TryGetProperty("items", out var items))
+            return output.TryGetProperty("items", out var produced) && FunctionValueCompatible(produced, items);
+        if (expected.GetString() != "object") return true;
+        var guaranteed = output.TryGetProperty("required", out var requiredOutput) ? requiredOutput.EnumerateArray().Select(value => value.GetString()).ToHashSet(StringComparer.Ordinal) : [];
+        if (input.TryGetProperty("required", out var requiredInput) && requiredInput.EnumerateArray().Any(value => !guaranteed.Contains(value.GetString()))) return false;
+        if (input.TryGetProperty("properties", out var properties) && output.TryGetProperty("properties", out var available))
+            foreach (var property in properties.EnumerateObject())
+                if (available.TryGetProperty(property.Name, out var source) && !FunctionValueCompatible(source, property.Value)) return false;
+        return true;
+    }
+
+    private static bool IsUnconstrained(JsonElement schema)
+    {
+        if (schema.ValueKind != JsonValueKind.Object) return false;
+        if (!schema.EnumerateObject().Any()) return true;
+        if (schema.EnumerateObject().Any(property => property.Name is not ("type" or "title" or "description" or "$schema" or "default" or "examples"))
+            || !schema.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.Array) return false;
+        var types = type.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()).ToHashSet(StringComparer.Ordinal);
+        return new[] { "object", "array", "string", "number", "boolean", "null" }.All(types.Contains);
+    }
+
     public async Task<FlowVersion> ResolveCallAsync(FlowCallReference reference, ResourceScopeRef consumer,
         ResourceNamespace ownerNamespace, CancellationToken ct)
     {
@@ -160,5 +240,18 @@ public sealed class FlowCompositionService(FlowService flows)
     }
     private static string Key(FlowVersion flow) => $"{flow.ScopeRef.Value}/{flow.FlowId}/{flow.Version}";
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    private static FlowValidationException Incompatible(FlowVersion template, FlowCompositionPointStepDefinition point,
+        string boundary, JsonElement actual, JsonElement expected) => new("flow_composition_contract_incompatible", "The configured Flow composition contracts are incompatible.")
+    { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
+    private static string TypeName(JsonElement schema)
+    {
+        if (schema.ValueKind != JsonValueKind.Object) return "unknown";
+        if (!schema.EnumerateObject().Any()) return "any";
+        if (!schema.TryGetProperty("type", out var type)) return "unspecified";
+        var names = type.ValueKind == JsonValueKind.Array ? type.EnumerateArray().ToArray() : [type];
+        var safe = names.Where(value => value.ValueKind == JsonValueKind.String
+            && value.GetString() is "object" or "array" or "string" or "number" or "integer" or "boolean" or "null").Select(value => value.GetString()).Take(7).ToArray();
+        return safe.Length == 0 ? "unknown" : string.Join('|', safe);
+    }
     private static FlowValidationException Error(string code) => new(code, "The configured Flow composition is unavailable, incompatible or exceeds its limits.");
 }

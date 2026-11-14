@@ -143,7 +143,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
             {
                 EntryStep = "input",
                 Steps = [new InputFlowStepDefinition { Name = "input" },
-                    new ArtifactTransformFlowStepDefinition { Name = "process", Mode = mode, OutputContract = new() { Schema = JsonSerializer.SerializeToElement(new { type = "string" }), MediaType = "text/plain" } },
+                    new ForeachArtifactsFlowStepDefinition { Name = "process", Mode = mode, OutputContract = new() { Schema = JsonSerializer.SerializeToElement(new { type = "string" }), MediaType = "text/plain" } },
                     new AgentFlowStepDefinition { Name = "anonymize", Agent = new(processingAgent, ScopeRef: ownerScope),
                         InputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
@@ -159,7 +159,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 var generic = new ToolFlowStepDefinition { Name = "anonymize", Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                     ArgumentsMapping = JsonSerializer.SerializeToElement(mode == ArtifactProcessingMode.Content
                         ? (object)"${input}" : new { text = "${steps.read.output.content}", language = "fr" }) };
-                var processing = (ArtifactTransformFlowStepDefinition)graph.Steps.Single(step => step.Name == "process");
+                var processing = (ForeachArtifactsFlowStepDefinition)graph.Steps.Single(step => step.Name == "process");
                 var body = mode == ArtifactProcessingMode.Content
                     ? new FlowStepDefinition[] { generic }
                     : [new ToolFlowStepDefinition { Name = "read", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.input_read"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance) },

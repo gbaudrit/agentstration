@@ -1,0 +1,109 @@
+@page "/transformation-functions/{Name}"
+@implements IDisposable
+@using Agentstration.Functions.Abstractions
+@using Agentstration.Functions.Contracts
+@inject ITransformationFunctionsClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("EditorHelp")" TestId="transformation-function-editor" />
+@if (original?.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <p role="note">@T("BuiltInHelp")</p> }
+@if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    <form class="panel form-section" @onsubmit="SaveAsync" @onsubmit:preventDefault @formname="transformation-function">
+        <fieldset disabled="@(!CanEdit || busy || !interactive)">
+            <label>@T("Name")<input @bind="technicalName" disabled="@(original is not null)" required data-testid="function-name" /></label>
+            <label>@T("DisplayName")<input @bind="displayName" required /></label>
+            @if (original?.Governance.Origin.Kind != ResourceOriginKind.BuiltIn)
+            { <label>@T("FunctionDescription")<textarea @bind="description" maxlength="4000" data-testid="function-description-input"></textarea></label> }
+            <label>@T("Enabled")<input type="checkbox" @bind="enabled" /></label>
+            <label>@T("Version")<input @bind="version" required /></label>
+            <label>@T("Kind")<select @bind="kindKey" data-testid="function-kind">
+                <option value="">@T("SelectKind")</option>
+                @foreach (var kind in kinds) { @foreach (var descriptor in kind.Definition.Versions) { <option value="@KindKey(kind, descriptor.Version)">@kind.Definition.DisplayName · @descriptor.Version</option> } }
+            </select></label>
+            <label>@T("Implementation")<select @bind="implementationKey" data-testid="function-implementation">
+                <option value="">@T("SelectImplementation")</option>
+                @foreach (var implementation in implementations) { <option value="@ImplementationKey(implementation)">@implementation.Id · @implementation.Version</option> }
+            </select></label>
+            @if (Selected is { } selected)
+            {
+                <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" />
+                <h2>@T("InputSchema")</h2><SchemaDocumentEditor Value="selected.InputSchema" ReadOnly="true" />
+                <h2>@T("OutputSchema")</h2><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" />
+            }
+            <p>@T("ImmutableHelp")</p>
+            <div class="form-actions"><button type="submit" class="button-primary" disabled="@(Selected is null || string.IsNullOrEmpty(kindKey))" data-testid="function-save">@T("Save")</button><a href="@ScopedUri("/transformation-functions")">@T("Back")</a></div>
+        </fieldset>
+    </form>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = "new";
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<FunctionKindResource> kinds = [];
+    private IReadOnlyList<NativeFunctionDescriptor> implementations = [];
+    private TransformationFunctionResource? original;
+    private string? etag;
+    private string technicalName = string.Empty, displayName = string.Empty, description = string.Empty, version = "1.0.0", kindKey = string.Empty, implementationKey = string.Empty;
+    private bool enabled = true, loading = true, busy, interactive;
+    private Exception? error;
+    private ResourceScopeRef? Owner => ScopeRef is null ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
+    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || !original.Governance.IsManaged && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
+    private NativeFunctionDescriptor? Selected => implementations.FirstOrDefault(item => ImplementationKey(item) == implementationKey);
+    private string T(string key) => Localizer[key];
+    private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
+    private static string KindKey(FunctionKindResource kind, string value) => $"{kind.ScopeRef}|{kind.Namespace}|{kind.Name}|{value}";
+    private static string ImplementationKey(NativeFunctionDescriptor value) => value.Id + "@" + value.Version;
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; error = null; original = null; etag = null;
+        technicalName = string.Empty; displayName = string.Empty; description = string.Empty; version = "1.0.0"; kindKey = string.Empty; implementationKey = string.Empty; enabled = true;
+        try
+        {
+            kinds = await Client.ListKindsAsync(Owner, cancellation.Token);
+            implementations = await Client.ImplementationsAsync(cancellation.Token);
+            if (Name != "new")
+            {
+                var snapshot = await Client.GetAsync(new(Name, "", Owner, Namespace is null ? null : ResourceNamespace.Parse(Namespace)), cancellation.Token);
+                original = snapshot.Value; etag = snapshot.ETag;
+                technicalName = original.Name; displayName = original.Definition.DisplayName; enabled = original.Definition.Enabled;
+                description = original.Definition.Description ?? string.Empty;
+                var latest = original.Definition.Versions.Last(); version = latest.Version;
+                kindKey = $"{latest.FunctionKind.ScopeRef ?? original.ScopeRef}|{latest.FunctionKind.Namespace ?? original.Namespace}|{latest.FunctionKind.Name}|{latest.FunctionKind.Version}";
+                var implementation = latest.Configuration.GetProperty("implementation");
+                implementationKey = implementation.GetProperty("id").GetString() + "@" + implementation.GetProperty("version").GetString();
+            }
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { loading = false; }
+    }
+    protected override void OnAfterRender(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } }
+    private async Task SaveAsync()
+    {
+        if (!CanEdit || busy || !interactive || Owner is not { } owner || Selected is not { } selected) return;
+        busy = true; error = null;
+        try
+        {
+            var kind = kinds.SelectMany(resource => resource.Definition.Versions.Select(descriptor => (Resource: resource, Version: descriptor)))
+                .Single(item => KindKey(item.Resource, item.Version.Version) == kindKey);
+            var next = new TransformationFunctionVersion(version, new(kind.Resource.Name, kind.Version.Version, kind.Resource.ScopeRef, kind.Resource.Namespace, kind.Resource.Uid, FunctionDigests.Compute(kind.Version)),
+                JsonSerializer.SerializeToElement(new { implementation = new { id = selected.Id, version = selected.Version } }));
+            var versions = original?.Definition.Versions.Where(item => item.Version != version).Append(next).ToArray() ?? [next];
+            var resource = original ?? new TransformationFunctionResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
+                ScopeRef = owner, Metadata = new() { Name = technicalName, Namespace = Namespace is null ? ResourceNamespace.Default : ResourceNamespace.Parse(Namespace) }, Definition = new(displayName, versions) };
+            await Client.SaveAsync(resource with { Definition = new(displayName, versions, enabled) { Description = string.IsNullOrWhiteSpace(description) ? null : description } }, etag, cancellation.Token);
+            Navigation.NavigateTo(ScopedUri("/transformation-functions"));
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { busy = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -74,7 +74,7 @@ public sealed class DataSourceDatasetCompositionService(
             bindings.Add("transformations", definition.Transformations);
         }
         bindings.Add("acquisition", [new() { Flow = new(flow.Name, FlowCallVersionStrategy.Exact, flow.Version, flow.Namespace, flow.ScopeRef)
-            { DefinitionHash = flow.DefinitionHash }, PassInputDirectly = true }]);
+            { DefinitionHash = flow.DefinitionHash, OutputSchema = rawOutput.Clone() }, PassInputDirectly = true }]);
         var root = definition.Orchestration ?? new FlowCallReference("data-source-orchestration-builtin", ScopeRef: ResourceScopeRef.Instance);
         if (accepted?.Composition is { } pinned)
         { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }
@@ -89,7 +89,10 @@ public sealed class DataSourceDatasetCompositionService(
             { OperationFlow = flow, Composition = composed, OperationOutputSchema = rawOutput,
                 OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null) };
         }
-        catch (Exception exception) when (exception is Agentstration.Flows.FlowValidationException or KeyNotFoundException)
+        catch (FlowValidationException exception)
+        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
+            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic }; }
+        catch (KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
@@ -192,6 +195,15 @@ public sealed class DataSourceDatasetCompositionService(
         try { ToolInputSchemaValidator.Validate(schema, value); }
         catch (ToolInputValidationException)
         { throw Invalid("data_source_parameters_invalid", "The value does not satisfy the effective operation schema."); }
+    }
+
+    public static void ValidateOutput(JsonElement schema, JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+            throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
+        try { Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(schema, "dataset-output"), value, "dataset-output"); }
+        catch (Agentstration.Schemas.DataContractException)
+        { throw Invalid("data_source_output_invalid", "The transformed output does not satisfy its accepted output contract."); }
     }
 
     private static JsonElement Schema(JsonElement definition, string property)

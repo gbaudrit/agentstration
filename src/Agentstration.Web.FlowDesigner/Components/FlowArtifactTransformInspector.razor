@@ -55,7 +55,7 @@
 @if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
 
 @code {
-    [Parameter, EditorRequired] public ArtifactTransformFlowStepDefinition Step { get; set; } = default!;
+    [Parameter, EditorRequired] public ForeachArtifactsFlowStepDefinition Step { get; set; } = default!;
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }

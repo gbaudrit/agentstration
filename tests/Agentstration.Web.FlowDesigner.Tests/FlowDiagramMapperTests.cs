@@ -12,7 +12,7 @@ public sealed class FlowDiagramMapperTests
     public void ArtifactProcessingUsesTwoBottomPortsAndKeepsOuterContinuationsOnTheRight()
     {
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
-            new InputFlowStepDefinition { Name = "input" }, new ArtifactTransformFlowStepDefinition { Name = "process" },
+            new InputFlowStepDefinition { Name = "input" }, new ForeachArtifactsFlowStepDefinition { Name = "process" },
             new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
             Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
                 new("return", "body", "completed", "process"), new("done", "process", "completed", "completed")] };

@@ -31,6 +31,7 @@ public partial class FlowDesigner
     private IReadOnlyList<FlowDesignerFlowVersion> flowVersions = [];
     private readonly Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>> flowVersionCatalog = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowDesignerTool> tools = [];
+    private IReadOnlyList<FlowDesignerFunction> functions = [];
     private bool loadingResources = true;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
@@ -180,6 +181,8 @@ public partial class FlowDesigner
             token.ThrowIfCancellationRequested();
             var loadedTools = await Resources.GetToolsAsync(owner, token);
             token.ThrowIfCancellationRequested();
+            var loadedFunctions = await Resources.GetFunctionsAsync(owner, token);
+            token.ThrowIfCancellationRequested();
             var loadedSchemas = await Resources.GetSchemaVersionsAsync(token);
             token.ThrowIfCancellationRequested();
             var versions = loaded.IsReadOnly ? [] : await Resources.GetFlowVersionsAsync(owner, target.Namespace, target.ResourceId, token);
@@ -187,6 +190,7 @@ public partial class FlowDesigner
             agents = routerAgents = loadedAgents;
             flows = loadedFlows;
             tools = loadedTools;
+            functions = loadedFunctions;
             schemaVersions = loadedSchemas;
             flowVersions = [];
             loadingTarget = false;
@@ -501,7 +505,7 @@ public partial class FlowDesigner
         {
             InputFlowStepDefinition input => ResolveSchema(input.SchemaBinding, input.Schema)
                 ?? ResolveSchema(resource.Definition.InputSchemaBinding, resource.Definition.InputSchema),
-            ArtifactTransformFlowStepDefinition => ArtifactTransformContracts.Manifest,
+            ForeachArtifactsFlowStepDefinition => ArtifactTransformContracts.Manifest,
             AgentFlowStepDefinition agent => agent.Agent.OutputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.OutputSchema),
             FlowCompositionPointStepDefinition point => point.OutputSchema,
             TransformFlowStepDefinition transform => ResolveSchema(transform.SchemaBinding, transform.Schema),

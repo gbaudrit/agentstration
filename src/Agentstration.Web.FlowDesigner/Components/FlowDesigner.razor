@@ -217,14 +217,18 @@ else
                                         }
                                         else if (SelectedStep is TransformFlowStepDefinition transform)
                                         {
-                                            <FlowTransformInspector Step="transform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" EffectiveIncomingSchema="EffectiveIncomingSchema"
+                                            <FlowTransformInspector Functions="functions" Step="transform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" EffectiveIncomingSchema="EffectiveIncomingSchema"
                                                 IncomingContractUnavailableText="@IncomingContractUnavailableText()" SchemaVersions="schemaVersions"
                                                 UpdateTransformMappingAsync="UpdateTransformMappingAsync" UpdateTransformSchemaBindingAsync="UpdateTransformSchemaBindingAsync"
                                                 ValidateSchemaDefinitionAsync="ValidateSchemaDefinitionAsync" ValidateSchemaInstanceAsync="ValidateSchemaInstanceAsync" />
                                         }
-                                        else if (SelectedStep is ArtifactTransformFlowStepDefinition artifactTransform)
+                                        else if (SelectedStep is ForeachFlowStepDefinition iteration)
                                         {
-                                            <FlowArtifactTransformInspector Step="artifactTransform" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />
+                                            <FlowForeachInspector Step="iteration" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />
+                                        }
+                                        else if (SelectedStep is ForeachArtifactsFlowStepDefinition foreachArtifacts)
+                                        {
+                                            <FlowArtifactTransformInspector Step="foreachArtifacts" ActiveTab="activeStepSettingsTab" ReadOnly="ReadOnly" Changed="UpdateSelectedAsync" />
                                         }
                                         else if (SelectedStep is FlowCompositionPointStepDefinition point)
                                         {
@@ -244,11 +248,11 @@ else
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="adjustments" /><h3>@T("NoStepConfiguration")</h3><p class="muted">@T("NoStepConfigurationHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ArtifactTransformFlowStepDefinition and not OutputFlowStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Input && SelectedStep is not InputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ForeachFlowStepDefinition and not ForeachArtifactsFlowStepDefinition and not OutputFlowStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-to-right" /><h3>@T("NoInputContract")</h3><p class="muted">@T("NoInputContractHelp")</p></div>
                                         }
-                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ArtifactTransformFlowStepDefinition)
+                                        @if (activeStepSettingsTab == FlowStepSettingsTab.Output && SelectedStep is not InputFlowStepDefinition and not OutputFlowStepDefinition and not FlowCallStepDefinition and not ToolFlowStepDefinition and not TransformFlowStepDefinition and not FlowCompositionPointStepDefinition and not AgentFlowStepDefinition and not ForeachFlowStepDefinition and not ForeachArtifactsFlowStepDefinition)
                                         {
                                             <div class="step-settings-empty"><UiIcon Name="arrow-bar-left" /><h3>@T("NoOutputContract")</h3><p class="muted">@T("NoOutputContractHelp")</p></div>
                                         }

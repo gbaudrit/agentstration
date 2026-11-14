@@ -136,9 +136,11 @@
   <data name="DatasetNoContent" xml:space="preserve"><value>No acquired content is available yet. Start an acquisition, then refresh its history.</value></data>
   <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition to read</value></data>
   <data name="DatasetYamlHelp" xml:space="preserve"><value>Read-only manifest of the saved Data Source. Use the Definition tab to edit its configuration.</value></data>
-  <data name="SequenceHelp" xml:space="preserve"><value>Flows run in order. Each receives the previous result as value and its saved parameters. Only compatible published versions can be saved.</value></data>
+  <data name="SequenceHelp" xml:space="preserve"><value>Functions and Flows run in order. Each receives the previous result and its saved parameters. Only compatible versions can be saved.</value></data>
   <data name="SequenceIdentity" xml:space="preserve"><value>No transformation: preserve the input.</value></data>
   <data name="SequenceUnavailable" xml:space="preserve"><value>The published Flow or its dependencies could not be loaded.</value></data>
+  <data name="SequenceInvalid" xml:space="preserve"><value>The transformation sequence could not be saved. Check that the selected versions are available and their input, parameter and output contracts are compatible.</value></data>
+  <data name="CompositionValidationReason" xml:space="preserve"><value>Composition validation:</value></data>
   <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
   <data name="SequenceFlow" xml:space="preserve"><value>Published Flow version</value></data>
   <data name="SequenceUp" xml:space="preserve"><value>Move up</value></data>
@@ -189,6 +191,8 @@
   <data name="DatasetDocumentHelp" xml:space="preserve"><value>Each acquired JSON object is retained in an immutable publication. Use a transformation Flow to normalize other result shapes.</value></data>
   <data name="DatasetDocumentRequired" xml:space="preserve"><value>Select an enabled collection allowing read, query and immutable publication. If none is available, configure one on the Storage.</value></data>
   <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
+  <data name="SequenceFunction" xml:space="preserve"><value>Function and version</value></data>
+  <data name="SequenceAddFunction" xml:space="preserve"><value>Add a function</value></data>
   <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Adopted operation response schema</value></data>
   <data name="ProjectedOutputSchema" xml:space="preserve"><value>Adopted projection output schema</value></data>
   <data name="Documents.QueryTitle" xml:space="preserve"><value>Query acquired documents</value></data>

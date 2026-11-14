@@ -75,4 +75,6 @@
   <data name="EnterValue"><value>Enter a value.</value></data>
   <data name="UseEmptyString"><value>Use empty text</value></data>
   <data name="UseEmptyStringFor"><value>Use empty text for {0}</value></data>
+  <data name="RequiredEmptyStringMarker" xml:space="preserve"><value>(required property; empty allowed)</value></data>
+  <data name="Rule.RequiredEmptyString" xml:space="preserve"><value>This property must be present. An empty string is a valid value.</value></data>
 </root>

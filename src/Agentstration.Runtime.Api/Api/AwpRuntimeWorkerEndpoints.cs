@@ -877,5 +877,5 @@ public static class AwpRuntimeWorkerEndpoints
 
     private static IResult Problem(int status, string code, string message, DataContractFailure? contractFailure = null) =>
         Results.Problem(statusCode: status, title: message,
-            extensions: new Dictionary<string, object?> { ["code"] = code, ["contractFailure"] = contractFailure });
+            extensions: new Dictionary<string, object?> { ["code"] = code, ["errorCode"] = code, ["contractFailure"] = contractFailure });
 }

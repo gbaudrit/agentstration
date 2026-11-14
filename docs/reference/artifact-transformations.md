@@ -1,9 +1,9 @@
-# Transform Artifact content in a Flow
+# Process Artifact content in a Flow
 
-The `artifactTransform` step processes an ordered list of Artifacts. The existing
+The `foreachArtifacts` step processes an ordered list of Artifacts. The existing
 `transform` step continues to map JSON values without loading stored files.
 
-In the Designer, add **Transform artifact(s)**. Connect the ordinary input to the
+In the Designer, add **For each Artifact**. Connect the ordinary input to the
 step, connect its **process** output to the processing steps, and return their
 successful result to the bottom **Processing result** port. Connect **completed**
 to the next outer step and **error** to an error output. Processing may include
@@ -53,6 +53,12 @@ A processing Tool then receives `{ "text": "...", "language": "fr" }`. If it ret
 `"${input.redacted}"`. Empty result mapping captures the entire successful result.
 An Agent can return text directly. JSON output must be valid JSON; Markdown code
 fences are not parsed. Empty output name/media type preserves the input values.
+
+To produce several Artifacts from one JSON document, a Transform step can call
+the native `artifact.explode` function and return its manifest to the processing
+result connector. All children are validated before any output is registered.
+See [Native transformation functions](transformation-functions.md) for paths,
+item contracts and bounds.
 
 Content mode defaults to 65,536 input bytes; its configurable maximum is 1 MiB.
 Oversized content fails explicitly. PDF, images and other binary formats require
@@ -270,7 +276,7 @@ wraps the business schema under `structuredContent` and validation checks that
 nested content. Internal Tools keep their ordinary result shape. The platform
 does not rewrite external Tool declarations or unwrap their execution results.
 
-The `artifactTransform` input port describes the reference envelope: an Artifact
+The `foreachArtifacts` input port describes the reference envelope: an Artifact
 list, an `{ artifacts: [...] }` manifest, or the composition `{ value, parameters }`
 wrapper. Its completed port returns a manifest. These structural contracts are
 separate from each Artifact's content schema and MIME type; heterogeneous input
@@ -337,7 +343,7 @@ New transformation templates and Output steps forward `${transition.output}`.
 Existing authored mappings remain intact. A mapping such as
 `${steps.transform.output}` still reads the step named `transform`, even after
 its incoming connection changes. If that step has been replaced by
-`artifactTransform`, open the draft's Output settings and select **Use the
+`foreachArtifacts`, open the draft's Output settings and select **Use the
 incoming transition**, or edit the explicit mapping. Published versions stay
 immutable; **Open draft** preserves the namespace, owner scope and navigation
 context while leaving the published view.

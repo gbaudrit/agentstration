@@ -156,7 +156,7 @@
   <data name="CompositionAllowEmpty" xml:space="preserve"><value>Autoriser une séquence vide (identité)</value></data>
   <data name="CompositionHelp" xml:space="preserve"><value>La ressource utilisatrice choisit ici une séquence ordonnée de Flows publiés. Chaque Flow reçoit value et ses paramètres enregistrés.</value></data>
   <data name="InvalidJson" xml:space="preserve"><value>Saisissez un JSON valide.</value></data>
-  <data name="Step.artifactTransform" xml:space="preserve"><value>Transformer les artefacts</value></data>
+  <data name="Step.foreachArtifacts" xml:space="preserve"><value>Pour chaque artefact</value></data>
   <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Reliez process aux étapes de votre traitement, puis leur résultat à cette étape. completed poursuit avec le manifeste des artefacts produits ; error gère un échec du traitement.</value></data>
   <data name="ArtifactProcessingMode" xml:space="preserve"><value>Transmettre l’entrée sous forme de</value></data>
   <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Contenu (texte ou JSON)</value></data>
@@ -236,6 +236,15 @@
   <data name="TransformProcessing.Help" xml:space="preserve"><value>Le mapping d’entrée sélectionne la valeur à découper. Reliez process aux étapes de traitement, puis ramenez leur résultat ici. La sortie est un tableau dans l’ordre des unités.</value></data>
   <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Éléments par lot / caractères par fragment de texte</value></data>
   <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Nombre maximal d’unités</value></data>
+  <data name="Step.foreach" xml:space="preserve"><value>Pour chaque</value></data>
+  <data name="Step.foreach.Description" xml:space="preserve"><value>Exécuter la branche de traitement pour chaque élément d’un tableau.</value></data>
+  <data name="Foreach.Collection" xml:space="preserve"><value>Mapping de la collection</value></data>
+  <data name="Foreach.ItemSchema" xml:space="preserve"><value>Schéma d’entrée d’un élément</value></data>
+  <data name="Foreach.ResultSchema" xml:space="preserve"><value>Schéma de résultat d’un élément</value></data>
+  <data name="Foreach.MaximumItems" xml:space="preserve"><value>Nombre maximal d’éléments</value></data>
+  <data name="Foreach.Help" xml:space="preserve"><value>Reliez Process à une branche puis son résultat au connecteur de retour inférieur. Chaque appel reçoit un élément ; les résultats conservent l’ordre d’entrée.</value></data>
+  <data name="TransformFunction" xml:space="preserve"><value>Fonction de transformation</value></data>
+  <data name="TransformMappingOnly" xml:space="preserve"><value>Mapping JSON</value></data>
   <data name="SubschemaPath" xml:space="preserve"><value>Chemin du sous-schéma (JSON Pointer)</value></data>
   <data name="SubschemaPathHelp" xml:space="preserve"><value>Laisser vide pour le schéma complet. Exemple : /properties/results/items. La version du parent reste épinglée.</value></data>
   <data name="SubschemaUnavailable" xml:space="preserve"><value>Le sous-schéma sélectionné ne peut pas être résolu.</value></data>

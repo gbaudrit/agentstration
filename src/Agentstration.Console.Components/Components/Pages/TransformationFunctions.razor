@@ -1,0 +1,83 @@
+@page "/transformation-functions"
+@page "/function-kinds"
+@implements IDisposable
+@using Agentstration.Functions.Contracts
+@inject ITransformationFunctionsClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="transformation-functions">
+    <Actions><button type="button" class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button>
+    @if (Context.HasPermission("resources/write")) { <a class="button-primary" href="@ScopedUri("/transformation-functions/new")">@T("Create")</a> }</Actions>
+</PageHeader>
+@if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    <section class="panel form-section">
+        <h2>@T("Kinds")</h2>
+        @foreach (var kind in kinds)
+        {
+            <details><summary>@kind.Definition.DisplayName · @kind.ScopeRef</summary>
+                @if (kind.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <span class="status-badge">@T("BuiltIn")</span> }
+                @if (!kind.Governance.IsManaged && ResourceOwnershipContext.CanManage(kind.ScopeRef, Services) && Context.HasPermission("resources/write"))
+                { <button type="button" class="button-secondary" disabled="@loading" @onclick="() => ToggleKindAsync(kind)">@T(kind.Definition.Enabled ? "Disable" : "Enable")</button> }
+                @foreach (var version in kind.Definition.Versions)
+                { <p><code>@version.Version · @version.Executor</code></p><SchemaDocumentEditor Value="version.DefinitionSchema" ReadOnly="true" /> }
+            </details>
+        }
+    </section>
+    <section class="panel form-section">
+        <h2>@T("Functions")</h2>
+        @if (items.Count == 0) { <p>@T("Empty")</p> }
+        @foreach (var item in items)
+        {
+            <article class="form-section" data-testid="transformation-function-row">
+                <a href="@Url(item)">@item.Definition.DisplayName</a><ResourceScopeBadge ScopeRef="item.ScopeRef" />
+                @if (item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <span class="status-badge">@T("BuiltIn")</span> }
+                <p><code>@item.Name · @string.Join(", ", item.Definition.Versions.Select(v => v.Version))</code></p>
+                <FunctionDescription Description="@item.Definition.Description" ImplementationId="@ImplementationId(item)" BuiltIn="@(item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn)" />
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<TransformationFunctionResource> items = [];
+    private IReadOnlyList<FunctionKindResource> kinds = [];
+    private bool loading;
+    private Exception? error;
+    private string T(string key) => Localizer[key];
+    private static string? ImplementationId(TransformationFunctionResource resource) => resource.Definition.Versions.LastOrDefault()?.Configuration is { ValueKind: JsonValueKind.Object } configuration
+        && configuration.TryGetProperty("implementation", out var implementation) && implementation.TryGetProperty("id", out var id)
+        && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+    private ResourceScopeRef? Owner => ResourceOwnershipContext.TryGetCurrent(Services);
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { items = await Client.ListAsync(Owner, cancellation.Token); kinds = await Client.ListKindsAsync(Owner, cancellation.Token); }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { loading = false; }
+    }
+    private async Task ToggleKindAsync(FunctionKindResource kind)
+    {
+        loading = true; error = null;
+        try
+        {
+            var snapshot = await Client.GetKindAsync(new(kind.Name, "", kind.ScopeRef, kind.Namespace), cancellation.Token);
+            await Client.SaveKindAsync(snapshot.Value with { Definition = snapshot.Value.Definition with { Enabled = !snapshot.Value.Definition.Enabled } }, snapshot.ETag, cancellation.Token);
+            await LoadAsync();
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { loading = false; }
+    }
+    private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
+    private string Url(TransformationFunctionResource resource) => ScopedUri("/transformation-functions/" + Uri.EscapeDataString(resource.Name)
+        + "?scopeRef=" + Uri.EscapeDataString(resource.ScopeRef!.Value.Value) + "&namespace=" + Uri.EscapeDataString(resource.Namespace.Value));
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}
