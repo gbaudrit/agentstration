@@ -1,0 +1,143 @@
+@page "/storages/{Name}"
+@implements IDisposable
+@inject IStoragesClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+
+<PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+<PageHeader Title="@(resource?.Definition.DisplayName ?? Name ?? T("Storage"))" Description="@T("Details.Description")" TestId="storage-details">
+    <Actions>
+        <button class="button-secondary" @onclick="LoadAsync" disabled="@busy">@T("Refresh")</button>
+        @if (CanWrite) { <button class="button-secondary" @onclick="() => confirmReconcile = true" disabled="@busy" data-testid="storage-reconcile">@T("Reconcile")</button>@if (resource!.Definition.Enabled) { <button class="button-danger" @onclick="() => confirmDeactivate = true" disabled="@busy" data-testid="storage-deactivate">@T("Deactivate")</button> } }
+        <a class="button-secondary" href="/storages">@T("Back")</a>
+    </Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (!Context.HasPermission("resources/read")) { <p role="alert">@T("Error.Forbidden")</p> }
+else
+{
+    <StorageError Error="error" />
+    @if (resource is not null)
+    {
+        <InheritedResourceNotice OwnerScopeRef="resource.ScopeRef!.Value" />
+        <ResourceTabs Label="@T("DetailsSections")">@foreach (var tab in AvailableTabs) { <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" data-testid="@($"storage-{tab.ToString().ToLowerInvariant()}-tab")" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button> }</ResourceTabs>
+        @if (activeTab == DetailsTab.Overview)
+        {
+            <section class="metric-grid"><MetricCard Label="@T("Availability")" Value="@T($"Availability.{Availability}")" /><MetricCard Label="@T("Generation")" Value="@resource.Generation.ToString()" /><MetricCard Label="@T("Enabled")" Value="@T(resource.Definition.Enabled ? "Yes" : "No")" /><MetricCard Label="@T("Scope")" Value="@T($"ScopeKind.{resource.ScopeRef.Value.Kind}")" /></section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Identity")</h2></div><dl class="details-list storage-evidence">
+                <dt>@T("Scope")</dt><dd><code>@resource.ScopeRef</code></dd>
+                <dt>@T("Uid")</dt><dd><code>@resource.Uid</code></dd><dt>@T("TechnicalName")</dt><dd><code>@resource.Namespace/@resource.Name</code></dd>
+                <dt>@T("Description")</dt><dd>@resource.Definition.Description</dd><dt>@T("Origin")</dt><dd>@T($"Origin.{resource.Governance.Origin.Kind}") · <code>@resource.Governance.Origin.Reference</code></dd>
+                <dt>@T("SavedType")</dt><dd><code>@resource.Definition.Type.Type.ScopeRef/@resource.Definition.Type.Type.Namespace/@resource.Definition.Type.Type.Name</code></dd>
+                <dt>@T("TypeUid")</dt><dd><code>@resource.Definition.Type.TypeUid</code></dd><dt>@T("Version")</dt><dd>@resource.Definition.Type.Version</dd><dt>@T("SchemaDigest")</dt><dd><code>@resource.Definition.Type.SchemaDigest</code></dd><dt>@T("ContractDigest")</dt><dd><code>@resource.Definition.Type.ContractDigest</code></dd>
+            </dl></section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("ExactType")</h2></div>@if (typeChoice is null) { <p role="status">@T("SavedTypeUnavailable")</p> } else { <StorageTypeEvidence Choice="typeChoice" /> }</section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("ConnectedService")</h2></div>
+                @if (resource.Definition.ConnectedService is { } service)
+                {
+                    <dl class="details-list storage-evidence"><dt>@T("SavedService")</dt><dd><a href="@ServiceUrl(service)"><code>@service.Service.ScopeRef/@service.Service.Address</code></a></dd><dt>@T("Uid")</dt><dd><code>@service.ServiceUid</code></dd><dt>@T("Generation")</dt><dd>@service.Generation</dd><dt>@T("ServiceType")</dt><dd><code>@resource.Definition.ConnectedServiceType?.Type.ScopeRef/@resource.Definition.ConnectedServiceType?.Type.Namespace/@resource.Definition.ConnectedServiceType?.Type.Name · @resource.Definition.ConnectedServiceType?.TypeUid · @resource.Definition.ConnectedServiceType?.Version · @resource.Definition.ConnectedServiceType?.SchemaDigest</code></dd></dl>
+                }
+                else { <p>@T("LocalStorage")</p> }
+                <h3>@T("Mappings")</h3>
+                @if (resource.Definition.Bindings.Count == 0) { <p>@T("NoMappings")</p> }
+                else { <DataGrid TItem="StorageExportBinding" Items="resource.Definition.Bindings"><Header><tr><th>@T("Requirement")</th><th>@T("Export")</th><th>@T("ValueType")</th><th>@T("Protection")</th></tr></Header><Row Context="binding"><tr data-testid="storage-mapping"><td><code>@binding.RequirementId</code></td><td><code>@binding.Export.Id</code></td><td>@T($"ValueType.{binding.Export.Type}")</td><td>@T($"Protection.{binding.Export.Protection}")</td></tr></Row></DataGrid> }
+            </section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Configuration")</h2></div><JsonSchemaInputEditor Schema="typeChoice?.Version.ConfigurationSchema" Value="resource.Definition.Configuration" ReadOnly /></section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Envelope")</h2></div><p>@T("Envelope.Help")</p><JsonSchemaInputEditor Schema="typeChoice?.Version.EnvelopeSchema" Value="resource.Definition.Envelope" ReadOnly /></section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Diagnostics")</h2></div>
+                @if (resource.ObservedState is { } state) { <p>@T("ObservedAt"): @state.ObservedAt.ToLocalTime().ToString("g")</p>@foreach (var diagnostic in state.Diagnostics.Take(16)) { <p><code>@diagnostic.Code</code> · @T(StorageErrorKey.For(new AgentstrationApiException(string.Empty, string.Empty, problemTitle: diagnostic.Code)))</p> } }
+                else { <p>@T("NotObserved")</p> }
+            </section>
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("Dependents.Help")</p>
+                @if (usages.Count == 0) { <p>@T("NoDependents")</p> }
+                else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@UsageUrl(usage)">@usage.DisplayName</a><code>@usage.Kind · @usage.Name</code></li> }</ul> }
+                <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="/data-sources">@T("DataSources")</a><a href="/knowledge-sources">@T("KnowledgeSources")</a></nav>
+            </section>
+        }
+        else if (activeTab == DetailsTab.Definition)
+        {
+            @if (CanWrite) { <StorageEditor @key="editorKey" Name="@resource.Name" EmbeddedAddress="StorageLinks.Address(resource)" Embedded="true" Saved="DefinitionSavedAsync" /> }
+            else { <p>@T("ReadOnlyHelp")</p> }
+        }
+        else if (activeTab == DetailsTab.Access && CanManageAccess)
+        {
+            <p class="form-alert form-alert-info" role="note">@T("Type.AccessHelp")</p>
+            <ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace" Kind="@StorageResourceKinds.Storage" Name="@resource.Name" Governance="resource.Governance" EvaluateSavedAccess />
+        }
+        else if (activeTab == DetailsTab.YAML)
+        {
+            <section class="panel form-section"><div class="panel-header"><h2>@T("Tab.YAML")</h2></div><p>@T("Yaml.Help")</p><textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("Yaml.Label")" data-testid="storage-yaml">@ResourceYaml</textarea></section>
+        }
+    }
+}
+<StorageConfirmation IsOpen="confirmReconcile" Title="@T("Reconcile")" Message="@T("Reconcile.Confirm")" ConfirmLabel="@T("Reconcile")" TestId="storage-reconcile-confirmation" OnConfirm="ReconcileAsync" OnCancel="() => confirmReconcile = false" />
+<StorageConfirmation IsOpen="confirmDeactivate" Title="@T("Deactivate")" Message="@T("Deactivate.Confirm")" ConfirmLabel="@T("Deactivate")" TestId="storage-deactivate-confirmation" OnConfirm="DeactivateAsync" OnCancel="() => confirmDeactivate = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private StorageResource? resource;
+    private StorageTypeChoice? typeChoice;
+    private IReadOnlyList<StorageUsage> usages = [];
+    private string? etag, loadedKey;
+    private long editorKey;
+    private bool loading = true, busy, confirmReconcile, confirmDeactivate;
+    private Exception? error;
+    private DetailsTab activeTab;
+    private StorageAvailability Availability => resource?.ObservedState?.Availability ?? StorageAvailability.Unavailable;
+    private bool IsOwnerContext => resource?.ScopeRef?.Value == Context.Current?.SelectedScopeRef;
+    private bool CanWrite => resource is not null && IsOwnerContext && Context.HasPermission("resources/write") && !resource.Governance.IsManaged;
+    private bool CanManageAccess => IsOwnerContext && Context.HasPermission("resources/write");
+    private IReadOnlyList<DetailsTab> AvailableTabs => Enum.GetValues<DetailsTab>().Where(tab => tab != DetailsTab.Access || CanManageAccess).ToArray();
+    private string T(string key) => Localizer[key].Value;
+    private string ResourceYaml => resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(new RawStorage(resource.ApiVersion, resource.Kind, resource.Metadata, resource.ScopeRef, resource.Definition));
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{ScopeRefValue}|{NamespaceValue}|{View}";
+        if (key == loadedKey) return;
+        loadedKey = key;
+        activeTab = Enum.TryParse<DetailsTab>(View, true, out var tab) ? tab : DetailsTab.Overview;
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        loading = true; error = null; resource = null; typeChoice = null; usages = [];
+        try
+        {
+            await Context.EnsureLoadedAsync(cancellation.Token);
+            if (!Context.HasPermission("resources/read")) return;
+            var address = ScopedResourceAddress.Create(ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException("scopeRef")), ResourceNamespace.Parse(NamespaceValue), StorageResourceKinds.Storage, Name!);
+            var snapshot = await Client.GetAsync(address, cancellation.Token);
+            resource = snapshot.Value; etag = snapshot.ETag; editorKey++;
+            var typesTask = Client.GetTypesAsync(ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef), cancellation.Token);
+            var usagesTask = Client.GetUsagesAsync(address, cancellation.Token);
+            await Task.WhenAll(typesTask, usagesTask);
+            typeChoice = (await typesTask).SelectMany(type => type.Definition.Versions.Select(version => new StorageTypeChoice(type, version))).FirstOrDefault(choice => choice.Matches(resource.Definition.Type));
+            usages = await usagesTask;
+            if (!AvailableTabs.Contains(activeTab)) activeTab = DetailsTab.Overview;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private async Task DefinitionSavedAsync() { await LoadAsync(); activeTab = DetailsTab.Definition; }
+    private async Task ReconcileAsync() { confirmReconcile = false; await ExecuteAsync(() => Client.ReconcileAsync(StorageLinks.Address(resource!), new(), etag!, cancellation.Token)); }
+    private async Task DeactivateAsync() { confirmDeactivate = false; await ExecuteAsync(() => Client.DeactivateAsync(StorageLinks.Address(resource!), etag!, cancellation.Token)); }
+    private async Task ExecuteAsync(Func<Task<ResourceSnapshot<StorageResource>>> action)
+    {
+        if (busy || !CanWrite) return;
+        busy = true; error = null;
+        try { var snapshot = await action(); resource = snapshot.Value; etag = snapshot.ETag; editorKey++; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+    private static string ServiceUrl(ConnectedServiceRevisionReference service) => $"/connected-services/{Uri.EscapeDataString(service.Service.Address.Name)}?scopeRef={Uri.EscapeDataString(service.Service.ScopeRef.Value)}";
+    private static string UsageUrl(StorageUsage usage) => usage.Url.StartsWith('/') && !usage.Url.StartsWith("//", StringComparison.Ordinal) && !usage.Url.Contains('\\') ? usage.Url : "#";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed record RawStorage(string ApiVersion, string Kind, ResourceMetadata Metadata, ResourceScopeRef? ScopeRef, StorageProperties Definition);
+    private enum DetailsTab { Overview, Definition, Access, YAML }
+}

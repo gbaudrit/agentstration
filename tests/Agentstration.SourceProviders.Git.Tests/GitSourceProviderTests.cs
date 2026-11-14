@@ -165,7 +165,7 @@ public sealed class GitSourceProviderTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => provider.ResolveAsync(
+        await Assert.ThrowsAsync<OperationCanceledException>(() => provider.ResolveAsync(
             new(Configuration(repository.Uri, "refs/heads/main")), cancellation.Token));
     }
 

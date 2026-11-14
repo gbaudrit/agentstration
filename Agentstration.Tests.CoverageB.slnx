@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/tests/coverage-b/">
+    <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
@@ -15,5 +16,6 @@
     <Project Path="tests/Agentstration.ResourcePlanning.Tests/Agentstration.ResourcePlanning.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.OpenDal.Tests/Agentstration.Extensions.OpenDal.Tests.csproj" />
   </Folder>
 </Solution>

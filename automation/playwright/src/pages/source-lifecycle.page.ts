@@ -91,6 +91,11 @@ export class SourceLifecyclePage {
       .filter({ hasText: acquisition.flowRunId }).getByRole('link').click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
     const summary = this.page.getByTestId(TestIds.sourceLifecycle.runError);
+    const disclosure = summary.getByRole('button', { name: text.showErrorDetails, exact: true });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    await expect(summary).not.toContainText('acquisition_failed');
+    await disclosure.click();
+    await expect(summary.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
     await expect(summary).toContainText('acquisition_failed');
     await expect(summary).toContainText(message);
     await expect(summary).not.toContainText('${transition.output}');
@@ -118,6 +123,9 @@ export class SourceLifecyclePage {
       await expect(inspector).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
     await topology.getByRole('button', { name: /Acquire source content/ }).click();
+    const stepDisclosure = inspector.getByRole('button', { name: text.showErrorDetails, exact: true });
+    await expect(stepDisclosure).toHaveAttribute('aria-expanded', 'false');
+    await stepDisclosure.click();
     await expect(inspector).toContainText(code);
     await expect(inspector).toContainText(message);
     await expect(inspector).toContainText('fetch-failure');
@@ -179,7 +187,7 @@ export class SourceLifecyclePage {
 
     // Optional input failure is visible in provenance while the valid input publishes.
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox').uncheck();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).uncheck();
     await this.saveKnowledge();
     const partial = await this.runProjection(consoleUrl);
     expect(partial.inputIssues).toEqual([expect.objectContaining({ bindingName: 'secondary', code: 'knowledge_projection_acquisition_missing' })]);
@@ -189,7 +197,7 @@ export class SourceLifecyclePage {
 
     const second = await this.acquire(consoleUrl, f.sources[1]);
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox').check();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).check();
     await this.saveKnowledge();
     const aggregate = await this.runProjection(consoleUrl);
     expect(aggregate.inputIssues).toEqual([]);
@@ -233,11 +241,13 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByLabel(text.enabled, { exact: false }).check();
+    await this.page.getByRole('checkbox', { name: text.enabled, exact: false }).check();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
+    await this.fillParameters(TestIds.sourceLifecycle.automaticParameters, { audience: 'operators', includeMetadata: true });
     await this.saveKnowledge();
+    await this.updateKnowledgeDependencies(consoleUrl, text);
     const simple = await this.runProjection(consoleUrl);
     await this.assertProjection(consoleUrl, simple, [first]);
     await this.retrieve(consoleUrl, simple);
@@ -408,10 +418,31 @@ export class SourceLifecyclePage {
     await choose(binding.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource), source);
   }
   private async saveKnowledge(): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave)).toBeEnabled();
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.knowledgeDetails)).toBeVisible();
   }
+  private async updateKnowledgeDependencies(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
+    const before = await this.read<ResourceWire>(consoleUrl, this.knowledgeApi());
+    await this.editKnowledge(consoleUrl);
+    const update = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindDependencies);
+    await expect(update).toHaveText(text.updateDependencies);
+    await update.click();
+    const confirmation = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindConfirmation);
+    await expect(confirmation).toContainText(text.dependencyUpdateHelp);
+    await confirmation.getByRole('button', { name: text.cancel, exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    expect((await this.read<ResourceWire>(consoleUrl, this.knowledgeApi())).generation).toBe(before.generation);
+    await update.click();
+    const confirm = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeRebindConfirm);
+    await expect(confirm).toHaveText(text.confirmDependencyUpdate);
+    await confirm.click();
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.knowledgeDetails)).toBeVisible();
+    await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, this.knowledgeApi())).generation).toBeGreaterThan(before.generation);
+  }
+
   private async editKnowledge(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
   }
@@ -428,8 +459,11 @@ export class SourceLifecyclePage {
     }, { timeout: 90_000 }).toBe(true);
     expect(result.state, result.errorMessage ?? undefined).toBe(4);
     expect(result.snapshotName).toBeTruthy();
-    await this.openKnowledge(consoleUrl, 'projections');
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).locator(`button[title="${result.metadata.name}"]`).click();
+    const completedRow = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionRow).filter({ has: this.page.locator(`button[title="${result.metadata.name}"]`) });
+    await expect(completedRow).toBeVisible();
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toHaveJSProperty('scrollLeft', 0);
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionProgress)).toHaveCount(0);
+    await completedRow.locator(`button[title="${result.metadata.name}"]`).click();
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.projectionProvenance)).toBeVisible();
     return result;
   }
@@ -468,6 +502,9 @@ export class SourceLifecyclePage {
 
   private async retrieve(consoleUrl: string, projection: Projection): Promise<void> {
     await this.openKnowledge(consoleUrl, 'retrieval');
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.nativeFields)).toHaveAttribute('data-interactive', 'true');
+    await this.page.getByTestId(TestIds.sourceLifecycle.retrievalOperation).selectOption('search_regex');
+    await this.page.getByTestId(TestIds.sourceLifecycle.retrievalSnapshot).selectOption(projection.snapshotName!);
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalText).fill('Schema-driven');
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalText).blur();
     await this.page.getByTestId(TestIds.sourceLifecycle.retrievalRun).click();

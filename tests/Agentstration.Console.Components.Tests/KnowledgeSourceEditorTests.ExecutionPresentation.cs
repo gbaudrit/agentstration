@@ -1,0 +1,179 @@
+using System.Text.Json;
+using Agentstration.Flows;
+using Agentstration.Knowledge.Contracts;
+using Agentstration.Resources;
+using Agentstration.Schemas;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.Flows;
+using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Console;
+using Bunit;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Agentstration.Web.Tests;
+
+public sealed partial class KnowledgeSourceEditorTests
+{
+    [TestMethod]
+    [DataRow("en-US", "Transformation before publication · 1")]
+    [DataRow("fr-FR", "Transformation avant publication · 1")]
+    public void ProgressUsesReadableStageNamesAndReportsRootStepCounts(string locale, string expected)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = CreateContext(new KnowledgeClientStub());
+        var run = PresentationRun("root", "orchestration", [new() { StepName = "cp-post", StepType = "transform", Status = FlowStepRunStatus.Running }]);
+        run = run with { DefinitionSnapshot = run.DefinitionSnapshot with { Graph = new() { EntryStep = "cp-post", Steps = [new TransformFlowStepDefinition { Name = "cp-post", DisplayName = "postAggregate 1" }] } } };
+        var rendered = context.Render<ExecutionProgress>(parameters => parameters.Add(value => value.Label, "Working").Add(value => value.Runs, [run])
+            .Add(value => value.CompletedSteps, 3).Add(value => value.TotalSteps, 6).Add(value => value.Elapsed, TimeSpan.FromSeconds(3)));
+        Assert.Contains(expected, rendered.Find(".execution-progress-location").TextContent);
+        Assert.DoesNotContain("postAggregate", rendered.Markup);
+        Assert.AreEqual("3", rendered.Find("progress").GetAttribute("value"));
+        Assert.AreEqual("6", rendered.Find("progress").GetAttribute("max"));
+        Assert.Contains("00:00:03", rendered.Find(".execution-progress-elapsed").TextContent);
+    }
+
+    [TestMethod]
+    public async Task ProgressReadsTheActiveDescendantInTheExactExecutionScopeAndDisplaysItsStep()
+    {
+        using var context = CreateContext(new KnowledgeClientStub());
+        var client = new FlowClientStub();
+        var child = PresentationRun("child", "anonymization", [new() { StepName = "agent", StepType = "agent", Status = FlowStepRunStatus.Running, AgentResourceId = "redactor" }]) with { ParentFlowRunId = "root" };
+        var root = PresentationRun("root", "orchestration", [new() { StepName = "transform", StepType = "flow", Status = FlowStepRunStatus.Running, ChildFlowRunId = "child", ChildFlowRunIds = ["old", "child"] }]);
+        client.Runs[child.Id] = child;
+        var active = await FlowRunInspection.ReadActiveAsync(client, root, default);
+        Assert.HasCount(1, client.RunReads);
+        Assert.AreEqual(root.ExecutionScopeRef, client.RunReads[0].Scope);
+        var rendered = context.Render<ExecutionProgress>(parameters => parameters.Add(value => value.Label, "Working")
+            .Add(value => value.Runs, active).Add(value => value.CompletedSteps, 2).Add(value => value.TotalSteps, 6));
+        Assert.Contains("anonymization · 1.0.0", rendered.Markup);
+        Assert.Contains("redactor", rendered.Markup);
+        Assert.DoesNotContain("orchestration · 1.0.0", rendered.Markup);
+        Assert.Contains("step=agent", rendered.Find("a").GetAttribute("href")!);
+        Assert.AreEqual("_blank", rendered.Find("a").GetAttribute("target"));
+    }
+
+    [TestMethod]
+    public async Task ProgressIgnoresWrongParentOrWrongScopeAndKeepsTheReadableParent()
+    {
+        var client = new FlowClientStub();
+        var root = PresentationRun("root", "orchestration", [new() { StepName = "transform", StepType = "flow", Status = FlowStepRunStatus.Running, ChildFlowRunId = "child" }]);
+        client.Runs["child"] = PresentationRun("child", "hidden", []) with { ParentFlowRunId = "unrelated" };
+        var active = await FlowRunInspection.ReadActiveAsync(client, root, default);
+        Assert.HasCount(1, active);
+        client.Runs["child"] = client.Runs["child"] with { ParentFlowRunId = "root", Scope = FlowRunScope.Instance(Guid.Empty) };
+        active = await FlowRunInspection.ReadActiveAsync(client, root, default);
+        Assert.HasCount(1, active);
+        Assert.AreEqual("transform", FlowRunInspection.ActiveLocations(active).Single().Step!.StepName);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "A valid JSON result was expected")]
+    [DataRow("fr-FR", "Un résultat JSON valide est attendu")]
+    public async Task FailedProjectionShowsLocalizedContractExplanationWithoutTheRawEnglishFailure(string locale, string explanation)
+    {
+        using var culture = new TestCultureScope(locale);
+        var source = ProjectedSource();
+        var client = new KnowledgeClientStub(source);
+        var failed = (await client.StartProjectionAsync(source.Namespace, source.Name, new())).Value with
+        { State = KnowledgeProjectionState.Failed, ErrorCode = "data_contract_json_invalid", ErrorMessage = "Raw English runtime failure" };
+        client.Projections.Clear();
+        client.ProjectionStarter = (_, _) => { client.Projections.Add(failed); return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(failed, "failed")); };
+        await using var context = CreateContext(client);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
+        await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
+        rendered.WaitForAssertion(() => Assert.Contains(explanation, rendered.Markup));
+        Assert.DoesNotContain("Raw English runtime failure", rendered.Markup);
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-summary"));
+        Assert.IsFalse(rendered.Find("[data-testid='knowledge-start-projection']").HasAttribute("disabled"));
+    }
+
+    [TestMethod]
+    public void ContractFailureDistinguishesProducerAndContractOwnerAndKeepsTechnicalDataCollapsed()
+    {
+        using var context = CreateContext(new KnowledgeClientStub());
+        var producer = PresentationRun("agent-run", "anonymization", [new() { StepName = "agent", StepType = "agent", AgentResourceId = "redactor" }]);
+        var owner = PresentationRun("transform-run", "artifact-processing", [new() { StepName = "transform", StepType = "artifactTransform" }]);
+        var failure = new DataContractFailure("agent-output", "flow:transform-run/step:transform/output-media", "$", "json_syntax", "valid JSON", "invalid JSON text", producer.Id, "agent", "data_contract_json_invalid");
+        var rendered = context.Render<ContractFailurePanel>(parameters => parameters.Add(value => value.Details, JsonSerializer.Serialize(failure))
+            .Add(value => value.Run, producer).Add(value => value.RelatedRuns, [producer, owner]));
+        var links = rendered.FindAll("a");
+        Assert.HasCount(2, links);
+        Assert.Contains("anonymization", links[0].TextContent);
+        Assert.Contains("redactor", links[0].TextContent);
+        Assert.Contains("artifact-processing", links[1].TextContent);
+        Assert.Contains("step=transform", links[1].GetAttribute("href")!);
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-summary"));
+        Assert.IsFalse(rendered.Find("details").HasAttribute("open"));
+        rendered.Render(parameters => parameters.Add(value => value.Compact, true));
+        Assert.HasCount(0, rendered.FindAll("details"));
+        Assert.HasCount(2, rendered.FindAll("a"));
+    }
+
+    private static FlowRun PresentationRun(string id, string flow, IReadOnlyList<FlowStepRun> steps) => new()
+    {
+        Id = id, FlowId = new(flow), FlowVersion = "1.0.0", Scope = new(Guid.Empty, new WorkspaceId(FlowClientStub.WorkspaceScope.TargetId!.Value), Guid.Empty) { LogicalScopeRef = ResourceScopeRef.Instance },
+        Status = FlowRunStatus.Running, Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = DateTimeOffset.UnixEpoch, Steps = steps,
+        DefinitionSnapshot = new(FlowClientStub.WorkspaceScope, new(flow), "1.0.0", null, new WorkflowFlowDefinition("input", [], [], []), new Dictionary<string, string>(), DateTimeOffset.UnixEpoch)
+    };
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void CollapsedContractFailureKeepsTheSummaryAndRevealsDetailsOnDemand(string language)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = CreateContext(new KnowledgeClientStub());
+        var failure = new DataContractFailure("output-mapping", "flow:child/step:completed/mapping", "steps.transform.output",
+            "step_output_reference", "available step output", "unavailable step output", "child", "completed", "data_contract_mapping_unavailable");
+        var rendered = context.Render<ContractFailurePanel>(parameters => parameters.Add(value => value.Details, JsonSerializer.Serialize(failure))
+            .Add(value => value.Collapsible, true));
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-summary"));
+        Assert.HasCount(0, rendered.FindAll(".contract-failure-body"));
+        Assert.AreEqual("false", rendered.Find(".contract-failure-toggle").GetAttribute("aria-expanded"));
+        rendered.Find(".contract-failure-toggle").Click();
+        Assert.AreEqual("true", rendered.Find(".contract-failure-toggle").GetAttribute("aria-expanded"));
+        Assert.HasCount(1, rendered.FindAll(".contract-failure-body"));
+        Assert.Contains("steps.transform.output", rendered.Markup);
+        rendered.Find(".contract-failure-toggle").Click();
+        Assert.HasCount(0, rendered.FindAll(".contract-failure-body"));
+    }
+
+    [TestMethod]
+    [DataRow("null", "explicitly null")]
+    [DataRow("\"\"", "text is empty")]
+    [DataRow("{\"artifacts\":[]}", "artifacts")]
+    public void CausalOutputsAreReadOnlyOnExpansionAndInTheExactScope(string output, string expected)
+    {
+        var client = new FlowClientStub();
+        using var context = CreateContext(new KnowledgeClientStub(), flows: client);
+        context.Services.AddSingleton<Agentstration.Web.Console.IArtifactsClient>(new ArtifactAdministrationComponentTests.ArtifactClient("fixture"));
+        var root = PresentationRun("root", "root-flow", []);
+        var child = PresentationRun("child", "child-flow", []) with { Status = FlowRunStatus.Succeeded, Output = JsonSerializer.Deserialize<JsonElement>(output) };
+        client.Runs[child.Id] = child;
+        var rendered = context.Render<FlowRunCausalityOutput>(parameters => parameters.Add(value => value.RunId, child.Id)
+            .Add(value => value.Root, root).Add(value => value.Scope, root.ExecutionScopeRef).Add(value => value.Status, child.Status));
+        Assert.HasCount(0, client.RunReads);
+        rendered.Find("button").Click();
+        rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
+        Assert.AreEqual((child.Id, root.ExecutionScopeRef), client.RunReads.Single());
+        rendered.Find(".causal-output-toggle").Click();
+        rendered.Find(".causal-output-toggle").Click();
+        Assert.HasCount(1, client.RunReads);
+    }
+
+    [TestMethod]
+    public void CausalOutputDoesNotRenderAResponseFromAnotherExecutionScope()
+    {
+        var client = new FlowClientStub();
+        using var context = CreateContext(new KnowledgeClientStub(), flows: client);
+        var root = PresentationRun("root", "root-flow", []);
+        var child = PresentationRun("child", "child-flow", []) with { Scope = new(Guid.Empty, WorkspaceId.New(), Guid.Empty), Output = JsonSerializer.SerializeToElement("withheld fixture") };
+        client.Runs[child.Id] = child;
+        var rendered = context.Render<FlowRunCausalityOutput>(parameters => parameters.Add(value => value.RunId, child.Id)
+            .Add(value => value.Root, root).Add(value => value.Scope, root.ExecutionScopeRef));
+        rendered.Find("button").Click();
+        rendered.WaitForAssertion(() => Assert.Contains("unavailable", rendered.Markup));
+        Assert.DoesNotContain("withheld fixture", rendered.Markup);
+    }
+}

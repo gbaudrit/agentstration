@@ -1,0 +1,196 @@
+@page "/connected-services/new"
+@page "/connected-services/{Name}/edit"
+@implements IDisposable
+@inject IConnectedServicesClient Client
+@inject IParametersClient ParametersClient
+@inject ISecretsClient SecretsClient
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+@if (!Embedded)
+{
+<PageTitle>@(IsNew ? T("Create") : T("EditConnectedService")) · Agentstration</PageTitle>
+<PageHeader Title="@(IsNew ? T("Create") : model.DisplayName)" Description="@T("Editor.Description")" TestId="connected-service-editor"><Actions><a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a></Actions></PageHeader>
+}
+<div class="form-alert form-alert-info"><strong>@T("ManualBinding")</strong><span>@T("ManualBindingExplanation")</span></div>
+@if (loading) { <LoadingState Message="@T("LoadingEditor")" /> }
+else if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+@if (!loading)
+{
+<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="connected-service-editor" class="resource-form" data-testid="connected-service-form"><DataAnnotationsValidator /><ValidationSummary />
+    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ConnectedServiceResource")</h2></div></div><div class="form-grid">
+        <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Generic" IsNew="@IsNew" DisplayNameTestId="connected-service-display-name" TechnicalNameTestId="connected-service-name" />
+        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+        @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
+        <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="model.Enabled" /></label>
+    </div></section>
+    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Contribution")</p><h2>@T("ExactTypeRevision")</h2></div></div>
+        @if (Variants.Count == 0) { <div class="form-alert form-alert-warning">@T("NoTypes")</div> }
+        else { <div class="form-grid"><label class="form-span-2"><span>@T("Type")</span><select value="@selectedVariantKey" @onchange="VariantChanged" disabled="@(!IsNew)" data-testid="connected-service-type">@foreach (var variant in Variants) { <option value="@variant.Key">@variant.Label</option> }</select><small>@T("TypePinnedHelp")</small></label>@if (SelectedVariant is { } selected) { <label><span>@T("ExtensionRegistration")</span><code>@selected.Type.ScopeRef/@selected.Type.Namespace/@selected.Type.Name</code></label><label><span>@T("ResourceId")</span><code>@selected.Type.Uid</code></label><label><span>@T("SchemaDigest")</span><code>@selected.Version.SchemaDigest</code></label><p class="form-span-2">@(selected.Type.Definition.Description ?? T("NoTypeDescription"))</p> }</div> }
+    </section>
+    @if (SelectedVariant is { } current)
+    {
+        @if (IsHttpUrlDiscovery) { <p class="form-alert form-alert-info">@T("Http.DiscoveryHelp")</p> }
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Options")</h2></div><JsonSchemaInputEditor Schema="current.Version.Schema" Value="model.Options" ValueChanged="value => model.Options = value" ValidationChanged="state => optionsValid = state.IsValid" Disabled="busy" /></section>
+        <section class="panel form-section"><div class="panel-header"><div><h2>@T("Bindings")</h2><p>@T("Bindings.Description")</p></div></div>
+            @if (current.Version.Inputs.Count == 0) { <p>@T("NoInputs")</p> }
+            else
+            {
+                <div class="binding-requirements">
+                    @foreach (var input in current.Version.Inputs)
+                    {
+                        var binding = Binding(input);
+                        <ValueBindingRequirementEditor @key="binding" Requirement="@RequirementModel(input)"
+                            AllowedSources="@BindingSources(input)" Options="@BindingOptions(input)"
+                            Selection="@BindingSelection(binding)" SelectionChanged="value => BindingChanged(binding, value)"
+                            CreationContext="@CreationContext(input)" ResourceCreated="ValueCreatedAsync"
+                            Disabled="busy" TestIdPrefix="connected-service" DialogSectionId="@binding" />
+                    }
+                </div>
+            }
+        </section>
+    }
+    <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
+    <div class="form-actions">@if (!Embedded) { <a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a> }<button type="submit" class="button-primary" disabled="@(!CanSave)" data-testid="connected-service-save">@(busy ? T("Saving") : T("Save"))</button></div>
+</EditForm>
+@foreach (var binding in model.Bindings) { <Microsoft.AspNetCore.Components.Sections.SectionOutlet SectionId="@binding" /> }
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public ResourceScopeRef? EmbeddedScopeRef { get; set; }
+    [Parameter] public EventCallback Saved { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ConnectedServiceEditorModel model = new();
+    private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
+    private IReadOnlyList<ParameterResource> parameters = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private IReadOnlyList<ConnectedServiceTypeResource> catalog = [];
+    private ResourceScopeRef? selectedScope;
+    private string selectedVariantKey = string.Empty;
+    private string? loadedKey;
+    private string? etag;
+    private bool loading = true, busy, optionsValid = true;
+    private Exception? error;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanSave => !busy && optionsValid && selectedScope is not null && SelectedVariant is not null && RequiredBindingsPresent;
+    private bool RequiredBindingsPresent => SelectedVariant is { } variant && variant.Version.Inputs.Where(value => value.Required).All(value => Binding(value).IsConfigured);
+    private IReadOnlyList<TypeVariant> Variants => catalog.Where(type => type.Definition.Enabled).SelectMany(type => type.Definition.Versions.Select(version => new TypeVariant(type, version))).OrderBy(value => value.Label, StringComparer.OrdinalIgnoreCase).ToArray();
+    private TypeVariant? SelectedVariant => Variants.FirstOrDefault(value => value.Key == selectedVariantKey);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnParametersSetAsync()
+    {
+        var scopeRefValue = EmbeddedScopeRef?.Value ?? ScopeRefValue;
+        var key = $"{Name}|{scopeRefValue}|{IsNew}";
+        if (string.Equals(loadedKey, key, StringComparison.Ordinal)) return;
+        loadedKey = key;
+        loading = true; error = null;
+        try
+        {
+            var catalogTask = Client.GetTypesAsync(cancellation.Token); var scopesTask = Client.GetScopeTargetsAsync(cancellation.Token); var parametersTask = ParametersClient.GetParametersAsync(cancellation.Token); var secretsTask = SecretsClient.GetSecretsAsync(cancellation.Token);
+            await Task.WhenAll(catalogTask, scopesTask, parametersTask, secretsTask); catalog = await catalogTask; scopeTargets = await scopesTask; parameters = await parametersTask; secrets = await secretsTask;
+            if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; selectedVariantKey = Variants.FirstOrDefault(value => value.Version.Version == value.Type.Definition.PreferredVersion)?.Key ?? Variants.FirstOrDefault()?.Key ?? string.Empty; PrepareBindings(); }
+            else { var scope = ResourceScopeRef.Parse(scopeRefValue ?? throw new ArgumentException(T("ScopeRequired"))); var snapshot = await Client.GetConnectedServiceAsync(Name!, scope, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); selectedScope = scope; etag = snapshot.ETag; selectedVariantKey = Variants.FirstOrDefault(value => Matches(snapshot.Value, value))?.Key ?? string.Empty; PrepareBindings(); }
+        }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private void VariantChanged(ChangeEventArgs args) { selectedVariantKey = args.Value?.ToString() ?? string.Empty; model.Options = JsonSerializer.SerializeToElement(new { }); model.Bindings.Clear(); PrepareBindings(); }
+    private void PrepareBindings() { if (SelectedVariant is not { } variant) return; foreach (var input in variant.Version.Inputs) if (model.Bindings.All(value => value.InputId != input.Id)) model.Bindings.Add(new() { InputId = input.Id, Kind = input.Protection == ConnectedServiceValueProtection.Standard ? ConnectedServiceBindingKind.Literal : ConnectedServiceBindingKind.Secret }); }
+    private ConnectedServiceBindingEditorModel Binding(ConnectedServiceInputDescriptor input) => model.Bindings.Single(value => value.InputId == input.Id);
+    private bool IsHttpUrlDiscovery => SelectedVariant is { } variant
+        && variant.Type.ScopeRef == ResourceScopeRef.Instance && variant.Type.Namespace == ResourceNamespace.Default
+        && variant.Type.Name == "http-endpoint" && variant.Version.OperationDiscovery is not null;
+    private ValueBindingRequirement RequirementModel(ConnectedServiceInputDescriptor input) => new(
+        input.Id, input.Required, ValueType(input.Type), input.Protection == ConnectedServiceValueProtection.Secured,
+        IsHttpUrlDiscovery && input.Id == "baseUrl" ? T("Http.SampleUrlHelp") : input.Description, input.Format);
+    private static IReadOnlyList<ValueBindingSourceKind> BindingSources(ConnectedServiceInputDescriptor input) =>
+        input.Protection == ConnectedServiceValueProtection.Secured ? [ValueBindingSourceKind.Secret]
+        : input.Type == ConnectedServiceValueType.Text ? [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret]
+        : [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter];
+    private IReadOnlyList<ValueBindingOption> BindingOptions(ConnectedServiceInputDescriptor input)
+    {
+        IEnumerable<ValueBindingOption> options = [];
+        if (input.Protection == ConnectedServiceValueProtection.Standard)
+            options = parameters.Where(value => value.ScopeRef is not null
+                    && (int)value.Definition.ValueType == (int)input.Type && CanUse(value.ScopeRef.Value, value.Definition.UsePolicy))
+                .Select(value => new ValueBindingOption(ValueBindingSourceKind.Parameter,
+                    ScopedResourceAddress.Create(value.ScopeRef!.Value, value.Namespace, value.Kind, value.Name), value.Definition.DisplayName));
+        if (input.Type == ConnectedServiceValueType.Text)
+            options = options.Concat(secrets.Where(value => value.ValueConfigured && value.Resource.ScopeRef is not null
+                    && CanUse(value.Resource.ScopeRef.Value, value.Resource.Definition.UsePolicy))
+                .Select(value => new ValueBindingOption(ValueBindingSourceKind.Secret,
+                    ScopedResourceAddress.Create(value.Resource.ScopeRef!.Value, value.Resource.Namespace, value.Resource.Kind, value.Resource.Name), value.Resource.Definition.DisplayName)));
+        return options.ToArray();
+    }
+    private static ValueBindingSelection BindingSelection(ConnectedServiceBindingEditorModel binding)
+    {
+        var kind = binding.Kind switch
+        {
+            ConnectedServiceBindingKind.Parameter => ValueBindingSourceKind.Parameter,
+            ConnectedServiceBindingKind.Secret => ValueBindingSourceKind.Secret,
+            ConnectedServiceBindingKind.Literal => ValueBindingSourceKind.Literal,
+            _ => throw new ArgumentOutOfRangeException(nameof(binding.Kind), binding.Kind, null)
+        };
+        if (kind == ValueBindingSourceKind.Literal) return new(kind, Literal: binding.Literal?.Clone());
+        if (string.IsNullOrWhiteSpace(binding.Reference)) return new(kind);
+        var parts = binding.Reference.Split('|', 3);
+        return parts.Length == 3
+            ? new(kind, ScopedResourceAddress.Create(ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]),
+                kind == ValueBindingSourceKind.Parameter ? ParameterResourceKinds.Parameter : SecretResourceKinds.Secret, parts[2]))
+            : new(kind);
+    }
+    private static void BindingChanged(ConnectedServiceBindingEditorModel binding, ValueBindingSelection value)
+    {
+        if (value.Kind is not (ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret or ValueBindingSourceKind.Literal)) return;
+        binding.Kind = value.Kind switch
+        {
+            ValueBindingSourceKind.Parameter => ConnectedServiceBindingKind.Parameter,
+            ValueBindingSourceKind.Secret => ConnectedServiceBindingKind.Secret,
+            ValueBindingSourceKind.Literal => ConnectedServiceBindingKind.Literal,
+            _ => binding.Kind
+        };
+        binding.Reference = value.Resource is { } resource
+            ? $"{resource.ScopeRef.Value}|{resource.Namespace.Value}|{resource.Name}"
+            : null;
+        binding.Literal = value.Kind == ValueBindingSourceKind.Literal ? value.Literal?.Clone() : null;
+    }
+    private ContextualValueCreationContext? CreationContext(ConnectedServiceInputDescriptor input)
+    {
+        if (selectedScope is not { } scopeRef) return null;
+        var consumerName = !string.IsNullOrWhiteSpace(model.Name) ? model.Name : SelectedVariant?.Type.Name ?? "connected-service";
+        var consumerDisplayName = !string.IsNullOrWhiteSpace(model.DisplayName) ? model.DisplayName : consumerName;
+        return new(scopeRef, SecretEditorModel.IdentifierFromDisplayName($"cs-{consumerName}-{input.Id}"),
+            $"{consumerDisplayName} — {input.Id}", Namespace: ResourceNamespace.Default);
+    }
+    private async Task ValueCreatedAsync(ScopedResourceAddress address)
+    {
+        if (address.Kind == ParameterResourceKinds.Parameter)
+            parameters = await ParametersClient.GetParametersAsync(cancellation.Token);
+        else if (address.Kind == SecretResourceKinds.Secret)
+            secrets = await SecretsClient.GetSecretsAsync(cancellation.Token);
+    }
+    private bool CanUse(ResourceScopeRef owner, DescendantUsePolicy policy)
+    {
+        if (selectedScope is not { } consumer) return false;
+        if (owner == consumer) return true;
+        if (owner.Kind >= consumer.Kind) return false;
+        return policy.Grants.Any(grant => grant.ScopeRef == consumer
+            || grant.IncludeDescendants && grant.ScopeRef.Kind < consumer.Kind);
+    }
+    private static string ValueType(ConnectedServiceValueType type) => type switch
+    {
+        ConnectedServiceValueType.Text => "string",
+        ConnectedServiceValueType.WholeNumber => "integer",
+        ConnectedServiceValueType.DecimalNumber => "number",
+        ConnectedServiceValueType.Logical => "boolean",
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+    };
+    private static bool Matches(ConnectedServiceResource resource, TypeVariant variant) { var reference = resource.Definition.Type.Type; return reference.Name == variant.Type.Name && reference.ScopeRef == variant.Type.ScopeRef && (reference.Namespace ?? resource.Namespace) == variant.Type.Namespace && resource.Definition.Type.TypeUid == variant.Type.Uid && variant.Version.Version == resource.Definition.Type.Version && variant.Version.SchemaDigest == resource.Definition.Type.SchemaDigest; }
+    private async Task SaveAsync() { if (!CanSave) return; busy = true; error = null; try { var variant = SelectedVariant!; var properties = model.Properties(variant.Type, variant.Version); var snapshot = IsNew ? await Client.CreateConnectedServiceAsync(new(model.Name, properties, selectedScope), cancellation.Token) : await Client.UpdateConnectedServiceAsync(model.Name, selectedScope!.Value, new(properties), etag!, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); etag = snapshot.ETag; PrepareBindings(); if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo($"/connected-services/{Uri.EscapeDataString(snapshot.Value.Name)}?scopeRef={Uri.EscapeDataString(snapshot.Value.ScopeRef!.Value.Value)}"); } catch (Exception exception) { error = exception; } finally { busy = false; } }
+    private string DetailsUrl() => $"/connected-services/{Uri.EscapeDataString(Name ?? model.Name)}?scopeRef={Uri.EscapeDataString(selectedScope?.Value ?? EmbeddedScopeRef?.Value ?? ScopeRefValue ?? string.Empty)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed record TypeVariant(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version) { public string Key => $"{Type.ScopeRef?.Value}|{Type.Namespace.Value}|{Type.Name}|{Type.Uid:D}|{Version.Version}|{Version.SchemaDigest}"; public string Label => $"{Type.Definition.DisplayName} · {Version.Version} · {Type.Governance.Origin.Reference ?? Type.Namespace.Value}"; }
+}

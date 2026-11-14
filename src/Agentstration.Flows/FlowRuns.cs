@@ -1,10 +1,15 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows;
 
-public sealed record FlowRunError(string Code, string Message, string? Details = null);
+public sealed record FlowRunError(string Code, string Message, string? Details = null)
+{
+    public FlowFailureOrigin? Origin { get; init; }
+}
 public sealed record FlowRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] WorkspaceId WorkspaceId,
@@ -49,6 +54,8 @@ public readonly record struct FlowRunKey(ResourceScopeRef ScopeRef, string RunId
 [method: JsonConstructor]
 public sealed record FlowRunEvent(ResourceScopeRef ScopeRef, string RunId, long Sequence, FlowRunEventType Type, string? StepId, JsonElement? Payload, DateTimeOffset Timestamp)
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
     public FlowRunEvent(WorkspaceId workspaceId, string runId, long sequence, FlowRunEventType type, string? stepId,
         JsonElement? payload, DateTimeOffset timestamp)
         : this(ResourceScopeRef.Workspace(workspaceId.Value), runId, sequence, type, stepId, payload, timestamp) { }
@@ -114,9 +121,13 @@ public sealed record FlowToolRouteResolution(
     ResourceNamespace ProviderNamespace);
 public sealed record FlowStepRun
 {
+    public FlowProcessAdmission? Process { get; init; }
     public required string StepName { get; init; }
     public required string StepType { get; init; }
     public FlowStepRunStatus Status { get; init; } = FlowStepRunStatus.NotStarted;
+    public InvocationDataContracts? Contracts { get; init; }
+    public IReadOnlyList<InvocationDataContracts> ArtifactContracts { get; init; } = [];
+    public bool MoreArtifactContracts { get; init; }
     public JsonElement? DeclaredInput { get; init; }
     public JsonElement? ResolvedInput { get; init; }
     public JsonElement? Output { get; init; }
@@ -142,6 +153,14 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    public FlowProcessRunOrigin? ProcessOrigin { get; init; }
+    public IReadOnlyList<string>? ReservedDescendantRunIds { get; init; }
+    public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
+    [JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
+    public FlowCompositionReceipt? Composition { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public WorkspaceId WorkspaceId { get; init; }
     public required string Id { get; init; }
@@ -169,6 +188,7 @@ public sealed record FlowRun
     public string? InteractionId { get; init; }
     public string? WorkTaskId { get; init; }
     public string? TriggerMessageId { get; init; }
+    public InvocationDataContracts? ContractContext { get; init; }
     public required FlowRunScope Scope { get; init; }
     public ResourceScopeRef ExecutionScopeRef => Scope.ScopeRef;
     public required JsonElement Input { get; init; }

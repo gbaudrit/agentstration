@@ -1,0 +1,18 @@
+{
+  "journey": "exercise-source-policies",
+  "input": {
+    "locale": "en-US"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "theme": "dark",
+  "captures": [
+    {
+      "checkpoint": "source-policies-lifecycle-verified",
+      "file": "source-policies.png",
+      "scope": "target"
+    }
+  ]
+}

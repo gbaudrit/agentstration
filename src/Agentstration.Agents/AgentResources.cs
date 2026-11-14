@@ -1,3 +1,4 @@
+using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Schemas.Contracts;
@@ -35,6 +36,7 @@ public record AgentProperties
     public JsonElement? InputSchema { get; init; }
     public SchemaBinding? InputSchemaBinding { get; init; }
     public JsonElement? OutputSchema { get; init; }
+    public DataContractDefinition? OutputContract { get; init; }
     public SchemaBinding? OutputSchemaBinding { get; init; }
 }
 
@@ -125,6 +127,7 @@ public sealed record ResolvedAgentDefinition
     public required string DefinitionHash { get; init; }
     public JsonElement? InputSchema { get; init; }
     public JsonElement? OutputSchema { get; init; }
+    public DataContractDefinition? OutputContract { get; init; }
     public IReadOnlyDictionary<string, SchemaBindingSnapshot> SchemaBindings { get; init; }
         = new Dictionary<string, SchemaBindingSnapshot>(StringComparer.Ordinal);
 }

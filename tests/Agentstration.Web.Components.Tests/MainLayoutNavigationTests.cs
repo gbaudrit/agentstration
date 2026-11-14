@@ -26,7 +26,7 @@ public sealed class MainLayoutNavigationTests
             ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),
             ("Workplace", [("Configuration", "/workspaces")]),
             ("Resources", [("Packs", "/packs"), ("Data Sources", "/data-sources"), ("Knowledge Sources", "/knowledge-sources"), ("Artifacts", "/artifacts"), ("Sources", "/settings/sources"), ("Source registries", "/settings/source-registries")]),
-            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
+            ("Integrations", [("MCP & Tools", "/tools"), ("Extensions", "/extensions"), ("Connected Services", "/connected-services"), ("Storages", "/storages"), ("Storage types", "/storage-types"), ("Model providers", "/modelproviders"), ("Source providers", "/sourceproviders")]),
             ("Configuration", [("Runtime profiles", "/runtimeprofiles"), ("Secrets", "/secrets"), ("Resource scopes", "/settings/resource-scopes")]),
             ("System", [("Workers", "/settings/runtime-workers"), ("Organization", "/settings/organization"), ("Bootstrap", "/settings/bootstrap"), ("Cleanup", "/cleanup"), ("Settings", "/settings")]));
 
@@ -52,6 +52,9 @@ public sealed class MainLayoutNavigationTests
             groups.Select(GroupLabel).ToArray());
         Assert.AreEqual("Configuration", groups[5].QuerySelector("a")?.TextContent.Trim());
         Assert.AreEqual("MCP & Outils", groups[7].QuerySelector("a")?.TextContent.Trim());
+        Assert.AreEqual("Services connectés", groups[7].QuerySelector("a[href='/connected-services']")?.TextContent.Trim());
+        Assert.AreEqual("Stockages", groups[7].QuerySelector("a[href='/storages']")?.TextContent.Trim());
+        Assert.AreEqual("Types de stockage", groups[7].QuerySelector("a[href='/storage-types']")?.TextContent.Trim());
         Assert.AreEqual("Profils de source de données", groups[1].QuerySelector("a[href='/data-source-profiles']")?.TextContent.Trim());
         Assert.AreEqual("Sources de données", groups[6].QuerySelector("a[href='/data-sources']")?.TextContent.Trim());
         Assert.AreEqual("Schémas", groups[1].QuerySelector("a[href='/schemas']")?.TextContent.Trim());
@@ -118,6 +121,7 @@ public sealed class MainLayoutNavigationTests
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/data-sources']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/schemas']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/conversations']").Count);
+        Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/connected-services']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/settings/resource-scopes']").Count);
         Assert.AreEqual(0, rendered.FindAll(".side-nav a[href='/cleanup']").Count);
         Assert.AreEqual(1, rendered.FindAll(".side-nav a[href='/agent-instances']").Count);
@@ -188,6 +192,56 @@ public sealed class MainLayoutNavigationTests
             Assert.AreEqual(workspaceScope, current?.SelectedScopeRef);
             Assert.AreEqual(2, provider.CallCount);
         });
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReturningToInstanceIgnoresThePendingWorkspaceResponse(bool failWorkspaceLoad)
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddAgentstrationWebComponents();
+        var provider = new DelayedNavigationProvider(failWorkspaceLoad);
+        context.Services.AddScoped<IConsoleContextProvider>(_ => provider);
+        var rendered = RenderLayout(context);
+        var state = context.Services.GetRequiredService<ConsoleContextState>();
+        rendered.WaitForAssertion(() => Assert.AreEqual("/instance", state.Current?.SelectedScopeRef));
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        await rendered.InvokeAsync(() => navigation.NavigateTo(
+            $"/agents/assistant?context={Uri.EscapeDataString($"/workspaces/{SwitchingContextProvider.WorkspaceId:D}")}"));
+        rendered.WaitForAssertion(() => Assert.AreEqual(2, provider.CallCount));
+        await rendered.InvokeAsync(() => navigation.NavigateTo("/modelprofiles/shared?context=%2Finstance"));
+        provider.CompleteWorkspace();
+
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(3, provider.CallCount);
+            Assert.AreEqual("/instance", state.Current?.SelectedScopeRef);
+            Assert.IsNull(state.Error);
+            Assert.AreEqual("/instance", rendered.Find("[data-testid='console-shell']").GetAttribute("data-context-scope"));
+        });
+    }
+
+    private sealed class DelayedNavigationProvider(bool failWorkspaceLoad) : IConsoleContextProvider
+    {
+        private readonly SwitchingContextProvider snapshots = new(AllNavigationPermissions);
+        private readonly TaskCompletionSource workspaceCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private ConsoleContextSnapshot? instance;
+        public int CallCount { get; private set; }
+
+        public async Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken)
+        {
+            var call = ++CallCount;
+            if (call == 1) return instance = await snapshots.GetAsync(cancellationToken);
+            if (call != 2) return instance!;
+            var workspace = await snapshots.GetAsync(cancellationToken);
+            await workspaceCompletion.Task.WaitAsync(cancellationToken);
+            if (failWorkspaceLoad) throw new InvalidOperationException("The previous Workspace request failed.");
+            return workspace;
+        }
+
+        public void CompleteWorkspace() => workspaceCompletion.TrySetResult();
     }
 
     private static readonly IReadOnlySet<string> AllNavigationPermissions = new HashSet<string>(

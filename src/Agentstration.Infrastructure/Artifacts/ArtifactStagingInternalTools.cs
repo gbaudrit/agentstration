@@ -28,7 +28,7 @@ public sealed class ArtifactStagingCreateMcpTool(IArtifactContentStore store) : 
 {
     public override InternalMcpToolDefinition Definition { get; } = new(ArtifactCapabilities.Create,
         "Create staged content", "Creates an empty opaque content object in the local staging backend.",
-        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, mediaType = new { type = "string" } }, required = new[] { "artifactId", "mediaType" }, additionalProperties = false }), InitialCategory: Category, ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { artifactId = new { type = "string" }, mediaType = new { type = "string" } }, required = new[] { "artifactId", "mediaType" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category, ExposeThroughMcp: false);
     public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var id = StagedArtifactId.Parse(RequiredString(invocation.Arguments, "artifactId"));
@@ -42,7 +42,7 @@ public sealed class ArtifactStagingWriteMcpTool(IArtifactContentStore store) : A
 {
     public override InternalMcpToolDefinition Definition { get; } = new(ArtifactCapabilities.Write,
         "Write staged content", "Appends one bounded chunk to an opaque staged content object.",
-        Schema(new { type = "object", properties = new { backendReference = new { type = "string" }, offset = new { type = "integer" }, contentBase64 = new { type = "string" } }, required = new[] { "backendReference", "offset", "contentBase64" }, additionalProperties = false }), InitialCategory: Category, ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { backendReference = new { type = "string" }, offset = new { type = "integer" }, contentBase64 = new { type = "string" } }, required = new[] { "backendReference", "offset", "contentBase64" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category, ExposeThroughMcp: false);
     public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var bytes = Convert.FromBase64String(RequiredString(invocation.Arguments, "contentBase64"));
@@ -58,7 +58,7 @@ public sealed class ArtifactStagingReadMcpTool(IArtifactContentStore store) : Ar
 {
     public override InternalMcpToolDefinition Definition { get; } = new(ArtifactCapabilities.Read,
         "Read staged content", "Reads one bounded chunk from an opaque staged content object.",
-        Schema(new { type = "object", properties = new { backendReference = new { type = "string" }, offset = new { type = "integer" }, length = new { type = "integer" } }, required = new[] { "backendReference", "offset", "length" }, additionalProperties = false }), InitialCategory: Category, ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { backendReference = new { type = "string" }, offset = new { type = "integer" }, length = new { type = "integer" } }, required = new[] { "backendReference", "offset", "length" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category, ExposeThroughMcp: false);
     public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var length = RequiredInt(invocation.Arguments, "length");
@@ -75,7 +75,7 @@ public sealed class ArtifactStagingStatMcpTool(IArtifactContentStore store) : Ar
 {
     public override InternalMcpToolDefinition Definition { get; } = new(ArtifactCapabilities.Stat,
         "Inspect staged content", "Returns bounded integrity metadata for an opaque staged content object.",
-        Schema(new { type = "object", properties = new { backendReference = new { type = "string" } }, required = new[] { "backendReference" }, additionalProperties = false }), InitialCategory: Category, ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { backendReference = new { type = "string" } }, required = new[] { "backendReference" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category, ExposeThroughMcp: false);
     public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         var stat = await Store.StatAsync(invocation.WorkspaceId, RequiredString(invocation.Arguments, "backendReference"), cancellationToken);
@@ -87,7 +87,7 @@ public sealed class ArtifactStagingDeleteMcpTool(IArtifactContentStore store) : 
 {
     public override InternalMcpToolDefinition Definition { get; } = new(ArtifactCapabilities.Delete,
         "Delete staged content", "Deletes an opaque staged content object after Agentstration lifecycle checks.",
-        Schema(new { type = "object", properties = new { backendReference = new { type = "string" } }, required = new[] { "backendReference" }, additionalProperties = false }), InitialCategory: Category, ExposeThroughMcp: false);
+        Schema(new { type = "object", properties = new { backendReference = new { type = "string" } }, required = new[] { "backendReference" }, additionalProperties = false }), OutputSchema: Schema(new { type = "object" }), InitialCategory: Category, ExposeThroughMcp: false);
     public override async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
         await Store.DeleteAsync(invocation.WorkspaceId, RequiredString(invocation.Arguments, "backendReference"), cancellationToken);

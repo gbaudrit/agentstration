@@ -24,6 +24,125 @@ public sealed class AepConformanceTests
     private static readonly string WorkloadToken = AepStaticBearerCredentials.Generate("aep-conformance-tests").AccessToken;
 
     [TestMethod]
+    public void ConnectedServiceTypesRoundTripWithPinnedSchemaInputsAndExports()
+    {
+        using var document = JsonDocument.Parse("""{"type":"object","required":["region"],"properties":{"region":{"type":"string"}}}""");
+        var contribution = new AepConnectedServiceTypeContribution(
+            "object-storage",
+            "Object storage account",
+            "1.0",
+            [AepConnectedServiceTypeVersionDescriptor.Create(
+                "1.0",
+                document.RootElement,
+                [new("endpoint", true), new("credential", true, Protection: AepValueProtection.Secured)],
+                [new("connection", Protection: AepValueProtection.Secured)])]);
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("cloud", "Cloud", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ConnectedServiceTypes] = new("1.0")
+            },
+            new AepContributions([], ConnectedServiceTypes: [contribution]));
+
+        var json = JsonSerializer.Serialize(manifest, AepProtocol.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<AepManifest>(json, AepProtocol.JsonOptions)!;
+
+        Assert.IsEmpty(AepDescriptorValidator.Validate(roundTripped));
+        var version = roundTripped.Contributions.ConnectedServiceTypes!.Single().Versions.Single();
+        Assert.AreEqual(AepSchemaDigest.Compute(version.Schema), version.SchemaDigest);
+        Assert.AreEqual(AepValueProtection.Secured, version.Inputs[1].Protection);
+        Assert.AreEqual("connection", version.Exports.Single().Id);
+    }
+
+    [TestMethod]
+    public void ConnectedServiceTypeValidationRejectsMutableOrAmbiguousContracts()
+    {
+        using var document = JsonDocument.Parse("""{"type":"object"}""");
+        var version = AepConnectedServiceTypeVersionDescriptor.Create(
+            "1.0",
+            document.RootElement,
+            [new("endpoint", true), new("endpoint", false)],
+            [new("connection")]) with
+        { SchemaDigest = "sha256:wrong" };
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("cloud", "Cloud", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ConnectedServiceTypes] = new("1.0")
+            },
+            new AepContributions([], ConnectedServiceTypes:
+            [new("object-storage", "Object storage account", "1.0", [version])]));
+
+        var errors = AepDescriptorValidator.Validate(manifest);
+
+        Assert.IsTrue(errors.Any(value => value.Contains("invalid schema digest", StringComparison.Ordinal)));
+        Assert.IsTrue(errors.Any(value => value.Contains("input 'endpoint' is duplicated", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void ConnectedServiceOperationTypesAndDiscoveryRoundTripAsExtensionOwnedContracts()
+    {
+        using var operationSchema = JsonDocument.Parse(
+            """{"type":"object","required":["operationId"],"properties":{"operationId":{"type":"string"}}}""");
+        using var serviceSchema = JsonDocument.Parse("""{"type":"object"}""");
+        var operationType = new AepConnectedServiceOperationTypeContribution(
+            "openapi-operation",
+            "OpenAPI operation",
+            "1.0.0",
+            [AepConnectedServiceOperationTypeVersionDescriptor.Create(
+                "1.0.0",
+                operationSchema.RootElement,
+                AepConnectedServiceOperationInteraction.RequestResponse,
+                new("openapi.invoke", "1.0")) with { Acquisition = new("openapi-acquire", "1.0.0", "request", "response", "readOnly") }]);
+        var serviceVersion = AepConnectedServiceTypeVersionDescriptor.Create(
+            "1.0.0", serviceSchema.RootElement) with
+        {
+            OperationDiscovery = new(
+                "openapi-discovery",
+                "1.0.0",
+                [new("openapi-operation", "1.0.0")])
+        };
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("openapi", "OpenAPI", "1.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ConnectedServiceTypes] = new("1.0"),
+                [AepCapabilityNames.ConnectedServiceOperationTypes] = new("1.0"),
+                [AepConnectedServiceAcquisitionProtocol.Capability] = new("1.0", AepConnectedServiceAcquisitionProtocol.Path)
+            },
+            new AepContributions([], ConnectedServiceTypes:
+                [new("openapi", "OpenAPI service", "1.0.0", [serviceVersion])],
+                ConnectedServiceOperationTypes: [operationType]));
+
+        var json = JsonSerializer.Serialize(manifest, AepProtocol.JsonOptions);
+        var roundTripped = JsonSerializer.Deserialize<AepManifest>(json, AepProtocol.JsonOptions)!;
+
+        Assert.IsEmpty(AepDescriptorValidator.Validate(roundTripped));
+        var operationVersion = roundTripped.Contributions.ConnectedServiceOperationTypes!
+            .Single().Versions.Single();
+        Assert.AreEqual("openapi.invoke", operationVersion.Invocation.ProviderOperationId);
+        Assert.AreEqual("openapi-acquire", operationVersion.Acquisition!.FlowName);
+        Assert.AreEqual("request", operationVersion.Acquisition.InputSchemaProperty);
+        foreach (var invalid in new[]
+        {
+            operationVersion with { Interaction = AepConnectedServiceOperationInteraction.ServerStream },
+            operationVersion with { Acquisition = operationVersion.Acquisition with { FlowName = "" } },
+            operationVersion with { Acquisition = operationVersion.Acquisition with { ReadOnlyProperty = "" } }
+        })
+        {
+            Assert.IsNotEmpty(AepDescriptorValidator.Validate(manifest with
+            { Contributions = manifest.Contributions with { ConnectedServiceOperationTypes = [operationType with { Versions = [invalid] }] } }));
+        }
+        Assert.IsNotEmpty(AepDescriptorValidator.Validate(manifest with
+        { Capabilities = manifest.Capabilities.Where(item => item.Key != AepConnectedServiceAcquisitionProtocol.Capability).ToDictionary() }));
+        Assert.AreEqual("openapi-discovery", roundTripped.Contributions.ConnectedServiceTypes!
+            .Single().Versions.Single().OperationDiscovery!.FlowName);
+    }
+
+    [TestMethod]
     public void SchemaFormatContributionsRoundTripAlongsideUnrelatedContributions()
     {
         var manifest = new AepManifest(

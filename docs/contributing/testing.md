@@ -20,7 +20,13 @@ dotnet test --solution Agentstration.Tests.Integration.slnx --configuration Rele
 
 Run both fast and integration solutions for complete required functional validation. Their union is the functional test inventory represented by the root solution.
 
-API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests`, `Agentstration.Api.Execution.Tests`, `Agentstration.Api.Resources.Tests`, and `Agentstration.Api.Tests`. These preserve the former consolidated module's cases and test names. The Resources module also owns the 38 Data Source and Artifact API cases moved from Management API after the combined 142-case module exceeded its retained memory budget (2725.1 MiB on Ubuntu CI). Each assembly owns its fixtures and runs its cases sequentially. Memory budgets remain unchanged; diagnostic minimum counts are 118 for Resources and 104 for Management API. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
+API integration tests run in four independent test assemblies: `Agentstration.Api.Flows.Tests`, `Agentstration.Api.Execution.Tests`, `Agentstration.Api.Resources.Tests`, and `Agentstration.Api.Tests`. These preserve the former consolidated module's cases and test names. The Resources module also owns the 38 Data Source and Artifact API cases moved from Management API after the combined 142-case module exceeded its retained memory budget (2725.1 MiB on Ubuntu CI). Each assembly owns its fixtures and runs its cases sequentially. Memory budgets remain unchanged; diagnostic minimum counts are 40 for API, 118 for Resources and 112 for Management API. The diagnostic job runs these assemblies one after another in separate processes so process memory is released between groups. The Integration lane and coverage shard B include all four projects.
+
+The #1044 reconciliation moves the 12 ToolDefinition and 5 relay API cases into the existing `Agentstration.Api.Tests` assembly, retaining the existing per-assembly host/Worker fixture pattern and preserving test namespaces and method names. Each assembly owns its fixture sources; the opt-in host instrumentation remains owned by the test root. Before redistribution, all 133 Management API cases passed, but [the retained CI diagnostic](https://github.com/gbaudrit/agentstration/actions/runs/42512171729/job/128828401591) measured 2831.1 MiB against its unchanged 2560 MiB ceiling. At that baseline, redistribution preserved all 1099 Integration cases (40 API and 116 Management API). Subsequent #1079 moved five Storage execution cases into Management Storage and added one StorageType administration case, leaving 112 Management API cases. Keep the existing process/worker limits and memory ceilings, and retain new diagnostic measurements before claiming a memory improvement.
+
+### Local Storage link rejection on Windows
+
+`LocalStorageContentTests.LinksAtStorageDirectoryAndContentFileAreRejected` creates real directory and file symbolic links before checking that Storage rejects them. The Windows test session must have permission to create those links. A privilege failure during setup is an environment limitation, not a successful Storage validation: report it explicitly and run the case in an environment with that capability. Keep the rejection assertions enabled; do not replace this check with a passing stub or silently skip it.
 
 ### SQLite connection pooling regression
 
@@ -86,6 +92,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Console.Client.Tests` | Fast | HTTP and SignalR mappings, pagination, errors, retries, and credential forwarding without an authoritative server |
 | `Agentstration.Console.Components.Tests` | Fast | Console Razor behavior, presentation state, permissions, localization, and static assets with mocked clients |
 | `Agentstration.ResourceManagement.Tests` | Fast | Resource access policies and descendant-use rules with in-memory ports |
+| `Agentstration.Storage.Tests` | Fast | Storage type/version, explicit export mappings, protected resolution, drift, authorization and concurrency with deterministic in-memory ports |
 | `Agentstration.Schemas.Tests` | Fast | Schema format selection and capability validation |
 | `Agentstration.Secrets.Tests` | Fast | Secret capability authorization, expiry and single-use redemption with fakes |
 | `Agentstration.Infrastructure.Tests` | Fast | Internal date/time tools and HTTP fetch validation with a fake handler |
@@ -97,7 +104,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Application.Tests` | Integration | Application use cases and their SQLite-backed contracts without the executable host |
 | `Agentstration.Management.Storage.Tests` | Integration | SQLite control-plane, Identity persistence, secrets, audit, and trigger storage |
 | `Agentstration.Management.Sources.Tests` | Integration | Source provider, registry transport, and Pack composition behavior without the executable host |
-| `Agentstration.Api.Tests` | Integration | Cross-cutting authentication registration, OpenAPI, MCP catalog, and Tool audit transport behavior |
+| `Agentstration.Api.Tests` | Integration | Cross-cutting authentication registration, OpenAPI, MCP catalog, Tool audit, and ToolDefinition/relay publication and adoption transport behavior |
 | `Agentstration.Api.Flows.Tests` | Integration | Flow authoring, persistence, execution, recovery, scope isolation, and hosted Flow APIs |
 | `Agentstration.Api.Execution.Tests` | Integration | Hosted Work, Workplace, Runtime Run, SignalR, and AWP worker execution boundaries |
 | `Agentstration.Api.Resources.Tests` | Integration | Sources, Source Registry, and Pack integration and transport behavior |
@@ -108,6 +115,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
+| `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASP/MCP, isolation, progressive transfer and restart |
 | `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
 | `Agentstration.Workplace.Web.Tests` | Integration | Workplace HTTP host |
@@ -136,7 +144,7 @@ The required inventory contains 1,731 cases: Fast contains 777 and Integration 9
 
 Flow recovery regressions cover terminal history, multiple active pages, equal update times, exact Instance/Tenant/Workspace keys, active leases, and input expiry while earlier runs become terminal. SQLite query checks require bounded, status-filtered key reads without loading payloads. The PostgreSQL CI lane also runs `FlowRecoveryRepairsLegacyStatusesAndDrainsChangingPages`: it creates a disposable database, upgrades stale status metadata without changing payloads, ETags or update times, and drains pages while visited runs are updated and deleted. Its test connection therefore needs permission to create and drop that disposable database; the default offline lane skips it when `AGENTSTRATION_TEST_POSTGRES` is absent.
 
-Management API retains real HTTP, MCP transport, hosted provisioning and AWP execution tests. Eleven service-only cases instead use `ManagementServiceFixture`: the production application registrations with hosted services disabled, private non-pooled SQLite stores and deterministic bootstrap. It starts no ASP.NET Core server, background scheduler or Worker, and disposes only its own provider/files. It deliberately retains real persistence, scope authorization, provisioning and the real artifact backend; those cases remain Integration tests. No host or mutable database is shared between tests.
+Management API retains real HTTP, MCP transport, hosted provisioning and AWP execution tests. Eleven service-only cases instead use `ManagementServiceFixture`: the production application registrations with hosted services disabled, private non-pooled SQLite stores and deterministic bootstrap. Five Storage execution/provisioning cases use a module-owned preparation helper in Management Storage, alongside the existing content/persistence tests. Each test creates its own provider and private non-pooled SQLite databases, without an ASP.NET Core server, background scheduler or Worker, and disposes only its own provider/files. The tests retain real persistence, scope authorization, provisioning and the real artifact backend; all sixteen cases remain in the required Integration and coverage inventories. No host, mutable database or cross-project source compilation is shared.
 
 `SecurityApiTests.Factory` defaults to the existing API-only composition. Tests rendering login/bootstrap/logout, account/PAT/profile, organization or audit pages explicitly request `fullHost: true` and keep their cookie/antiforgery checks. The role/PAT matrix asserts exact statuses and endpoint-specific Problem Details or response properties. Artifact leases are successfully read before expiry, denied exactly at the controlled deadline and denied independently after revocation, without wall-clock sleeps.
 

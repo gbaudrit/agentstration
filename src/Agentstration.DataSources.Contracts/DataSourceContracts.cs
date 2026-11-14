@@ -1,6 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
+
+using Agentstration.Flows;
 
 namespace Agentstration.DataSources.Contracts;
 
@@ -84,8 +88,34 @@ public sealed record DataSourceProperties
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
-    public required ResourceReference Profile { get; init; }
+    public ResourceReference? Profile { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public DataSourceDatasetProperties? Dataset { get; init; }
+}
+
+public sealed record DataSourceOperationAcquisitionBinding(
+    ConnectedServiceOperationRevisionReference Operation, JsonElement Parameters);
+
+/// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
+public sealed record DataSourceDatasetProperties(
+    StorageRevisionReference? Storage, StorageContentPolicy Rule,
+    DataSourceOperationAcquisitionBinding Acquisition)
+{
+    public DataSourceAcquisitionPolicy? Lifecycle { get; init; }
+    public FlowCallReference? Orchestration { get; init; }
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
+        = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
+}
+
+public sealed record ResolvedDataSourceDataset(
+    DataSourceDatasetProperties Definition, ConnectedServiceOperationResource Operation,
+    ConnectedServiceOperationTypeVersionDescriptor OperationType,
+    JsonElement InputSchema, JsonElement OutputSchema, string Partition,
+    ResolvedDataSourceFlowBinding Flow)
+{
+    public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
+    public ResolvedFlowComposition? Composition { get; init; }
 }
 
 public sealed record DataSourceResource : Resource
@@ -171,7 +201,11 @@ public sealed record DataSourceReadiness(
     ResolvedDataSourceProfile? Profile,
     IReadOnlyList<string> Issues,
     ResolvedDataSourceFlowBinding? Acquisition = null,
-    ResolvedDataSourceFlowBinding? Discovery = null);
+    ResolvedDataSourceFlowBinding? Discovery = null)
+{
+    public ResolvedDataSourceDataset? Dataset { get; init; }
+    public bool CanAcquire { get; init; }
+}
 
 public sealed record CreateDataSourceProfileRequest(
     string Name,
@@ -360,7 +394,15 @@ public sealed record DataSourceAcquisitionResource : Resource
     public required ResourceNamespace DataSourceNamespace { get; init; }
     public required long DataSourceGeneration { get; init; }
     public DataSourceAcquisitionTargetResource? Target { get; init; }
-    public required ResolvedDataSourceAcquisitionComposition Composition { get; init; }
+    public ResolvedDataSourceAcquisitionComposition? Composition { get; init; }
+    public ResolvedDataSourceDataset? Dataset { get; init; }
+    public StorageObject? Content { get; init; }
+    public DirectDataSourceResult? DirectResult { get; init; }
+    public DateTimeOffset? ContentRetiredAt { get; init; }
+    public DateTimeOffset? ContentRetiringAt { get; init; }
+    public bool ContentRetirementPending { get; init; }
+    public IReadOnlyDictionary<string, DateTimeOffset> ProjectionLeases { get; init; } = new Dictionary<string, DateTimeOffset>();
+    public DateTimeOffset? WriteNotAfter { get; init; }
     public required string FlowRunId { get; init; }
     public required DataSourceAcquisitionState State { get; init; }
     public required string CorrelationId { get; init; }

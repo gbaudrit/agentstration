@@ -130,8 +130,8 @@ internal static class KnowledgeSourceEndpoints
         {
             var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
             var stored = id.ScopeRef is { } exact
-                ? await service.PutExactAsync(exact, id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken)
-                : await service.PutAsync(id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
+                ? await service.PutExactAsync(exact, id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken, body.RebindDependencies)
+                : await service.PutAsync(id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken, body.RebindDependencies);
             return Resource(stored, response, 200);
         });
 

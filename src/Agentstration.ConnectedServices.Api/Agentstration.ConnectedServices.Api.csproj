@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="../ApiModuleGlobalUsings.cs" Link="GlobalUsings.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
+    <ProjectReference Include="../Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+    <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+  </ItemGroup>
+</Project>

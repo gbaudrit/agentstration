@@ -57,3 +57,26 @@ window.agentstrationEnrollment = {
         window.open(window.agentstrationEnrollment.themedUri(uri), "_blank", "noopener,noreferrer");
     }
 };
+
+window.agentstrationDataSources = {
+    focusTab: function (element) {
+        if (!(element instanceof HTMLElement)) {
+            return;
+        }
+        element.focus({ preventScroll: true });
+        element.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+};
+
+window.agentstrationDataSources.openDesigner = function (uri) {
+    window.open(uri, "_blank", "noopener,noreferrer");
+};
+
+window.agentstrationDataSources.bindTransformationCreator = function (element) {
+    element.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) return;
+        event.preventDefault();
+        const create = element.querySelector('[data-action="create-transformation"]');
+        if (create && !create.disabled) create.click();
+    });
+};

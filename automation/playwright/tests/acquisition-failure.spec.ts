@@ -7,7 +7,7 @@ test.use({ authenticationMode: 'Local', acquisitionFailureFixture: true });
 
 for (const locale of ['en-US', 'fr-FR'] as const) {
   for (const mobile of [false, true]) {
-    test(`REST acquisition failure diagnostics ${locale} ${mobile ? 'mobile @responsive' : 'desktop'} @smoke${locale === 'fr-FR' && !mobile ? ' @locale' : ''}`,
+    test(`REST acquisition failure diagnostics expand on demand ${locale} ${mobile ? 'mobile @responsive' : 'desktop'} @smoke${locale === 'fr-FR' && !mobile ? ' @locale' : ''}`,
       async ({ page, product }) => {
         test.setTimeout(240_000);
         const pages = new ProductPages(page);

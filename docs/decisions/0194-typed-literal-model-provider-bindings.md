@@ -1,4 +1,4 @@
-# ADR-0192 — Model Provider bindings support typed literals
+# ADR-0194 — Model Provider bindings support typed literals
 
 ## Status
 

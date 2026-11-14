@@ -1,0 +1,3 @@
+fieldset { min-width: 0; }
+.form-actions { flex-wrap: wrap; }
+button, a { max-width: 100%; white-space: normal; }

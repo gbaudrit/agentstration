@@ -1,11 +1,13 @@
 @page "/artifacts/staged/{Id}"
 @implements IDisposable
 @inject IArtifactsClient Client
+@inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject TimeProvider TimeProvider
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
 <PageTitle>@(artifact?.FileName ?? Id) · Agentstration</PageTitle>
+<div class="artifact-header">
 <PageHeader Title="@(artifact?.FileName ?? Id)" Description="@T("DetailsDescription")" TestId="staged-artifact-details">
     <Actions>
         @if (artifact is not null)
@@ -15,6 +17,7 @@
         <a class="button-secondary" href="/artifacts">@T("Back")</a>
     </Actions>
 </PageHeader>
+</div>
 
 @if (confirmPurge)
 {
@@ -83,7 +86,7 @@ else if (artifact is not null)
         }
         else if (activeTab == DetailsTab.Content)
         {
-            <StagedArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" Metadata="artifact" />
+            <StagedArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" Metadata="artifact" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
         }
         else
         {

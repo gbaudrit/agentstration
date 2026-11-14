@@ -20,6 +20,30 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes) : IDataSourceAcquisitionCompositionResolver
 {
+    public async Task<ResolvedDataSourceFlowBinding> ResolveOperationAsync(ResourceScopeRef consumerScope,
+        Agentstration.ConnectedServices.Contracts.ConnectedServiceDiscoveryFlowReference reference,
+        CancellationToken cancellationToken)
+    {
+        var scope = reference.Flow.ScopeRef ?? throw Error("operation_flow_scope_required", "The operation Flow must have an exact scope.");
+        var ns = reference.Flow.Namespace ?? ResourceNamespace.Default;
+        var flow = await flows.GetExactAsync(scope, new FlowId(reference.Flow.Name, ns), cancellationToken);
+        if (flow?.Value.Uid != reference.FlowUid || reference.Contract != DataSourceDatasetCompositionService.FlowContract)
+            throw Error("operation_flow_stale", "The exact operation Flow identity or contract is unavailable.");
+        var resolved = await flows.ResolveAsync(consumerScope, new FlowReference(new(reference.Flow.Name, ns),
+            reference.Version, false, ns, scope), ns, cancellationToken);
+        if (!flow.Value.Enabled || !(await accessPolicies.EvaluateAsync(new ResourceAccessIdentity(flow.Value.Uid,
+                scope, ns, FlowResourceKinds.Flow, Version: reference.Version), consumerScope,
+                ResourceAccessAction.Use, cancellationToken)).Allowed)
+            throw Error("operation_flow_access_denied", "The exact operation Flow does not authorize this consumer.");
+        var hash = resolved.DefinitionHash ?? (resolved.Graph is null
+            ? FlowDefinitionHash.Compute(resolved.Definition) : FlowDefinitionHash.Compute(resolved.Graph));
+        if (hash != reference.DefinitionHash || resolved.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract) != reference.Contract)
+            throw Error("operation_flow_stale", "The exact operation Flow revision or contract is unavailable.");
+        return new(reference.Flow.Name, ns, reference.Version, false, resolved.Graph?.InputSchema,
+            resolved.Graph?.OutputSchema, reference.Contract, hash)
+        { ScopeRef = scope };
+    }
+
     public async Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
         ResourceScopeRef ownerScope,
         ResourceNamespace ownerNamespace,
@@ -302,7 +326,9 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 null,
                 Scope(request.WorkspaceId, request.TenantId, request.PrincipalId) with { LogicalScopeRef = request.LogicalScopeRef })
             {
-                DefinitionScopeRef = request.Flow.ScopeRef
+                DefinitionScopeRef = request.Flow.ScopeRef,
+                Compositions = request.Compositions,
+                TransientPayloads = request.TransientPayloads
             }, cancellationToken);
             return Snapshot(stored.Value);
         }
@@ -349,7 +375,15 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
         run.Output?.Clone(),
         run.Error?.Code,
         run.Error?.Message,
-        run.CompletedAt);
+        run.CompletedAt)
+    {
+        TransientPayloadsAvailable = run.TransientPayloadsAvailable,
+        RootFlowRunId = run.RootFlowRunId,
+        FlowName = run.FlowId.Value,
+        FlowNamespace = run.FlowId.Namespace,
+        DefinitionScope = run.DefinitionScopeRef,
+        DefinitionHash = run.Composition?.TemplateHash ?? run.DefinitionHash
+    };
 }
 
 public sealed class DataSourceArtifactReferenceValidator(IResourceStore store)

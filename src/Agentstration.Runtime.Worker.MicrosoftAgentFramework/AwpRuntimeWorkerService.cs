@@ -105,7 +105,7 @@ internal sealed class AwpRuntimeWorkerService(
             .Assembly.GetName().Version?.ToString();
         return new([AwpProtocol.Version], new(client.WorkerId, client.SessionId, softwareVersion,
             configured.MaximumConcurrentAssignments,
-            [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"], mafVersion)]));
+            [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"], mafVersion)]));
     }
 
     private static bool IsAuthenticationFailure(AwpClientException exception) =>

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
@@ -9,6 +8,11 @@ using Agentstration.Tools;
 
 namespace Agentstration.Knowledge;
 
+public interface IKnowledgeAccessToolResolver
+{
+    Task<ToolRelayTarget> ResolveAsync(KnowledgeSourceOperation operation, ResourceScopeRef consumer, CancellationToken cancellationToken);
+}
+
 public sealed class KnowledgeSourceToolExposureService(
     KnowledgeSourceManagementService sources,
     ToolDefinitionService definitions,
@@ -17,11 +21,12 @@ public sealed class KnowledgeSourceToolExposureService(
     IResourceScopeOperations scopeOperations,
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
-    ISecurityAuditWriter audit)
+    ISecurityAuditWriter audit,
+    IKnowledgeAccessToolResolver? nativeTools = null)
 {
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
     private static readonly KnowledgeSourceOperation[] Operations =
-        [KnowledgeSourceOperation.Search, KnowledgeSourceOperation.Query, KnowledgeSourceOperation.Read];
+        [KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus];
 
     public async Task<StoredResource<KnowledgeSourceToolExposureResource>?> GetAsync(
         KnowledgeSourceId id,
@@ -44,30 +49,24 @@ public sealed class KnowledgeSourceToolExposureService(
         bool requiresApproval,
         CancellationToken cancellationToken)
     {
-        var scopeRef = CurrentWorkspaceScope();
+        var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
+        var executionScope = administrative is null ? CurrentWorkspaceScope() : ResourceScopeRef.Workspace(administrative.WorkspaceId);
+        var scopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? executionScope;
         var source = await sources.ResolveForUseAsync(id, scopeRef, cancellationToken);
         var readiness = await sources.GetReadinessForUseAsync(id, scopeRef, cancellationToken);
-        var retrieval = readiness.Retrieval
-            ?? throw new KnowledgeSourceValidationException("knowledge_source_retrieval_flow_unavailable", "The KnowledgeSource retrieval Flow is unavailable.");
         if (!readiness.Ready)
             throw new KnowledgeSourceValidationException("knowledge_source_not_ready", "Only a ready KnowledgeSource can be exposed as Tools.");
-        if (!string.Equals(retrieval.Contract, KnowledgeFlowContracts.Retrieval, StringComparison.Ordinal))
-            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_contract_invalid",
-                $"The retrieval Flow must declare '{KnowledgeFlowContracts.Retrieval}'.");
-        var supportedOperations = Operations.Where(operation => retrieval.Capabilities?.Contains(
-            KnowledgeFlowContracts.Capability(operation), StringComparer.Ordinal) == true).ToArray();
-        if (supportedOperations.Length == 0)
-            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_capabilities_missing",
-                "The retrieval Flow must declare at least one supported Knowledge capability.");
+        var supportedOperations = Operations;
+        var toolSetName = source.Value.Name + ".access";
         var existingToolSet = await toolSets.GetExactAsync(scopeRef,
-            source.Value.Namespace, source.Value.Name, cancellationToken);
+            source.Value.Namespace, toolSetName, cancellationToken);
         if (existingToolSet is not null && !IsOwnedBy(existingToolSet.Value.Metadata, source.Value.Uid))
             throw new KnowledgeSourceValidationException("knowledge_source_tool_set_conflict",
                 $"ToolSet '{source.Value.Namespace}/{source.Value.Name}' is not owned by this KnowledgeSource.");
         var currentDefinitions = new Dictionary<KnowledgeSourceOperation, StoredResource<ToolDefinitionResource>?>();
         foreach (var operation in supportedOperations)
         {
-            var definitionName = $"{source.Value.Name}.{operation.ToString().ToLowerInvariant()}";
+            var definitionName = $"{source.Value.Name}.access.{KnowledgeAccessSchemas.Route(operation).Replace('_', '-')}";
             var current = await store.GetExactAsync<ToolDefinitionResource>(ScopedResourceAddress.Create(scopeRef,
                 source.Value.Namespace, ToolResourceKinds.ToolDefinition, definitionName), cancellationToken);
             if (current is not null && !IsOwnedBy(current.Value.Metadata, source.Value.Uid))
@@ -79,8 +78,8 @@ public sealed class KnowledgeSourceToolExposureService(
         var members = new List<ToolSetMember>(supportedOperations.Length);
         foreach (var operation in supportedOperations)
         {
-            var route = operation.ToString().ToLowerInvariant();
-            var definitionName = $"{source.Value.Name}.{route}";
+            var route = KnowledgeAccessSchemas.Route(operation);
+            var definitionName = $"{source.Value.Name}.access.{route.Replace('_', '-')}";
             var current = currentDefinitions[operation];
             _ = await definitions.PutAsync(new ToolDefinitionResource
             {
@@ -100,36 +99,32 @@ public sealed class KnowledgeSourceToolExposureService(
                     }
                 },
                 ScopeRef = scopeRef,
-                Definition = new ToolDefinitionProperties
+                Definition = new RelayToolDefinitionProperties
                 {
+                    Version = version,
+                    Publish = true,
                     DisplayName = $"{source.Value.Definition.DisplayName} {route}",
-                    Description = $"{route} operation for KnowledgeSource '{source.Value.Name}'.",
+                    Description = operation switch
+                    {
+                        KnowledgeSourceOperation.Read => "Read Unicode character chunks. Without a Snapshot or cursor, prepare current data if necessary. Continue with cursor only; a cursor stays on the same Snapshot. Reuse search_regex snapshotId, documentId and readRange as range.",
+                        KnowledgeSourceOperation.SearchRegex => "Search a Snapshot using a bounded .NET non-backtracking regular expression. May be called before read; prepares data if necessary. Returns Unicode matchRange and readRange for read. Continue with cursor only. Unsupported lookarounds and backreferences are rejected.",
+                        _ => "Inspect active and latest published Snapshots, compare a snapshotId and inspect input freshness and processing without starting acquisition or projection. Freshness is evidence from recorded inputs, not a guarantee about the remote origin."
+                    },
                     RequiresApproval = requiresApproval,
-                    InputSchema = PublicSchema(retrieval.InputSchema, operation),
-                    FixedArguments = JsonSerializer.SerializeToElement(new
+                    Target = nativeTools is not null ? await nativeTools.ResolveAsync(operation, scopeRef, cancellationToken)
+                        : throw new KnowledgeSourceValidationException("knowledge_access_tools_unavailable", "The platform Knowledge Tools are unavailable."),
+                    Bindings = [new LiteralToolArgumentBinding
                     {
-                        knowledgeSourceId = ToolResourceIdentity.CatalogId(source.Value.Namespace, source.Value.Name),
-                        knowledgeSourceUid = source.Value.Uid,
-                        knowledgeSourceGeneration = source.Value.Generation,
-                        operation = route,
-                        snapshot = new { name = string.Empty, uid = Guid.Empty, artifacts = Array.Empty<object>() },
-                        caller = new { principalId = Guid.Empty, tenantId = Guid.Empty, workspaceId = Guid.Empty },
-                        correlationId = string.Empty,
-                        retrievalId = string.Empty
-                    }),
-                    OutputSchema = retrieval.OutputSchema?.Clone(),
-                    Flow = new ToolDefinitionFlowTarget
-                    {
-                        Name = retrieval.Name,
-                        Namespace = retrieval.Namespace,
-                        ScopeRef = retrieval.ScopeRef,
-                        Version = retrieval.Version,
-                        UseActiveVersion = false
-                    }
+                        Path = "/source", Value = JsonSerializer.SerializeToElement(new
+                        {
+                            name = source.Value.Name, @namespace = source.Value.Namespace.Value,
+                            scopeRef = source.Value.ScopeRef!.Value.Value, uid = source.Value.Uid
+                        })
+                    }]
                 }
             }, current?.ETag, current is null, cancellationToken);
 
-            var toolName = AgentstrationToolProvider.ToolResourceName(definitionName);
+            var toolName = AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName(definitionName, version));
             var tool = new ResourceReference(toolName, scopeRef, source.Value.Namespace);
             var capability = $"knowledge.{route}";
             operations.Add(new KnowledgeSourceToolOperationExposure
@@ -159,7 +154,7 @@ public sealed class KnowledgeSourceToolExposureService(
                 Kind = ToolResourceKinds.ToolSet,
                 Metadata = new ResourceMetadata
                 {
-                    Name = source.Value.Name,
+                    Name = toolSetName,
                     Namespace = source.Value.Namespace,
                     Tags = new Dictionary<string, string> { ["agentstration.io/category"] = "knowledge-source" },
                     Annotations = new Dictionary<string, string>
@@ -174,7 +169,7 @@ public sealed class KnowledgeSourceToolExposureService(
         }
         else
         {
-            _ = await toolSets.PutAsync(source.Value.Namespace, source.Value.Name, toolSetDefinition,
+            _ = await toolSets.PutAsync(source.Value.Namespace, toolSetName, toolSetDefinition,
                 existingToolSet.ETag, cancellationToken);
         }
 
@@ -184,7 +179,7 @@ public sealed class KnowledgeSourceToolExposureService(
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = KnowledgeResourceKinds.KnowledgeSourceToolExposure,
             Metadata = new ResourceMetadata { Name = source.Value.Name, Namespace = source.Value.Namespace },
-            ScopeRef = scopeRef,
+            ScopeRef = executionScope,
             Uid = existing?.Value.Uid ?? Guid.Empty,
             Generation = existing is null ? 1 : checked(existing.Value.Generation + 1),
             Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded },
@@ -192,15 +187,17 @@ public sealed class KnowledgeSourceToolExposureService(
             KnowledgeSourceScopeRef = source.Value.ScopeRef,
             KnowledgeSourceName = source.Value.Name,
             KnowledgeSourceGeneration = source.Value.Generation,
-            RetrievalFlow = retrieval,
-            ToolSet = new ResourceReference(source.Value.Name, scopeRef, source.Value.Namespace),
+            RetrievalFlow = readiness.Retrieval,
+            ToolSet = new ResourceReference(toolSetName, scopeRef, source.Value.Namespace),
             ToolSetVersion = version,
             Operations = operations
         };
-        var stored = await scopeOperations.WriteAsync(exposure, scopeRef, AuthorizationPermissions.ResourcesWrite,
-            token => store.PutExactAsync(scopeRef, exposure, existing?.ETag, existing is null, token), cancellationToken);
+        StoredResource<KnowledgeSourceToolExposureResource> stored;
+        using (administrative is null ? null : requestScopes.Push(administrative))
+            stored = await scopeOperations.WriteAsync(exposure, executionScope, AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(executionScope, exposure, existing?.ETag, existing is null, token), cancellationToken);
         await audit.WriteAsync(new(SecurityAuditActions.KnowledgeSourceToolExposurePublished,
-            WorkspaceId: scopeRef.TargetId), cancellationToken);
+            WorkspaceId: executionScope.TargetId), cancellationToken);
         return stored;
     }
 
@@ -217,82 +214,4 @@ public sealed class KnowledgeSourceToolExposureService(
         && Guid.TryParse(owner, out var ownerUid)
         && ownerUid == sourceUid;
 
-    private static JsonElement PublicSchema(JsonElement? inputSchema, KnowledgeSourceOperation operation)
-    {
-        if (inputSchema is not { ValueKind: JsonValueKind.Object } schema)
-            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_input_schema_invalid", "The retrieval Flow requires an object input schema.");
-        var root = JsonNode.Parse(schema.GetRawText())?.AsObject()
-            ?? throw new KnowledgeSourceValidationException("knowledge_source_retrieval_input_schema_invalid", "The retrieval Flow input schema is invalid.");
-        if (root["properties"] is not JsonObject properties
-            || !properties.ContainsKey("knowledgeSourceId")
-            || !properties.ContainsKey("operation")
-            || !properties.ContainsKey("request"))
-            throw new KnowledgeSourceValidationException("knowledge_source_retrieval_contract_invalid",
-                "The retrieval Flow must declare the shared Knowledge retrieval input envelope.");
-        string[] fixedNames =
-        [
-            "knowledgeSourceId", "knowledgeSourceUid", "knowledgeSourceGeneration", "operation",
-            "snapshot", "caller", "correlationId", "retrievalId"
-        ];
-        foreach (var name in fixedNames) properties.Remove(name);
-        properties["request"] = JsonNode.Parse(RequestSchema(operation).GetRawText());
-        if (root["required"] is JsonArray required)
-            for (var index = required.Count - 1; index >= 0; index--)
-                if (required[index]?.GetValue<string>() is { } name && fixedNames.Contains(name, StringComparer.Ordinal))
-                    required.RemoveAt(index);
-        return JsonSerializer.SerializeToElement(root);
-    }
-
-    private static JsonElement RequestSchema(KnowledgeSourceOperation operation) => operation switch
-    {
-        KnowledgeSourceOperation.Search => JsonSerializer.SerializeToElement(new
-        {
-            type = "object",
-            properties = new
-            {
-                query = new { type = "string", minLength = 1, maxLength = KnowledgeRetrievalService.MaximumSearchQueryCharacters },
-                filters = new
-                {
-                    type = "object",
-                    maxProperties = KnowledgeRetrievalService.MaximumFilters,
-                    additionalProperties = new { type = "string", maxLength = 1_000 }
-                },
-                limit = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumResults },
-                continuationToken = new { type = "string", maxLength = KnowledgeRetrievalService.MaximumContinuationCharacters },
-                snapshotName = new { type = "string" },
-                correlationId = new { type = "string", maxLength = 200 }
-            },
-            required = new[] { "query" },
-            additionalProperties = false
-        }),
-        KnowledgeSourceOperation.Query => JsonSerializer.SerializeToElement(new
-        {
-            type = "object",
-            properties = new
-            {
-                question = new { type = "string", minLength = 1, maxLength = KnowledgeRetrievalService.MaximumQuestionCharacters },
-                maximumItems = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumResults },
-                maximumOutputCharacters = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumOutputCharacters },
-                snapshotName = new { type = "string" },
-                correlationId = new { type = "string", maxLength = 200 }
-            },
-            required = new[] { "question" },
-            additionalProperties = false
-        }),
-        KnowledgeSourceOperation.Read => JsonSerializer.SerializeToElement(new
-        {
-            type = "object",
-            properties = new
-            {
-                artifactId = new { type = "string", minLength = 1, maxLength = 200 },
-                offset = new { type = "integer", minimum = 0 },
-                length = new { type = "integer", minimum = 1, maximum = KnowledgeRetrievalService.MaximumReadBytes },
-                snapshotName = new { type = "string" },
-                correlationId = new { type = "string", maxLength = 200 }
-            },
-            required = new[] { "artifactId" },
-            additionalProperties = false
-        }),
-        _ => throw new ArgumentOutOfRangeException(nameof(operation))
-    };
 }

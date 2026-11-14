@@ -88,6 +88,9 @@ var openApiEnabledSetting = builder.Configuration["OpenApi:Enabled"];
 if (openApiEnabledSetting is not null && !bool.TryParse(openApiEnabledSetting, out _))
     throw new InvalidOperationException("OpenApi:Enabled must be true or false.");
 var openApiEnabled = bool.TryParse(openApiEnabledSetting, out var configuredOpenApiEnabled) && configuredOpenApiEnabled;
+var openDalEnabledSetting = builder.Configuration["OpenDal:Enabled"] ?? "false";
+if (!bool.TryParse(openDalEnabledSetting, out var openDalEnabled))
+    throw new InvalidOperationException("OpenDal:Enabled must be true or false.");
 var openApiAllowedDomains = builder.Configuration.GetSection("OpenApi:AllowedDomains")
     .GetChildren()
     .Select(value => value.Value)
@@ -155,11 +158,17 @@ var crawl4AiAllowedPorts = builder.Configuration.GetSection("Crawl4AI:AllowedPor
     .Cast<string>()
     .ToArray();
 
+var aepInferenceTimeout = builder.Configuration["Agentstration:Aep:Inference:Timeout"];
+var ollamaInferenceTimeout = builder.Configuration["Ollama:Inference:Timeout"];
+
 var ollamaExtension = builder.AddProject<Projects.Agentstration_Extensions_Ollama>("ollama-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("Ollama__Endpoint", parsedOllamaEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
+if (ollamaInferenceTimeout is not null)
+    ollamaExtension.WithEnvironment("Ollama__Inference__Timeout", ollamaInferenceTimeout);
+
 var llamaCppExtension = builder.AddProject<Projects.Agentstration_Extensions_LlamaCpp>("llama-cpp-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithEnvironment("LlamaCpp__Endpoint", parsedLlamaCppEndpoint.AbsoluteUri)
@@ -231,6 +240,31 @@ if (openApiEnabled)
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "Agentstration.Extensions.OpenApi", "openapi-extension", openApiExtension));
+}
+if (openDalEnabled)
+{
+    const string hostingStartupExclusionsKey = "ASPNETCORE_HOSTINGSTARTUPEXCLUDEASSEMBLIES";
+    var hostingStartupExclusions = (builder.Configuration[hostingStartupExclusionsKey] ?? string.Empty)
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Append("Microsoft.WebTools.ApiEndpointDiscovery")
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+    var openDalExtension = builder.AddProject<Projects.Agentstration_Extensions_OpenDal>(
+            "opendal-extension", options => options.ExcludeLaunchProfile = true)
+        .WithHttpEndpoint(port: 5189, name: "http")
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts)
+        .WithEnvironment(hostingStartupExclusionsKey, string.Join(';', hostingStartupExclusions))
+        .WithEnvironment("OpenDal__RootDirectory", Path.Combine(slotDataPath, "opendal-data"))
+        .WithEnvironment("OpenDal__AllowPairedClient", usePairingCode ? "true" : "false");
+    if (!usePairingCode)
+    {
+        const string clientId = "agentstration-development";
+        openDalExtension
+            .WithEnvironment("Aep__SharedKeyFile__ClientId", clientId)
+            .WithEnvironment("OpenDal__AllowedClients__0", clientId);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "agentstration.extensions.opendal", "opendal-extension", openDalExtension));
 }
 if (crawl4AiEnabled)
 {
@@ -329,6 +363,8 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
+if (aepInferenceTimeout is not null)
+    console.WithEnvironment("Agentstration__Aep__Inference__Timeout", aepInferenceTimeout);
 if (usePairingCode)
 {
     foreach (var extension in developmentExtensions)

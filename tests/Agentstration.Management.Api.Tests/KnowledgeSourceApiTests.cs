@@ -51,7 +51,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
             _ = await policies.PutAsync(new(new(source.Value.Uid, instanceScope, source.Value.Namespace,
-                source.Value.Kind, source.Value.Generation),
+                source.Value.Kind),
                 [new(tenantScope, [ResourceAccessAction.Discover, ResourceAccessAction.Use], true)]), null, default);
 
         var knowledge = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
@@ -139,7 +139,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
             Assert.IsNotNull(stored.Value.Composition);
             Assert.IsFalse(string.IsNullOrWhiteSpace(stored.Value.Composition.DependencyHash));
             Assert.AreEqual(instanceScope, stored.Value.Composition.ProjectionFlow.ScopeRef);
-            Assert.AreEqual(instanceScope, stored.Value.Composition.RetrievalFlow.ScopeRef);
+            Assert.AreEqual(instanceScope, stored.Value.Composition.RetrievalFlow!.ScopeRef);
             var dependency = stored.Value.Composition.DataSources.Single();
             Assert.AreEqual(instanceScope, dependency.DataSourceScopeRef);
             Assert.AreEqual(source.Value.Uid, dependency.DataSourceUid);
@@ -333,8 +333,8 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         var artifact = primary.Acquisition.Manifest?.Artifacts.Single();
         Assert.IsNotNull(artifact);
         Assert.AreEqual(DataSourceArtifactDisposition.Publishable, artifact.Disposition);
-        Assert.AreEqual("web-builtin", primary.Acquisition.Composition.Profile.Name);
-        Assert.AreEqual(DataSourceFlowContracts.Acquisition, primary.Acquisition.Composition.Flow.Contract);
+        Assert.AreEqual("web-builtin", primary.Acquisition.Composition!.Profile.Name);
+        Assert.AreEqual(DataSourceFlowContracts.Acquisition, primary.Acquisition.Composition!.Flow.Contract);
         var durable = await factory.Services.GetRequiredService<ArtifactManagementService>()
             .GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(artifact.ArtifactId), default);
         Assert.IsNotNull(durable);
@@ -372,20 +372,27 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
         using var projectionResponse = await client.PostAsJsonAsync(
             $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
             new StartKnowledgeProjectionRequest());
-        Assert.AreEqual(HttpStatusCode.Created, projectionResponse.StatusCode,
+        Assert.AreEqual(HttpStatusCode.Accepted, projectionResponse.StatusCode,
             await projectionResponse.Content.ReadAsStringAsync());
         var projection = await projectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(projection);
+        Assert.AreEqual(KnowledgeProjectionState.Running, projection.State);
+        var projectionService = factory.Services.GetRequiredService<KnowledgeProjectionService>();
+        // Hosted execution is intentionally disabled in this fixture; drive the same durable recovery use case.
+        await projectionService.RecoverPendingAsync(default);
+        projection = (await projectionService.GetAsync(projection.Name, projection.Namespace, default)).Value;
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.State, projection.ErrorMessage);
         Assert.IsNotNull(projection.SnapshotName);
 
         using var secondProjectionResponse = await client.PostAsJsonAsync(
             $"/api/knowledgesources/{knowledgeSource.Value.Name}/projections",
             new StartKnowledgeProjectionRequest());
-        Assert.AreEqual(HttpStatusCode.Created, secondProjectionResponse.StatusCode,
+        Assert.AreEqual(HttpStatusCode.Accepted, secondProjectionResponse.StatusCode,
             await secondProjectionResponse.Content.ReadAsStringAsync());
         var secondProjection = await secondProjectionResponse.Content.ReadFromJsonAsync<KnowledgeProjectionResource>();
         Assert.IsNotNull(secondProjection);
+        await projectionService.RecoverPendingAsync(default);
+        secondProjection = (await projectionService.GetAsync(secondProjection.Name, secondProjection.Namespace, default)).Value;
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, secondProjection.State, secondProjection.ErrorMessage);
         Assert.IsNotNull(secondProjection.SnapshotName);
         Assert.AreNotEqual(projection.Name, secondProjection.Name);

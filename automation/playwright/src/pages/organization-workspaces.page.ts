@@ -211,10 +211,11 @@ export class OrganizationWorkspacesPage {
   public async currentScope(): Promise<string> {
     const shell = this.page.getByTestId(TestIds.console.shell);
     let scope = '';
+    // Capture the validated read itself: hydration can replace the shell between two reads.
     await expect.poll(async () => {
       scope = await shell.getAttribute('data-context-scope') ?? '';
       return scope;
-    }).not.toBe('');
+    }).toMatch(/^\/(?:instance|(?:tenants|workspaces)\/[0-9a-f-]{36})$/);
     return scope;
   }
 

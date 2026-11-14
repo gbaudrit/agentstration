@@ -40,11 +40,15 @@ model {
           }
 
           dataSourcesApi = component 'DataSources.Api' {
-            description 'Data Source profiles, origins, governed acquisitions, and exact provenance transport'
+            description 'Data Source profiles, origins, direct or retained acquisitions, independent freshness and history, and exact provenance transport'
+          }
+
+          storageApi = component 'Storage.Api' {
+            description 'Governed Storage types, scoped logical resources, explicit service export mappings, reconciliation and protected resolution'
           }
 
           knowledgeApi = component 'Knowledge.Api' {
-            description 'Knowledge Source projections, immutable Snapshots, retrieval, and source-specific Tool exposure transport'
+            description 'Knowledge Source projections, immutable Snapshots, native content reading, regex search, status, optional custom retrieval, and source-specific relay Tool exposure transport'
           }
 
           modelsApi = component 'Models.Api' {
@@ -126,7 +130,7 @@ model {
       }
 
       resources = component 'Resource-family services' {
-        description 'Family-owned exact-scope lifecycle and descendant-access services for Agents, Models, Entries, Triggers, Extensions, Sources, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
+        description 'Family-owned exact-scope lifecycle and descendant-access services for Agents, Models, Entries, Triggers, Extensions, Sources, Storages, Data Sources, Artifacts, Knowledge, Secrets, and related resources'
       }
 
       distribution = component 'Distribution and bootstrap' {
@@ -138,7 +142,7 @@ model {
       }
 
       flow = component 'Flow engine' {
-        description 'Flow definitions, immutable publications, durable Flow Runs, and provider-neutral graph execution'
+        description 'Flow definitions, typed resource-bound composition points, immutable publications, admission-pinned child sequences, durable Flow Runs, and provider-neutral graph execution'
       }
 
       runtime = component 'Runtime execution' {
@@ -147,6 +151,10 @@ model {
 
       tools = component 'Tool execution pipeline' {
         description 'Governed Tool catalog, policy hooks, approvals, MCP publication, and invocation'
+      }
+
+      storageExecution = component 'Storage execution adapters' {
+        description 'Infrastructure-owned exact Storage resolution, local UID-isolated content and Artifact adapters, protected AEP bindings, ASP MCP invocation and lease-aware content retirement'
       }
 
       scheduling = component 'Scheduling and background processing' {
@@ -180,6 +188,10 @@ model {
 
     runtimeData = container 'Runtime data' {
       description 'Workspace-owned technical Runtime Runs, events, attempts, and execution state, including protected operational Workspaces'
+    }
+
+    storageContent = container 'Storage content data' {
+      description 'Operator-mounted local root with separate exact Storage UID directories; historical Artifact locations and receipts remain preserved'
     }
   }
 
@@ -230,6 +242,7 @@ model {
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.agentsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.artifactsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.dataSourcesApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.storageApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.resourceApis.knowledgeApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.bootstrapApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.extensionsApi 'Composes'
@@ -257,6 +270,11 @@ model {
   agentstration.server.runtime -> agentstration.server.resources 'Resolves immutable Agents and profiles'
   agentstration.server.runtime -> agentstration.server.tools 'Invokes assigned agent Tools'
   agentstration.server.tools -> agentstration.server.resources 'Resolves Tool definitions, providers, and policies'
+  agentstration.server.storageExecution -> agentstration.server.resources 'Resolves exact Storage, type, service and manual export pins'
+  agentstration.server.storageExecution -> agentstration.server.identity 'Checks current scoped use and execution rights'
+  agentstration.server.tools -> agentstration.server.storageExecution 'Uses native Artifact persistence under governed execution'
+  agentstration.server.storageExecution -> agentstration.storageContent 'Reads and writes isolated local content'
+  agentstration.server.storageExecution -> aepExtensions 'Configures protected bindings and invokes generic ASP operations'
   agentstration.server.identity -> agentstration.identityData 'Reads and writes'
   agentstration.server.resources -> agentstration.controlPlaneData 'Reads and writes'
   agentstration.server.work -> agentstration.workData 'Reads and writes'

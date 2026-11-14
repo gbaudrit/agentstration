@@ -62,7 +62,7 @@ public sealed class FlowDesignerResourceProviderTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = "notify" },
-            Definition = new ToolDefinitionProperties
+            Definition = new FlowToolDefinitionProperties
             {
                 DisplayName = "Notify",
                 InputSchema = schema,
@@ -78,10 +78,40 @@ public sealed class FlowDesignerResourceProviderTests
         Assert.AreEqual(reference, tools.Single().InputSchemaReference);
     }
 
-    private sealed class ToolsClientStub(IReadOnlyList<ToolResource> tools) : IToolsClient
+    [TestMethod]
+    [DataRow(ToolProviderType.Mcp, true)]
+    [DataRow(ToolProviderType.Mcp, false)]
+    [DataRow(ToolProviderType.Aep, false)]
+    public async Task DesignerOutputPortMatchesTheActualProviderResultShape(ToolProviderType type, bool internalProvider)
+    {
+        var scope = ResourceScopeRef.Instance;
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { safe = new { type = "boolean" } }, required = new[] { "safe" } });
+        var providerResource = new ToolProviderResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "fixture" }, ScopeRef = scope,
+            Definition = new() { DisplayName = "Fixture", ProviderType = type,
+                Mcp = type == ToolProviderType.Mcp ? new() { Internal = internalProvider } : null }
+        };
+        var tool = new ToolResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool,
+            Metadata = new() { Name = "fixture-tool" }, ScopeRef = scope,
+            Definition = new() { DisplayName = "Fixture Tool", Provider = new("fixture", scope),
+                Schema = new() { Input = JsonSerializer.SerializeToElement(new { type = "object" }), Output = schema } }
+        };
+        var client = new MockApiClient(TimeProvider.System);
+        var resources = new FlowDesignerResourceProvider(client, client,
+            new ToolsClientStub([tool], [providerResource]), new ToolDefinitionsClientStub([]), null!);
+        var output = (await resources.GetToolsAsync(scope, default)).Single().OutputSchema!.Value;
+        Assert.IsTrue(JsonElement.DeepEquals(schema, internalProvider ? output : output.GetProperty("properties").GetProperty("structuredContent")));
+        Assert.IsTrue(JsonElement.DeepEquals(schema, tool.Definition.Schema.Output!.Value));
+    }
+
+    private sealed class ToolsClientStub(IReadOnlyList<ToolResource> tools, IReadOnlyList<ToolProviderResource>? providers = null) : IToolsClient
     {
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => Task.FromResult(tools);
-        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolProviderResource>>(providers ?? []);
         public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

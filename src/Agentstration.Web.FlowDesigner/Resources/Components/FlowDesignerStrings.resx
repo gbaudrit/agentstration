@@ -156,6 +156,91 @@
   <data name="NoOutputContractHelp"><value>This step does not currently expose a configurable output contract.</value></data>
   <data name="SelectFlowVersionForContract"><value>Select an available Flow version to inspect its contract.</value></data>
   <data name="SelectToolForContract"><value>Select an available Tool to inspect its contract.</value></data>
+  <data name="Step.composition" xml:space="preserve"><value>Composition point</value></data>
+  <data name="CompositionPoint" xml:space="preserve"><value>Point name</value></data>
+  <data name="CompositionAllowEmpty" xml:space="preserve"><value>Allow an empty sequence (identity)</value></data>
+  <data name="CompositionHelp" xml:space="preserve"><value>The consuming resource selects an ordered sequence of published Flows here. Each Flow receives value and its saved parameters.</value></data>
+  <data name="InvalidJson" xml:space="preserve"><value>Enter valid JSON.</value></data>
+  <data name="Step.artifactTransform" xml:space="preserve"><value>Transform artifact(s)</value></data>
+  <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Connect process to any processing steps, then connect their result back to this step. completed continues with the output Artifact manifest; error handles processing failure.</value></data>
+  <data name="ArtifactProcessingMode" xml:space="preserve"><value>Provide input as</value></data>
+  <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Content (text or JSON)</value></data>
+  <data name="ArtifactProcessingMode.Access" xml:space="preserve"><value>Scoped input/output access</value></data>
+  <data name="ArtifactContentHelp" xml:space="preserve"><value>Reads bounded UTF-8 text or JSON and captures the selected processing result. Oversized content is refused; binary extraction must be explicit.</value></data>
+  <data name="ArtifactAccessHelp" xml:space="preserve"><value>Agents receive temporary input_read/search_regex and output_write/read/search_regex/complete Tools. The processing decides how to read and verify content. Output stays isolated until successful completion.</value></data>
+  <data name="ArtifactMaximumCount" xml:space="preserve"><value>Maximum Artifacts</value></data>
+  <data name="ArtifactMaximumInput" xml:space="preserve"><value>Maximum input bytes in content mode</value></data>
+  <data name="ArtifactMaximumOutput" xml:space="preserve"><value>Maximum output bytes per Artifact</value></data>
+  <data name="ArtifactOutputName" xml:space="preserve"><value>Output file name (empty: preserve input name)</value></data>
+  <data name="ArtifactOutputMediaType" xml:space="preserve"><value>Output media type (empty: preserve input type)</value></data>
+  <data name="ArtifactManifestMapping" xml:space="preserve"><value>Input Artifact list or manifest mapping (JSON)</value></data>
+  <data name="ArtifactProcessingInputMapping" xml:space="preserve"><value>Processing input mapping (JSON, optional)</value></data>
+  <data name="ArtifactProcessingInputHelp" xml:space="preserve"><value>The mapping can reference input.content, input.artifact, input.inputAccess, input.outputAccess and input.parameters. For a generic Tool, map content to its existing parameter. Empty passes this envelope.</value></data>
+  <data name="ArtifactResultMapping" xml:space="preserve"><value>Processing result mapping (JSON, optional)</value></data>
+  <data name="ArtifactResultHelp" xml:space="preserve"><value>In content mode, input and transition.output reference the processing result to capture. In access mode, complete the output draft using output_complete; returning from processing allows this step to finalize it.</value></data>
+  <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Processing result</value></data>
+  <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Processing</value></data>
+  <data name="ArtifactOutputMediaTypeHelp" xml:space="preserve"><value>Choose a suggested MIME type or enter your own. Match the type to the produced content; leave empty to keep the input type.</value></data>
+  <data name="InspectPortNamed" xml:space="preserve"><value>Inspect port {0}</value></data>
+  <data name="PortContractTitle" xml:space="preserve"><value>Port {1} · {0}</value></data>
+  <data name="PortContractDesignHelp" xml:space="preserve"><value>Declared contracts and mappings for this definition. Dynamic contracts are resolved for each execution. Artifact data contracts describe the content, separately from the reference envelope.</value></data>
+  <data name="PortContractSummary" xml:space="preserve"><value>{0}: {1} · {2}</value></data>
+  <data name="PortContractUnresolved" xml:space="preserve"><value>No concrete schema available here</value></data>
+  <data name="DataContractMode" xml:space="preserve"><value>Contract mode</value></data>
+  <data name="DataContractMode.Absent" xml:space="preserve"><value>Undeclared</value></data>
+  <data name="DataContractMode.Fixed" xml:space="preserve"><value>Explicit fixed contract</value></data>
+  <data name="DataContractMode.Dynamic" xml:space="preserve"><value>Explicit dynamic contract</value></data>
+  <data name="ArtifactDataSchema" xml:space="preserve"><value>Artifact content schema (JSON Schema)</value></data>
+  <data name="ArtifactContractHelp" xml:space="preserve"><value>The final selected processing result must satisfy this contract. An explicit producer output contract takes precedence. Access mode validates the completed draft; the final chat message is separate.</value></data>
+  <data name="ContractSource" xml:space="preserve"><value>Resolve contract from</value></data>
+  <data name="ContractSource.Input" xml:space="preserve"><value>Input Artifact data contract</value></data>
+  <data name="ContractSource.Parent" xml:space="preserve"><value>Parent invocation expectation</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="ContractSource.CalledAgent" xml:space="preserve"><value>Provided by the called Agent</value></data>
+  <data name="ContractSource.ArtifactEnvelope" xml:space="preserve"><value>Artifact references (content described separately)</value></data>
+  <data name="AgentInputMapping" xml:space="preserve"><value>Input mapping (JSON)</value></data>
+  <data name="AgentInputContractAbsent" xml:space="preserve"><value>No input contract is declared by this Agent.</value></data>
+  <data name="ArtifactInputContentContract" xml:space="preserve"><value>Each input Artifact carries its own content contract and MIME type when available; these are resolved during execution.</value></data>
+  <data name="ArtifactOutputContentContract" xml:space="preserve"><value>Content contracts apply to each produced Artifact. An explicit producer output contract takes precedence.</value></data>
+  <data name="BeforePublication" xml:space="preserve"><value>Transform before publication</value></data>
+  <data name="ConnectionContractMismatch" xml:space="preserve"><value>Incompatible contracts: {0} → {1}. The mapped output does not satisfy the target input contract. Review the mapping or the contracts.</value></data>
+  <data name="CallAgent" xml:space="preserve"><value>Call an Agent</value></data>
+  <data name="CalledAgentNode" xml:space="preserve"><value>Agent: {0}</value></data>
+  <data name="MappingDataTitle" xml:space="preserve"><value>Data sent to the Agent</value></data>
+  <data name="MappingDataHelp" xml:space="preserve"><value>Choose a value or author a mapping independently of the expected contract.</value></data>
+  <data name="MappingValue" xml:space="preserve"><value>Value or expression</value></data>
+  <data name="MappingPlaceholder" xml:space="preserve"><value>Select a suggestion or enter a value</value></data>
+  <data name="MappingFreeValue" xml:space="preserve"><value>Expressions and literal text are accepted. Empty: forward the incoming value.</value></data>
+  <data name="MappingJson" xml:space="preserve"><value>Custom JSON</value></data>
+  <data name="MappingSimple" xml:space="preserve"><value>Single value</value></data>
+  <data name="MappingPrevious" xml:space="preserve"><value>Previous step result</value></data>
+  <data name="MappingFlowInput" xml:space="preserve"><value>Input received by this Flow</value></data>
+  <data name="MappingArtifactContent" xml:space="preserve"><value>Input Artifact content</value></data>
+  <data name="MappingArtifactMetadata" xml:space="preserve"><value>Input Artifact metadata</value></data>
+  <data name="MappingArtifactInputAccess" xml:space="preserve"><value>Scoped input access</value></data>
+  <data name="MappingArtifactOutputAccess" xml:space="preserve"><value>Scoped output access</value></data>
+  <data name="MappingParameters" xml:space="preserve"><value>Processing parameters</value></data>
+  <data name="MappingStepOutput" xml:space="preserve"><value>Result of “{0}” (if executed)</value></data>
+  <data name="MappingStepProperty" xml:space="preserve"><value>“{0}” result · {1}</value></data>
+  <data name="MappingShowValues" xml:space="preserve"><value>Available values</value></data>
+  <data name="MappingNoOptions" xml:space="preserve"><value>No matching suggestion. You can enter a free value.</value></data>
+  <data name="OpenDraft" xml:space="preserve"><value>Open draft</value></data>
+  <data name="ExplicitOutputMapping" xml:space="preserve"><value>Explicit output mapping</value></data>
+  <data name="ExplicitOutputMappingHelp" xml:space="preserve"><value>This output reads a specific mapping, which can differ from the incoming transition.</value></data>
+  <data name="OutputDataTitle" xml:space="preserve"><value>Value returned by the Flow</value></data>
+  <data name="OutputDataHelp" xml:space="preserve"><value>Choose the incoming result or enter an explicit mapping. An empty mapping forwards the incoming result.</value></data>
+  <data name="UseIncomingTransition" xml:space="preserve"><value>Use the incoming transition</value></data>
+  <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Published version: this mapping is read-only. Open the draft to edit it.</value></data>
+  <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>Output {0} references an unavailable step in its mapping. Check the referenced step or use the incoming transition.</value></data>
+  <data name="ProcessConcurrency" xml:space="preserve"><value>Maximum concurrent process units</value></data>
+  <data name="ProcessConcurrency.Help" xml:space="preserve"><value>Default: sequential. The Worker may apply a lower shared limit; output order is preserved.</value></data>
+  <data name="TransformProcessing" xml:space="preserve"><value>Processing</value></data>
+  <data name="TransformProcessing.None" xml:space="preserve"><value>Single mapping</value></data>
+  <data name="TransformProcessing.Batches" xml:space="preserve"><value>Process array batches</value></data>
+  <data name="TransformProcessing.TextChunks" xml:space="preserve"><value>Process text chunks</value></data>
+  <data name="TransformProcessing.Help" xml:space="preserve"><value>The input mapping selects the value to partition. Connect process to the processing steps and return their result here. The output is an array in unit order.</value></data>
+  <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Elements per batch / characters per text chunk</value></data>
+  <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Maximum process units</value></data>
   <data name="DraftChangedDuringSave" xml:space="preserve">
     <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
   </data>

@@ -99,3 +99,76 @@ Agent, Tool, Tool-route, child-Flow, repeat, and Flow-output steps may capture a
 `clean` accepts `auto`, `true`, or `false`. `auto` is the default and removes the local staged copy when the containing Flow reaches any terminal state, whether or not a Storage Flow is configured. `true` fixes the same cleanup behavior explicitly; `false` retains the copy until ordinary retention expires it. A requested capture or storage failure fails the Flow instead of silently discarding the Artifact.
 
 See [ADR-0151](../decisions/0151-artifacts-use-toolset-backed-staging-and-storage-flows.md), [ADR-0165](../decisions/0165-flow-steps-optionally-capture-results-as-artifacts.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
+
+## Retained Storage publication
+
+Knowledge `output` selects an exact `StorageRevisionReference` and a narrowing
+`StorageContentPolicy` rule. Native inputs require an output. The existing
+`artifacts` manifest array also accepts `kind: inline`, `disposition: publishable`,
+`artifactId`, `mediaType`, optional `digest` and bounded `contentBase64`. `inline`
+is content for projection, not a durable Artifact receipt. Transformations and
+projection retain the existing `artifact.transform/v1` and
+`knowledge.projection/v1` Flow orchestration. The builtin projection aggregates
+prepared entries; a specialized Flow can emit normalized or filtered content.
+
+A published entry's optional `content` contains the retained Storage publication
+reference. Historical entries without it continue to resolve durable Artifacts.
+Retrieval remains `knowledge.retrieval/v1` and returns the existing item/citation
+shape. The builtin routes validate the complete persisted Snapshot before reading
+its exact content. Neither a caller nor a model can substitute another Storage,
+version or content reference.
+
+`StartKnowledgeProjectionRequest.idempotencyKey` is bounded to 200 characters.
+Conflicting reuse is refused. Pending attempts retain exact input evidence and
+resume through the ordinary Flow service. See
+[ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md).
+
+### Freshness, direct inputs, and history
+
+The optional native dataset `lifecycle` controls acquisition TTL from successful
+completion. No input Storage requires explicit `allowDirect`; TTL and input history
+require Storage. Direct input data is an ephemeral projection handoff, never a
+reusable acquisition or intermediate Artifact. It expires and cannot resume after
+process loss. Composed child Flows are supported; Flow-backed Tool Definitions
+inside direct work are refused because their WorkItems would retain the payload.
+
+Knowledge independently configures Snapshot `timeToLive`, `keepHistory`,
+`historyRetention` and `allowExpiredOnRefreshFailure`. A binding may set
+`allowStaleOnRefreshFailure` with `maximumFallbackAge` at least its Data Source TTL.
+Refresh is attempted first, and provenance records its failure before any fallback.
+A failed replacement preserves the previous active Snapshot. An exact native read
+cursor remains attached to its Snapshot to the original lease expiry, even if a
+new Snapshot is published meanwhile.
+
+Cleanup preserves metadata and producer/Storage provenance after retiring bytes.
+Active input/read leases and Workspace executions postpone cleanup. Built-in local
+Storage supports exact retirement; supported remote ASP stores use a conditional
+empty replacement, while unsupported/revoked providers remain pending. Provider
+backups and object version history have their own retention settings. Existing
+resources without lifecycle keep legacy binding freshness rules.
+
+
+## Artifact data-contract evidence
+
+A manifest entry may include `dataContract` for the content it references. This is
+separate from the Flow's manifest schema. Dataset acquisitions retain their exact
+validated output schema. Artifact processing and Snapshot publication preserve
+concrete evidence after validating content. See
+[effective data contracts](artifact-transformations.md#effective-data-contracts).
+
+## Asynchronous projection launch
+
+`POST /api/knowledgesources/{name}/projections` returns `202 Accepted`, the durable
+projection resource, `Location` and `ETag` after authorization, source/dependency
+admission and persistence. It does not wait for acquisition, Agent execution or
+Snapshot publication. Supply an `idempotencyKey` and reuse it after a lost response;
+a changed request with the same identity is rejected. Poll the returned resource or
+Source projection history for the authoritative terminal state.
+
+Each Workspace admits at most 32 pending/running projections; admission returns 429
+when that bound is reached. A bounded wake-up accelerates the existing recoverable pending-resource scan. A lost
+wake-up or server restart does not lose admission. The worker restores the original
+caller and exact scope and refuses changed accepted Source generation. Projection
+execution uses the same application use case as recovery. Console monitoring replaces
+an earlier communication failure with the persisted model/contract execution error;
+a launch timeout does not imply that its Flow failed or should be submitted twice.

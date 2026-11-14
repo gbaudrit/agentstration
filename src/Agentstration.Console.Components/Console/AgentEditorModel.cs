@@ -30,6 +30,7 @@ public sealed class AgentEditorModel
     public AgentProperties? SourceDefinition { get; set; }
     public JsonElement? InputSchema { get; set; }
     public SchemaBinding? InputSchemaBinding { get; set; }
+    public Agentstration.Schemas.DataContractDefinition? OutputContract { get; set; }
     public JsonElement? OutputSchema { get; set; }
     public SchemaBinding? OutputSchemaBinding { get; set; }
 
@@ -73,6 +74,7 @@ public sealed class AgentEditorModel
                 ToolSets = ToolSets,
                 InputSchema = InputSchema?.Clone(),
                 InputSchemaBinding = InputSchemaBinding,
+                OutputContract = OutputContract,
                 OutputSchema = OutputSchema?.Clone(),
                 OutputSchemaBinding = OutputSchemaBinding
             }
@@ -97,7 +99,8 @@ public sealed class AgentEditorModel
         ToolSets = resource.Definition.ToolSets,
         InputSchema = resource.Definition.InputSchema?.Clone(),
         InputSchemaBinding = resource.Definition.InputSchemaBinding,
-        OutputSchema = resource.Definition.OutputSchema?.Clone(),
+        OutputContract = resource.Definition.OutputContract,
+        OutputSchema = (resource.Definition.OutputSchema ?? (resource.Definition.OutputContract is { Mode: Agentstration.Schemas.DataContractMode.Fixed } ? resource.Definition.OutputContract.Schema : null))?.Clone(),
         OutputSchemaBinding = resource.Definition.OutputSchemaBinding,
         Tags = Format(resource.Metadata.Tags),
         Annotations = Format(resource.Metadata.Annotations),
@@ -122,7 +125,8 @@ public sealed class AgentEditorModel
         ToolSets = request.Definition.ToolSets,
         InputSchema = request.Definition.InputSchema?.Clone(),
         InputSchemaBinding = request.Definition.InputSchemaBinding,
-        OutputSchema = request.Definition.OutputSchema?.Clone(),
+        OutputContract = request.Definition.OutputContract,
+        OutputSchema = (request.Definition.OutputSchema ?? (request.Definition.OutputContract is { Mode: Agentstration.Schemas.DataContractMode.Fixed } ? request.Definition.OutputContract.Schema : null))?.Clone(),
         OutputSchemaBinding = request.Definition.OutputSchemaBinding,
         Tags = Format(request.Metadata.Tags),
         Annotations = Format(request.Metadata.Annotations),

@@ -36,6 +36,9 @@ public sealed record AwpExecutionAgentMaterial(
     string ModelProfileNamespace,
     IReadOnlyList<AwpExecutionToolMaterial> Tools)
 {
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public JsonElement? OutputContract { get; init; }
     public string AgentNamespace { get; init; } = "default";
     public string? ModelProfileScopeRef { get; init; }
     public string RuntimeProfileName { get; init; } = string.Empty;
@@ -83,6 +86,8 @@ public sealed record AwpRootFlowExecutionMaterial(
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId)
 {
     public string? FlowScopeRef { get; init; }
+    public JsonElement? ContractContext { get; init; }
+    public JsonElement? ProcessOrigin { get; init; }
 }
 
 public sealed record AwpFlowResumeMaterial(
@@ -280,6 +285,10 @@ public sealed record AwpInvokeFlowToolResponse(
     string ExternalToolId,
     AwpFlowToolRoute? Route);
 
+public sealed record AwpProcessArtifactRequest(AwpAssignmentCommandContext Context,
+    AwpStepExecutionId StepExecutionId, int Index, string Action, JsonElement Arguments);
+public sealed record AwpProcessArtifactResponse(DateTimeOffset ServerTime, JsonElement Result);
+
 public sealed record AwpCaptureFlowArtifactRequest(
     AwpAssignmentCommandContext Context,
     AwpStepExecutionId StepExecutionId,
@@ -328,11 +337,29 @@ public sealed record AwpCreateChildFlowRequest(
     AwpStepExecutionId StepExecutionId,
     JsonElement Input,
     string Purpose = "flowCall",
-    int? Iteration = null);
+    int? Iteration = null)
+{
+    public AwpProcessUnit? ProcessUnit { get; init; }
+}
+
+public sealed record AwpProcessUnit(string Key, int Ordinal, string? Descriptor = null, int? TotalUnits = null);
+public sealed record AwpCloseProcessRequest(AwpAssignmentCommandContext Context, AwpStepExecutionId StepExecutionId);
+public sealed record AwpCloseProcessResponse(DateTimeOffset ServerTime);
 
 public sealed record AwpChildFlowResponse(
     DateTimeOffset ServerTime,
     string RunId,
     string Status,
     JsonElement? Output,
-    AwpRootFlowExecutionMaterial? Material = null);
+    AwpRootFlowExecutionMaterial? Material = null)
+{
+    public string? FlowId { get; init; }
+    public string? FlowNamespace { get; init; }
+    public string? FlowVersion { get; init; }
+    public string? OutputName { get; init; }
+    public string? Outcome { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? ErrorDetails { get; init; }
+    public JsonElement? ErrorOrigin { get; init; }
+}

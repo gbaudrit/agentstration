@@ -1,7 +1,9 @@
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -23,11 +25,20 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     IResourceGovernanceContext governance,
     IResourceAccessPolicyService accessPolicies,
     InternalMcpToolProjectionService internalTools,
+    ConnectedServicePlatformResourceProvisioner connectedServiceTypes,
+    StoragePlatformResourceProvisioner storageTypes,
+    LocalStorageDefaultsProvisioner localStorage,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
+        using (scopes.PushSystem())
+        {
+            await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
+            await connectedServiceTypes.EnsureAsync(cancellationToken);
+            await storageTypes.EnsureAsync(cancellationToken);
+        }
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
@@ -40,14 +51,18 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
+        // Flow publication snapshots Tool contracts, so project the adapters before their Flows.
+        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
+        await connectedServiceTypes.EnsureAsync(cancellationToken);
+        await storageTypes.EnsureAsync(cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
+        await localStorage.EnsureAsync(workspace, cancellationToken);
         var runtimeProfile = await EnsureStandardRuntimeProfileAsync(cancellationToken);
         if (OperationalTopologyIdentities.IsOperationalWorkspace(workspace))
             await RemoveWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
         else
             await EnsureWorkspaceAccessAsync(runtimeProfile.Value, ResourceScopeRef.Workspace(workspaceId), cancellationToken);
-        await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await artifacts.EnsureAsync(ResourceScopeRef.Instance, cancellationToken);
         await internalTools.EnsureAsync(
             ResourceScopeRef.Workspace(workspaceId),

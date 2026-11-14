@@ -25,3 +25,13 @@ Current API families include:
 Problem Details, ETags/conditional writes, pagination, and `202 Accepted` are used where their implemented boundary requires them. API versioning is explained in [Versioning strategy](../versioning.md).
 
 Individual cleanup operations are exposed through `DELETE /api/flowRuns/{runId}`, `DELETE /api/runtime/runs/{runId}`, and the default or namespaced Entry routes. Run deletion is limited to terminal Runs, requires the current ETag through `If-Match`, and atomically removes the history owned by the corresponding Flow or Runtime module. Entry deletion retains its existing draft and dependency safeguards; callers must explicitly opt in when Dashboard references need to be removed or eligible durable Interactions need to be closed.
+
+## Storages
+
+The [Storages API](../storages.md) owns `/api/storage-types` and `/api/storages`,
+including scoped lifecycle, immutable type versions, explicit manual export
+mappings, ETags, bounded validation and protected consumer resolution.
+
+## ToolDefinitions
+
+The [ToolDefinition and relay API](../tool-relays.md) owns `/api/tooldefinitions`, its `/{name}/versions` publication/listing routes and `/{name}/usages`. Draft writes use the existing ETag and exact scope/namespace conventions. `toolKind` selects Flow, relay or acquisition behavior. Publication creates an independently versioned ordinary Tool; consumers adopt it explicitly through their existing revision/version mechanisms. Execution remains under the governed `/api/tools/{name}/run` and MCP paths.

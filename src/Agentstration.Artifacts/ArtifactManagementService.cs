@@ -1,4 +1,5 @@
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Schemas;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -12,7 +13,8 @@ public sealed class ArtifactManagementService(
     IAuthorizationService authorization,
     IArtifactStagingToolExecutor staging,
     ISecurityAuditWriter audit,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IArtifactDurableStore? durable = null) : IStoredArtifactRegistrar
 {
     public const int MaximumChunkBytes = 256 * 1024;
 
@@ -381,6 +383,19 @@ public sealed class ArtifactManagementService(
             || source.Value.Length != request.Receipt.Length
             || !string.Equals(source.Value.MediaType, request.Receipt.MediaType, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The storage receipt does not match the sealed StagedArtifact integrity metadata.");
+        if (request.Receipt.DataContract is { } declaredContract)
+        {
+            var contract = await ValidateStoredContractAsync(declaredContract, request.Receipt.MediaType, source.Value.Length,
+                async (offset, length) =>
+                {
+                    var binding = await RequireBindingAsync(source.Value, cancellationToken);
+                    var chunk = await staging.ReadAsync(binding.Value, source.Value.Backend, offset, length,
+                        Command(current, $"staged-artifact:{sourceId}:contract", source.Value.Producer.CorrelationId,
+                            source.Value.Producer.FlowRunId, source.Value.Producer.FlowStepId), cancellationToken);
+                    return Convert.FromBase64String(chunk.ContentBase64);
+                }, cancellationToken);
+            request = request with { Receipt = request.Receipt with { DataContract = contract } };
+        }
         var existing = (await store.ListAllAsync<FlowRunArtifactResource>(ArtifactResourceKinds.FlowRunArtifact, cancellationToken))
             .SingleOrDefault(value => value.Value.WorkspaceId.Value == current.WorkspaceId
                 && value.Value.SourceArtifactId == sourceId
@@ -417,6 +432,80 @@ public sealed class ArtifactManagementService(
             }, cancellationToken);
         await AuditAsync("flow-run-artifact.completed", current, id.ToString(), cancellationToken);
         return created;
+    }
+
+    public async Task<FlowRunArtifactResource> RegisterStoredAsync(RegisterStoredArtifactRequest request,
+        CancellationToken cancellationToken)
+    {
+        var current = await RequireAsync(AuthorizationPermissions.ArtifactsWrite, cancellationToken);
+        var materialization = request.Materialization;
+        if (string.IsNullOrWhiteSpace(request.Identity) || request.Identity.Length > 512
+            || string.IsNullOrWhiteSpace(request.ProducerFlowRunId) || string.IsNullOrWhiteSpace(request.ProducerExecutionId)
+            || request.ProducerUid == Guid.Empty || request.ProducerGeneration < 1
+            || materialization.WorkspaceId.Value != current.WorkspaceId || materialization.Length < 0
+            || materialization.Sha256 is not { Length: 64 } || !materialization.Sha256.All(char.IsAsciiHexDigit))
+            throw Error("artifact_materialization_invalid", "Exact producer, Workspace and content evidence are required.");
+        ValidateMediaType(request.MediaType);
+        var reference = ArtifactStorageReferences.Encode(materialization);
+        var stat = await (durable ?? throw Error("artifact_materialization_unavailable", "Artifact storage is unavailable."))
+            .StatAsync(materialization.WorkspaceId, reference, cancellationToken);
+        if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
+            throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
+        if (request.DataContract is { } declaredContract)
+            request = request with { DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
+                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken) };
+        var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
+        var resource = new FlowRunArtifactResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ArtifactResourceKinds.FlowRunArtifact,
+            Metadata = new() { Name = id.ToString() },
+            ScopeRef = ResourceScopeRef.Workspace(current.WorkspaceId),
+            Generation = 1,
+            Status = Succeeded(),
+            WorkspaceId = materialization.WorkspaceId,
+            ArtifactId = id,
+            ProducerResource = request.ProducerResource,
+            ProducerExecutionId = request.ProducerExecutionId,
+            ProducerResourceUid = request.ProducerUid,
+            ProducerResourceGeneration = request.ProducerGeneration,
+            ProducerFlowRunId = request.ProducerFlowRunId,
+            ProducerFlowStepId = request.ProducerFlowStepId ?? string.Empty,
+            Receipt = new()
+            {
+                StorageFlowRunId = string.Empty,
+                OpaqueReference = reference,
+                Materialization = materialization,
+                DataContract = request.DataContract,
+                MediaType = request.MediaType,
+                Length = materialization.Length,
+                Sha256 = materialization.Sha256,
+                Provenance = new Dictionary<string, string> { ["provider"] = "storage", ["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin") }
+            },
+            CreatedAt = timeProvider.GetUtcNow()
+        };
+        var address = new ScopedResourceAddress(resource.ScopeRef.Value, resource.Namespace, resource.Kind, resource.Name);
+        var existing = await store.GetExactAsync<FlowRunArtifactResource>(address, cancellationToken);
+        if (existing is null)
+        {
+            try
+            {
+                var created = await store.CreateImmutableAsync(resource, cancellationToken);
+                await AuditAsync("flow-run-artifact.materialized", current, id.ToString(), cancellationToken);
+                return created.Value;
+            }
+            catch (ResourceConcurrencyException)
+            { existing = await store.GetExactAsync<FlowRunArtifactResource>(address, cancellationToken); }
+        }
+        if (existing is null || existing.Value.ProducerFlowRunId != resource.ProducerFlowRunId
+            || existing.Value.ProducerFlowStepId != resource.ProducerFlowStepId
+            || existing.Value.ProducerResource != resource.ProducerResource
+            || existing.Value.ProducerResourceUid != resource.ProducerResourceUid
+            || existing.Value.ProducerResourceGeneration != resource.ProducerResourceGeneration
+            || existing.Value.ProducerExecutionId != resource.ProducerExecutionId
+            || !SameReceipt(existing.Value.Receipt, resource.Receipt))
+            throw Error("artifact_storage_receipt_conflict", "The Artifact identity already has different producer or materialization evidence.");
+        return existing.Value;
     }
 
     public async Task<IReadOnlyList<StoredResource<FlowRunArtifactResource>>> ListFlowRunArtifactsAsync(CancellationToken cancellationToken)
@@ -608,10 +697,36 @@ public sealed class ArtifactManagementService(
     private static bool HasLease(StagedArtifactResource artifact, ArtifactLeaseId id, ArtifactLeaseOperation operation, DateTimeOffset now) =>
         artifact.Leases.Any(value => value.Id == id && value.RevokedAt is null && value.ExpiresAt > now && value.Operations.Contains(operation));
 
+    private static async Task<ResolvedDataContract> ValidateStoredContractAsync(ResolvedDataContract declaration, string mediaType,
+        long length, Func<long, int, Task<byte[]>> read, CancellationToken token)
+    {
+        var contract = DataContracts.Declared(declaration.Schema, declaration.Origin, declaration.MediaType)
+            ?? throw DataContracts.Failure("data_contract_unresolved", "artifact-publication", "artifact", "$", "contract_missing", "concrete contract", "absent");
+        if (contract.MediaType is { } expected && !string.Equals(expected, mediaType, StringComparison.OrdinalIgnoreCase))
+            throw DataContracts.Failure("data_contract_media_mismatch", "artifact-publication", contract.Origin, "$", "media_type", expected, mediaType);
+        if (contract.Schema is null && !DataContracts.IsJsonMediaType(mediaType)) return contract with { Validated = true };
+        if (length > DataContracts.MaximumValueCharacters)
+            throw DataContracts.Failure("data_contract_value_too_large", "artifact-publication", contract.Origin, "$", "value_size", "bounded value", "oversized");
+        using var content = new MemoryStream();
+        while (content.Length < length)
+        {
+            token.ThrowIfCancellationRequested();
+            var remaining = (int)Math.Min(MaximumChunkBytes, length - content.Length);
+            var chunk = await read(content.Length, remaining);
+            if (chunk.Length == 0 || chunk.Length > remaining) throw Error("artifact_content_incomplete", "The Artifact content is incomplete.");
+            await content.WriteAsync(chunk, token);
+        }
+        _ = DataContracts.ReadUtf8(contract, content.GetBuffer().AsSpan(0, (int)content.Length), "artifact-publication");
+        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true };
+    }
+
     private static bool SameReceipt(ArtifactStorageReceipt left, ArtifactStorageReceipt right) =>
         string.Equals(left.StorageFlowRunId, right.StorageFlowRunId, StringComparison.Ordinal)
         && string.Equals(left.OpaqueReference, right.OpaqueReference, StringComparison.Ordinal)
         && string.Equals(left.MediaType, right.MediaType, StringComparison.OrdinalIgnoreCase)
+        && left.DataContract?.Digest == right.DataContract?.Digest
+        && left.DataContract?.Origin == right.DataContract?.Origin
+        && left.DataContract?.Validated == right.DataContract?.Validated
         && left.Length == right.Length
         && string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase)
         && left.Provenance.Count == right.Provenance.Count

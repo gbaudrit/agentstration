@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Sources;
@@ -35,12 +36,14 @@ public sealed class RegistrationContractTests
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (16, ServiceLifetime.Scoped),
+            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (3, ServiceLifetime.Singleton),
+            [typeof(IBootstrapResourceHandler)] = (20, ServiceLifetime.Scoped),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
-            [typeof(IAepEnrollmentResourceProvisioner)] = (2, ServiceLifetime.Singleton),
+            [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (3, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolDefinitionProvider)] = (34, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolHandler)] = (34, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolDefinitionProvider)] = (47, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolHandler)] = (47, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
             [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
             [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)
@@ -65,10 +68,14 @@ public sealed class RegistrationContractTests
             .ToArray();
         Assert.HasCount(0, accidentalDuplicates, string.Join(Environment.NewLine, accidentalDuplicates));
         AssertSingleton<IRuntimeRunExecutionScope>(services, typeof(WorkspaceRuntimeRunExecutionScope));
+        AssertSingleton<ConnectedServiceAcquisitionExecutor>(services);
+        AssertSingleton<ConnectedServiceBoundValues>(services);
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);
-        Assert.HasCount(0, services.Where(descriptor => descriptor.ServiceType == typeof(IHostedService)).ToArray());
+        var frameworkHost = services.Single(descriptor => descriptor.ServiceType == typeof(IHostedService));
+        Assert.AreEqual("Microsoft.AspNetCore.DataProtection.Internal.DataProtectionHostedService", frameworkHost.ImplementationType?.FullName);
+        Assert.AreEqual(ServiceLifetime.Singleton, frameworkHost.Lifetime);
         CollectionAssert.AreEqual(new Type?[]
         {
             typeof(ToolDefinitionFlowDeletionGuard),

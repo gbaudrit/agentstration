@@ -151,6 +151,91 @@
   <data name="NoOutputContractHelp"><value>Cette étape n’expose actuellement aucun contrat de sortie configurable.</value></data>
   <data name="SelectFlowVersionForContract"><value>Sélectionnez une version de Flow disponible pour consulter son contrat.</value></data>
   <data name="SelectToolForContract"><value>Sélectionnez un Tool disponible pour consulter son contrat.</value></data>
+  <data name="Step.composition" xml:space="preserve"><value>Point de composition</value></data>
+  <data name="CompositionPoint" xml:space="preserve"><value>Nom du point</value></data>
+  <data name="CompositionAllowEmpty" xml:space="preserve"><value>Autoriser une séquence vide (identité)</value></data>
+  <data name="CompositionHelp" xml:space="preserve"><value>La ressource utilisatrice choisit ici une séquence ordonnée de Flows publiés. Chaque Flow reçoit value et ses paramètres enregistrés.</value></data>
+  <data name="InvalidJson" xml:space="preserve"><value>Saisissez un JSON valide.</value></data>
+  <data name="Step.artifactTransform" xml:space="preserve"><value>Transformer les artefacts</value></data>
+  <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Reliez process aux étapes de votre traitement, puis leur résultat à cette étape. completed poursuit avec le manifeste des artefacts produits ; error gère un échec du traitement.</value></data>
+  <data name="ArtifactProcessingMode" xml:space="preserve"><value>Transmettre l’entrée sous forme de</value></data>
+  <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Contenu (texte ou JSON)</value></data>
+  <data name="ArtifactProcessingMode.Access" xml:space="preserve"><value>Accès limités à l’entrée et à la sortie</value></data>
+  <data name="ArtifactContentHelp" xml:space="preserve"><value>Lit le texte UTF-8 ou le JSON dans la limite configurée et capture le résultat choisi. Un contenu trop volumineux est refusé ; l’extraction des fichiers binaires doit être explicite.</value></data>
+  <data name="ArtifactAccessHelp" xml:space="preserve"><value>Les Agents reçoivent des Tools temporaires input_read/search_regex et output_write/read/search_regex/complete. Le traitement choisit comment lire et vérifier le contenu. La sortie reste isolée jusqu’à la réussite du traitement.</value></data>
+  <data name="ArtifactMaximumCount" xml:space="preserve"><value>Nombre maximal d’artefacts</value></data>
+  <data name="ArtifactMaximumInput" xml:space="preserve"><value>Taille maximale de l’entrée en octets en mode contenu</value></data>
+  <data name="ArtifactMaximumOutput" xml:space="preserve"><value>Taille maximale de chaque sortie en octets</value></data>
+  <data name="ArtifactOutputName" xml:space="preserve"><value>Nom du fichier de sortie (vide : conserver le nom d’entrée)</value></data>
+  <data name="ArtifactOutputMediaType" xml:space="preserve"><value>Type de média de sortie (vide : conserver le type d’entrée)</value></data>
+  <data name="ArtifactManifestMapping" xml:space="preserve"><value>Mapping de la liste ou du manifeste d’artefacts (JSON)</value></data>
+  <data name="ArtifactProcessingInputMapping" xml:space="preserve"><value>Mapping de l’entrée du traitement (JSON, facultatif)</value></data>
+  <data name="ArtifactProcessingInputHelp" xml:space="preserve"><value>Le mapping peut référencer input.content, input.artifact, input.inputAccess, input.outputAccess et input.parameters. Pour un Tool générique, affectez le contenu à son paramètre existant. Vide : transmettre cette enveloppe.</value></data>
+  <data name="ArtifactResultMapping" xml:space="preserve"><value>Mapping du résultat du traitement (JSON, facultatif)</value></data>
+  <data name="ArtifactResultHelp" xml:space="preserve"><value>En mode contenu, input et transition.output désignent le résultat du traitement à capturer. En mode accès, terminez le brouillon avec output_complete ; le retour du traitement permet à cette étape de le finaliser.</value></data>
+  <data name="ArtifactProcessingResultPort" xml:space="preserve"><value>Résultat du traitement</value></data>
+  <data name="ArtifactProcessingStartPort" xml:space="preserve"><value>Traitement</value></data>
+  <data name="ArtifactOutputMediaTypeHelp" xml:space="preserve"><value>Choisissez un type MIME proposé ou saisissez une valeur libre. Le type doit correspondre au contenu produit ; laissez vide pour conserver le type d’entrée.</value></data>
+  <data name="InspectPortNamed" xml:space="preserve"><value>Inspecter le port {0}</value></data>
+  <data name="PortContractTitle" xml:space="preserve"><value>Port {1} · {0}</value></data>
+  <data name="PortContractDesignHelp" xml:space="preserve"><value>Contrats et mappings déclarés dans cette définition. Les contrats dynamiques sont résolus à chaque exécution. Le contrat de la donnée décrit le contenu de l’artefact, séparément de l’enveloppe de référence.</value></data>
+  <data name="PortContractSummary" xml:space="preserve"><value>{0} : {1} · {2}</value></data>
+  <data name="PortContractUnresolved" xml:space="preserve"><value>Aucun schéma concret disponible ici</value></data>
+  <data name="DataContractMode" xml:space="preserve"><value>Mode du contrat</value></data>
+  <data name="DataContractMode.Absent" xml:space="preserve"><value>Non déclaré</value></data>
+  <data name="DataContractMode.Fixed" xml:space="preserve"><value>Contrat explicite fixe</value></data>
+  <data name="DataContractMode.Dynamic" xml:space="preserve"><value>Contrat dynamique explicite</value></data>
+  <data name="ArtifactDataSchema" xml:space="preserve"><value>Schéma du contenu de l’artefact (JSON Schema)</value></data>
+  <data name="ArtifactContractHelp" xml:space="preserve"><value>Le résultat final sélectionné du traitement doit respecter ce contrat. Le contrat de sortie explicite du producteur est prioritaire. Le mode accès valide le brouillon finalisé ; le message de conversation est séparé.</value></data>
+  <data name="ContractSource" xml:space="preserve"><value>Résoudre le contrat depuis</value></data>
+  <data name="ContractSource.Input" xml:space="preserve"><value>Contrat de la donnée de l’artefact d’entrée</value></data>
+  <data name="ContractSource.Parent" xml:space="preserve"><value>Attente de l’invocation parente</value></data>
+  <data name="Close" xml:space="preserve"><value>Fermer</value></data>
+  <data name="ContractSource.CalledAgent" xml:space="preserve"><value>Fourni par l’Agent appelé</value></data>
+  <data name="ContractSource.ArtifactEnvelope" xml:space="preserve"><value>Références d’artefacts (contenu décrit séparément)</value></data>
+  <data name="AgentInputMapping" xml:space="preserve"><value>Mapping d’entrée (JSON)</value></data>
+  <data name="AgentInputContractAbsent" xml:space="preserve"><value>Aucun contrat d’entrée n’est déclaré par cet Agent.</value></data>
+  <data name="ArtifactInputContentContract" xml:space="preserve"><value>Chaque artefact d’entrée porte son propre contrat de contenu et son type MIME lorsqu’ils sont disponibles ; ils sont résolus à l’exécution.</value></data>
+  <data name="ArtifactOutputContentContract" xml:space="preserve"><value>Les contrats de contenu s’appliquent à chaque artefact produit. Un contrat de sortie explicite du traitement est prioritaire.</value></data>
+  <data name="BeforePublication" xml:space="preserve"><value>Transformer avant publication</value></data>
+  <data name="ConnectionContractMismatch" xml:space="preserve"><value>Contrats incompatibles : {0} → {1}. La sortie après mapping ne satisfait pas le contrat d’entrée de la cible. Vérifiez le mapping ou les contrats.</value></data>
+  <data name="CallAgent" xml:space="preserve"><value>Appeler un Agent</value></data>
+  <data name="CalledAgentNode" xml:space="preserve"><value>Agent : {0}</value></data>
+  <data name="MappingDataTitle" xml:space="preserve"><value>Données transmises à l’Agent</value></data>
+  <data name="MappingDataHelp" xml:space="preserve"><value>Choisissez une valeur ou composez un mapping indépendamment du contrat attendu.</value></data>
+  <data name="MappingValue" xml:space="preserve"><value>Valeur ou expression</value></data>
+  <data name="MappingPlaceholder" xml:space="preserve"><value>Choisir une suggestion ou saisir une valeur</value></data>
+  <data name="MappingFreeValue" xml:space="preserve"><value>Les expressions et le texte libre sont acceptés. Vide : transmettre la valeur reçue.</value></data>
+  <data name="MappingJson" xml:space="preserve"><value>JSON personnalisé</value></data>
+  <data name="MappingSimple" xml:space="preserve"><value>Valeur simple</value></data>
+  <data name="MappingPrevious" xml:space="preserve"><value>Résultat de l’étape précédente</value></data>
+  <data name="MappingFlowInput" xml:space="preserve"><value>Entrée reçue par ce Flow</value></data>
+  <data name="MappingArtifactContent" xml:space="preserve"><value>Contenu de l’artefact d’entrée</value></data>
+  <data name="MappingArtifactMetadata" xml:space="preserve"><value>Métadonnées de l’artefact d’entrée</value></data>
+  <data name="MappingArtifactInputAccess" xml:space="preserve"><value>Accès limité à l’entrée</value></data>
+  <data name="MappingArtifactOutputAccess" xml:space="preserve"><value>Accès limité à la sortie</value></data>
+  <data name="MappingParameters" xml:space="preserve"><value>Paramètres du traitement</value></data>
+  <data name="MappingStepOutput" xml:space="preserve"><value>Résultat de « {0} » (si exécutée)</value></data>
+  <data name="MappingStepProperty" xml:space="preserve"><value>Résultat de « {0} » · {1}</value></data>
+  <data name="MappingShowValues" xml:space="preserve"><value>Valeurs disponibles</value></data>
+  <data name="MappingNoOptions" xml:space="preserve"><value>Aucune suggestion correspondante. Vous pouvez saisir une valeur libre.</value></data>
+  <data name="OpenDraft" xml:space="preserve"><value>Ouvrir le brouillon</value></data>
+  <data name="ExplicitOutputMapping" xml:space="preserve"><value>Mapping de sortie explicite</value></data>
+  <data name="ExplicitOutputMappingHelp" xml:space="preserve"><value>Cette sortie utilise un mapping spécifique, qui peut différer de la transition entrante.</value></data>
+  <data name="OutputDataTitle" xml:space="preserve"><value>Valeur retournée par le Flow</value></data>
+  <data name="OutputDataHelp" xml:space="preserve"><value>Choisissez le résultat entrant ou renseignez un mapping explicite. Un mapping vide transmet le résultat entrant.</value></data>
+  <data name="UseIncomingTransition" xml:space="preserve"><value>Utiliser la transition entrante</value></data>
+  <data name="PublishedMappingReadOnly" xml:space="preserve"><value>Version publiée : ce mapping est en lecture seule. Ouvrez le brouillon pour le modifier.</value></data>
+  <data name="OutputMappingReferenceUnavailable" xml:space="preserve"><value>La sortie {0} référence une étape indisponible dans son mapping. Vérifiez l’étape référencée ou utilisez la transition entrante.</value></data>
+  <data name="ProcessConcurrency" xml:space="preserve"><value>Nombre maximal d’unités simultanées</value></data>
+  <data name="ProcessConcurrency.Help" xml:space="preserve"><value>Par défaut : séquentiel. Le Worker peut appliquer une limite partagée plus basse ; l’ordre des sorties est conservé.</value></data>
+  <data name="TransformProcessing" xml:space="preserve"><value>Traitement</value></data>
+  <data name="TransformProcessing.None" xml:space="preserve"><value>Mapping simple</value></data>
+  <data name="TransformProcessing.Batches" xml:space="preserve"><value>Traiter par lots d’éléments</value></data>
+  <data name="TransformProcessing.TextChunks" xml:space="preserve"><value>Traiter par fragments de texte</value></data>
+  <data name="TransformProcessing.Help" xml:space="preserve"><value>Le mapping d’entrée sélectionne la valeur à découper. Reliez process aux étapes de traitement, puis ramenez leur résultat ici. La sortie est un tableau dans l’ordre des unités.</value></data>
+  <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Éléments par lot / caractères par fragment de texte</value></data>
+  <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Nombre maximal d’unités</value></data>
   <data name="DraftChangedDuringSave" xml:space="preserve">
     <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
   </data>

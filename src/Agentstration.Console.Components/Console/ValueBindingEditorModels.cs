@@ -12,7 +12,8 @@ public sealed record ValueBindingRequirement(
     bool Secured = false,
     string? Description = null,
     string? Format = null,
-    IReadOnlyList<JsonElement>? AllowedValues = null);
+    IReadOnlyList<JsonElement>? AllowedValues = null,
+    JsonElement? LiteralSchema = null);
 
 public sealed record ValueBindingOption(
     ValueBindingSourceKind Kind,
@@ -27,7 +28,7 @@ public sealed record ValueBindingSelection(
     public bool IsConfigured => Kind switch
     {
         ValueBindingSourceKind.Caller => true,
-        ValueBindingSourceKind.Literal => Literal is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) },
+        ValueBindingSourceKind.Literal => Literal is { ValueKind: not JsonValueKind.Undefined },
         _ => Resource is not null
     };
 

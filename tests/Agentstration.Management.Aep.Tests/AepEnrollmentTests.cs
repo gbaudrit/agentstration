@@ -4,6 +4,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
+using Agentstration.ConnectedServices;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
@@ -12,6 +14,7 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Bootstrap;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Declarative;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.ModelProviders;
@@ -85,6 +88,91 @@ public sealed class AepEnrollmentTests
                     [],
                     [],
                     "The test extension is intentionally unavailable."));
+    }
+
+    [TestMethod]
+    public async Task EnrollmentMaterializesConnectedServiceTypesAsExtensionOwnedResources()
+    {
+        await using var factory = EnrollmentFactory();
+        var context = await GetBootstrapContextAsync(factory);
+        var target = ResourceScopeRef.Tenant(context.TenantId);
+        var registration = new ExtensionRegistrationResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.ExtensionRegistration,
+            Metadata = new() { Name = "paired-storage" },
+            ScopeRef = target,
+            Definition = new()
+            {
+                DisplayName = "Storage extension",
+                Endpoint = new("https://storage.extension.example")
+            }
+        };
+        var schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            additionalProperties = false
+        });
+        var manifest = new AepManifest(
+            AepProtocol.Version,
+            new("io.agentstration.test.storage", "Storage extension", "2.0.0"),
+            new Dictionary<string, AepCapabilityDescriptor>
+            {
+                [AepCapabilityNames.ConnectedServiceTypes] = new(
+                    AepProtocol.ConnectedServiceTypesCapabilityVersion),
+                [AepCapabilityNames.ConnectedServiceOperationTypes] = new(
+                    AepProtocol.ConnectedServiceOperationTypesCapabilityVersion)
+            },
+            new AepContributions([], ConnectedServiceTypes:
+            [
+                new AepConnectedServiceTypeContribution(
+                    "s3-account",
+                    "S3 account",
+                    "1.0.0",
+                    [AepConnectedServiceTypeVersionDescriptor.Create("1.0.0", schema)])
+            ], ConnectedServiceOperationTypes:
+            [
+                new AepConnectedServiceOperationTypeContribution(
+                    "s3-operation",
+                    "S3 operation",
+                    "1.0.0",
+                    [AepConnectedServiceOperationTypeVersionDescriptor.Create(
+                        "1.0.0", schema,
+                        AepConnectedServiceOperationInteraction.RequestResponse,
+                        new("s3.invoke", "1.0"))])
+            ]),
+            null);
+
+        using var systemScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var operationTypeProvisioner = factory.Services.GetServices<IAepEnrollmentResourceProvisioner>()
+            .OfType<AepEnrollmentConnectedServiceOperationTypeProvisioner>().Single();
+        await operationTypeProvisioner.ProvisionAsync(registration, manifest, default);
+        var provisioner = factory.Services.GetServices<IAepEnrollmentResourceProvisioner>()
+            .OfType<AepEnrollmentConnectedServiceTypeProvisioner>().Single();
+        await provisioner.ProvisionAsync(registration, manifest, default);
+
+        var types = factory.Services.GetRequiredService<ConnectedServiceTypeManagementService>();
+        var created = await types.GetExactAsync(target,
+            ResourceNamespace.Parse("io.agentstration.test.storage"), "s3-account", default);
+        Assert.IsNotNull(created);
+        Assert.AreEqual(ResourceOriginKind.Extension, created.Value.Governance.Origin.Kind);
+        Assert.AreEqual("io.agentstration.test.storage", created.Value.Governance.Origin.Reference);
+        Assert.AreEqual(ResourceManagementAuthorityKind.ExtensionInstallation,
+            created.Value.Governance.ManagedBy?.Kind);
+        Assert.AreEqual($"{target.Value}/{ExtensionKinds.ExtensionRegistration}/default/paired-storage",
+            created.Value.Governance.ManagedBy?.Reference);
+        var operationType = await factory.Services
+            .GetRequiredService<ConnectedServiceOperationTypeManagementService>()
+            .GetExactAsync(target, ResourceNamespace.Parse("io.agentstration.test.storage"),
+                "s3-operation", default);
+        Assert.IsNotNull(operationType);
+        Assert.AreEqual(ResourceOriginKind.Extension, operationType.Value.Governance.Origin.Kind);
+        Assert.AreEqual("s3.invoke",
+            operationType.Value.Definition.Versions.Single().Invocation.ProviderOperationId);
+
+        await provisioner.ProvisionAsync(registration, manifest, default);
+        Assert.AreEqual(created.ETag, (await types.GetExactAsync(target,
+            ResourceNamespace.Parse("io.agentstration.test.storage"), "s3-account", default))!.ETag);
     }
 
     [TestMethod]

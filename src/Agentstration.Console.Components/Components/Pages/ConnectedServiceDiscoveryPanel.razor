@@ -1,0 +1,122 @@
+@implements IDisposable
+@inject IConnectedServiceOperationsClient Client
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+<section class="panel discovery-panel" data-testid="connected-service-discovery" data-interactive="@(interactive ? "true" : "false")">
+    <div class="panel-header">
+        <div><h2>@T("Discovery.Title")</h2><p>@T("Discovery.Help")</p></div>
+        <div class="form-actions">
+            @if (CanManage)
+            {
+                <button class="button-primary" type="button" data-testid="connected-service-start-discovery" disabled="@(busy || !interactive || !Supported || !Service.Definition.Enabled || HasActiveDiscovery)" @onclick="StartAsync">@T("Discovery.Start")</button>
+            }
+            <button class="button-secondary" type="button" data-testid="connected-service-refresh-discovery" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Discovery.Refresh")</button>
+        </div>
+    </div>
+    @if (Supported && Service.Definition.Type?.Type.Name == "http-endpoint") { <p>@T("Http.DiscoveryHelp")</p> }
+    @if (!Supported) { <p role="status">@T("Discovery.Unsupported")</p> }
+    @if (error) { <p class="form-alert form-alert-danger" role="alert">@T("Discovery.Failed")</p> }
+    @if (accepted) { <p class="form-alert form-alert-success" role="status">@T("Discovery.Accepted")</p> }
+    @if (loading) { <LoadingState Message="@T("Discovery.Loading")" /> }
+    else
+    {
+        <h3>@T("Discovery.Operations")</h3>
+        <p>@T("Discovery.ActivationHelp")</p>
+        @if (operations.Count == 0) { <p data-testid="connected-service-no-operations">@T("Discovery.NoOperations")</p> }
+        else
+        {
+            <DataGrid TItem="ConnectedServiceOperationResource" Items="operations">
+                <Header><tr><th>@T("Discovery.Operation")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th>@T("Generation")</th><th>@T("Discovery.Actions")</th></tr></Header>
+                <Row Context="operation"><tr data-testid="connected-service-operation-row" data-operation-uid="@operation.Uid">
+                    <td><strong>@operation.Definition.DisplayName</strong><small><code>@operation.Definition.ExternalId</code></small></td>
+                    <td>@T($"Discovery.Availability.{operation.ObservedState.Availability}")</td>
+                    <td>@T(operation.Enabled ? "Yes" : "No")</td><td>@operation.Generation</td>
+                    <td>@if (CanManage && ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))
+                        {
+                            <button class="button-secondary" type="button" data-testid="connected-service-operation-enabled" disabled="@(busy || !interactive || !operation.Enabled && (!Service.Definition.Enabled || operation.ObservedState.Availability != ConnectedServiceOperationAvailability.Available || operation.Definition.Service.Generation != Service.Generation))" @onclick="() => ToggleAsync(operation)">@T(operation.Enabled ? "Discovery.DisableOperation" : "Discovery.EnableOperation")</button>
+                        }
+                    </td>
+                </tr></Row>
+            </DataGrid>
+        }
+        <h3>@T("Discovery.History")</h3>
+        @if (history.Count == 0) { <p>@T("Discovery.NoHistory")</p> }
+        else
+        {
+            <DataGrid TItem="ConnectedServiceOperationDiscoveryResource" Items="history">
+                <Header><tr><th>@T("Discovery.Created")</th><th>@T("Discovery.State")</th><th>@T("Discovery.FlowRun")</th><th>@T("Code")</th></tr></Header>
+                <Row Context="discovery"><tr data-testid="connected-service-discovery-row" data-state="@discovery.State">
+                    <td>@discovery.CreatedAt.ToLocalTime().ToString("g")</td>
+                    <td>@T($"Discovery.State.{discovery.State}")</td>
+                    <td><a class="text-button" href="@FlowUrl(discovery)" data-testid="connected-service-discovery-flow-link"><code>@discovery.FlowRunId</code></a></td>
+                    <td><code>@(discovery.ErrorCode ?? "—")</code></td>
+                </tr></Row>
+            </DataGrid>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ConnectedServiceResource Service { get; set; } = null!;
+    [Parameter] public bool Supported { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ConnectedServiceOperationResource> operations = [];
+    private IReadOnlyList<ConnectedServiceOperationDiscoveryResource> history = [];
+    private string? loadedKey;
+    private bool loading = true, busy, error, accepted, interactive;
+    private bool CanManage => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
+        && ResourceOwnershipContext.CanManage(Service.ScopeRef, Services);
+    private bool HasActiveDiscovery => history.Any(item => item.State is ConnectedServiceOperationDiscoveryState.Pending
+        or ConnectedServiceOperationDiscoveryState.Running or ConnectedServiceOperationDiscoveryState.WaitingForInput
+        or ConnectedServiceOperationDiscoveryState.WaitingForChild);
+    private string T(string key) => Localizer[key];
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Service.Uid}:{Service.Generation}:{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (key == loadedKey) return;
+        loadedKey = key;
+        loading = true;
+        await RefreshAsync();
+        loading = false;
+    }
+    private bool Matches(ConnectedServiceRevisionReference reference) => reference.ServiceUid == Service.Uid
+        && reference.Service.ScopeRef == Service.ScopeRef && reference.Service.Address == Service.Address;
+    private async Task LoadAsync()
+    {
+        // Reading history synchronizes completed runs before their materialized operations are listed.
+        history = (await Client.GetDiscoveriesAsync(Service, cancellation.Token)).Where(item => Matches(item.Service))
+            .OrderByDescending(item => item.CreatedAt).ToArray();
+        operations = (await Client.GetForServiceAsync(Service, cancellation.Token)).Where(item => Matches(item.Definition.Service))
+            .OrderBy(item => item.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
+    }
+    private Task RefreshAsync() => RunAsync(LoadAsync);
+    private Task StartAsync() => RunAsync(async () =>
+    {
+        var discovery = await Client.DiscoverAsync(Service, cancellation.Token);
+        history = new[] { discovery }.Concat(history.Where(item => item.Uid != discovery.Uid)).ToArray();
+        accepted = true;
+    });
+    private Task ToggleAsync(ConnectedServiceOperationResource operation) => RunAsync(async () =>
+    {
+        var saved = await Client.SetEnabledAsync(operation, !operation.Enabled, cancellation.Token);
+        operations = operations.Select(item => item.Uid == saved.Value.Uid ? saved.Value : item).ToArray();
+    });
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true; error = accepted = false;
+        try { await action(); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = true; }
+        finally { busy = false; }
+    }
+    private static string FlowUrl(ConnectedServiceOperationDiscoveryResource discovery) =>
+        $"/flow-runs/{Uri.EscapeDataString(discovery.FlowRunId)}?scopeRef={Uri.EscapeDataString(discovery.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(discovery.LogicalScopeRef?.Value ?? discovery.ScopeRef.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

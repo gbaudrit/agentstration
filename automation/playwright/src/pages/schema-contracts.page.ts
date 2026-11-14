@@ -72,7 +72,7 @@ export class SchemaContractsPage {
     });
     const inlineConnectionFlow = await this.createConnectionFlow(consoleUrl, `aaa-browser-tool-link-${suffix}`, {
       type: 'tool', name: 'target', displayName: 'Contract Tool',
-      tool: { resourceId: `agentstration.${toolDefinitionName}` }, argumentsMapping: '${transition.output}',
+      tool: { resourceId: `agentstration.${toolDefinitionName}.v1.0.0` }, argumentsMapping: '${transition.output}',
     });
     return { schemaName, flowName, agentName, toolDefinitionName, sharedConnectionFlow, inlineConnectionFlow };
   }
@@ -111,6 +111,11 @@ export class SchemaContractsPage {
 
   public async exerciseToolFlowContracts(consoleUrl: string, fixtures: ContractFixtures): Promise<void> {
     await this.open(`${consoleUrl}/tools/definitions/new`, TestIds.resourceAdministration.toolDefinitionEditor);
+    await expect(this.page.getByTestId(TestIds.schemaContracts.toolCreateForm)).toHaveAttribute('data-interactive', 'true');
+    await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).fill('Contract Tool');
+    await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).blur();
+    await this.page.getByTestId(TestIds.schemaContracts.toolCreateFlowKind).click();
+    await this.page.getByTestId(TestIds.schemaContracts.toolCreateContinue).click();
     const flow = this.page.getByTestId(TestIds.schemaContracts.toolFlow);
     const flowValue = await flow.locator('option').filter({ hasText: `Contract flow ${fixtures.flowName}` }).getAttribute('value');
     if (!flowValue) throw new Error(`The ToolDefinition editor did not list Flow '${fixtures.flowName}'.`);
@@ -228,6 +233,7 @@ export class SchemaContractsPage {
         name,
         namespace: 'default',
         properties: {
+          toolKind: 'flow', version: '1.0.0', publish: true,
           displayName: 'Contract Tool', description: 'Schema contract fixture.', enabled: true,
           requiresApproval: false, invocationTimeoutSeconds: 90,
           inputSchema: inlineContract, inputSchemaBinding: inputBinding,
@@ -297,8 +303,13 @@ export class SchemaContractsPage {
   }
 
   private async saveAndReload(consoleUrl: string, name: string): Promise<void> {
-    await this.page.getByTestId(TestIds.flowObservability.designerSave).click();
-    await expect(this.page.locator('.save-state.saved')).toBeVisible();
+    const saved = this.page.locator('.save-state.saved');
+    await expect(async () => {
+      if (!await saved.isVisible()) {
+        await this.page.getByTestId(TestIds.flowObservability.designerSave).click({ timeout: 1_000 });
+      }
+      await expect(saved).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
     await this.openFlow(consoleUrl, name);
   }
 

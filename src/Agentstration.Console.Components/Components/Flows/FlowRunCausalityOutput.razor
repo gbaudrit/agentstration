@@ -1,0 +1,64 @@
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
+<div class="causal-output" data-run-id="@RunId">
+    <button type="button" class="causal-output-toggle" data-testid="flow-causality-output-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="ToggleAsync"><UiIcon Name="chevron-right" />@Localizer["CausalOutput"]</button>
+    @if (expanded)
+    {
+        <div id="@bodyId" class="causal-output-body">
+            @if (loading) { <p role="status">@Localizer["CausalOutputLoading"]</p> }
+            else if (loaded is null) { <p class="muted" role="status">@Localizer["CausalOutputUnavailable"]</p> }
+            else
+            {
+                @if (Agentstration.Schemas.DataContracts.ParseFailure(loaded.Error?.Details) is { } failure)
+                {
+                    <p class="causal-failure-origin">@Localizer[failure.FlowRunId == loaded.Id ? "CausalFailureOrigin" : "CausalFailurePropagated"]
+                        <a href="@FlowRunInspection.RunUrl(failure.FlowRunId ?? loaded.Id, Scope, LogicalScope, failure.StepName)">@(failure.StepName ?? failure.FlowRunId ?? loaded.Id)</a> <code>@loaded.Error!.Code</code></p>
+                }
+                <FlowRunOutput Run="loaded" MaximumPreviewCharacters="16384" />
+            }
+        </div>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public string RunId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public ResourceScopeRef Scope { get; set; }
+    [Parameter] public ResourceScopeRef? LogicalScope { get; set; }
+    [Parameter] public FlowRunStatus Status { get; set; }
+    [Parameter, EditorRequired] public FlowRun Root { get; set; } = default!;
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly string bodyId = "causal-output-" + Guid.NewGuid().ToString("N");
+    private FlowRun? loaded;
+    private bool expanded, loading;
+    private string? signature;
+    private int revision;
+    protected override async Task OnParametersSetAsync()
+    {
+        var next = $"{RunId}/{Scope.Value}/{Status}";
+        if (signature == next) return;
+        signature = next; revision++; loaded = null; loading = false;
+        if (expanded) await LoadAsync();
+    }
+    private async Task ToggleAsync()
+    {
+        expanded = !expanded;
+        if (expanded && loaded is null && !loading) await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        var current = ++revision;
+        var id = RunId; var scope = Scope; var workspace = Root.WorkspaceId;
+        loading = true;
+        try
+        {
+            var value = id == Root.Id ? Root : await Client.GetFlowRunAsync(id, scope, cancellation.Token);
+            if (current == revision && !cancellation.IsCancellationRequested && value?.Id == id
+                && value.WorkspaceId == workspace && value.ExecutionScopeRef == scope) loaded = value;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception) { if (current == revision) loaded = null; }
+        finally { if (current == revision) loading = false; }
+    }
+    public void Dispose() { revision++; cancellation.Cancel(); cancellation.Dispose(); }
+}

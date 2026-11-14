@@ -13,6 +13,8 @@ using Agentstration.Schemas.Aep;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using ModelContextProtocol.Server;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
@@ -28,6 +30,37 @@ public sealed class McpToolCatalogTests
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
     [TestMethod]
+    public async Task StructuredMcpOutputKeepsItsProtocolEnvelopeAndValidatesItsDeclaredBusinessContent()
+    {
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddMcpServer().WithTools<ContractFixtureTools>()));
+        var provider = Provider();
+        var adapter = new ToolProviderAdapter(new StubAepExtensionRegistrationResolver(),
+            new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()),
+            new TestHttpMessageHandlerFactory(host.Server.CreateHandler), NullLoggerFactory.Instance);
+        var discovered = (await adapter.DiscoverAsync(provider, default)).Tools.Single(tool => tool.ExternalId == "contract_fixture");
+        Assert.IsNotNull(discovered.OutputSchema);
+        var baseline = Tool(provider.Name);
+        var tool = baseline with { Definition = baseline.Definition with { ExternalId = discovered.ExternalId,
+            Schema = new() { Input = discovered.InputSchema, Output = discovered.OutputSchema } } };
+        var result = await adapter.InvokeAsync(provider, tool, JsonSerializer.SerializeToElement(new { }), default);
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Value.GetProperty("structuredContent").GetProperty("safe").GetBoolean());
+        var invocationSchema = ToolInvocationContracts.OutputSchema(discovered.OutputSchema, provider.Definition);
+        DataContracts.Validate(DataContracts.Declared(invocationSchema, "mcp-fixture/output"), result.Value, "tool-output");
+        Assert.IsTrue(JsonElement.DeepEquals(discovered.OutputSchema.Value,
+            invocationSchema!.Value.GetProperty("properties").GetProperty("structuredContent")));
+    }
+
+    public sealed record ContractFixtureOutput(bool Safe);
+    [McpServerToolType]
+    public sealed class ContractFixtureTools
+    {
+        [McpServerTool(Name = "contract_fixture", UseStructuredContent = true)]
+        public static ContractFixtureOutput Invoke() => new(true);
+    }
+
+    [TestMethod]
     public async Task AepSchemaFormatContributionValidatesThroughGovernedMcpWithoutBecomingAnAgentTool()
     {
         await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
@@ -40,9 +73,11 @@ public sealed class McpToolCatalogTests
         var recorder = new AuthorizationRecorder(token);
         var secrets = new TestSecretResolver(token);
         var extensionUnavailable = false;
+        var waitForOperationCancellation = false;
         var httpHandlers = new TestHttpMessageHandlerFactory(() =>
             extensionUnavailable
                 ? new AuthenticationFailureHandler()
+                : waitForOperationCancellation ? new WaitForCancellationHandler()
                 : new RecordingAuthorizationHandler(host.Server.CreateHandler(), recorder));
         var transport = new AepMcpTransport(httpHandlers, NullLoggerFactory.Instance);
         var source = new AepSchemaFormatHandlerSource(
@@ -106,6 +141,8 @@ public sealed class McpToolCatalogTests
             SchemaFormatIds.JsonSchema,
             SchemaFormatCapabilities.ValidateDefinition,
             contributed.Provider);
+        // Exercise cancellation deterministically instead of racing a timer against synchronous TestServer responses.
+        waitForOperationCancellation = true;
         var timeout = await Assert.ThrowsAsync<SchemaFormatOperationException>(async () =>
             await timeoutHandler.ValidateDefinitionAsync(
                 JsonSerializer.SerializeToElement(new { type = "object" }),
@@ -599,6 +636,15 @@ public sealed class McpToolCatalogTests
         {
             recorder.Record(request);
             return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    private sealed class WaitForCancellationHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The request must be cancelled by its operation timeout.");
         }
     }
 

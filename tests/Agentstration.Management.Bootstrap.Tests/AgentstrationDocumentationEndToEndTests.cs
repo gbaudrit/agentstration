@@ -112,9 +112,9 @@ public sealed class AgentstrationDocumentationEndToEndTests
         _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
         var resourceStore = services.GetRequiredService<IResourceStore>();
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.search", "query");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.query", "question");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.read", "artifactId");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.search-regex", "pattern");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.get-status", "snapshotId");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.read", "maxCharacters");
 
         var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -122,12 +122,12 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 new WorkspaceId(workspace.Id),
                 principal.Id,
                 ResourceNamespace.Default,
-                "agentstration-documentation.search",
+                ToolDefinitionService.VersionName("agentstration-documentation.access.search-regex", "1.0.0"),
                 "documentation-search-call",
                 "documentation-search-correlation",
-                JsonSerializer.SerializeToElement(new { request = new { query = "Workspace", limit = 5 } }),
-                ToolDefinitionCallerKind.Agent,
-                "agentstration-documentation-assistant"), default);
+                JsonSerializer.SerializeToElement(new { request = new { pattern = "Workspace", limit = 5 } }),
+                ToolDefinitionCallerKind.Console,
+                "documentation-administrator"), default);
         var toolResult = await worker.AwaitAsync(toolExecution);
         StringAssert.Contains(toolResult.Output!.Value.GetRawText(), "governed ownership");
 
@@ -157,9 +157,8 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var schema = stored.Value.Definition.InputSchema;
         var request = schema.GetProperty("properties").GetProperty("request");
         Assert.IsTrue(request.GetProperty("properties").TryGetProperty(requiredRequestProperty, out _));
-        CollectionAssert.Contains(
-            request.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray(),
-            requiredRequestProperty);
+        Assert.IsInstanceOfType<RelayToolDefinitionProperties>(stored.Value.Definition);
+        Assert.IsFalse(schema.GetProperty("properties").TryGetProperty("source", out _));
         Assert.IsFalse(request.GetProperty("additionalProperties").GetBoolean());
     }
 
@@ -199,7 +198,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
             await client.ActivateSessionAsync(default);
             _ = await client.RegisterAsync(new([AwpProtocol.Version], new(client.WorkerId, client.SessionId,
                 "bootstrap-test", 1,
-                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), default);
+                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])])), default);
             return worker;
         }
 
@@ -299,7 +298,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { startUrl = new { type = "string" }, maximumDepth = new { type = "integer" }, maximumPages = new { type = "integer" }, correlationId = new { type = "string" } },
                 required = new[] { "startUrl" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "object" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
@@ -340,7 +339,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { contentReference = new { type = "string" }, offset = new { type = "integer" }, maximumBytes = new { type = "integer" } },
                 required = new[] { "contentReference", "offset" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "object" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {
@@ -373,7 +372,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 properties = new { contentReference = new { type = "string" } },
                 required = new[] { "contentReference" },
                 additionalProperties = false
-            }));
+            }), Schema(new { type = "boolean" }));
 
         public Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
         {

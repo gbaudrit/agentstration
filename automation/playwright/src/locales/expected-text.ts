@@ -69,7 +69,7 @@ export interface ExpectedText {
     runTool: string;
     input: string;
   };
-  acquisitionFailure: { errorLegend: string };
+  acquisitionFailure: { errorLegend: string; showErrorDetails: string };
   governedKnowledge: {
     deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
     newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
@@ -77,7 +77,8 @@ export interface ExpectedText {
   sourceLifecycle: {
     displayName: string; technicalName: string; acquisitionFlow: string; configurationSchema: string;
     save: string; yaml: string; revisions: string; definition: string; version: string;
-    publish: string; activate: string; enabled: string; addDataSource: string; notReady: string;
+    publish: string; activate: string; enabled: string; requiredInput: string; addDataSource: string; notReady: string;
+    updateDependencies: string; confirmDependencyUpdate: string; dependencyUpdateHelp: string; cancel: string;
   };
   schemaDrivenSources: {
     formMode: string;
@@ -102,6 +103,7 @@ export interface ExpectedText {
   };
   flowDiagnostics: {
     modelProfileUnavailable: string;
+    showErrorDetails: string;
   };
 }
 
@@ -120,7 +122,7 @@ export const ExpectedTextByLocale = {
         { heading: 'Observe', links: [{ label: 'Agent instances', url: '/agent-instances' }, { label: 'Agent runs', url: '/agent-runs' }, { label: 'Flow runs', url: '/flow-runs' }, { label: 'Run events', url: '/run-events' }] },
         { heading: 'Workplace', links: [{ label: 'Configuration', url: '/workspaces' }] },
         { heading: 'Resources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Data Sources', url: '/data-sources' }, { label: 'Knowledge Sources', url: '/knowledge-sources' }, { label: 'Artifacts', url: '/artifacts' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Source registries', url: '/settings/source-registries' }] },
-        { heading: 'Integrations', links: [{ label: 'MCP & Tools', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Model providers', url: '/modelproviders' }, { label: 'Source providers', url: '/sourceproviders' }] },
+        { heading: 'Integrations', links: [{ label: 'MCP & Tools', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Connected Services', url: '/connected-services' }, { label: 'Storages', url: '/storages' }, { label: 'Storage types', url: '/storage-types' }, { label: 'Model providers', url: '/modelproviders' }, { label: 'Source providers', url: '/sourceproviders' }] },
         { heading: 'Configuration', links: [{ label: 'Runtime profiles', url: '/runtimeprofiles' }, { label: 'Secrets', url: '/secrets' }, { label: 'Resource scopes', url: '/settings/resource-scopes' }] },
         { heading: 'System', links: [{ label: 'Workers', url: '/settings/runtime-workers' }, { label: 'Organization', url: '/settings/organization' }, { label: 'Bootstrap', url: '/settings/bootstrap' }, { label: 'Cleanup', url: '/cleanup' }, { label: 'Settings', url: '/settings' }] },
       ],
@@ -157,9 +159,9 @@ export const ExpectedTextByLocale = {
       runTool: 'Run this tool',
       input: 'Input',
     },
-    acquisitionFailure: { errorLegend: 'Error' },
+    acquisitionFailure: { errorLegend: 'Error', showErrorDetails: 'Show error details' },
     governedKnowledge: { deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
-    sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', addDataSource: 'Add a Data Source', notReady: 'Not ready' },
+    sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', requiredInput: 'Required input', addDataSource: 'Add a Data Source', notReady: 'Not ready', updateDependencies: 'Update dependencies', confirmDependencyUpdate: 'Save and update', dependencyUpdateHelp: 'Published Snapshots keep their original references.', cancel: 'Cancel' },
     schemaDrivenSources: {
       formMode: 'Form',
       rawMode: 'Raw JSON',
@@ -182,6 +184,7 @@ export const ExpectedTextByLocale = {
       changeScope: 'Change scope',
     },
     flowDiagnostics: {
+      showErrorDetails: 'Show error details',
       modelProfileUnavailable: 'An Agent model profile required by this Flow is unavailable in the execution context. Check its access policy and republish the Agent if its pinned revision changed.',
     },
   },
@@ -199,7 +202,7 @@ export const ExpectedTextByLocale = {
         { heading: 'Observer', links: [{ label: 'Instances d’agent', url: '/agent-instances' }, { label: 'Exécutions d’agents', url: '/agent-runs' }, { label: 'Exécutions de Flows', url: '/flow-runs' }, { label: 'Événements d’exécution', url: '/run-events' }] },
         { heading: 'Workplace', links: [{ label: 'Configuration', url: '/workspaces' }] },
         { heading: 'Ressources', links: [{ label: 'Packs', url: '/packs' }, { label: 'Sources de données', url: '/data-sources' }, { label: 'Sources de connaissances', url: '/knowledge-sources' }, { label: 'Artefacts', url: '/artifacts' }, { label: 'Sources', url: '/settings/sources' }, { label: 'Registres de Sources', url: '/settings/source-registries' }] },
-        { heading: 'Intégrations', links: [{ label: 'MCP & Outils', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Fournisseurs de modèles', url: '/modelproviders' }, { label: 'Fournisseurs de Sources', url: '/sourceproviders' }] },
+        { heading: 'Intégrations', links: [{ label: 'MCP & Outils', url: '/tools' }, { label: 'Extensions', url: '/extensions' }, { label: 'Services connectés', url: '/connected-services' }, { label: 'Stockages', url: '/storages' }, { label: 'Types de stockage', url: '/storage-types' }, { label: 'Fournisseurs de modèles', url: '/modelproviders' }, { label: 'Fournisseurs de Sources', url: '/sourceproviders' }] },
         { heading: 'Configuration', links: [{ label: 'Profils d’exécution', url: '/runtimeprofiles' }, { label: 'Secrets', url: '/secrets' }, { label: 'Périmètres', url: '/settings/resource-scopes' }] },
         { heading: 'Système', links: [{ label: 'Workers', url: '/settings/runtime-workers' }, { label: 'Organisation', url: '/settings/organization' }, { label: 'Bootstrap', url: '/settings/bootstrap' }, { label: 'Nettoyage', url: '/cleanup' }, { label: 'Paramètres', url: '/settings' }] },
       ],
@@ -236,9 +239,9 @@ export const ExpectedTextByLocale = {
       runTool: 'Exécuter cet outil',
       input: 'Entrées',
     },
-    acquisitionFailure: { errorLegend: 'Erreur' },
+    acquisitionFailure: { errorLegend: 'Erreur', showErrorDetails: 'Afficher les détails de l’erreur' },
     governedKnowledge: { deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
-    sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', addDataSource: 'Ajouter une source de données', notReady: 'Non prête' },
+    sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', requiredInput: 'Entrée requise', addDataSource: 'Ajouter une source de données', notReady: 'Non prête', updateDependencies: 'Mettre à jour les dépendances', confirmDependencyUpdate: 'Enregistrer et mettre à jour', dependencyUpdateHelp: 'Les Snapshots déjà publiés conservent leurs références d’origine.', cancel: 'Annuler' },
     schemaDrivenSources: {
       formMode: 'Formulaire',
       rawMode: 'JSON brut',
@@ -261,6 +264,7 @@ export const ExpectedTextByLocale = {
       changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
     flowDiagnostics: {
+      showErrorDetails: 'Afficher les détails de l’erreur',
       modelProfileUnavailable: 'Un profil de mod\u00e8le requis par un agent de ce Flow est indisponible dans le p\u00e9rim\u00e8tre d\u2019ex\u00e9cution. V\u00e9rifiez sa politique d\u2019acc\u00e8s et republiez l\u2019agent si sa r\u00e9vision \u00e9pingl\u00e9e a chang\u00e9.',
     },
   },
@@ -298,4 +302,14 @@ export const OrganizationStructureTextByLocale = {
     openTenant: (name: string) => `Ouvrir le tenant ${name}`,
     openWorkspace: (name: string) => `Ouvrir l’espace de travail ${name}`,
   },
+} as const;
+
+/** Independent acceptance text for the #1116/#1118 lifecycle/composition delta. */
+export const SourcePolicyTextByLocale = {
+  'en-US': { createTransformation: 'Create a transformation Flow', createdTransformation: 'Draft created.', ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
+    direct: 'Direct result', composition: 'Flow composition', failed: 'Failed', retired: 'Retired',
+    storageRequired: 'Freshness and history require an input Storage.', fallback: 'Allow an older acquisition after a failed refresh' },
+  'fr-FR': { createTransformation: 'Créer un flow de transformation', createdTransformation: 'Brouillon créé.', ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
+    direct: 'Résultat direct', composition: 'Composition des Flows', failed: 'Échec', retired: 'Retiré',
+    storageRequired: 'La fraîcheur et la conservation nécessitent un Storage d’entrée.', fallback: 'Autoriser une ancienne acquisition après un échec de rafraîchissement' },
 } as const;

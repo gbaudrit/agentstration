@@ -17,6 +17,7 @@ public static class AepAuthenticationDefaults
     public const string Policy = "AepWorkload";
     public const string PermissionClaim = "aep:permission";
     public const string ClientIdClaim = "aep:client_id";
+    public const string PairedClientClaim = "aep:paired_client";
     public const string InvokePermission = "aep.invoke";
 }
 
@@ -135,6 +136,8 @@ internal sealed class AepStaticBearerAuthenticationHandler(
             new(AepAuthenticationDefaults.ClientIdClaim, clientId),
             new("aep:token_id", matched?.TokenId ?? "pairing-code")
         };
+        if (matched is null && dynamicClientId is not null && dynamicMatch != AepDynamicCredentialMatch.Revoked)
+            claims.Add(new(AepAuthenticationDefaults.PairedClientClaim, "true"));
         claims.AddRange((matched?.Permissions ?? [AepAuthenticationDefaults.InvokePermission])
             .Select(value => new Claim(AepAuthenticationDefaults.PermissionClaim, value)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name));

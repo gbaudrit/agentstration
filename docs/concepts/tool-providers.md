@@ -56,3 +56,7 @@ definition:
 `requiresApproval` remains a native Tool policy. Agentstration wraps its own function adapter in MAF `ApprovalRequiredAIFunction`, preserving durable `RequestInfoEvent` → `InputRequest` → `WaitingForInput` → checkpoint resume behavior. After approval, the resumed invocation enters the Agentstration pipeline and its hook chain. The boundary carries logical Tool Call and physical invocation identities plus the available Tenant, Workspace, Principal, Run, Agent, revision, correlation and argument context. It does not implement automatic retries, provider idempotency or exactly-once effects.
 
 STDIO environment values are not persisted. `environmentReferences` maps child-process variable names to host configuration keys, resolved only when connecting. OAuth, a durable secret store, scheduled polling, MCP Resources and MCP Prompts are outside this iteration.
+
+## Product-owned ToolDefinitions
+
+ToolDefinitions publish Flow, relay and acquisition Tools using `toolKind` variants and independent immutable versions. Relays bind literal, Parameter or Secret inputs and keep exact source revisions under normal governance. See [ToolDefinitions and parameter relays](../reference/tool-relays.md) and [ADR-0202](../decisions/0202-tool-definitions-publish-independent-governed-relay-versions.md).

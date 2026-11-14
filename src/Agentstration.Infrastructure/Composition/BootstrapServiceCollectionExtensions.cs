@@ -14,6 +14,10 @@ internal static class BootstrapServiceCollectionExtensions
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PackInstallationBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ParameterBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ConnectedServiceTypeBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, StorageTypeBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, StorageBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ConnectedServiceOperationTypeBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProviderBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, RuntimeProfileBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ModelProfileBootstrapResourceHandler>();

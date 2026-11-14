@@ -217,7 +217,40 @@ Use **Proposed** when implementation or repository evidence does not establish a
 189. [ADR-0189 — Service registration has explicit module ownership](0189-service-registration-has-explicit-module-ownership.md)
 190. [ADR-0190 — ToolDefinitions replay governed Data Source acquisitions](0190-tool-definitions-replay-governed-data-source-acquisitions.md)
 191. [ADR-0191 — OpenAPI discovery and invocation remain an AEP extension](0191-openapi-discovery-and-invocation-remain-an-aep-extension.md)
-192. [ADR-0192 — Model Provider bindings support typed literals](0192-typed-literal-model-provider-bindings.md)
+192. [ADR-0192 — ASP defines a standalone content profile over MCP](0192-asp-defines-a-standalone-content-profile-over-mcp.md)
+193. [ADR-0193 — ASP Tools select logical targets and Agentstration owns parameter relays](0193-asp-tools-select-logical-targets-and-product-owns-relays.md)
+194. [ADR-0194 — Model Provider bindings support typed literals](0194-typed-literal-model-provider-bindings.md)
+195. [ADR-0195 — Connected Services are product resources over extension-defined types](0195-connected-services-are-product-resources-over-extension-defined-types.md)
+196. [ADR-0196 — Connected Service types are governed resources](0196-connected-service-types-are-governed-resources.md)
+197. [ADR-0197 — Connected Service bindings support typed literals](0197-connected-service-bindings-support-typed-literals.md)
+198. [ADR-0198 — Connected Service operations are typed discovered resources](0198-connected-service-operations-are-typed-discovered-resources.md)
+199. [ADR-0199 — Storages own explicit Connected Service export bindings](0199-storages-own-explicit-service-export-bindings.md)
+200. [ADR-0200 — Storage execution pins protected bindings and local Workspace defaults](0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
+201. [ADR-0201 — OpenAPI discovery uses protected Connected Service execution](0201-openapi-discovery-uses-protected-connected-service-execution.md)
+202. [ADR-0202 — ToolDefinitions publish independent governed relay versions](0202-tool-definitions-publish-independent-governed-relay-versions.md)
+203. [ADR-0203 — Durable Flow inputs retain live Secret references](0203-durable-flow-inputs-retain-live-secret-references.md)
+204. [ADR-0204 — Data Sources compose operation acquisitions with logical datasets](0204-data-sources-compose-operation-acquisitions-with-logical-datasets.md)
+205. [ADR-0205 — ASP uses scoped progressive content sessions](0205-asp-uses-scoped-progressive-content-sessions.md)
+206. [ADR-0206 — OpenDAL runs in an autonomous ASP extension](0206-opendal-runs-in-an-autonomous-asp-extension.md)
+207. [ADR-0207 — Knowledge publishes retained Storage content](0207-knowledge-publishes-retained-storage-content.md)
+
+208. [ADR-0208 — Produced content remains an Artifact materialized in Storage](0208-produced-content-remains-an-artifact-materialized-in-storage.md)
+209. [ADR-0209 — Knowledge Tools follow the publishing Console scope](0209-knowledge-tools-follow-the-publishing-console-scope.md)
+
+210. [ADR-0210 — Knowledge exposes native Snapshot access Tools](0210-knowledge-exposes-native-snapshot-access-tools.md)
+
+211. [ADR-0211 — Resources bind ordered Flows to typed composition points](0211-resource-bound-flow-composition-points.md)
+
+212. [ADR-0212 — Source content has independent freshness and retention policies](0212-source-content-lifecycle-and-ephemeral-handoff.md)
+
+213. [ADR-0213 — Artifact transformations own scoped content processing](0213-artifact-transformations-own-scoped-content-processing.md)
+
+214. [ADR-0214 — Effective data contracts follow Flow invocations](0214-effective-data-contracts-follow-flow-invocations.md)
+
+215. [ADR-0215 — Process regions have derived Flow identities](0215-process-regions-have-derived-flow-identities.md)
+
+219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)
+
 193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
 194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)
 195. [ADR-0195 — HTTP category switches always enable both payload directions](0195-http-categories-enable-both-bodies.md)

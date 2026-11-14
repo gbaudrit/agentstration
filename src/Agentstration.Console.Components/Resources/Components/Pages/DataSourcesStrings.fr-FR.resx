@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
-  <data name="DataSources" xml:space="preserve"><value>Sources de données</value></data><data name="DataSourcesHelp" xml:space="preserve"><value>Gérez les origines gouvernées indépendamment des projections qui consomment leurs artefacts.</value></data>
+  <data name="DataSources" xml:space="preserve"><value>Sources de données</value></data><data name="DataSourcesHelp" xml:space="preserve"><value>Composez des acquisitions d’opérations gouvernées en datasets logiques dans des Storages existants.</value></data>
   <data name="Profiles" xml:space="preserve"><value>Profils de source de données</value></data><data name="ProfilesHelp" xml:space="preserve"><value>Définissez des contrats réutilisables de configuration et d’acquisition.</value></data>
   <data name="Create" xml:space="preserve"><value>Créer</value></data><data name="Refresh" xml:space="preserve"><value>Actualiser</value></data><data name="Loading" xml:space="preserve"><value>Chargement…</value></data><data name="Open" xml:space="preserve"><value>Ouvrir</value></data><data name="Back" xml:space="preserve"><value>Retour</value></data><data name="Delete" xml:space="preserve"><value>Supprimer</value></data><data name="Save" xml:space="preserve"><value>Enregistrer</value></data><data name="Saving" xml:space="preserve"><value>Enregistrement…</value></data>
   <data name="EmptySources" xml:space="preserve"><value>Aucune source de données n’a été créée.</value></data><data name="EmptyProfiles" xml:space="preserve"><value>Aucun profil de source de données n’est visible dans ce contexte.</value></data>
@@ -82,4 +82,105 @@
   <data name="AcquisitionToolForbidden"><value>Vous n’avez pas l’autorisation de créer un Tool à partir de cette acquisition.</value></data>
   <data name="AcquisitionToolCreateFailed"><value>Le Tool n’a pas pu être créé à partir de cette acquisition.</value></data>
   <data name="Cancel"><value>Annuler</value></data>
+  <data name="DatasetStorageOrProfile" xml:space="preserve"><value>Storage / profil</value></data>
+  <data name="DatasetHelp" xml:space="preserve"><value>Un dataset logique acquis depuis une opération gouvernée dans un Storage existant.</value></data>
+  <data name="DatasetStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="DatasetPinnedUnavailable" xml:space="preserve"><value>Révision épinglée indisponible — sélectionnez explicitement une révision actuelle.</value></data>
+  <data name="DatasetStorageHelp" xml:space="preserve"><value>Le Storage sélectionné reste propriétaire de sa connexion, de ses mappings et de ses contraintes fixes.</value></data>
+  <data name="DatasetPrefix" xml:space="preserve"><value>Préfixe du dataset</value></data>
+  <data name="DatasetPrefixHelp" xml:space="preserve"><value>Répertoire relatif facultatif se terminant par /. Le segment datasets est réservé ; une partition unique du dataset est toujours ajoutée.</value></data>
+  <data name="DatasetOperation" xml:space="preserve"><value>Opération</value></data>
+  <data name="DatasetOperationHelp" xml:space="preserve"><value>Sélectionnez une révision exacte d’une opération en lecture seule. Les actions suivent un parcours distinct.</value></data>
+  <data name="DatasetNoConfiguration" xml:space="preserve"><value>Sans configuration</value></data>
+  <data name="DatasetParametersHelp" xml:space="preserve"><value>Ces paramètres sauvegardés sont validés et fixés pour chaque acquisition. Les valeurs par défaut du schéma ne sont jamais remplies automatiquement.</value></data>
+  <data name="DatasetLegacyProfile" xml:space="preserve"><value>Depuis un profil historique</value></data>
+  <data name="DatasetService" xml:space="preserve"><value>Connected Service</value></data>
+  <data name="DatasetFixedCallHelp" xml:space="preserve"><value>L’acquisition utilise l’opération, les paramètres et le Storage sauvegardés. Les substitutions par l’appelant sont refusées.</value></data>
+  <data name="DatasetNotReady" xml:space="preserve"><value>La composition sauvegardée est indisponible. Vérifiez ses révisions exactes, son activation et ses accès avant une acquisition.</value></data>
+  <data name="DatasetContent" xml:space="preserve"><value>Contenu acquis</value></data>
+  <data name="DatasetReadContent" xml:space="preserve"><value>Lire le contenu</value></data>
+  <data name="DatasetExecutionFailed" xml:space="preserve"><value>Échec de l’acquisition.</value></data>
+  <data name="DatasetContentUntrusted" xml:space="preserve"><value>Le contenu est affiché comme des données et n’est jamais exécuté.</value></data>
+  <data name="DatasetContentTruncated" xml:space="preserve"><value>Cet aperçu est limité au premier segment du contenu.</value></data>
+  <data name="DatasetCloseContent" xml:space="preserve"><value>Fermer le contenu</value></data>
+  <data name="DatasetLoadFailed" xml:space="preserve"><value>Le dataset ou ses dépendances disponibles n’ont pas pu être chargés.</value></data>
+  <data name="DatasetActionFailed" xml:space="preserve"><value>L’action a été refusée ou n’a pas abouti. Vérifiez les révisions actuelles, les valeurs saisies et les accès, puis réessayez explicitement.</value></data>
+  <data name="DatasetAcquisitionNotAuthorized" xml:space="preserve"><value>Vous n’êtes pas autorisé à lancer des acquisitions dans le Workspace opérationnel.</value></data>
+  <data name="DatasetServiceHelp" xml:space="preserve"><value>Choisissez le service connecté propriétaire de l’opération d’acquisition. La découverte et l’activation se gèrent sur ce service.</value></data>
+  <data name="DatasetManageOperations" xml:space="preserve"><value>Ouvrir la découverte et les opérations du service</value></data>
+  <data name="DatasetSelectOperationFirst" xml:space="preserve"><value>Choisissez un service connecté, puis une opération pour configurer ses paramètres d’appel enregistrés.</value></data>
+  <data name="DatasetNoServiceOperations" xml:space="preserve"><value>Aucune opération n’est actuellement disponible pour ce service. Ouvrez son onglet Découverte pour découvrir et examiner ses opérations.</value></data>
+  <data name="DatasetOperationTypeUnavailable" xml:space="preserve"><value>La version exacte du type d’opération est indisponible. Vérifiez sa référence et les accès.</value></data>
+  <data name="DatasetOperationAdapterUnavailable" xml:space="preserve"><value>Ce type d’opération ne fournit pas de Flow d’acquisition. Il ne peut pas alimenter une Data Source activée.</value></data>
+  <data name="DatasetOperationNotReadOnly" xml:space="preserve"><value>L’acquisition nécessite une opération en lecture seule de type requête-réponse.</value></data>
+  <data name="DatasetOperationSchemaMissing" xml:space="preserve"><value>Le schéma effectif d’entrée ou de sortie est absent ou non pris en charge pour l’acquisition.</value></data>
+  <data name="DatasetParametersUnavailable" xml:space="preserve"><value>Les paramètres sont disponibles lorsque l’opération prend en charge l’acquisition.</value></data>
+  <data name="DatasetParametersInvalid" xml:space="preserve"><value>Les paramètres sauvegardés ne respectent pas le schéma d’entrée de l’opération.</value></data>
+  <data name="DatasetPrefixInvalid" xml:space="preserve"><value>Utilisez un préfixe de répertoire relatif se terminant par /, sans .. ni le segment réservé datasets.</value></data>
+  <data name="DatasetErrorReference" xml:space="preserve"><value>Référence de l’erreur :</value></data>
+  <data name="DatasetEdit" xml:space="preserve"><value>Modifier</value></data>
+  <data name="DatasetCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="DatasetSections" xml:space="preserve"><value>Sections de la source de données</value></data>
+  <data name="DatasetContentTab" xml:space="preserve"><value>Contenu</value></data>
+  <data name="DatasetComposition" xml:space="preserve"><value>Composition du dataset</value></data>
+  <data name="DatasetDataSource" xml:space="preserve"><value>Source de données</value></data>
+  <data name="DatasetBytes" xml:space="preserve"><value>{0:N0} octets</value></data>
+  <data name="DatasetViewFlowRun" xml:space="preserve"><value>Voir l’exécution du Flow</value></data>
+  <data name="DatasetSavedConfiguration" xml:space="preserve"><value>Configuration sauvegardée</value></data>
+  <data name="DatasetIdentity" xml:space="preserve"><value>Identité</value></data>
+  <data name="DatasetSavedAcquisition" xml:space="preserve"><value>Acquisition configurée</value></data>
+  <data name="DatasetDestination" xml:space="preserve"><value>Destination du dataset</value></data>
+  <data name="DatasetIsolatedContent" xml:space="preserve"><value>Chaque Data Source conserve son propre dataset. Les contraintes du Storage restent appliquées.</value></data>
+  <data name="DatasetRecentAcquisitions" xml:space="preserve"><value>Dernières acquisitions</value></data>
+  <data name="DatasetAllHistory" xml:space="preserve"><value>Tout l’historique</value></data>
+  <data name="DatasetNoContent" xml:space="preserve"><value>Aucun contenu acquis n’est disponible pour le moment. Lancez une acquisition, puis actualisez son historique.</value></data>
+  <data name="DatasetContentAcquisition" xml:space="preserve"><value>Acquisition à consulter</value></data>
+  <data name="DatasetYamlHelp" xml:space="preserve"><value>Manifeste en lecture seule de la source de données sauvegardée. Utilisez l’onglet Définition pour modifier sa configuration.</value></data>
+  <data name="SequenceHelp" xml:space="preserve"><value>Les Flows s’exécutent dans cet ordre. Chacun reçoit le résultat précédent dans value et ses paramètres enregistrés. Seules les versions publiées compatibles peuvent être enregistrées.</value></data>
+  <data name="SequenceIdentity" xml:space="preserve"><value>Aucune transformation : conserver l’entrée.</value></data>
+  <data name="SequenceUnavailable" xml:space="preserve"><value>Le Flow publié ou ses dépendances n’ont pas pu être chargés.</value></data>
+  <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
+  <data name="SequenceFlow" xml:space="preserve"><value>Version publiée du Flow</value></data>
+  <data name="SequenceUp" xml:space="preserve"><value>Monter</value></data>
+  <data name="SequenceDown" xml:space="preserve"><value>Descendre</value></data>
+  <data name="SequenceRemove" xml:space="preserve"><value>Retirer la transformation</value></data>
+  <data name="SequenceAdd" xml:space="preserve"><value>Ajouter une transformation</value></data>
+  <data name="CompositionTitle" xml:space="preserve"><value>Orchestration des Flows et transformations</value></data>
+  <data name="CompositionOrchestration" xml:space="preserve"><value>Flow d’orchestration</value></data>
+  <data name="CompositionStandard" xml:space="preserve"><value>Orchestration standard</value></data>
+  <data name="CompositionBoundaryHelp" xml:space="preserve"><value>Configurez les points déclarés. L’acquisition et la publication restent gouvernées par la source.</value></data>
+  <data name="CompositionOrphanHelp" xml:space="preserve"><value>Ce point n’est pas déclaré par l’orchestration sélectionnée. Retirez sa configuration ou sélectionnez son Flow d’origine avant d’enregistrer.</value></data>
+  <data name="CompositionRemovePoint" xml:space="preserve"><value>Retirer la configuration du point</value></data>
+  <data name="LifecycleTitle" xml:space="preserve"><value>Fraîcheur et historique</value></data>
+  <data name="LifecycleEnable" xml:space="preserve"><value>Configurer la fraîcheur et la conservation</value></data>
+  <data name="LifecycleTtl" xml:space="preserve"><value>Durée de fraîcheur (hh:mm:ss)</value></data>
+  <data name="LifecycleTtlHelp" xml:space="preserve"><value>Laissez vide pour ne pas appliquer d’expiration automatique. La durée commence lorsque le résultat est disponible avec succès.</value></data>
+  <data name="LifecycleHistory" xml:space="preserve"><value>Conserver les versions précédentes réussies</value></data>
+  <data name="LifecycleRetention" xml:space="preserve"><value>Durée de conservation de l’historique (hh:mm:ss)</value></data>
+  <data name="LifecycleHistoryHelp" xml:space="preserve"><value>Sans historique, le dernier résultat réussi reste disponible jusqu’au succès de son remplacement. Les exécutions et curseurs de lecture en cours protègent leur contenu exact.</value></data>
+  <data name="LifecycleDurationInvalid" xml:space="preserve"><value>Saisissez une durée positive sous la forme heures:minutes:secondes (au maximum 3 650 jours).</value></data>
+  <data name="LifecycleStorageRequired" xml:space="preserve"><value>La fraîcheur et l’historique des acquisitions nécessitent un Storage d’entrée.</value></data>
+  <data name="DirectPermission" xml:space="preserve"><value>Autoriser l’acquisition directe sans Storage d’entrée</value></data>
+  <data name="DirectPermissionHelp" xml:space="preserve"><value>Sans Storage d’entrée, chaque nouvelle projection acquiert un résultat borné en mémoire. Les métadonnées et la provenance restent disponibles ; le Snapshot final est stocké séparément.</value></data>
+  <data name="DirectInput" xml:space="preserve"><value>Entrée directe · sans Storage intermédiaire</value></data>
+  <data name="DirectResult" xml:space="preserve"><value>Résultat direct · contenu temporaire</value></data>
+  <data name="DirectResultHelp" xml:space="preserve"><value>Le contenu a été transmis à sa projection ; l’historique d’acquisition conserve son identité et sa provenance.</value></data>
+  <data name="ContentRetired" xml:space="preserve"><value>Contenu retiré · provenance conservée</value></data>
+  <data name="ContentRetirementPending" xml:space="preserve"><value>Retrait du contenu en attente</value></data>
+  <data name="SequenceCreate" xml:space="preserve"><value>Créer un flow de transformation</value></data>
+  <data name="SequenceCreateHelp" xml:space="preserve"><value>Les contrats d’entrée et de sortie sont préremplis pour ce point. Le Designer s’ouvre dans un autre onglet ; vos modifications de la source restent ici.</value></data>
+  <data name="SequenceNoPublishedFlows" xml:space="preserve"><value>Aucun Flow de transformation publié n’est disponible dans ce contexte. Créez-en un, définissez sa transformation et publiez-le, puis actualisez la liste.</value></data>
+  <data name="SequenceRefresh" xml:space="preserve"><value>Actualiser les Flows</value></data>
+  <data name="SequenceCancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="SequenceCreateDraft" xml:space="preserve"><value>Créer le brouillon et ouvrir le Designer</value></data>
+  <data name="SequenceOpenDesigner" xml:space="preserve"><value>Ouvrir le Designer dans un autre onglet</value></data>
+  <data name="SequenceCreated" xml:space="preserve"><value>Brouillon créé. Après sa publication dans le Designer, actualisez les Flows pour l’ajouter à la séquence.</value></data>
+  <data name="SequenceCreateFailed" xml:space="preserve"><value>Le brouillon n’a pas pu être créé. Vérifiez le nom, le contexte et les droits de création des Flows, puis réessayez.</value></data>
+  <data name="SequenceClose" xml:space="preserve"><value>Fermer</value></data>
+  <data name="SequenceSearchFlow" xml:space="preserve"><value>Rechercher un Flow</value></data>
+  <data name="SequenceResource" xml:space="preserve"><value>Flow</value></data>
+  <data name="SequenceVersion" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="SequenceOpenVersion" xml:space="preserve"><value>Ouvrir cette version du Flow</value></data>
+  <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations avant publication</value></data>
+  <data name="BeforePublicationHelp" xml:space="preserve"><value>Ces transformations traitent les résultats réunis de toutes les sources d’entrée, avant la création et la publication du Snapshot.</value></data>
 </root>

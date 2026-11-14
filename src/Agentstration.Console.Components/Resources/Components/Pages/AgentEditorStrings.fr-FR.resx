@@ -108,4 +108,11 @@
   <data name="InvocationContractsHelp"><value>Décrivez la valeur structurée acceptée par cet Agent et celle qu’il retourne. L’exécution reste textuelle.</value></data>
   <data name="InputContract"><value>Contrat d’entrée</value></data>
   <data name="OutputContract"><value>Contrat de sortie</value></data>
+  <data name="OutputInstructionHelp" xml:space="preserve"><value>Le schéma de sortie déclaré est ajouté aux instructions système de l’invocation et la réponse est validée. Sans schéma fixe, la résolution dynamique doit être sélectionnée explicitement.</value></data>
+  <data name="OutputResolution" xml:space="preserve"><value>Résolution du contrat de sortie</value></data>
+  <data name="OutputResolution.Absent" xml:space="preserve"><value>Non déclaré ; accepter l’attente de l’invocation parente</value></data>
+  <data name="OutputResolution.Input" xml:space="preserve"><value>Dynamique : hériter du contrat de la donnée d’entrée</value></data>
+  <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamique : utiliser l’attente de sortie du parent</value></data>
+  <data name="OutputMediaType" xml:space="preserve"><value>Type MIME de sortie (facultatif)</value></data>
+  <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixe : schéma ou type MIME déclaré</value></data>
 </root>

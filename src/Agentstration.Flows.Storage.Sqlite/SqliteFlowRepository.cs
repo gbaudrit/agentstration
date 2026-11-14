@@ -52,7 +52,7 @@ internal sealed class FlowDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contextFactory, TimeProvider timeProvider) : IFlowRepository
+public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contextFactory, TimeProvider timeProvider, IFlowPayloadPersistence? payloads = null) : IFlowRepository
 {
     private const string DefinitionKind = "definition";
     private const string VersionKind = "version";
@@ -278,7 +278,7 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         if (existing.Scope != run.Scope)
             throw new FlowConcurrencyException("The Flow Run execution scope is immutable.");
         var now = timeProvider.GetUtcNow();
-        document.Payload = JsonSerializer.Serialize(run, JsonOptions);
+        document.Payload = Serialize(run);
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
@@ -338,6 +338,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
 
     public async Task<FlowRunEvent> AppendRunEventAsync(FlowRunEvent runEvent, CancellationToken cancellationToken)
     {
+        var owner = await GetRunExactAsync(runEvent.ScopeRef, runEvent.RunId, cancellationToken);
+        runEvent = runEvent with { TransientPayloads = owner?.Value.TransientPayloads == true };
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         // SQLite takes the write lock before reading the sequence, including across host processes.
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -358,6 +360,8 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
 
     public async Task<StoredInputRequest> CreateInputRequestAsync(InputRequest request, CancellationToken cancellationToken)
     {
+        var owner = await GetRunExactAsync(request.ScopeRef, request.RunId, cancellationToken);
+        request = request with { TransientPayloads = owner?.Value.TransientPayloads == true };
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         var document = Document(request.ScopeRef, InputRequestKey(request.ScopeRef, request.RunId, request.Id), InputRequestKind, new FlowId(request.RunId), request.Id, request, now);
@@ -387,20 +391,22 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
 
     public async Task<StoredInputRequest> UpdateInputRequestAsync(InputRequest request, string expectedETag, CancellationToken cancellationToken)
     {
+        var owner = await GetRunExactAsync(request.ScopeRef, request.RunId, cancellationToken);
+        request = request with { TransientPayloads = owner?.Value.TransientPayloads == true };
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.SingleOrDefaultAsync(value => value.Key == InputRequestKey(request.ScopeRef, request.RunId, request.Id), cancellationToken)
             ?? throw new FlowRunNotFoundException(request.RunId);
         if (!string.Equals(document.ETag, expectedETag, StringComparison.Ordinal))
             throw new FlowConcurrencyException("The Input Request was modified concurrently.");
         var now = timeProvider.GetUtcNow();
-        document.Payload = JsonSerializer.Serialize(request, JsonOptions);
+        document.Payload = Serialize(request);
         document.ETag = NewETag();
         document.UpdatedAt = now;
         await SaveUpdateAsync(context, cancellationToken);
         return new StoredInputRequest(request, document.ETag, now);
     }
 
-    private static FlowDocument Document<T>(ResourceScopeRef scopeRef, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
+    private FlowDocument Document<T>(ResourceScopeRef scopeRef, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) => new()
     {
         WorkspaceId = scopeRef.Kind == ResourceScopeKind.Workspace ? scopeRef.TargetId!.Value : Guid.Empty,
         ScopeRef = scopeRef.Value,
@@ -409,18 +415,39 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         FlowId = id.Value,
         Namespace = id.Namespace.Value,
         Version = version,
-        Payload = JsonSerializer.Serialize(value, JsonOptions),
+        Payload = Serialize(value),
         ETag = NewETag(),
         UpdatedAt = now
     };
-    private static FlowDocument Document<T>(WorkspaceId workspaceId, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) =>
+    private FlowDocument Document<T>(WorkspaceId workspaceId, string key, string kind, FlowId id, string? version, T value, DateTimeOffset now) =>
         Document(ResourceScopeRef.Workspace(workspaceId.Value), key, kind, id, version, value, now);
-    private static StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
-    private static StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
-    private static StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
-    private static StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
-    private static StoredInputRequest ToInputRequest(FlowDocument document) => new(Deserialize<InputRequest>(document), document.ETag, document.UpdatedAt);
-    private static T Deserialize<T>(FlowDocument document) => JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
+    private StoredFlow ToFlow(FlowDocument document) => new(Deserialize<FlowResource>(document), document.ETag, document.UpdatedAt);
+    private StoredFlowVersion ToVersion(FlowDocument document) => new(Deserialize<FlowVersion>(document), document.ETag, document.UpdatedAt);
+    private StoredFlowRun ToRun(FlowDocument document) => new(Deserialize<FlowRun>(document), document.ETag, document.UpdatedAt);
+    private StoredFlowDraft ToDraft(FlowDocument document) => new(Deserialize<FlowDraft>(document), document.ETag, document.UpdatedAt);
+    private StoredInputRequest ToInputRequest(FlowDocument document) => new(Deserialize<InputRequest>(document), document.ETag, document.UpdatedAt);
+    private string Serialize<T>(T value)
+    {
+        object? stored = value switch
+        {
+            FlowRun run => payloads?.Store(run) ?? (run.TransientPayloads ? throw new InvalidOperationException("Direct payload persistence is unavailable.") : run),
+            FlowRunEvent valueEvent => payloads?.Store(valueEvent) ?? (valueEvent.TransientPayloads ? throw new InvalidOperationException("Direct payload persistence is unavailable.") : valueEvent),
+            InputRequest input => payloads?.Store(input) ?? (input.TransientPayloads ? throw new InvalidOperationException("Direct payload persistence is unavailable.") : input),
+            _ => value
+        };
+        return JsonSerializer.Serialize(stored, JsonOptions);
+    }
+    private T Deserialize<T>(FlowDocument document)
+    {
+        var value = JsonSerializer.Deserialize<T>(document.Payload, JsonOptions) ?? throw new InvalidOperationException($"Stored Flow resource '{document.Key}' is invalid.");
+        return (T)(object)(value switch
+        {
+            FlowRun run => payloads?.Restore(run) ?? run,
+            FlowRunEvent valueEvent => payloads?.Restore(valueEvent) ?? valueEvent,
+            InputRequest input => payloads?.Restore(input) ?? input,
+            _ => (object)value
+        });
+    }
     private static async Task MigrateLegacyDefinitionScopesAsync(FlowDbContext context, CancellationToken cancellationToken)
     {
         var legacy = await context.Documents.Where(value =>

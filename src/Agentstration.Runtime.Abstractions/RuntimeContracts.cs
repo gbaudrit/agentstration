@@ -1,7 +1,9 @@
+using Agentstration.Schemas;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Runtime.Abstractions;
 
@@ -140,6 +142,9 @@ public sealed record ExecutableAgentDefinition
     public required IReadOnlyCollection<string> Capabilities { get; init; }
     public required string Handler { get; init; }
     public required string DefinitionHash { get; init; }
+    public JsonElement? InputSchema { get; init; }
+    public JsonElement? OutputSchema { get; init; }
+    public DataContractDefinition? OutputContract { get; init; }
 }
 
 public sealed record ResolvedRuntimeAgent(
@@ -307,7 +312,7 @@ public interface IToolCatalog
         CancellationToken cancellationToken = default) => ResolveAsync(tools.Select(value => value.Id), cancellationToken);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console, Mcp }
 
 public sealed record ToolExecutionScope
 {
@@ -325,6 +330,9 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    public bool TransientPayloads { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+    public bool HasSensitiveArguments { get; init; }
     public ToolExecutionOwnerKind OwnerKind { get; init; }
     public required string ToolCallId { get; init; }
     public required string InvocationId { get; init; }
@@ -380,6 +388,9 @@ public sealed record ToolExecutionCaptureOptions
 
 public interface IToolExecutionPipeline
 {
+    ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
+        ValueTask.FromException(new InvalidOperationException("Tool validation is unavailable."));
+
     ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default);
 
     async ValueTask<ToolInvocationResult> ExecuteDetailedAsync(

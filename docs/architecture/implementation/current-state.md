@@ -41,6 +41,7 @@ src/
   Agentstration.Packs.Contracts/    Pack installation, authoring and composition contracts
   Agentstration.Packs/            Pack authoring, installation and composition
   Agentstration.Parameters*/      scoped nonsecret Parameter resources, contracts and API
+  Agentstration.ConnectedServices*/ scoped remote-service resources, contracts and API
   Agentstration.Schemas*/         format-neutral Schema drafts, immutable versions, contracts and API
   Agentstration.Sources/          Source and source-registry use cases
   Agentstration.ResourceManagement.Storage.Sqlite/
@@ -144,6 +145,8 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, durable Worker assignments with renewable leases and fencing, authenticated AWP registration and governed operations, independent MAF Worker processes, bounded pull-based claim/heartbeat transport, governed AWP model streaming over typed SSE events, Aspire/Compose/manual hosting, registry, reconciliation, and provider-neutral AWP v1 wire contracts | additional Runtime implementations, Kubernetes integration, and automatic checkpoint-based recovery after Worker loss |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
+| Storages | Governed immutable types, independent StorageType and Storage Console administration, explicit version publication, discoverable references, scoped generic Discover/Use grant administration/evaluation, manual Connected Service export mappings, JSON Schema validation, ETag lifecycle/reconciliation, Bootstrap, protected neutral resolution | ASP/AEP/Artifact adapters (#1040), dataset/Snapshot consumers (#1041/#1042), new user-permission work (#1077), UsePolicy administration (#1078), gated administration scenario (#1065) |
+| Connected Services | Governed service and operation types (Core-, user-, Bootstrap- or extension-owned), exact type/Flow pins, Instance-/Tenant-/Workspace-owned remote-service definitions, durable Flow-backed operation discovery, schema-validated read-only operation materialization, typed Literal and late-bound Parameter/Secret inputs, scoped CRUD and reconciliation | invocation dispatch and explicit consumer export bindings, including Storage/OpenDAL adapters |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
 | Work storage | independent SQLite snapshots, indexed query fields, optimistic version concurrency | migrations and richer projections |
 | Flows | Instance-, Tenant-, and Workspace-owned typed graph drafts, immutable exact-scope versions, Workspace-owned durable Runs, opaque SQLite/PostgreSQL runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |
@@ -153,12 +156,12 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Agents | management definitions plus isolated MAF runtime adapter | sessions, execution budgets, richer tool policies |
 | Workflows | normalize → analyze → remember | parallel, routing, handoff, supervisor, HITL |
 | Scheduling | Workspace-owned Trigger resources, including placement in governed Instance/Tenant operational Workspaces, durable occurrences, exact Workspace-keyed Quartz.NET projection in the selected SQLite or PostgreSQL store, startup reconciliation, explicit misfire/concurrency policy, pinned Flow identity and authorized Work submission | webhook/event/condition sources, workload identities, clustered scheduling |
-| Tools | hierarchical ToolProvider, Tool, ToolSet, and immutable ToolSet-version resources with exact Extension-registration scope; AEP contribution resolution, MCP schema catalog, governed execution, Workspace ToolDefinitions that publish bounded Flow-backed Tools, and deterministic routing and pinned Agent assignment | richer permissions, credentials, connection policies, and additional built-in hook handlers |
+| Tools | hierarchical ToolProvider, Tool, ToolSet, and immutable ToolSet-version resources with exact Extension-registration scope; AEP contribution resolution, MCP schema catalog, governed execution, Instance/Tenant/Workspace ToolDefinitions with independently versioned Flow, relay and acquisition publications, typed literal/Parameter/Secret bindings, explicit consumer adoption, deterministic routing and pinned Agent assignment | richer permissions, credentials, connection policies, and additional built-in hook handlers |
 | Artifacts | Workspace-scoped staged content, provenance, bounded leases and retention, ToolSet-backed temporary storage, brokered MCP access, immutable Flow Run artifacts, and composable Storage Flows with a local filesystem default | additional provider-supplied staging ToolSets and packaged storage recipes |
 | Data Sources | Instance-, tenant-, and Workspace-scoped origins, reusable versioned acquisition profiles, schema-validated configuration, Workspace execution through `datasource.acquisition/v1`, and exact Flow, Tool, provider and policy provenance | source-usage policy and additional provider compositions |
 | Knowledge | Instance-, Tenant-, and Workspace-owned reusable Knowledge Source definitions over exact Data Source and Flow pins; Workspace-isolated projection, acquisition, Artifact, Snapshot, retrieval, index, and session state; optional `artifact.transform/v1` bindings and governed internal MCP exposure | specialized projection and retrieval catalogs |
 | Notifications | Work and Workplace notification records, the server-keyed `work.notification.create` internal MCP Tool, and reusable delivery Flows | packaged external-provider delivery recipes |
-| MCP | generic governed provider/client infrastructure, bounded internal Tools, and dynamic `tools/list`/`tools/call` publication of enabled ToolDefinitions; no generic Flow launcher or legacy platform tools | resources, prompts, and richer task progress |
+| MCP | generic governed provider/client infrastructure, bounded internal Tools, and dynamic `tools/list`/`tools/call` exposure of enabled immutable ToolDefinition publications through the ordinary governed pipeline; no generic Flow launcher or legacy platform tools | resources, prompts, and richer task progress |
 | Observability | OTel traces/metrics/log correlation tags | dashboards and SLOs |
 
 ## Principal contracts
@@ -248,7 +251,9 @@ Executable Agent, Tool, Tool-route, child-Flow, repeat and Flow-output steps may
 
 A successful Knowledge projection publishes one atomic `KnowledgeSnapshot` containing only the durable, publishable Artifacts emitted by the projection Flow. Publication validates the exact Knowledge Source generation, projection Flow version and run, Data Source acquisition provenance, artifact lineage, Workspace, and integrity before the immutable write. Publication attempts and the active Snapshot pointer are separate mutable state, so failures, retries, recovery, activation, and supersession never rewrite a published Snapshot. Snapshot queries expose active, superseded, or unavailable state while retaining deterministic history. See ADR-0153 and ADR-0167.
 
-Data Sources are the only governed acquisition boundary. `DataSource` and `DataSourceProfile` support instance, tenant, and Workspace ownership with ancestor-only visibility plus explicit descendant-use grants. Publishing a profile resolves its dependencies from the profile owner scope and immutably pins the exact Flow version and hash and every Tool and provider identity, generation, limit, and policy. A same-scope acquisition Flow needs no descendant grant; an ancestor Flow must authorize `use` for the profile owner through the shared access overlay. Acquisition executes in a consuming Workspace, validates those pins without resolving names again, and records the exact source and active profile revision before starting `datasource.acquisition/v1`. The protected Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope and granted to descendant Workspaces through their tenant; operational acquisition state remains Workspace-isolated. Their underlying Tools remain generic and carry no Knowledge identity. See ADR-0164, ADR-0166, ADR-0167, ADR-0176, ADR-0172, and ADR-0179.
+New Data Source `dataset` compositions select an exact Storage, a narrowing logical rule and one saved Operation/parameter binding. Explicitly enabled read-only Operations run through a type-owned, exact durable Flow and the existing AWP worker. Bounded output is written through the neutral Storage gateway under the dataset UID and operational Workspace; content reads reauthorize exact identities and renew references. See [Data Source composition](data-source-composition.md) and ADR-0204. Independently versioned Tool relays are provided by #1044; native Knowledge Snapshot adoption is implemented by #1042 as described under Retained Knowledge output below.
+
+The existing profile composition remains executable; historical resources, acquisitions and fixed acquisition Tools are preserved. Data Sources remain the governed acquisition boundary. `DataSource` and `DataSourceProfile` support instance, tenant, and Workspace ownership with ancestor-only visibility plus explicit descendant-use grants. Publishing a profile resolves its dependencies from the profile owner scope and immutably pins the exact Flow version and hash and every Tool and provider identity, generation, limit, and policy. A same-scope acquisition Flow needs no descendant grant; an ancestor Flow must authorize `use` for the profile owner through the shared access overlay. Acquisition executes in a consuming Workspace, validates those pins without resolving names again, and records the exact source and active profile revision before starting `datasource.acquisition/v1`. The protected Web, REST, and Artifact-import profiles and their complete acquisition composition are reconciled at instance scope and granted to descendant Workspaces through their tenant; operational acquisition state remains Workspace-isolated. Their underlying Tools remain generic and carry no Knowledge identity. See ADR-0164, ADR-0166, ADR-0167, ADR-0176, ADR-0172, and ADR-0179.
 
 The Console discovery tab links the pinned discovery Flow and each scoped Flow Run, displays execution history and localized states, and refreshes active discovery and acquisition operations every two seconds without resetting editable form values. Successful discovery refreshes choices and target staleness together; transient refresh failures retain the last results and expose a retry action. Polling is cancelled when the editor is disposed. See ADR-0182.
 
@@ -383,7 +388,7 @@ AEP owns extension identity, presentation metadata, server declarations, and the
 
 Successful AEP enrollment now reconciles this governed catalog before the extension becomes available. An authenticated descriptor with Tool contributions creates an exact-scoped AEP ToolProvider bound to the enrolled Extension Registration and materializes its MCP-discovered Tools as disabled-by-default resources. Extensions without Tool contributions do not create an empty provider. Enrollment fails closed on discovery errors or identity collisions, while identical retries preserve resource UIDs and generations.
 
-The reserved `agentstration` MCP provider is materialized from Workspace-owned `ToolDefinition` resources. An enabled definition publishes one stable MCP Tool whose exact or active Flow implementation has the same JSON input/output schemas. Editable ToolDefinitions may bind either inline JSON Schema or one exact published reusable Schema; saving resolves the binding and materializes its effective content while externally discovered MCP/AEP schemas remain provider-owned and read-only. `tools/call` and assigned Agent invocations both create or recover the root WorkItem/FlowRun through `RootFlowSubmissionService`; trusted scope never comes from Tool arguments. Calls execute within the configured bound, return the Flow output, and retain a receipt containing the effective immutable Flow version and durable identifiers. Active Flow publication is guarded against breaking an enabled definition. See ADR-0106.
+The reserved `agentstration` MCP provider is materialized in the exact Instance, Tenant or Workspace ownership scope of a `ToolDefinition`. Saving edits a draft; publication creates an immutable `ToolDefinitionVersion` and an ordinary Tool named `agentstration.<definition>.v<version>`. Typed Flow, relay and acquisition definitions retain independent publication versions. Flow-backed definitions may bind inline JSON Schema or an exact published reusable Schema; saving resolves its effective content, while discovered MCP/AEP schemas remain provider-owned and read-only. Relays pin exact source identities and contracts, bind literal/Parameter/Secret inputs, and never update consumers automatically. Flow-backed calls create or recover the root WorkItem/FlowRun through `RootFlowSubmissionService`; trusted scope never comes from Tool arguments. Durable Secret inputs retain scoped, UID-bound references through Work, Flow and step state and child Flows. Each server-side Tool attempt resolves the current value and rechecks authorization and the input contract, including after rotation or recovery; the Worker receives symbolic inputs. Validation-only relay simulation checks the source and live bindings without invoking its implementation. Usages lists exact published consumers in the owner scope and authorized descendants. Active Flow publication remains guarded against incompatible contracts. See ADR-0106, ADR-0202 and [ADR-0203](../../decisions/0203-durable-flow-inputs-retain-live-secret-references.md).
 
 The same internal provider publishes a deliberately bounded atomic `work.notification.create` Tool and projects it as an ordinary governed Tool in each Workspace. It accepts presentation fields while Agentstration generates the unique persisted notification identity; scope and Flow/Tool causality come only from the trusted execution context. A reusable delivery Flow maps its stable contract to that Tool; parents call the delivery Flow, and a contract-compatible active version can instead map to Slack, Teams, email, or another MCP provider without changing them. There is no notification-specific graph step or channel resource. See ADR-0107.
 
@@ -575,9 +580,58 @@ SQLite schema evolution remains reset-only before the first release: existing ge
 - ADR-0102: Source Providers follow hierarchical resource visibility
 - ADR-0105: Flows compose reusable Flows and governed Tools
 - ADR-0106: ToolDefinitions publish Flow-backed MCP Tools
+- [ADR-0202 — independent governed ToolDefinition relay versions](../../decisions/0202-tool-definitions-publish-independent-governed-relay-versions.md), extending ADR-0106 with typed variants, immutable publications and explicit adoption; see the [relay contract and acquisition boundary](../../reference/tool-relays.md)
 - ADR-0107: notification channels are delivery Flows
 - ADR-0108: Flow Run causality is a bounded read model
 - [ADR-0117 — product-owned reusable browser journeys](../../decisions/0117-product-owned-browser-journeys.md)
 - [ADR-0118 — dedicated Workspaces for browser campaign data isolation](../../decisions/0118-browser-campaigns-use-dedicated-workspaces.md)
 - [ADR-0157 — Crawl4AI web acquisition is an AEP Tool Provider](../../decisions/0157-crawl4ai-web-acquisition-is-an-aep-tool-provider.md)
 - [ADR-0161 — Web crawlers produce bounded aggregate content](../../decisions/0161-web-crawlers-produce-bounded-aggregate-content.md)
+
+## Retained Knowledge output
+
+Knowledge composition accepts native Data Source datasets when an exact output
+Storage and narrowing rule are selected. The existing transformation/projection
+Flows execute through Runtime/AWP; Storage preparation and sealing precede
+immutable Snapshot creation and separate activation. The first retained-output
+adapter supports builtin local Storages using a namespace distinct from mutable
+ASP objects. Existing Artifact-only Snapshots remain readable through their
+receipts. Projection request identities and pending evidence support restart
+recovery through the existing worker; current authorization is checked again.
+See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md).
+The [implementation validation report](knowledge-snapshots-validation-2026-11-09.md)
+records the executed chain, required suite results and remaining UX gates.
+
+
+## Produced Artifacts and their Storage materializations
+
+Native acquisitions and retained Knowledge publications register immutable Artifact
+metadata for their physically stored content. Artifacts retain producer revision,
+execution/Flow Run and exact Storage location/integrity evidence. The existing
+catalogue and content materialization Flow serve previews/downloads. The recovery
+worker reconciles missing metadata from earlier native histories under the original
+caller's current permissions, without rewriting immutable Snapshots or origin data.
+See [ADR-0208](../../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
+
+## Resource-bound Flow composition
+
+Published Flows can declare typed composition points. Data Sources and Knowledge
+Sources bind ordered published child Flows and literal parameters to those points.
+Admission expands them into ordinary governed child calls with exact versions,
+resource UIDs and hashes; Flow Run receipts distinguish the immutable template
+from the compiled executable graph. Standard orchestrations preserve source-owned
+acquisition and publication boundaries, per-binding Knowledge preparation and a
+global post-aggregation sequence. See
+[ADR-0211](../../decisions/0211-resource-bound-flow-composition-points.md) and
+[the source composition inventory](data-source-composition.md#configurable-flow-sequences).
+
+## Source freshness and retained history
+
+Native acquisition and Knowledge Snapshot lifecycles are independent opt-in
+policies. Direct read-only acquisitions use bounded ephemeral Flow/runtime payloads;
+retained inputs refresh according to their source TTL. Explicit binding fallback
+records failed refresh evidence and an exact compatible previous input. Snapshot
+access uses its own publication TTL and explicit expired-serving option. Bounded
+history reconciliation preserves active work, read leases and immutable provenance;
+provider-qualified retirement can remain pending. See
+[ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).

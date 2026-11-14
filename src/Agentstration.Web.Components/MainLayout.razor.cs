@@ -30,7 +30,7 @@ public partial class MainLayout
         new("Group.Observe", "observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
         new("Group.Workplace", "workplace", [new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "work")]),
         new("Group.Resources", "resources", [new("Nav.Packs", "/packs", "package"), new("Nav.DataSources", "/data-sources", "database", "tool", ["resources/read"]), new("Nav.KnowledgeSources", "/knowledge-sources", "brain", "tool", ["resources/read"]), new("Nav.Artifacts", "/artifacts", "file", "flow"), new("Nav.Sources", "/settings/sources", "books"), new("Nav.SourceRegistries", "/settings/source-registries", "database-search")]),
-        new("Group.Integrations", "integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
+        new("Group.Integrations", "integrations", [new("Nav.Tools", "/tools", "wrench", "tool"), new("Nav.Extensions", "/extensions", "puzzle"), new("Nav.ConnectedServices", "/connected-services", "plug-connected", "source", ["resources/read"]), new("Nav.Storages", "/storages", "database", "storage", ["resources/read"]), new("Nav.StorageTypes", "/storage-types", "database", "storage-type", ["resources/read"]), new("Nav.ModelProviders", "/modelproviders", "cpu", "model"), new("Nav.SourceProviders", "/sourceproviders", "plug-connected", "source")]),
         new("Group.Configuration", "configuration", [new("Nav.RuntimeProfiles", "/runtimeprofiles", "cube", "runtime"), new("Nav.Secrets", "/secrets", "key"), new("Nav.ResourceScopes", "/settings/resource-scopes", "binary-tree", RequiredPermissions: ["resources/read"])]),
         new("Group.System", "system", [new("Nav.RuntimeWorkers", "/settings/runtime-workers", "server"), new("Nav.Organization", "/settings/organization", "building"), new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload"), new("Nav.Cleanup", "/cleanup", "trash", RequiredPermissions: ["resources/delete", "runs/delete"]), new("Nav.Settings", "/settings", "settings")])
     ];
@@ -82,6 +82,12 @@ public partial class MainLayout
         new("Command.DiscoverSources", "/settings/source-registries/discovery", "search", "Command", "registry catalog source discovery registre catalogue découverte"),
         new("Command.ProfileSettings", "/settings/profile", "user-circle", "Nav.Profile", "appearance theme personal preferences apparence thème préférences"),
         new("Nav.Extensions", "/extensions", "puzzle", "Group.Integrations", "AEP option contracts compatibility extensions"),
+        new("Nav.ConnectedServices", "/connected-services", "plug-connected", "Group.Integrations", "connected services services connectés integrations", ["resources/read"]),
+        new("Nav.Storages", "/storages", "database", "Group.Integrations", "storages stockages", ["resources/read"]),
+        new("Nav.StorageTypes", "/storage-types", "database", "Group.Integrations", "storage types types stockage", ["resources/read"]),
+        new("Command.CreateStorageType", "/storage-types/new", "plus", "Command", "new nouveau storage type type stockage", ["resources/write"]),
+        new("Command.CreateStorage", "/storages/new", "plus", "Command", "new nouveau storage stockage", ["resources/write"]),
+        new("Command.CreateConnectedService", "/connected-services/new", "plus", "Command", "new nouveau connected service service connecté", ["resources/write"]),
         new("Nav.Cleanup", "/cleanup", "trash", "Group.System", "cleanup clean delete purge nettoyage suppression", ["resources/delete", "runs/delete"]),
         new("Nav.Organization", "/settings/organization", "building", "Group.System", "tenant organization organisation"),
         new("Nav.Bootstrap", "/settings/bootstrap", "cloud-upload", "Group.System", "bootstrap profiles configuration profils configuration"),
@@ -195,7 +201,7 @@ public partial class MainLayout
         NavigationManager.LocationChanged += OnLocationChanged;
         platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
-            ContextState.LoadAsync(lifetimeCancellation.Token),
+            ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
         NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
         locationChangingRegistration = NavigationManager.RegisterLocationChangingHandler(PreserveConsoleContextAsync);
@@ -370,18 +376,21 @@ public partial class MainLayout
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
+        if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
         if (requestedContext is not null
-            && ContextState.Current is { } current
-            && !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal))
+            && (ContextState.IsLoading || ContextState.Current is not { } current
+                || !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal)))
         {
-            await ContextState.LoadAsync(lifetimeCancellation.Token);
+            await ContextState.LoadAsync(requestedContext, lifetimeCancellation.Token);
         }
+        if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         StateHasChanged();
         try
         {
             await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
-            if (contextModule is not null && ContextState.Current is { } context)
+            if (contextModule is not null && ContextState.Current is { } context && !ContextState.IsLoading
+                && ContextState.Error is null && string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal))
                 await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
         }
         catch (JSDisconnectedException) { }

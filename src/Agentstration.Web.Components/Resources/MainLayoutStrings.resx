@@ -22,6 +22,8 @@
   <data name="Nav.DataSourceProfiles" xml:space="preserve"><value>Data Source Profiles</value></data>
   <data name="Nav.Schemas" xml:space="preserve"><value>Schemas</value></data>
   <data name="Command.CreateSchema" xml:space="preserve"><value>Create Schema</value></data>
+  <data name="Nav.ConnectedServices" xml:space="preserve"><value>Connected Services</value></data>
+  <data name="Command.CreateConnectedService" xml:space="preserve"><value>Create Connected Service</value></data>
   <data name="CurrentContext" xml:space="preserve"><value>Current Console context</value></data>
   <data name="ChangeContext" xml:space="preserve"><value>Change Console context</value></data>
   <data name="ChooseContext" xml:space="preserve"><value>Choose a context</value></data>
@@ -36,4 +38,8 @@
   <data name="TenantAdministration" xml:space="preserve"><value>Tenant administration</value></data>
   <data name="ConfirmContextChange" xml:space="preserve"><value>You have unsaved changes. Discard them and change context?</value></data>
   <data name="ContextChangeFailed" xml:space="preserve"><value>Context change failed</value></data>
+  <data name="Nav.Storages" xml:space="preserve"><value>Storages</value></data>
+  <data name="Command.CreateStorage" xml:space="preserve"><value>Create Storage</value></data>
+  <data name="Nav.StorageTypes" xml:space="preserve"><value>Storage types</value></data>
+  <data name="Command.CreateStorageType" xml:space="preserve"><value>Create Storage type</value></data>
 </root>

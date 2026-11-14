@@ -62,7 +62,7 @@ export class GovernedKnowledgePage {
     await status(response, 200);
     const exposure = await response.json() as Exposure;
     // The materialized search member is chosen by its invariant capability route.
-    const search = exposure.operations.find(item => item.route === 'search');
+    const search = exposure.operations.find(item => item.route === 'search_regex');
     expect(search).toBeDefined();
     const selected = search!.tool.name;
     const excluded = exposure.operations.filter(item => item.tool.name !== selected).map(item => item.tool.name);
@@ -136,17 +136,17 @@ export class GovernedKnowledgePage {
     const originalVersion = await (await this.get(consoleUrl, `${path}/versions/1.0.0`, scope)).json() as unknown;
     const current = await this.get(consoleUrl, path, scope);
     const toolSet = await current.json() as { definition: { members: unknown[] } & Record<string, unknown> };
-    const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${knowledge}.search`, scope)).json() as { definition: Record<string, unknown> };
+    const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${knowledge}.access.search-regex`, scope)).json() as { definition: Record<string, unknown> };
     const additionalName = `${knowledge}.additional-search`;
     await this.post(consoleUrl, '/api/tooldefinitions', scope, {
-      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName },
+      name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName, publish: true },
     }, 201);
-    const additionalTool = `agentstration.${additionalName}`;
+    const additionalTool = `agentstration.${additionalName}.v${String(definition.definition.version)}`;
     const updated = await this.page.request.put(this.url(consoleUrl, path, scope), {
       headers: { 'X-Agentstration-Context': scope, 'If-Match': current.headers()['etag']! },
       data: { properties: { ...toolSet.definition, version: '2.0.0', publish: true,
         members: [...toolSet.definition.members, { tool: { name: additionalTool, namespace: 'default', scopeRef: scope },
-          capability: 'knowledge.search', route: 'additional-search' }] } },
+          capability: 'knowledge.search_regex', route: 'additional-search' }] } },
     });
     await status(updated, 200);
     const latest = await (await this.get(consoleUrl, `${path}/versions/2.0.0`, scope)).json() as { members: { toolName: string }[] };
@@ -157,8 +157,8 @@ export class GovernedKnowledgePage {
     await this.openToolSet(consoleUrl, evidence.toolSetName, scope);
     const versions = this.page.getByTestId(TestIds.governedKnowledge.toolSetVersion);
     await expect(versions).toHaveCount(2);
-    await expect(versions.filter({ hasText: '2.0.0' })).toContainText(additionalTool);
-    await expect(versions.filter({ hasText: '1.0.0' })).not.toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b2\.0\.0$/ }) })).toContainText(additionalTool);
+    await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b1\.0\.0$/ }) })).not.toContainText(additionalTool);
     const beforeDelete = await (await this.get(consoleUrl, path, scope)).json() as unknown;
     await this.publishedTools.getByRole('button', { name: text.deleteToolSet, exact: true }).click();
     await this.page.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
@@ -202,18 +202,18 @@ export class GovernedKnowledgePage {
 
     const conflict = `${knowledge}-conflict`;
     await createSource(conflict, true);
-    const current = await (await this.get(consoleUrl, `/api/toolsets/${knowledge}`, scope)).json() as { definition: Record<string, unknown> };
+    const current = await (await this.get(consoleUrl, `/api/toolsets/${knowledge}.access`, scope)).json() as { definition: Record<string, unknown> };
     // A foreign unpublished ToolSet deliberately owns this otherwise-ready source's name.
     await this.post(consoleUrl, '/api/toolsets', scope, {
-      name: conflict, namespace: 'default', properties: { ...current.definition, displayName: conflict, version: '1.0.0', publish: false },
+      name: `${conflict}.access`, namespace: 'default', properties: { ...current.definition, displayName: conflict, version: '1.0.0', publish: false },
     }, 201);
-    const foreign = await (await this.get(consoleUrl, `/api/toolsets/${conflict}`, scope)).json() as unknown;
+    const foreign = await (await this.get(consoleUrl, `/api/toolsets/${conflict}.access`, scope)).json() as unknown;
     await this.openTools(consoleUrl, conflict, scope);
     await exposure.getByRole('button', { name: text.publishExposure, exact: true }).click();
     await expect(this.page.locator('.form-alert-danger[role="status"]')).toContainText(conflict);
     const conflicting = await this.post(consoleUrl, `/api/knowledgesources/${conflict}/tool-exposure`, scope, { version: '1.0.0' }, 422);
     expect((await conflicting.json() as { type: string }).type).toContain('knowledge_source_tool_set_conflict');
-    expect(await (await this.get(consoleUrl, `/api/toolsets/${conflict}`, scope)).json()).toEqual(foreign);
+    expect(await (await this.get(consoleUrl, `/api/toolsets/${conflict}.access`, scope)).json()).toEqual(foreign);
 
     const restricted = `${knowledge}-restricted`;
     await createSource(restricted, true);
@@ -235,18 +235,18 @@ export class GovernedKnowledgePage {
       await status(await reader.request.post(this.url(consoleUrl, `/api/knowledgesources/${restricted}/tool-exposure`, scope), {
         data: { version: '1.0.0' },
       }), 403);
-      await reader.goto(this.toolSetUrl(consoleUrl, knowledge, scope));
+      await reader.goto(this.toolSetUrl(consoleUrl, `${knowledge}.access`, scope));
       await reader.getByTestId(TestIds.governedKnowledge.toolSetDetails).getByRole('button', { name: text.deleteToolSet, exact: true }).click();
       await reader.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
       await expect(reader.getByRole('alert')).toContainText(/403|Forbidden/i);
-      await status(await reader.request.delete(this.url(consoleUrl, `/api/toolsets/${knowledge}`, scope)), 403);
+      await status(await reader.request.delete(this.url(consoleUrl, `/api/toolsets/${knowledge}.access`, scope)), 403);
       await expect(reader.locator('#blazor-error-ui')).not.toBeVisible();
     } finally { await readerContext.close(); }
-    expect(await (await this.get(consoleUrl, `/api/toolsets/${knowledge}`, scope)).json()).toEqual(current);
+    expect(await (await this.get(consoleUrl, `/api/toolsets/${knowledge}.access`, scope)).json()).toEqual(current);
     const noExposure = await this.page.request.get(this.url(consoleUrl, `/api/knowledgesources/${restricted}/tool-exposure`, scope));
     await status(noExposure, 422);
     expect((await noExposure.json() as { type: string }).type).toContain('knowledge_source_tool_exposure_not_found');
-    await this.openToolSet(consoleUrl, knowledge, scope);
+    await this.openToolSet(consoleUrl, `${knowledge}.access`, scope);
   }
 
   private url(consoleUrl: string, path: string, scope: string): string {
