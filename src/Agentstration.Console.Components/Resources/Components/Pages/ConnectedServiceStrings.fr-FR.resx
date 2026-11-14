@@ -148,4 +148,11 @@
   <data name="Discovery.State.TimedOut" xml:space="preserve"><value>Délai dépassé</value></data>
   <data name="Http.DiscoveryHelp"><value>L’URL HTTP sert d’exemple pour découvrir une opération GET et ses paramètres de requête. La découverte n’effectue aucun appel. Les valeurs d’exemple sont écartées ; configurez les valeurs d’acquisition dans chaque Data Source. Les noms de paramètres répétés ne sont pas pris en charge.</value></data>
   <data name="Http.SampleUrlHelp"><value>Saisissez l’URL HTTP(S) complète d’un exemple d’appel, avec ses paramètres de requête. Leurs valeurs servent uniquement d’exemples et ne sont pas copiées dans l’opération ou la Data Source.</value></data>
+<data name="SchemaCandidate.Title" xml:space="preserve"><value>Schéma de réponse déclaré</value></data>
+<data name="SchemaCandidate.Help" xml:space="preserve"><value>Inspectez la preuve OpenAPI épinglée et le contrat effectif d’acquisition. Créer un brouillon ne le publie pas et ne modifie aucun consommateur. Publiez explicitement, puis adoptez sa version exacte dans une Data Source ou une collection.</value></data>
+<data name="SchemaCandidate.Name" xml:space="preserve"><value>Nom technique du Schema</value></data>
+<data name="SchemaCandidate.CreateDraft" xml:space="preserve"><value>Créer un brouillon Schema</value></data>
+<data name="SchemaCandidate.Unsupported" xml:space="preserve"><value>Ce candidat ne peut pas être exporté avec le profil de schéma d’acquisition pris en charge. Sa preuve d’origine reste disponible.</value></data>
+<data name="SchemaCandidate.Failed" xml:space="preserve"><value>Le brouillon Schema n’a pas pu être créé. Vérifiez le nom, les droits et les constructions de schéma prises en charge.</value></data>
+<data name="SchemaCandidate.Library" xml:space="preserve"><value>Inspecter ou réutiliser un Schema publié</value></data>
 </root>

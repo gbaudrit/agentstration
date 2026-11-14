@@ -56,6 +56,8 @@ public sealed class ToolRelayExecutor(
             {
                 switch (binding)
                 {
+                    case OmittedToolArgumentBinding:
+                        break;
                     case LiteralToolArgumentBinding literal:
                         values[binding.Path] = literal.Value.Clone();
                         break;

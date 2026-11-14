@@ -94,3 +94,5 @@ contracts do not depend on it or on PostgreSQL. The memory sample is
 `asp/samples/StructuredDocuments`; the product's autonomous PostgreSQL provider is
 `src/Agentstration.Extensions.PostgreSql`. See the full
 [contract and deployment reference](../docs/reference/structured-documents.md).
+
+Protected document bindings report bounded problem codes for backend connection refusal, unavailability and timeout (`backend_connection_refused`, `backend_unavailable`, `backend_timeout`). These remain distinct from policy refusal. PostgreSQL classifies connection failures before returning the binding response; product acquisitions retain the reason and localize it without forwarding connection strings or remote exception text. Unknown or malformed peer failures fall back to the HTTP status category.

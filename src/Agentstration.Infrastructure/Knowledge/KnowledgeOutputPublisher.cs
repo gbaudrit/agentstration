@@ -82,7 +82,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             {
                 var concrete = DataContracts.Declared(contract.Schema, contract.Origin, contract.MediaType)!;
                 _ = DataContracts.ReadText(concrete, Encoding.UTF8.GetString(bytes.Span), "snapshot-output", projection.ProjectionFlowRunId);
-                contract = concrete with { DeclaredMode = contract.DeclaredMode, Validated = true };
+                contract = concrete with { DeclaredMode = contract.DeclaredMode, Validated = true, SchemaEvidence = contract.SchemaEvidence };
             }
             if (output.DocumentCollectionUid is null) reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
             result.Add(new()

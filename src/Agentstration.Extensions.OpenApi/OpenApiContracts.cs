@@ -22,7 +22,11 @@ public sealed record OpenApiDiscoveryResult(
     IReadOnlyList<OpenApiDiscoveryChoice> Choices, IReadOnlyList<OpenApiDiagnostic> Diagnostics);
 
 public sealed record OpenApiOperationSelector(
-    string ContractUri, string ContractDigest, string Server, string OperationId, string Method, string Path);
+    string ContractUri, string ContractDigest, string Server, string OperationId, string Method, string Path)
+{
+    public string? ResponseStatus { get; init; }
+    public string? ResponseMediaType { get; init; }
+}
 
 public sealed record OpenApiFixedBindings(
     IReadOnlyDictionary<string, string>? Path = null,
@@ -38,3 +42,8 @@ public sealed class OpenApiExtensionException(string code, string message, Excep
 {
     public string Code { get; } = code;
 }
+
+/// <summary>Exact declared response evidence, distinct from a projected executable acquisition schema.</summary>
+public sealed record OpenApiResponseSchemaCandidate(string Status, string MediaType, string SchemaLocation,
+    JsonElement? NativeDefinition, string ContractUri, string ContractDigest, string OpenApiVersion,
+    string OperationId, IReadOnlyList<string> Diagnostics);

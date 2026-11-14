@@ -11,7 +11,7 @@
                 <ul>@foreach (var issue in schemaError.ValidationIssues.Take(10)) { <li><code>@issue.Path</code> · @Localizer[IssueKey(issue)] @if (issue.Keyword is not null) { <code>@issue.Keyword</code> }</li> }</ul>
             }
         }
-        else { <span>@Localizer["Error.RefreshHelp"]</span> }
+        else if (StorageErrorKey.For(Error) is not ("Error.Metadata" or "Error.BackendConnectionRefused" or "Error.BackendTimeout" or "Error.BackendUnavailable")) { <span>@Localizer["Error.RefreshHelp"]</span> }
     </div>
 }
 @code {

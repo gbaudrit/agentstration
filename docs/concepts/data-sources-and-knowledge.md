@@ -204,3 +204,54 @@ it also links its execution and reports completed root steps. The history and
 Snapshots refresh after success or failure, without retrying the start request.
 Reloading the page resumes observation of an existing active projection. A
 refresh failure leaves processing in progress and offers an explicit refresh.
+
+## Querying structured acquisition content
+
+For a Data Source backed by structured document Storage, open **Content** and
+choose a successful retained acquisition. Its query panel reads that acquisition's
+immutable publication. The acquired JSON preview remains available. Save the
+query under a display name and technical name to create an independent draft.
+
+Open **Queries** to edit and publish that draft, inspect its versions and execute
+one exact publication or the latest published version. Editing a draft changes no
+published version. Published queries live in Agentstration's configuration store,
+separately from acquired documents. The Query access panel controls sharing with
+descendant scopes; Source and Storage Use remain necessary at execution.
+
+Open **Tools** to find the Data Source's persisted publications after navigation
+or refresh. **Edit** opens the existing Tool definition editor to prepare and
+publish a new Tool version; the published invocation link remains available.
+The generic Query Tool belongs to the shared catalog and is omitted from this
+Data Source-specific list. It accepts the scoped Query reference; its invocation
+JSON is available on the selected Query. A named relay fixes the Query identity and
+optionally its version. Without a version, each initial call uses the most recent
+publication, including when its version number is lower. Publishing a compatible
+filter/order change requires no Tool or Flow republication. An incompatible
+contract fails explicitly instead of falling back; publish a new Tool version to
+adopt it. Acquisition selection is independent: latest successful retained
+acquisition or one fixed acquisition when publishing the relay.
+
+New Query relays hide the internal acquisition UID/pin from their caller schema. The initial call accepts `{}` and selects the latest retained acquisition automatically; platform authorization supplies the execution identity. In the Tool draft, **Hide** / **Masquer** can additionally omit optional inputs such as `request.acquisitionId` or the whole `request` object. Publish a new Tool version and explicitly adopt it to change an existing model-facing contract.
+
+Continue with the returned Query cursor only. The Query version and acquisition
+remain fixed during pagination even after new publications. Current permissions
+are checked on each page; retention and bounded cursor expiry still apply. Results
+record the resolved Query identity/version, digests and acquisition.
+
+Existing direct acquisition Tools are retained and listed as existing direct
+exposures. They still take query JSON at invocation; free-form input uses raw JSON
+editing. They are not rewritten into named queries automatically.
+
+For an acquired object containing `results`, the collection schema must describe
+the whole stored object. Selecting `/properties/results/items` does not split it.
+An OData payload such as `{"$select":"results"}` selects the envelope property;
+`{"$filter":"results/any(r:r/status eq 'EN COURS')"}` selects envelopes containing
+a matching item without filtering items inside the returned array. Per-item
+queries require an explicit transformation before publication.
+
+Storage administration configures collections and their contracts/capabilities;
+its query/Tool-publication block is no longer displayed. Underlying mutable
+document APIs remain available and do not address acquisition publications.
+
+See [ADR-0227](../decisions/0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
+and [ADR-0228](../decisions/0228-data-source-queries-evolve-independently-from-tool-exposures.md).

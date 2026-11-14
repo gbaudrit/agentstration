@@ -442,6 +442,7 @@ public sealed class IdentityExperienceService(
     private static readonly IReadOnlySet<string> InstanceAdministrativePermissions = new HashSet<string>(
         [
             AuthorizationPermissions.TenantsRead,
+            AuthorizationPermissions.RunsExecute,
             AuthorizationPermissions.ResourcesRead,
             AuthorizationPermissions.ResourcesWrite,
             AuthorizationPermissions.ResourcesDelete,
@@ -456,6 +457,7 @@ public sealed class IdentityExperienceService(
             AuthorizationPermissions.WorkspacesRead,
             AuthorizationPermissions.WorkspacesWrite,
             AuthorizationPermissions.WorkspacesDelete,
+            AuthorizationPermissions.RunsExecute,
             AuthorizationPermissions.ResourcesRead,
             AuthorizationPermissions.ResourcesWrite,
             AuthorizationPermissions.ResourcesDelete,

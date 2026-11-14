@@ -89,7 +89,7 @@ else
         {
             <section class="panel"><h2>@T("FixedInputBindings")</h2><p>@T("LiveBindingHelp")</p>
                 <CascadingValue Value="bindingEditContext" IsFixed="true">
-                @foreach (var row in rows)
+                @foreach (var row in VisibleRows)
                 {
                     <div class="relay-binding" data-binding-path="@row.Path" @key="row.Path">
                         <ValueBindingRequirementEditor Requirement="@BindingRequirement(row)" AllowedSources="@BindingSources(row)"
@@ -171,6 +171,8 @@ else
     private bool loading = true, busy, enabled = true, requiresApproval, reviewing, sourceUpdateRequested, interactive;
     private static readonly JsonSerializerOptions IndentedJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private bool HasInvalidBindings => validationError is not null || editorValidationInvalid;
+    private IEnumerable<BindingRow> VisibleRows => rows.Where(row => !rows.Any(parent => parent.Kind == "omitted"
+        && row.Path.StartsWith(parent.Path + "/", StringComparison.Ordinal)));
     private JsonElement? PreviewSchema => HasInvalidBindings || string.IsNullOrWhiteSpace(preview) ? null : JsonSerializer.Deserialize<JsonElement>(preview);
     private string DraftBindings { get { try { return HasInvalidBindings ? T("RelayBindingInvalid") : JsonSerializer.Serialize(BuildBindings(), IndentedJson); } catch (InvalidOperationException) { return T("RelayBindingInvalid"); } } }
     private int timeout = 90;
@@ -259,6 +261,7 @@ else
             if (row is null) { row = new() { Path = binding.Path, Schema = JsonSerializer.SerializeToElement(new { }), Missing = true }; rows.Add(row); }
             switch (binding)
             {
+                case OmittedToolArgumentBinding: row.Kind = "omitted"; break;
                 case LiteralToolArgumentBinding literal: row.Kind = "literal"; row.Literal = literal.Value.Clone(); break;
                 case ParameterToolArgumentBinding parameter: row.Kind = "parameter"; row.Resource = ScopedResourceAddress.Create(parameter.Parameter.ScopeRef, parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name); break;
                 case SecretToolArgumentBinding secret when secret.Secret.ScopeRef is { } owner: row.Kind = "secret"; row.Resource = ScopedResourceAddress.Create(owner, secret.Secret.Address.Namespace, secret.Secret.Address.Kind, secret.Secret.Address.Name); break;
@@ -280,8 +283,9 @@ else
         }
     }
 
-    private IReadOnlyList<ToolArgumentBinding> BuildBindings() => rows.Where(row => row.Kind != "caller").Select<BindingRow, ToolArgumentBinding>(row => row.Kind switch
+    private IReadOnlyList<ToolArgumentBinding> BuildBindings() => VisibleRows.Where(row => row.Kind != "caller").Select<BindingRow, ToolArgumentBinding>(row => row.Kind switch
     {
+        "omitted" when !row.Required && !row.Missing => new OmittedToolArgumentBinding { Path = row.Path },
         "literal" when row.Literal is { ValueKind: not JsonValueKind.Undefined } value => new LiteralToolArgumentBinding { Path = row.Path, Value = value.Clone() },
         "parameter" when parameters.FirstOrDefault(parameter => ResourceAddress(parameter) == row.Resource && CompatibleParameter(parameter, row.Schema)) is { } parameter => new ParameterToolArgumentBinding { Path = row.Path, Parameter = new(parameter.Address, parameter.ScopeRef!.Value) },
         "secret" when IsString(row.Schema) && secrets.FirstOrDefault(secret => ResourceAddress(secret.Resource) == row.Resource && secret.ValueConfigured) is { } secret => new SecretToolArgumentBinding { Path = row.Path, Secret = new(secret.Resource.Address, secret.Resource.ScopeRef) },
@@ -293,7 +297,7 @@ else
         reviewing = false; validationError = null;
         try
         {
-            if (rows.Any(row => row.Missing && row.Kind != "caller")) throw new InvalidOperationException(T("RelayBindingInvalid"));
+            if (VisibleRows.Any(row => row.Missing && row.Kind != "caller")) throw new InvalidOperationException(T("RelayBindingInvalid"));
             if (selected?.Definition.Schema is { } schema) preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, BuildBindings()));
         }
         catch (Exception exception) { validationError = exception.Message; preview = ""; }
@@ -386,10 +390,15 @@ else
         AllowedValues: row.Schema.TryGetProperty("enum", out var values) && values.ValueKind == JsonValueKind.Array ? values.EnumerateArray().Select(value => value.Clone()).ToArray() : null,
         LiteralSchema: row.Schema);
     private static string? SchemaText(JsonElement schema, string property) => schema.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-    private static IReadOnlyList<ValueBindingSourceKind> BindingSources(BindingRow row) => IsString(row.Schema)
+    private static IReadOnlyList<ValueBindingSourceKind> BindingSources(BindingRow row)
+    {
+        List<ValueBindingSourceKind> sources = IsString(row.Schema)
         ? [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret]
         : Scalar(row.Schema) ? [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter]
         : [ValueBindingSourceKind.Caller, ValueBindingSourceKind.Literal];
+        if (!row.Required && !row.Missing) sources.Add(ValueBindingSourceKind.Omitted);
+        return sources;
+    }
     private IReadOnlyList<ValueBindingOption> BindingOptions(BindingRow row) => parameters
         .Where(value => Scalar(row.Schema) && CompatibleParameter(value, row.Schema))
         .Select(value => new ValueBindingOption(ValueBindingSourceKind.Parameter, ResourceAddress(value), value.Definition.DisplayName))

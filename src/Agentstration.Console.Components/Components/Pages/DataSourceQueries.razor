@@ -1,0 +1,174 @@
+@implements IDisposable
+@inject IDataSourcesClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+<section data-testid="dataset-queries">
+    <div class="panel-header"><h2>@T(ShowTools ? "Tools" : "Queries")</h2><button type="button" class="button-secondary" disabled="@busy" @onclick="RefreshAsync">@T("Refresh")</button></div>
+    <p>@T(ShowTools ? "Queries.ToolsHelp" : "Queries.Help")</p>
+    @if (loading) { <p role="status">@T("Loading")</p> }
+    else if (ShowTools)
+    {
+        @if (tools.Count == 0) { <p>@T("Queries.NoTools")</p> }
+        else
+        {
+            <DataGrid TItem="DataSourceQueryToolPublication" Items="tools"><Header><tr><th>@T("Tools")</th><th>@T("Queries.Version")</th><th>@T("Queries.QueryVersion")</th><th>@T("DatasetContentAcquisition")</th><th>@T("Queries.EditTool")</th></tr></Header><Row Context="item">
+                <tr data-testid="dataset-query-tool-row"><td data-label="@T("Tools")"><a href="@ToolUrl(item.Tool)">@(item.DisplayName ?? item.Tool.Name)</a></td>
+                    <td data-label="@T("Queries.Version")">@item.ToolVersion</td><td data-label="@T("Queries.QueryVersion")">@(item.Generic ? T("Queries.Generic") : item.Legacy ? T("Queries.Legacy") : item.QueryName + " / " + (item.SelectedQueryVersion ?? T("Queries.Latest")))</td>
+                    <td data-label="@T("DatasetContentAcquisition")">@(item.Acquisition?.Id ?? T("Queries.LatestAcquisition"))</td>
+                    <td data-label="@T("Queries.EditTool")">@if (CanWrite && item.Definition is { } definition && definition.ScopeRef == Owner)
+                        { <a href="@DefinitionUrl(definition)" data-testid="dataset-query-tool-edit">@T("Queries.EditTool")</a> }</td></tr>
+            </Row></DataGrid>
+        }
+        @if (CanWrite)
+        {
+            <h3>@T("Documents.ToolTitle")</h3>
+            <fieldset class="form-grid" disabled="@busy">
+                <label><span>@T("Queries.Select")</span><select value="@selectedUid" @onchange="SelectQueryAsync" data-testid="dataset-tool-query"><option value="">@T("Select")</option>@foreach (var query in queries) { <option value="@query.Uid">@query.Definition.DisplayName · @query.Namespace/@query.Name</option> }</select></label>
+                @if (selected is not null)
+                {
+                    <label><span>@T("Queries.QueryVersion")</span><select @bind="selectedVersion" @bind:after="ClearResult" data-testid="dataset-tool-query-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version</option> }</select><small>@T("Queries.VersionHelp")</small></label>
+                    <ResourceIdentityFields @bind-DisplayName="toolDisplayName" @bind-TechnicalName="toolName" IsNew="true" DisplayNameTestId="dataset-query-tool-display-name" TechnicalNameTestId="dataset-query-tool-name" />
+                    <label><span>@T("Queries.Version")</span><input @bind="toolVersion" maxlength="32" data-testid="dataset-query-tool-version" /></label>
+                    <label><span>@T("Documents.ToolMode")</span><select @bind="acquisitionMode" data-testid="dataset-query-tool-mode"><option value="latest">@T("Documents.ToolLatest")</option><option value="exact">@T("Documents.ToolExact")</option></select></label>
+                    @if (acquisitionMode == "exact") { <label><span>@T("DatasetContentAcquisition")</span><select @bind="acquisitionUid"><option value="">@T("Select")</option>@foreach (var item in Retained) { <option value="@item.Uid">@item.Name</option> }</select></label> }
+                    <label><span>@T("Queries.Approval")</span><input type="checkbox" @bind="approval" /></label>
+                    <button class="button-primary" type="button" disabled="@(!selected.Value.Definition.Enabled || versions.Count == 0 || string.IsNullOrWhiteSpace(toolName) || string.IsNullOrWhiteSpace(toolDisplayName) || string.IsNullOrWhiteSpace(toolVersion) || acquisitionMode == "exact" && string.IsNullOrEmpty(acquisitionUid))"
+                        @onclick="PublishToolAsync" data-testid="dataset-query-tool-publish">@T("Documents.PublishTool")</button>
+                }
+            </fieldset>
+        }
+    }
+    else
+    {
+        @if (queries.Count == 0) { <p>@T("Queries.Empty")</p> }
+        else
+        {
+            <DataGrid TItem="DataSourceQueryResource" Items="queries"><Header><tr><th>@T("Queries")</th><th>@T("Queries.State")</th><th>@T("Queries.Edit")</th></tr></Header><Row Context="item">
+                <tr data-testid="dataset-query-row"><td data-label="@T("Queries")">@item.Definition.DisplayName <code>@item.Namespace/@item.Name</code></td><td data-label="@T("Queries.State")">@T(item.Definition.Enabled ? "Enabled" : "Disabled")</td><td><button class="text-button" type="button" disabled="@busy" @onclick="() => LoadQueryAsync(item)">@T("Queries.Edit")</button></td></tr>
+            </Row></DataGrid>
+        }
+        @if (selected is not null)
+        {
+            <fieldset class="form-grid" disabled="@(busy || !CanEdit)">
+                <ResourceIdentityFields @bind-DisplayName="displayName" TechnicalName="@selected.Value.Name" IsNew="false" DisplayNameTestId="dataset-query-edit-display-name" TechnicalNameTestId="dataset-query-edit-name" />
+                <label><span>@T("Enabled")</span><input type="checkbox" @bind="enabled" disabled="@(!CanEdit)" /></label>
+                <label class="form-span-2"><span>@T("Queries.Json")</span><textarea class="form-code-editor" rows="10" @bind="payload" readonly="@(!CanEdit)" maxlength="8192" data-testid="dataset-query-edit-json"></textarea></label>
+                @if (CanEdit)
+                {
+                    <button class="button-secondary" type="button" @onclick="SaveAsync" data-testid="dataset-query-edit-save">@T("Queries.SaveDraft")</button>
+                    <label><span>@T("Queries.Version")</span><input @bind="publishVersion" maxlength="32" data-testid="dataset-query-publish-version" /></label>
+                    <button class="button-primary" type="button" disabled="@(!enabled)" @onclick="PublishAsync" data-testid="dataset-query-publish">@T("Queries.Publish")</button>
+                }
+            </fieldset>
+            <details><summary>@T("Queries.Reference")</summary><pre class="runner-json">@ReferenceJson</pre></details>
+            @if (CanWrite && selected.Value.ScopeRef == Owner)
+            {
+                <button type="button" class="button-secondary" @onclick="() => showAccess = !showAccess">@T("Access")</button>
+                @if (showAccess) { <ResourceAccessPanel OwnerScopeRef="Owner" Namespace="selected.Value.Namespace" Kind="@DataSourceResourceKinds.DataSourceQuery" Name="@selected.Value.Name" Generation="selected.Value.Generation" Governance="selected.Value.Governance" /> }
+            }
+            <h3>@T("Queries.Published")</h3>
+            <label><span>@T("Queries.QueryVersion")</span><select @bind="selectedVersion" @bind:after="ClearResult" data-testid="dataset-query-run-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version · @item.PublishedAt.ToLocalTime().ToString("g")</option> }</select></label>
+            <p class="muted">@T("Queries.VersionHelp")</p>
+            <button class="button-primary" type="button" disabled="@(busy || !Context.HasPermission("runs/execute") || versions.Count == 0)" @onclick="RunAsync" data-testid="dataset-query-run">@T("Queries.Run")</button>
+            @if (result is not null)
+            {
+                <p>@T("Queries.Resolved"): <code>@result.Query.Version · @result.Result.AcquisitionId</code></p>
+                <pre class="runner-json" data-testid="dataset-query-result">@JsonSerializer.Serialize(result, Pretty)</pre>
+                @if (result.NextCursor is not null) { <button type="button" class="button-secondary" disabled="@busy" @onclick="NextAsync">@T("Queries.Next")</button> }
+            }
+        }
+    }
+    @if (error is not null) { <p class="form-alert form-alert-danger" role="alert" data-testid="dataset-queries-error">@T("Queries.Failed") @if (error is AgentstrationApiException api) { <code>@api.ProblemTitle · @api.ErrorId</code> }</p> }
+    @if (notice) { <p role="status">@T("Queries.Done")</p> }
+</section>
+@code {
+    [Parameter, EditorRequired] public DataSourceResource Source { get; set; } = null!;
+    [Parameter] public bool ShowTools { get; set; }
+    [Parameter] public IReadOnlyList<DataSourceAcquisitionResource> Acquisitions { get; set; } = [];
+    private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<DataSourceQueryResource> queries = [];
+    private IReadOnlyList<DataSourceQueryToolPublication> tools = [];
+    private IReadOnlyList<DataSourceQueryVersionResource> versions = [];
+    private ResourceSnapshot<DataSourceQueryResource>? selected;
+    private DataSourceQueryExecutionResult? result;
+    private Guid loaded;
+    private string loadedScope = "", selectedUid = "", selectedVersion = "", name = "", displayName = "", payload = "{}", publishVersion = "1.0.0";
+    private string toolName = "", toolDisplayName = "", toolVersion = "1.0.0", acquisitionMode = "latest", acquisitionUid = "";
+    private bool loading, busy, enabled, approval, notice, showAccess;
+    private Exception? error;
+    private ResourceScopeRef Owner => ResourceScopeRef.Parse(Context.Current?.SelectedScopeRef ?? Source.ScopeRef!.Value.Value);
+    private bool CanWrite => Context.HasPermission("resources/write");
+    private bool CanEdit => CanWrite && selected?.Value.ScopeRef == Owner;
+    private IEnumerable<DataSourceAcquisitionResource> Retained => Acquisitions.Where(a => a.State == DataSourceAcquisitionState.Succeeded && a.ContentRetiredAt is null && a.Publication?.Document is not null
+        && (selected is null || a.LogicalScopeRef == selected.Value.Definition.Selection.AcquisitionScope));
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == Source.Uid && loadedScope == Owner.Value) return;
+        loaded = Source.Uid; loadedScope = Owner.Value; loading = true;
+        selected = null; versions = []; queries = []; tools = []; result = null; selectedUid = "";
+        try { await LoadAsync(); } catch (Exception e) { error = e; } finally { loading = false; }
+    }
+    private async Task LoadAsync()
+    {
+        queries = await Client.GetQueriesAsync(Owner, Source.Uid, cancellation.Token);
+        tools = (await Client.GetQueryToolsAsync(Owner, Source.Uid, cancellation.Token)).Where(item => !item.Generic).ToArray();
+    }
+    private Task RefreshAsync() => PerformAsync(LoadAsync);
+    private async Task SelectQueryAsync(ChangeEventArgs args)
+    {
+        var query = queries.FirstOrDefault(q => q.Uid.ToString() == args.Value?.ToString());
+        if (query is null) { selected = null; selectedUid = ""; return; }
+        await LoadQueryAsync(query);
+    }
+    private Task LoadQueryAsync(DataSourceQueryResource value) => PerformAsync(async () =>
+    {
+        selected = await Client.GetQueryAsync(value.ScopeRef!.Value, value.Namespace, value.Name, cancellation.Token);
+        versions = await Client.GetQueryVersionsAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellation.Token);
+        selectedUid = value.Uid.ToString(); selectedVersion = ""; result = null; showAccess = false;
+        name = value.Name; displayName = selected.Value.Definition.DisplayName; enabled = selected.Value.Definition.Enabled;
+        payload = JsonSerializer.Serialize(selected.Value.Definition.Query, Pretty);
+    });
+    private async Task SaveCoreAsync()
+    {
+        using var json = JsonDocument.Parse(payload);
+        selected = await Client.SaveQueryAsync(selected!.Value with { Definition = selected.Value.Definition with
+        { DisplayName = displayName, Enabled = enabled, Query = json.RootElement.Clone() } }, selected.ETag, cancellation.Token);
+    }
+    private Task SaveAsync() => PerformAsync(async () => { await SaveCoreAsync(); await LoadAsync(); notice = true; });
+    private Task PublishAsync() => PerformAsync(async () =>
+    {
+        await SaveCoreAsync();
+        _ = await Client.PublishQueryAsync(selected!.Value, publishVersion, selected.ETag, cancellation.Token);
+        versions = await Client.GetQueryVersionsAsync(selected.Value.ScopeRef!.Value, selected.Value.Namespace, name, cancellation.Token);
+        await LoadAsync(); notice = true;
+    });
+    private void ClearResult() => result = null;
+    private string ReferenceJson => JsonSerializer.Serialize(new { query = new DataSourceQueryReference
+    { Query = new(selected!.Value.Name, selected.Value.ScopeRef, selected.Value.Namespace), QueryUid = selected.Value.Uid, Version = RunVersion } },
+        new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    private string? RunVersion => string.IsNullOrEmpty(selectedVersion) ? null : selectedVersion;
+    private Task RunAsync() => PerformAsync(async () => result = await Client.ExecuteQueryAsync(selected!.Value, RunVersion, new(), cancellation.Token));
+    private Task NextAsync() => PerformAsync(async () => result = await Client.ExecuteQueryAsync(selected!.Value, RunVersion,
+        new() { Cursor = result!.NextCursor }, cancellation.Token));
+    private Task PublishToolAsync() => PerformAsync(async () =>
+    {
+        var item = Retained.FirstOrDefault(a => a.Uid.ToString() == acquisitionUid);
+        if (acquisitionMode == "exact" && item is null) throw new InvalidOperationException(T("Queries.Failed"));
+        _ = await Client.PublishQueryToolAsync(selected!.Value, new(toolName, toolDisplayName, toolVersion, RunVersion,
+            acquisitionMode == "exact" && item is not null ? new(item.Name, item.Uid) : null, approval), cancellation.Token);
+        await LoadAsync(); notice = true;
+    });
+    private async Task PerformAsync(Func<Task> action)
+    {
+        if (busy) return; busy = true; error = null; notice = false;
+        try { await action(); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception e) { error = e; }
+        finally { busy = false; }
+    }
+    private static string ToolUrl(ResourceReference value) => $"/tools/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString((value.Namespace ?? ResourceNamespace.Default).Value)}&scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}";
+    private static string DefinitionUrl(ResourceReference value) => $"/tools/definitions/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString((value.Namespace ?? ResourceNamespace.Default).Value)}&scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}";
+    private string T(string key) => Localizer[key];
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

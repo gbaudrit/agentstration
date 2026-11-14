@@ -23,12 +23,57 @@ public sealed partial class OpenApiExtensionTests
         """;
 
     [TestMethod]
+    public async Task ResponseCandidatesKeepDeclaredStructureAndExplicitStatusMediaChoicesWithoutInvocation()
+    {
+        const string contract = """
+            {"openapi":"3.1.0","info":{"title":"Results","version":"1"},"paths":{"/items":{"get":{"operationId":"items",
+            "responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"type":"object",
+            "properties":{"total_count":{"type":"integer"},"results":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}}},"required":["total_count","results"]}}}},
+            "206":{"description":"Partial","content":{"application/json":{"schema":{"type":"object"}}}},
+            "default":{"description":"Other","content":{"application/problem+json":{"schema":{"type":"object"}}}}}}}}}
+            """;
+        var calls = 0;
+        var service = Service((request, _) =>
+        {
+            Assert.AreEqual("/openapi.json", request.RequestUri!.AbsolutePath);
+            calls++;
+            return Task.FromResult(Response(contract, "application/json"));
+        });
+        var discovered = await service.DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "responses", default);
+        Assert.AreEqual(1, calls);
+        Assert.HasCount(3, discovered.Operations);
+        Assert.AreEqual(3, discovered.Operations.Select(o => o.ExternalId).Distinct(StringComparer.Ordinal).Count());
+        var full = discovered.Operations.Single(o => o.DisplayName.Contains("200", StringComparison.Ordinal));
+        var evidence = full.Definition.GetProperty("responseShape").GetProperty("x-agentstration-response");
+        Assert.AreEqual("200", evidence.GetProperty("status").GetString());
+        Assert.AreEqual("application/json", evidence.GetProperty("mediaType").GetString());
+        Assert.Contains("/responses/200/", evidence.GetProperty("schemaLocation").GetString()!);
+        Assert.AreEqual(Parser().Parse(contract, "application/json", new("https://origin.example.test/openapi.json")).Descriptor.Sha256,
+            evidence.GetProperty("contractDigest").GetString());
+        Assert.IsTrue(evidence.GetProperty("nativeDefinition").GetProperty("properties").TryGetProperty("results", out _));
+        Assert.AreEqual("name", full.Definition.GetProperty("outputSchema").GetProperty("properties")
+            .GetProperty("results").GetProperty("items").GetProperty("required")[0].GetString());
+    }
+
+    [TestMethod]
+    public async Task IncompleteResponseSchemaRetainsAHonestDiagnostic()
+    {
+        var contract = AcquisitionContract.Replace("{\"type\":\"object\"}", "{}", StringComparison.Ordinal);
+        var discovered = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "incomplete", default);
+        Assert.Contains("openapi_response_schema_incomplete", discovered.Diagnostics.Select(d => d.Code));
+        var operation = discovered.Operations.Single(o => o.Definition.GetProperty("operationId").GetString() == "getItems");
+        Assert.AreEqual(JsonValueKind.Array, operation.Definition.GetProperty("outputSchema").GetProperty("type").ValueKind);
+    }
+
+    [TestMethod]
     [DataRow("valid", null)]
     [DataRow("changed-contract", "openapi_contract_digest_mismatch")]
     [DataRow("foreign-contract", "openapi_connection_origin_denied")]
     [DataRow("foreign-server", "openapi_connection_origin_denied")]
     [DataRow("action", "openapi_acquisition_action_denied")]
     [DataRow("credential-reflection", "openapi_sensitive_response")]
+    [DataRow("response-status-mismatch", "openapi_response_selection_mismatch")]
     public async Task ProtectedOpenApiAcquisitionUsesSavedSelectorAndRefusesChangedOrForeignAuthority(string scenario, string? expected)
     {
         var businessCalls = 0;
@@ -38,7 +83,9 @@ public sealed partial class OpenApiExtensionTests
             Assert.AreEqual("Bearer synthetic-acquisition-token", request.Headers.Authorization?.ToString());
             if (request.RequestUri!.AbsolutePath == "/openapi.json") return Task.FromResult(Response(current, "application/json"));
             businessCalls++;
-            return Task.FromResult(Response(scenario == "credential-reflection" ? "{\"token\":\"synthetic-acquisition-token\"}" : "{\"dataset\":\"alpha\"}", "application/json"));
+            var response = Response(scenario == "credential-reflection" ? "{\"token\":\"synthetic-acquisition-token\"}" : "{\"dataset\":\"alpha\"}", "application/json");
+            if (scenario == "response-status-mismatch") response.StatusCode = HttpStatusCode.PartialContent;
+            return Task.FromResult(response);
         });
         var discovery = await service.DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"],
             "synthetic-acquisition-token", "discover", default);
@@ -80,7 +127,7 @@ public sealed partial class OpenApiExtensionTests
             var failure = await Assert.ThrowsAsync<Agentstration.Aep.AspNetCore.AepServerException>(() => provider.AcquireAsync(request, default));
             Assert.AreEqual(expected, failure.Code);
         }
-        Assert.AreEqual(scenario is "valid" or "credential-reflection" ? 1 : 0, businessCalls);
+        Assert.AreEqual(scenario is "valid" or "credential-reflection" or "response-status-mismatch" ? 1 : 0, businessCalls);
     }
 
     [TestMethod]
