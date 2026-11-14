@@ -36,10 +36,12 @@ public sealed partial class OpenApiExtensionTests
     }
 
     [TestMethod]
-    public async Task DiscoveryPinsConflictingJsonRepresentationsAsDistinctChoicesWithoutDroppingSchemas()
+    [DataRow("application/json; charset=utf-8")]
+    [DataRow("Application/JSON")]
+    public async Task DiscoveryPinsConflictingJsonRepresentationsAsDistinctChoicesWithoutDroppingSchemas(string otherMedia)
     {
         var contract = AcquisitionContract.Replace("\"application/json\":{\"schema\":{\"type\":\"object\"}}",
-            "\"application/json\":{\"schema\":{\"type\":\"object\"}},\"application/json; charset=utf-8\":{\"schema\":{\"type\":\"array\"}}", StringComparison.Ordinal);
+            "\"application/json\":{\"schema\":{\"type\":\"object\"}},\"" + otherMedia + "\":{\"schema\":{\"type\":\"array\"}}", StringComparison.Ordinal);
         var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
             .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "ambiguous-json", default);
         var operations = discovery.Operations.Where(item => item.Definition.GetProperty("operationId").GetString() == "getItems").ToArray();

@@ -52,7 +52,7 @@ internal static class OpenApiAcquisitionSchemas
         if (responseStatus is not null && responseMediaType is not null)
         {
             var content = (Resolve(responses[responseStatus]) as JsonObject)?["content"] as JsonObject;
-            var media = content?.FirstOrDefault(p => p.Key.Equals(responseMediaType, StringComparison.OrdinalIgnoreCase)).Value;
+            var media = content?[responseMediaType] ?? throw Unsupported();
             output = Schema(media?["schema"], 0);
         }
         else
