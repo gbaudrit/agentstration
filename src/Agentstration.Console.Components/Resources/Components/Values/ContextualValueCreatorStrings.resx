@@ -21,6 +21,8 @@
   <data name="Binding.Source.Secret"><value>Secret</value></data>
   <data name="Binding.Source.Literal"><value>Literal</value></data>
   <data name="Binding.Source.Caller"><value>Provided by caller</value></data>
+  <data name="Binding.Source.Omitted"><value>Hide</value></data>
+  <data name="Binding.OmittedHelp"><value>This optional input and its nested fields are hidden from callers. No value is sent to the source Tool, which keeps its default behavior.</value></data>
   <data name="Binding.ExactResource"><value>Exact scoped resource</value></data>
   <data name="Binding.SelectResource"><value>Select a resource</value></data>
   <data name="Binding.CreateParameter"><value>Create a Parameter</value></data>

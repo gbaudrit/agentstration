@@ -56,6 +56,18 @@ public sealed partial class DataSourceDatasetTests
         var exactTool = await tools.PublishAsync(reference, new("alpha-exact", "Alpha exact", "1.0.0", "9.0.0"), default);
         var definitions = factory.Services.GetRequiredService<ToolDefinitionService>();
         var publishedBefore = (await definitions.GetInvocationAsync("alpha-dynamic.v1.0.0", default, default, Owner))!;
+        var publishedTool = (await factory.Services.GetRequiredService<IResourceStore>().GetExactAsync<ToolResource>(
+            new(Owner, default, ToolResourceKinds.Tool, dynamicTool.Name), default))!.Value;
+        var callerSchema = publishedTool.Definition.Schema!.Input;
+        Assert.IsFalse(callerSchema.GetProperty("properties").TryGetProperty("acquisition", out _));
+        Assert.IsFalse(callerSchema.GetProperty("properties").TryGetProperty("query", out _));
+        Assert.IsFalse(callerSchema.GetProperty("properties").TryGetProperty("contract", out _));
+        ToolInputSchemaValidator.Validate(callerSchema, Empty);
+        Assert.Contains("Call with {}", publishedTool.Definition.Description!);
+        Assert.Contains("latest successful retained acquisition", publishedTool.Definition.Description!);
+        using var hiddenOverride = await client.PostAsJsonAsync($"/api/tools/{dynamicTool.Name}/run?scopeRef=/instance",
+            new RunToolRequest(StructuredStorageFixture.Json("""{"acquisition":{"id":"other","uid":"00000000-0000-0000-0000-000000000000"}}"""), ToolRunMode.Execute));
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, hiddenOverride.StatusCode);
         var flows = factory.Services.GetRequiredService<FlowService>();
         var flow = await flows.CreateExactAsync(Owner, new CreateFlowCommand("named-query-consumer", null, "1.0.0", true,
             new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
@@ -112,7 +124,8 @@ public sealed partial class DataSourceDatasetTests
         definitionResponse.EnsureSuccessStatusCode();
         var beforeEdit = (await definitionResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
         var changed = (RelayToolDefinitionProperties)beforeEdit.Definition with
-        { DisplayName = "Edited alpha query", Version = "2.0.0", Publish = false };
+        { DisplayName = "Edited alpha query", Version = "2.0.0", Publish = false,
+            Bindings = [.. beforeEdit.Definition.Bindings, new OmittedToolArgumentBinding { Path = "/request" }] };
         using var editRequest = new HttpRequestMessage(HttpMethod.Put, editPath)
         { Content = JsonContent.Create(new PutToolDefinitionRequest(changed)) };
         editRequest.Headers.IfMatch.Add(definitionResponse.Headers.ETag!);
@@ -124,6 +137,11 @@ public sealed partial class DataSourceDatasetTests
         using var republish = await client.PostAsJsonAsync($"/api/tooldefinitions/{editable.Name}/versions?namespace={editable.Namespace}",
             new PublishToolDefinitionRequest("2.0.0", editResponse.Headers.ETag!.ToString()));
         Assert.AreEqual(HttpStatusCode.Created, republish.StatusCode, await republish.Content.ReadAsStringAsync());
+        var noInputToolName = AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName(editable.Name, "2.0.0"));
+        var noInputTool = (await factory.Services.GetRequiredService<IResourceStore>().GetExactAsync<ToolResource>(
+            new(Owner, default, ToolResourceKinds.Tool, noInputToolName), default))!.Value;
+        Assert.HasCount(0, noInputTool.Definition.Schema!.Input.GetProperty("properties").EnumerateObject().ToArray());
+        Assert.HasCount(1, (await RunNamedQueryToolAsync(client, new(noInputToolName, Owner, default))).Result.Page.Documents);
         var reloaded = (await client.GetFromJsonAsync<DataSourceQueryToolPublication[]>($"/api/datasourcequeries/tools?scopeRef=/instance&sourceUid={source.Value.Uid}"))!;
         Assert.HasCount(3, reloaded);
         Assert.IsTrue(reloaded.Any(p => p.Definition?.Name == editable.Name && p.ToolVersion == "2.0.0" && p.DisplayName == changed.DisplayName));

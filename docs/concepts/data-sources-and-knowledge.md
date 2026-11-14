@@ -231,6 +231,8 @@ contract fails explicitly instead of falling back; publish a new Tool version to
 adopt it. Acquisition selection is independent: latest successful retained
 acquisition or one fixed acquisition when publishing the relay.
 
+New Query relays hide the internal acquisition UID/pin from their caller schema. The initial call accepts `{}` and selects the latest retained acquisition automatically; platform authorization supplies the execution identity. In the Tool draft, **Hide** / **Masquer** can additionally omit optional inputs such as `request.acquisitionId` or the whole `request` object. Publish a new Tool version and explicitly adopt it to change an existing model-facing contract.
+
 Continue with the returned Query cursor only. The Query version and acquisition
 remain fixed during pagination even after new publications. Current permissions
 are checked on each page; retention and bounded cursor expiry still apply. Results

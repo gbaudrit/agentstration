@@ -68,6 +68,7 @@
     </div>
     @if (ShowValidationMessage && ValidationError is { } message) { <p class="inline-warning" role="alert">@message</p> }
     @if (selection.Kind == ValueBindingSourceKind.Secret) { <p class="inline-info">@T("Binding.SecretValueHidden")</p> }
+    @if (selection.Kind == ValueBindingSourceKind.Omitted && Sources.Contains(selection.Kind)) { <p class="inline-info">@T("Binding.OmittedHelp")</p> }
 </div>
 
 @if (DialogSectionId is { } sectionId)

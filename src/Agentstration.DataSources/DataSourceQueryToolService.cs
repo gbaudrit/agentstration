@@ -73,6 +73,7 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
             bindings.Add(new LiteralToolArgumentBinding { Path = "/acquisition", Value = JsonSerializer.SerializeToElement(request.Acquisition, Json) });
             bindings.Add(new LiteralToolArgumentBinding { Path = "/request/acquisitionId", Value = JsonSerializer.SerializeToElement(request.Acquisition.Id) });
         }
+        else bindings.Add(new OmittedToolArgumentBinding { Path = "/acquisition" });
         var generic = await EnsureGenericAsync(scope, ns, ct);
         var genericTool = (await resources.GetExactAsync<ToolResource>(new(scope, ns, ToolResourceKinds.Tool, generic.Name), ct))!.Value;
         try
@@ -86,9 +87,16 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
                 Definition = new RelayToolDefinitionProperties
                 {
                     DisplayName = request.DisplayName, Version = request.Version, Publish = true,
-                    Description = "Execute published Data Source Query " + reference.Query.Name + (reference.Version is null
-                        ? "; resolve the latest published Query version at each initial call." : "; use exact Query version " + reference.Version + ".")
-                        + " Continue with cursor only. Query and acquisition stay fixed throughout pagination.",
+                    Description = "Read documents already acquired from Data Source '" + selected.Definition.Selection.Source.Name
+                        + "' using saved Query '" + selected.Definition.DisplayName + "' (" + reference.Query.Name + "). "
+                        + "All caller inputs are optional. Call with {} on the first call. "
+                        + (request.Acquisition is null
+                            ? "The server automatically selects the latest successful retained acquisition. request.acquisitionId is optional, only for an explicitly requested acquisition; otherwise omit it. "
+                            : "The configured acquisition is selected automatically. ")
+                        + "Authorization is handled by the platform; do not ask the user for credentials or technical UIDs. "
+                        + (reference.Version is null
+                        ? "Resolve the latest published Query version at each initial call." : "Use exact Query version " + reference.Version + ".")
+                        + " request.pageSize is optional. For a next page use request.cursor from the previous result. Query and acquisition stay fixed throughout pagination.",
                     Target = new() { Name = genericTool.Name, Namespace = ns, ScopeRef = scope, Uid = genericTool.Uid, Generation = genericTool.Generation }, Bindings = bindings, RequiresApproval = request.RequiresApproval
                 }
             }, existing?.ETag, existing is null, ct);

@@ -23,6 +23,36 @@ public sealed class ToolRelayEditorTests
     private static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
     [TestMethod]
+    [DataRow("en-US", "Hide")]
+    [DataRow("fr-FR", "Masquer")]
+    public void OptionalObjectCanBeHiddenSavedAndReopenedWithoutItsRequiredChildren(string culture, string label)
+    {
+        using var currentCulture = new TestCultureScope(culture);
+        using var handler = new ApiHandler("""{"type":"object","properties":{"acquisition":{"type":"object","properties":{"id":{"type":"string"},"uid":{"type":"string"}},"required":["id","uid"]},"query":{"type":"string"}},"required":["query"]}""")
+        { InitialBindings = [] };
+        using var context = Context(handler);
+        var page = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        page.WaitForElement("[data-requirement-id='/acquisition'] [data-testid='relay-binding-kind']");
+        Assert.AreEqual(label, page.Find("[data-requirement-id='/acquisition'] option[value='Omitted']").TextContent);
+        Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/id'] option[value='Omitted']"));
+        Assert.HasCount(0, page.FindAll("[data-requirement-id='/query'] option[value='Omitted']"));
+        page.Find("[data-requirement-id='/acquisition'] [data-testid='relay-binding-kind']").Change("Omitted");
+        page.WaitForAssertion(() => Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/id']")));
+        Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/uid']"));
+        page.Find("[data-testid='relay-save-draft']").Click();
+        page.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
+        var binding = ((RelayToolDefinitionProperties)handler.Saved!.Properties).Bindings.Single();
+        Assert.IsInstanceOfType<OmittedToolArgumentBinding>(binding);
+        Assert.AreEqual("/acquisition", binding.Path);
+        page.Dispose();
+        var reopened = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        reopened.WaitForAssertion(() => Assert.AreEqual(ValueBindingSourceKind.Omitted,
+            reopened.FindComponents<ValueBindingRequirementEditor>().Single(c => c.Instance.Requirement.Id == "/acquisition").Instance.Selection.Kind));
+        Assert.HasCount(0, reopened.FindAll("[data-requirement-id='/acquisition/id']"));
+        Assert.IsFalse(reopened.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
+    }
+
+    [TestMethod]
     [DataRow("en-US", "ToolDefinition version", "Target source Tool version / revision")]
     [DataRow("fr-FR", "Version de la ToolDefinition", "Version / révision du Tool source ciblée")]
     public void EditorSeparatesRelayAndSourceVersionsAndShowsValueSources(string locale, string relayLabel, string sourceLabel)
