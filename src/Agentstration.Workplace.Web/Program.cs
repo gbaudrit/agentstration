@@ -1,14 +1,17 @@
+using Agentstration.Http.Diagnostics;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Components.State;
 using Agentstration.Workplace.Client;
 using Agentstration.Workplace.Web;
 using Agentstration.Workplace.Web.Components;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddAgentstrationHttpDiagnostics();
 var apiValue = builder.Configuration["Agentstration:ApiBaseUrl"] ?? throw new InvalidOperationException("Agentstration:ApiBaseUrl is required.");
 if (!Uri.TryCreate(apiValue, UriKind.Absolute, out var apiUrl) || apiUrl.Scheme is not ("http" or "https")) throw new InvalidOperationException("Agentstration:ApiBaseUrl must be an absolute HTTP(S) URL.");
 var hubValue = builder.Configuration["Agentstration:WorkplaceHubUrl"];
@@ -35,8 +38,38 @@ builder.Services.AddAgentstrationWorkplaceClient(apiUrl, hubUrl)
 builder.Services.AddHttpClient<IUserPreferencesClient, HttpUserPreferencesClient>(client => client.BaseAddress = apiUrl)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
     .AddHttpMessageHandler<WorkplaceApiSessionHandler>();
-builder.Services.AddProblemDetails(); builder.Services.AddHealthChecks();
+builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
 var otlp = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-builder.Services.AddOpenTelemetry().ConfigureResource(value => value.AddService("Agentstration.Workplace.Web")).WithTracing(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); }).WithMetrics(value => { value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation(); if (otlp) value.AddOtlpExporter(); });
-var app = builder.Build(); app.UseExceptionHandler(); app.UseStatusCodePages(); app.UseRequestLocalization(); app.UseAntiforgery(); app.MapHealthChecks("/health"); app.MapAgentstrationCultureEndpoint(); app.MapStaticAssets(); app.MapRazorComponents<App>().AddInteractiveServerRenderMode(); await app.RunAsync();
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(value => value.AddService("Agentstration.Workplace.Web"))
+    .WithTracing(value =>
+    {
+        value.AddSource(HttpDiagnosticsExtensions.ActivitySourceName)
+            .AddAspNetCoreInstrumentation().AddHttpClientInstrumentation();
+        if (otlp) value.AddOtlpExporter();
+    })
+    .WithMetrics(value =>
+    {
+        value.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation();
+        if (otlp) value.AddOtlpExporter();
+    });
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("Agentstration.Workplace.Web"));
+    logging.IncludeScopes = true;
+    logging.IncludeFormattedMessage = true;
+    if (otlp) logging.AddOtlpExporter();
+});
+var app = builder.Build();
+app.UseAgentstrationHttpDiagnostics();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseRequestLocalization();
+app.UseAntiforgery();
+app.MapHealthChecks("/health");
+app.MapAgentstrationCultureEndpoint();
+app.MapStaticAssets();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+await app.RunAsync();
 public partial class Program;

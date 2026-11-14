@@ -241,4 +241,7 @@
   <data name="TransformProcessing.Help" xml:space="preserve"><value>The input mapping selects the value to partition. Connect process to the processing steps and return their result here. The output is an array in unit order.</value></data>
   <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Elements per batch / characters per text chunk</value></data>
   <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Maximum process units</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
+  </data>
 </root>

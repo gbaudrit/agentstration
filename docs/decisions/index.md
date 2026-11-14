@@ -262,3 +262,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 224. [ADR-0224 — Structured Snapshots pin immutable document publications](0224-structured-snapshots-pin-immutable-document-publications.md)
 
 225. [ADR-0225 — Structured storage does not define agent Memory policy](0225-structured-storage-does-not-define-memory-policy.md)
+
+193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
+194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)
+195. [ADR-0195 — HTTP category switches always enable both payload directions](0195-http-categories-enable-both-bodies.md)

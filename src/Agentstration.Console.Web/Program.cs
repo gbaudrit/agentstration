@@ -1,17 +1,20 @@
 using Agentstration.Console.Web;
 using Agentstration.Console.Web.Components;
 using Agentstration.Console.Web.Configuration;
+using Agentstration.Http.Diagnostics;
 using Agentstration.Identity.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Console;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddAgentstrationHttpDiagnostics();
 builder.Services.AddAgentstrationConsolePresentation(builder.Configuration);
 builder.Services.AddAgentstrationConsoleHost(builder.Configuration);
-builder.Services.AddAgentstrationConsoleObservability(builder.Configuration);
+builder.Services.AddAgentstrationConsoleObservability(builder.Logging, builder.Configuration);
 
 var app = builder.Build();
+app.UseAgentstrationHttpDiagnostics();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRequestLocalization();
