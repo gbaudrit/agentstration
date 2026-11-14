@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Net.Http.Headers;
 
 namespace Agentstration.Extensions.OpenApi;
 
@@ -43,16 +44,27 @@ internal static class OpenApiAcquisitionSchemas
         }
         if (Resolve(endpoint["requestBody"]) is JsonObject body)
         {
-            ((JsonObject)input["properties"]!)["body"] = Schema(body["content"]?["application/json"]?["schema"], 0);
+            ((JsonObject)input["properties"]!)["body"] = JsonContentSchema(body["content"]);
             if (body["required"]?.GetValue<bool>() == true) ((JsonArray)input["required"]!).Add("body");
         }
         var responses = Resolve(endpoint["responses"]) as JsonObject ?? throw Unsupported();
         var schemas = responses.Where(item => item.Key.Length == 3 && item.Key[0] == '2')
-            .Select(item => Schema((Resolve(item.Value) as JsonObject)?["content"]?["application/json"]?["schema"], 0))
+            .Select(item => JsonContentSchema((Resolve(item.Value) as JsonObject)?["content"]))
             .ToArray();
-        var output = schemas.FirstOrDefault() ?? Schema((Resolve(responses["default"]) as JsonObject)?["content"]?["application/json"]?["schema"], 0);
+        var output = schemas.FirstOrDefault() ?? JsonContentSchema((Resolve(responses["default"]) as JsonObject)?["content"]);
         if (schemas.Any(schema => !JsonNode.DeepEquals(schema, output))) throw Unsupported();
         return (JsonSerializer.SerializeToElement(input), JsonSerializer.SerializeToElement(output));
+
+        JsonObject JsonContentSchema(JsonNode? content)
+        {
+            if (content is not JsonObject mediaTypes) return AnyJson();
+            var choices = mediaTypes.Where(item => MediaTypeHeaderValue.TryParse(item.Key, out var media)
+                    && string.Equals(media.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+                .Select(item => Schema((Resolve(item.Value) as JsonObject)?["schema"], 0)).ToArray();
+            if (choices.Length == 0) return AnyJson();
+            if (choices.Skip(1).Any(schema => !JsonNode.DeepEquals(schema, choices[0]))) throw Unsupported();
+            return choices[0];
+        }
 
         JsonNode? Resolve(JsonNode? node)
         {

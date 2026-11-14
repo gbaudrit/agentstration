@@ -87,14 +87,14 @@ public sealed class FlowCompositionService(FlowService flows)
                 {
                     if (call.Parameters.EnumerateObject().Any()) throw Error("flow_composition_parameters_invalid");
                     if (!previousSchema.TryGetProperty("type", out var sourceType) || !inputSchema.TryGetProperty("type", out var targetType)
-                        || !JsonElement.DeepEquals(sourceType, targetType)) throw Error("flow_composition_contract_incompatible");
+                        || !JsonElement.DeepEquals(sourceType, targetType)) throw Incompatible(template, point, "flowInput", previousSchema, inputSchema);
                     input = mapping.Clone();
                 }
                 else
                 {
                     if (!inputSchema.TryGetProperty("properties", out var properties) || !properties.TryGetProperty("value", out var value)
-                        || !properties.TryGetProperty("parameters", out var parameters)
-                        || !FlowCompositionSchema.IsAssignable(previousSchema, value)) throw Error("flow_composition_contract_incompatible");
+                        || !properties.TryGetProperty("parameters", out var parameters)) throw Incompatible(template, point, "flowInputEnvelope", previousSchema, inputSchema);
+                    if (!FlowCompositionSchema.IsAssignable(previousSchema, value)) throw Incompatible(template, point, "flowInput", previousSchema, value);
                     FlowCompositionSchema.ValidateValue(parameters, call.Parameters);
                     input = mapping.Clone();
                 }
@@ -145,7 +145,7 @@ public sealed class FlowCompositionService(FlowService flows)
                 mapping = JsonSerializer.SerializeToElement("${steps." + name + ".output}");
                 previousSchema = outputSchema;
             }
-            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Error("flow_composition_contract_incompatible");
+            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
             nodes.Add(new TransformFlowStepDefinition
             {
                 Name = point.Name,
@@ -222,5 +222,18 @@ public sealed class FlowCompositionService(FlowService flows)
     }
     private static string Key(FlowVersion flow) => $"{flow.ScopeRef.Value}/{flow.FlowId}/{flow.Version}";
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    private static FlowValidationException Incompatible(FlowVersion template, FlowCompositionPointStepDefinition point,
+        string boundary, JsonElement actual, JsonElement expected) => new("flow_composition_contract_incompatible", "The configured Flow composition contracts are incompatible.")
+    { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
+    private static string TypeName(JsonElement schema)
+    {
+        if (schema.ValueKind != JsonValueKind.Object) return "unknown";
+        if (!schema.EnumerateObject().Any()) return "any";
+        if (!schema.TryGetProperty("type", out var type)) return "unspecified";
+        var names = type.ValueKind == JsonValueKind.Array ? type.EnumerateArray().ToArray() : [type];
+        var safe = names.Where(value => value.ValueKind == JsonValueKind.String
+            && value.GetString() is "object" or "array" or "string" or "number" or "integer" or "boolean" or "null").Select(value => value.GetString()).Take(7).ToArray();
+        return safe.Length == 0 ? "unknown" : string.Join('|', safe);
+    }
     private static FlowValidationException Error(string code) => new(code, "The configured Flow composition is unavailable, incompatible or exceeds its limits.");
 }

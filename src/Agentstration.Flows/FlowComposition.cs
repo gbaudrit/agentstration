@@ -27,6 +27,10 @@ public sealed record FlowCompositionPointStepDefinition : FlowStepDefinition
 public sealed record FlowCompositionReceipt(string TemplateHash, string ExecutableHash,
     IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Bindings);
 
+/// <summary>Schema-level diagnostics only; never contains invocation values or schema defaults.</summary>
+public sealed record FlowCompositionDiagnostic(string Point, string Boundary, string Template, string Version,
+    string ActualType, string ExpectedType);
+
 public sealed record ResolvedFlowComposition(FlowCallReference Orchestration, JsonElement? InputSchema,
     JsonElement? OutputSchema, FlowCompositionReceipt? Receipt);
 

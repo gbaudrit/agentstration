@@ -17,6 +17,34 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ExistingOpenApiAnyJsonOutputCanBeAcquiredSelectedAndStored(bool arrayResponse)
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var anyJson = JsonSerializer.Deserialize<JsonElement>("""{"type":["object","array","string","number","boolean","null"]}""");
+        var items = new[] { new { id = "alert-1" } };
+        var responseValue = arrayResponse ? JsonSerializer.SerializeToElement(items) : JsonSerializer.SerializeToElement(new { results = new { items } });
+        var fixture = await PrepareAsync(factory.Services, operationResult: responseValue, declareAcquisitionOutput: false, operationOutputSchema: anyJson);
+        using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+        var source = Source("openapi-union", fixture, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
+        var definition = source.Definition with { Dataset = source.Definition.Dataset! with
+        { Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
+            { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = arrayResponse ? "" : "/results/items" }) }] } } };
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        using var response = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(source.Name, definition, ScopeRef: Owner));
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var acquisition = await AcquireAsync(client, source.Name);
+        Assert.IsTrue(JsonElement.DeepEquals(anyJson, acquisition.Dataset!.OperationOutputSchema!.Value));
+        var content = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
+        using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
+        Assert.AreEqual(JsonValueKind.Array, json.RootElement.ValueKind);
+        Assert.AreEqual("alert-1", json.RootElement[0].GetProperty("id").GetString());
+    }
+
+    [TestMethod]
     public async Task StartupReactivatesCurrentDataSourceOrchestrationAndPreservesPublishedLegacyVersion()
     {
         await using var factory = Factory();
@@ -29,7 +57,7 @@ public sealed partial class DataSourceDatasetTests
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
         var legacy = current.Value.Graph! with { OutputSchema = schema, Steps = current.Value.Graph.Steps.Select(step => step switch
         {
-            FlowCompositionPointStepDefinition point when point.Point == "transformations" => point with { OutputSchema = schema },
+            FlowCompositionPointStepDefinition point => point with { InputSchema = schema, OutputSchema = schema },
             OutputFlowStepDefinition output => output with { Schema = schema },
             _ => step
         }).ToArray() };
@@ -38,7 +66,7 @@ public sealed partial class DataSourceDatasetTests
         await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         var restored = (await flows.GetExactAsync(Owner, id, default))!;
         Assert.AreEqual(current.Value.Uid, restored.Value.Uid);
-        Assert.AreEqual("1.1.0", restored.Value.ActiveVersion);
+        Assert.AreEqual("1.2.0", restored.Value.ActiveVersion);
         Assert.AreEqual(original.Value.DefinitionHash, (await flows.GetVersionExactAsync(Owner, id, "1.0.0", default))!.Value.DefinitionHash);
     }
 
@@ -71,7 +99,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
         var acquisition = await AcquireAsync(client, source.Name);
         Assert.AreEqual("object", acquisition.Dataset!.OperationOutputSchema!.Value.GetProperty("type").GetString());
-        Assert.AreEqual("1.1.0", acquisition.Dataset.Composition!.Orchestration.Version);
+        Assert.AreEqual("1.2.0", acquisition.Dataset.Composition!.Orchestration.Version);
         var content = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
         Assert.AreEqual(kind, json.RootElement.ValueKind);
@@ -89,13 +117,13 @@ public sealed partial class DataSourceDatasetTests
         var source = Source("invalid-expansion", fixture, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
         var definition = source.Definition with { Dataset = source.Definition.Dataset! with
         { Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
-            { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/results/items" }) }] } } };
+            { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = 42 }) }] } } };
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
         using var response = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(source.Name, definition, ScopeRef: Owner));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.AreEqual("flow_composition_function_input_incompatible", problem.RootElement.GetProperty("compositionErrorCode").GetString());
+        Assert.AreEqual("flow_composition_value_invalid", problem.RootElement.GetProperty("compositionErrorCode").GetString());
         Assert.IsTrue(problem.RootElement.GetProperty("type").GetString()!.EndsWith("data_source_composition_invalid", StringComparison.Ordinal));
     }
 

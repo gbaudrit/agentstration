@@ -898,7 +898,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
     }
 
-    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null, bool declareAcquisitionOutput = true)
+    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null, bool declareAcquisitionOutput = true, JsonElement? operationOutputSchema = null)
     {
         var bootstrap = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
@@ -937,7 +937,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             {
                 Operations =
             [new() { ExternalId = "fixture.read", DisplayName = "Read fixture", Type = typeRef,
-                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = operationResult is null ? input : JsonSerializer.SerializeToElement(new { type = "object" }) }) }]
+                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = operationOutputSchema ?? (operationResult is null ? input : JsonSerializer.SerializeToElement(new { type = "object" })) }) }]
             }));
         var serviceTypes = services.GetRequiredService<ConnectedServiceTypeManagementService>();
         var version = new ConnectedServiceTypeVersionDescriptor("1.0.0", AepSchemaDigest.Compute(definitionSchema), definitionSchema, [], [])

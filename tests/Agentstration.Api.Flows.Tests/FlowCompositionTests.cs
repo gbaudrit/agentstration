@@ -11,6 +11,29 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    public async Task CompositionDiagnosticsIdentifyTheFailingBoundaryWithoutCopyingInputValues()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var union = JsonSerializer.Deserialize<JsonElement>("""{"type":["object","array","string","number","boolean","null"]}""");
+        var child = CompositionChild() with { OutputSchema = union };
+        child = child with { Steps = child.Steps.Select(step => step is OutputFlowStepDefinition output ? output with { Schema = union } : step).ToArray() };
+        await CreatePublishedGraphAsync(fixture, "union-output", child);
+        var parent = await CreatePublishedGraphAsync(fixture, "typed-boundary", CompositionTemplate());
+        var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
+        var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => new FlowCompositionService(fixture.Service).ResolveAsync(template,
+            new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = [new() { Flow = new("union-output"),
+                Parameters = JsonSerializer.SerializeToElement(new { label = "private-instance-value" }) }] }, TestScope.AccessScopeRef, default));
+        Assert.AreEqual("flow_composition_contract_incompatible", error.Code);
+        Assert.IsNotNull(error.CompositionDiagnostic);
+        Assert.AreEqual("prepare", error.CompositionDiagnostic.Point);
+        Assert.AreEqual("output", error.CompositionDiagnostic.Boundary);
+        Assert.AreEqual("1.0.0", error.CompositionDiagnostic.Version);
+        Assert.AreEqual("object|array|string|number|boolean|null", error.CompositionDiagnostic.ActualType);
+        Assert.AreEqual("object", error.CompositionDiagnostic.ExpectedType);
+        Assert.DoesNotContain("private-instance-value", JsonSerializer.Serialize(error.CompositionDiagnostic));
+    }
+
+    [TestMethod]
     [DataRow(false, false, false)]
     [DataRow(false, true, false)]
     [DataRow(true, false, false)]

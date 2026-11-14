@@ -80,7 +80,8 @@ public sealed class DataSourceDatasetCompositionService(
             { OperationFlow = flow, OperationOutputSchema = output.Clone(), Composition = composed };
         }
         catch (FlowValidationException exception)
-        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.") { CompositionErrorCode = exception.Code }; }
+        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
+            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic }; }
         catch (KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }

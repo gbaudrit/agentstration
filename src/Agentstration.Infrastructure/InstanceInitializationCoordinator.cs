@@ -14,8 +14,8 @@ public interface IInstanceInitializationCoordinator
 public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
-    // Provision the native function catalogue at Instance scope without a declarative Bootstrap profile.
-    public int TargetVersion { get; set; } = 10;
+    // Reconcile compiled catalogues and JSON acquisition orchestration without a file Bootstrap profile.
+    public int TargetVersion { get; set; } = 11;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

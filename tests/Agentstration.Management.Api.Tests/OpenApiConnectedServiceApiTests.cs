@@ -448,7 +448,7 @@ public sealed partial class ConnectedServiceApiTests
             {
                 Content = new StringContent("""
                     {"openapi":"3.1.0","info":{"title":"Orders","version":"1"},"paths":{
-                      "/orders":{"get":{"operationId":"getOrders","parameters":[{"in":"query","name":"dataset","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"type":"object","properties":{"dataset":{"type":"string"}},"required":["dataset"],"additionalProperties":false}}}}}}}
+                      "/orders":{"get":{"operationId":"getOrders","parameters":[{"in":"query","name":"dataset","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"OK","content":{"application/json; charset=utf-8":{"schema":{"type":"object","properties":{"dataset":{"type":"string"}},"required":["dataset"],"additionalProperties":false}}}}}}}
                     }}
                     """, System.Text.Encoding.UTF8, "application/json")
             });

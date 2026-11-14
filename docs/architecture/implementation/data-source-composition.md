@@ -47,7 +47,7 @@ in the accepted composition. A declared adapter schema still takes precedence;
 ordinary transformation Flows must declare their own output contracts. The
 boundary validates its result before the transformation sequence executes.
 
-Standard DataSource orchestration version `1.1.0` accepts any transformed JSON value. `json.select` can therefore store an array or scalar directly. The Operation output schema is pinned separately and still validates the raw acquired response. Transformed output is validated against the final composition contract and bounded to 64 KiB before storage. This produces one stored JSON content; Artifact fan-out remains a separate Knowledge publication operation. Failed composition responses retain `data_source_composition_invalid` and expose `compositionErrorCode` for HTTP and Console diagnosis.
+Standard DataSource orchestration version `1.2.0` accepts any acquired business JSON value and any transformed JSON value. The acquisition request remains an object envelope. This also supports existing OpenAPI operations whose response schema lists all JSON types. `json.select` can therefore store an array or scalar directly. The Operation output schema is pinned separately and still validates the raw acquired response. Transformed output is validated against the final composition contract and bounded to 64 KiB before storage. This produces one stored JSON content; Artifact fan-out remains a separate Knowledge publication operation. Failed composition responses retain `data_source_composition_invalid` and expose `compositionErrorCode` for HTTP and Console diagnosis.
 
 The integration baseline includes StorageType administration and scoped generic
 grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
@@ -413,3 +413,5 @@ instructions. The existing Schemas handler validates bounded nullable types and
 compositions as well as ordinary object contracts. Retained Artifact receipts and
 direct handoffs keep concrete content evidence; Flow Run diagnostics preserve
 causal contract failures across child executions.
+
+OpenAPI acquisition schema discovery recognizes `application/json` with media-type parameters such as `charset=utf-8`, including case variants and local schema references. Conflicting JSON representations are rejected rather than silently choosing one. Existing Operation revisions remain pinned; rediscovery is explicit. Contract mismatch diagnostics include the composition point, boundary, template/version and JSON type summaries, without invocation values or schema defaults.
