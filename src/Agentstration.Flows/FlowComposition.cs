@@ -6,7 +6,10 @@ namespace Agentstration.Flows;
 /// <summary>A resource-owned ordered binding for a named point in an immutable Flow.</summary>
 public sealed record FlowCompositionCall
 {
-    public required FlowCallReference Flow { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public FlowCallReference? Flow { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Agentstration.Functions.Contracts.FunctionReference? Function { get; init; }
     public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     // Used by platform-owned acquisition bindings whose existing contract receives the complete envelope.
     public bool PassInputDirectly { get; init; }

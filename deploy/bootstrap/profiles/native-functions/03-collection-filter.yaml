@@ -1,0 +1,25 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "TransformationFunction",
+  "metadata": {
+    "name": "collection-filter"
+  },
+  "definition": {
+    "displayName": "collection.filter",
+    "versions": [
+      {
+        "version": "1.0.0",
+        "functionKind": {
+          "name": "native",
+          "version": "1.0.0"
+        },
+        "configuration": {
+          "implementation": {
+            "id": "collection.filter",
+            "version": "1.0.0"
+          }
+        }
+      }
+    ]
+  }
+}

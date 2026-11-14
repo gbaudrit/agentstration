@@ -367,7 +367,8 @@ bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-e
 ## Artifact content processing
 
 [ADR-0213](../../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
-adds a distinct `artifactTransform` step to Artifact-manifest transformations. Its
+introduced Artifact-manifest processing; [ADR-0226](../../decisions/0226-native-function-catalogue-and-explicit-iteration.md)
+names its explicit iteration step `foreachArtifacts`. Its
 private process/return region can contain ordinary Agents, Tools, mappings and
 child Flow calls without another published processor. Invocation adaptation belongs
 to the step, not reusable Tool definitions. Content mode supplies bounded UTF-8
@@ -383,6 +384,17 @@ See the [authoring and content-access reference](../../reference/artifact-transf
 for mappings, operation contracts, publication behavior and current bounds. The
 reusable browser scenario is tracked separately by #1145, pending UX validation
 and implementation merge.
+
+Native transformation functions can be selected directly in ordinary Transform
+steps and mixed with published Flows in source sequences. A Knowledge binding
+transforms only its selected DataSource; `postAggregate` transforms the combined
+projection manifest before Snapshot publication. The same parameter editor serves
+both locations. `artifact.explode` selects an array or object by JSON Pointer and
+returns multiple independently publishable items. A processing branch may return
+that manifest: all children are validated and prepared before registration,
+without storing an intermediate batch Artifact. Direct handoffs stay transient
+until final publication. See the [function reference](../../reference/transformation-functions.md)
+for contracts, bootstrap declarations and bounds.
 
 
 Effective processing contracts follow [ADR-0214](../../decisions/0214-effective-data-contracts-follow-flow-invocations.md).

@@ -24,7 +24,7 @@ public partial class MainLayout
     private static readonly NavigationGroup[] NavigationGroups =
     [
         new("", "overview", [new("Nav.Overview", "/", "home")]),
-        new("Group.Design", "design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Schemas", "/schemas", "document", "flow", ["resources/read"]), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "adjustments", "model"), new("Nav.DataSourceProfiles", "/data-source-profiles", "database-cog", "tool", ["resources/read"])]),
+        new("Group.Design", "design", [new("Nav.Agents", "/agents", "agent", "agent"), new("Nav.Flows", "/flows", "workflow", "flow"), new("Nav.Schemas", "/schemas", "document", "flow", ["resources/read"]), new("Nav.TransformationFunctions", "/transformation-functions", "wrench", "function", ["resources/read"]), new("Nav.Entries", "/entries", "entry", "work"), new("Nav.ResourcePlans", "/resource-plans", "layers", "work", ["resources/read"]), new("Nav.ModelProfiles", "/modelprofiles", "adjustments", "model"), new("Nav.DataSourceProfiles", "/data-source-profiles", "database-cog", "tool", ["resources/read"])]),
         new("Group.Automate", "automate", [new("Nav.Triggers", "/triggers", "clock", "work")]),
         new("Group.Operate", "operate", [new("Nav.Conversations", "/conversations", "message-circle", "work", ["runs/read"]), new("Nav.Tasks", "/tasks", "tasks", "work")]),
         new("Group.Observe", "observe", [new("Nav.AgentInstances", "/agent-instances", "server", "runtime"), new("Nav.AgentRuns", "/agent-runs", "play-circle", "execution"), new("Nav.FlowRuns", "/flow-runs", "flow-run", "flow"), new("Nav.RunEvents", "/run-events", "activity")]),
@@ -62,6 +62,7 @@ public partial class MainLayout
         new("Nav.WorkplaceSetup", "/workspaces", "layout-grid", "Group.Workplace", "workspace composition primary entries espace composition"),
         new("Nav.Packs", "/packs", "package", "Group.Resources", "package distribution install archive resources paquet installation"),
         new("Nav.Schemas", "/schemas", "document", "Group.Design", "schema schemas contract contracts schéma schémas contrat contrats", ["resources/read"]),
+        new("Nav.TransformationFunctions", "/transformation-functions", "wrench", "Group.Design", "functions transformations fonctions", ["resources/read"]),
         new("Command.CreateSchema", "/schemas/new", "plus", "Command", "new nouveau schema schéma", ["resources/write"]),
         new("Nav.KnowledgeSources", "/knowledge-sources", "brain", "Group.Resources", "knowledge source retrieval ingestion connaissances", ["resources/read"]),
         new("Nav.DataSources", "/data-sources", "database", "Group.Resources", "data sources acquisition origins sources données", ["resources/read"]),

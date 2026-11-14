@@ -64,7 +64,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         Assert.AreEqual(@namespace, backend.LoadedTarget?.Namespace);
         Assert.AreEqual("Steps", rendered.Find("#palette-steps-heading").TextContent);
         Assert.AreEqual("View", rendered.Find("#palette-view-heading").TextContent);
-        Assert.HasCount(10, rendered.FindAll(".step-palette-group:not(.palette-view) button .ui-icon"));
+        Assert.HasCount(11, rendered.FindAll(".step-palette-group:not(.palette-view) button .ui-icon"));
         Assert.HasCount(4, rendered.FindAll(".palette-view button .ui-icon"));
 
         var readOnlyCanvas = rendered.FindComponent<FlowCanvas>();

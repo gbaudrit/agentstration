@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Title" xml:space="preserve"><value>Fonctions de transformation</value></data>
+  <data name="Description" xml:space="preserve"><value>Fonctions natives réutilisables avec contrats et versions exacts.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Create" xml:space="preserve"><value>Créer une fonction</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement des fonctions…</value></data>
+  <data name="Kinds" xml:space="preserve"><value>Types de fonctions</value></data>
+  <data name="Functions" xml:space="preserve"><value>Fonctions</value></data>
+  <data name="CreateNativeKind" xml:space="preserve"><value>Déclarer le type natif dans cette portée</value></data>
+  <data name="Native" xml:space="preserve"><value>Natif</value></data>
+  <data name="Empty" xml:space="preserve"><value>Aucune fonction déclarée dans cette portée.</value></data>
+  <data name="EditorHelp" xml:space="preserve"><value>Sélectionnez une implémentation native. Les versions publiées sont immuables.</value></data>
+  <data name="Name" xml:space="preserve"><value>Nom technique</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Nom affiché</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Activée</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Kind" xml:space="preserve"><value>Type de fonction</value></data>
+  <data name="SelectKind" xml:space="preserve"><value>Sélectionner un type</value></data>
+  <data name="Implementation" xml:space="preserve"><value>Implémentation native</value></data>
+  <data name="SelectImplementation" xml:space="preserve"><value>Sélectionner une implémentation</value></data>
+  <data name="InputSchema" xml:space="preserve"><value>Contrat d’entrée</value></data>
+  <data name="OutputSchema" xml:space="preserve"><value>Contrat de sortie</value></data>
+  <data name="ImmutableHelp" xml:space="preserve"><value>Choisissez une nouvelle version pour changer l’implémentation. Les versions existantes restent disponibles.</value></data>
+  <data name="Save" xml:space="preserve"><value>Enregistrer</value></data>
+  <data name="Back" xml:space="preserve"><value>Retour aux fonctions</value></data>
+<data name="Error" xml:space="preserve"><value>Impossible de charger ou d’enregistrer la fonction. Vérifiez sa portée, son implémentation native et sa version immuable.</value></data>
+<data name="Details" xml:space="preserve"><value>Détails techniques</value></data>
+<data name="Enable"><value>Activer</value></data>
+<data name="Disable"><value>Désactiver</value></data>
+</root>

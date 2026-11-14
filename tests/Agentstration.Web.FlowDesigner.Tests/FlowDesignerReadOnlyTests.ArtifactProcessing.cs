@@ -12,7 +12,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     [TestMethod]
     public void TransformProcessCapabilityExposesPrivateProcessAndResultPorts()
     {
-        var step = new TransformFlowStepDefinition { Name = "partition", Processing = new() { Partition = FlowProcessPartition.TextChunks } };
+        var step = new ForeachFlowStepDefinition { Name = "partition", Partition = new() { Partition = FlowProcessPartition.TextChunks } };
         Assert.IsTrue(step.OutputEvents().Contains("process"));
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step,
             new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
@@ -21,7 +21,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         var body = FlowProcessGraph.Extract(graph, step);
         Assert.AreEqual("process_input", body.EntryStep);
         Assert.AreEqual("process_result", body.Transitions.Single(edge => edge.FromStep == "body").ToStep);
-        var units = FlowProcessRegions.Partition(System.Text.Json.JsonSerializer.SerializeToElement("a😀b"), step.Processing with { UnitSize = 2 });
+        var units = FlowProcessRegions.Partition(System.Text.Json.JsonSerializer.SerializeToElement("a😀b"), step.Partition with { UnitSize = 2 });
         CollectionAssert.AreEqual(new[] { "a😀", "b" }, units.Select(unit => unit.GetString()).ToArray());
     }
 
@@ -33,7 +33,7 @@ public sealed partial class FlowDesignerReadOnlyTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<Blazor.Diagrams.Core.Geometry.Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new(0, 0, 1024, 768));
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
-            new ArtifactTransformFlowStepDefinition { Name = "transform", OutputMediaType = "text/plain", OutputContract = new() { Schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"string"}""") } }] };
+            new ForeachArtifactsFlowStepDefinition { Name = "transform", OutputMediaType = "text/plain", OutputContract = new() { Schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"string"}""") } }] };
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerBackend>(new BackendStub(true, graph));
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.State.FlowEditorStore>();
@@ -88,12 +88,12 @@ public sealed partial class FlowDesignerReadOnlyTests
         using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        ArtifactTransformFlowStepDefinition? changed = null;
-        var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize" };
+        ForeachArtifactsFlowStepDefinition? changed = null;
+        var step = new ForeachArtifactsFlowStepDefinition { Name = "anonymize" };
         var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters
             .Add(component => component.Step, step)
             .Add(component => component.ActiveTab, FlowStepSettingsTab.Output)
-            .Add(component => component.Changed, value => changed = (ArtifactTransformFlowStepDefinition)value));
+            .Add(component => component.Changed, value => changed = (ForeachArtifactsFlowStepDefinition)value));
         Assert.Contains(label, rendered.Markup);
         rendered.FindAll("select").Single(select => select.QuerySelector("option[value=Dynamic]") is not null).Change("Dynamic");
         Assert.AreEqual(DataContractMode.Dynamic, changed?.OutputContract?.Mode);
@@ -111,12 +111,12 @@ public sealed partial class FlowDesignerReadOnlyTests
         using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        ArtifactTransformFlowStepDefinition? changed = null;
-        var step = new ArtifactTransformFlowStepDefinition { Name = "anonymize" };
+        ForeachArtifactsFlowStepDefinition? changed = null;
+        var step = new ForeachArtifactsFlowStepDefinition { Name = "anonymize" };
         var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters
             .Add(component => component.Step, step)
             .Add(component => component.ActiveTab, FlowStepSettingsTab.Configuration)
-            .Add(component => component.Changed, value => changed = (ArtifactTransformFlowStepDefinition)value));
+            .Add(component => component.Changed, value => changed = (ForeachArtifactsFlowStepDefinition)value));
         StringAssert.Contains(rendered.Markup, label);
         rendered.Find("[data-testid='artifact-processing-mode']").Change("Access");
         Assert.AreEqual(ArtifactProcessingMode.Access, changed?.Mode);
@@ -137,11 +137,11 @@ public sealed partial class FlowDesignerReadOnlyTests
         using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        ArtifactTransformFlowStepDefinition? changed = null;
+        ForeachArtifactsFlowStepDefinition? changed = null;
         var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters
-            .Add(component => component.Step, new ArtifactTransformFlowStepDefinition { Name = "transform" })
+            .Add(component => component.Step, new ForeachArtifactsFlowStepDefinition { Name = "transform" })
             .Add(component => component.ActiveTab, FlowStepSettingsTab.Configuration)
-            .Add(component => component.Changed, value => changed = (ArtifactTransformFlowStepDefinition)value));
+            .Add(component => component.Changed, value => changed = (ForeachArtifactsFlowStepDefinition)value));
         var input = rendered.Find("[data-testid='artifact-output-media-type']");
         var list = rendered.Find("datalist");
         Assert.AreEqual(list.Id, input.GetAttribute("list"));

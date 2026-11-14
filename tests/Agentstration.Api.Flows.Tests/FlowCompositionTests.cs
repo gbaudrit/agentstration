@@ -51,8 +51,8 @@ public sealed partial class FlowTests
         var runs = Service(fixture, new TestFlowRunQueue());
         var input = JsonSerializer.SerializeToElement(new { article = "valid" });
         var root = await runs.CreateAsync(parent.Value.Id, "1.0.0", "local", FlowRunTrigger.Manual, "tester", "validation", input, TestScope, default);
-        var gateway = new RuntimeWorkerOperationGateway(null!, null!, null!, null!, null!, null!, null!, null!, runs,
-            TimeProvider.System, null!, NullLogger<RuntimeWorkerOperationGateway>.Instance);
+        var gateway = new RuntimeWorkerOperationGateway(null!, null!, null!, null!, fixture.Repository, null!, null!, null!, runs,
+            TimeProvider.System, new Agentstration.Identity.CurrentRequestContext(), NullLogger<RuntimeWorkerOperationGateway>.Instance);
         var error = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => gateway.CreateOrGetChildFlowAsync(
             TestScope.ScopeRef, TestScope.WorkspaceId, root.Value.Id, "analyze", JsonSerializer.SerializeToElement(new { article = 42 }), "flowCall", null, default));
         Assert.AreEqual("flow_input_type_invalid", error.Code);
@@ -91,7 +91,7 @@ public sealed partial class FlowTests
         var accepted = await compiler.ResolveAsync(template, new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = calls }, TestScope.AccessScopeRef, default);
         var pinned = accepted.Receipt!.Bindings["prepare"];
         Assert.HasCount(2, pinned);
-        Assert.IsTrue(pinned.All(call => call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact && call.Flow.Version == "1.0.0" && call.Flow.ResourceUid is not null && call.Flow.DefinitionHash is not null));
+        Assert.IsTrue(pinned.All(call => call.Flow is { VersionStrategy: FlowCallVersionStrategy.Exact, Version: "1.0.0", ResourceUid: not null, DefinitionHash: not null }));
         var generated = accepted.Definition.Graph!.Steps.OfType<FlowCallStepDefinition>().ToArray();
         Assert.HasCount(2, generated);
         Assert.AreEqual("${input.keepLiteral}", generated[0].CompositionParameters?.GetProperty("label").GetString());
@@ -105,7 +105,7 @@ public sealed partial class FlowTests
         var resumed = await compiler.ResolveAsync(template, accepted.Receipt.Bindings, TestScope.AccessScopeRef, default);
         Assert.AreEqual(accepted.Receipt.ExecutableHash, resumed.Receipt!.ExecutableHash);
         var next = await compiler.ResolveAsync(template, new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = calls }, TestScope.AccessScopeRef, default);
-        Assert.AreEqual("2.0.0", next.Receipt!.Bindings["prepare"][0].Flow.Version);
+        Assert.AreEqual("2.0.0", next.Receipt!.Bindings["prepare"][0].Flow!.Version);
     }
 
     [TestMethod]

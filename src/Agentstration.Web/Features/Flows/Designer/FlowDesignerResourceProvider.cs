@@ -13,8 +13,12 @@ public sealed class FlowDesignerResourceProvider(
     IFlowApiClient flowClient,
     IToolsClient toolsClient,
     IToolDefinitionsClient toolDefinitionsClient,
-    ISchemasClient schemasClient) : IFlowDesignerResourceProvider
+    ISchemasClient schemasClient,
+    ITransformationFunctionsClient? functionsClient = null) : IFlowDesignerResourceProvider
 {
+    public async Task<IReadOnlyList<FlowDesignerFunction>> GetFunctionsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        functionsClient is null ? [] : (await functionsClient.ChoicesAsync(contextScope, cancellationToken)).Select(choice => new FlowDesignerFunction(choice.DisplayName, choice.Function)).ToArray();
+
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {
         var agents = await client.GetAgentsAsync(contextScope, cancellationToken);

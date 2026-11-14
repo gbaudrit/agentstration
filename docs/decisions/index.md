@@ -262,3 +262,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 224. [ADR-0224 — Structured Snapshots pin immutable document publications](0224-structured-snapshots-pin-immutable-document-publications.md)
 
 225. [ADR-0225 — Structured storage does not define agent Memory policy](0225-structured-storage-does-not-define-memory-policy.md)
+
+226. [ADR-0226 — Native function catalogue and explicit iteration](0226-native-function-catalogue-and-explicit-iteration.md)

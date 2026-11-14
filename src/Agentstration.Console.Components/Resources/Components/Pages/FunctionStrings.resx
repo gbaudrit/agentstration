@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Title" xml:space="preserve"><value>Transformation functions</value></data>
+  <data name="Description" xml:space="preserve"><value>Reusable native functions with exact contracts and versions.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Create" xml:space="preserve"><value>Create a function</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading functions…</value></data>
+  <data name="Kinds" xml:space="preserve"><value>Function kinds</value></data>
+  <data name="Functions" xml:space="preserve"><value>Functions</value></data>
+  <data name="CreateNativeKind" xml:space="preserve"><value>Declare the native kind in this scope</value></data>
+  <data name="Native" xml:space="preserve"><value>Native</value></data>
+  <data name="Empty" xml:space="preserve"><value>No function has been declared in this scope.</value></data>
+  <data name="EditorHelp" xml:space="preserve"><value>Select a native implementation. Published versions are immutable.</value></data>
+  <data name="Name" xml:space="preserve"><value>Technical name</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Display name</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Kind" xml:space="preserve"><value>Function kind</value></data>
+  <data name="SelectKind" xml:space="preserve"><value>Select a kind</value></data>
+  <data name="Implementation" xml:space="preserve"><value>Native implementation</value></data>
+  <data name="SelectImplementation" xml:space="preserve"><value>Select an implementation</value></data>
+  <data name="InputSchema" xml:space="preserve"><value>Input contract</value></data>
+  <data name="OutputSchema" xml:space="preserve"><value>Output contract</value></data>
+  <data name="ImmutableHelp" xml:space="preserve"><value>Choose a new version to change the implementation. Existing versions remain available.</value></data>
+  <data name="Save" xml:space="preserve"><value>Save</value></data>
+  <data name="Back" xml:space="preserve"><value>Back to functions</value></data>
+<data name="Error" xml:space="preserve"><value>The function could not be loaded or saved. Check its scope, native implementation and immutable version.</value></data>
+<data name="Details" xml:space="preserve"><value>Technical details</value></data>
+<data name="Enable"><value>Enable</value></data>
+<data name="Disable"><value>Disable</value></data>
+</root>

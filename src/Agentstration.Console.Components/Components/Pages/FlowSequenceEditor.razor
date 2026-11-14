@@ -1,3 +1,5 @@
+@using Agentstration.Functions.Contracts
+@using System.Text.Json.Nodes
 @implements IDisposable
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
@@ -5,26 +7,38 @@
 <section class="form-section" data-testid="flow-sequence-editor">
     <h3>@Title</h3><p>@T("SequenceHelp")</p>
     @if (loadFailed) { <p role="status">@T("SequenceUnavailable")</p> }
-    @if (!loading && !loadFailed && options.Count == 0) { <p role="status">@T("SequenceNoPublishedFlows")</p> }
+    @if (!loading && !loadFailed && options.Count == 0 && functionOptions.Count == 0) { <p role="status">@T("SequenceNoPublishedFlows")</p> }
     @if (Value.Count == 0) { <p class="muted">@T("SequenceIdentity")</p> }
     @for (var index = 0; index < Value.Count; index++)
     {
-        var position = index; var call = Value[index]; var selected = options.FirstOrDefault(option => Key(option.Reference) == Key(call.Flow));
-        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call" data-flow-reference="@Key(call.Flow)">
+        var position = index; var call = Value[index]; var selected = options.FirstOrDefault(option => Key(option.Reference) == Key(FlowReference(call)));
+        var function = call.Function is null ? null : functionOptions.FirstOrDefault(option => FunctionKey(option.Function.Reference) == FunctionKey(call.Function));
+        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call" data-flow-reference="@Key(FlowReference(call))">
             <legend>@Localizer["SequencePosition", index + 1]</legend>
+            @if (call.Function is not null)
+            {
+                <label>@T("SequenceFunction")<select value="@FunctionKey(call.Function)" @onchange="args => SelectFunctionAsync(position, args.Value?.ToString())" data-testid="function-sequence-target">
+                    @if (function is null) { <option value="@FunctionKey(call.Function)">@call.Function.Name · @T("SequenceUnavailable")</option> }
+                    @foreach (var choice in functionOptions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
+                </select></label>
+                <JsonSchemaInputEditor Schema="@(function is null ? null : FunctionParameters(function.Function.InputSchema))" Value="call.Parameters" ValueChanged="value => SetParametersAsync(position, value)" Disabled="ReadOnly" />
+            }
+            else
+            {
             <div class="flow-sequence-selection">
                 <label><span>@T("SequenceSearchFlow")</span><input type="search" value="@searches.GetValueOrDefault(position)" @oninput="args => searches[position] = args.Value?.ToString() ?? string.Empty" data-testid="flow-sequence-search" /></label>
-                <label><span>@T("SequenceResource")</span><select value="@FlowKey(call.Flow)" @onchange="args => SelectFlowAsync(position, args.Value?.ToString())" data-testid="flow-sequence-flow">
-                    @if (selected is null) { <option value="@FlowKey(call.Flow)">@call.Flow.ResourceId · @T("SequenceUnavailable")</option> }
-                    @foreach (var option in FlowOptions(position, call.Flow)) { <option value="@FlowKey(option.Reference)">@option.Label</option> }
+                <label><span>@T("SequenceResource")</span><select value="@FlowKey(FlowReference(call))" @onchange="args => SelectFlowAsync(position, args.Value?.ToString())" data-testid="flow-sequence-flow">
+                    @if (selected is null) { <option value="@FlowKey(FlowReference(call))">@FlowReference(call).ResourceId · @T("SequenceUnavailable")</option> }
+                    @foreach (var option in FlowOptions(position, FlowReference(call))) { <option value="@FlowKey(option.Reference)">@option.Label</option> }
                 </select></label>
-                <label><span>@T("SequenceVersion")</span><select value="@Key(call.Flow)" @onchange="args => SelectAsync(position, args.Value?.ToString())" data-testid="flow-sequence-target">
-                    @if (selected is null) { <option value="@Key(call.Flow)" selected>@call.Flow.Version · @T("SequenceUnavailable")</option> }
-                    @foreach (var option in Versions(call.Flow)) { <option value="@Key(option.Reference)" selected="@(Key(option.Reference) == Key(call.Flow))">@option.Reference.Version</option> }
+                <label><span>@T("SequenceVersion")</span><select value="@Key(FlowReference(call))" @onchange="args => SelectAsync(position, args.Value?.ToString())" data-testid="flow-sequence-target">
+                    @if (selected is null) { <option value="@Key(FlowReference(call))" selected>@FlowReference(call).Version · @T("SequenceUnavailable")</option> }
+                    @foreach (var option in Versions(FlowReference(call))) { <option value="@Key(option.Reference)" selected="@(Key(option.Reference) == Key(FlowReference(call)))">@option.Reference.Version</option> }
                 </select></label>
-                @if (selected is not null) { <a class="text-button" href="@VersionUrl(call.Flow)" target="_blank" rel="noopener noreferrer" data-testid="flow-sequence-open">@T("SequenceOpenVersion") ↗</a> }
+                @if (selected is not null) { <a class="text-button" href="@VersionUrl(FlowReference(call))" target="_blank" rel="noopener noreferrer" data-testid="flow-sequence-open">@T("SequenceOpenVersion") ↗</a> }
             </div>
             <div><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="selected?.Parameters" Value="call.Parameters" ValueChanged="value => SetParametersAsync(position, value)" Disabled="ReadOnly" /></div>
+            }
             <div class="form-actions">
                 <button type="button" class="button-secondary" disabled="@(ReadOnly || index == 0)" @onclick="() => MoveAsync(position, -1)" data-testid="flow-sequence-up">@T("SequenceUp")</button>
                 <button type="button" class="button-secondary" disabled="@(ReadOnly || index == Value.Count - 1)" @onclick="() => MoveAsync(position, 1)" data-testid="flow-sequence-down">@T("SequenceDown")</button>
@@ -33,6 +47,7 @@
         </fieldset>
     }
     <div class="form-actions">
+        <button type="button" class="button-secondary" disabled="@(ReadOnly || loading || functionOptions.Count == 0 || Value.Count >= 32)" @onclick="AddFunctionAsync" data-testid="function-sequence-add">@T("SequenceAddFunction")</button>
         <button type="button" class="button-secondary" disabled="@(ReadOnly || loading || options.Count == 0 || Value.Count >= 32)" @onclick="AddAsync" data-testid="flow-sequence-add">@T("SequenceAdd")</button>
         <button type="button" class="button-secondary" disabled="@(ReadOnly || loading || loadFailed || CreationInput is null || CreationOutput is null)" @onclick="OpenCreator" data-testid="flow-sequence-create">@T("SequenceCreate")</button>
         <button type="button" class="text-button" disabled="@loading" @onclick="LoadAsync" data-testid="flow-sequence-refresh">@T("SequenceRefresh")</button>
@@ -54,12 +69,14 @@
     [Parameter] public bool ReadOnly { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private readonly List<Option> options = [];
+    private IReadOnlyList<FunctionChoice> functionOptions = [];
     private bool loadFailed, loading, showCreator;
     private JsonElement? templateInput, templateOutput;
     private FlowTransformationTemplate? creation;
     private int creationRevision;
     private JsonElement? CreationInput => Value.Count == 0 ? InputSchema ?? templateInput
-        : options.FirstOrDefault(option => Key(option.Reference) == Key(Value[^1].Flow))?.OutputSchema;
+        : Value[^1].Function is { } function ? functionOptions.FirstOrDefault(option => FunctionKey(option.Function.Reference) == FunctionKey(function))?.Function.OutputSchema
+        : options.FirstOrDefault(option => Key(option.Reference) == Key(FlowReference(Value[^1])))?.OutputSchema;
     private JsonElement? CreationOutput => OutputSchema ?? templateOutput;
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync()
@@ -89,6 +106,7 @@
                 }
             }
             options.Sort((left, right) => right.PublishedAt.CompareTo(left.PublishedAt));
+            await LoadFunctionsAsync();
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { options.Clear(); loadFailed = true; }
         finally { loading = false; }
@@ -98,7 +116,19 @@
         if (ReadOnly || loading || loadFailed || CreationInput is not { } input || CreationOutput is not { } output) return;
         creation = new(input.Clone(), output.Clone()); creationRevision++; showCreator = true;
     }
+    private static FlowCallReference FlowReference(FlowCompositionCall call) => call.Flow ?? new(string.Empty);
     private static string Key(FlowCallReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.ResourceId}|{reference.Version}";
+    private Task AddFunctionAsync() => ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Function = functionOptions[0].Function.Reference }]);
+    private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
+    private Task SelectFunctionAsync(int position, string? key) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position
+        ? new FlowCompositionCall { Function = functionOptions.Single(choice => FunctionKey(choice.Function.Reference) == key).Function.Reference } : value).ToArray());
+    private static JsonElement FunctionParameters(JsonElement schema) => FunctionInvocationSchemas.Parameters(schema);
+    private async Task LoadFunctionsAsync()
+    {
+        if (Services.GetService(typeof(ITransformationFunctionsClient)) is not ITransformationFunctionsClient functions) return;
+        var owner = ResourceOwnershipContext.TryGetCurrent(Services);
+        if (owner is not null) functionOptions = await functions.ChoicesAsync(owner.Value, cancellation.Token);
+    }
     private Task AddAsync() => ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Flow = options[0].Reference }]);
     private Task RemoveAsync(int position) => ValueChanged.InvokeAsync(Value.Where((_, index) => index != position).ToArray());
     private Task SetParametersAsync(int position, JsonElement parameters) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? value with { Parameters = parameters.Clone() } : value).ToArray());

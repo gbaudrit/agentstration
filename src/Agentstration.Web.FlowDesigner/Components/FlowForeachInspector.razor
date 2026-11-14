@@ -1,0 +1,42 @@
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+<label>@T("Foreach.MaximumItems")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@Step.MaximumItems" @onchange="args => LimitAsync(args, false)" /></label>
+<label>@T("ProcessConcurrency")<input type="number" min="1" max="16" disabled="@ReadOnly" value="@Step.MaximumConcurrency" @onchange="args => LimitAsync(args, true)" /></label>
+<p>@T("Foreach.Help")</p>
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+<label>@T("Foreach.Collection")<textarea disabled="@ReadOnly" value="@Step.ItemsMapping?.GetRawText()" @onchange="MappingAsync" data-testid="foreach-collection"></textarea></label>
+@if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }
+<h3>@T("Foreach.ItemSchema")</h3>
+<SchemaDocumentEditor Value="@(Step.ItemSchema ?? JsonSerializer.Deserialize<JsonElement>("{}"))" ReadOnly="ReadOnly" ValueChanged="schema => Changed.InvokeAsync(Step with { ItemSchema = schema })" />
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+<h3>@T("Foreach.ResultSchema")</h3>
+<SchemaDocumentEditor Value="@(Step.ResultSchema ?? JsonSerializer.Deserialize<JsonElement>("{}"))" ReadOnly="ReadOnly" ValueChanged="schema => Changed.InvokeAsync(Step with { ResultSchema = schema })" />
+}
+
+@code {
+    [Parameter, EditorRequired] public ForeachFlowStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private string T(string key) => Localizer[key];
+    private bool invalidJson;
+    private Task MappingAsync(ChangeEventArgs args)
+    {
+        if (ReadOnly) return Task.CompletedTask;
+        try
+        {
+            var mapping = string.IsNullOrWhiteSpace(args.Value?.ToString()) ? (JsonElement?)null : JsonSerializer.Deserialize<JsonElement>(args.Value!.ToString()!);
+            invalidJson = false;
+            return Changed.InvokeAsync(Step with { ItemsMapping = mapping });
+        }
+        catch (JsonException) { invalidJson = true; return Task.CompletedTask; }
+    }
+    private Task LimitAsync(ChangeEventArgs args, bool concurrency) => !ReadOnly && int.TryParse(args.Value?.ToString(), out var value)
+        ? Changed.InvokeAsync(concurrency ? Step with { MaximumConcurrency = value } : Step with { MaximumItems = value }) : Task.CompletedTask;
+}

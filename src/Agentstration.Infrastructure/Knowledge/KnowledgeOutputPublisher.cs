@@ -164,7 +164,8 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                         projection.ProjectionFlowRunId, new(source.ScopeRef!.Value, source.Namespace, source.Kind, source.Name),
                         projection.Name, item.MediaType, new(new(projection.WorkspaceId), reference.Target,
                             reference.Key, reference.Version, reference.Length, reference.Sha256, reference),
-                        ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract), cancellationToken);
+                        ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract,
+                        Provenance: manifest.Artifacts.FirstOrDefault(input => input.ArtifactId == item.ArtifactId)?.Provenance), cancellationToken);
                 catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });
             }
         }

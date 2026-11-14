@@ -8,7 +8,7 @@ public static class FlowProcessGraph
     public static FlowGraphDefinition Extract(FlowGraphDefinition graph, FlowStepDefinition owner, string inputName = "process_input", string resultName = "process_result")
     {
         var region = owner.Region() ?? throw new InvalidOperationException("The step does not expose a process region.");
-        if (owner is ArtifactTransformFlowStepDefinition) { inputName = FlowArtifactProcessingGraph.InputName; resultName = FlowArtifactProcessingGraph.ResultName; }
+        if (owner is ForeachArtifactsFlowStepDefinition) { inputName = FlowArtifactProcessingGraph.InputName; resultName = FlowArtifactProcessingGraph.ResultName; }
         var entries = graph.Transitions.Where(edge => edge.FromStep == owner.Name && edge.Event == region.Key).ToArray();
         if (entries.Length != 1 || entries[0].Condition is not null || entries[0].ToStep == owner.Name)
             throw new InvalidOperationException("Processing requires one unconditional process connection.");
@@ -36,11 +36,11 @@ public static class FlowProcessGraph
         return new()
         {
             EntryStep = inputName,
-            Steps = [new InputFlowStepDefinition { Name = inputName },
+            Steps = [new InputFlowStepDefinition { Name = inputName, Schema = (owner as ForeachFlowStepDefinition)?.ItemSchema },
                 .. graph.Steps.Where(step => names.Contains(step.Name)),
-                new OutputFlowStepDefinition { Name = resultName, Outcome = FlowOutputOutcome.Success,
+                new OutputFlowStepDefinition { Name = resultName, Outcome = FlowOutputOutcome.Success, Schema = (owner as ForeachFlowStepDefinition)?.ResultSchema,
                     OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
-            Transitions = [new(owner is ArtifactTransformFlowStepDefinition ? "artifact-processing-start" : "process-start", inputName, "completed", entries[0].ToStep),
+            Transitions = [new(owner is ForeachArtifactsFlowStepDefinition ? "artifact-processing-start" : "process-start", inputName, "completed", entries[0].ToStep),
                 .. graph.Transitions.Where(edge => names.Contains(edge.FromStep)).Select(edge =>
                     edge.ToStep == owner.Name ? edge with { ToStep = resultName } : edge)]
         };

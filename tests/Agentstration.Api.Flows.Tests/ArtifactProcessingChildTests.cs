@@ -14,7 +14,7 @@ public sealed partial class FlowTests
         {
             EntryStep = "input",
             Steps = [new InputFlowStepDefinition { Name = "input" },
-                new ArtifactTransformFlowStepDefinition { Name = "artifacts", Mode = ArtifactProcessingMode.Access },
+                new ForeachArtifactsFlowStepDefinition { Name = "artifacts", Mode = ArtifactProcessingMode.Access },
                 new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement("${input}") },
                 new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
                 new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],

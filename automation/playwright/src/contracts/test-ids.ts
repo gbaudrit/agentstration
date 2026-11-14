@@ -1,9 +1,14 @@
 export const TestIds = {
+  transformationFunctions: {
+    catalogue: 'transformation-functions', row: 'transformation-function-row', nativeKindCreate: 'function-native-kind-create',
+    editor: 'transformation-function-editor', name: 'function-name', kind: 'function-kind', implementation: 'function-implementation', save: 'function-save',
+    sequenceAdd: 'function-sequence-add', sequenceTarget: 'function-sequence-target', transform: 'transform-function', foreachCollection: 'foreach-collection',
+  },
   flowMapping: { editor: 'flow-data-mapping', value: 'agent-input-mapping', json: 'agent-input-mapping-json', outputValue: 'output-value-mapping', outputJson: 'output-value-mapping-json', useIncoming: 'output-use-transition' },
   artifactProcessing: {
     outputMediaType: 'artifact-output-media-type',
     inputArtifact: 'artifact-transformation-input', processingRun: 'artifact-processing-run',
-    palette: 'flow-palette-artifactTransform', mode: 'artifact-processing-mode',
+    palette: 'flow-palette-foreachArtifacts', mode: 'artifact-processing-mode',
     startPort: 'artifact-processing-start-port', resultPort: 'artifact-processing-result-port',
     manifestMapping: 'artifact-manifest-mapping', inputMapping: 'artifact-input-mapping', resultMapping: 'artifact-result-mapping',
   },

@@ -1,0 +1,25 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "TransformationFunction",
+  "metadata": {
+    "name": "collection-distinct"
+  },
+  "definition": {
+    "displayName": "collection.distinct",
+    "versions": [
+      {
+        "version": "1.0.0",
+        "functionKind": {
+          "name": "native",
+          "version": "1.0.0"
+        },
+        "configuration": {
+          "implementation": {
+            "id": "collection.distinct",
+            "version": "1.0.0"
+          }
+        }
+      }
+    ]
+  }
+}

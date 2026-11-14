@@ -38,7 +38,8 @@ public sealed record FlowDesignerMetadata
 [JsonDerivedType(typeof(RouterFlowStepDefinition), "router")]
 [JsonDerivedType(typeof(ConditionFlowStepDefinition), "condition")]
 [JsonDerivedType(typeof(TransformFlowStepDefinition), "transform")]
-[JsonDerivedType(typeof(ArtifactTransformFlowStepDefinition), "artifactTransform")]
+[JsonDerivedType(typeof(ForeachFlowStepDefinition), "foreach")]
+[JsonDerivedType(typeof(ForeachArtifactsFlowStepDefinition), "foreachArtifacts")]
 [JsonDerivedType(typeof(FlowCallStepDefinition), "flow")]
 [JsonDerivedType(typeof(FlowCompositionPointStepDefinition), "composition")]
 [JsonDerivedType(typeof(RepeatFlowStepDefinition), "repeat")]
@@ -144,8 +145,8 @@ public sealed record ConditionFlowStepDefinition : FlowStepDefinition
 
 public sealed record TransformFlowStepDefinition : FlowStepDefinition
 {
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public TransformProcessDefinition? Processing { get; init; }
+    public Agentstration.Functions.Contracts.FunctionReference? Function { get; init; }
+    public JsonElement? FunctionInputSchema { get; init; }
     public string Mode { get; init; } = "Mapping";
     public JsonElement? Mapping { get; init; }
     public string? Expression { get; init; }
@@ -216,6 +217,9 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
 {
     public required FlowToolReference Tool { get; init; }
     public JsonElement? ArgumentsMapping { get; init; }
+    public Agentstration.Functions.Contracts.ResolvedTransformationFunction? FunctionBinding { get; init; }
+    public JsonElement? FunctionParameters { get; init; }
+    public JsonElement? FunctionOutputSchema { get; init; }
 }
 
 public sealed record FlowToolSetReference(
@@ -321,7 +325,8 @@ public static class FlowStepDefinitionExtensions
         RouterFlowStepDefinition => "router",
         ConditionFlowStepDefinition => "condition",
         TransformFlowStepDefinition => "transform",
-        ArtifactTransformFlowStepDefinition => "artifactTransform",
+        ForeachFlowStepDefinition => "foreach",
+        ForeachArtifactsFlowStepDefinition => "foreachArtifacts",
         FlowCallStepDefinition => "flow",
         FlowCompositionPointStepDefinition => "composition",
         RepeatFlowStepDefinition => "repeat",
@@ -337,9 +342,10 @@ public static class FlowStepDefinitionExtensions
         AgentFlowStepDefinition => ["success", "error"],
         RouterFlowStepDefinition => ["selected", "failed"],
         ConditionFlowStepDefinition => ["true", "false"],
-        TransformFlowStepDefinition { Processing: not null } => ["process", "completed", "error"],
+        TransformFlowStepDefinition { Function: not null } => ["completed", "error"],
         TransformFlowStepDefinition => ["completed"],
-        ArtifactTransformFlowStepDefinition => ["process", "completed", "error"],
+        ForeachArtifactsFlowStepDefinition => ["process", "completed", "error"],
+        ForeachFlowStepDefinition => ["process", "completed", "error"],
         FlowCompositionPointStepDefinition => ["completed"],
         ToolFlowStepDefinition => ["success", "error"],
         ToolRouteFlowStepDefinition => ["success", "error"],

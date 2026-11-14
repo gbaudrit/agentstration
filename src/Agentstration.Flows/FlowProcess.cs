@@ -29,8 +29,8 @@ public sealed record FlowFailureOrigin(string RunId, string StepName, string? Un
 [JsonConverter(typeof(JsonStringEnumConverter<FlowProcessPartition>))]
 public enum FlowProcessPartition { Batches, TextChunks }
 
-/// <summary>Partitioning owned by the built-in Transform executor; other executors may expose different semantics.</summary>
-public sealed record TransformProcessDefinition
+/// <summary>Optional partitioning owned by the built-in Foreach executor; other executors may expose different semantics.</summary>
+public sealed record ForeachPartitionDefinition
 {
     public FlowProcessPartition Partition { get; init; } = FlowProcessPartition.Batches;
     public int UnitSize { get; init; } = 1;
@@ -42,12 +42,12 @@ public static class FlowProcessRegions
 {
     public static FlowProcessRegion? Region(this FlowStepDefinition step) => step switch
     {
-        ArtifactTransformFlowStepDefinition artifact => new("process", artifact.MaximumArtifacts, artifact.MaximumConcurrency ?? 1),
-        TransformFlowStepDefinition { Processing: { } process } => new("process", process.MaximumUnits, process.MaximumConcurrency),
+        ForeachArtifactsFlowStepDefinition artifact => new("process", artifact.MaximumArtifacts, artifact.MaximumConcurrency ?? 1),
+        ForeachFlowStepDefinition iteration => new("process", iteration.Partition?.MaximumUnits ?? iteration.MaximumItems, iteration.Partition?.MaximumConcurrency ?? iteration.MaximumConcurrency),
         _ => null
     };
 
-    public static IReadOnlyList<JsonElement> Partition(JsonElement input, TransformProcessDefinition process)
+    public static IReadOnlyList<JsonElement> Partition(JsonElement input, ForeachPartitionDefinition process)
     {
         if (process.MaximumUnits is < 1 or > 128 || process.UnitSize is < 1 or > 65536
             || process.MaximumConcurrency is < 1 or > 16 || !Enum.IsDefined(process.Partition))

@@ -132,7 +132,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
             if (!NamePattern().IsMatch(step.Name)) issues.Add(Error("step_name_invalid", "Step names must contain letters, digits, '-' or '_'.", step.Name, property: "name"));
             if (!steps.TryAdd(step.Name, step)) issues.Add(Error("step_name_duplicate", $"Step '{step.Name}' is duplicated.", step.Name));
             await ValidateStepAsync(step, definition.Transitions, context, issues, cancellationToken);
-            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition or ArtifactTransformFlowStepDefinition
+            if (step is AgentFlowStepDefinition or ToolFlowStepDefinition or ToolRouteFlowStepDefinition or ForeachArtifactsFlowStepDefinition
                 && !definition.Transitions.Any(transition => transition.FromStep == step.Name && transition.Event == "error"))
                 issues.Add(Error(
                     "error_transition_required",
@@ -209,7 +209,7 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
         CancellationToken token)
     {
         await ValidateArtifactOutputAsync(step, transitions, context, issues, token);
-        if (step is TransformFlowStepDefinition { Processing: { } process }
+        if (step is ForeachFlowStepDefinition { Partition: { } process }
             && (process.MaximumUnits is < 1 or > 128 || process.MaximumConcurrency is < 1 or > 16
                 || process.UnitSize is < 1 or > 65536 || !Enum.IsDefined(process.Partition)))
             issues.Add(Error("process_limits_invalid", "Process partition limits are outside their supported bounds.", step.Name, property: "processing"));
@@ -246,8 +246,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     issues.Add(Error("flow_transform_schema_invalid", "The transformed output has an invalid or unsupported schema.", step.Name, property: "schema"));
                 ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
                 break;
-            case ArtifactTransformFlowStepDefinition processing:
-                if (processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
+            case ForeachArtifactsFlowStepDefinition processing:
+                if (processing.MaximumOutputArtifacts is < 1 or > 100 || processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
                     || processing.MaximumOutputBytes is < 1 or > 16_777_216 || !Enum.IsDefined(processing.Mode))
                     issues.Add(Error("artifact_processing_limits_invalid", "Artifact processing limits are outside their supported bounds.", step.Name));
                 if (processing.OutputContract is { } outputContract)
@@ -263,6 +263,13 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                     issues.Add(Error("artifact_processing_file_name_invalid", "Output requires a simple file name.", step.Name));
                 if (processing.OutputMediaType is { } media && (media.Length > 255 || !media.Contains('/')))
                     issues.Add(Error("artifact_processing_media_type_invalid", "Output requires a valid media type.", step.Name));
+                break;
+            case ForeachFlowStepDefinition iteration:
+                if (iteration.MaximumItems is < 1 or > 128 || iteration.MaximumConcurrency is < 1 or > 16)
+                    issues.Add(Error("foreach_limits_invalid", "Foreach requires bounded item count and concurrency.", step.Name));
+                ValidateJsonExpressions(iteration.ItemsMapping, issues, step.Name, "itemsMapping");
+                if (!ValidContractSchema(iteration.ItemSchema) || !ValidContractSchema(iteration.ResultSchema))
+                    issues.Add(Error("foreach_contract_invalid", "Foreach requires supported item and result contracts.", step.Name));
                 break;
             case FlowCompositionPointStepDefinition point:
                 if (string.IsNullOrWhiteSpace(point.Point) || point.Point.Length > 128

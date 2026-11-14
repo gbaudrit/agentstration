@@ -12,7 +12,8 @@ public sealed record ArtifactStorageMaterialization(WorkspaceId WorkspaceId, Sto
 public sealed record RegisterStoredArtifactRequest(string Identity, string ProducerFlowRunId,
     ScopedResourceAddress ProducerResource, string ProducerExecutionId, string MediaType,
     ArtifactStorageMaterialization Materialization, string? ProducerFlowStepId = null,
-    Guid ProducerUid = default, long ProducerGeneration = 0, ResolvedDataContract? DataContract = null);
+    Guid ProducerUid = default, long ProducerGeneration = 0, ResolvedDataContract? DataContract = null,
+    IReadOnlyDictionary<string, string>? Provenance = null);
 
 public interface IStoredArtifactRegistrar
 {

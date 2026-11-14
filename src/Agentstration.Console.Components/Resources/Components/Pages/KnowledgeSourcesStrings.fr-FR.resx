@@ -18,7 +18,8 @@
   <data name="SelectRetrievalFlow" xml:space="preserve"><value>Sélectionner un Flow de retrieval</value></data>
   <data name="ProjectionInputs" xml:space="preserve"><value>Entrées de la projection</value></data>
   <data name="DataSourceBindings" xml:space="preserve"><value>Liaisons aux sources de données</value></data>
-  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Associez une ou plusieurs sources de données gouvernées. Chaque entrée peut être préparée par un Flow de transformation compatible.</value></data>
+  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Associez une ou plusieurs sources de données gouvernées. Chaque entrée peut avoir sa propre séquence de fonctions et de Flows compatibles.</value></data>
+  <data name="BindingTransformations" xml:space="preserve"><value>Transformations de cette source de données</value></data>
   <data name="AddDataSource" xml:space="preserve"><value>Ajouter une source de données</value></data>
   <data name="NoDataSourceBindings" xml:space="preserve"><value>Ajoutez au moins une source de données en entrée.</value></data>
   <data name="BindingName" xml:space="preserve"><value>Nom de la liaison</value></data>

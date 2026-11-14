@@ -3,6 +3,7 @@ using Agentstration.Artifacts.Api;
 using Agentstration.Bootstrap.Api;
 using Agentstration.ConnectedServices.Api;
 using Agentstration.Storage.Api;
+using Agentstration.Functions.Api;
 using Agentstration.DataSources.Api;
 using Agentstration.Extensions.Api;
 using Agentstration.Flows.Api;
@@ -45,6 +46,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapBootstrapApi();
         app.MapConnectedServicesApi();
         app.MapStorageApi();
+        app.MapFunctionsApi();
         app.MapAgentsApi();
         app.MapTriggersApi();
         app.MapSourcesApi();

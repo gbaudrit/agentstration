@@ -540,7 +540,7 @@ else if (source is not null && readiness is not null)
         var sequence = source?.Composition?.InputCompositions.GetValueOrDefault(binding.Name)?.Receipt?.Bindings.GetValueOrDefault("transformations")
             ?? source?.Definition.DataSources.FirstOrDefault(value => value.Name == binding.Name)?.Transformations ?? [];
         if (sequence.Count > 0)
-            return string.Join(" → ", sequence.Select(call => $"{call.Flow.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
+            return string.Join(" → ", sequence.Select(call => call.Function is { } function ? $"{function.Namespace ?? source!.Namespace}/{function.Name}:{function.Version}" : $"{call.Flow!.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
         return binding.Transformation is { } flow ? $"{flow.Namespace}/{flow.Name}:{flow.Version}" : T("IdentityTransformation");
     }
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";

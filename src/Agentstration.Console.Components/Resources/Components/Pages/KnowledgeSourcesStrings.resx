@@ -18,7 +18,8 @@
   <data name="SelectRetrievalFlow" xml:space="preserve"><value>Select a retrieval Flow</value></data>
   <data name="ProjectionInputs" xml:space="preserve"><value>Projection inputs</value></data>
   <data name="DataSourceBindings" xml:space="preserve"><value>Data Source bindings</value></data>
-  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Bind one or more governed Data Sources. Each input may optionally be prepared by a compatible transformation Flow.</value></data>
+  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Bind one or more governed Data Sources. Each input can have its own sequence of compatible functions and Flows.</value></data>
+  <data name="BindingTransformations" xml:space="preserve"><value>Transformations for this Data Source</value></data>
   <data name="AddDataSource" xml:space="preserve"><value>Add a Data Source</value></data>
   <data name="NoDataSourceBindings" xml:space="preserve"><value>Add at least one Data Source input.</value></data>
   <data name="BindingName" xml:space="preserve"><value>Binding name</value></data>

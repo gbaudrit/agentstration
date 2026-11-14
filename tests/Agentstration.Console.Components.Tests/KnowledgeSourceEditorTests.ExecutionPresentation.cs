@@ -94,7 +94,7 @@ public sealed partial class KnowledgeSourceEditorTests
     {
         using var context = CreateContext(new KnowledgeClientStub());
         var producer = PresentationRun("agent-run", "anonymization", [new() { StepName = "agent", StepType = "agent", AgentResourceId = "redactor" }]);
-        var owner = PresentationRun("transform-run", "artifact-processing", [new() { StepName = "transform", StepType = "artifactTransform" }]);
+        var owner = PresentationRun("transform-run", "artifact-processing", [new() { StepName = "transform", StepType = "foreachArtifacts" }]);
         var failure = new DataContractFailure("agent-output", "flow:transform-run/step:transform/output-media", "$", "json_syntax", "valid JSON", "invalid JSON text", producer.Id, "agent", "data_contract_json_invalid");
         var rendered = context.Render<ContractFailurePanel>(parameters => parameters.Add(value => value.Details, JsonSerializer.Serialize(failure))
             .Add(value => value.Run, producer).Add(value => value.RelatedRuns, [producer, owner]));

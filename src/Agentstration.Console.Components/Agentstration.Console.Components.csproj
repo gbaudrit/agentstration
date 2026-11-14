@@ -4,6 +4,7 @@
     <RootNamespace>Agentstration.Web</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Functions.Contracts/Agentstration.Functions.Contracts.csproj" />
     <InternalsVisibleTo Include="Agentstration.Console.Components.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="BlazorMonaco" />

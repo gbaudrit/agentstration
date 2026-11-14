@@ -57,8 +57,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
-            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is TransformFlowStepDefinition { Processing: not null }
-                || step is ArtifactTransformFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is ForeachFlowStepDefinition
+                || step is ForeachArtifactsFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
             throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
                 "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
         if (run.TransientPayloads && !run.TransientPayloadsAvailable)
@@ -130,8 +130,8 @@ public sealed class RuntimeExecutionMaterialResolver(
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
         if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
-            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is TransformFlowStepDefinition { Processing: not null }
-                || step is ArtifactTransformFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is ForeachFlowStepDefinition
+                || step is ForeachArtifactsFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
             throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
                 "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
         if (run.TransientPayloads && !run.TransientPayloadsAvailable)

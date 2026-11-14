@@ -60,8 +60,43 @@ public sealed class FlowService(
     ISecurityAuditWriter? audit = null,
     IFlowResourceReferenceResolver? resourceReferenceResolver = null,
     IFlowUsePolicy? usePolicy = null,
-    IFlowToolContractResolver? toolContracts = null)
+    IFlowToolContractResolver? toolContracts = null,
+    Agentstration.Functions.Contracts.ITransformationFunctionResolver? functions = null)
 {
+    public async Task<Agentstration.Functions.Contracts.ResolvedTransformationFunction> ResolveFunctionAsync(
+        Agentstration.Functions.Contracts.FunctionReference reference, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (functions is null) throw new FlowValidationException("flow_function_resolver_unavailable", "Function resolution is unavailable.");
+        try { return await functions.ResolveAsync(reference, consumer, ct); }
+        catch (Agentstration.Functions.Abstractions.TransformationFunctionException error)
+        { throw new FlowValidationException(error.Code, error.Message); }
+    }
+
+    internal async Task<FlowVersion> CompileFunctionsAsync(FlowVersion version, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (version.Graph is not { } graph) return version;
+        var steps = new List<FlowStepDefinition>();
+        foreach (var step in graph.Steps)
+        {
+            if (step is not TransformFlowStepDefinition { Function: { } reference } transform) { steps.Add(step); continue; }
+            var resolved = await ResolveFunctionAsync(reference with { Namespace = reference.Namespace ?? version.FlowId.Namespace }, consumer, ct);
+            steps.Add(FunctionStep(transform.Name, resolved, transform.Mapping ?? JsonSerializer.SerializeToElement("${transition.output}"), transform.DisplayName, transform.ArtifactOutput, outputSchema: transform.Schema));
+        }
+        // Tool executors use their ordinary success event. Keep the author's completed connection.
+        var converted = graph.Steps.OfType<TransformFlowStepDefinition>().Where(s => s.Function is not null).Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+        var compiled = graph with { Steps = steps, Transitions = graph.Transitions.Select(t => converted.Contains(t.FromStep) && t.Event == "completed" ? t with { Event = "success" } : t).ToArray() };
+        return version with { Graph = compiled, DefinitionHash = FlowDefinitionHash.Compute(compiled) };
+    }
+
+    internal static ToolFlowStepDefinition FunctionStep(string name, Agentstration.Functions.Contracts.ResolvedTransformationFunction function,
+        JsonElement input, string? displayName = null, FlowStepArtifactOutputDefinition? artifactOutput = null, JsonElement? parameters = null, JsonElement? outputSchema = null) => new()
+    {
+        Name = name, DisplayName = displayName, ArtifactOutput = artifactOutput,
+        FunctionBinding = function, FunctionParameters = parameters,
+        FunctionOutputSchema = outputSchema ?? function.OutputSchema,
+        Tool = new("agentstration.transformation.invoke", ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance),
+        ArgumentsMapping = JsonSerializer.SerializeToElement(new { input }, JsonOptions)
+    };
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
 
@@ -253,6 +288,14 @@ public sealed class FlowService(
         IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
         if (graph is not null)
         {
+            var pinnedSteps = new List<FlowStepDefinition>();
+            foreach (var step in graph.Steps)
+            {
+                if (step is not TransformFlowStepDefinition { Function: { } function } transform) { pinnedSteps.Add(step); continue; }
+                var contract = await ResolveFunctionAsync(function with { Namespace = function.Namespace ?? id.Namespace }, scopeRef, cancellationToken);
+                pinnedSteps.Add(transform with { Function = contract.Reference, FunctionInputSchema = contract.InputSchema, Schema = transform.Schema ?? contract.OutputSchema });
+            }
+            graph = graph with { Steps = pinnedSteps };
             var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
                 .ResolveAsync(scopeRef, id, graph, cancellationToken);
             graph = await new FlowOutputContractSnapshotter(resourceReferenceResolver)

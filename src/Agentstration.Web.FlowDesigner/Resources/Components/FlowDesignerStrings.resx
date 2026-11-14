@@ -161,7 +161,7 @@
   <data name="CompositionAllowEmpty" xml:space="preserve"><value>Allow an empty sequence (identity)</value></data>
   <data name="CompositionHelp" xml:space="preserve"><value>The consuming resource selects an ordered sequence of published Flows here. Each Flow receives value and its saved parameters.</value></data>
   <data name="InvalidJson" xml:space="preserve"><value>Enter valid JSON.</value></data>
-  <data name="Step.artifactTransform" xml:space="preserve"><value>Transform artifact(s)</value></data>
+  <data name="Step.foreachArtifacts" xml:space="preserve"><value>For each Artifact</value></data>
   <data name="ArtifactProcessingHelp" xml:space="preserve"><value>Connect process to any processing steps, then connect their result back to this step. completed continues with the output Artifact manifest; error handles processing failure.</value></data>
   <data name="ArtifactProcessingMode" xml:space="preserve"><value>Provide input as</value></data>
   <data name="ArtifactProcessingMode.Content" xml:space="preserve"><value>Content (text or JSON)</value></data>
@@ -241,4 +241,13 @@
   <data name="TransformProcessing.Help" xml:space="preserve"><value>The input mapping selects the value to partition. Connect process to the processing steps and return their result here. The output is an array in unit order.</value></data>
   <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Elements per batch / characters per text chunk</value></data>
   <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Maximum process units</value></data>
+  <data name="Step.foreach" xml:space="preserve"><value>For each</value></data>
+  <data name="Step.foreach.Description" xml:space="preserve"><value>Run the process branch for each element of an array.</value></data>
+  <data name="Foreach.Collection" xml:space="preserve"><value>Collection mapping</value></data>
+  <data name="Foreach.ItemSchema" xml:space="preserve"><value>Element input schema</value></data>
+  <data name="Foreach.ResultSchema" xml:space="preserve"><value>Element result schema</value></data>
+  <data name="Foreach.MaximumItems" xml:space="preserve"><value>Maximum elements</value></data>
+  <data name="Foreach.Help" xml:space="preserve"><value>Connect Process to a branch and return its result to the bottom result port. Each invocation receives one element; results preserve input order.</value></data>
+  <data name="TransformFunction" xml:space="preserve"><value>Transformation function</value></data>
+  <data name="TransformMappingOnly" xml:space="preserve"><value>JSON mapping</value></data>
 </root>
