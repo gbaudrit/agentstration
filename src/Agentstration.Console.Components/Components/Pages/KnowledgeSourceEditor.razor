@@ -23,7 +23,7 @@ else
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
     <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
+        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
         <div class="form-grid">
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
@@ -33,12 +33,23 @@ else
             <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
             @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
-            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" data-testid="knowledge-output-storage">
+            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" @bind:after="() => outputCollectionUid = Guid.Empty" data-testid="knowledge-output-storage">
                 <option value="">@T("ArtifactOutputDefault")</option>
                 @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef</option> }
                 @if (savedOutput is not null && !storages.Any(value => StorageKey(value) == outputStorageKey)) { <option value="@outputStorageKey">@T("PinnedOutputStorage")</option> }
             </select><small>@T("OutputStorageHelp")</small></label>
-            <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
+            @if (SelectedOutputStorage is { } structuredStorage && (RequiresOutputCollection || structuredStorage.Definition.Collections.Count > 0))
+            {
+                <label class="form-field-wide"><span>@T("StructuredOutputCollection")</span><select @bind="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T(RequiresOutputCollection ? "StructuredOutputSelect" : "StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(CompatibleOutputCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</select><small>@T("StructuredOutputHelp")</small></label>
+                @if (!OutputCollectionValid)
+                {
+                    <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="knowledge-output-collection-required">@T("StructuredOutputRequired") <a href="@(StorageLinks.Details(structuredStorage) + "&view=definition")">@T("ConfigureOutputStorage")</a></p>
+                }
+            }
+            @if (!RequiresOutputCollection && outputCollectionUid == Guid.Empty)
+            {
+                <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
+            }
             <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
             <label><span>@T("NativeLegacyRetrieval")</span><select @bind="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select><small>@T("NativeLegacyRetrievalHelp")</small></label>
             <div class="form-span-2" data-testid="knowledge-automatic-parameters"><span>@T("NativeAutomaticParameters")</span><JsonSchemaInputEditor Schema="AutomaticParametersSchema" Value="automaticParameters" ValueChanged="value => automaticParameters = value" ValidationChanged="state => automaticParametersValid = state.IsValid" Disabled="busy" /><small>@T("NativeAutomaticParametersHelp")</small></div>
@@ -73,7 +84,7 @@ else
                 }
             </section>
         </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></div>
+        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></div>
         </fieldset>
     </EditForm>
 }
@@ -88,17 +99,27 @@ else
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
     private IReadOnlyList<StorageResource> storages = [];
+    private IReadOnlyList<StorageTypeResource> storageTypes = [];
     private KnowledgeOutputStorage? savedOutput;
     private string outputStorageKey = string.Empty, outputPrefix = string.Empty;
     private static string StorageKey(StorageResource value) => $"{value.Uid}:{value.Generation}:{StorageDigests.Binding(value.Definition)}";
+    private Guid outputCollectionUid;
+    private StorageResource? SelectedOutputStorage => storages.FirstOrDefault(s => StorageKey(s) == outputStorageKey);
+    private bool RequiresOutputCollection => SelectedOutputStorage?.Definition.Type is { } type && storageTypes
+        .FirstOrDefault(t => t.Uid == type.TypeUid)?.Definition.Versions
+        .FirstOrDefault(v => v.Version == type.Version) is { Documents: not null, Capabilities.Write: false };
+    private static bool CompatibleOutputCollection(StorageDocumentCollection c) => c.Enabled && c.Policy.Get && c.Policy.Query && c.Policy.Publish;
+    private bool OutputCollectionValid => SelectedOutputStorage is null && savedOutput is not null
+        && outputCollectionUid == savedOutput.DocumentCollectionUid.GetValueOrDefault() || (outputCollectionUid == Guid.Empty ? !RequiresOutputCollection
+        : SelectedOutputStorage?.Definition.Collections.Any(c => c.Uid == outputCollectionUid && CompatibleOutputCollection(c)) == true);
     private KnowledgeOutputStorage? OutputSelection()
     {
         if (string.IsNullOrEmpty(outputStorageKey)) return null;
         if (savedOutput is not null && outputStorageKey == $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}")
-            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix } };
+            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix }, DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
         var selected = storages.Single(value => StorageKey(value) == outputStorageKey);
         return new(new(new(selected.ScopeRef!.Value, selected.Namespace, selected.Kind, selected.Name), selected.Uid,
-            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix));
+            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix)) { DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
     }
     private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
@@ -135,7 +156,12 @@ else
             dataSources = await dataSourcesTask;
             if (Services.GetService(typeof(IStoragesClient)) is IStoragesClient storageClient
                 && ResourceOwnershipContext.TryGetCurrent(Services) is { } owner)
-                storages = await storageClient.GetStoragesAsync(owner, cancellation.Token);
+            {
+                var storagesTask = storageClient.GetStoragesAsync(owner, cancellation.Token);
+                var typesTask = storageClient.GetTypesAsync(owner, cancellation.Token);
+                await Task.WhenAll(storagesTask, typesTask);
+                storages = await storagesTask; storageTypes = await typesTask;
+            }
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
@@ -154,6 +180,7 @@ else
                 if (snapshot.Value.Definition.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["postAggregate"] = snapshot.Value.Definition.Transformations };
                 automaticParameters = snapshot.Value.Definition.ProjectionParameters.Clone();
                 savedOutput = snapshot.Value.Definition.Output;
+                outputCollectionUid = savedOutput?.DocumentCollectionUid ?? Guid.Empty;
                 outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
                 outputPrefix = savedOutput?.Rule.Prefix ?? string.Empty;
                 projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);
@@ -209,7 +236,7 @@ else
     private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync()
     {
-        if (busy || !interactive || !LifecycleValid || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed || !FallbackValid(value))) return;
+        if (busy || !interactive || !LifecycleValid || !OutputCollectionValid || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed || !FallbackValid(value))) return;
         busy = true;
         message = null;
         try

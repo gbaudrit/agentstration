@@ -684,6 +684,36 @@ public sealed partial class KnowledgeSourceEditorTests
         });
     }
 
+    [TestMethod]
+    [DataRow("en-US", false)]
+    [DataRow("fr-FR", false)]
+    [DataRow("en-US", true)]
+    [DataRow("fr-FR", true)]
+    public async Task DocumentKnowledgeRequiresAnExplicitPublishableCollection(string cultureName, bool hasCollection)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var documents = new StructuredStorageUiFixture(hasCollection);
+        using var http = new HttpClient(documents) { BaseAddress = new("https://agentstration.test/") };
+        var client = new KnowledgeClientStub();
+        using var context = CreateContext(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(documents);
+        context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
+        var page = context.Render<KnowledgeSourceEditor>();
+        page.WaitForElement("[data-testid=knowledge-output-storage]");
+        await page.Find("[data-testid=knowledge-source-display-name]").ChangeAsync("Alerts");
+        await page.Find("[data-testid=knowledge-source-data-source-bindings] select").ChangeAsync($"{DataSourceScope.Value}|default|documentation");
+        var storageKey = page.Find("[data-testid=knowledge-output-storage] option:last-child").GetAttribute("value");
+        await page.Find("[data-testid=knowledge-output-storage]").ChangeAsync(storageKey);
+        Assert.IsTrue(page.Find("[data-testid=knowledge-source-save]").HasAttribute("disabled"));
+        Assert.IsNotNull(page.Find("[data-testid=knowledge-output-collection-required] a[href*='view=definition']"));
+        Assert.IsNull(client.CreatedRequest);
+        if (!hasCollection) return;
+        await page.Find("[data-testid=knowledge-output-collection]").ChangeAsync(documents.Collection.ToString());
+        Assert.IsFalse(page.Find("[data-testid=knowledge-source-save]").HasAttribute("disabled"));
+        await page.Find("form").SubmitAsync();
+        page.WaitForAssertion(() => Assert.AreEqual(documents.Collection, client.CreatedRequest?.Properties.Output?.DocumentCollectionUid));
+    }
+
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null, IFlowApiClient? flows = null)
     {
         var context = new BunitContext();
@@ -1003,9 +1033,14 @@ public sealed partial class KnowledgeSourceEditorTests
             CreatedTransformation = request;
             return Task.FromResult(new FlowDraftResponse(new()
             {
-                WorkspaceId = new(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")), ScopeRef = request.ScopeRef,
-                Id = request.Name + "-draft", FlowId = new(request.Name), DisplayName = request.DisplayName,
-                Definition = new() { EntryStep = "input" }, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+                WorkspaceId = new(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+                ScopeRef = request.ScopeRef,
+                Id = request.Name + "-draft",
+                FlowId = new(request.Name),
+                DisplayName = request.DisplayName,
+                Definition = new() { EntryStep = "input" },
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
             }, "created"));
         }
         public Task<FlowDraftResponse> GetDraftAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();

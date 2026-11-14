@@ -251,6 +251,25 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)
 
-193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
-194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)
-195. [ADR-0195 — HTTP category switches always enable both payload directions](0195-http-categories-enable-both-bodies.md)
+220. [ADR-0220 — ASP documents use additive capabilities and open query profiles](0220-asp-document-capabilities-and-open-query-profiles.md)
+
+221. [ADR-0221 — Structured queries start with a bounded OData profile](0221-bounded-standard-odata-query-profile.md)
+
+222. [ADR-0222 — Logical document collections remain governed Storage configuration](0222-logical-document-collections-remain-storage-configuration.md)
+
+223. [ADR-0223 — PostgreSQL JSONB uses an autonomous provider-owned layout](0223-postgresql-jsonb-is-an-autonomous-asp-provider.md)
+
+224. [ADR-0224 — Structured Snapshots pin immutable document publications](0224-structured-snapshots-pin-immutable-document-publications.md)
+
+225. [ADR-0225 — Structured storage does not define agent Memory policy](0225-structured-storage-does-not-define-memory-policy.md)
+
+226. [ADR-0226 — Schema bindings select sub-schemas of exact published versions](0226-schema-bindings-select-versioned-subschemas.md)
+
+227. [ADR-0227 — Data Source document Tools select latest or exact acquisitions](0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
+
+228. [ADR-0228 — Data Source queries evolve independently from Tool exposures](0228-data-source-queries-evolve-independently-from-tool-exposures.md)
+229. [ADR-0229 — General HTTP diagnostics observe bounded streams](0229-http-diagnostics-observe-bounded-streams.md)
+230. [ADR-0230 — HTTP diagnostics use explicit category capture policies](0230-http-diagnostics-use-category-policies.md)
+231. [ADR-0231 — HTTP category switches always enable both payload directions](0231-http-categories-enable-both-bodies.md)
+
+232. [ADR-0232 — Tool relays can omit optional inputs](0232-tool-relays-can-omit-optional-inputs.md)

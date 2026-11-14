@@ -44,6 +44,7 @@
             <div class="flow-schema-reference-fields">
                 <label><span>@Localizer["SharedSchema"]</span>
                     <select disabled="@ReadOnly" value="@SelectedSchemaKey" @onchange="ChangeSchemaAsync" data-testid="@($"{TestId}-resource")">
+                        <option value="">@Localizer["SharedSchema"]</option>
                         @foreach (var schema in Schemas)
                         {
                             <option value="@SchemaKey(schema)">@schema.DisplayName (@schema.Namespace.Value/@schema.Name)</option>
@@ -61,9 +62,14 @@
             </div>
             @if (selectedVersion is not null)
             {
+                <label><span>@Localizer["SubschemaPath"]</span>
+                    <input value="@schemaPath" disabled="@ReadOnly" @onchange="ChangeSchemaPathAsync" data-testid="@($"{TestId}-path")" />
+                    <small>@Localizer["SubschemaPathHelp"]</small>
+                </label>
+                @if (selectionError) { <p role="alert">@Localizer["SubschemaUnavailable"]</p> }
                 <p class="flow-schema-reference-summary"><span>@selectedVersion.Format</span><code>@(selectedVersion.Dialect ?? "—")</code></p>
                 <SchemaDocumentEditor Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect" Descriptor="JsonSchemaDescriptor"
-                    Value="@selectedVersion.Content" ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync"
+                    Value="@SelectedContent" ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync"
                     InstanceValidator="ValidateInstanceAsync" />
             }
             else if (Binding?.Reference is { } missing)
@@ -99,6 +105,16 @@
     [Parameter] public string? HelpText { get; set; }
     [Parameter] public bool ShowSourceControls { get; set; } = true;
 
+    private string schemaPath = "";
+    private bool selectionError;
+    private JsonElement SelectedContent
+    {
+        get
+        {
+            try { return selectedVersion is null ? inlineContent : JsonSchemaSelection.Select(selectedVersion.Content, schemaPath); }
+            catch (SchemaSelectionException) { return JsonSerializer.SerializeToElement(new { }); }
+        }
+    }
     private BindingMode mode;
     private JsonElement inlineContent = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
     private FlowDesignerSchemaVersion? selectedVersion;
@@ -115,9 +131,10 @@
     {
         var versionsKey = string.Join(';', SchemaVersions.Select(version =>
             $"{version.ScopeRef.Value}/{version.Namespace.Value}/{version.Name}:{version.Version}"));
-        var nextKey = $"{Binding?.Inline?.Content.GetRawText()}|{Binding?.Reference?.ScopeRef?.Value}|{Binding?.Reference?.Namespace?.Value}|{Binding?.Reference?.Name}|{Binding?.Reference?.Version}|{LegacySchema?.GetRawText()}|{versionsKey}";
+        var nextKey = $"{Binding?.Inline?.Content.GetRawText()}|{Binding?.Reference?.ScopeRef?.Value}|{Binding?.Reference?.Namespace?.Value}|{Binding?.Reference?.Name}|{Binding?.Reference?.Version}|{Binding?.Reference?.SchemaPath}|{LegacySchema?.GetRawText()}|{versionsKey}";
         if (nextKey == stateKey) return;
         stateKey = nextKey;
+        schemaPath = Binding?.Reference?.SchemaPath ?? "";
         mode = Binding?.Reference is null ? BindingMode.Inline : BindingMode.Shared;
         inlineContent = Binding?.Inline?.Content.Clone() ?? LegacySchema?.Clone()
             ?? JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
@@ -181,12 +198,20 @@
         new SchemaBinding { Inline = new InlineSchemaBinding { Format = SchemaFormatIds.JsonSchema, Dialect = JsonSchemaDialect, Content = inlineContent.Clone() } },
         inlineContent.Clone()));
 
+    private async Task ChangeSchemaPathAsync(ChangeEventArgs args)
+    {
+        schemaPath = args.Value?.ToString() ?? "";
+        await PublishReferenceAsync();
+    }
+
     private Task PublishReferenceAsync()
     {
         if (selectedVersion is null) return Task.CompletedTask;
+        try { _ = JsonSchemaSelection.Select(selectedVersion.Content, schemaPath); selectionError = false; }
+        catch (SchemaSelectionException) { selectionError = true; }
         return ValueChanged.InvokeAsync(new(
-            new SchemaBinding { Reference = new SchemaVersionReference { Name = selectedVersion.Name, Version = selectedVersion.Version, Namespace = selectedVersion.Namespace, ScopeRef = selectedVersion.ScopeRef } },
-            selectedVersion.Content.Clone()));
+            new SchemaBinding { Reference = new SchemaVersionReference { Name = selectedVersion.Name, Version = selectedVersion.Version, Namespace = selectedVersion.Namespace, ScopeRef = selectedVersion.ScopeRef, SchemaPath = string.IsNullOrEmpty(schemaPath) ? null : schemaPath } },
+            selectionError ? null : SelectedContent));
     }
 
     private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>

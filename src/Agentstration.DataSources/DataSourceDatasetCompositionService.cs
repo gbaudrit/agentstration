@@ -5,6 +5,8 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.DataSources;
 
@@ -12,7 +14,8 @@ public sealed class DataSourceDatasetCompositionService(
     ConnectedServiceOperationService operations,
     IStorageResolver storage,
     IStorageContentGateway content,
-    IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null)
+    IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
+    DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
     internal const int MaximumValueBytes = 64 * 1024;
@@ -31,22 +34,37 @@ public sealed class DataSourceDatasetCompositionService(
             || readOnly.ValueKind != JsonValueKind.True)
             throw Invalid("data_source_operation_not_read_only", "Actions are not eligible for acquisition.");
         var input = Schema(operation.Definition.Definition, adapter.InputSchemaProperty);
-        var output = Schema(operation.Definition.Definition, adapter.OutputSchemaProperty);
+        var declaredOutput = Schema(operation.Definition.Definition, adapter.OutputSchemaProperty);
+        var operationOutput = definition.Acquisition.OutputSchemaSnapshot?.Content ?? declaredOutput;
+        var rawOutput = JsonSchemaSelection.Select(operationOutput);
+        ValidateSchema(rawOutput);
+        var finalSnapshot = definition.OutputSchemaSnapshot;
+        var output = finalSnapshot is null ? rawOutput : JsonSchemaSelection.Select(finalSnapshot.Content);
+        ValidateSchema(output);
         ValidateValue(input, definition.Acquisition.Parameters);
         var partition = Partition(source);
         if (definition.Storage is { } inputStorage)
         {
             var consumerContext = new StorageResolutionContext(consumer, source.Address);
             var target = await storage.ResolveAsync(inputStorage, consumerContext, cancellationToken);
-            if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
-                || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
-                throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
-            var effective = definition.Rule with { Prefix = partition };
-            await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+            if (definition.DocumentCollectionUid is not null)
+            {
+                if (documentStorage is null) throw Invalid("data_source_document_storage_unavailable", "Structured acquisition storage is unavailable.");
+                await documentStorage.ValidateAsync(inputStorage, consumerContext, definition, cancellationToken);
+            }
+            else
+            {
+                if (!target.Capabilities.List || !target.Capabilities.Read || !target.Capabilities.Write
+                    || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
+                    throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
+                var effective = definition.Rule with { Prefix = partition };
+                await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+            }
         }
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
-            return new(definition, operation, type, input, output, partition, flow);
+            return new(definition, operation, type, input, output, partition, flow)
+            { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot };
         if (sequences is null || definition.Compositions.ContainsKey("acquisition"))
             throw Invalid("data_source_composition_invalid", "The acquisition point is owned by the Data Source.");
         var bindings = definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -67,15 +85,73 @@ public sealed class DataSourceDatasetCompositionService(
                 composed.Orchestration.Namespace ?? source.Namespace, composed.Orchestration.Version!, false,
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
             { ScopeRef = composed.Orchestration.ScopeRef };
-            return new(definition, operation, type, input, composed.OutputSchema ?? output, partition, targetFlow)
-            { OperationFlow = flow, Composition = composed };
+            return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
+            { OperationFlow = flow, Composition = composed, OperationOutputSchema = rawOutput,
+                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null) };
         }
         catch (Exception exception) when (exception is Agentstration.Flows.FlowValidationException or KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
+    public async Task<DataSourceResource> AdoptSchemasAsync(DataSourceResource resource, CancellationToken token, DataSourceResource? previous = null)
+    {
+        if (resource.Definition.Dataset is not { } dataset) return resource;
+        var prior = previous?.Definition.Dataset;
+        var raw = await ResolveBindingAsync(dataset.Acquisition.OutputSchemaBinding, "$.dataset.acquisition.outputSchema", resource,
+            prior?.Acquisition.OutputSchemaBinding, prior?.Acquisition.OutputSchemaSnapshot, token);
+        var final = await ResolveBindingAsync(dataset.OutputSchemaBinding, "$.dataset.outputSchema", resource,
+            prior?.OutputSchemaBinding, prior?.OutputSchemaSnapshot, token);
+        return resource with { Definition = resource.Definition with { Dataset = dataset with
+        {
+            Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw }, OutputSchemaSnapshot = final
+        } } };
+    }
+
+    private async Task<SchemaBindingSnapshot?> ResolveBindingAsync(SchemaBinding? binding, string path,
+        DataSourceResource source, SchemaBinding? previousBinding, SchemaBindingSnapshot? previousSnapshot, CancellationToken token)
+    {
+        if (binding is null) return null;
+        if (previousSnapshot is not null && previousBinding is not null
+            && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(binding), JsonSerializer.SerializeToElement(previousBinding)))
+            return previousSnapshot;
+        if (schemaBindings is null) throw Invalid("schema_resolver_unavailable", "Schema binding resolution is unavailable.");
+        try
+        {
+            var snapshot = await schemaBindings.ResolveAsync(path, binding,
+                new(source.ScopeRef!.Value, source.Namespace, SchemaFormatIds.JsonSchema), token);
+            if (snapshot.Dialect is { } dialect && dialect != BuiltinJsonSchemaFormatHandler.Draft202012)
+                throw Invalid("schema_dialect_incompatible", "The acquisition validator does not support the selected dialect.");
+            ValidateSchema(JsonSchemaSelection.Select(snapshot.Content));
+            _ = DataContracts.Declared(JsonSchemaSelection.Select(snapshot.Content), path, "application/json");
+            return snapshot;
+        }
+        catch (SchemaBindingResolutionException exception) { throw Invalid(exception.Code, exception.Message); }
+        catch (SchemaSelectionException exception) { throw Invalid(exception.Code, "The selected schema is unsupported."); }
+    }
+
+    public static void ValidateOperationOutput(ResolvedDataSourceDataset dataset, JsonElement result, string? runId = null)
+    {
+        var schema = dataset.OperationOutputSchema ?? dataset.OutputSchema;
+        if (dataset.Definition.Acquisition.OutputSchemaSnapshot is { } snapshot)
+            DataContracts.Validate(DataContracts.Declared(schema, snapshot.Path, "application/json"), result,
+                "acquisition-operation", runId);
+        else ValidateValue(schema, result);
+    }
+
+    public static ResolvedDataContract Contract(ResolvedDataSourceDataset dataset, string origin)
+    {
+        var contract = DataContracts.Declared(dataset.OutputSchema, origin, "application/json")!;
+        var snapshot = dataset.OutputSchemaSnapshot;
+        if (snapshot?.Source is not { ScopeRef: { } scope, Namespace: { } ns } source
+            || snapshot.SchemaUid is not { } uid || snapshot.SchemaGeneration is not { } generation) return contract;
+        return contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+            snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+    }
+
     public static void ValidateLifecycle(DataSourceDatasetProperties definition)
     {
+        if (definition.DocumentCollectionUid is { } collection && (collection == Guid.Empty || definition.Storage is null))
+            throw Invalid("data_source_document_collection_required", "Structured acquisition requires an exact Storage and collection.");
         var policy = definition.Lifecycle;
         if (definition.Storage is null && policy?.AllowDirect != true)
             throw Invalid("data_source_direct_permission_required", "Direct acquisition requires explicit permission.");
@@ -104,7 +180,8 @@ public sealed class DataSourceDatasetCompositionService(
         var dataset = acquisition.Dataset!;
         return new(dataset.Definition.Storage ?? throw Invalid("data_source_content_unavailable", "This acquisition has no retained input Storage."),
             new(consumer, ResourceAddress.Create(acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName)),
-            dataset.Definition.Rule with { Prefix = dataset.Partition });
+            dataset.Definition.Rule with { Prefix = dataset.Partition })
+        { DocumentCollectionUid = dataset.Definition.DocumentCollectionUid };
     }
 
     public static void ValidateValue(JsonElement schema, JsonElement value)

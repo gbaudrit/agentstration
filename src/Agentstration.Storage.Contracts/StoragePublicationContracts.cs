@@ -11,7 +11,10 @@ public sealed record StoragePublicationReference(StorageContentRequest Target, s
     string Version, long Length, string Sha256)
 {
     public StoragePublicationBinding? Binding { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public StorageDocumentArtifactReference? Document { get; init; }
 }
+public sealed record StorageDocumentArtifactReference(StorageDocumentPublicationReference Publication, string DocumentId, string Revision);
 
 /// <summary>Provider-owned publication semantics. Generic read/write capability does not imply support.</summary>
 public interface IStoragePublicationGateway

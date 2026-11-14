@@ -1,0 +1,121 @@
+@implements IDisposable
+@inject IStoragesClient Client
+@inject ConsoleContextState Context
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+<section class="panel form-section" data-testid="storage-document-access">
+    <div class="panel-header"><h2>@T("Documents.Access")</h2></div>
+    <p>@T("Documents.AccessHelp")</p>
+    <fieldset class="form-grid" disabled="@busy">
+        <label><span>@T("Documents.Collection")</span><select aria-label="@T("Documents.Collection")" @bind="collection" @bind:after="Reset"><option value="@Guid.Empty">@T("Documents.SelectCollection")</option>@foreach (var c in Resource.Definition.Collections.Where(c => c.Enabled)) { <option value="@c.Uid">@c.DisplayName · @c.Name</option> }</select></label>
+        <button type="button" class="button-secondary" @onclick="DescribeAsync" disabled="@(collection == Guid.Empty)">@T("Documents.Discover")</button>
+        @if (description is not null)
+        {
+            <p class="form-span-2"><code>@description.SchemaDigest</code> · @T("Documents.PageSize"): @description.Policy.MaximumPageSize</p>
+            <label><span>@T("Documents.Operation")</span><select aria-label="@T("Documents.Operation")" @bind="operation" @bind:after="ResetResult">
+                @if (string.IsNullOrEmpty(operation)) { <option value="">@T("Documents.NoOperations")</option> }
+                @if (description.Policy.Get) { <option value="get">@T("Documents.Get")</option> }
+                @if (description.Policy.Query) { <option value="query">@T("Documents.Query")</option> }
+                @if (description.Policy.Put && Context.HasPermission("resources/write")) { <option value="put">@T("Documents.Put")</option> }
+                @if (description.Policy.Delete && Context.HasPermission("resources/delete")) { <option value="delete">@T("Documents.Delete")</option> }
+            </select></label>
+            @if (operation == "query")
+            {
+                <div class="form-span-2"><StructuredDocumentQueryEditor @key="collection" Description="description" Busy="busy" CanExecute="@Context.HasPermission("runs/execute")"
+                    HasNextPage="@(page?.Cursor is not null)" RunRequested="RunQueryAsync" NextRequested="NextQueryAsync" ResetRequested="ResetResult"
+                    ProfileChanged="profile => queryProfile = profile" TestId="storage-document-query" /></div>
+            }
+            else
+            {
+                <label><span>@T("Documents.Id")</span><input @bind="documentId" maxlength="128" @bind:after="ResetResult" /></label>
+                @if (operation is "put" or "delete") { <label><span>@T("Documents.Revision")</span><input @bind="revision" maxlength="128" @bind:after="ResetResult" /><small>@T("Documents.RevisionHelp")</small></label> }
+            }
+            @if (operation == "put") { <label class="form-span-2"><span>@T("Documents.Value")</span><textarea class="form-code-editor" rows="8" @bind="payload" @bind:after="ResetResult" maxlength="65536"></textarea></label> }
+            @if (operation != "query")
+            {
+                <button type="button" class="button-primary" disabled="@(!Context.HasPermission("runs/execute") || string.IsNullOrEmpty(operation))" @onclick="RunAsync">@T("Documents.Run")</button>
+                @if (!Context.HasPermission("runs/execute")) { <p class="form-span-2" role="status">@T("Documents.ExecutePermissionRequired")</p> }
+            }
+            @if (Context.HasPermission("resources/write"))
+            {
+                <label><span>@T("Documents.ToolVersion")</span><input @bind="version" maxlength="32" /></label>
+                <label><span>@T("Documents.ToolApproval")</span><input type="checkbox" @bind="requiresApproval" /></label>
+                <button type="button" class="button-secondary" disabled="@(string.IsNullOrEmpty(operation) || operation == "query" && queryProfile is null)" @onclick="PublishAsync">@T("Documents.PublishTool")</button>
+                <p class="form-span-2">@T("Documents.PublishToolHelp")</p>
+            }
+        }
+    </fieldset>
+    <StorageError Error="error" />
+    @if (result is not null) { <pre data-testid="storage-document-result">@result</pre> }
+    @foreach (var tool in tools) { <p><code>@tool.Name</code></p> }
+</section>
+@code {
+    [Parameter, EditorRequired] public StorageResource Resource { get; set; } = null!;
+    private readonly CancellationTokenSource cancellation = new();
+    private StorageDocumentDescription? description;
+    private StorageDocumentPage? page;
+    private IReadOnlyList<ResourceReference> tools = [];
+    private Guid collection;
+    private StorageQueryProfilePin? queryProfile;
+    private StructuredDocumentQueryEditorRequest? queryRequest;
+    private string operation = "query", documentId = "", revision = "", payload = "{}", version = "1.0.0";
+    private string? result;
+    private Exception? error;
+    private bool busy, requiresApproval;
+    private StorageDocumentWrite? pendingWrite;
+    private StorageDocumentDelete? pendingDelete;
+    private string T(string key) => Localizer[key];
+    private void Reset() { description = null; tools = []; ResetResult(); }
+    private void ResetResult() { result = null; page = null; queryRequest = null; pendingWrite = null; pendingDelete = null; error = null; }
+    private Task DescribeAsync() => ExecuteAsync(async () =>
+    {
+        ResetResult();
+        description = await Client.DescribeDocumentsAsync(StorageLinks.Address(Resource), collection, cancellation.Token);
+        operation = description.Policy.Query ? "query" : description.Policy.Get ? "get"
+            : description.Policy.Put && Context.HasPermission("resources/write") ? "put"
+            : description.Policy.Delete && Context.HasPermission("resources/delete") ? "delete" : ""; queryProfile = description.QueryProfiles.FirstOrDefault();
+    });
+    private Task RunAsync() => ExecuteAsync(async () =>
+    {
+        object response;
+        var address = StorageLinks.Address(Resource);
+        if (operation == "get") response = await Client.GetDocumentAsync(address, collection, documentId, cancellation.Token);
+        else if (operation == "put")
+        {
+            using var json = JsonDocument.Parse(payload);
+            pendingWrite ??= new(Guid.NewGuid().ToString("N"), Clock.GetUtcNow().AddMinutes(4), documentId, json.RootElement.Clone(), string.IsNullOrWhiteSpace(revision) ? null : revision);
+            response = await Client.PutDocumentAsync(address, collection, pendingWrite, cancellation.Token); pendingWrite = null;
+        }
+        else
+        {
+            pendingDelete ??= new(Guid.NewGuid().ToString("N"), Clock.GetUtcNow().AddMinutes(4), documentId, revision);
+            response = await Client.DeleteDocumentAsync(address, collection, pendingDelete, cancellation.Token); pendingDelete = null;
+        }
+        result = JsonSerializer.Serialize(response);
+    });
+    private Task RunQueryAsync(StructuredDocumentQueryEditorRequest request) => ExecuteAsync(async () =>
+    {
+        queryRequest = request;
+        page = await Client.QueryDocumentsAsync(StorageLinks.Address(Resource), collection,
+            new(Guid.NewGuid().ToString("N"), request.Profile, request.Query, request.PageSize), cancellation.Token);
+        result = JsonSerializer.Serialize(page);
+    });
+    private Task NextQueryAsync() => ExecuteAsync(async () =>
+    {
+        if (queryRequest is null || page?.Cursor is null) return;
+        page = await Client.QueryDocumentsAsync(StorageLinks.Address(Resource), collection,
+            new(Guid.NewGuid().ToString("N"), queryRequest.Profile, queryRequest.Query, queryRequest.PageSize, page.Cursor), cancellation.Token);
+        result = JsonSerializer.Serialize(page);
+    });
+    private Task PublishAsync() => ExecuteAsync(async () => tools = await Client.PublishDocumentToolsAsync(StorageLinks.Address(Resource), collection,
+        new(version, [operation], operation == "query" ? queryProfile : null, requiresApproval), cancellation.Token));
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (busy) return; busy = true; error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception ex) { error = ex; }
+        finally { busy = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

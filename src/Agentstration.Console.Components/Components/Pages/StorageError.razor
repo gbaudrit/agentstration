@@ -1,9 +1,29 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 @if (Error is not null)
 {
-    <div class="form-alert form-alert-danger" role="alert" data-testid="storage-error">
+    <div class="form-alert form-alert-danger storage-error" role="alert" data-testid="storage-error">
         <strong>@Localizer[StorageErrorKey.For(Error)]</strong>
-        <span>@Localizer["Error.RefreshHelp"]</span>
+        @if (Error is AgentstrationApiException { ProblemTitle: "storage_collection_schema_invalid" } schemaError)
+        {
+            <span>@Localizer["Error.SchemaHelp"]</span>
+            @if (schemaError.ValidationIssues.Count > 0)
+            {
+                <ul>@foreach (var issue in schemaError.ValidationIssues.Take(10)) { <li><code>@issue.Path</code> · @Localizer[IssueKey(issue)] @if (issue.Keyword is not null) { <code>@issue.Keyword</code> }</li> }</ul>
+            }
+        }
+        else if (StorageErrorKey.For(Error) is not ("Error.Metadata" or "Error.BackendConnectionRefused" or "Error.BackendTimeout" or "Error.BackendUnavailable")) { <span>@Localizer["Error.RefreshHelp"]</span> }
     </div>
 }
-@code { [Parameter] public Exception? Error { get; set; } }
+@code {
+    [Parameter] public Exception? Error { get; set; }
+    private static string IssueKey(ApiValidationIssue issue) => (issue.Code, issue.Keyword) switch
+    {
+        ("unsupported_schema", "$ref") => "Error.Schema.ReferenceUnsupported",
+        ("invalid_schema", "$ref") => "Error.Schema.ReferenceInvalid",
+        ("unsupported_schema", "anyOf") => "Error.Schema.Union",
+        ("unsupported_schema", "format") => "Error.Schema.Format",
+        ("unsupported_schema", _) => "Error.Schema.Keyword",
+        ("limit_exceeded", _) => "Error.Schema.Limit",
+        _ => "Error.Schema.Invalid"
+    };
+}

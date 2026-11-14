@@ -91,6 +91,9 @@ var openApiEnabled = bool.TryParse(openApiEnabledSetting, out var configuredOpen
 var openDalEnabledSetting = builder.Configuration["OpenDal:Enabled"] ?? "false";
 if (!bool.TryParse(openDalEnabledSetting, out var openDalEnabled))
     throw new InvalidOperationException("OpenDal:Enabled must be true or false.");
+var postgreSqlDocumentsEnabledSetting = builder.Configuration["PostgreSqlDocuments:Enabled"] ?? "false";
+if (!bool.TryParse(postgreSqlDocumentsEnabledSetting, out var postgreSqlDocumentsEnabled))
+    throw new InvalidOperationException("PostgreSqlDocuments:Enabled must be true or false.");
 var openApiAllowedDomains = builder.Configuration.GetSection("OpenApi:AllowedDomains")
     .GetChildren()
     .Select(value => value.Value)
@@ -265,6 +268,22 @@ if (openDalEnabled)
     }
     developmentExtensions.Add(new DevelopmentAepExtension(
         "agentstration.extensions.opendal", "opendal-extension", openDalExtension));
+}
+if (postgreSqlDocumentsEnabled)
+{
+    var extension = builder.AddProject<Projects.Agentstration_Extensions_PostgreSql>("postgresql-documents-extension", options => options.ExcludeLaunchProfile = true)
+        .WithHttpEndpoint(port: 5190, name: "http")
+        .WithDynamicHostPorts(dynamicApplicationPorts)
+        .WithEnvironment("PostgreSqlDocuments__AllowPairedClient", usePairingCode ? "true" : "false")
+        .WithEnvironment("PostgreSqlDocuments__ProvisionSchema", builder.Configuration["PostgreSqlDocuments:ProvisionSchema"] ?? "false")
+        .WithEnvironment("PostgreSqlDocuments__AllowLoopbackWithoutTls", builder.Configuration["PostgreSqlDocuments:AllowLoopbackWithoutTls"] ?? "false");
+    if (!usePairingCode)
+    {
+        const string clientId = "agentstration-development";
+        extension.WithEnvironment("Aep__SharedKeyFile__ClientId", clientId)
+            .WithEnvironment("PostgreSqlDocuments__AllowedClients__0", clientId);
+    }
+    developmentExtensions.Add(new DevelopmentAepExtension("agentstration.extensions.postgresql", "postgresql-documents-extension", extension));
 }
 if (crawl4AiEnabled)
 {

@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Asp.Abstractions;
@@ -20,7 +20,7 @@ using ModelContextProtocol.Client;
 namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Protected configuration exchange followed by SDK-owned MCP content operations.</summary>
-public sealed class StorageAspRemoteAdapter(IResourceStore resources, IStorageResolver storages,
+public sealed partial class StorageAspRemoteAdapter(IResourceStore resources, IStorageResolver storages,
     AepMcpTransport transport, IParameterResolver parameters,
     ISecretCapabilityService capabilities, ISecretResolver secrets, IConfiguration configuration,
     IRequestContextScopeFactory requestScopes, TimeProvider clock,

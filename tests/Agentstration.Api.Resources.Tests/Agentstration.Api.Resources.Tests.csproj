@@ -1,5 +1,8 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <None Include="../Agentstration.Extensions.PostgreSql.Tests/Fixtures/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
+    <ProjectReference Include="../../asp/samples/StructuredDocuments/StructuredDocuments.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
     <ProjectReference Include="../../src/Agentstration.Agents/Agentstration.Agents.csproj" />

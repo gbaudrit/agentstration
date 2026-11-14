@@ -30,9 +30,33 @@ Definitions containing composition or reference constructs such as `$ref`, `$def
 
 The standalone product registers a native `json-schema` provider and does not require AEP. The supported dialect is `https://json-schema.org/draft/2020-12/schema`.
 
-The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the `uri` format. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
+The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the asserted `uri` and `date-time` formats. Date-time validation reuses JsonSchema.Net, as does the ASP document profile. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
 
 Format resolution is capability-based. A provider has a stable identity and version, lists its dialects and capabilities, and reports availability. Multiple capable providers require one explicit default or an exact caller pin; registration order is never used as an implicit selection policy.
+
+## Reusing response schemas and sub-schemas
+
+OpenAPI Connected Service discovery retains declared response-schema evidence without invoking the business operation. Inspect the operation's response choice, then explicitly create a Schema draft or reuse a published Schema. Creation does not publish, adopt or grant access. The draft retains the original response definition, contract URI/digest, operation identity, status/media and source location; its executable standalone content remains reviewable before publication.
+
+A binding can select the whole published Schema or one sub-schema using `reference.schemaPath`:
+
+```json
+{
+  "reference": {
+    "name": "observations",
+    "version": "1.0.0",
+    "namespace": "default",
+    "scopeRef": "/instance",
+    "schemaPath": "/properties/results/items"
+  }
+}
+```
+
+This selects each result's schema, not the envelope or the result array. It creates no additional Schema resource. Local references resolve in the parent document, with bounded size/depth and no remote fetches. Parent Use policy applies. Publishing another parent version does not change this selection.
+
+Data Source dataset configuration offers separate adopted contracts for the raw operation response and the final projection output. A Flow projection can use the same binding controls. Declare the contract matching the actual output shape; selection alone neither splits arrays nor renames fields. Accepted acquisitions and durable Artifacts retain parent/version/path/hash evidence. Generic JSON acceptance is not structural validation.
+
+Structured Storage collections support inline or shared bindings. Create or explicitly reconcile the Storage to adopt a version. Both document validation and the chosen query profile must support the effective schema; unsupported constraints are rejected rather than removed. Existing documents are not migrated by a binding change, and historical publications retain their original contract evidence. See [ADR-0226](../decisions/0226-schema-bindings-select-versioned-subschemas.md).
 
 ## AEP format contributions
 

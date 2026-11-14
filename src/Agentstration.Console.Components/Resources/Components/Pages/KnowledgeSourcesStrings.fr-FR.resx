@@ -75,7 +75,7 @@
   <data name="OutputStorage" xml:space="preserve"><value>Storage de sortie des Snapshots</value></data>
   <data name="ArtifactOutputDefault" xml:space="preserve"><value>Publication Artifact existante</value></data>
   <data name="PinnedOutputStorage" xml:space="preserve"><value>Révision exacte du Storage enregistrée</value></data>
-  <data name="OutputStorageHelp" xml:space="preserve"><value>Sélectionnez un Storage indépendant compatible avec les publications conservées. L’implémentation locale est prise en charge.</value></data>
+  <data name="OutputStorageHelp" xml:space="preserve"><value>Sélectionnez un Storage compatible avec les Snapshots conservés. Un Storage documentaire nécessite aussi une collection autorisant la lecture, les requêtes et la publication.</value></data>
   <data name="OutputPrefix" xml:space="preserve"><value>Préfixe de sortie</value></data>
   <data name="OutputPrefixHelp" xml:space="preserve"><value>Un préfixe relatif dans l’enveloppe du Storage sélectionné. Terminez les préfixes de répertoire par /.</value></data>
   <data name="RefreshIfNecessary" xml:space="preserve"><value>Actualiser les acquisitions si nécessaire</value></data>
@@ -134,6 +134,12 @@
   <data name="DirectInput" xml:space="preserve"><value>Entrée directe</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Ancienne acquisition utilisée</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Échec du rafraîchissement :</value></data>
+  <data name="StructuredOutputCollection" xml:space="preserve"><value>Collection de sortie structurée</value></data>
+  <data name="StructuredOutputNone" xml:space="preserve"><value>Sortie de contenu (sans collection structurée)</value></data>
+  <data name="StructuredOutputHelp" xml:space="preserve"><value>Sélectionnez une collection autorisant la publication immuable. Chaque objet JSON projeté devient un document canonique dans un Snapshot exact conservé.</value></data>
+  <data name="Operation.StructuredQuery" xml:space="preserve"><value>Interroger les documents structurés</value></data>
+  <data name="StructuredQueryPayload" xml:space="preserve"><value>Requête structurée (JSON)</value></data>
+  <data name="StructuredQueryHelp" xml:space="preserve"><value>Nécessite un Storage documentaire et un profil de requête compatibles. Pour OData, utilisez par exemple {"$filter":"status eq 'degraded'"}. Les Snapshots historiques conservent leur Storage et leur modèle d’origine.</value></data>
   <data name="ProjectionStarting" xml:space="preserve"><value>Démarrage de la projection…</value></data>
   <data name="ProjectionRunning" xml:space="preserve"><value>Projection en cours…</value></data>
   <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquisition des sources de données…</value></data>
@@ -145,4 +151,7 @@
   <data name="ProjectionFailed" xml:space="preserve"><value>La projection n’a pas abouti : {0}</value></data>
   <data name="ProjectionAccepted" xml:space="preserve"><value>Projection acceptée. Le suivi s’actualise automatiquement.</value></data>
   <data name="FlowRunNewTab" xml:space="preserve"><value>Afficher l’exécution de Flow {0} dans un nouvel onglet.</value></data>
+  <data name="StructuredOutputSelect" xml:space="preserve"><value>Sélectionnez une collection</value></data>
+  <data name="StructuredOutputRequired" xml:space="preserve"><value>Ce Storage documentaire nécessite une collection activée autorisant la lecture, les requêtes et la publication immuable. Configurez-en une dans le Storage, puis sélectionnez-la ici.</value></data>
+  <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
 </root>

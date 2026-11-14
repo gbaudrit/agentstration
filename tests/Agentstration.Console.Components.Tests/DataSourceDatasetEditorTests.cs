@@ -60,6 +60,7 @@ public sealed class DataSourceDatasetEditorTests
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
+        context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
         context.Services.AddSingleton<IConnectedServicesClient>(new ConnectedServicesApiClient(http));
@@ -251,6 +252,35 @@ public sealed class DataSourceDatasetEditorTests
         Assert.IsEmpty(rendered.FindAll("[role=alert]"));
     }
 
+    [TestMethod]
+    [DataRow("en-US", false)]
+    [DataRow("fr-FR", false)]
+    [DataRow("en-US", true)]
+    [DataRow("fr-FR", true)]
+    public async Task DocumentAcquisitionRequiresAnExplicitCollectionAndPinsItsIdentity(string cultureName, bool hasCollection)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var documents = new StructuredStorageUiFixture(hasCollection);
+        using var handler = new DatasetHandler { Storage = documents.Storage, StorageTypes = [documents.Type] };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(page, handler);
+        await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Acquired alerts");
+        await page.Find("[data-testid=data-source-name]").ChangeAsync("acquired-alerts");
+        Assert.IsTrue(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
+        Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href*='view=definition']"));
+        Assert.IsNull(handler.Created);
+        if (!hasCollection) return;
+        await page.Find("[data-testid=dataset-document-collection]").ChangeAsync(documents.Collection.ToString());
+        Assert.IsFalse(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
+        await page.Find("form").SubmitAsync();
+        page.WaitForAssertion(() => Assert.AreEqual(documents.Collection, handler.Created?.Properties.Dataset?.DocumentCollectionUid));
+        page.WaitForAssertion(() => Assert.HasCount(8, page.FindAll("[role=tab]")));
+        Assert.IsNotNull(page.Find("[data-testid=dataset-queries-tab]"));
+        Assert.IsNotNull(page.Find("[data-testid=dataset-tools-tab]"));
+    }
+
     private static async Task SelectAsync(IRenderedComponent<DataSourceDatasetEditor> rendered, DatasetHandler handler)
     {
         rendered.WaitForElement("[data-testid='dataset-storage']");
@@ -269,6 +299,7 @@ public sealed class DataSourceDatasetEditorTests
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
+        context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
         context.Services.AddSingleton<IConnectedServicesClient>(new ConnectedServicesApiClient(http));
@@ -296,6 +327,7 @@ public sealed class DataSourceDatasetEditorTests
                 }
             };
         }
+        public IReadOnlyList<StorageTypeResource> StorageTypes { get; set; } = [];
         public bool MissingAdapter { get; set; }
         public bool FailSave { get; set; }
         public bool StaleType { get; set; }
@@ -394,7 +426,7 @@ public sealed class DataSourceDatasetEditorTests
                 new(Write: true), new(new(new(Operation.ScopeRef!.Value, Operation.Namespace, Operation.Kind, Operation.Name), Operation.Uid, Operation.Generation, Operation.Definition.DefinitionDigest), JsonSerializer.SerializeToElement(new { })))
             }
         };
-        public StorageResource Storage { get; } = new()
+        public StorageResource Storage { get; set; } = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = "Storage",
@@ -430,6 +462,7 @@ public sealed class DataSourceDatasetEditorTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/schemas") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { value = Array.Empty<object>() }) };
             object body;
             if (request.Method == HttpMethod.Post && path == "/api/datasources")
             {
@@ -459,6 +492,7 @@ public sealed class DataSourceDatasetEditorTests
             else if (path == "/api/connected-services") body = new[] { Service, OtherService };
             else if (path == "/api/datasources/inventory" && Existing) body = Source;
             else if (path.EndsWith("/operation-discoveries", StringComparison.Ordinal)) { Discoveries++; body = Array.Empty<ConnectedServiceOperationDiscoveryResource>(); }
+            else if (path == "/api/storage-types") body = new { value = StorageTypes };
             else if (path == "/api/storages") body = new { value = new[] { Storage } };
             else if (path.EndsWith("/readiness", StringComparison.Ordinal)) body = new DataSourceReadiness(true, true, null, []) { CanAcquire = true };
             else if (path.EndsWith("/acquisitions", StringComparison.Ordinal)) body = WithHistory ? Acquisitions : Array.Empty<DataSourceAcquisitionResource>();

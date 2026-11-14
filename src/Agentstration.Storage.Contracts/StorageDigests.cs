@@ -25,17 +25,22 @@ public static class StorageDigests
             version.Deprecated
         });
         // Preserve the exact published digest of versions with no ASP mapping.
-        return version.Asp is null ? definition : Compute(new { Definition = definition, version.Asp });
+        var mapped = version.Asp is null ? definition : Compute(new { Definition = definition, version.Asp });
+        return version.Documents is null ? mapped : Compute(new { Definition = mapped, version.Documents });
     }
-    public static string Binding(StorageProperties definition) => Compute(new
+    public static string Binding(StorageProperties definition)
     {
-        definition.Type,
-        definition.ConnectedService,
-        definition.ConnectedServiceType,
-        Bindings = definition.Bindings.OrderBy(binding => binding.RequirementId, StringComparer.Ordinal),
-        definition.Configuration,
-        definition.Envelope
-    });
+        var result = Compute(new
+        {
+            definition.Type,
+            definition.ConnectedService,
+            definition.ConnectedServiceType,
+            Bindings = definition.Bindings.OrderBy(binding => binding.RequirementId, StringComparer.Ordinal),
+            definition.Configuration,
+            definition.Envelope
+        });
+        return definition.Collections.Count == 0 ? result : Compute(new { Binding = result, definition.Collections });
+    }
 
     private static string Compute<T>(T value) =>
         $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Options))).ToLowerInvariant()}";

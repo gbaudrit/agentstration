@@ -4,6 +4,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="JsonSchema.Net" Version="8.0.5" />
     <PackageVersion Include="Apache.OpenDAL" Version="0.3.1" />
     <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
     <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
@@ -27,6 +28,7 @@
     <!-- Pin the pooled-connection ownership fix independently of EF Core servicing (#975). -->
     <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.13" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.OData.Core" Version="8.4.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.9.0" />

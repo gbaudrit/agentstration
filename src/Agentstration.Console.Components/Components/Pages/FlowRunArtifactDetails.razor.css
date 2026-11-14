@@ -33,3 +33,5 @@
 .artifact-header ::deep p {
     overflow-wrap: anywhere;
 }
+
+.schema-evidence code { white-space: normal; overflow-wrap: anywhere; }

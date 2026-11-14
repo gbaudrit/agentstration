@@ -8,6 +8,7 @@ using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Storage;
 using Agentstration.Security.Contracts;
+using Agentstration.Schemas;
 
 namespace Agentstration.Knowledge;
 
@@ -25,7 +26,10 @@ public sealed record KnowledgeDurableArtifactEvidence(
     string MediaType,
     long Length,
     string Sha256,
-    IReadOnlyDictionary<string, string> Provenance);
+    IReadOnlyDictionary<string, string> Provenance)
+{
+    public ResolvedDataContract? DataContract { get; init; }
+}
 
 public interface IKnowledgeSnapshotArtifactResolver
 {

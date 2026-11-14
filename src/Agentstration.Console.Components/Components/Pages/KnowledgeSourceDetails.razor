@@ -116,7 +116,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Retrieval)
     {
-        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" />
+        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" SupportsStructured="@(source?.Definition.Output?.DocumentCollectionUid is not null || snapshots.Any(s => s.Snapshot.Artifacts.Any(a => a.Content?.Document is not null)))" />
     }
     else if (activeTab == DetailsTab.Tools)
     {

@@ -183,4 +183,59 @@
   <data name="SequenceOpenVersion" xml:space="preserve"><value>Open this Flow version</value></data>
   <data name="BeforePublicationTitle" xml:space="preserve"><value>Transformations before publication</value></data>
   <data name="BeforePublicationHelp" xml:space="preserve"><value>These transformations process the results gathered from all input sources before the Snapshot is created and published.</value></data>
+  <data name="DatasetDocumentCollection" xml:space="preserve"><value>Acquisition document collection</value></data>
+  <data name="DatasetDocumentSelect" xml:space="preserve"><value>Select a collection</value></data>
+  <data name="DatasetContentStorage" xml:space="preserve"><value>Content storage (no document collection)</value></data>
+  <data name="DatasetDocumentHelp" xml:space="preserve"><value>Each acquired JSON object is retained in an immutable publication. Use a transformation Flow to normalize other result shapes.</value></data>
+  <data name="DatasetDocumentRequired" xml:space="preserve"><value>Select an enabled collection allowing read, query and immutable publication. If none is available, configure one on the Storage.</value></data>
+  <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
+  <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Adopted operation response schema</value></data>
+  <data name="ProjectedOutputSchema" xml:space="preserve"><value>Adopted projection output schema</value></data>
+  <data name="Documents.QueryTitle" xml:space="preserve"><value>Query acquired documents</value></data>
+  <data name="Documents.QueryHelp" xml:space="preserve"><value>Queries read the immutable publication of the selected acquisition. They do not start an acquisition.</value></data>
+  <data name="Documents.Publication" xml:space="preserve"><value>Selected publication</value></data>
+  <data name="Documents.SchemaVersion" xml:space="preserve"><value>Published query schema</value></data>
+  <data name="Documents.EnvelopeHelp" xml:space="preserve"><value>Queries follow the stored document shape. Selecting a sub-schema does not split an acquired response envelope.</value></data>
+  <data name="Documents.ToolTitle" xml:space="preserve"><value>Publish a query Tool</value></data>
+  <data name="Documents.ToolMode" xml:space="preserve"><value>Acquisition selection</value></data>
+  <data name="Documents.ToolLatest" xml:space="preserve"><value>Latest successful acquisition or one specified at invocation</value></data>
+  <data name="Documents.ToolExact" xml:space="preserve"><value>Only this acquisition</value></data>
+  <data name="Documents.ToolModeHelp" xml:space="preserve"><value>Dynamic mode reads the latest successful retained acquisition in this context, unless the caller supplies acquisitionId. Fixed mode keeps this exact acquisition.</value></data>
+  <data name="Documents.ToolContractHelp" xml:space="preserve"><value>Every Tool version fixes the Data Source identity, acquisition context, schema version and query profile. A changed contract requires explicit republication. Pagination keeps the acquisition chosen on the first page.</value></data>
+  <data name="Documents.PublishTool" xml:space="preserve"><value>Publish the query Tool</value></data>
+  <data name="Documents.ToolPublished" xml:space="preserve"><value>Query Tool published:</value></data>
+  <data name="Documents.ContractMismatch" xml:space="preserve"><value>The acquisition contract differs from this Tool version. Inspect the latest acquisition or publish a new version; use fixed mode to query this acquisition.</value></data>
+  <data name="Documents.Unavailable" xml:space="preserve"><value>This acquisition has no retained structured publication available for querying.</value></data>
+  <data name="Documents.CursorInvalid" xml:space="preserve"><value>This query continuation is unavailable or expired. Run the query again.</value></data>
+  <data name="Documents.QueryFailed" xml:space="preserve"><value>The acquisition query or Tool publication failed. Check the selected acquisition, query profile and permissions.</value></data>
+  <data name="Queries" xml:space="preserve"><value>Queries</value></data>
+  <data name="Tools" xml:space="preserve"><value>Tools</value></data>
+  <data name="Queries.SaveDraft" xml:space="preserve"><value>Save Query draft</value></data>
+  <data name="Queries.SaveHelp" xml:space="preserve"><value>Save this JSON query under its own identity, then publish and expose it from Queries and Tools.</value></data>
+  <data name="Queries.Saved" xml:space="preserve"><value>Query draft saved. Open Queries to publish it.</value></data>
+  <data name="Queries.Help" xml:space="preserve"><value>Queries have independent drafts and immutable published versions. Save a query from acquired Content to create one.</value></data>
+  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Published exposures for this Data Source are reloaded from storage. Edit opens the Tool definition to prepare a new version. A relay fixes the Query name and optionally its version; otherwise each call resolves the latest publication.</value></data>
+  <data name="Queries.EditTool" xml:space="preserve"><value>Edit</value></data>
+  <data name="Queries.NoTools" xml:space="preserve"><value>No query Tools have been published for this Data Source.</value></data>
+  <data name="Queries.Empty" xml:space="preserve"><value>No saved Query. Test a query in Content and save it as a draft.</value></data>
+  <data name="Queries.Version" xml:space="preserve"><value>Publication version</value></data>
+  <data name="Queries.QueryVersion" xml:space="preserve"><value>Query version</value></data>
+  <data name="Queries.Latest" xml:space="preserve"><value>Latest published version</value></data>
+  <data name="Queries.LatestAcquisition" xml:space="preserve"><value>Latest successful acquisition or chosen at invocation</value></data>
+  <data name="Queries.Legacy" xml:space="preserve"><value>Direct acquisition Tool (legacy)</value></data>
+  <data name="Queries.Select" xml:space="preserve"><value>Query to expose</value></data>
+  <data name="Queries.VersionHelp" xml:space="preserve"><value>Without an exact version, the next call uses the most recent publication. Draft edits have no effect. Incompatible contracts fail explicitly.</value></data>
+  <data name="Queries.Approval" xml:space="preserve"><value>Require approval for this Tool</value></data>
+  <data name="Queries.State" xml:space="preserve"><value>State</value></data>
+  <data name="Queries.Edit" xml:space="preserve"><value>Open draft</value></data>
+  <data name="Queries.Json" xml:space="preserve"><value>Query JSON</value></data>
+  <data name="Queries.Publish" xml:space="preserve"><value>Save and publish Query</value></data>
+  <data name="Queries.Published" xml:space="preserve"><value>Execute a published version</value></data>
+  <data name="Queries.Run" xml:space="preserve"><value>Execute Query</value></data>
+  <data name="Queries.Next" xml:space="preserve"><value>Next page</value></data>
+  <data name="Queries.Resolved" xml:space="preserve"><value>Resolved Query version and acquisition</value></data>
+  <data name="Queries.Failed" xml:space="preserve"><value>The Query operation failed. Check the JSON, version, contract and permissions; the code identifies the failure.</value></data>
+  <data name="Queries.Done" xml:space="preserve"><value>Saved successfully.</value></data>
+  <data name="Queries.Generic" xml:space="preserve"><value>Generic Query executor</value></data>
+  <data name="Queries.Reference" xml:space="preserve"><value>Generic Tool invocation JSON</value></data>
 </root>

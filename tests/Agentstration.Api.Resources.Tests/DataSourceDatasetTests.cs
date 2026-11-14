@@ -898,7 +898,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
     }
 
-    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false)
+    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null)
     {
         var bootstrap = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
@@ -908,7 +908,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var input = emptyInput ? JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false })
             : JsonSerializer.SerializeToElement(new { type = "object", properties = new { dataset = new { type = "string", minLength = 1 } }, required = new[] { "dataset" }, additionalProperties = false });
         var flow = await PublishAsync(services, "fixture-acquire", DataSourceDatasetCompositionService.FlowContract,
-            emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" }));
+            operationResult ?? (emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" })));
         var definitionSchema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = true });
         var type = await services.GetRequiredService<ConnectedServiceOperationTypeManagementService>().CreateAsync(new()
         {
@@ -937,7 +937,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             {
                 Operations =
             [new() { ExternalId = "fixture.read", DisplayName = "Read fixture", Type = typeRef,
-                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = input }) }]
+                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = operationResult is null ? input : JsonSerializer.SerializeToElement(new { type = "object" }) }) }]
             }));
         var serviceTypes = services.GetRequiredService<ConnectedServiceTypeManagementService>();
         var version = new ConnectedServiceTypeVersionDescriptor("1.0.0", AepSchemaDigest.Compute(definitionSchema), definitionSchema, [], [])

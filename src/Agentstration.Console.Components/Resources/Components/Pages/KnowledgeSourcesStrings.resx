@@ -75,7 +75,7 @@
   <data name="OutputStorage" xml:space="preserve"><value>Snapshot output Storage</value></data>
   <data name="ArtifactOutputDefault" xml:space="preserve"><value>Existing Artifact publication</value></data>
   <data name="PinnedOutputStorage" xml:space="preserve"><value>Saved exact Storage revision</value></data>
-  <data name="OutputStorageHelp" xml:space="preserve"><value>Select an independent output Storage supporting retained publications. The local implementation is supported.</value></data>
+  <data name="OutputStorageHelp" xml:space="preserve"><value>Select a Storage supporting retained Snapshots. Document storage also requires a collection allowing read, query and publication.</value></data>
   <data name="OutputPrefix" xml:space="preserve"><value>Output prefix</value></data>
   <data name="OutputPrefixHelp" xml:space="preserve"><value>A relative prefix within the selected Storage envelope. End directory prefixes with /.</value></data>
   <data name="RefreshIfNecessary" xml:space="preserve"><value>Refresh acquisitions if necessary</value></data>
@@ -134,6 +134,12 @@
   <data name="DirectInput" xml:space="preserve"><value>Direct input</value></data>
   <data name="InputFallbackUsed" xml:space="preserve"><value>Older acquisition used</value></data>
   <data name="InputRefreshFailed" xml:space="preserve"><value>Refresh failed:</value></data>
+  <data name="StructuredOutputCollection" xml:space="preserve"><value>Structured output collection</value></data>
+  <data name="StructuredOutputNone" xml:space="preserve"><value>Content output (no structured collection)</value></data>
+  <data name="StructuredOutputHelp" xml:space="preserve"><value>Select a collection allowing immutable publication. Each projected JSON object becomes a canonical document in an exact retained Snapshot.</value></data>
+  <data name="Operation.StructuredQuery" xml:space="preserve"><value>Query structured documents</value></data>
+  <data name="StructuredQueryPayload" xml:space="preserve"><value>Structured query (JSON)</value></data>
+  <data name="StructuredQueryHelp" xml:space="preserve"><value>Requires a compatible document Storage and query profile. For OData, use options such as {"$filter":"status eq 'degraded'"}. Historical Snapshots retain their original Storage and model.</value></data>
   <data name="ProjectionStarting" xml:space="preserve"><value>Starting projection…</value></data>
   <data name="ProjectionRunning" xml:space="preserve"><value>Projection in progress…</value></data>
   <data name="ProjectionAcquiring" xml:space="preserve"><value>Acquiring Data Sources…</value></data>
@@ -145,4 +151,7 @@
   <data name="ProjectionFailed" xml:space="preserve"><value>Projection did not succeed: {0}</value></data>
   <data name="ProjectionAccepted" xml:space="preserve"><value>Projection accepted. Progress will refresh automatically.</value></data>
   <data name="FlowRunNewTab" xml:space="preserve"><value>Open Flow Run {0} in a new tab.</value></data>
+  <data name="StructuredOutputSelect" xml:space="preserve"><value>Select a collection</value></data>
+  <data name="StructuredOutputRequired" xml:space="preserve"><value>This document Storage requires an enabled collection allowing read, query and immutable publication. Configure one on the Storage, then select it here.</value></data>
+  <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
 </root>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Schemas.Contracts;
 using System.Text.Json.Serialization;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Resources;
@@ -11,6 +12,8 @@ namespace Agentstration.DataSources.Contracts;
 public static class DataSourceResourceKinds
 {
     public const string DataSource = "DataSource";
+    public const string DataSourceQuery = "DataSourceQuery";
+    public const string DataSourceQueryVersion = "DataSourceQueryVersion";
     public const string DataSourceProfile = "DataSourceProfile";
     public const string DataSourceProfileRevision = "DataSourceProfileRevision";
     public const string DataSourceAcquisition = "DataSourceAcquisition";
@@ -94,14 +97,27 @@ public sealed record DataSourceProperties
 }
 
 public sealed record DataSourceOperationAcquisitionBinding(
-    ConnectedServiceOperationRevisionReference Operation, JsonElement Parameters);
+    ConnectedServiceOperationRevisionReference Operation, JsonElement Parameters)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? OutputSchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
+}
 
 /// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
 public sealed record DataSourceDatasetProperties(
     StorageRevisionReference? Storage, StorageContentPolicy Rule,
     DataSourceOperationAcquisitionBinding Acquisition)
 {
+    /// <summary>Explicit structured acquisition target; null retains the content profile.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
     public DataSourceAcquisitionPolicy? Lifecycle { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? OutputSchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
     public FlowCallReference? Orchestration { get; init; }
     public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
@@ -114,6 +130,10 @@ public sealed record ResolvedDataSourceDataset(
     JsonElement InputSchema, JsonElement OutputSchema, string Partition,
     ResolvedDataSourceFlowBinding Flow)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? OperationOutputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
     public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
     public ResolvedFlowComposition? Composition { get; init; }
 }
@@ -397,6 +417,8 @@ public sealed record DataSourceAcquisitionResource : Resource
     public ResolvedDataSourceAcquisitionComposition? Composition { get; init; }
     public ResolvedDataSourceDataset? Dataset { get; init; }
     public StorageObject? Content { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public StoragePublicationReference? Publication { get; init; }
     public DirectDataSourceResult? DirectResult { get; init; }
     public DateTimeOffset? ContentRetiredAt { get; init; }
     public DateTimeOffset? ContentRetiringAt { get; init; }
@@ -419,6 +441,7 @@ public sealed record DataSourceAcquisitionResource : Resource
     public int Attempt { get; init; } = 1;
     public string? RetriedFrom { get; init; }
     public DataSourceAcquisitionManifest? Manifest { get; init; }
+    public Agentstration.Schemas.DataContractFailure? ContractFailure { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
 }

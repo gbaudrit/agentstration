@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Web.Console;
 
@@ -28,6 +29,8 @@ public interface IKnowledgeSourcesClient
     Task<KnowledgeRetrievalResult> SearchAsync(ResourceNamespace @namespace, string name, SearchKnowledgeRequest request, CancellationToken cancellationToken = default);
     Task<KnowledgeRetrievalResult> QueryAsync(ResourceNamespace @namespace, string name, QueryKnowledgeRequest request, CancellationToken cancellationToken = default);
     Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name, ReadKnowledgeRequest request, CancellationToken cancellationToken = default);
+    Task<KnowledgeAccessResult> QueryDocumentsAsync(ResourceNamespace ns, string name, KnowledgeDocumentQueryRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<StorageDocumentDescription> DescribeDocumentsAsync(ResourceNamespace ns, string name, string? snapshotId, CancellationToken ct = default) => throw new NotSupportedException();
     Task<KnowledgeAccessResult> ReadContentAsync(ResourceNamespace @namespace, string name, KnowledgeReadRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<KnowledgeAccessStatus> GetContentStatusAsync(ResourceNamespace @namespace, string name, KnowledgeStatusRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -151,6 +154,12 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
     public Task<KnowledgeRetrievalResult> ReadAsync(ResourceNamespace @namespace, string name,
         ReadKnowledgeRequest request, CancellationToken cancellationToken = default) =>
         PostAsync<KnowledgeRetrievalResult>(ChildPath(@namespace, name, "read"), request, cancellationToken);
+
+    public Task<KnowledgeAccessResult> QueryDocumentsAsync(ResourceNamespace ns, string name, KnowledgeDocumentQueryRequest request, CancellationToken ct = default) =>
+        PostAsync<KnowledgeAccessResult>(ChildPath(ns, name, "content/query-documents"), request, ct);
+    public Task<StorageDocumentDescription> DescribeDocumentsAsync(ResourceNamespace ns, string name, string? snapshotId, CancellationToken ct = default) =>
+        ApiResponse.ReadAsync<StorageDocumentDescription>(httpClient, ChildPath(ns, name, "content/document-capabilities")
+            + (snapshotId is null ? "" : ((ns.IsDefault ? "?" : "&") + "snapshotId=" + Uri.EscapeDataString(snapshotId))), ct);
 
     public Task<KnowledgeAccessResult> ReadContentAsync(ResourceNamespace @namespace, string name, KnowledgeReadRequest request, CancellationToken cancellationToken = default) =>
         PostAsync<KnowledgeAccessResult>(ChildPath(@namespace, name, "content/read"), request, cancellationToken);

@@ -119,10 +119,14 @@ public sealed record ToolRelayTarget
 [JsonDerivedType(typeof(LiteralToolArgumentBinding), "literal")]
 [JsonDerivedType(typeof(ParameterToolArgumentBinding), "parameter")]
 [JsonDerivedType(typeof(SecretToolArgumentBinding), "secret")]
+[JsonDerivedType(typeof(OmittedToolArgumentBinding), "omitted")]
 public abstract record ToolArgumentBinding
 {
     public required string Path { get; init; }
 }
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record OmittedToolArgumentBinding : ToolArgumentBinding;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record LiteralToolArgumentBinding : ToolArgumentBinding

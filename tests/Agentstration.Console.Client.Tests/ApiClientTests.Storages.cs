@@ -15,6 +15,25 @@ public sealed partial class ApiClientTests
     private static readonly ScopedResourceAddress StorageAddress = new(StorageScope, ResourceNamespace.Parse("records"), StorageResourceKinds.Storage, "documents");
 
     [TestMethod]
+    public async Task CollectionSchemaErrorsRetainFieldPathsForLocalizedConsoleDiagnostics()
+    {
+        using var handler = new StubHandler(_ => new(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "storage_collection_schema_invalid",
+                validationIssues = new[]
+            { new { path = "/definition/collections/0/schema/properties/date/format", code = "unsupported_schema", keyword = "format" } }
+            })
+        });
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        var error = await Assert.ThrowsAsync<AgentstrationApiException>(() => new StoragesApiClient(http).GetAsync(StorageAddress, default));
+        Assert.AreEqual("storage_collection_schema_invalid", error.ProblemTitle);
+        Assert.AreEqual("/definition/collections/0/schema/properties/date/format", error.ValidationIssues.Single().Path);
+        Assert.AreEqual("format", error.ValidationIssues.Single().Keyword);
+    }
+
+    [TestMethod]
     public async Task StorageCatalogFollowsPaginationWithoutFollowingUntrustedNextLink()
     {
         var calls = 0;
@@ -117,12 +136,17 @@ public sealed partial class ApiClientTests
 
     private static StorageResource StorageClientResource() => new()
     {
-        Uid = Guid.Parse("10460000-0000-0000-0000-000000000007"), ApiVersion = ResourceApiVersions.CoreV1,
-        Kind = StorageResourceKinds.Storage, Metadata = new() { Name = StorageAddress.Name, Namespace = StorageAddress.Namespace }, ScopeRef = StorageScope,
+        Uid = Guid.Parse("10460000-0000-0000-0000-000000000007"),
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = StorageResourceKinds.Storage,
+        Metadata = new() { Name = StorageAddress.Name, Namespace = StorageAddress.Namespace },
+        ScopeRef = StorageScope,
         Definition = new()
         {
-            DisplayName = "Documents", Type = new() { Type = new("local", ResourceScopeRef.Instance), TypeUid = Guid.Parse("10460000-0000-0000-0000-000000000008"), Version = "1", SchemaDigest = "schema", ContractDigest = "contract" },
-            Configuration = JsonSerializer.SerializeToElement(new { }), Envelope = JsonSerializer.SerializeToElement(new { })
+            DisplayName = "Documents",
+            Type = new() { Type = new("local", ResourceScopeRef.Instance), TypeUid = Guid.Parse("10460000-0000-0000-0000-000000000008"), Version = "1", SchemaDigest = "schema", ContractDigest = "contract" },
+            Configuration = JsonSerializer.SerializeToElement(new { }),
+            Envelope = JsonSerializer.SerializeToElement(new { })
         }
     };
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Agentstration.Aep.Abstractions;
 
@@ -7,6 +8,7 @@ public static class AepStorageProtocol
 {
     public const string Capability = "aep.storage-types";
     public const string ContributionKind = "storage-type";
+    public const string DocumentCapability = "aep.storage-documents";
     public const string Version = "1.0";
     public const string BindingPath = "/aep/storage/bindings";
     public const string BindingHeader = "X-Agentstration-Asp-Binding";
@@ -23,7 +25,14 @@ public sealed record AepStorageAspMapping(string Profile, string McpServer, stri
 public sealed record AepStorageTypeVersion(string Version, string SchemaDigest, JsonElement ConfigurationSchema,
     string EnvelopeSchemaDigest, JsonElement EnvelopeSchema, bool RequiresConnectedService,
     IReadOnlyList<AepStorageRequirement> Requirements, AepStorageCapabilities Capabilities,
-    AepStorageLimits Limits, AepStorageAspMapping Asp, bool Deprecated = false);
+    AepStorageLimits Limits, AepStorageAspMapping Asp, bool Deprecated = false)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AepStorageDocumentCapabilities? Documents { get; init; }
+}
+public sealed record AepStorageQueryProfile(string Id, string Version, string Encoding);
+public sealed record AepStorageDocumentCapabilities(bool Get, bool Put, bool Delete, bool Query,
+    bool ImmutablePublications, IReadOnlyList<AepStorageQueryProfile> QueryProfiles);
 public sealed record AepStorageTypeContribution(string Id, string DisplayName, string PreferredVersion,
     IReadOnlyList<AepStorageTypeVersion> Versions, string? Description = null);
 
@@ -32,6 +41,10 @@ public sealed record AepStorageBindingRequest(string ContributionId, string Vers
     JsonElement Store, IReadOnlyList<AepBoundValue> Connection, JsonElement Configuration, JsonElement Envelope,
     JsonElement DatasetRule, string AuthorizationRevision, DateTimeOffset ExpiresAt)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? DocumentCollections { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? DocumentSelection { get; init; }
     public override string ToString() => "[REDACTED]";
 }
 public sealed record AepStorageBindingLease(string Token, DateTimeOffset ExpiresAt)
@@ -83,13 +96,23 @@ public static class AepStorageDescriptorValidator
                     || version.Requirements.Select(r => r.Id).Distinct(StringComparer.Ordinal).Count() != version.Requirements.Count
                     || !version.RequiresConnectedService && version.Requirements.Count != 0)
                     errors.Add("Invalid Storage requirements.");
-                if (version.Asp is not { Profile: "asp.content/1" } mapping || mapping.ToolPrefix is not { Length: > 0 and <= 64 }
+                if (version.Asp is not { Profile: "asp.content/1" or "asp.documents/1" } mapping || mapping.ToolPrefix is not { Length: > 0 and <= 64 }
                     || !mapping.ToolPrefix.All(c => char.IsAsciiLetterOrDigit(c) || c == '_')
                     || !Member(mapping.ProviderId) || !Member(mapping.ProviderVersion)
                     || !Member(mapping.McpServer)
                     || mapping.BindingPath != AepStorageProtocol.BindingPath
                     || !(manifest.Mcp?.Servers.Any(s => s.Id == mapping.McpServer) ?? false))
-                    errors.Add("Storage operations must map to a declared MCP server and the known ASP content profile.");
+                    errors.Add("Storage operations must map to a declared MCP server and the known ASP content or document profile.");
+                if (version.Documents is { } documents)
+                {
+                    if (version.Asp.Profile != "asp.documents/1"
+                        || !manifest.Capabilities.TryGetValue(AepStorageProtocol.DocumentCapability, out var documentCapability) || documentCapability.Version != "1.0"
+                        || documents.QueryProfiles is not { Count: <= 8 } || documents.Query && documents.QueryProfiles.Count == 0
+                        || documents.QueryProfiles.Any(p => string.IsNullOrWhiteSpace(p.Id) || p.Id.Length > 128 || !Member(p.Version) || string.IsNullOrWhiteSpace(p.Encoding) || p.Encoding.Length > 128)
+                        || documents.QueryProfiles.Select(p => (p.Id, p.Version, p.Encoding)).Distinct().Count() != documents.QueryProfiles.Count)
+                        errors.Add("Document storage requires an explicit versioned document capability and bounded query profiles.");
+                }
+                else if (version.Asp.Profile == "asp.documents/1") errors.Add("Document mappings require document capability declarations.");
                 if (version.Capabilities is null || version.Capabilities.Delete || version.Capabilities.StableVersions || version.Capabilities.DurableRetention
                     || version.Limits is null || version.Limits.MaximumPageSize is < 1 or > 100
                     || version.Limits.MaximumReadBytes is < 1 or > 65536 || version.Limits.MaximumWriteBytes is < 1 or > 65536)

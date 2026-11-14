@@ -13,6 +13,39 @@ public sealed class ToolRelayTests
         """);
 
     [TestMethod]
+    public void OmittedOptionalObjectHidesRequiredChildrenWithoutInjectingAValue()
+    {
+        var schema = Json("""{"type":"object","properties":{"acquisition":{"type":"object","properties":{"id":{"type":"string"},"uid":{"type":"string"}},"required":["id","uid"]},"request":{"type":"object","properties":{"cursor":{"type":"string"}}}},"additionalProperties":false}""");
+        ToolArgumentBinding[] bindings = [new OmittedToolArgumentBinding { Path = "/acquisition" }];
+        var projected = ToolRelayArguments.PublicSchema(schema, bindings);
+        Assert.IsFalse(projected.GetProperty("properties").TryGetProperty("acquisition", out _));
+        ToolInputSchemaValidator.Validate(projected, Json("{}"));
+        var output = ToolRelayArguments.Reconstruct(Json("{}"), bindings, new Dictionary<string, JsonElement>(), schema);
+        Assert.AreEqual("{}", output.GetRawText());
+        Assert.Throws<ToolDefinitionValidationException>(() => ToolRelayArguments.Reconstruct(
+            Json("""{"acquisition":{"id":"other","uid":"other"}}"""), bindings, new Dictionary<string, JsonElement>(), schema));
+        Assert.Throws<ToolDefinitionValidationException>(() => ToolRelayArguments.PublicSchema(schema,
+            [new OmittedToolArgumentBinding { Path = "/acquisition/id" }]));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void OmittingNestedOptionalInputPreservesItsParentsRequiredness(bool requiredParent)
+    {
+        var schema = Json("{\"type\":\"object\",\"properties\":{\"request\":{\"type\":\"object\",\"properties\":{\"cursor\":{\"type\":\"string\"}}}},\"required\":"
+            + (requiredParent ? "[\"request\"]" : "[]") + "}");
+        ToolArgumentBinding[] bindings = [new OmittedToolArgumentBinding { Path = "/request/cursor" }];
+        var projected = ToolRelayArguments.PublicSchema(schema, bindings);
+        if (requiredParent)
+            Assert.Throws<ToolInputValidationException>(() => ToolInputSchemaValidator.Validate(projected, Json("{}")));
+        else
+            Assert.AreEqual("{}", ToolRelayArguments.Reconstruct(Json("{}"), bindings, new Dictionary<string, JsonElement>(), schema).GetRawText());
+        var output = ToolRelayArguments.Reconstruct(Json("""{"request":{}}"""), bindings, new Dictionary<string, JsonElement>(), schema);
+        Assert.AreEqual("{}", output.GetProperty("request").GetRawText());
+    }
+
+    [TestMethod]
     public void NestedBindingProjectsTheCallerSchemaAndReconstructsTheOriginalContract()
     {
         ToolArgumentBinding[] bindings = [Literal("/store/id", "\"hr\"")];
@@ -113,7 +146,7 @@ public sealed class ToolRelayTests
             {
                 DisplayName = "Relay",
                 Target = new() { Name = "source", ScopeRef = scope, Uid = Guid.NewGuid(), Generation = 7 },
-                Bindings = [Literal("/store/id", "\"hr\"")]
+                Bindings = [Literal("/store/id", "\"hr\""), new OmittedToolArgumentBinding { Path = "/optional" }]
             }
         };
         var yaml = ResourceManifestSerializer.ToYaml(resource);
@@ -121,6 +154,7 @@ public sealed class ToolRelayTests
         var parsed = ResourceManifestSerializer.FromYaml<ToolDefinitionResource>(yaml);
         Assert.IsInstanceOfType<RelayToolDefinitionProperties>(parsed.Definition);
         Assert.IsInstanceOfType<LiteralToolArgumentBinding>(parsed.Definition.Bindings[0]);
+        Assert.IsInstanceOfType<OmittedToolArgumentBinding>(parsed.Definition.Bindings[1]);
         Assert.IsFalse(yaml.Contains("implementation:", StringComparison.Ordinal));
     }
 

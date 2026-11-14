@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Agentstration.ResourceManagement;
 using Agentstration.Schemas;
@@ -28,7 +26,7 @@ public sealed class ManagementSchemaBindingResolver(
         {
             await ValidateAsync(inline.Format, inline.Dialect, inline.Content, context.RequiredFormat, cancellationToken);
             return new(path, inline.Format, inline.Dialect, inline.Content.Clone(),
-                DefinitionHash(inline.Format, inline.Dialect, inline.Content));
+                JsonSchemaSelection.DefinitionHash(inline.Format, inline.Dialect, inline.Content));
         }
 
         var reference = binding.Reference!;
@@ -49,11 +47,30 @@ public sealed class ManagementSchemaBindingResolver(
             ?? throw Error("schema_version_not_found",
                 $"Referenced Schema version '{@namespace}/{reference.Name}:{reference.Version}' was not found.");
 
-        await ValidateAsync(version.Value.Format, version.Value.Dialect, version.Value.Content,
-            context.RequiredFormat, cancellationToken);
-        return new(path, version.Value.Format, version.Value.Dialect, version.Value.Content.Clone(),
-            version.Value.DefinitionHash, reference with { ScopeRef = ownerScope, Namespace = @namespace },
-            version.Value.SchemaUid, version.Value.SchemaGeneration);
+        if (version.Value.DefinitionHash != JsonSchemaSelection.DefinitionHash(version.Value.Format,
+                version.Value.Dialect, version.Value.Content, published: true))
+            throw Error("schema_version_hash_mismatch", "The published Schema definition does not match its hash.");
+        if (version.Value.SchemaUid != source.Value.Uid)
+            throw Error("schema_reference_replaced", "The published version belongs to a replaced Schema.");
+        if (!string.IsNullOrEmpty(reference.SchemaPath) && version.Value.Dialect is { } dialect
+            && dialect != BuiltinJsonSchemaFormatHandler.Draft202012)
+            throw Error("schema_selection_dialect_unsupported", "Sub-schema selection requires the supported JSON Schema dialect.");
+        JsonElement selected;
+        try
+        {
+            selected = reference.SchemaPath is null or "" ? version.Value.Content.Clone()
+                : version.Value.Format == SchemaFormatIds.JsonSchema
+                    ? JsonSchemaSelection.Select(version.Value.Content, reference.SchemaPath)
+                    : throw Error("schema_selection_format_unsupported", "Sub-schema selection requires JSON Schema.");
+        }
+        catch (SchemaSelectionException exception) { throw Error(exception.Code, "The selected sub-schema cannot be resolved."); }
+        await ValidateAsync(version.Value.Format, version.Value.Dialect, selected, context.RequiredFormat, cancellationToken);
+        return new(path, version.Value.Format, version.Value.Dialect, selected,
+            reference.SchemaPath is null or "" ? version.Value.DefinitionHash
+                : JsonSchemaSelection.DefinitionHash(version.Value.Format, version.Value.Dialect, selected),
+            reference with { ScopeRef = ownerScope, Namespace = @namespace },
+            version.Value.SchemaUid, version.Value.SchemaGeneration)
+        { ParentDefinitionHash = version.Value.DefinitionHash };
     }
 
     private async ValueTask ValidateAsync(string format, string? dialect, JsonElement content,
@@ -78,44 +95,6 @@ public sealed class ManagementSchemaBindingResolver(
         if (!validation.IsValid)
             throw Error("schema_definition_invalid",
                 $"Schema definition is invalid at '{validation.Issues[0].Path}': {validation.Issues[0].Message}");
-    }
-
-    private static string DefinitionHash(string format, string? dialect, JsonElement content)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("format", format);
-            writer.WriteString("dialect", dialect);
-            writer.WritePropertyName("content");
-            WriteCanonical(writer, content);
-            writer.WriteEndObject();
-        }
-        return "sha256:" + Convert.ToHexStringLower(SHA256.HashData(stream.ToArray()));
-    }
-
-    private static void WriteCanonical(Utf8JsonWriter writer, JsonElement value)
-    {
-        if (value.ValueKind == JsonValueKind.Object)
-        {
-            writer.WriteStartObject();
-            foreach (var property in value.EnumerateObject().OrderBy(item => item.Name, StringComparer.Ordinal))
-            {
-                writer.WritePropertyName(property.Name);
-                WriteCanonical(writer, property.Value);
-            }
-            writer.WriteEndObject();
-            return;
-        }
-        if (value.ValueKind == JsonValueKind.Array)
-        {
-            writer.WriteStartArray();
-            foreach (var item in value.EnumerateArray()) WriteCanonical(writer, item);
-            writer.WriteEndArray();
-            return;
-        }
-        value.WriteTo(writer);
     }
 
     private static SchemaBindingResolutionException Error(string code, string message) => new(code, message);

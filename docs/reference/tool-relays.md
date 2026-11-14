@@ -103,11 +103,36 @@ Limits: 64 bindings, twelve object levels and 1,024 characters per path, eight r
 
 ## Console workflow
 
+### Hide an optional input
+
+The relay editor offers **Hide** (French: **Masquer**) for optional source
+properties. Hiding an object removes its entire subtree from the caller schema
+and hides its child controls. The source receives no value for that property
+and retains its normal default behavior. This differs from a literal `null` or
+an empty object, which are actual values and must satisfy the source contract.
+
+The persisted binding is explicit:
+
+```yaml
+bindings:
+  - kind: omitted
+    path: /acquisition
+```
+
+A required input needs a caller value or a configured binding; it cannot be
+hidden on its own. An optional parent may be hidden even when its children are
+required whenever that parent is present. Hidden paths reject caller overrides.
+Omitting a nested field does not create its parent or change the parent's
+requiredness. Old publications retain their old schema: publish a new relay
+version and explicitly adopt it in Agents, ToolSets or Flows.
+
+### Edit and publish
+
 Choose **New definition** from **Tools > Definitions** or a Tool detail page. The **Define** step collects the identity, namespace and independent initial version, then offers **From a Flow** or **Tool relay**. Its **Scope** picker reuses the Flow creation control and the current context's authorized ownership targets. Definitions may belong to Instance, Tenant or Workspace. Source catalogs, bound values and draft creation use that exact owner scope; creating the draft opens its editor in the corresponding context. Changing the owner clears source configuration while retaining identity fields. The **Configure** step adapts to the chosen kind. Opening from a Tool detail preselects Relay and its source without skipping the identity step.
 
 Administrative execution reuses [ADR-0185](../decisions/0185-administrative-execution-uses-governed-operational-workspaces.md): definitions and publications retain their Instance/Tenant owner, while Work and Flow Runs are stored in the corresponding protected operational Workspace. `LogicalScopeRef` preserves the administrative authorization scope independently of physical placement. A relay forwards the trusted operational context through the existing pipeline; a Flow-backed Tool uses the shared execution-scope accessor and root Flow submission path. Selecting Instance never rebinds a definition or its execution to a business Workspace.
 
-For a relay, select the source Tool and an exact version/revision, configure caller-provided or literal/Parameter/Secret inputs, and inspect derived input/source output contracts. Multiple source publications require an explicit version selection. All four sources use the shared `ValueBindingRequirementEditor`, including contextual creation and exact scoped references. Each input's schema is supplied as `LiteralSchema`; literals are actual JSON values without an envelope. Missing configuration, an empty string and explicit null remain distinct. A fixed literal must be configured even for an optional source property; invalid or malformed raw JSON blocks draft creation, saving and publication rather than saving the last parsed value. For a Flow Tool, select a published Flow and its exact version and inspect its read-only contracts. Returning to Define retains the configuration. **Create draft** saves the definition and opens its editor; publication remains a separate explicit action. Acquisition Tools are still created from successful acquisitions.
+For a relay, select the source Tool and an exact version/revision, configure caller-provided, omitted or literal/Parameter/Secret inputs, and inspect derived input/source output contracts. Multiple source publications require an explicit version selection. These choices use the shared `ValueBindingRequirementEditor`, including contextual creation and exact scoped references. Each input's schema is supplied as `LiteralSchema`; literals are actual JSON values without an envelope. Missing configuration, an empty string and explicit null remain distinct. A fixed literal must be configured even for an optional source property; invalid or malformed raw JSON blocks draft creation, saving and publication rather than saving the last parsed value. For a Flow Tool, select a published Flow and its exact version and inspect its read-only contracts. Returning to Define retains the configuration. **Create draft** saves the definition and opens its editor; publication remains a separate explicit action. Acquisition Tools are still created from successful acquisitions.
 
 The definition exposes **Configuration**, **Versions** and **Usages**. **New version** retains the source. **Update source** prepares a new draft and deliberate source selection; the latest source is never adopted automatically. Missing/renamed paths remain visible and block publication until explicitly discarded/rebound. Review the version pair and changes before publication, then use Usages to plan consumer adoption.
 

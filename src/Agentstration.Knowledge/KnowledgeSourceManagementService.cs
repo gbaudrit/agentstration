@@ -304,7 +304,7 @@ public sealed class KnowledgeSourceManagementService(
         ValidateStructure(resource);
         if (resource.Definition.Output is { } output && publications is not null)
         {
-            try { await publications.ValidateAsync(new(output.Storage, new(RequireScope(resource), resource.Address), output.Rule), cancellationToken); }
+            try { await publications.ValidateAsync(new(output.Storage, new(RequireScope(resource), resource.Address), output.Rule) { DocumentCollectionUid = output.DocumentCollectionUid }, cancellationToken); }
             catch (StorageException exception) { throw new KnowledgeSourceValidationException(exception.Code, exception.Message); }
         }
         var composition = await ResolveCompositionAsync(resource, cancellationToken);
@@ -389,7 +389,7 @@ public sealed class KnowledgeSourceManagementService(
         var issues = new List<string>();
         if (resource.Definition.Output is { } output && publications is not null)
         {
-            try { await publications.ValidateAsync(new(output.Storage, new(executionScope, resource.Address), output.Rule), cancellationToken); }
+            try { await publications.ValidateAsync(new(output.Storage, new(executionScope, resource.Address), output.Rule) { DocumentCollectionUid = output.DocumentCollectionUid }, cancellationToken); }
             catch (StorageException exception)
             {
                 if (rejectInvalidBindings) throw new KnowledgeSourceValidationException(exception.Code, exception.Message);

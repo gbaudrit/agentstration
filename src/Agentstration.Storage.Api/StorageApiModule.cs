@@ -7,6 +7,7 @@ public static class StorageApiModule
     public static IEndpointRouteBuilder MapStorageApi(this IEndpointRouteBuilder endpoints)
     {
         StorageEndpoints.Map(endpoints);
+        StorageDocumentEndpoints.Map(endpoints);
         return endpoints;
     }
 }

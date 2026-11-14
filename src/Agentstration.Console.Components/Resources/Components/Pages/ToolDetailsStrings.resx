@@ -87,4 +87,5 @@
   <data name="OpenReturnedArtifact"><value>Open artifact</value></data>
   <data name="AcquisitionTargetStale" xml:space="preserve"><value>A newer discovery is available. Open the source, reconcile the target in Discovery, then run this Tool again. If the selected operation changed, run a new acquisition and create a Tool from it.</value></data>
   <data name="NewDefinition" xml:space="preserve"><value>New definition</value></data>
+  <data name="DataSourceQueryFailed" xml:space="preserve"><value>The Data Source query failed. Check its published version, arguments, contract and access.</value></data>
 </root>

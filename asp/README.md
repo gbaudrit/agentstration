@@ -83,3 +83,16 @@ one call. Larger transfers continue through the same text or binary method with
 provide async Stream adapters; writes require explicit `CompleteAsync`.
 Capabilities, conditional writes, optional metadata, chunk/range semantics and
 uncertain outcomes are specified in [the protocol](docs/protocol.md).
+
+## Structured document and query profiles
+
+`asp.documents/1` is an additive MCP mapping in the same standalone SDK. It supplies
+conditional document operations, open versioned query-profile references,
+protected cursors and optional immutable publication. `Agentstration.Asp.OData`
+contains the optional bounded standard OData parser/model adapter; generic ASP
+contracts do not depend on it or on PostgreSQL. The memory sample is
+`asp/samples/StructuredDocuments`; the product's autonomous PostgreSQL provider is
+`src/Agentstration.Extensions.PostgreSql`. See the full
+[contract and deployment reference](../docs/reference/structured-documents.md).
+
+Protected document bindings report bounded problem codes for backend connection refusal, unavailability and timeout (`backend_connection_refused`, `backend_unavailable`, `backend_timeout`). These remain distinct from policy refusal. PostgreSQL classifies connection failures before returning the binding response; product acquisitions retain the reason and localize it without forwarding connection strings or remote exception text. Unknown or malformed peer failures fall back to the HTTP status category.

@@ -1,10 +1,9 @@
-using Agentstration.Schemas;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-
 using Agentstration.Flows;
+using Agentstration.Resources;
+using Agentstration.Schemas;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge.Contracts;
 
@@ -36,7 +35,7 @@ public static class KnowledgeFlowContracts
     };
 }
 
-public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus }
+public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus, StructuredQuery }
 
 public readonly record struct KnowledgeSourceId(
     string Value,
@@ -62,7 +61,11 @@ public sealed record KnowledgeFlowTarget
     public bool UseActiveVersion { get; init; } = true;
 }
 
-public sealed record KnowledgeOutputStorage(StorageRevisionReference Storage, StorageContentPolicy Rule);
+public sealed record KnowledgeOutputStorage(StorageRevisionReference Storage, StorageContentPolicy Rule)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+}
 
 public sealed record KnowledgeSourceProperties
 {
