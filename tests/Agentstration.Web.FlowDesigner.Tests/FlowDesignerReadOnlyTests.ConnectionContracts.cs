@@ -54,6 +54,9 @@ public sealed partial class FlowDesignerReadOnlyTests
         }
 
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<FlowCanvas>()));
+        var canvas = rendered.FindComponent<FlowCanvas>();
+        Assert.IsFalse(canvas.Instance.IsReadOnly);
+        Assert.IsTrue(GetDiagram(canvas.Instance).Nodes.All(node => !node.Locked));
     }
 
     [TestMethod]

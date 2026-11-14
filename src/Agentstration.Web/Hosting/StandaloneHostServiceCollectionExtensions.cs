@@ -2,6 +2,7 @@ using Agentstration.Application.Work;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
+using Agentstration.Http.Diagnostics;
 using Agentstration.Identity;
 using Agentstration.Infrastructure;
 using Agentstration.ModelProviders;
@@ -134,6 +135,7 @@ internal static class StandaloneHostServiceCollectionExtensions
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddSource(
+                        HttpDiagnosticsExtensions.ActivitySourceName,
                         WorkItemService.ActivitySource.Name,
                         RuntimeRunService.ActivitySource.Name,
                         FlowRunService.ActivitySource.Name,

@@ -6,6 +6,7 @@
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
     <Project Path="tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
+    <Project Path="tests/Agentstration.Http.Diagnostics.Tests/Agentstration.Http.Diagnostics.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />

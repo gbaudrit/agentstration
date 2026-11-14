@@ -236,4 +236,7 @@
   <data name="TransformProcessing.Help" xml:space="preserve"><value>Le mapping d’entrée sélectionne la valeur à découper. Reliez process aux étapes de traitement, puis ramenez leur résultat ici. La sortie est un tableau dans l’ordre des unités.</value></data>
   <data name="TransformProcessing.UnitSize" xml:space="preserve"><value>Éléments par lot / caractères par fragment de texte</value></data>
   <data name="TransformProcessing.MaximumUnits" xml:space="preserve"><value>Nombre maximal d’unités</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
+  </data>
 </root>

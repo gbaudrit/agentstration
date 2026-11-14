@@ -3,8 +3,12 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
+using Agentstration.Http.Diagnostics;
 using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Runtime.Tests;
@@ -12,6 +16,31 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class AwpWorkerClientTests
 {
+    [TestMethod]
+    public async Task FactoryClientPreservesAwpSignaturesWithHttpDiagnosticsEnabled()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = Environments.Development });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Observability:Http:Enabled"] = "true"
+        });
+        builder.AddAgentstrationHttpDiagnostics();
+        var secret = Encoding.UTF8.GetBytes("test-worker-secret-material-at-least-32-bytes");
+        using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance", secret);
+        var handler = new RecordingHandler(secret, credential);
+        builder.Services.AddHttpClient("agentstration-awp").ConfigurePrimaryHttpMessageHandler(() => handler);
+        using var host = builder.Build();
+        using var client = new AwpClient(new Uri("https://authority.test"), credential,
+            new(Guid.NewGuid()), TimeProvider.System, 1, host.Services.GetRequiredService<IHttpClientFactory>().CreateClient("agentstration-awp"));
+
+        var response = await client.RegisterAsync(new([AwpProtocol.Version], new(client.WorkerId, client.SessionId,
+            "test", 1, [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0"])])), CancellationToken.None);
+
+        Assert.AreEqual(AwpProtocol.Version, response.SelectedProtocolVersion);
+        Assert.HasCount(2, handler.Requests);
+        Assert.IsTrue(handler.Requests.All(request => request.SignatureValid));
+    }
+
     [TestMethod]
     public async Task RetryKeepsMessageIdentityAndUsesFreshSignedNonce()
     {

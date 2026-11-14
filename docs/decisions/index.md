@@ -250,3 +250,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 215. [ADR-0215 — Process regions have derived Flow identities](0215-process-regions-have-derived-flow-identities.md)
 
 219. [ADR-0219 — Builtin HTTP discovery derives request shape from example URLs](0219-builtin-http-discovery-derives-request-shape-from-example-urls.md)
+
+193. [ADR-0193 — General HTTP diagnostics observe bounded streams](0193-http-diagnostics-observe-bounded-streams.md)
+194. [ADR-0194 — HTTP diagnostics use explicit category capture policies](0194-http-diagnostics-use-category-policies.md)
+195. [ADR-0195 — HTTP category switches always enable both payload directions](0195-http-categories-enable-both-bodies.md)
