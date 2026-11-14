@@ -39,7 +39,8 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         cancellationToken.ThrowIfCancellationRequested();
         var issues = new List<SchemaFormatValidationIssue>();
         ValidateDialect(definition, dialect, issues);
-        ValidateSchema(definition, "$", 0, issues);
+        try { ValidateSchema(JsonSchemaSelection.ResolveLocalReferences(definition), "$", 0, issues); }
+        catch (SchemaSelectionException exception) { Add(issues, "$", exception.Code, "The schema contains an unsupported or unresolvable local reference."); }
         return ValueTask.FromResult(new SchemaFormatValidationResult(issues));
     }
 
@@ -49,7 +50,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         var definitionResult = await ValidateDefinitionAsync(definition, dialect, cancellationToken);
         if (!definitionResult.IsValid) return definitionResult;
         var issues = new List<SchemaFormatValidationIssue>();
-        ValidateValue(definition, instance, "$", 0, issues);
+        ValidateValue(JsonSchemaSelection.ResolveLocalReferences(definition), instance, "$", 0, issues);
         return new(issues);
     }
 
@@ -59,7 +60,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         var checkedDefinition = await ValidateDefinitionAsync(definition, null, cancellationToken);
         if (!checkedDefinition.IsValid) return checkedDefinition;
         var issues = new List<SchemaFormatValidationIssue>();
-        ValidateValue(definition, instance, "$", 0, issues, isProtectedString);
+        ValidateValue(JsonSchemaSelection.ResolveLocalReferences(definition), instance, "$", 0, issues, isProtectedString);
         return new(issues);
     }
 
@@ -142,7 +143,7 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         ValidateNumber(schema, "exclusiveMaximum", path, issues);
 
         if (schema.TryGetProperty("format", out var format) && format.ValueKind == JsonValueKind.String
-            && !string.Equals(format.GetString(), "uri", StringComparison.Ordinal))
+            && format.GetString() is not ("uri" or "date-time"))
             Add(issues, PropertyPath(path, "format"), "json_schema_format_unsupported",
                 $"Format '{format.GetString()}' is not supported by the built-in handler.");
 
@@ -298,6 +299,9 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         if (string.Equals(Text(schema, "format"), "uri", StringComparison.Ordinal)
             && !Uri.TryCreate(value, UriKind.Absolute, out _))
             Add(issues, path, "json_schema_instance_format", "The value must be an absolute URI.");
+        if (string.Equals(Text(schema, "format"), "date-time", StringComparison.Ordinal)
+            && !Json.Schema.Formats.DateTime.Validate(JsonSerializer.SerializeToElement(value), out _))
+            Add(issues, path, "json_schema_instance_format", "The value must be an RFC 3339 date-time.");
     }
 
     private static void ValidateNumericValue(JsonElement schema, JsonElement value, string path,

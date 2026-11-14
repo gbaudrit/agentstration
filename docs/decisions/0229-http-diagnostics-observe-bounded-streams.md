@@ -1,4 +1,4 @@
-# ADR-0193: General HTTP diagnostics observe bounded streams at host boundaries
+# ADR-0229: General HTTP diagnostics observe bounded streams at host boundaries
 
 ## Status
 

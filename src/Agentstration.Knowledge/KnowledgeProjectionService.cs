@@ -620,6 +620,7 @@ public sealed class KnowledgeProjectionService(
             return new KnowledgeSnapshotArtifact
             {
                 ArtifactId = value.ArtifactId,
+                DataContract = value.DataContract,
                 ProducerFlowRunId = value.ProducerFlowRunId,
                 ProducerFlowStepId = value.ProducerFlowStepId,
                 StorageFlowRunId = value.StorageFlowRunId,

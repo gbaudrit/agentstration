@@ -51,7 +51,8 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
     public async ValueTask DisposeAsync() { await extension.StopAsync(); await extension.DisposeAsync(); }
 
     internal static async Task<StructuredStorageFixture> StartAsync(IServiceProvider services, HttpClient secretClient,
-        ResourceScopeRef owner, bool postgres, JsonElement? documentSchema = null)
+        ResourceScopeRef owner, bool postgres, JsonElement? documentSchema = null,
+        Agentstration.Schemas.Contracts.SchemaBinding? schemaBinding = null)
     {
         var connectionText = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASP_POSTGRES");
         if (postgres && string.IsNullOrWhiteSpace(connectionText)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASP_POSTGRES for the disposable local provider.");
@@ -170,7 +171,7 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
                     Bindings = version.Requirements.Select(r => new StorageExportBinding(r.Id, serviceVersion.Exports.Single(e => e.Id == r.Id))).ToArray(),
                     Configuration = Json("{}"),
                     Envelope = Json("""{"get":true,"put":true,"delete":true,"query":true,"publish":true,"queryProfiles":["odata/4.01"]}"""),
-                    Collections = [new() { Name = "shared", DisplayName = "Shared", Schema = documentSchema ?? Schema,
+                    Collections = [new() { Name = "shared", DisplayName = "Shared", Schema = documentSchema ?? Schema, SchemaBinding = schemaBinding,
                         Policy = new(Put: true, Delete: true, Publish: true, QueryProfiles: ["odata/4.01"]) },
                         new() { Name = "private", DisplayName = "Private", Schema = Schema,
                             Policy = new(Put: true, QueryProfiles: ["odata/4.01"]) }]
@@ -187,11 +188,13 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         private readonly ConcurrentDictionary<string, MemoryDocumentProvider> providers = new(StringComparer.Ordinal);
         public int Configurations { get; private set; }
         public bool UseWrongDocumentSchema { get; set; }
+        public string? FailureCode { get; set; }
         public AepStorageBindingRequest? Last { get; private set; }
         public IReadOnlyList<AepStorageTypeContribution> Contributions => PostgreSqlStorageTypes.Contributions;
         public async ValueTask<AspDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
         {
             Configurations++; Last = request;
+            if (FailureCode is { } failure) throw new AspException(failure, "PRIVATE PROVIDER DETAILS");
             var production = new PostgreSqlBindingFactory(new Options(), new Clients(secrets));
             var binding = await production.CreateAsync(request, caller, ct);
             if (postgres) return binding;

@@ -1407,6 +1407,40 @@ public sealed partial class AwpAssignmentExecutorTests
     }
 
     [TestMethod]
+    public async Task AgentReceivesAnOptionalQueryToolContractAndCallsItWithEmptyArguments()
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"request":{"type":"object","properties":{"acquisitionId":{"type":"string"},"pageSize":{"type":"integer"},"cursor":{"type":"string"}},"additionalProperties":false}},"required":[],"additionalProperties":false}""");
+        const string description = "Read saved alerts. Call with {} to use the latest retained acquisition; all inputs are optional.";
+        var modelCalls = 0;
+        var toolCalls = 0;
+        var handler = new GraphHandler(TestNow)
+        {
+            ModelResponseFactory = request =>
+            {
+                var tool = request.Tools!.Single();
+                Assert.AreEqual("status-en-cours", tool.Name);
+                Assert.AreEqual(description, tool.Description);
+                Assert.IsTrue(JsonElement.DeepEquals(schema, tool.Parameters));
+                if (++modelCalls == 1)
+                    return [new AwpModelToolCallContent("query-call", tool.Name, JsonSerializer.SerializeToElement(new { }))];
+                return [new AwpModelTextContent("Fixture waste collection alerts.")];
+            },
+            AgentToolResultFactory = request =>
+            {
+                toolCalls++;
+                Assert.AreEqual("{}", request.Arguments!.Value.GetRawText());
+                return JsonSerializer.SerializeToElement(new { alerts = new[] { "Fixture collection alert" } });
+            }
+        };
+        var agent = AgentMaterial() with
+        { AgentName = "assistant", Tools = [ToolMaterial("status-en-cours") with { Description = description, InputSchema = schema }] };
+        var (result, _) = await ExecuteGraphAsync(AgentAnswerGraph(), JsonSerializer.SerializeToElement(new { }), handler, agentMaterial: agent);
+        Assert.AreEqual("Fixture waste collection alerts.", result.Output?.GetString());
+        Assert.AreEqual(1, toolCalls);
+        Assert.AreEqual(2, modelCalls);
+    }
+
+    [TestMethod]
     [DataRow("length", "model_output_token_limit", false)]
     [DataRow("stop", "model_empty_response", false)]
     [DataRow("length", "model_output_token_limit", true)]

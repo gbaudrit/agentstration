@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Agentstration.Resources;
 
 namespace Agentstration.Schemas;
 
@@ -19,8 +20,24 @@ public sealed record DataContractDefinition
     public string Source { get; init; } = "input";
 }
 
+public sealed record SchemaContractEvidence(string Name, string Version, ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace, Guid SchemaUid, long SchemaGeneration, string ParentDefinitionHash,
+    string? SchemaPath, string DefinitionHash);
+
 public sealed record ResolvedDataContract(JsonElement? Schema, string? MediaType, string Origin,
-    DataContractMode DeclaredMode, string Digest, bool Validated = false);
+    DataContractMode DeclaredMode, string Digest, bool Validated = false)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaContractEvidence? SchemaEvidence { get; init; }
+    [JsonIgnore]
+    public bool HasStructuralConstraints => Schema is { } schema && HasConstraints(schema);
+    private static bool HasConstraints(JsonElement schema) => schema.ValueKind == JsonValueKind.Object && schema.EnumerateObject().Any(p =>
+        p.Name is "required" or "enum" or "minimum" or "maximum" or "exclusiveMinimum" or "exclusiveMaximum"
+            or "minLength" or "maxLength" or "pattern" or "format" or "minItems" or "maxItems" or "anyOf" or "oneOf" or "allOf"
+        || p.Name == "additionalProperties" && p.Value.ValueKind == JsonValueKind.False
+        || p.Name == "properties" && p.Value.ValueKind == JsonValueKind.Object && p.Value.EnumerateObject().Any()
+        || p.Name == "items" && HasConstraints(p.Value));
+}
 
 public sealed record InvocationDataContracts(ResolvedDataContract? Input = null, ResolvedDataContract? ExpectedOutput = null, bool ArtifactDraft = false, bool FinalResultMapped = false);
 

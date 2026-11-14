@@ -731,7 +731,7 @@ public sealed class ArtifactManagementService(
             await content.WriteAsync(chunk, token);
         }
         _ = DataContracts.ReadUtf8(contract, content.GetBuffer().AsSpan(0, (int)content.Length), "artifact-publication");
-        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true };
+        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true, SchemaEvidence = declaration.SchemaEvidence };
     }
 
     private static bool SameReceipt(ArtifactStorageReceipt left, ArtifactStorageReceipt right) =>
@@ -741,6 +741,7 @@ public sealed class ArtifactManagementService(
         && left.DataContract?.Digest == right.DataContract?.Digest
         && left.DataContract?.Origin == right.DataContract?.Origin
         && left.DataContract?.Validated == right.DataContract?.Validated
+        && left.DataContract?.SchemaEvidence == right.DataContract?.SchemaEvidence
         && left.Length == right.Length
         && string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase)
         && left.Provenance.Count == right.Provenance.Count

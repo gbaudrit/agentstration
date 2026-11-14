@@ -376,7 +376,7 @@ bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-e
 ## Artifact content processing
 
 [ADR-0213](../../decisions/0213-artifact-transformations-own-scoped-content-processing.md)
-introduced Artifact-manifest processing; [ADR-0226](../../decisions/0226-native-function-catalogue-and-explicit-iteration.md)
+introduced Artifact-manifest processing; [ADR-0233](../../decisions/0233-native-function-catalogue-and-explicit-iteration.md)
 names its explicit iteration step `foreachArtifacts`. Its
 private process/return region can contain ordinary Agents, Tools, mappings and
 child Flow calls without another published processor. Invocation adaptation belongs

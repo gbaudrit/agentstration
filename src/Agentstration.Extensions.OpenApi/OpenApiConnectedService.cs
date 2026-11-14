@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -229,38 +231,47 @@ public sealed partial class OpenApiService
                         diagnostics.Add(new("openapi_operation_ineligible", "An operation has a missing or duplicate operationId."));
                         continue;
                     }
-                    // Identity depends on location and operationId, never on mutable contract content/digest.
-                    var externalId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{candidate.AbsoluteUri}\n{operation.OperationId}")));
-                    var definition = new Dictionary<string, object?>
+                    var candidates = ResponseSchemas(parsed, operation);
+                    if (operation.ReadOnly && candidates.Count == 0)
+                        diagnostics.Add(new("openapi_response_schema_incomplete", "No declared JSON response schema is available."));
+                    // A response choice is explicit in the discovered operation identity. Single-response identities remain compatible.
+                    foreach (var response in candidates.Count == 0 ? new OpenApiResponseSchemaCandidate?[] { null } : candidates.Cast<OpenApiResponseSchemaCandidate?>())
                     {
-                        ["contractUri"] = candidate.AbsoluteUri,
-                        ["contractDigest"] = contract.Sha256,
-                        ["server"] = contract.Servers[0],
-                        ["operationId"] = operation.OperationId,
-                        ["method"] = operation.Method,
-                        ["path"] = operation.Path,
-                        ["readOnly"] = operation.ReadOnly
-                    };
-                    if (operation.RequestShape is { } input) definition["requestShape"] = input;
-                    if (operation.ResponseShape is { } output) definition["responseShape"] = output;
-                    if (operation.ReadOnly)
-                    {
-                        try
+                        var suffix = candidates.Count <= 1 ? "" : $"\n{response!.Status}\n{response.MediaType}";
+                        var externalId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{candidate.AbsoluteUri}\n{operation.OperationId}{suffix}")));
+                        var definition = new Dictionary<string, object?>
                         {
-                            var schemas = OpenApiAcquisitionSchemas.Create(parsed, operation);
-                            definition["inputSchema"] = schemas.Input;
-                            definition["outputSchema"] = schemas.Output;
-                        }
-                        catch (OpenApiExtensionException)
+                            ["contractUri"] = candidate.AbsoluteUri, ["contractDigest"] = contract.Sha256,
+                            ["server"] = contract.Servers[0], ["operationId"] = operation.OperationId,
+                            ["method"] = operation.Method, ["path"] = operation.Path, ["readOnly"] = operation.ReadOnly
+                        };
+                        if (operation.RequestShape is { } input) definition["requestShape"] = input;
+                        if (operation.ResponseShape is { } output) definition["responseShape"] = output;
+                        if (response is not null)
                         {
-                            diagnostics.Add(new("openapi_acquisition_schema_unsupported", "An operation cannot be acquired with the supported schema profile."));
+                            var shape = operation.ResponseShape is { ValueKind: JsonValueKind.Object } original
+                                ? JsonNode.Parse(original.GetRawText())!.AsObject() : new JsonObject();
+                            shape["x-agentstration-response"] = JsonSerializer.SerializeToNode(response, JsonSerializerOptions.Web);
+                            definition["responseShape"] = JsonSerializer.SerializeToElement(shape);
+                            foreach (var code in response.Diagnostics) diagnostics.Add(new(code, "The declared response contract has incomplete or unsupported schema evidence."));
                         }
+                        if (operation.ReadOnly)
+                        {
+                            try
+                            {
+                                var schemas = OpenApiAcquisitionSchemas.Create(parsed, operation, response?.Status, response?.MediaType);
+                                definition["inputSchema"] = schemas.Input; definition["outputSchema"] = schemas.Output;
+                            }
+                            catch (OpenApiExtensionException)
+                            { diagnostics.Add(new("openapi_acquisition_schema_unsupported", "An operation cannot be acquired with the supported schema profile.")); }
+                        }
+                        var name = string.IsNullOrWhiteSpace(operation.Summary) ? operation.OperationId! : operation.Summary;
+                        if (response is not null) name += $" · {response.Status} {response.MediaType}";
+                        operations.Add(new(externalId, name[..Math.Min(200, name.Length)], "openapi-operation",
+                            OpenApiConnectedService.Version, JsonSerializer.SerializeToElement(definition)));
+                        if (operations.Count > options.MaximumOperations)
+                            throw new OpenApiExtensionException("openapi_operations_exceeded", "The operation inventory exceeds its bound.");
                     }
-                    var displayName = string.IsNullOrWhiteSpace(operation.Summary) ? operation.OperationId! : operation.Summary;
-                    operations.Add(new(externalId, displayName[..Math.Min(200, displayName.Length)],
-                        "openapi-operation", OpenApiConnectedService.Version, JsonSerializer.SerializeToElement(definition)));
-                    if (operations.Count > options.MaximumOperations)
-                        throw new OpenApiExtensionException("openapi_operations_exceeded", "The operation inventory exceeds its bound.");
                 }
             }
             catch (OpenApiExtensionException exception)
@@ -278,6 +289,73 @@ public sealed partial class OpenApiService
             || operations.Count > options.MaximumOperations)
             throw new OpenApiExtensionException("openapi_manifest_too_large", "The operation inventory exceeds its bound.");
         return result;
+    }
+
+    private static string DeclaredResponseStatus(ParsedOpenApiContract contract, OpenApiOperationDescriptor operation, int status)
+    {
+        var path = Resolve(contract.Document["paths"]?[operation.Path]);
+        var responses = Resolve(path?[operation.Method.ToLowerInvariant()]?["responses"]);
+        var exact = status.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var range = exact[..1] + "XX";
+        return responses is JsonObject map && map.ContainsKey(exact) ? exact
+            : responses is JsonObject ranges && ranges.ContainsKey(range) ? range : "default";
+        JsonNode? Resolve(JsonNode? node) => ResolveResponseNode(contract.Document, node);
+    }
+
+    private static IReadOnlyList<OpenApiResponseSchemaCandidate> ResponseSchemas(ParsedOpenApiContract parsed, OpenApiOperationDescriptor operation)
+    {
+        var endpoint = Resolve(parsed.Document["paths"]?[operation.Path])?[operation.Method.ToLowerInvariant()];
+        if (Resolve(endpoint?["responses"]) is not JsonObject responses) return [];
+        var result = new List<OpenApiResponseSchemaCandidate>();
+        foreach (var response in responses.Where(p => p.Key == "default" || p.Key.Length == 3 && p.Key[0] == '2'))
+        {
+            if (Resolve(response.Value)?["content"] is not JsonObject content) continue;
+            foreach (var media in content.Where(p => ResponseMediaTypeOf(p.Key) is { } type
+                && (type.Equals("application/json", StringComparison.OrdinalIgnoreCase) || type.EndsWith("+json", StringComparison.OrdinalIgnoreCase))))
+            {
+                var native = media.Value?["schema"];
+                var location = $"/paths/{Escape(operation.Path)}/{operation.Method.ToLowerInvariant()}/responses/{Escape(response.Key)}/content/{Escape(media.Key)}/schema";
+                if (native is not null) location = SourcePath(native);
+                var issues = new List<string>();
+                if (native is null || native is JsonObject obj && obj.Count == 0)
+                    issues.Add("openapi_response_schema_incomplete");
+                result.Add(new(response.Key, media.Key, location, native is null ? null : JsonSerializer.SerializeToElement(native),
+                    parsed.Descriptor.Uri, parsed.Descriptor.Sha256, parsed.Descriptor.OpenApiVersion, operation.OperationId!, issues));
+                if (result.Count > 32) throw new OpenApiExtensionException("openapi_response_candidates_exceeded", "Too many response schema candidates.");
+            }
+        }
+        return result;
+        JsonNode? Resolve(JsonNode? node) => ResolveResponseNode(parsed.Document, node);
+        static string Escape(string value) => value.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
+    }
+
+    private static JsonNode? ResolveResponseNode(JsonObject document, JsonNode? node)
+    {
+        for (var depth = 0; node is JsonObject obj && obj["$ref"] is { } reference; depth++)
+        {
+            var address = reference.GetValue<string>();
+            if (depth > 12 || !address.StartsWith("#/", StringComparison.Ordinal))
+                throw new OpenApiExtensionException("openapi_reference_denied", "The response reference cannot be resolved.");
+            node = document;
+            foreach (var part in address[2..].Split('/'))
+                node = node?[Uri.UnescapeDataString(part.Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal))];
+        }
+        return node;
+    }
+
+    private static string? ResponseMediaTypeOf(string? value) => MediaTypeHeaderValue.TryParse(value, out var media) ? media.MediaType : null;
+
+    private static string SourcePath(JsonNode node)
+    {
+        var segments = new Stack<string>();
+        for (var current = node; current.Parent is { } parent; current = parent)
+        {
+            var segment = parent is JsonObject obj
+                ? obj.Single(p => ReferenceEquals(p.Value, current)).Key
+                : ((JsonArray)parent).IndexOf(current).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            segments.Push(segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal));
+        }
+        return "/" + string.Join('/', segments);
     }
 
     internal static bool ContainsCredential(JsonElement value, string credential) => value.ValueKind switch

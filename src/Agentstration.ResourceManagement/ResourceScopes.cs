@@ -63,7 +63,7 @@ public static class ResourceScopePolicy
         "Vault" or "Secret" or "Parameter" or "ConnectedServiceType" or "ConnectedService"
             or "ConnectedServiceOperationType" or "ConnectedServiceOperation"
             or "FunctionKind" or "TransformationFunction" or "StorageType" or "Storage" or "Schema" or "SchemaVersion" or "DataSource"
-            or "DataSourceProfile" or "DataSourceProfileRevision" or "KnowledgeSource" => InstanceTenantWorkspace,
+            or "DataSourceProfile" or "DataSourceProfileRevision" or "DataSourceQuery" or "DataSourceQueryVersion" or "KnowledgeSource" => InstanceTenantWorkspace,
         "ToolProvider" or "Tool" or "ToolSet" or "ToolSetVersion" or "ToolDefinition" or "ToolDefinitionVersion" => InstanceTenantWorkspace,
         "ToolCategory" or "ToolExecutionHook" or "ConnectedServiceOperationDiscovery" or "DataSourceAcquisition"
             or "DataSourceDiscovery" or "DataSourceAcquisitionTarget" => WorkspaceOnly,

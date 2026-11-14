@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -57,8 +58,10 @@ public sealed partial class StorageAspRemoteAdapter
                 DocumentSelection = JsonSerializer.SerializeToElement(effective.Selection, AspProtocol.JsonOptions)
             };
             using var http = transport.CreateConfigurationClient(extension);
-            using var response = await http.PostAsJsonAsync(new Uri(registration.Definition.Endpoint, mapping.BindingPath), request, AepProtocol.JsonOptions, ct);
-            AspValidation.Require(response.IsSuccessStatusCode, "binding_refused", "The extension refused the document configuration.");
+            using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(registration.Definition.Endpoint, mapping.BindingPath))
+            { Content = JsonContent.Create(request, options: AepProtocol.JsonOptions) };
+            using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
+            await EnsureDocumentBindingSuccessAsync(response, ct);
             await response.Content.LoadIntoBufferAsync(4096, ct);
             var lease = await response.Content.ReadFromJsonAsync<AepStorageBindingLease>(AepProtocol.JsonOptions, ct)
                 ?? throw new AspException("invalid_result", "No document binding lease was returned.");
@@ -77,5 +80,33 @@ public sealed partial class StorageAspRemoteAdapter
             foreach (var handle in handles) capabilities.Revoke(handle);
             if (connection is not null) await connection.DisposeAsync();
         }
+    }
+
+    internal static async Task EnsureDocumentBindingSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var code = response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "forbidden",
+            HttpStatusCode.RequestTimeout or HttpStatusCode.GatewayTimeout => "backend_timeout",
+            _ when (int)response.StatusCode >= 500 => "provider_unavailable",
+            _ => "binding_refused"
+        };
+        if (code != "forbidden" && response.Content.Headers.ContentLength is null or <= 4096)
+        {
+            try
+            {
+                await response.Content.LoadIntoBufferAsync(4096, ct);
+                using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct),
+                    new JsonDocumentOptions { MaxDepth = 8 }, ct);
+                if (body.RootElement.ValueKind == JsonValueKind.Object
+                    && body.RootElement.TryGetProperty("code", out var value) && value.ValueKind == JsonValueKind.String
+                    && value.GetString() is "backend_connection_refused" or "backend_unavailable" or "backend_timeout")
+                    code = value.GetString()!;
+            }
+            catch (Exception exception) when (exception is JsonException or HttpRequestException or IOException)
+            { /* A malformed or oversized error body never replaces the bounded status classification. */ }
+        }
+        throw new AspException(code, "The document binding could not be established.");
     }
 }

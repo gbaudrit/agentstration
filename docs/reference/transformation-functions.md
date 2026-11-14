@@ -34,6 +34,8 @@ For acquired JSON `{ "results": [{"id":"a"},{"id":"b"}] }`, select `artifact.exp
 
 If the Data Source already applies `json.select` with `/results`, its stored JSON is the array itself. In the Knowledge binding or before-publication sequence, use `artifact.explode` with `{"path":"","mode":"arrayItems"}` to expand that root array. Reusing `/results` would look for a property that no longer exists.
 
+Shared Schema selection addresses the schema definition, separately from content selection. For an envelope with a `results` array, `/properties/results` selects the array schema and `/properties/results/items` selects an item schema; neither path transforms the payload. A Data Source can adopt the envelope contract for raw acquisition and the array contract for final output after `json.select`. A shape-changing transformation without an explicit final shared binding does not retain the envelope's Schema identity on its result. `artifact.explode` currently accepts an inline `itemSchema`; it validates each child without claiming a shared Schema identity for that inline contract.
+
 Declare `itemSchema` to validate each item's content. The acquisition/envelope schema is not copied onto items. Outputs retain parent identity/digest, path, key and transformation evidence. Empty collections, duplicate object keys, invalid paths, mismatching schemas and output limits fail explicitly. At most 100 output Artifacts are publishable to Knowledge, each at most 64 KiB; a function invocation also bounds aggregate output content to 512 KiB. A larger source still has to satisfy its acquisition and read limits.
 
 Inside **For each Artifact**, a content-processing branch can pass `{"value":{"content":"${input.content}"},"path":"/results"}` to the same function. Return its manifest to the bottom result connector. The owner validates and prepares all children before registering them; it does not first capture another durable Artifact containing the complete batch. An explicit output contract applies to each expanded child. Retained input Artifacts remain unchanged.
@@ -46,4 +48,4 @@ Knowledge binding transformations run after a retained acquisition is stored, an
 
 **For each Artifact** accepts a reference manifest and supports bounded content mode or scoped progressive access. Both steps expose bottom **Process** and **Processing result** connectors plus ordinary completed/error continuations. Their branches may contain Agents, Tools, functions and child Flows. Execution uses the existing causal implicit child runs.
 
-See [ADR-0226](../decisions/0226-native-function-catalogue-and-explicit-iteration.md) and [Artifact processing](artifact-transformations.md).
+See [ADR-0233](../decisions/0233-native-function-catalogue-and-explicit-iteration.md) and [Artifact processing](artifact-transformations.md).

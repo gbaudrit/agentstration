@@ -1,4 +1,5 @@
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.DataSources;
 using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
@@ -73,6 +74,10 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<StorageDocumentPutMcpTool>(services);
         AddInternalTool<StorageDocumentDeleteMcpTool>(services);
         AddInternalTool<StorageDocumentQueryMcpTool>(services);
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceDocumentQueryDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceDocumentQueryMcpTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceQueryToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceQueryMcpTool>();
         AddInternalTool<KnowledgeDocumentQueryMcpTool>(services);
         AddInternalTool<KnowledgeContentReadMcpTool>(services);
         AddInternalTool<KnowledgeContentRegexMcpTool>(services);

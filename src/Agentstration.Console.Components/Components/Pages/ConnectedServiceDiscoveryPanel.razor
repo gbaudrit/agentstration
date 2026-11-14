@@ -29,7 +29,8 @@
             <DataGrid TItem="ConnectedServiceOperationResource" Items="operations">
                 <Header><tr><th>@T("Discovery.Operation")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th>@T("Generation")</th><th>@T("Discovery.Actions")</th></tr></Header>
                 <Row Context="operation"><tr data-testid="connected-service-operation-row" data-operation-uid="@operation.Uid">
-                    <td><strong>@operation.Definition.DisplayName</strong><small><code>@operation.Definition.ExternalId</code></small></td>
+                    <td><strong>@operation.Definition.DisplayName</strong><small><code>@operation.Definition.ExternalId</code></small>@if (operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out _))
+                        { <OperationSchemaCandidate Operation="operation" CanManage="@CanAuthorSchema" TargetScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /> }</td>
                     <td>@T($"Discovery.Availability.{operation.ObservedState.Availability}")</td>
                     <td>@T(operation.Enabled ? "Yes" : "No")</td><td>@operation.Generation</td>
                     <td>@if (CanManage && ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))
@@ -67,6 +68,8 @@
     private bool loading = true, busy, error, accepted, interactive;
     private bool CanManage => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
         && ResourceOwnershipContext.CanManage(Service.ScopeRef, Services);
+    private bool CanAuthorSchema => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
+        && ResourceOwnershipContext.CanManage(ResourceOwnershipContext.TryGetCurrent(Services), Services);
     private bool HasActiveDiscovery => history.Any(item => item.State is ConnectedServiceOperationDiscoveryState.Pending
         or ConnectedServiceOperationDiscoveryState.Running or ConnectedServiceOperationDiscoveryState.WaitingForInput
         or ConnectedServiceOperationDiscoveryState.WaitingForChild);

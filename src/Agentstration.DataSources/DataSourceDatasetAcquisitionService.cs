@@ -6,6 +6,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Schemas;
 
 namespace Agentstration.DataSources;
 
@@ -189,6 +190,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             acquisition.TenantId, acquisition.CreatedBy, cancellationToken);
         if (run is null) return stored;
         var state = run.TransientPayloadsAvailable ? run.State : DataSourceAcquisitionState.Failed;
+        DataContractFailure? contractFailure = null;
         var code = run.TransientPayloadsAvailable ? run.ErrorCode : "data_source_direct_content_unavailable";
         StorageObject? result = null;
         DataSourceAcquisitionManifest? manifest = acquisition.Manifest;
@@ -200,7 +202,12 @@ public sealed class DataSourceDatasetAcquisitionService(
             {
                 await ValidateExecutionAsync(acquisition, cancellationToken);
                 if (run.Output is not { } output) throw Invalid("data_source_output_missing", "The operation returned no content.");
-                DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset!.OutputSchema, output);
+                if (output.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(output).Length > DataSourceDatasetCompositionService.MaximumValueBytes)
+                    throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
+                if (acquisition.Dataset!.OutputSchemaSnapshot is not null)
+                    DataContracts.Validate(DataSourceDatasetCompositionService.Contract(acquisition.Dataset, acquisition.Name), output,
+                        "acquisition-output", acquisition.FlowRunId);
+                else DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset.OutputSchema, output);
                 var bytes = acquisition.Dataset.Definition.DocumentCollectionUid is null
                     ? JsonSerializer.SerializeToUtf8Bytes(output) : DataSourceDocumentStorage.Encode(output);
                 if (acquisition.Dataset.Definition.Storage is null)
@@ -273,8 +280,8 @@ public sealed class DataSourceDatasetAcquisitionService(
                         "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
                         new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
                         acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
-                        ProducerGeneration: acquisition.DataSourceGeneration, DataContract: Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset!.OutputSchema,
-                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json")), cancellationToken));
+                        ProducerGeneration: acquisition.DataSourceGeneration, DataContract: DataSourceDatasetCompositionService.Contract(acquisition.Dataset!,
+                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output")), cancellationToken));
                     manifest = new()
                     {
                         Artifacts = [new() { ArtifactId = artifact.ArtifactId.ToString(),
@@ -283,16 +290,18 @@ public sealed class DataSourceDatasetAcquisitionService(
                     };
                 }
             }
-            catch (Exception exception) when (exception is ArtifactValidationException or DataSourceValidationException or DataSourceAcquisitionException
+            catch (Exception exception) when (exception is ArtifactValidationException or DataSourceValidationException or DataSourceAcquisitionException or DataContractException
                 or Agentstration.Storage.StorageException or Agentstration.ConnectedServices.ConnectedServiceOperationDiscoveryException
                 or Agentstration.ConnectedServices.Contracts.ConnectedServiceExportInspectionException
                 or Agentstration.ConnectedServices.ConnectedServiceOperationTypeValidationException
                 or Agentstration.ConnectedServices.ConnectedServiceOperationTypeRevisionException)
             {
                 state = DataSourceAcquisitionState.Failed;
+                contractFailure = (exception as DataContractException)?.Failure;
                 result = null;
                 code = exception switch
                 {
+                    DataContractException invalid => invalid.Code,
                     ArtifactValidationException invalid => invalid.Code,
                     DataSourceValidationException invalid => invalid.Code,
                     DataSourceAcquisitionException invalid => invalid.Code,
@@ -313,6 +322,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             Manifest = state == DataSourceAcquisitionState.Succeeded ? manifest : null,
             CompletedAt = Terminal(state) ? clock.GetUtcNow() : null,
             ErrorCode = code,
+            ContractFailure = contractFailure,
             ErrorMessage = code is null ? null : "The operation or dataset publication could not complete.",
             Status = new()
             {
@@ -475,8 +485,8 @@ public sealed class DataSourceDatasetAcquisitionService(
             "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
             new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
             acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
-            ProducerGeneration: acquisition.DataSourceGeneration, DataContract: Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset!.OutputSchema,
-                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json")), cancellationToken));
+            ProducerGeneration: acquisition.DataSourceGeneration, DataContract: DataSourceDatasetCompositionService.Contract(acquisition.Dataset!,
+                            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output")), cancellationToken));
         var updated = acquisition with
         {
             Generation = checked(acquisition.Generation + 1),

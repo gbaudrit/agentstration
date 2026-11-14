@@ -1,4 +1,4 @@
-# ADR-0226: Native function catalogue and explicit iteration
+# ADR-0233: Native function catalogue and explicit iteration
 
 ## Status
 

@@ -282,6 +282,26 @@ public sealed class JsonSchemaInputEditorTests
         Assert.IsFalse(value.GetProperty("options").GetProperty("enabled").GetBoolean());
     }
 
+    [TestMethod]
+    public void NestedFreeFormQueryFallsBackToEditableJsonAndValidatesItsObjectType()
+    {
+        using var context = Context();
+        JsonElement value = default;
+        JsonSchemaInputValidationState? validation = null;
+        var editor = context.Render<JsonSchemaInputEditor>(p => p
+            .Add(c => c.Schema, Json("""{"type":"object","properties":{"request":{"type":"object","properties":{"query":{"type":"object"}},"required":["query"]}},"required":["request"]}"""))
+            .Add(c => c.Value, Json("{}"))
+            .Add(c => c.ValueChanged, next => value = next)
+            .Add(c => c.ValidationChanged, next => validation = next));
+        Assert.HasCount(1, editor.FindAll("textarea"));
+        Assert.IsFalse(validation!.IsValid);
+        editor.Find("textarea").Input("""{"request":{"query":{"$filter":"status eq 'active'"}}}""");
+        Assert.IsTrue(validation.IsValid);
+        Assert.AreEqual("status eq 'active'", value.GetProperty("request").GetProperty("query").GetProperty("$filter").GetString());
+        editor.Find("textarea").Input("""{"request":{"query":[]}}""");
+        Assert.IsFalse(validation.IsValid);
+    }
+
     private static BunitContext Context()
     {
         var context = new BunitContext();

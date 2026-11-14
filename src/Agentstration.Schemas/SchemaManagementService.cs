@@ -121,6 +121,7 @@ public sealed class SchemaManagementService(
             Format = source.Value.Definition.Format,
             Dialect = source.Value.Definition.Dialect,
             Content = source.Value.Definition.Content.Clone(),
+            SourceEvidence = source.Value.Definition.SourceEvidence?.Clone(),
             DefinitionHash = hash,
             PublishedAt = timeProvider.GetUtcNow(),
             Generation = 1,
@@ -135,6 +136,8 @@ public sealed class SchemaManagementService(
 
     private async Task ValidateAsync(SchemaResource resource, CancellationToken cancellationToken)
     {
+        if (resource.Definition.SourceEvidence is { } evidence && JsonSerializer.SerializeToUtf8Bytes(evidence).Length > 65_536)
+            throw new SchemaValidationException("schema_evidence_too_large", "Schema source evidence cannot exceed 64 KiB.");
         if (resource.Kind != SchemaResourceKinds.Schema || resource.ApiVersion != ResourceApiVersions.CoreV1)
             throw new SchemaValidationException("schema_identity_invalid", "Invalid Schema resource envelope.");
         ValidateName(resource.Name);

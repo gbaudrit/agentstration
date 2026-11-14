@@ -7,7 +7,7 @@ namespace Agentstration.Extensions.OpenApi;
 // Project only contracts the native acquisition validator can enforce, without inventing required values.
 internal static class OpenApiAcquisitionSchemas
 {
-    public static (JsonElement Input, JsonElement Output) Create(ParsedOpenApiContract contract, OpenApiOperationDescriptor operation)
+    public static (JsonElement Input, JsonElement Output) Create(ParsedOpenApiContract contract, OpenApiOperationDescriptor operation, string? responseStatus = null, string? responseMediaType = null)
     {
         var document = contract.Document;
         var path = Resolve(document["paths"]?[operation.Path]) as JsonObject ?? throw Unsupported();
@@ -48,11 +48,21 @@ internal static class OpenApiAcquisitionSchemas
             if (body["required"]?.GetValue<bool>() == true) ((JsonArray)input["required"]!).Add("body");
         }
         var responses = Resolve(endpoint["responses"]) as JsonObject ?? throw Unsupported();
-        var schemas = responses.Where(item => item.Key.Length == 3 && item.Key[0] == '2')
-            .Select(item => JsonContentSchema((Resolve(item.Value) as JsonObject)?["content"]))
-            .ToArray();
-        var output = schemas.FirstOrDefault() ?? JsonContentSchema((Resolve(responses["default"]) as JsonObject)?["content"]);
-        if (schemas.Any(schema => !JsonNode.DeepEquals(schema, output))) throw Unsupported();
+        JsonObject output;
+        if (responseStatus is not null && responseMediaType is not null)
+        {
+            var content = (Resolve(responses[responseStatus]) as JsonObject)?["content"] as JsonObject;
+            var media = content?.FirstOrDefault(p => p.Key.Equals(responseMediaType, StringComparison.OrdinalIgnoreCase)).Value;
+            output = Schema(media?["schema"], 0);
+        }
+        else
+        {
+            var schemas = responses.Where(item => item.Key.Length == 3 && item.Key[0] == '2')
+                .Select(item => JsonContentSchema((Resolve(item.Value) as JsonObject)?["content"]))
+                .ToArray();
+            output = schemas.FirstOrDefault() ?? JsonContentSchema((Resolve(responses["default"]) as JsonObject)?["content"]);
+            if (schemas.Any(schema => !JsonNode.DeepEquals(schema, output))) throw Unsupported();
+        }
         return (JsonSerializer.SerializeToElement(input), JsonSerializer.SerializeToElement(output));
 
         JsonObject JsonContentSchema(JsonNode? content)

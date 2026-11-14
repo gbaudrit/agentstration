@@ -21,7 +21,7 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         var capabilities = context.Documents!;
         var model = AspDocumentValidation.Digest(collection.Schema);
         return new(capabilities, From(policy), capabilities.QueryProfiles.Where(p => policy.QueryProfiles!.Contains(p.Id, StringComparer.Ordinal))
-            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model);
+            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model) { SchemaSnapshot = collection.SchemaSnapshot };
     }
     public Task<StorageDocumentValue> GetAsync(StorageDocumentTarget target, string id, string? revision, CancellationToken ct) =>
         ExecuteAsync(target, "get", async (client, token) => Value(await client.GetAsync(new(Guid.NewGuid().ToString("N"), id, revision), token)), ct);
@@ -47,7 +47,8 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
             var profile = client.Description.QueryProfiles.FirstOrDefault()
                 ?? throw new AspException("unsupported_capability", "Structured publication needs an implemented query profile.");
             return new StorageDocumentPublicationReference(target with { Publication = publication.Id }, new(publication.Id, publication.Digest, publication.Count, publication.SchemaDigest),
-                new(profile.Reference.Id, profile.Reference.Version, profile.Reference.Encoding, profile.Reference.ModelDigest));
+                new(profile.Reference.Id, profile.Reference.Version, profile.Reference.Encoding, profile.Reference.ModelDigest))
+            { SchemaSnapshot = (await DescribeAsync(target, token)).SchemaSnapshot };
         }, ct);
     public Task SealAsync(StorageDocumentPublicationReference reference, CancellationToken ct) => PublicationAsync(reference, "seal", ct);
     public Task ValidatePublicationAsync(StorageDocumentPublicationReference reference, CancellationToken ct) => PublicationAsync(reference, "inspect", ct);
@@ -88,7 +89,13 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
                 WorkspaceId: current.IsInitialized ? current.Current.WorkspaceId : null, ReasonCode: operation), timeout.Token);
             return result;
         }
-        catch (AspException ex) { throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code == "forbidden" ? 403 : ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422); }
+        catch (AspException ex) { throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code switch
+        {
+            "forbidden" => 403,
+            "backend_timeout" => 504,
+            "backend_connection_refused" or "backend_unavailable" or "provider_unavailable" => 503,
+            _ => ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422
+        }); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new StorageException("storage_documents_timeout", "The document operation timed out.", 504); }
         catch (Exception ex) when (ex is IOException or HttpRequestException or JsonException)
         { throw new StorageException("storage_documents_unavailable", "The exact document provider is unavailable.", 503); }
