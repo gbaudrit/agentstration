@@ -240,7 +240,9 @@ else
     private ConnectedServiceOperationResource? savedOperation;
     private string contentAcquisitionKey = "";
     private enum DatasetTab { Overview, Definition, Acquisitions, Content, Queries, Tools, Access, Yaml }
-    private IEnumerable<DatasetTab> AvailableTabs => Enum.GetValues<DatasetTab>().Where(tab => tab != DatasetTab.Access || CanManage);
+    private IEnumerable<DatasetTab> AvailableTabs => Enum.GetValues<DatasetTab>().Where(tab =>
+        (tab != DatasetTab.Access || CanManage) && (tab is not (DatasetTab.Queries or DatasetTab.Tools)
+            || source?.Definition.Dataset?.DocumentCollectionUid is not null));
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
     private IReadOnlyList<DataSourceAcquisitionResource> VisibleHistory => (activeTab == DatasetTab.Overview ? OrderedHistory.Take(3) : OrderedHistory).ToArray();
     private IEnumerable<DataSourceAcquisitionResource> ContentAcquisitions => OrderedHistory.Where(item => item.Content is not null && item.ContentRetiredAt is null);
