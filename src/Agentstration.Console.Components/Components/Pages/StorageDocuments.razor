@@ -31,7 +31,8 @@
             }
             @if (operation is "query" or "put") { <label class="form-span-2"><span>@T(operation == "query" ? "Documents.QueryPayload" : "Documents.Value")</span><textarea class="form-code-editor" rows="8" @bind="payload" @bind:after="ResetResult" maxlength="65536"></textarea></label> }
             <button type="button" class="button-primary" disabled="@(!Context.HasPermission("runs/execute") || string.IsNullOrEmpty(operation) || operation == "query" && description.QueryProfiles.Count == 0)" @onclick="() => RunAsync(false)">@T("Documents.Run")</button>
-            @if (page?.Cursor is not null) { <button type="button" class="button-secondary" @onclick="() => RunAsync(true)">@T("Documents.Next")</button> }
+            @if (!Context.HasPermission("runs/execute")) { <p class="form-span-2" role="status">@T("Documents.ExecutePermissionRequired")</p> }
+            @if (page?.Cursor is not null) { <button type="button" class="button-secondary" disabled="@(!Context.HasPermission("runs/execute"))" @onclick="() => RunAsync(true)">@T("Documents.Next")</button> }
             @if (Context.HasPermission("resources/write"))
             {
                 <label><span>@T("Documents.ToolVersion")</span><input @bind="version" maxlength="32" /></label>

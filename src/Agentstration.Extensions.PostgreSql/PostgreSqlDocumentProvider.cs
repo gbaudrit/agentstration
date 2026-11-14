@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -26,7 +27,7 @@ public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElem
     /// <summary>Explicit operator provisioning only; never called by content/query arguments.</summary>
     public async Task InitializeAsync(CancellationToken ct)
     {
-        await using var connection = new NpgsqlConnection(connectionString); await connection.OpenAsync(ct);
+        await using var connection = await OpenAsync(ct);
         await using var command = new NpgsqlCommand("""
             CREATE SCHEMA IF NOT EXISTS asp_jsonb;
             CREATE TABLE IF NOT EXISTS asp_jsonb.documents (
@@ -278,6 +279,19 @@ public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElem
     {
         var connection = new NpgsqlConnection(connectionString);
         try { await connection.OpenAsync(ct); return connection; }
+        catch (NpgsqlException exception)
+        {
+            await connection.DisposeAsync();
+            var code = "backend_unavailable";
+            for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
+            {
+                if (cause is SocketException { SocketErrorCode: SocketError.ConnectionRefused })
+                { code = "backend_connection_refused"; break; }
+                if (cause is TimeoutException or SocketException { SocketErrorCode: SocketError.TimedOut })
+                    code = "backend_timeout";
+            }
+            throw new AspException(code, "The database connection could not be established.");
+        }
         catch { await connection.DisposeAsync(); throw; }
     }
     private static async Task LockAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, AspDocumentContext context, CancellationToken ct)

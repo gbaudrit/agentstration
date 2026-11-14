@@ -232,4 +232,10 @@
   <data name="Error.Schema.Invalid" xml:space="preserve"><value>Vérifiez le type, la structure et les bornes à cet emplacement du schéma.</value></data>
 <data name="Documents.UseSharedSchema" xml:space="preserve"><value>Sélectionner un Schema publié</value></data>
 <data name="Documents.UseInlineSchema" xml:space="preserve"><value>Utiliser un schéma inline</value></data>
+  <data name="Documents.IdentityRequired" xml:space="preserve"><value>Saisissez un nom d’affichage (200 caractères maximum) et un nom technique (1 à 128 lettres minuscules, chiffres, points ou tirets, commençant par une lettre ou un chiffre).</value></data>
+  <data name="Error.Metadata" xml:space="preserve"><value>Renseignez le nom d’affichage du stockage et de chaque collection (200 caractères maximum). Les descriptions ne doivent pas dépasser 2000 caractères.</value></data>
+  <data name="Error.BackendConnectionRefused" xml:space="preserve"><value>Le serveur de stockage a refusé la connexion. Vérifiez qu’il est démarré et accessible depuis l’extension.</value></data>
+  <data name="Error.BackendTimeout" xml:space="preserve"><value>La connexion au stockage a expiré. Vérifiez que le serveur est accessible depuis l’extension.</value></data>
+  <data name="Error.BackendUnavailable" xml:space="preserve"><value>Le stockage est indisponible. Vérifiez le service de base de données et les paramètres de connexion de l’extension.</value></data>
+  <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>L’exécution d’une opération documentaire nécessite le droit runs/execute dans le contexte sélectionné. Sélectionnez un contexte autorisé ou demandez ce droit.</value></data>
 </root>

@@ -89,7 +89,13 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
                 WorkspaceId: current.IsInitialized ? current.Current.WorkspaceId : null, ReasonCode: operation), timeout.Token);
             return result;
         }
-        catch (AspException ex) { throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code == "forbidden" ? 403 : ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422); }
+        catch (AspException ex) { throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code switch
+        {
+            "forbidden" => 403,
+            "backend_timeout" => 504,
+            "backend_connection_refused" or "backend_unavailable" or "provider_unavailable" => 503,
+            _ => ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422
+        }); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new StorageException("storage_documents_timeout", "The document operation timed out.", 504); }
         catch (Exception ex) when (ex is IOException or HttpRequestException or JsonException)
         { throw new StorageException("storage_documents_unavailable", "The exact document provider is unavailable.", 503); }

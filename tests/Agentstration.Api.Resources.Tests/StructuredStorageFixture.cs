@@ -187,11 +187,13 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         private readonly ConcurrentDictionary<string, MemoryDocumentProvider> providers = new(StringComparer.Ordinal);
         public int Configurations { get; private set; }
         public bool UseWrongDocumentSchema { get; set; }
+        public string? FailureCode { get; set; }
         public AepStorageBindingRequest? Last { get; private set; }
         public IReadOnlyList<AepStorageTypeContribution> Contributions => PostgreSqlStorageTypes.Contributions;
         public async ValueTask<AspDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
         {
             Configurations++; Last = request;
+            if (FailureCode is { } failure) throw new AspException(failure, "PRIVATE PROVIDER DETAILS");
             var production = new PostgreSqlBindingFactory(new Options(), new Clients(secrets));
             var binding = await production.CreateAsync(request, caller, ct);
             if (postgres) return binding;

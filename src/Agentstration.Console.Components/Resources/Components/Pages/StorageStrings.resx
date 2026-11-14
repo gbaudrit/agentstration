@@ -232,4 +232,10 @@
   <data name="Error.Schema.Invalid" xml:space="preserve"><value>Check the type, structure and bounds at this schema location.</value></data>
 <data name="Documents.UseSharedSchema" xml:space="preserve"><value>Select a published Schema</value></data>
 <data name="Documents.UseInlineSchema" xml:space="preserve"><value>Use an inline schema</value></data>
+  <data name="Documents.IdentityRequired" xml:space="preserve"><value>Enter a display name (up to 200 characters) and a technical name (1–128 lowercase letters, digits, dots or hyphens, starting with a letter or digit).</value></data>
+  <data name="Error.Metadata" xml:space="preserve"><value>Enter a display name for the Storage and each collection (up to 200 characters). Descriptions must not exceed 2000 characters.</value></data>
+  <data name="Error.BackendConnectionRefused" xml:space="preserve"><value>The storage server refused the connection. Check that it is running and reachable from the extension.</value></data>
+  <data name="Error.BackendTimeout" xml:space="preserve"><value>The storage connection timed out. Check that the server is reachable from the extension.</value></data>
+  <data name="Error.BackendUnavailable" xml:space="preserve"><value>The storage backend is unavailable. Check the database service and the extension’s connection settings.</value></data>
+  <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>Executing a document operation requires runs/execute in the selected context. Select an authorized context or request this permission.</value></data>
 </root>

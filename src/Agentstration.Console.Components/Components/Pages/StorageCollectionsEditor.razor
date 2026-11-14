@@ -2,13 +2,16 @@
 <section class="panel form-section" data-testid="storage-collections">
     <div class="panel-header"><h2>@T("Documents.Collections")</h2></div>
     <p>@T("Documents.CollectionsHelp")</p>
-    @for (var index = 0; index < Value.Count; index++)
+    @for (var index = 0; index < rows.Count; index++)
     {
         var row = index;
-        var collection = Value[row];
-        <fieldset class="form-grid" disabled="@ReadOnly">
-            <label><span>@T("TechnicalName")</span><input value="@collection.Name" maxlength="128" @onchange="e => SetAsync(row, collection with { Name = Text(e) })" /></label>
-            <label><span>@T("DisplayNameLabel")</span><input value="@collection.DisplayName" maxlength="128" @onchange="e => SetAsync(row, collection with { DisplayName = Text(e) })" /></label>
+        var collection = rows[row];
+        <fieldset @key="(rowKeys[row], collection.Uid)" class="form-grid" disabled="@ReadOnly">
+            <ResourceIdentityFields DisplayName="@collection.DisplayName" DisplayNameChanged="value => SetAsync(row, rows[row] with { DisplayName = value })"
+                TechnicalName="@collection.Name" TechnicalNameChanged="value => SetAsync(row, rows[row] with { Name = value })"
+                Policy="ResourceNamePolicy.Parameter" IsNew="@(collection.Uid == Guid.Empty)"
+                DisplayNameTestId="@($"collection-{row}-display-name")" TechnicalNameTestId="@($"collection-{row}-name")" />
+            @if (!IdentityValid(collection)) { <p class="field-validation-error form-span-2" role="alert">@T("Documents.IdentityRequired")</p> }
             <label><span>@T("Uid")</span><code>@(collection.Uid == Guid.Empty ? T("Documents.NewUid") : collection.Uid.ToString())</code></label>
             <label><span>@T("Enabled")</span><input type="checkbox" checked="@collection.Enabled" @onchange="e => SetAsync(row, collection with { Enabled = Checked(e) })" /></label>
             <label><span>@T("Documents.Get")</span><input type="checkbox" checked="@collection.Policy.Get" @onchange="e => SetAsync(row, collection with { Policy = collection.Policy with { Get = Checked(e) } })" /></label>
@@ -39,7 +42,7 @@
             @if (!ReadOnly) { <button type="button" class="button-danger" @onclick="() => RemoveAsync(row)">@T("Documents.Remove")</button> }
         </fieldset>
     }
-    @if (!ReadOnly) { <button type="button" class="button-secondary" disabled="@(Value.Count >= 32)" @onclick="AddAsync" data-testid="storage-collection-add">@T("Documents.Add")</button> }
+    @if (!ReadOnly) { <button type="button" class="button-secondary" disabled="@(rows.Count >= 32)" @onclick="AddAsync" data-testid="storage-collection-add">@T("Documents.Add")</button> }
 </section>
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<StorageDocumentCollection> Value { get; set; } = [];
@@ -47,36 +50,72 @@
     [Parameter] public EventCallback<IReadOnlyList<StorageDocumentCollection>> ValueChanged { get; set; }
     [Parameter] public EventCallback<bool> ValidationChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    private IReadOnlyList<StorageDocumentCollection> rows = [];
+    private readonly List<object> rowKeys = [];
+    private bool? lastValid;
     private readonly Dictionary<int, string> drafts = [];
     private readonly HashSet<int> invalid = [];
     private string T(string key) => Localizer[key];
     private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
     private static bool Checked(ChangeEventArgs e) => e.Value is true;
-    private Task SetAsync(int row, StorageDocumentCollection value) => ValueChanged.InvokeAsync(Value.Select((c, i) => i == row ? value : c).ToArray());
-    private Task AddAsync() => ValueChanged.InvokeAsync([.. Value, new() { Name = "collection-" + (Value.Count + 1), DisplayName = "", Policy = new(Query: Capabilities.Query, QueryProfiles: Capabilities.QueryProfiles.Select(p => p.Id).ToArray()) }]);
-    private async Task RemoveAsync(int row) { drafts.Clear(); invalid.Clear(); await ValidationChanged.InvokeAsync(true); await ValueChanged.InvokeAsync(Value.Where((_, i) => i != row).ToArray()); }
+    protected override async Task OnParametersSetAsync()
+    {
+        rows = Value;
+        SynchronizeKeys();
+        await NotifyValidationAsync();
+    }
+    private void SynchronizeKeys()
+    {
+        while (rowKeys.Count < rows.Count) rowKeys.Add(new());
+        if (rowKeys.Count > rows.Count) rowKeys.RemoveRange(rows.Count, rowKeys.Count - rows.Count);
+    }
+    private static bool IdentityValid(StorageDocumentCollection collection) =>
+        !string.IsNullOrWhiteSpace(collection.DisplayName) && collection.DisplayName.Length <= 200
+        && collection.Name is { Length: >= 1 and <= 128 } && char.IsAsciiLetterOrDigit(collection.Name[0])
+        && collection.Name.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c is '.' or '-');
+    private Task NotifyValidationAsync()
+    {
+        var valid = invalid.Count == 0 && rows.All(IdentityValid);
+        if (lastValid == valid) return Task.CompletedTask;
+        lastValid = valid;
+        return ValidationChanged.InvokeAsync(valid);
+    }
+    private async Task UpdateRowsAsync(IReadOnlyList<StorageDocumentCollection> updated)
+    {
+        rows = updated;
+        SynchronizeKeys();
+        await ValueChanged.InvokeAsync(updated);
+        await NotifyValidationAsync();
+    }
+    private Task SetAsync(int row, StorageDocumentCollection value) => UpdateRowsAsync(rows.Select((c, i) => i == row ? value : c).ToArray());
+    private Task AddAsync() => UpdateRowsAsync([.. rows, new() { Name = "", DisplayName = "", Policy = new(Query: Capabilities.Query, QueryProfiles: Capabilities.QueryProfiles.Select(p => p.Id).ToArray()) }]);
+    private async Task RemoveAsync(int row)
+    {
+        rowKeys.RemoveAt(row); drafts.Clear(); invalid.Clear();
+        await UpdateRowsAsync(rows.Where((_, i) => i != row).ToArray());
+    }
     private async Task PageAsync(int row, ChangeEventArgs e)
     {
-        if (int.TryParse(Text(e), out var size)) await SetAsync(row, Value[row] with { Policy = Value[row].Policy with { MaximumPageSize = size } });
+        if (int.TryParse(Text(e), out var size)) await SetAsync(row, rows[row] with { Policy = rows[row].Policy with { MaximumPageSize = size } });
     }
     private async Task SharedAsync(int row)
     {
         invalid.Add(row);
-        await SetAsync(row, Value[row] with { SchemaBinding = new() { Reference = new() { Name = "", Version = "" } }, SchemaSnapshot = null });
-        await ValidationChanged.InvokeAsync(false);
+        await SetAsync(row, rows[row] with { SchemaBinding = new() { Reference = new() { Name = "", Version = "" } }, SchemaSnapshot = null });
+        await NotifyValidationAsync();
     }
     private async Task InlineAsync(int row)
     {
         invalid.Remove(row); drafts.Remove(row);
-        await SetAsync(row, Value[row] with { SchemaBinding = null, SchemaSnapshot = null });
-        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+        await SetAsync(row, rows[row] with { SchemaBinding = null, SchemaSnapshot = null });
+        await NotifyValidationAsync();
     }
     private async Task BindingAsync(int row, SchemaBindingEditorValue value)
     {
         if (value.Binding is null || value.EffectiveContent is null) invalid.Add(row); else invalid.Remove(row);
-        await SetAsync(row, Value[row] with { SchemaBinding = value.Binding,
-            Schema = value.EffectiveContent ?? Value[row].Schema, SchemaSnapshot = null });
-        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+        await SetAsync(row, rows[row] with { SchemaBinding = value.Binding,
+            Schema = value.EffectiveContent ?? rows[row].Schema, SchemaSnapshot = null });
+        await NotifyValidationAsync();
     }
     private async Task SchemaAsync(int row, ChangeEventArgs e)
     {
@@ -86,9 +125,9 @@
             using var json = JsonDocument.Parse(drafts[row]);
             if (json.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
             invalid.Remove(row);
-            await SetAsync(row, Value[row] with { Schema = json.RootElement.Clone(), SchemaBinding = null, SchemaSnapshot = null });
+            await SetAsync(row, rows[row] with { Schema = json.RootElement.Clone(), SchemaBinding = null, SchemaSnapshot = null });
         }
         catch (JsonException) { invalid.Add(row); }
-        await ValidationChanged.InvokeAsync(invalid.Count == 0);
+        await NotifyValidationAsync();
     }
 }

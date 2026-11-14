@@ -111,6 +111,18 @@ public static class AspDocumentAepEndpoints
                 return Results.Json(await bindings.ConfigureAsync(request, http.User, ct), AepProtocol.JsonOptions);
             }
             catch (AspException ex)
-            { return Results.Problem(statusCode: ex.Code == "forbidden" ? 403 : 422, title: "The protected document binding was refused."); }
+            {
+                var code = ex.Code is "backend_connection_refused" or "backend_unavailable" or "backend_timeout" or "forbidden"
+                    ? ex.Code : "binding_refused";
+                var status = code switch
+                {
+                    "forbidden" => 403,
+                    "backend_timeout" => 504,
+                    "backend_connection_refused" or "backend_unavailable" => 503,
+                    _ => 422
+                };
+                return Results.Problem(statusCode: status, title: "The protected document binding could not be established.",
+                    extensions: new Dictionary<string, object?> { ["code"] = code });
+            }
         }).RequireAuthorization(AepAuthenticationDefaults.Policy);
 }

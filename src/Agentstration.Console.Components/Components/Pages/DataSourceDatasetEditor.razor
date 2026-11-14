@@ -7,6 +7,7 @@
 @inject IServiceProvider Services
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> StorageLocalizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? T("CreateSource")) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@(source?.Definition.Description ?? T("DatasetHelp"))" TestId="data-source-dataset-editor">
@@ -175,7 +176,7 @@ else
                             else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
                             @if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button><small>@Localizer["DatasetBytes", item.Content.Length]</small> }
                             @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
-                            @if (item.ErrorCode is not null) { <span role="status">@T("DatasetExecutionFailed") <code>@item.ErrorCode</code>
+                            @if (item.ErrorCode is not null) { <span role="status">@FailureMessage(item.ErrorCode) <code>@item.ErrorCode</code>
                                 @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
                             </span> }
                         </td><td data-label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></td></tr>
@@ -325,6 +326,12 @@ else
     private bool NoConfiguration => InputSchema is { ValueKind: JsonValueKind.Object } schema && schema.TryGetProperty("additionalProperties", out var additional) && additional.ValueKind == JsonValueKind.False
         && (!schema.TryGetProperty("properties", out var properties) || properties.EnumerateObject().Any() == false)
         && (!schema.TryGetProperty("required", out var required) || required.GetArrayLength() == 0);
+    private string FailureMessage(string code)
+    {
+        var key = StorageErrorKey.ForCode(code);
+        return key is "Error.BackendConnectionRefused" or "Error.BackendTimeout" or "Error.BackendUnavailable"
+            ? StorageLocalizer[key].Value : T("DatasetExecutionFailed");
+    }
     private string T(string key) => Localizer[key];
     private static string StorageKey(StorageResource item) => $"{item.Uid}:{item.Generation}:{item.ObservedState?.BindingDigest}";
     private static string OperationKey(ConnectedServiceOperationResource item) => $"{item.Uid}:{item.Generation}:{item.Definition.DefinitionDigest}";
