@@ -75,4 +75,6 @@
   <data name="EnterValue"><value>Saisissez une valeur.</value></data>
   <data name="UseEmptyString"><value>Utiliser un texte vide</value></data>
   <data name="UseEmptyStringFor"><value>Utiliser un texte vide pour {0}</value></data>
+  <data name="RequiredEmptyStringMarker" xml:space="preserve"><value>(propriété requise ; vide autorisé)</value></data>
+  <data name="Rule.RequiredEmptyString" xml:space="preserve"><value>Cette propriété doit être présente. Une chaîne vide est une valeur valide.</value></data>
 </root>

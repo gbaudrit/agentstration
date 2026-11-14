@@ -4,6 +4,10 @@
 @if (!string.IsNullOrWhiteSpace(Text))
 {
     <p class="muted" aria-live="polite" data-testid="function-description">@Text</p>
+    @if (ImplementationId is "json.select" or "artifact.explode")
+    {
+        <p class="muted">@Localizer["JsonPointerRootHelp"]</p>
+    }
 }
 
 @code {

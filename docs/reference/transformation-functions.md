@@ -14,7 +14,7 @@ Inspect the catalogue under `/function-kinds` and `/transformation-functions`. S
 | `collection.distinct` | `{value:[...], path}` | First element for each semantically equal selected JSON value |
 | `artifact.explode` | `{value:{artifacts:[...]}, path, mode?, itemSchema?, maximumOutputs?}` | Manifest of independently publishable JSON items |
 
-The empty Pointer selects the root. Escape `/` as `~1` and `~` as `~0`. Missing properties, invalid array indices and malformed escapes fail; there is no original-value fallback. Filter and distinct preserve order. Functions have a 1 MiB JSON invocation/result limit; individual functions and consumers may impose smaller bounds.
+The empty Pointer selects the root. The `path` property is required, but its value may be `""`; the form distinguishes a missing property from an explicitly empty string and provides **Use empty text** for that value. Escape `/` as `~1` and `~` as `~0`. Missing properties, invalid array indices and malformed escapes fail; there is no original-value fallback. Filter and distinct preserve order. Functions have a 1 MiB JSON invocation/result limit; individual functions and consumers may impose smaller bounds.
 
 Each function has an optional resource `description`, editable for user declarations. The standard descriptions are reconciled automatically at Instance scope and shown in English or French after selection in source sequences and the ordinary Transform inspector. Descriptions are presentation metadata: editing one does not change an accepted function version or implementation contract.
 
@@ -31,6 +31,8 @@ In source sequences, use **Add a function** alongside the existing Flow action. 
 ## Exploding acquired content
 
 For acquired JSON `{ "results": [{"id":"a"},{"id":"b"}] }`, select `artifact.explode` and set `path` to `/results`. `arrayItems` is the default mode. `objectValues` instead expands an object's values in ordinal key order and retains each key in provenance. Selection with `json.select` keeps a selected array as one value; explosion explicitly produces multiple Artifact entries.
+
+If the Data Source already applies `json.select` with `/results`, its stored JSON is the array itself. In the Knowledge binding or before-publication sequence, use `artifact.explode` with `{"path":"","mode":"arrayItems"}` to expand that root array. Reusing `/results` would look for a property that no longer exists.
 
 Declare `itemSchema` to validate each item's content. The acquisition/envelope schema is not copied onto items. Outputs retain parent identity/digest, path, key and transformation evidence. Empty collections, duplicate object keys, invalid paths, mismatching schemas and output limits fail explicitly. At most 100 output Artifacts are publishable to Knowledge, each at most 64 KiB; a function invocation also bounds aggregate output content to 512 KiB. A larger source still has to satisfy its acquisition and read limits.
 

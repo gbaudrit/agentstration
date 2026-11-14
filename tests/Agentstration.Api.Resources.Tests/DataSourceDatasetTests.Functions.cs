@@ -16,6 +16,49 @@ public sealed partial class DataSourceDatasetTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
+    public async Task SelectedDataSourceArrayExplodesAtTheJsonRootInKnowledge(bool onBinding)
+    {
+        await using var factory = Factory();
+        await using var worker = await AwpTestWorker.StartAsync(factory);
+        var items = new[] { new { id = "a" }, new { id = "b" } };
+        var inputs = await PrepareAsync(factory.Services, operationResult: JsonSerializer.SerializeToElement(new { results = items }), declareAcquisitionOutput: false);
+        using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(inputs.Context);
+        var source = Source("selected-array", inputs, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
+        source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
+        {
+            Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
+            { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/results" }) }] }
+        } } };
+        await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, Owner);
+        var acquired = await AcquireAsync(client, source.Name);
+        var content = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquired, 0, 65536, default);
+        Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(items), JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(content.ContentBase64))));
+        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "", mode = "arrayItems" }) };
+        var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner, Metadata = new() { Name = "root-explosion" },
+            Definition = new()
+            {
+                DisplayName = "Root explosion", Output = new(inputs.Storage, new(Write: true)),
+                ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
+                DataSources = [new() { Name = "selected", DataSource = new(source.Name, Owner), RefreshIfNecessary = true, Transformations = onBinding ? [explode] : [] }],
+                Transformations = onBinding ? [] : [explode]
+            }
+        }, default);
+        var id = new KnowledgeSourceId(knowledge.Value.Name, ScopeRef: Owner);
+        var projected = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
+        Assert.AreEqual(KnowledgeProjectionState.Succeeded, projected.Value.State);
+        var snapshot = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot;
+        Assert.HasCount(2, snapshot.Artifacts);
+        var read = await factory.Services.GetRequiredService<KnowledgeAccessService>().ReadAsync(id, new() { SnapshotId = snapshot.Name }, default);
+        CollectionAssert.AreEquivalent(new[] { "a", "b" }, read.Chunks.Select(chunk => JsonSerializer.Deserialize<JsonElement>(chunk.Content).GetProperty("id").GetString()).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
     public async Task NativeExplosionComposesWithFlowsOnTheBindingAndPostAggregate(bool onBinding)
     {
         await using var factory = Factory();

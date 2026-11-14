@@ -230,6 +230,9 @@ public sealed partial class FlowTests
         Assert.IsTrue(FlowCompositionSchema.IsAssignable(objectSchema, any));
         Assert.IsTrue(FlowCompositionSchema.IsAssignable(any, any));
         Assert.IsFalse(FlowCompositionSchema.IsAssignable(any, objectSchema));
+        var openApiObject = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":["object","array","string","number","boolean","null"]},"number":{"type":"integer","format":"int64"}}}""");
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(openApiObject, objectSchema));
+        Assert.IsFalse(FlowCompositionSchema.IsAssignable(openApiObject, JsonSerializer.Deserialize<JsonElement>("""{"type":"object","required":["missing"]}""")));
         var parameters = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"equals":{}},"required":["equals"],"additionalProperties":false}""");
         var value = JsonSerializer.SerializeToElement(new { equals = new { active = true } });
         Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(parameters, value));

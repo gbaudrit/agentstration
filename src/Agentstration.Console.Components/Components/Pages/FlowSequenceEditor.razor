@@ -19,7 +19,7 @@
             {
                 <label>@T("SequenceFunction")<select value="@FunctionKey(call.Function)" @onchange="args => SelectFunctionAsync(position, args.Value?.ToString())" data-testid="function-sequence-target">
                     @if (function is null) { <option value="@FunctionKey(call.Function)">@call.Function.Name · @T("SequenceUnavailable")</option> }
-                    @foreach (var choice in functionOptions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
+                    @foreach (var choice in functionOptions) { <option value="@FunctionKey(choice.Function.Reference)" selected="@(FunctionKey(choice.Function.Reference) == FunctionKey(call.Function))">@choice.DisplayName</option> }
                 </select></label>
                 @if (function is not null)
                 { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
