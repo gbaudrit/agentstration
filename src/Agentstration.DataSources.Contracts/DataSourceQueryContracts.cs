@@ -52,4 +52,5 @@ public sealed record PublishDataSourceQueryRequest(string Version);
 public sealed record PublishDataSourceQueryToolRequest(string Name, string DisplayName, string Version,
     string? QueryVersion = null, DataSourceQueryAcquisitionPin? Acquisition = null, bool RequiresApproval = false);
 public sealed record DataSourceQueryToolPublication(ResourceReference Tool, Guid QueryUid, string QueryName,
-    string ToolVersion, string? SelectedQueryVersion, DataSourceQueryAcquisitionPin? Acquisition, bool Legacy = false, bool Generic = false, string? DisplayName = null);
+    string ToolVersion, string? SelectedQueryVersion, DataSourceQueryAcquisitionPin? Acquisition, bool Legacy = false, bool Generic = false,
+    string? DisplayName = null, ResourceReference? Definition = null);

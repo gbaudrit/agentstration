@@ -218,9 +218,12 @@ published version. Published queries live in Agentstration's configuration store
 separately from acquired documents. The Query access panel controls sharing with
 descendant scopes; Source and Storage Use remain necessary at execution.
 
-Open **Tools** to find persisted publications after navigation or refresh. The
-generic Query Tool accepts the scoped Query reference; its invocation JSON is
-available on the selected Query. A named relay fixes the Query identity and
+Open **Tools** to find the Data Source's persisted publications after navigation
+or refresh. **Edit** opens the existing Tool definition editor to prepare and
+publish a new Tool version; the published invocation link remains available.
+The generic Query Tool belongs to the shared catalog and is omitted from this
+Data Source-specific list. It accepts the scoped Query reference; its invocation
+JSON is available on the selected Query. A named relay fixes the Query identity and
 optionally its version. Without a version, each initial call uses the most recent
 publication, including when its version number is lower. Publishing a compatible
 filter/order change requires no Tool or Flow republication. An incompatible

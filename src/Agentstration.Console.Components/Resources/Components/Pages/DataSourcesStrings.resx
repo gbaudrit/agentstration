@@ -214,7 +214,8 @@
   <data name="Queries.SaveHelp" xml:space="preserve"><value>Save this JSON query under its own identity, then publish and expose it from Queries and Tools.</value></data>
   <data name="Queries.Saved" xml:space="preserve"><value>Query draft saved. Open Queries to publish it.</value></data>
   <data name="Queries.Help" xml:space="preserve"><value>Queries have independent drafts and immutable published versions. Save a query from acquired Content to create one.</value></data>
-  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Published exposures are reloaded from storage. A relay fixes the Query name and optionally its version; otherwise each call resolves the latest publication.</value></data>
+  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Published exposures for this Data Source are reloaded from storage. Edit opens the Tool definition to prepare a new version. A relay fixes the Query name and optionally its version; otherwise each call resolves the latest publication.</value></data>
+  <data name="Queries.EditTool" xml:space="preserve"><value>Edit</value></data>
   <data name="Queries.NoTools" xml:space="preserve"><value>No query Tools have been published for this Data Source.</value></data>
   <data name="Queries.Empty" xml:space="preserve"><value>No saved Query. Test a query in Content and save it as a draft.</value></data>
   <data name="Queries.Version" xml:space="preserve"><value>Publication version</value></data>

@@ -130,7 +130,10 @@ internal static class ToolDefinitionEndpoints
                 ControlPlaneAccessMode.TenantAdministration => ResourceScopeRef.Tenant(context.Current.TenantId),
                 _ => (ResourceScopeRef?)null
             };
-            var resource = Resource(name, ns, body.Properties, owner ?? ResourceScopeRef.Workspace(context.Current.WorkspaceId));
+            var scope = owner ?? ResourceScopeRef.Workspace(context.Current.WorkspaceId);
+            var current = await service.GetExactAsync(name, ns, scope, cancellationToken);
+            var resource = current is null ? Resource(name, ns, body.Properties, scope)
+                : current.Value with { Definition = body.Properties };
             return ToolsApiHttp.ResourceResult(
                 await service.PutAsync(resource, ToolsApiHttp.IfMatch(request), false, cancellationToken), response, 200);
         });

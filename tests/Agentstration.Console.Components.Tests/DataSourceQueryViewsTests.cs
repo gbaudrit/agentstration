@@ -40,6 +40,7 @@ public sealed class DataSourceQueryViewsTests
         await page.Find("[data-testid=dataset-query-publish]").ClickAsync();
         Assert.AreEqual("B", handler.PublishedVersion);
         page.Render(p => p.Add(c => c.ShowTools, true));
+        Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-tool-row]"), "The shared generic executor does not belong to this Data Source's exposures.");
         await page.Find("[data-testid=dataset-tool-query]").ChangeAsync(handler.Query.Uid.ToString());
         Assert.Contains(label, page.Markup);
         await page.Find("[data-testid=dataset-query-tool-display-name]").InputAsync("Beta query tool");
@@ -54,15 +55,35 @@ public sealed class DataSourceQueryViewsTests
         page.Dispose();
         var reloaded = context.Render<DataSourceQueries>(p => p.Add(c => c.Source, handler.Source).Add(c => c.ShowTools, true));
         reloaded.WaitForElement("[data-testid=dataset-query-tool-row]");
+        Assert.HasCount(1, reloaded.FindAll("[data-testid=dataset-query-tool-row]"));
         Assert.Contains("2.0.0", reloaded.Markup);
         Assert.IsNotNull(reloaded.Find("[data-testid=dataset-query-tool-row] a[href*='/tools/']"));
+        var edit = reloaded.Find("[data-testid=dataset-query-tool-edit]");
+        Assert.AreEqual("/tools/definitions/beta-query-tool?namespace=default&scopeRef=%2Finstance", edit.GetAttribute("href"));
+        Assert.AreEqual(culture == "fr-FR" ? "Modifier" : "Edit", edit.TextContent);
     }
 
-    private sealed class ContextProvider : IConsoleContextProvider
+    [TestMethod]
+    public async Task ToolDefinitionsCannotBeEditedWithoutWritePermission()
+    {
+        using var context = new BunitContext();
+        using var handler = new QueryHandler { Publication = new("beta-query-tool", "Beta query tool", "1.0.0") };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
+        var state = new ConsoleContextState(new ContextProvider(false)); await state.EnsureLoadedAsync(default);
+        context.Services.AddSingleton(state);
+        var page = context.Render<DataSourceQueries>(p => p.Add(c => c.Source, handler.Source).Add(c => c.ShowTools, true));
+        page.WaitForElement("[data-testid=dataset-query-tool-row]");
+        Assert.HasCount(1, page.FindAll("[data-testid=dataset-query-tool-row]"));
+        Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-tool-edit]"));
+    }
+
+    private sealed class ContextProvider(bool canWrite = true) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken ct) => Task.FromResult(new ConsoleContextSnapshot(
             Guid.NewGuid(), "Operator", "/instance", ConsoleContextKind.Instance, Guid.NewGuid(), "tenant", "Tenant", Guid.NewGuid(), "workspace", "Workspace",
-            new HashSet<string> { "resources/read", "resources/write", "runs/read", "runs/execute" }, [], []));
+            new HashSet<string>(canWrite ? ["resources/read", "resources/write", "runs/read", "runs/execute"] : ["resources/read", "runs/read"]), [], []));
     }
     private sealed class QueryHandler : HttpMessageHandler
     {
@@ -73,7 +94,7 @@ public sealed class DataSourceQueryViewsTests
         };
         public DataSourceQueryResource Query { get; private set; }
         public string PublishedVersion { get; private set; } = "A";
-        public PublishDataSourceQueryToolRequest? Publication { get; private set; }
+        public PublishDataSourceQueryToolRequest? Publication { get; set; }
         public QueryHandler()
         {
             Query = new()
@@ -96,9 +117,17 @@ public sealed class DataSourceQueryViewsTests
                     Publication = await request.Content!.ReadFromJsonAsync<PublishDataSourceQueryToolRequest>(ct);
                     body = new ResourceReference("agentstration.beta-query-tool.v" + Publication!.Version, ResourceScopeRef.Instance, ResourceNamespace.Default);
                 }
-                else body = Publication is null ? Array.Empty<DataSourceQueryToolPublication>() : new[] { new DataSourceQueryToolPublication(
-                    new("agentstration.beta-query-tool.v" + Publication.Version, ResourceScopeRef.Instance, ResourceNamespace.Default),
-                    Query.Uid, Query.Name, Publication.Version, Publication.QueryVersion, null) };
+                else
+                {
+                    List<DataSourceQueryToolPublication> publications = [new(
+                        new("agentstration.datasource-query.v1.0.0", ResourceScopeRef.Instance, ResourceNamespace.Default),
+                        Guid.Empty, "", "1.0.0", null, null, Generic: true, DisplayName: "Data Source Query")];
+                    if (Publication is not null) publications.Add(new(
+                        new("agentstration.beta-query-tool.v" + Publication.Version, ResourceScopeRef.Instance, ResourceNamespace.Default),
+                        Query.Uid, Query.Name, Publication.Version, Publication.QueryVersion, null,
+                        Definition: new("beta-query-tool", ResourceScopeRef.Instance, ResourceNamespace.Default)));
+                    body = publications;
+                }
             }
             else if (path.EndsWith("/versions", StringComparison.Ordinal))
             {

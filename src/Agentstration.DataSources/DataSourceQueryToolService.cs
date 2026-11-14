@@ -108,11 +108,7 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
         {
             if (version.Definition is not RelayToolDefinitionProperties relay) continue;
             if (version.DefinitionName == GenericName && version.Metadata.Annotations.ContainsKey("agentstration.io/query-generic"))
-            {
-                result.Add(new(new(AgentstrationToolProvider.ToolResourceName(version.Name), version.ScopeRef, version.Namespace),
-                    Guid.Empty, "", relay.Version, null, null, Generic: true, DisplayName: relay.DisplayName));
                 continue;
-            }
             var reference = relay.Bindings.OfType<LiteralToolArgumentBinding>().FirstOrDefault(b => b.Path == "/query");
             if (reference is not null)
             {
@@ -123,7 +119,8 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
                 var acquisition = relay.Bindings.OfType<LiteralToolArgumentBinding>().FirstOrDefault(b => b.Path == "/acquisition")?.Value
                     .Deserialize<DataSourceQueryAcquisitionPin>(Json);
                 result.Add(new(new(AgentstrationToolProvider.ToolResourceName(version.Name), version.ScopeRef, version.Namespace),
-                    query.QueryUid, query.Query.Name, relay.Version, query.Version, acquisition, DisplayName: relay.DisplayName));
+                    query.QueryUid, query.Query.Name, relay.Version, query.Version, acquisition, DisplayName: relay.DisplayName,
+                    Definition: new(version.DefinitionName, version.ScopeRef, version.Namespace)));
             }
             else
             {
@@ -133,7 +130,8 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
                 try { selection = literal.Value.Deserialize<DataSourceDocumentSelection>(Json); } catch (JsonException) { continue; }
                 if (selection?.SourceUid != sourceUid) continue;
                 result.Add(new(new(AgentstrationToolProvider.ToolResourceName(version.Name), version.ScopeRef, version.Namespace),
-                    Guid.Empty, "", relay.Version, null, selection.AcquisitionUid is { } uid && selection.AcquisitionId is { } id ? new(id, uid) : null, true, DisplayName: relay.DisplayName));
+                    Guid.Empty, "", relay.Version, null, selection.AcquisitionUid is { } uid && selection.AcquisitionId is { } id ? new(id, uid) : null,
+                    true, DisplayName: relay.DisplayName, Definition: new(version.DefinitionName, version.ScopeRef, version.Namespace)));
             }
         }
         return result;

@@ -99,10 +99,35 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(flowVersion.Value.DefinitionHash, (await flows.GetVersionExactAsync(Owner, flow.Value.Id, "1.0.0", default))!.Value.DefinitionHash);
         var publications = await client.GetFromJsonAsync<DataSourceQueryToolPublication[]>($"/api/datasourcequeries/tools?scopeRef=/instance&sourceUid={source.Value.Uid}");
         Assert.IsNotNull(publications);
-        Assert.HasCount(3, publications);
-        Assert.HasCount(1, publications.Where(p => p.Generic).ToArray());
+        Assert.HasCount(2, publications);
+        Assert.IsFalse(publications.Any(p => p.Generic));
+        Assert.IsTrue(publications.All(p => p.Definition is { ScopeRef: { } scope } && scope == Owner));
+        Assert.IsTrue(publications.Any(p => p.Definition?.Name == "alpha-dynamic"));
+        Assert.IsTrue(publications.Any(p => p.Definition?.Name == "alpha-exact"));
         Assert.IsTrue(publications.Any(p => p.SelectedQueryVersion is null));
         Assert.IsTrue(publications.Any(p => p.SelectedQueryVersion == "9.0.0"));
+        var editable = publications.Single(p => p.Definition?.Name == "alpha-exact").Definition!;
+        var editPath = $"/api/tooldefinitions/{editable.Name}?namespace={editable.Namespace}&scopeRef=/instance";
+        using var definitionResponse = await client.GetAsync(editPath);
+        definitionResponse.EnsureSuccessStatusCode();
+        var beforeEdit = (await definitionResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        var changed = (RelayToolDefinitionProperties)beforeEdit.Definition with
+        { DisplayName = "Edited alpha query", Version = "2.0.0", Publish = false };
+        using var editRequest = new HttpRequestMessage(HttpMethod.Put, editPath)
+        { Content = JsonContent.Create(new PutToolDefinitionRequest(changed)) };
+        editRequest.Headers.IfMatch.Add(definitionResponse.Headers.ETag!);
+        using var editResponse = await client.SendAsync(editRequest);
+        Assert.AreEqual(HttpStatusCode.OK, editResponse.StatusCode, await editResponse.Content.ReadAsStringAsync());
+        var afterEdit = (await editResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        Assert.AreEqual(beforeEdit.Uid, afterEdit.Uid);
+        Assert.AreEqual(query.Uid.ToString("D"), afterEdit.Metadata.Annotations["agentstration.io/query-uid"]);
+        using var republish = await client.PostAsJsonAsync($"/api/tooldefinitions/{editable.Name}/versions?namespace={editable.Namespace}",
+            new PublishToolDefinitionRequest("2.0.0", editResponse.Headers.ETag!.ToString()));
+        Assert.AreEqual(HttpStatusCode.Created, republish.StatusCode, await republish.Content.ReadAsStringAsync());
+        var reloaded = (await client.GetFromJsonAsync<DataSourceQueryToolPublication[]>($"/api/datasourcequeries/tools?scopeRef=/instance&sourceUid={source.Value.Uid}"))!;
+        Assert.HasCount(3, reloaded);
+        Assert.IsTrue(reloaded.Any(p => p.Definition?.Name == editable.Name && p.ToolVersion == "2.0.0" && p.DisplayName == changed.DisplayName));
+        Assert.IsTrue(reloaded.Any(p => p.Definition?.Name == editable.Name && p.ToolVersion == "1.0.0" && p.DisplayName == beforeEdit.Definition.DisplayName));
         var invalid = await Assert.ThrowsAsync<DataSourceValidationException>(() => service.PublishAsync(Owner, query.Namespace, query.Name, "9.0.0", draft.ETag, default));
         Assert.AreEqual("data_source_query_version_immutable", invalid.Code);
         draft = await service.UpdateAsync(Owner, query.Namespace, query.Name, draft.Value.Definition with

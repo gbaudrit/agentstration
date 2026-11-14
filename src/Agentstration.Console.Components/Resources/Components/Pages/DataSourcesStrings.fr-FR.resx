@@ -214,7 +214,8 @@
   <data name="Queries.SaveHelp" xml:space="preserve"><value>Enregistrez cette requête JSON sous sa propre identité, puis publiez-la et exposez-la depuis Queries et Tools.</value></data>
   <data name="Queries.Saved" xml:space="preserve"><value>Brouillon de Query enregistré. Ouvrez Queries pour le publier.</value></data>
   <data name="Queries.Help" xml:space="preserve"><value>Les Queries possèdent leurs brouillons et versions publiées immuables. Enregistrez une requête depuis le Contenu acquis pour en créer une.</value></data>
-  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Les expositions publiées sont rechargées depuis le stockage. Un relais fixe le nom de Query et éventuellement sa version ; sinon chaque appel résout la dernière publication.</value></data>
+  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Les expositions publiées pour cette Data Source sont rechargées depuis le stockage. Modifier ouvre la définition du Tool pour préparer une nouvelle version. Un relais fixe le nom de Query et éventuellement sa version ; sinon chaque appel résout la dernière publication.</value></data>
+  <data name="Queries.EditTool" xml:space="preserve"><value>Modifier</value></data>
   <data name="Queries.NoTools" xml:space="preserve"><value>Aucun Tool de requête publié pour cette Data Source.</value></data>
   <data name="Queries.Empty" xml:space="preserve"><value>Aucune Query enregistrée. Testez une requête dans Contenu puis enregistrez son brouillon.</value></data>
   <data name="Queries.Version" xml:space="preserve"><value>Version publiée</value></data>
