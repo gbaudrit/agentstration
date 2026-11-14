@@ -199,6 +199,21 @@ public sealed partial class FlowTests
         Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(JsonSerializer.SerializeToElement(new { type = "string", pattern = "^[a-z]+$" }), JsonSerializer.SerializeToElement("42")));
     }
 
+    [TestMethod]
+    public void UnconstrainedOutputTargetsAndNativeParameterValuesRetainRuntimeValidation()
+    {
+        var any = JsonSerializer.SerializeToElement(new { });
+        var objectSchema = JsonSerializer.SerializeToElement(new { type = "object" });
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(objectSchema, any));
+        Assert.IsTrue(FlowCompositionSchema.IsAssignable(any, any));
+        Assert.IsFalse(FlowCompositionSchema.IsAssignable(any, objectSchema));
+        var parameters = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"equals":{}},"required":["equals"],"additionalProperties":false}""");
+        var value = JsonSerializer.SerializeToElement(new { equals = new { active = true } });
+        Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(parameters, value));
+        FlowCompositionSchema.ValidateValue(parameters, value, allowDynamicSchema: true);
+        Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(parameters, any, allowDynamicSchema: true));
+    }
+
     private static FlowGraphDefinition CompositionTemplate()
     {
         var value = JsonSerializer.SerializeToElement(new { type = "object" });

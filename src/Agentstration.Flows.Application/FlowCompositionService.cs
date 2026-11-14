@@ -51,8 +51,8 @@ public sealed class FlowCompositionService(FlowService flows)
                     JsonElement? functionParameters = null;
                     if (function.InputSchema.TryGetProperty("properties", out var functionProperties) && functionProperties.TryGetProperty("value", out var functionValue))
                     {
-                        if (!FunctionValueCompatible(previousSchema, functionValue)) throw Error("flow_composition_contract_incompatible");
-                        FlowCompositionSchema.ValidateValue(Agentstration.Functions.Contracts.FunctionInvocationSchemas.Parameters(function.InputSchema), call.Parameters);
+                        if (!FunctionValueCompatible(previousSchema, functionValue)) throw Error("flow_composition_function_input_incompatible");
+                        FlowCompositionSchema.ValidateValue(Agentstration.Functions.Contracts.FunctionInvocationSchemas.Parameters(function.InputSchema), call.Parameters, allowDynamicSchema: true);
                         arguments = JsonSerializer.SerializeToElement(new { value = mapping.Clone() });
                         functionParameters = call.Parameters.Clone();
                     }
@@ -172,6 +172,7 @@ public sealed class FlowCompositionService(FlowService flows)
     // Function value constraints are checked on the actual value by the authority. Check known structure here.
     private static bool FunctionValueCompatible(JsonElement output, JsonElement input)
     {
+        if (!output.EnumerateObject().Any()) return true;
         if (!input.EnumerateObject().Any()) return true;
         if (input.TryGetProperty("anyOf", out var alternatives)) return alternatives.EnumerateArray().Any(candidate => FunctionValueCompatible(output, candidate));
         if (!output.TryGetProperty("type", out var actual) || !input.TryGetProperty("type", out var expected)) return false;

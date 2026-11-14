@@ -87,12 +87,18 @@ internal static class DataSourceEndpoints
         catch (ResourceNotFoundException exception) { return Problem("data-source-not-found", "Data Source not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
-        catch (Exception exception) when (exception is DataSourceValidationException or ResourceScopePolicyException
+        catch (DataSourceValidationException exception)
+        { return Problem(exception.Code, "Invalid Data Source", 422, exception.Message, exception.CompositionErrorCode); }
+        catch (Exception exception) when (exception is ResourceScopePolicyException
             or ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException or ArgumentException or FormatException)
-        { return Problem(exception is DataSourceValidationException validation ? validation.Code : "data-source-invalid", "Invalid Data Source", 422, exception.Message); }
+        { return Problem("data-source-invalid", "Invalid Data Source", 422, exception.Message); }
     }
-    private static IResult Problem(string type, string title, int status, string detail) => Results.Problem(new ProblemDetails
-    { Type = $"https://agentstration.dev/problems/{type}", Title = title, Status = status, Detail = detail });
+    private static IResult Problem(string type, string title, int status, string detail, string? compositionErrorCode = null)
+    {
+        var problem = new ProblemDetails { Type = $"https://agentstration.dev/problems/{type}", Title = title, Status = status, Detail = detail };
+        if (compositionErrorCode is not null) problem.Extensions["compositionErrorCode"] = compositionErrorCode;
+        return Results.Problem(problem);
+    }
 }
 
 internal static class DataSourceProfileEndpoints

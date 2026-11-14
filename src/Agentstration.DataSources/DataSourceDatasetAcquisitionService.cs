@@ -200,7 +200,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             {
                 await ValidateExecutionAsync(acquisition, cancellationToken);
                 if (run.Output is not { } output) throw Invalid("data_source_output_missing", "The operation returned no content.");
-                DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset!.OutputSchema, output);
+                DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset!.OutputSchema, output);
                 var bytes = acquisition.Dataset.Definition.DocumentCollectionUid is null
                     ? JsonSerializer.SerializeToUtf8Bytes(output) : DataSourceDocumentStorage.Encode(output);
                 if (acquisition.Dataset.Definition.Storage is null)

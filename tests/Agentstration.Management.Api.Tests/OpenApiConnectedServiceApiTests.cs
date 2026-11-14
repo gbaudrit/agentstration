@@ -329,8 +329,8 @@ public sealed partial class ConnectedServiceApiTests
             {
                 Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
                 {
-                    ["transformations"] = [new() { Function = new("json-project-builtin", "1.0.0", ResourceScopeRef.Instance),
-                        Parameters = JsonSerializer.SerializeToElement(new { properties = new[] { new { name = "dataset", path = "/dataset" } } }) }]
+                    ["transformations"] = [new() { Function = new("json-select-builtin", "1.0.0", ResourceScopeRef.Instance),
+                        Parameters = JsonSerializer.SerializeToElement(new { path = "/dataset" }) }]
                 }
             };
             using var save = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(dataset,
@@ -347,11 +347,16 @@ public sealed partial class ConnectedServiceApiTests
                     $"/api/datasourceacquisitions/{acquisition.Name}", acquisitionTimeout.Token))!;
             } while (acquisition.CompletedAt is null);
             Assert.AreEqual(DataSourceAcquisitionState.Succeeded, acquisition.State, $"{acquisition.ErrorCode}: {acquisition.ErrorMessage}");
-            if (transform) Assert.AreEqual("json-project-builtin", acquisition.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single().Function!.Name);
+            if (transform)
+            {
+                Assert.AreEqual("json-select-builtin", acquisition.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single().Function!.Name);
+                Assert.AreEqual("object", acquisition.Dataset.OperationOutputSchema!.Value.GetProperty("type").GetString());
+            }
             using var read = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content");
             Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
             var content = (await read.Content.ReadFromJsonAsync<StorageObjectContent>())!;
-            Assert.AreEqual(dataset, JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(content.ContentBase64)).GetProperty("dataset").GetString());
+            var storedJson = JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(content.ContentBase64));
+            Assert.AreEqual(dataset, transform ? storedJson.GetString() : storedJson.GetProperty("dataset").GetString());
             results.Add(acquisition);
         }
         Assert.AreNotEqual(results[0].Content!.Key, results[1].Content!.Key);

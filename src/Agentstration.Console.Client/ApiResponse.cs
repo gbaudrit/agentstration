@@ -43,11 +43,11 @@ internal static class ApiResponse
         catch (System.Text.Json.JsonException) { }
         var message = problem?.Detail ?? problem?.Title ?? $"Agentstration API returned {(int)response.StatusCode} ({response.ReasonPhrase}).";
         throw new AgentstrationApiException(message, correlationId ?? Guid.NewGuid().ToString("N"), response.StatusCode, problem?.Title)
-        { ProblemType = problem?.Type, ValidationIssues = problem?.ValidationIssues?.Take(10).ToArray() ?? [] };
+        { ProblemType = problem?.Type, CompositionErrorCode = problem?.CompositionErrorCode, ValidationIssues = problem?.ValidationIssues?.Take(10).ToArray() ?? [] };
     }
 
     private sealed record ApiProblemDetails(string? Title, string? Detail, int? Status, string? Type,
-        IReadOnlyList<ApiValidationIssue>? ValidationIssues = null);
+        IReadOnlyList<ApiValidationIssue>? ValidationIssues = null, string? CompositionErrorCode = null);
 }
 
 public sealed record ApiValidationIssue(string Path, string Code, string? Keyword = null);
@@ -58,6 +58,7 @@ public sealed class AgentstrationApiException(string message, string errorId, Ht
     public HttpStatusCode? StatusCode { get; } = statusCode;
     public string? ProblemTitle { get; } = problemTitle;
     public string? ProblemType { get; init; }
+    public string? CompositionErrorCode { get; init; }
     public IReadOnlyList<ApiValidationIssue> ValidationIssues { get; init; } = [];
     public bool IsConcurrencyConflict => StatusCode == HttpStatusCode.PreconditionFailed
         || StatusCode == HttpStatusCode.Conflict && string.Equals(ProblemTitle, "Resource version conflict", StringComparison.OrdinalIgnoreCase);

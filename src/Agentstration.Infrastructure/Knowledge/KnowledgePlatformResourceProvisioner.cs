@@ -502,6 +502,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
         })
         {
             var result = boundary == "acquisition" ? value : KnowledgeBuiltinSchemas.ArtifactManifestOutput;
+            var transformed = boundary == "acquisition" ? JsonSerializer.SerializeToElement(new { }) : result;
             var sequence = boundary is null ? "transformations" : boundary == "acquisition" ? "transformations" : "postAggregate";
             var nodes = new List<FlowStepDefinition> { new InputFlowStepDefinition { Name = "input", Schema = boundary is null ? result : value } };
             if (boundary is not null) nodes.Add(new FlowCompositionPointStepDefinition
@@ -520,20 +521,20 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 Point = sequence,
                 AllowEmpty = true,
                 InputSchema = result,
-                OutputSchema = result,
+                OutputSchema = transformed,
                 InputMapping = JsonSerializer.SerializeToElement(boundary is null ? "${input}" : "${steps." + boundary + ".output}")
             });
             nodes.Add(new OutputFlowStepDefinition
             {
                 Name = "output",
-                Schema = result,
+                Schema = transformed,
                 OutputMapping = JsonSerializer.SerializeToElement("${steps." + sequence + ".output}")
             });
-            await CreateAndPublishFlowAsync(scope, name, name, contract, null, "1.0.0", new()
+            await CreateAndPublishFlowAsync(scope, name, name, contract, null, boundary == "acquisition" ? "1.1.0" : "1.0.0", new()
             {
                 EntryStep = "input",
                 InputSchema = boundary is null ? result : value,
-                OutputSchema = result,
+                OutputSchema = transformed,
                 Steps = nodes,
                 Transitions = nodes.Zip(nodes.Skip(1), (left, right) => new FlowTransitionDefinition(left.Name + "-next", left.Name,
                     "completed", right.Name)).ToArray()

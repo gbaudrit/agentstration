@@ -77,9 +77,11 @@ public sealed class DataSourceDatasetCompositionService(
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
             { ScopeRef = composed.Orchestration.ScopeRef };
             return new(definition, operation, type, input, composed.OutputSchema ?? output, partition, targetFlow)
-            { OperationFlow = flow, Composition = composed };
+            { OperationFlow = flow, OperationOutputSchema = output.Clone(), Composition = composed };
         }
-        catch (Exception exception) when (exception is Agentstration.Flows.FlowValidationException or KeyNotFoundException)
+        catch (FlowValidationException exception)
+        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.") { CompositionErrorCode = exception.Code }; }
+        catch (KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
 
@@ -127,6 +129,15 @@ public sealed class DataSourceDatasetCompositionService(
         try { ToolInputSchemaValidator.Validate(schema, value); }
         catch (ToolInputValidationException)
         { throw Invalid("data_source_parameters_invalid", "The value does not satisfy the effective operation schema."); }
+    }
+
+    public static void ValidateOutput(JsonElement schema, JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+            throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
+        try { Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(schema, "dataset-output"), value, "dataset-output"); }
+        catch (Agentstration.Schemas.DataContractException)
+        { throw Invalid("data_source_output_invalid", "The transformed output does not satisfy its accepted output contract."); }
     }
 
     private static JsonElement Schema(JsonElement definition, string property)

@@ -118,6 +118,7 @@ public sealed record ResolvedDataSourceDataset(
     ResolvedDataSourceFlowBinding Flow)
 {
     public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
+    public JsonElement? OperationOutputSchema { get; init; }
     public ResolvedFlowComposition? Composition { get; init; }
 }
 

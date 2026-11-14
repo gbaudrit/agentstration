@@ -47,6 +47,8 @@ in the accepted composition. A declared adapter schema still takes precedence;
 ordinary transformation Flows must declare their own output contracts. The
 boundary validates its result before the transformation sequence executes.
 
+Standard DataSource orchestration version `1.1.0` accepts any transformed JSON value. `json.select` can therefore store an array or scalar directly. The Operation output schema is pinned separately and still validates the raw acquired response. Transformed output is validated against the final composition contract and bounded to 64 KiB before storage. This produces one stored JSON content; Artifact fan-out remains a separate Knowledge publication operation. Failed composition responses retain `data_source_composition_invalid` and expose `compositionErrorCode` for HTTP and Console diagnosis.
+
 The integration baseline includes StorageType administration and scoped generic
 grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
 the merged `local@1.0.0` contract and current Storage/StorageType Use decisions;

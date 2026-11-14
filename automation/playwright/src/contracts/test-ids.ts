@@ -14,7 +14,7 @@ export const TestIds = {
     manifestMapping: 'artifact-manifest-mapping', inputMapping: 'artifact-input-mapping', resultMapping: 'artifact-result-mapping',
   },
   sourcePolicies: {
-    pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code',
+    pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code', compositionError: 'dataset-composition-error-code',
     definitionFields: 'dataset-definition-fields', service: 'dataset-service', operation: 'dataset-operation',
     storage: 'dataset-storage', direct: 'dataset-allow-direct', lifecycle: 'source-lifecycle-editor',
     enable: 'lifecycle-enable', ttl: 'lifecycle-ttl', history: 'lifecycle-history', retention: 'lifecycle-retention',

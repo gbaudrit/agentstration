@@ -102,7 +102,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             var result = await client.AcquireConnectedServiceOperationAsync(new(type.Name, version.Version,
                 service.Definition.Options, values, operationType.Name, operationVersion.Version,
                 operation.Definition.Definition, acquisition.Parameters, acquisition.CorrelationId), cancellationToken);
-            DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset.OutputSchema, result.Result);
+            DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset.OperationOutputSchema ?? acquisition.Dataset.OutputSchema, result.Result);
             return result.Result.Clone();
         }, cancellationToken);
     }

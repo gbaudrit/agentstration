@@ -186,6 +186,7 @@ public sealed class DataSourceDatasetEditorTests
         rendered.WaitForAssertion(() => Assert.AreEqual(code, rendered.Find("[data-testid='dataset-error-code']").TextContent));
         Assert.Contains(expected, rendered.Find("[role='alert']").TextContent);
         Assert.Contains("fixture-error-reference", rendered.Find("[role='alert']").TextContent);
+        if (code == "data_source_composition_invalid") Assert.AreEqual("flow_composition_function_input_incompatible", rendered.Find("[data-testid='dataset-composition-error-code']").TextContent);
         Assert.DoesNotContain("private-saved-value", rendered.Markup);
     }
 
@@ -466,7 +467,8 @@ public sealed class DataSourceDatasetEditorTests
                 if (FailSave)
                 {
                     var failure = new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/" + SaveFailureCode, detail = "private-saved-value" }) };
+                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/" + SaveFailureCode, detail = "private-saved-value",
+                        compositionErrorCode = SaveFailureCode == "data_source_composition_invalid" ? "flow_composition_function_input_incompatible" : null }) };
                     failure.Headers.Add("X-Correlation-ID", "fixture-error-reference");
                     return failure;
                 }

@@ -26,6 +26,7 @@ else
     {
         <div class="form-alert form-alert-danger" role="alert">@error
             @if (errorCode is not null) { <code data-testid="dataset-error-code">@errorCode</code> }
+            @if (compositionErrorCode is not null) { <small>@T("CompositionValidationReason") <code data-testid="dataset-composition-error-code">@compositionErrorCode</code></small> }
             @if (errorId is not null) { <small>@T("DatasetErrorReference") <code>@errorId</code></small> }
         </div>
     }
@@ -211,7 +212,7 @@ else
     private DataSourceReadiness? readiness;
     private ResourceScopeRef? scope;
     private string technicalName = "", displayName = "", resourceNamespace = "default", description = "", prefix = "", storageKey = "", operationKey = "", serviceKey = "";
-    private string? etag, error, preview, errorCode, errorId;
+    private string? etag, error, preview, errorCode, errorId, compositionErrorCode;
     private string savedServiceKey = "";
     private bool loading = true, busy, enabled = true, parametersValid = true, previewTruncated;
     private bool interactive;
@@ -334,7 +335,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         activeTab = Enum.TryParse<DatasetTab>(View, true, out var requested) ? requested : DatasetTab.Overview;
-        loading = true; error = null; errorCode = null; errorId = null;
+        loading = true; error = null; errorCode = null; errorId = null; compositionErrorCode = null;
         try
         {
             scope = string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
@@ -451,7 +452,7 @@ else
     });
     private async Task RunAsync(Func<Task> action)
     {
-        busy = true; error = null; errorCode = null; errorId = null;
+        busy = true; error = null; errorCode = null; errorId = null; compositionErrorCode = null;
         try { await action(); }
         catch (AgentstrationApiException exception)
         {
@@ -459,6 +460,8 @@ else
             var code = exception.ProblemType?.StartsWith(prefix, StringComparison.Ordinal) == true ? exception.ProblemType[prefix.Length..] : null;
             errorCode = code is { Length: > 0 and <= 96 } && code.All(value => char.IsAsciiLetterOrDigit(value) || value is '_' or '-') ? code : null;
             errorId = exception.ErrorId;
+            compositionErrorCode = exception.CompositionErrorCode is { Length: > 0 and <= 96 } reason
+                && reason.All(value => char.IsAsciiLetterOrDigit(value) || value is '_' or '-') ? reason : null;
             error = T(errorCode switch
             {
                 "data_source_operation_adapter_unavailable" => "DatasetOperationAdapterUnavailable",
