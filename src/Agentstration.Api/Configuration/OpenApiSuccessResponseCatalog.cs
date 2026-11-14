@@ -49,6 +49,7 @@ internal static class OpenApiSuccessResponseCatalog
             ?? WorkOperations(verb, path)
             ?? Workplace(verb, path)
             ?? Management(verb, path)
+            ?? DataSourceQueries(verb, path)
             ?? ModelManagement(verb, path)
             ?? Bootstrap(verb, path)
             ?? Identity(verb, path);
@@ -442,6 +443,22 @@ internal static class OpenApiSuccessResponseCatalog
         return null;
     }
 
+    private static OpenApiSuccessResponse? DataSourceQueries(string method, string path)
+    {
+        if (path.StartsWith("/api/datasourcequeries", StringComparison.Ordinal))
+        {
+            if (path.EndsWith("/execute", StringComparison.Ordinal)) return Json<DataSourceQueryExecutionResult>(200, "Execute a published Query");
+            if (path.EndsWith("/tools", StringComparison.Ordinal)) return method == "POST" ? Json<ResourceReference>(200, "Publish a Query relay") : Json<IReadOnlyList<DataSourceQueryToolPublication>>(200, "List Query Tools");
+            if (path.EndsWith("/versions", StringComparison.Ordinal)) return method == "POST" ? Json<DataSourceQueryVersionResource>(200, "Publish a Query version") : Json<IReadOnlyList<DataSourceQueryVersionResource>>(200, "List Query versions");
+            if (path.TrimEnd('/') == "/api/datasourcequeries" && method == "GET") return Json<IReadOnlyList<DataSourceQueryResource>>(200, "List Data Source queries");
+            return Json<DataSourceQueryResource>(method == "POST" ? 201 : 200, "Read or save a Query draft");
+        }
+        if (path == "/api/datasourceacquisitions/{id}/documents/capabilities") return Json<DataSourceDocumentDescription>(200, "Inspect an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/query") return Json<DataSourceDocumentQueryResult>(200, "Query an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/tools") return Json<ResourceReference>(200, "Publish an acquisition query Tool");
+        return null;
+    }
+
     private static OpenApiSuccessResponse? Identity(string method, string path)
     {
         if (path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase))
@@ -471,17 +488,6 @@ internal static class OpenApiSuccessResponseCatalog
         }
         if (path.StartsWith("/api/identity/accounts", StringComparison.OrdinalIgnoreCase))
             return path == "/api/identity/accounts" && method == "GET" ? Json<IReadOnlyList<LocalAccountResponse>>(200, "List local accounts") : Json<LocalAccountResponse>(method == "POST" ? 201 : 200, method == "POST" ? "Create a local account" : "Update local account status");
-        if (path.StartsWith("/api/datasourcequeries", StringComparison.Ordinal))
-        {
-            if (path.EndsWith("/execute", StringComparison.Ordinal)) return Json<DataSourceQueryExecutionResult>(200, "Execute a published Query");
-            if (path.EndsWith("/tools", StringComparison.Ordinal)) return method == "POST" ? Json<ResourceReference>(200, "Publish a Query relay") : Json<IReadOnlyList<DataSourceQueryToolPublication>>(200, "List Query Tools");
-            if (path.EndsWith("/versions", StringComparison.Ordinal)) return method == "POST" ? Json<DataSourceQueryVersionResource>(200, "Publish a Query version") : Json<IReadOnlyList<DataSourceQueryVersionResource>>(200, "List Query versions");
-            if (path.TrimEnd('/') == "/api/datasourcequeries" && method == "GET") return Json<IReadOnlyList<DataSourceQueryResource>>(200, "List Data Source queries");
-            return Json<DataSourceQueryResource>(method == "POST" ? 201 : 200, "Read or save a Query draft");
-        }
-        if (path == "/api/datasourceacquisitions/{id}/documents/capabilities") return Json<DataSourceDocumentDescription>(200, "Inspect an acquisition publication");
-        if (path == "/api/datasourceacquisitions/{id}/documents/query") return Json<DataSourceDocumentQueryResult>(200, "Query an acquisition publication");
-        if (path == "/api/datasourceacquisitions/{id}/documents/tools") return Json<ResourceReference>(200, "Publish an acquisition query Tool");
         if (path == "/api/identity/context") return Json<IdentityConsoleContextResponse>(200, "Get the current identity context");
         if (path == "/api/identity/context/selection") return Json<SelectConsoleContextResponse>(200, "Select the current Console context");
         if (path == "/api/identity/context/workspace") return Json<RequestContext>(200, "Select the current workspace");
