@@ -12,6 +12,8 @@ namespace Agentstration.DataSources.Contracts;
 public static class DataSourceResourceKinds
 {
     public const string DataSource = "DataSource";
+    public const string DataSourceQuery = "DataSourceQuery";
+    public const string DataSourceQueryVersion = "DataSourceQueryVersion";
     public const string DataSourceProfile = "DataSourceProfile";
     public const string DataSourceProfileRevision = "DataSourceProfileRevision";
     public const string DataSourceAcquisition = "DataSourceAcquisition";

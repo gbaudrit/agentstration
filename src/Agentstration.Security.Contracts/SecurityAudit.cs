@@ -58,6 +58,10 @@ public static class SecurityAuditActions
     public const string SourceRegistryDeleted = "source-registry.deleted";
     public const string SourceRegistryRefreshed = "source-registry.refreshed";
     public const string SourceRegistrySourceImported = "source-registry.source-imported";
+    public const string DataSourceQueryCreated = "data-source-query.created";
+    public const string DataSourceQueryUpdated = "data-source-query.updated";
+    public const string DataSourceQueryPublished = "data-source-query.published";
+    public const string DataSourceQueryExecuted = "data-source-query.executed";
     public const string DataSourceCreated = "data-source.created";
     public const string DataSourceUpdated = "data-source.updated";
     public const string DataSourceDeleted = "data-source.deleted";

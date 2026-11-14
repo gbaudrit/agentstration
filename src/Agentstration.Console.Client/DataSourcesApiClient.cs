@@ -6,6 +6,14 @@ namespace Agentstration.Web.Console;
 
 public interface IDataSourcesClient
 {
+    Task<IReadOnlyList<DataSourceQueryResource>> GetQueriesAsync(ResourceScopeRef scope, Guid sourceUid, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<ResourceSnapshot<DataSourceQueryResource>> GetQueryAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<ResourceSnapshot<DataSourceQueryResource>> SaveQueryAsync(DataSourceQueryResource value, string? etag = null, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<IReadOnlyList<DataSourceQueryVersionResource>> GetQueryVersionsAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<DataSourceQueryVersionResource> PublishQueryAsync(DataSourceQueryResource value, string version, string etag, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<DataSourceQueryExecutionResult> ExecuteQueryAsync(DataSourceQueryResource value, string? version, DataSourceQueryExecutionRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<ResourceReference> PublishQueryToolAsync(DataSourceQueryResource value, PublishDataSourceQueryToolRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<IReadOnlyList<DataSourceQueryToolPublication>> GetQueryToolsAsync(ResourceScopeRef scope, Guid sourceUid, CancellationToken ct = default) => throw new NotSupportedException();
     Task<DataSourceDocumentDescription> DescribeAcquisitionDocumentsAsync(ResourceNamespace ns, string id, CancellationToken ct = default) => throw new NotSupportedException();
     Task<DataSourceDocumentQueryResult> QueryAcquisitionDocumentsAsync(ResourceNamespace ns, string id, DataSourceDocumentQueryRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     Task<ResourceReference> PublishAcquisitionDocumentToolAsync(ResourceNamespace ns, string id, PublishDataSourceDocumentToolRequest request, CancellationToken ct = default) => throw new NotSupportedException();
@@ -66,6 +74,25 @@ public interface IDataSourceProfilesClient
 
 public sealed class DataSourcesApiClient(HttpClient httpClient) : IDataSourcesClient
 {
+    public Task<IReadOnlyList<DataSourceQueryResource>> GetQueriesAsync(ResourceScopeRef scope, Guid sourceUid, CancellationToken ct = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<DataSourceQueryResource>>(httpClient, $"api/datasourcequeries?scopeRef={Uri.EscapeDataString(scope.Value)}&sourceUid={sourceUid}", ct);
+    public Task<ResourceSnapshot<DataSourceQueryResource>> GetQueryAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, CancellationToken ct = default) =>
+        GetResourceAsync<DataSourceQueryResource>(QueryPath(scope, ns, name), ct);
+    public Task<ResourceSnapshot<DataSourceQueryResource>> SaveQueryAsync(DataSourceQueryResource value, string? etag = null, CancellationToken ct = default) =>
+        SendAsync<DataSourceQueryResource>(etag is null ? HttpMethod.Post : HttpMethod.Put, etag is null ? "api/datasourcequeries" : QueryPath(value.ScopeRef!.Value, value.Namespace, value.Name),
+            etag is null ? value : value.Definition, etag, ct);
+    public Task<IReadOnlyList<DataSourceQueryVersionResource>> GetQueryVersionsAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, CancellationToken ct = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<DataSourceQueryVersionResource>>(httpClient, QueryPath(scope, ns, name, "versions"), ct);
+    public async Task<DataSourceQueryVersionResource> PublishQueryAsync(DataSourceQueryResource value, string version, string etag, CancellationToken ct = default) =>
+        (await SendAsync<DataSourceQueryVersionResource>(HttpMethod.Post, QueryPath(value.ScopeRef!.Value, value.Namespace, value.Name, "versions"), new PublishDataSourceQueryRequest(version), etag, ct)).Value;
+    public Task<DataSourceQueryExecutionResult> ExecuteQueryAsync(DataSourceQueryResource value, string? version, DataSourceQueryExecutionRequest request, CancellationToken ct = default) =>
+        DocumentPostAsync<DataSourceQueryExecutionResult>(QueryPath(value.ScopeRef!.Value, value.Namespace, value.Name, "execute") + (version is null ? "" : "&version=" + Uri.EscapeDataString(version)), request, ct);
+    public Task<ResourceReference> PublishQueryToolAsync(DataSourceQueryResource value, PublishDataSourceQueryToolRequest request, CancellationToken ct = default) =>
+        DocumentPostAsync<ResourceReference>(QueryPath(value.ScopeRef!.Value, value.Namespace, value.Name, "tools"), request, ct);
+    public Task<IReadOnlyList<DataSourceQueryToolPublication>> GetQueryToolsAsync(ResourceScopeRef scope, Guid sourceUid, CancellationToken ct = default) =>
+        ApiResponse.ReadAsync<IReadOnlyList<DataSourceQueryToolPublication>>(httpClient, $"api/datasourcequeries/tools?scopeRef={Uri.EscapeDataString(scope.Value)}&sourceUid={sourceUid}", ct);
+    private static string QueryPath(ResourceScopeRef scope, ResourceNamespace ns, string name, string? action = null) =>
+        $"api/datasourcequeries/{Uri.EscapeDataString(name)}{(action is null ? "" : "/" + action)}?scopeRef={Uri.EscapeDataString(scope.Value)}&namespace={Uri.EscapeDataString(ns.Value)}";
     public Task<DataSourceDocumentDescription> DescribeAcquisitionDocumentsAsync(ResourceNamespace ns, string id, CancellationToken ct = default) =>
         ApiResponse.ReadAsync<DataSourceDocumentDescription>(httpClient, AcquisitionDocumentPath(ns, id, "capabilities"), ct);
     public Task<DataSourceDocumentQueryResult> QueryAcquisitionDocumentsAsync(ResourceNamespace ns, string id, DataSourceDocumentQueryRequest request, CancellationToken ct = default) =>

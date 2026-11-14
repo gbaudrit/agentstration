@@ -198,7 +198,7 @@ public sealed class DataSourceDatasetEditorTests
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.Name, "inventory").Add(c => c.ScopeRef, "/instance"));
-        rendered.WaitForAssertion(() => Assert.HasCount(6, rendered.FindAll("[role=tab]")));
+        rendered.WaitForAssertion(() => Assert.HasCount(8, rendered.FindAll("[role=tab]")));
         Assert.AreEqual(overview, rendered.Find("[data-testid=dataset-overview-tab]").TextContent);
         Assert.AreEqual(definition, rendered.Find("[data-testid=dataset-definition-tab]").TextContent);
         Assert.AreEqual(content, rendered.Find("[data-testid=dataset-content-tab]").TextContent);

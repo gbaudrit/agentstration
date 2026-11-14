@@ -4,7 +4,7 @@
         @for (var i = 0; i < Description.QueryProfiles.Count; i++) { var p = Description.QueryProfiles[i]; <option value="@i">@p.Id / @p.Version · @p.Encoding</option> }
     </select></label>
     <label><span>@T("Documents.RequestPageSize")</span><input type="number" min="1" max="@Description.Policy.MaximumPageSize" @bind="pageSize" @bind:after="ResetAsync" disabled="@Busy" data-testid="@($"{TestId}-page-size")" /></label>
-    <label class="form-span-2"><span>@T("Documents.QueryPayload")</span><textarea class="form-code-editor" rows="8" maxlength="8192" @bind="payload" @bind:event="oninput" @bind:after="ResetAsync" disabled="@Busy" data-testid="@($"{TestId}-payload")"></textarea></label>
+    <label class="form-span-2"><span>@T("Documents.QueryPayload")</span><textarea class="form-code-editor" rows="8" maxlength="8192" @bind="Payload" @bind:event="oninput" @bind:after="ResetAsync" disabled="@Busy" data-testid="@($"{TestId}-payload")"></textarea></label>
     @if (invalid) { <p class="form-alert form-alert-danger form-span-2" role="alert">@T("Documents.QueryInputInvalid")</p> }
     @if (Description.QueryProfiles.Count == 0) { <p role="status">@T("Documents.Error.Profile")</p> }
     @if (!CanExecute) { <p class="form-span-2" role="status">@T("Documents.ExecutePermissionRequired")</p> }
@@ -26,7 +26,8 @@
     private StorageQueryProfilePin? notifiedProfile;
     private StorageQueryProfilePin? SelectedProfile => profileIndex >= 0 && profileIndex < Description.QueryProfiles.Count ? Description.QueryProfiles[profileIndex] : null;
     private int profileIndex, pageSize = 50;
-    private string payload = "{}";
+    [Parameter] public string Payload { get; set; } = "{}";
+    [Parameter] public EventCallback<string> PayloadChanged { get; set; }
     private bool initialized, invalid;
     protected override async Task OnParametersSetAsync()
     {
@@ -46,14 +47,14 @@
         await NotifyProfileAsync();
         await ResetAsync();
     }
-    private async Task ResetAsync() { invalid = false; await ResetRequested.InvokeAsync(); }
+    private async Task ResetAsync() { invalid = false; await PayloadChanged.InvokeAsync(Payload); await ResetRequested.InvokeAsync(); }
     private async Task RunAsync()
     {
         if (Busy || !CanExecute || !Description.Policy.Query || SelectedProfile is not { } profile) return;
         JsonElement query;
         try
         {
-            using var json = JsonDocument.Parse(payload);
+            using var json = JsonDocument.Parse(Payload);
             query = json.RootElement.Clone();
             if (query.ValueKind != JsonValueKind.Object || JsonSerializer.SerializeToUtf8Bytes(query).Length > 8192
                 || pageSize < 1 || pageSize > Description.Policy.MaximumPageSize) throw new JsonException();

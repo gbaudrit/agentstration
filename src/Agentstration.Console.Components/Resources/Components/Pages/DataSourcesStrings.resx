@@ -208,4 +208,33 @@
   <data name="Documents.Unavailable" xml:space="preserve"><value>This acquisition has no retained structured publication available for querying.</value></data>
   <data name="Documents.CursorInvalid" xml:space="preserve"><value>This query continuation is unavailable or expired. Run the query again.</value></data>
   <data name="Documents.QueryFailed" xml:space="preserve"><value>The acquisition query or Tool publication failed. Check the selected acquisition, query profile and permissions.</value></data>
+  <data name="Queries" xml:space="preserve"><value>Queries</value></data>
+  <data name="Tools" xml:space="preserve"><value>Tools</value></data>
+  <data name="Queries.SaveDraft" xml:space="preserve"><value>Save Query draft</value></data>
+  <data name="Queries.SaveHelp" xml:space="preserve"><value>Save this JSON query under its own identity, then publish and expose it from Queries and Tools.</value></data>
+  <data name="Queries.Saved" xml:space="preserve"><value>Query draft saved. Open Queries to publish it.</value></data>
+  <data name="Queries.Help" xml:space="preserve"><value>Queries have independent drafts and immutable published versions. Save a query from acquired Content to create one.</value></data>
+  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Published exposures are reloaded from storage. A relay fixes the Query name and optionally its version; otherwise each call resolves the latest publication.</value></data>
+  <data name="Queries.NoTools" xml:space="preserve"><value>No query Tools have been published for this Data Source.</value></data>
+  <data name="Queries.Empty" xml:space="preserve"><value>No saved Query. Test a query in Content and save it as a draft.</value></data>
+  <data name="Queries.Version" xml:space="preserve"><value>Publication version</value></data>
+  <data name="Queries.QueryVersion" xml:space="preserve"><value>Query version</value></data>
+  <data name="Queries.Latest" xml:space="preserve"><value>Latest published version</value></data>
+  <data name="Queries.LatestAcquisition" xml:space="preserve"><value>Latest successful acquisition or chosen at invocation</value></data>
+  <data name="Queries.Legacy" xml:space="preserve"><value>Direct acquisition Tool (legacy)</value></data>
+  <data name="Queries.Select" xml:space="preserve"><value>Query to expose</value></data>
+  <data name="Queries.VersionHelp" xml:space="preserve"><value>Without an exact version, the next call uses the most recent publication. Draft edits have no effect. Incompatible contracts fail explicitly.</value></data>
+  <data name="Queries.Approval" xml:space="preserve"><value>Require approval for this Tool</value></data>
+  <data name="Queries.State" xml:space="preserve"><value>State</value></data>
+  <data name="Queries.Edit" xml:space="preserve"><value>Open draft</value></data>
+  <data name="Queries.Json" xml:space="preserve"><value>Query JSON</value></data>
+  <data name="Queries.Publish" xml:space="preserve"><value>Save and publish Query</value></data>
+  <data name="Queries.Published" xml:space="preserve"><value>Execute a published version</value></data>
+  <data name="Queries.Run" xml:space="preserve"><value>Execute Query</value></data>
+  <data name="Queries.Next" xml:space="preserve"><value>Next page</value></data>
+  <data name="Queries.Resolved" xml:space="preserve"><value>Resolved Query version and acquisition</value></data>
+  <data name="Queries.Failed" xml:space="preserve"><value>The Query operation failed. Check the JSON, version, contract and permissions; the code identifies the failure.</value></data>
+  <data name="Queries.Done" xml:space="preserve"><value>Saved successfully.</value></data>
+  <data name="Queries.Generic" xml:space="preserve"><value>Generic Query executor</value></data>
+  <data name="Queries.Reference" xml:space="preserve"><value>Generic Tool invocation JSON</value></data>
 </root>

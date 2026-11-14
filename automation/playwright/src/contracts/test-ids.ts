@@ -22,6 +22,17 @@ export const TestIds = {
     transformationCreator: 'flow-transformation-creator', transformationDisplayName: 'flow-transformation-display-name',
     transformationName: 'flow-transformation-name', transformationCreate: 'flow-transformation-create', transformationDesigner: 'flow-transformation-designer',
   },
+  dataSourceQueries: {
+    queriesTab: 'dataset-queries-tab', toolsTab: 'dataset-tools-tab', panel: 'dataset-queries',
+    draftSave: 'dataset-query-save', draftDisplayName: 'dataset-query-display-name', draftName: 'dataset-query-name',
+    row: 'dataset-query-row', editJson: 'dataset-query-edit-json', save: 'dataset-query-edit-save',
+    publishVersion: 'dataset-query-publish-version', publish: 'dataset-query-publish',
+    run: 'dataset-query-run', result: 'dataset-query-result', toolRow: 'dataset-query-tool-row',
+    toolQuery: 'dataset-tool-query', toolQueryVersion: 'dataset-tool-query-version',
+    toolDisplayName: 'dataset-query-tool-display-name', toolName: 'dataset-query-tool-name',
+    toolVersion: 'dataset-query-tool-version', toolMode: 'dataset-query-tool-mode', toolPublish: 'dataset-query-tool-publish',
+    error: 'dataset-queries-error',
+  },
   dataSourceDocuments: {
     access: 'dataset-document-access', query: 'dataset-document-query', payload: 'dataset-document-query-payload',
     run: 'dataset-document-query-run', next: 'dataset-document-query-next', result: 'dataset-document-result',

@@ -43,8 +43,8 @@ public sealed class RegistrationContractTests
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (3, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolDefinitionProvider)] = (53, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolHandler)] = (53, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolDefinitionProvider)] = (54, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolHandler)] = (54, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
             [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
             [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)

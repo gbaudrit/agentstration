@@ -17,9 +17,9 @@ namespace Agentstration.Web.Tests;
 public sealed class DataSourceAcquisitionDocumentTests
 {
     [TestMethod]
-    [DataRow("en-US", "Latest successful acquisition")]
-    [DataRow("fr-FR", "Dernière acquisition réussie")]
-    public async Task SelectedAcquisitionQueriesItsPublicationAndPublishesConfigurableTools(string culture, string label)
+    [DataRow("en-US", "Save Query draft")]
+    [DataRow("fr-FR", "Enregistrer le brouillon de Query")]
+    public async Task SelectedAcquisitionQueriesItsPublicationAndSavesIndependentQueryDraft(string culture, string label)
     {
         using var currentCulture = new TestCultureScope(culture);
         using var context = new BunitContext();
@@ -31,11 +31,9 @@ public sealed class DataSourceAcquisitionDocumentTests
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
         var page = context.Render<DataSourceAcquisitionDocuments>(p => p.Add(c => c.Acquisition, handler.Acquisition));
-        page.WaitForElement("[data-testid=dataset-document-tool-mode]");
+        page.WaitForElement("[data-testid=dataset-query-save]");
         Assert.Contains(label, page.Markup);
         Assert.Contains("publication-A", page.Markup);
-        Assert.AreEqual("latest", page.Find("[data-testid=dataset-document-tool-mode]").GetAttribute("value")
-            ?? page.Find("[data-testid=dataset-document-tool-mode] option[selected]").GetAttribute("value"));
         await page.Find("[data-testid=dataset-document-query-run]").ClickAsync();
         Assert.AreEqual(handler.Profile, handler.Queries.Single().Profile);
         Assert.AreEqual("{}", handler.Queries.Single().Query!.Value.GetRawText());
@@ -46,17 +44,13 @@ public sealed class DataSourceAcquisitionDocumentTests
         await page.Find("[data-testid=dataset-document-query-payload]").InputAsync("{\"$select\":\"results\"}");
         Assert.IsEmpty(page.FindAll("[data-testid=dataset-document-result]"));
         Assert.IsEmpty(page.FindAll("[data-testid=dataset-document-query-next]"));
-        await page.Find("[data-testid=dataset-document-tool-publish]").ClickAsync();
-        Assert.AreEqual(DataSourceDocumentSelectionModes.Latest, handler.Publications.Single().Mode);
-        page.WaitForElement("[data-testid=dataset-document-tool-link]");
-        await page.Find("[data-testid=dataset-document-tool-mode]").ChangeAsync("exact");
-        await page.Find("[data-testid=dataset-document-tool-version]").ChangeAsync("2.0.0");
-        await page.Find("input[type=checkbox]").ChangeAsync(true);
-        await page.Find("[data-testid=dataset-document-tool-publish]").ClickAsync();
-        Assert.AreEqual(DataSourceDocumentSelectionModes.Exact, handler.Publications.Last().Mode);
-        Assert.AreEqual("2.0.0", handler.Publications.Last().Version);
-        Assert.IsTrue(handler.Publications.Last().RequiresApproval);
-        Assert.IsTrue(handler.Paths.All(path => path.Contains(handler.Acquisition.Name, StringComparison.Ordinal)));
+        await page.Find("[data-testid=dataset-query-display-name]").InputAsync("Results query");
+        Assert.AreEqual("results-query", page.Find("[data-testid=dataset-query-name]").GetAttribute("value"));
+        await page.Find("[data-testid=dataset-query-save]").ClickAsync();
+        Assert.IsNotNull(handler.SavedQuery);
+        Assert.AreEqual("results", handler.SavedQuery.Definition.Query.GetProperty("$select").GetString());
+        Assert.AreEqual(handler.Profile, handler.SavedQuery.Definition.Selection.Contract.Profile);
+        Assert.IsEmpty(page.FindAll("[data-testid=dataset-document-tool-publish]"));
     }
 
     [TestMethod]
@@ -108,6 +102,7 @@ public sealed class DataSourceAcquisitionDocumentTests
             AcquisitionScope = ResourceScopeRef.Instance, Contract = new(Profile), Mode = "exact", AcquisitionId = Acquisition.Name, AcquisitionUid = Acquisition.Uid
         }, Acquisition.Name, Acquisition.Uid, "publication-A", new(new(true, false, false, true, true,
             [new(Profile.Id, Profile.Version, Profile.Encoding)]), new(QueryProfiles: [Profile.Id]), [Profile], JsonSerializer.SerializeToElement(new { type = "object" }), "model"));
+        public DataSourceQueryResource? SavedQuery { get; private set; }
         public List<DataSourceDocumentQueryRequest> Queries { get; } = [];
         public List<PublishDataSourceDocumentToolRequest> Publications { get; } = [];
         public List<string> Paths { get; } = [];
@@ -115,6 +110,12 @@ public sealed class DataSourceAcquisitionDocumentTests
         {
             var path = request.RequestUri!.AbsolutePath;
             Paths.Add(path);
+            if (path == "/api/datasourcequeries")
+            {
+                SavedQuery = await request.Content!.ReadFromJsonAsync<DataSourceQueryResource>(cancellationToken);
+                var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(SavedQuery) };
+                response.Headers.ETag = new("\"query-1\""); return response;
+            }
             if (path.EndsWith("/query", StringComparison.Ordinal))
             {
                 Queries.Add((await request.Content!.ReadFromJsonAsync<DataSourceDocumentQueryRequest>(cancellationToken))!);

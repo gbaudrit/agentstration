@@ -110,6 +110,8 @@ public sealed partial class DataSourceDatasetTests
         var latest = await Run(dynamicTool, new { query = Empty });
         Assert.AreEqual(b.Uid, latest.AcquisitionUid);
         Assert.AreEqual("beta", latest.Page.Documents.Single().Value.GetProperty("dataset").GetString());
+        var filteredLegacy = await Run(dynamicTool, new { query = new Dictionary<string, string> { ["$filter"] = "dataset eq 'beta'" } });
+        Assert.HasCount(1, filteredLegacy.Page.Documents, "Existing direct Tools must retain nonempty query arguments.");
         var exact = await Run(fixedTool, new { query = Empty });
         Assert.AreEqual(a.Uid, exact.AcquisitionUid);
         Assert.AreEqual("alpha", exact.Page.Documents.Single().Value.GetProperty("dataset").GetString());

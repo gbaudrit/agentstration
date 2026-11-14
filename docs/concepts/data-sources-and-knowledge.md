@@ -209,31 +209,44 @@ refresh failure leaves processing in progress and offers an explicit refresh.
 
 For a Data Source backed by structured document Storage, open **Content** and
 choose a successful retained acquisition. Its query panel reads that acquisition's
-immutable publication. The Storage document runner continues to query current
-mutable documents; an empty result there does not mean the acquisition is empty.
-The acquired JSON preview remains available below the query panel.
+immutable publication. The acquired JSON preview remains available. Save the
+query under a display name and technical name to create an independent draft.
 
-Publish a query Tool from this panel with either **latest successful acquisition
-or one specified at invocation** (default) or **only this acquisition**. Dynamic
-Tools accept `request.acquisitionId` optionally; omitting it selects the latest
-successful retained acquisition in the publication context's acquisition stream.
-Fixed Tools bind the chosen acquisition's UID. Both modes pin the query profile
-and exact shared Schema version; an incompatible latest acquisition causes an
-explicit contract error, rather than a fallback to older data. Publish a new Tool
-version to adopt a changed contract. Current Source/Storage Use and execution
-permissions are checked at invocation. Tools query retained content without
-starting acquisition work.
+Open **Queries** to edit and publish that draft, inspect its versions and execute
+one exact publication or the latest published version. Editing a draft changes no
+published version. Published queries live in Agentstration's configuration store,
+separately from acquired documents. The Query access panel controls sharing with
+descendant scopes; Source and Storage Use remain necessary at execution.
+
+Open **Tools** to find persisted publications after navigation or refresh. The
+generic Query Tool accepts the scoped Query reference; its invocation JSON is
+available on the selected Query. A named relay fixes the Query identity and
+optionally its version. Without a version, each initial call uses the most recent
+publication, including when its version number is lower. Publishing a compatible
+filter/order change requires no Tool or Flow republication. An incompatible
+contract fails explicitly instead of falling back; publish a new Tool version to
+adopt it. Acquisition selection is independent: latest successful retained
+acquisition or one fixed acquisition when publishing the relay.
+
+Continue with the returned Query cursor only. The Query version and acquisition
+remain fixed during pagination even after new publications. Current permissions
+are checked on each page; retention and bounded cursor expiry still apply. Results
+record the resolved Query identity/version, digests and acquisition.
+
+Existing direct acquisition Tools are retained and listed as existing direct
+exposures. They still take query JSON at invocation; free-form input uses raw JSON
+editing. They are not rewritten into named queries automatically.
 
 For an acquired object containing `results`, the collection schema must describe
 the whole stored object. Selecting `/properties/results/items` does not split it.
-An OData profile payload such as `{"$select":"results"}` selects the envelope
-property; `{"$filter":"results/any(r:r/status eq 'EN COURS')"}` selects envelopes
-with a matching item, without filtering items inside the returned array. Per-item
-queries require explicit transformation into separate documents before publication.
+An OData payload such as `{"$select":"results"}` selects the envelope property;
+`{"$filter":"results/any(r:r/status eq 'EN COURS')"}` selects envelopes containing
+a matching item without filtering items inside the returned array. Per-item
+queries require an explicit transformation before publication.
 
-Continue paginated Tool results with `request.cursor` only. Pagination stays on
-its first acquisition, even when a new acquisition arrives. Cursors expire after
-four minutes and are bound to the caller and context. A fixed Tool's content can
-still expire under the Data Source retention policy.
+Storage administration configures collections and their contracts/capabilities;
+its query/Tool-publication block is no longer displayed. Underlying mutable
+document APIs remain available and do not address acquisition publications.
 
-See [ADR-0227](../decisions/0227-data-source-document-tools-select-latest-or-exact-acquisitions.md).
+See [ADR-0227](../decisions/0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
+and [ADR-0228](../decisions/0228-data-source-queries-evolve-independently-from-tool-exposures.md).

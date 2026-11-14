@@ -195,12 +195,18 @@ else
                 }
                 @if (SelectedContentAcquisition is { Publication.Document: not null, ContentRetiredAt: null } selectedDocuments)
                 {
-                    <DataSourceAcquisitionDocuments @key="selectedDocuments.Uid" Acquisition="selectedDocuments" />
+                    <DataSourceAcquisitionDocuments @key="selectedDocuments.Uid" Acquisition="selectedDocuments" QuerySaved="() => SelectTab(DatasetTab.Queries)" />
                 }
                 @if (preview is not null)
                 {
                     <div data-testid="dataset-content"><h3>@T("DatasetContent")</h3><pre class="runner-json">@preview</pre>@if (previewTruncated) { <p>@T("DatasetContentTruncated")</p> }<button class="button-secondary" type="button" @onclick="CloseContent">@T("DatasetCloseContent")</button></div>
                 }
+            </section>
+        }
+        else if (activeTab is DatasetTab.Queries or DatasetTab.Tools)
+        {
+            <section class="panel form-section" id="@PanelId(activeTab)" role="tabpanel" aria-labelledby="@TabId(activeTab)">
+                <DataSourceQueries @key="source.Uid" Source="source" ShowTools="@(activeTab == DatasetTab.Tools)" Acquisitions="history" />
             </section>
         }
         else if (activeTab == DatasetTab.Access && CanManage && scope is { } accessScope)
@@ -230,10 +236,10 @@ else
     private bool interactive;
     private DatasetTab activeTab = DatasetTab.Overview;
     private DatasetTab? focusAfterRender;
-    private readonly ElementReference[] tabButtons = new ElementReference[6];
+    private readonly ElementReference[] tabButtons = new ElementReference[8];
     private ConnectedServiceOperationResource? savedOperation;
     private string contentAcquisitionKey = "";
-    private enum DatasetTab { Overview, Definition, Acquisitions, Content, Access, Yaml }
+    private enum DatasetTab { Overview, Definition, Acquisitions, Content, Queries, Tools, Access, Yaml }
     private IEnumerable<DatasetTab> AvailableTabs => Enum.GetValues<DatasetTab>().Where(tab => tab != DatasetTab.Access || CanManage);
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
     private IReadOnlyList<DataSourceAcquisitionResource> VisibleHistory => (activeTab == DatasetTab.Overview ? OrderedHistory.Take(3) : OrderedHistory).ToArray();

@@ -75,6 +75,8 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<StorageDocumentQueryMcpTool>(services);
         services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceDocumentQueryDefinitionProvider>();
         services.AddSingleton<IInternalMcpToolHandler, DataSourceDocumentQueryMcpTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceQueryToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceQueryMcpTool>();
         AddInternalTool<KnowledgeDocumentQueryMcpTool>(services);
         AddInternalTool<KnowledgeContentReadMcpTool>(services);
         AddInternalTool<KnowledgeContentRegexMcpTool>(services);

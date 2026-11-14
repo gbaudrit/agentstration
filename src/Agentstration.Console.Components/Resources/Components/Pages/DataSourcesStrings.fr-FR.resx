@@ -208,4 +208,33 @@
   <data name="Documents.Unavailable" xml:space="preserve"><value>Cette acquisition ne possède pas de publication structurée conservée et disponible pour les requêtes.</value></data>
   <data name="Documents.CursorInvalid" xml:space="preserve"><value>Cette continuation de requête est indisponible ou expirée. Relancez la requête.</value></data>
   <data name="Documents.QueryFailed" xml:space="preserve"><value>La requête ou la publication du Tool a échoué. Vérifiez l’acquisition sélectionnée, le profil de requête et les permissions.</value></data>
+  <data name="Queries" xml:space="preserve"><value>Queries</value></data>
+  <data name="Tools" xml:space="preserve"><value>Tools</value></data>
+  <data name="Queries.SaveDraft" xml:space="preserve"><value>Enregistrer le brouillon de Query</value></data>
+  <data name="Queries.SaveHelp" xml:space="preserve"><value>Enregistrez cette requête JSON sous sa propre identité, puis publiez-la et exposez-la depuis Queries et Tools.</value></data>
+  <data name="Queries.Saved" xml:space="preserve"><value>Brouillon de Query enregistré. Ouvrez Queries pour le publier.</value></data>
+  <data name="Queries.Help" xml:space="preserve"><value>Les Queries possèdent leurs brouillons et versions publiées immuables. Enregistrez une requête depuis le Contenu acquis pour en créer une.</value></data>
+  <data name="Queries.ToolsHelp" xml:space="preserve"><value>Les expositions publiées sont rechargées depuis le stockage. Un relais fixe le nom de Query et éventuellement sa version ; sinon chaque appel résout la dernière publication.</value></data>
+  <data name="Queries.NoTools" xml:space="preserve"><value>Aucun Tool de requête publié pour cette Data Source.</value></data>
+  <data name="Queries.Empty" xml:space="preserve"><value>Aucune Query enregistrée. Testez une requête dans Contenu puis enregistrez son brouillon.</value></data>
+  <data name="Queries.Version" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="Queries.QueryVersion" xml:space="preserve"><value>Version de Query</value></data>
+  <data name="Queries.Latest" xml:space="preserve"><value>Dernière version publiée</value></data>
+  <data name="Queries.LatestAcquisition" xml:space="preserve"><value>Dernière acquisition réussie ou précisée à l’appel</value></data>
+  <data name="Queries.Legacy" xml:space="preserve"><value>Tool direct d’acquisition (existant)</value></data>
+  <data name="Queries.Select" xml:space="preserve"><value>Query à exposer</value></data>
+  <data name="Queries.VersionHelp" xml:space="preserve"><value>Sans version exacte, le prochain appel utilise la publication la plus récente. Les modifications du brouillon sont sans effet. Les contrats incompatibles sont refusés explicitement.</value></data>
+  <data name="Queries.Approval" xml:space="preserve"><value>Exiger une approbation pour ce Tool</value></data>
+  <data name="Queries.State" xml:space="preserve"><value>État</value></data>
+  <data name="Queries.Edit" xml:space="preserve"><value>Ouvrir le brouillon</value></data>
+  <data name="Queries.Json" xml:space="preserve"><value>Requête JSON</value></data>
+  <data name="Queries.Publish" xml:space="preserve"><value>Enregistrer et publier la Query</value></data>
+  <data name="Queries.Published" xml:space="preserve"><value>Exécuter une version publiée</value></data>
+  <data name="Queries.Run" xml:space="preserve"><value>Exécuter la Query</value></data>
+  <data name="Queries.Next" xml:space="preserve"><value>Page suivante</value></data>
+  <data name="Queries.Resolved" xml:space="preserve"><value>Version de Query et acquisition résolues</value></data>
+  <data name="Queries.Failed" xml:space="preserve"><value>L’opération sur la Query a échoué. Vérifiez le JSON, la version, le contrat et les permissions ; le code précise l’échec.</value></data>
+  <data name="Queries.Done" xml:space="preserve"><value>Enregistrement effectué.</value></data>
+  <data name="Queries.Generic" xml:space="preserve"><value>Exécuteur générique de Query</value></data>
+  <data name="Queries.Reference" xml:space="preserve"><value>JSON d’appel du Tool générique</value></data>
 </root>

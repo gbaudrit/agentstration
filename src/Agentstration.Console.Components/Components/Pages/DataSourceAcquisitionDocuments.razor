@@ -13,7 +13,8 @@
         </dl>
         <p class="muted">@T("Documents.EnvelopeHelp")</p>
         <StructuredDocumentQueryEditor Description="@QueryDescription" Busy="@busy" CanExecute="@Context.HasPermission("runs/execute")"
-            HasNextPage="@(result?.NextCursor is not null)" RunRequested="QueryAsync" NextRequested="NextAsync" ResetRequested="ResetResult" TestId="dataset-document-query" />
+            @bind-Payload="payload" HasNextPage="@(result?.NextCursor is not null)" RunRequested="QueryAsync" NextRequested="NextAsync"
+            ResetRequested="ResetResult" TestId="dataset-document-query" />
         @if (result is not null)
         {
             <p>@T("DatasetContentAcquisition"): <code>@result.AcquisitionId</code></p>
@@ -21,29 +22,28 @@
         }
         @if (Context.HasPermission("resources/write"))
         {
-            <h3>@T("Documents.ToolTitle")</h3>
+            <h3>@T("Queries.SaveDraft")</h3><p>@T("Queries.SaveHelp")</p>
             <fieldset class="form-grid" disabled="@busy">
-                <label><span>@T("Documents.ToolMode")</span><select @bind="mode" data-testid="dataset-document-tool-mode"><option value="latest">@T("Documents.ToolLatest")</option><option value="exact">@T("Documents.ToolExact")</option></select><small>@T("Documents.ToolModeHelp")</small></label>
-                <label><span>@StorageLocalizer["Documents.ToolVersion"]</span><input @bind="version" maxlength="32" data-testid="dataset-document-tool-version" /></label>
-                <label><span>@StorageLocalizer["Documents.ToolApproval"]</span><input type="checkbox" @bind="requiresApproval" /></label>
-                <button class="button-secondary" type="button" disabled="@(busy || !description.Documents.Policy.Query || QueryDescription.QueryProfiles.Count == 0 || string.IsNullOrWhiteSpace(version))" @onclick="PublishAsync" data-testid="dataset-document-tool-publish">@T("Documents.PublishTool")</button>
+                <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="true"
+                    DisplayNameTestId="dataset-query-display-name" TechnicalNameTestId="dataset-query-name" />
+                <button type="button" class="button-secondary" disabled="@(string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(displayName))"
+                    @onclick="SaveAsync" data-testid="dataset-query-save">@T("Queries.SaveDraft")</button>
             </fieldset>
-            <p class="muted">@T("Documents.ToolContractHelp")</p>
         }
-        @if (tool is not null) { <p role="status">@T("Documents.ToolPublished") <a href="@ToolUrl(tool)" data-testid="dataset-document-tool-link"><code>@tool.Name</code></a></p> }
+        @if (saved) { <p role="status">@T("Queries.Saved")</p> }
     }
     @if (error is not null) { <p class="form-alert form-alert-danger" role="alert" data-testid="dataset-document-error">@ErrorMessage @if (error is AgentstrationApiException api) { <code>@api.ProblemTitle</code> }</p> }
 </section>
 @code {
     [Parameter, EditorRequired] public DataSourceAcquisitionResource Acquisition { get; set; } = null!;
+    [Parameter] public EventCallback QuerySaved { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private DataSourceDocumentDescription? description;
     private DataSourceDocumentQueryResult? result;
-    private ResourceReference? tool;
     private Exception? error;
     private Guid loaded;
-    private bool loading, busy, requiresApproval;
-    private string mode = DataSourceDocumentSelectionModes.Latest, version = "1.0.0";
+    private bool loading, busy, saved;
+    private string name = "", displayName = "", payload = "{}";
     private StorageDocumentDescription QueryDescription => description!.Documents with { QueryProfiles = description.Documents.QueryProfiles.Where(p => p == description.Selection.Contract.Profile).ToArray() };
     private string ErrorMessage => error is AgentstrationApiException api ? api.ProblemTitle switch
     {
@@ -51,26 +51,32 @@
         "data_source_document_acquisition_unavailable" or "data_source_document_acquisition_unsupported" => T("Documents.Unavailable"),
         "data_source_document_cursor_invalid" or "data_source_document_cursor_expired" or "data_source_document_cursor_parameters" => T("Documents.CursorInvalid"),
         { } code when StorageErrorKey.ForCode(code).StartsWith("Error.Backend", StringComparison.Ordinal) => StorageLocalizer[StorageErrorKey.ForCode(code)].Value,
-        _ => T("Documents.QueryFailed")
-    } : T("Documents.QueryFailed");
+        _ => T("Queries.Failed")
+    } : T("Queries.Failed");
     protected override async Task OnParametersSetAsync()
     {
         if (loaded == Acquisition.Uid) return;
-        loaded = Acquisition.Uid; loading = true; error = null; description = null; result = null; tool = null;
+        loaded = Acquisition.Uid; loading = true; error = null; description = null; result = null; saved = false;
         try { description = await Client.DescribeAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name, cancellation.Token); }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { error = exception; }
         finally { loading = false; }
     }
-    private void ResetResult() { result = null; error = null; }
+    private void ResetResult() { result = null; error = null; saved = false; }
     private Task QueryAsync(StructuredDocumentQueryEditorRequest request) => ExecuteAsync(async () =>
         result = await Client.QueryAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name,
             new() { Profile = request.Profile, Query = request.Query, PageSize = request.PageSize }, cancellation.Token));
     private Task NextAsync() => ExecuteAsync(async () =>
         result = await Client.QueryAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name,
             new() { Profile = description!.Selection.Contract.Profile, Cursor = result!.NextCursor }, cancellation.Token));
-    private Task PublishAsync() => ExecuteAsync(async () => tool = await Client.PublishAcquisitionDocumentToolAsync(Acquisition.Namespace,
-        Acquisition.Name, new(version, description!.Selection.Contract.Profile, mode, requiresApproval), cancellation.Token));
+    private Task SaveAsync() => ExecuteAsync(async () =>
+    {
+        using var json = JsonDocument.Parse(payload);
+        _ = await Client.SaveQueryAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQuery,
+            Metadata = new() { Name = name, Namespace = Acquisition.Namespace }, ScopeRef = Acquisition.LogicalScopeRef,
+            Definition = new() { DisplayName = displayName, Selection = description!.Selection, Query = json.RootElement.Clone() } }, ct: cancellation.Token);
+        saved = true; await QuerySaved.InvokeAsync();
+    });
     private async Task ExecuteAsync(Func<Task> action)
     {
         if (busy) return; busy = true; error = null;
@@ -80,6 +86,5 @@
         finally { busy = false; }
     }
     private string T(string key) => Localizer[key];
-    private static string ToolUrl(ResourceReference value) => $"/tools/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString((value.Namespace ?? ResourceNamespace.Default).Value)}&scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }
