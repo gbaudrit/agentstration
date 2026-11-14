@@ -1,4 +1,6 @@
 using Agentstration.Agents;
+using Agentstration.DataSources.Contracts;
+using Agentstration.Resources;
 using Agentstration.Agents.Contracts;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
@@ -469,6 +471,9 @@ internal static class OpenApiSuccessResponseCatalog
         }
         if (path.StartsWith("/api/identity/accounts", StringComparison.OrdinalIgnoreCase))
             return path == "/api/identity/accounts" && method == "GET" ? Json<IReadOnlyList<LocalAccountResponse>>(200, "List local accounts") : Json<LocalAccountResponse>(method == "POST" ? 201 : 200, method == "POST" ? "Create a local account" : "Update local account status");
+        if (path == "/api/datasourceacquisitions/{id}/documents/capabilities") return Json<DataSourceDocumentDescription>(200, "Inspect an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/query") return Json<DataSourceDocumentQueryResult>(200, "Query an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/tools") return Json<ResourceReference>(200, "Publish an acquisition query Tool");
         if (path == "/api/identity/context") return Json<IdentityConsoleContextResponse>(200, "Get the current identity context");
         if (path == "/api/identity/context/selection") return Json<SelectConsoleContextResponse>(200, "Select the current Console context");
         if (path == "/api/identity/context/workspace") return Json<RequestContext>(200, "Select the current workspace");

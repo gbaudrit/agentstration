@@ -238,4 +238,6 @@
   <data name="Error.BackendTimeout" xml:space="preserve"><value>La connexion au stockage a expiré. Vérifiez que le serveur est accessible depuis l’extension.</value></data>
   <data name="Error.BackendUnavailable" xml:space="preserve"><value>Le stockage est indisponible. Vérifiez le service de base de données et les paramètres de connexion de l’extension.</value></data>
   <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>L’exécution d’une opération documentaire nécessite le droit runs/execute dans le contexte sélectionné. Sélectionnez un contexte autorisé ou demandez ce droit.</value></data>
+  <data name="Documents.RunQuery" xml:space="preserve"><value>Exécuter la requête</value></data>
+  <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Saisissez un objet JSON de 8 Kio maximum et une taille de page respectant la limite affichée.</value></data>
 </root>

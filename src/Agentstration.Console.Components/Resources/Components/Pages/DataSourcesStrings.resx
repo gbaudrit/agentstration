@@ -191,4 +191,21 @@
   <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
   <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Adopted operation response schema</value></data>
   <data name="ProjectedOutputSchema" xml:space="preserve"><value>Adopted projection output schema</value></data>
+  <data name="Documents.QueryTitle" xml:space="preserve"><value>Query acquired documents</value></data>
+  <data name="Documents.QueryHelp" xml:space="preserve"><value>Queries read the immutable publication of the selected acquisition. They do not start an acquisition.</value></data>
+  <data name="Documents.Publication" xml:space="preserve"><value>Selected publication</value></data>
+  <data name="Documents.SchemaVersion" xml:space="preserve"><value>Published query schema</value></data>
+  <data name="Documents.EnvelopeHelp" xml:space="preserve"><value>Queries follow the stored document shape. Selecting a sub-schema does not split an acquired response envelope.</value></data>
+  <data name="Documents.ToolTitle" xml:space="preserve"><value>Publish a query Tool</value></data>
+  <data name="Documents.ToolMode" xml:space="preserve"><value>Acquisition selection</value></data>
+  <data name="Documents.ToolLatest" xml:space="preserve"><value>Latest successful acquisition or one specified at invocation</value></data>
+  <data name="Documents.ToolExact" xml:space="preserve"><value>Only this acquisition</value></data>
+  <data name="Documents.ToolModeHelp" xml:space="preserve"><value>Dynamic mode reads the latest successful retained acquisition in this context, unless the caller supplies acquisitionId. Fixed mode keeps this exact acquisition.</value></data>
+  <data name="Documents.ToolContractHelp" xml:space="preserve"><value>Every Tool version fixes the Data Source identity, acquisition context, schema version and query profile. A changed contract requires explicit republication. Pagination keeps the acquisition chosen on the first page.</value></data>
+  <data name="Documents.PublishTool" xml:space="preserve"><value>Publish the query Tool</value></data>
+  <data name="Documents.ToolPublished" xml:space="preserve"><value>Query Tool published:</value></data>
+  <data name="Documents.ContractMismatch" xml:space="preserve"><value>The acquisition contract differs from this Tool version. Inspect the latest acquisition or publish a new version; use fixed mode to query this acquisition.</value></data>
+  <data name="Documents.Unavailable" xml:space="preserve"><value>This acquisition has no retained structured publication available for querying.</value></data>
+  <data name="Documents.CursorInvalid" xml:space="preserve"><value>This query continuation is unavailable or expired. Run the query again.</value></data>
+  <data name="Documents.QueryFailed" xml:space="preserve"><value>The acquisition query or Tool publication failed. Check the selected acquisition, query profile and permissions.</value></data>
 </root>

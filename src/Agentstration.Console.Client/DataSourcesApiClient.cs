@@ -6,6 +6,9 @@ namespace Agentstration.Web.Console;
 
 public interface IDataSourcesClient
 {
+    Task<DataSourceDocumentDescription> DescribeAcquisitionDocumentsAsync(ResourceNamespace ns, string id, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<DataSourceDocumentQueryResult> QueryAcquisitionDocumentsAsync(ResourceNamespace ns, string id, DataSourceDocumentQueryRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+    Task<ResourceReference> PublishAcquisitionDocumentToolAsync(ResourceNamespace ns, string id, PublishDataSourceDocumentToolRequest request, CancellationToken ct = default) => throw new NotSupportedException();
     Task<Agentstration.Storage.Contracts.StorageObjectContent> ReadContentAsync(ResourceNamespace ns, string acquisitionId,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default);
@@ -63,6 +66,20 @@ public interface IDataSourceProfilesClient
 
 public sealed class DataSourcesApiClient(HttpClient httpClient) : IDataSourcesClient
 {
+    public Task<DataSourceDocumentDescription> DescribeAcquisitionDocumentsAsync(ResourceNamespace ns, string id, CancellationToken ct = default) =>
+        ApiResponse.ReadAsync<DataSourceDocumentDescription>(httpClient, AcquisitionDocumentPath(ns, id, "capabilities"), ct);
+    public Task<DataSourceDocumentQueryResult> QueryAcquisitionDocumentsAsync(ResourceNamespace ns, string id, DataSourceDocumentQueryRequest request, CancellationToken ct = default) =>
+        DocumentPostAsync<DataSourceDocumentQueryResult>(AcquisitionDocumentPath(ns, id, "query"), request, ct);
+    public Task<ResourceReference> PublishAcquisitionDocumentToolAsync(ResourceNamespace ns, string id, PublishDataSourceDocumentToolRequest request, CancellationToken ct = default) =>
+        DocumentPostAsync<ResourceReference>(AcquisitionDocumentPath(ns, id, "tools"), request, ct);
+    private static string AcquisitionDocumentPath(ResourceNamespace ns, string id, string action) =>
+        $"api/datasourceacquisitions/{Uri.EscapeDataString(id)}/documents/{action}?namespace={Uri.EscapeDataString(ns.Value)}";
+    private async Task<T> DocumentPostAsync<T>(string path, object request, CancellationToken ct)
+    {
+        using var response = await httpClient.PostAsJsonAsync(path, request, ct);
+        await ApiResponse.EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<T>(ct) ?? throw new AgentstrationApiException("Missing document response.", Guid.NewGuid().ToString("N"));
+    }
     public Task<Agentstration.Storage.Contracts.StorageObjectContent> ReadContentAsync(ResourceNamespace ns, string acquisitionId,
         CancellationToken cancellationToken = default) => ApiResponse.ReadAsync<Agentstration.Storage.Contracts.StorageObjectContent>(httpClient,
             $"api/datasourceacquisitions/{Uri.EscapeDataString(acquisitionId)}/content?namespace={Uri.EscapeDataString(ns.Value)}", cancellationToken);

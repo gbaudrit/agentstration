@@ -264,3 +264,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 225. [ADR-0225 — Structured storage does not define agent Memory policy](0225-structured-storage-does-not-define-memory-policy.md)
 
 226. [ADR-0226 — Schema bindings select sub-schemas of exact published versions](0226-schema-bindings-select-versioned-subschemas.md)
+
+227. [ADR-0227 — Data Source document Tools select latest or exact acquisitions](0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)

@@ -191,4 +191,21 @@
   <data name="DatasetConfigureStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
   <data name="AcquisitionOutputSchema" xml:space="preserve"><value>Schéma adopté pour la réponse de l’opération</value></data>
   <data name="ProjectedOutputSchema" xml:space="preserve"><value>Schéma adopté pour la sortie de projection</value></data>
+  <data name="Documents.QueryTitle" xml:space="preserve"><value>Interroger les documents acquis</value></data>
+  <data name="Documents.QueryHelp" xml:space="preserve"><value>Les requêtes lisent la publication immuable de l’acquisition sélectionnée. Elles ne déclenchent aucune acquisition.</value></data>
+  <data name="Documents.Publication" xml:space="preserve"><value>Publication sélectionnée</value></data>
+  <data name="Documents.SchemaVersion" xml:space="preserve"><value>Schéma de requête publié</value></data>
+  <data name="Documents.EnvelopeHelp" xml:space="preserve"><value>Les requêtes suivent la structure des documents stockés. Sélectionner un sous-schéma ne découpe pas l’enveloppe acquise.</value></data>
+  <data name="Documents.ToolTitle" xml:space="preserve"><value>Publier un Tool de requête</value></data>
+  <data name="Documents.ToolMode" xml:space="preserve"><value>Sélection de l’acquisition</value></data>
+  <data name="Documents.ToolLatest" xml:space="preserve"><value>Dernière acquisition réussie ou précisée à l’appel</value></data>
+  <data name="Documents.ToolExact" xml:space="preserve"><value>Uniquement cette acquisition</value></data>
+  <data name="Documents.ToolModeHelp" xml:space="preserve"><value>Le mode dynamique lit la dernière acquisition réussie et conservée dans ce contexte, sauf si l’appel fournit acquisitionId. Le mode fixe conserve cette acquisition exacte.</value></data>
+  <data name="Documents.ToolContractHelp" xml:space="preserve"><value>Chaque version du Tool fixe l’identité de la Data Source, le contexte d’acquisition, la version du schéma et le profil de requête. Un contrat modifié exige une republication explicite. La pagination conserve l’acquisition choisie à la première page.</value></data>
+  <data name="Documents.PublishTool" xml:space="preserve"><value>Publier le Tool de requête</value></data>
+  <data name="Documents.ToolPublished" xml:space="preserve"><value>Tool de requête publié :</value></data>
+  <data name="Documents.ContractMismatch" xml:space="preserve"><value>Le contrat de l’acquisition diffère de cette version du Tool. Inspectez la dernière acquisition ou publiez une nouvelle version ; utilisez le mode fixe pour cette acquisition.</value></data>
+  <data name="Documents.Unavailable" xml:space="preserve"><value>Cette acquisition ne possède pas de publication structurée conservée et disponible pour les requêtes.</value></data>
+  <data name="Documents.CursorInvalid" xml:space="preserve"><value>Cette continuation de requête est indisponible ou expirée. Relancez la requête.</value></data>
+  <data name="Documents.QueryFailed" xml:space="preserve"><value>La requête ou la publication du Tool a échoué. Vérifiez l’acquisition sélectionnée, le profil de requête et les permissions.</value></data>
 </root>

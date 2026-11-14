@@ -22,6 +22,12 @@ export const TestIds = {
     transformationCreator: 'flow-transformation-creator', transformationDisplayName: 'flow-transformation-display-name',
     transformationName: 'flow-transformation-name', transformationCreate: 'flow-transformation-create', transformationDesigner: 'flow-transformation-designer',
   },
+  dataSourceDocuments: {
+    access: 'dataset-document-access', query: 'dataset-document-query', payload: 'dataset-document-query-payload',
+    run: 'dataset-document-query-run', next: 'dataset-document-query-next', result: 'dataset-document-result',
+    toolMode: 'dataset-document-tool-mode', toolVersion: 'dataset-document-tool-version',
+    publish: 'dataset-document-tool-publish', toolLink: 'dataset-document-tool-link', error: 'dataset-document-error',
+  },
   common: {
     iconPicker: 'icon-picker',
     schemaInputEditor: 'schema-input-editor',
@@ -58,6 +64,9 @@ export const TestIds = {
     storageEditor: 'storage-editor',
     storageCollections: 'storage-collections',
     storageCollectionAdd: 'storage-collection-add',
+    storageDocumentQuery: 'storage-document-query',
+    storageDocumentQueryPayload: 'storage-document-query-payload',
+    storageDocumentQueryRun: 'storage-document-query-run',
     storageDocumentAccess: 'storage-document-access',
     storageDocumentResult: 'storage-document-result',
     settings: 'console-admin-settings',

@@ -238,4 +238,6 @@
   <data name="Error.BackendTimeout" xml:space="preserve"><value>The storage connection timed out. Check that the server is reachable from the extension.</value></data>
   <data name="Error.BackendUnavailable" xml:space="preserve"><value>The storage backend is unavailable. Check the database service and the extension’s connection settings.</value></data>
   <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>Executing a document operation requires runs/execute in the selected context. Select an authorized context or request this permission.</value></data>
+  <data name="Documents.RunQuery" xml:space="preserve"><value>Run query</value></data>
+  <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Enter a JSON object of at most 8 KiB and a page size within the displayed limit.</value></data>
 </root>

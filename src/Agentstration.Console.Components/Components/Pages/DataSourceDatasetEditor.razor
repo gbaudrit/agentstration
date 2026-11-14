@@ -193,6 +193,10 @@ else
                 {
                     <label class="dataset-content-picker"><span>@T("DatasetContentAcquisition")</span><select value="@contentAcquisitionKey" @onchange="ChangeContentAcquisitionAsync" disabled="@(busy || !interactive)"><option value="">@T("Select")</option>@foreach (var item in ContentAcquisitions) { <option value="@item.Uid">@item.CreatedAt.ToLocalTime().ToString("g") · @item.Name</option> }</select></label>
                 }
+                @if (SelectedContentAcquisition is { Publication.Document: not null, ContentRetiredAt: null } selectedDocuments)
+                {
+                    <DataSourceAcquisitionDocuments @key="selectedDocuments.Uid" Acquisition="selectedDocuments" />
+                }
                 @if (preview is not null)
                 {
                     <div data-testid="dataset-content"><h3>@T("DatasetContent")</h3><pre class="runner-json">@preview</pre>@if (previewTruncated) { <p>@T("DatasetContentTruncated")</p> }<button class="button-secondary" type="button" @onclick="CloseContent">@T("DatasetCloseContent")</button></div>
@@ -233,7 +237,8 @@ else
     private IEnumerable<DatasetTab> AvailableTabs => Enum.GetValues<DatasetTab>().Where(tab => tab != DatasetTab.Access || CanManage);
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
     private IReadOnlyList<DataSourceAcquisitionResource> VisibleHistory => (activeTab == DatasetTab.Overview ? OrderedHistory.Take(3) : OrderedHistory).ToArray();
-    private IEnumerable<DataSourceAcquisitionResource> ContentAcquisitions => OrderedHistory.Where(item => item.Content is not null);
+    private IEnumerable<DataSourceAcquisitionResource> ContentAcquisitions => OrderedHistory.Where(item => item.Content is not null && item.ContentRetiredAt is null);
+    private DataSourceAcquisitionResource? SelectedContentAcquisition => ContentAcquisitions.FirstOrDefault(item => item.Uid.ToString() == contentAcquisitionKey);
     private DataSourceAcquisitionResource? LatestAcquisition => OrderedHistory.FirstOrDefault();
     private ConnectedServiceResource? SavedService => connectedServices.FirstOrDefault(item => item.Uid == savedOperation?.Definition.Service.ServiceUid
         && item.ScopeRef == savedOperation.Definition.Service.Service.ScopeRef && item.Address == savedOperation.Definition.Service.Service.Address);

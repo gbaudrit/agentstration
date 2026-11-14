@@ -1,0 +1,85 @@
+@implements IDisposable
+@inject IDataSourcesClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> StorageLocalizer
+<section class="form-section" data-testid="dataset-document-access">
+    <h3>@T("Documents.QueryTitle")</h3><p>@T("Documents.QueryHelp")</p>
+    @if (loading) { <p role="status">@T("Loading")</p> }
+    else if (description is not null)
+    {
+        <dl class="resource-details"><dt>@T("Documents.Publication")</dt><dd><code>@description.PublicationId</code></dd>
+            @if (description.Selection.Contract.SchemaReference is { } schema) { <dt>@T("Documents.SchemaVersion")</dt><dd><code>@schema.Name / @schema.Version @schema.SchemaPath</code></dd> }
+        </dl>
+        <p class="muted">@T("Documents.EnvelopeHelp")</p>
+        <StructuredDocumentQueryEditor Description="@QueryDescription" Busy="@busy" CanExecute="@Context.HasPermission("runs/execute")"
+            HasNextPage="@(result?.NextCursor is not null)" RunRequested="QueryAsync" NextRequested="NextAsync" ResetRequested="ResetResult" TestId="dataset-document-query" />
+        @if (result is not null)
+        {
+            <p>@T("DatasetContentAcquisition"): <code>@result.AcquisitionId</code></p>
+            <pre class="runner-json" data-testid="dataset-document-result">@JsonSerializer.Serialize(result.Page, new JsonSerializerOptions { WriteIndented = true })</pre>
+        }
+        @if (Context.HasPermission("resources/write"))
+        {
+            <h3>@T("Documents.ToolTitle")</h3>
+            <fieldset class="form-grid" disabled="@busy">
+                <label><span>@T("Documents.ToolMode")</span><select @bind="mode" data-testid="dataset-document-tool-mode"><option value="latest">@T("Documents.ToolLatest")</option><option value="exact">@T("Documents.ToolExact")</option></select><small>@T("Documents.ToolModeHelp")</small></label>
+                <label><span>@StorageLocalizer["Documents.ToolVersion"]</span><input @bind="version" maxlength="32" data-testid="dataset-document-tool-version" /></label>
+                <label><span>@StorageLocalizer["Documents.ToolApproval"]</span><input type="checkbox" @bind="requiresApproval" /></label>
+                <button class="button-secondary" type="button" disabled="@(busy || !description.Documents.Policy.Query || QueryDescription.QueryProfiles.Count == 0 || string.IsNullOrWhiteSpace(version))" @onclick="PublishAsync" data-testid="dataset-document-tool-publish">@T("Documents.PublishTool")</button>
+            </fieldset>
+            <p class="muted">@T("Documents.ToolContractHelp")</p>
+        }
+        @if (tool is not null) { <p role="status">@T("Documents.ToolPublished") <a href="@ToolUrl(tool)" data-testid="dataset-document-tool-link"><code>@tool.Name</code></a></p> }
+    }
+    @if (error is not null) { <p class="form-alert form-alert-danger" role="alert" data-testid="dataset-document-error">@ErrorMessage @if (error is AgentstrationApiException api) { <code>@api.ProblemTitle</code> }</p> }
+</section>
+@code {
+    [Parameter, EditorRequired] public DataSourceAcquisitionResource Acquisition { get; set; } = null!;
+    private readonly CancellationTokenSource cancellation = new();
+    private DataSourceDocumentDescription? description;
+    private DataSourceDocumentQueryResult? result;
+    private ResourceReference? tool;
+    private Exception? error;
+    private Guid loaded;
+    private bool loading, busy, requiresApproval;
+    private string mode = DataSourceDocumentSelectionModes.Latest, version = "1.0.0";
+    private StorageDocumentDescription QueryDescription => description!.Documents with { QueryProfiles = description.Documents.QueryProfiles.Where(p => p == description.Selection.Contract.Profile).ToArray() };
+    private string ErrorMessage => error is AgentstrationApiException api ? api.ProblemTitle switch
+    {
+        "data_source_document_contract_mismatch" => T("Documents.ContractMismatch"),
+        "data_source_document_acquisition_unavailable" or "data_source_document_acquisition_unsupported" => T("Documents.Unavailable"),
+        "data_source_document_cursor_invalid" or "data_source_document_cursor_expired" or "data_source_document_cursor_parameters" => T("Documents.CursorInvalid"),
+        { } code when StorageErrorKey.ForCode(code).StartsWith("Error.Backend", StringComparison.Ordinal) => StorageLocalizer[StorageErrorKey.ForCode(code)].Value,
+        _ => T("Documents.QueryFailed")
+    } : T("Documents.QueryFailed");
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == Acquisition.Uid) return;
+        loaded = Acquisition.Uid; loading = true; error = null; description = null; result = null; tool = null;
+        try { description = await Client.DescribeAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name, cancellation.Token); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    private void ResetResult() { result = null; error = null; }
+    private Task QueryAsync(StructuredDocumentQueryEditorRequest request) => ExecuteAsync(async () =>
+        result = await Client.QueryAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name,
+            new() { Profile = request.Profile, Query = request.Query, PageSize = request.PageSize }, cancellation.Token));
+    private Task NextAsync() => ExecuteAsync(async () =>
+        result = await Client.QueryAcquisitionDocumentsAsync(Acquisition.Namespace, Acquisition.Name,
+            new() { Profile = description!.Selection.Contract.Profile, Cursor = result!.NextCursor }, cancellation.Token));
+    private Task PublishAsync() => ExecuteAsync(async () => tool = await Client.PublishAcquisitionDocumentToolAsync(Acquisition.Namespace,
+        Acquisition.Name, new(version, description!.Selection.Contract.Profile, mode, requiresApproval), cancellation.Token));
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (busy) return; busy = true; error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { busy = false; }
+    }
+    private string T(string key) => Localizer[key];
+    private static string ToolUrl(ResourceReference value) => $"/tools/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString((value.Namespace ?? ResourceNamespace.Default).Value)}&scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}";
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

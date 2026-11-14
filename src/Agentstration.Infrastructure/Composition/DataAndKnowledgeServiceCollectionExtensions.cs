@@ -1,4 +1,6 @@
 using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
+using Agentstration.Infrastructure.DataSources;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Knowledge;
@@ -25,6 +27,10 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<DataSourceDatasetAcquisitionService>();
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, DataSourceStorageUsageProvider>();
         services.AddSingleton<DataSourceAcquisitionService>();
+        services.AddSingleton<DataSourceDocumentAccessService>();
+        services.AddSingleton<DataSourceDocumentToolExposureService>();
+        services.AddSingleton<IDataSourceDocumentCursorProtector, DataSourceDocumentCursorProtector>();
+        services.AddSingleton<IDataSourceDocumentToolResolver, DataSourceDocumentToolResolver>();
         services.AddSingleton<DataSourceDiscoveryService>();
         services.AddSingleton<DataSourceAcquisitionTargetService>();
         services.AddSingleton<KnowledgeSourceManagementService>();
