@@ -152,6 +152,31 @@ public sealed class McpToolCatalogTests
     }
 
     [TestMethod]
+    public async Task SchemaFormatDeadlineSurvivesWrappedTransportCancellation()
+    {
+        await using var host = new WebApplicationFactory<UtilitiesExtension::Program>();
+        var registration = Registration("utilities-extension", "Agentstration.Extensions.Utilities");
+        var failRequests = false;
+        var handlers = new TestHttpMessageHandlerFactory(() => failRequests
+            ? new WrappedCancellationHandler()
+            : host.Server.CreateHandler());
+        var source = new AepSchemaFormatHandlerSource(new FakeStore(registration),
+            new AepMcpTransport(handlers, NullLoggerFactory.Instance),
+            new AepSchemaFormatOptions { OperationTimeout = TimeSpan.FromMilliseconds(100) });
+        var registry = new SchemaFormatRegistry([], [source]);
+        var handler = await registry.ResolveAsync(SchemaFormatIds.JsonSchema,
+            SchemaFormatCapabilities.ValidateDefinition,
+            new("Agentstration.Extensions.Utilities/json-schema.validation", "1.0"));
+        failRequests = true;
+
+        var exception = await Assert.ThrowsAsync<SchemaFormatOperationException>(async () =>
+            await handler.ValidateDefinitionAsync(JsonSerializer.SerializeToElement(new { type = "object" }),
+                BuiltinJsonSchemaFormatHandler.Draft202012, default));
+
+        Assert.AreEqual("schema_format_provider_timeout", exception.Code);
+    }
+
+    [TestMethod]
     public void ServerMcpEndpointRemainsAvailableWithoutLegacyPlatformTools()
     {
         using var host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
@@ -620,6 +645,22 @@ public sealed class McpToolCatalogTests
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("The request must be cancelled by its operation timeout.");
+        }
+    }
+
+    private sealed class WrappedCancellationHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException exception)
+            {
+                throw new HttpRequestException("Transport wrapped the cancelled request.", exception);
+            }
+            throw new InvalidOperationException("The request must finish through cancellation.");
         }
     }
 

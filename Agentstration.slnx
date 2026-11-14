@@ -58,6 +58,7 @@
   <Folder Name="/src/Composition/">
     <Project Path="src/Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
     <Project Path="src/Agentstration.Api/Agentstration.Api.csproj" />
+    <Project Path="src/Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
     <Project Path="src/Agentstration.AppHost/Agentstration.AppHost.csproj" />
     <Project Path="src/Agentstration.Application/Agentstration.Application.csproj" />
     <Project Path="src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
@@ -264,6 +265,7 @@
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Web/">
+    <Project Path="tests/Agentstration.Http.Diagnostics.Tests/Agentstration.Http.Diagnostics.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.FlowDesigner.Tests/Agentstration.Web.FlowDesigner.Tests.csproj" />

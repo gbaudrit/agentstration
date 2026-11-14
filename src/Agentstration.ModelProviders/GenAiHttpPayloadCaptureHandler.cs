@@ -32,7 +32,8 @@ public sealed partial class GenAiHttpPayloadCaptureHandler(
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var capture = observability.HttpPayloadCapture;
-        if (!capture.Enabled) return await base.SendAsync(request, cancellationToken);
+        if (!capture.Enabled || (request.Options.TryGetValue(new HttpRequestOptionsKey<bool>("Agentstration.Http.Diagnostics.Active"), out var generalDiagnostics) && generalDiagnostics))
+            return await base.SendAsync(request, cancellationToken);
 
         using var activity = ActivitySource.StartActivity("gen_ai.http.payload_capture", ActivityKind.Internal);
         var safeRequestUri = SafeRequestUri(request.RequestUri);

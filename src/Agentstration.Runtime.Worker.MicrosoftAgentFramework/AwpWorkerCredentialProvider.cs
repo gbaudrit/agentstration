@@ -13,6 +13,7 @@ internal sealed record AwpClientCredential(Guid WorkerId, Guid CredentialId, str
 
 internal sealed class AwpWorkerCredentialProvider(
     IOptions<RuntimeWorkerOptions> options,
+    IHttpClientFactory httpClientFactory,
     ILogger<AwpWorkerCredentialProvider> logger)
 {
     public async Task<AwpClientCredential> LoadAsync(CancellationToken cancellationToken)
@@ -36,7 +37,8 @@ internal sealed class AwpWorkerCredentialProvider(
 
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("Announcing AWP Worker {WorkerId} for pairing", configured.WorkerId);
-        using var enrollment = new HttpClient { BaseAddress = new Uri(configured.AuthorityUrl, UriKind.Absolute) };
+        using var enrollment = httpClientFactory.CreateClient("agentstration-awp-enrollment");
+        enrollment.BaseAddress = new Uri(configured.AuthorityUrl, UriKind.Absolute);
         using var announced = await enrollment.PostAsJsonAsync("/api/awp/enrollment/announce",
             new AnnounceAwpWorkerRequest(configured.WorkerId, configured.DisplayName, AwpWorkerAuthentication.ProtocolVersion),
             AwpProtocolJson.Options, cancellationToken);

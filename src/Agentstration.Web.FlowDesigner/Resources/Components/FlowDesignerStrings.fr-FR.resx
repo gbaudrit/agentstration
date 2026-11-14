@@ -245,4 +245,7 @@
   <data name="Foreach.Help" xml:space="preserve"><value>Reliez Process à une branche puis son résultat au connecteur de retour inférieur. Chaque appel reçoit un élément ; les résultats conservent l’ordre d’entrée.</value></data>
   <data name="TransformFunction" xml:space="preserve"><value>Fonction de transformation</value></data>
   <data name="TransformMappingOnly" xml:space="preserve"><value>Mapping JSON</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
+  </data>
 </root>

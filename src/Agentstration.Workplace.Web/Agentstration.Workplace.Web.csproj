@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
     <ProjectReference Include="../Agentstration.Web.Components/Agentstration.Web.Components.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Components/Agentstration.Workplace.Components.csproj" />
     <ProjectReference Include="../Agentstration.Workplace.Client/Agentstration.Workplace.Client.csproj" />

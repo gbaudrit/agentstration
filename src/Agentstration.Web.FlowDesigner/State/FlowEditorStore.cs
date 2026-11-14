@@ -9,6 +9,8 @@ namespace Agentstration.Web.FlowDesigner.State;
 public enum FlowEditorMode { Designer, Definition, Split }
 public enum FlowSaveState { Saved, Saving, UnsavedChanges, SaveFailed }
 public sealed record FlowEditorSelection(string? StepName = null, string? TransitionId = null);
+public sealed record FlowEditorSaveSnapshot(Guid SessionId, long EditRevision, long GraphRevision, long SourceRevision,
+    FlowDesignerResource Resource, string ETag, string Source, bool HasSourceChanges);
 public sealed record FlowDesignerNode(string Name, string Type, string DisplayName, FlowNodePosition Position, string? Resource, IReadOnlyList<string> OutputEvents)
 {
     public IReadOnlyDictionary<string, FlowOutputOutcome> OutputOutcomes { get; init; } = new Dictionary<string, FlowOutputOutcome>(StringComparer.Ordinal);
@@ -50,6 +52,7 @@ public sealed record FlowEditorState
     public string? ETag { get; init; }
     public string SourceText { get; init; } = string.Empty;
     public string? SourceError { get; init; }
+    public bool HasSourceChanges { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public string? PublishedVersion { get; init; }
     public bool IsReadOnly { get; init; }
@@ -286,6 +289,9 @@ internal static class FlowGraphAutoLayout
 
 public sealed class FlowEditorStore
 {
+    private Guid sessionId = Guid.NewGuid();
+    private long editRevision;
+    private long sourceRevision;
     private readonly Stack<FlowGraphDefinition> undo = new();
     private readonly Stack<FlowGraphDefinition> redo = new();
     public FlowEditorState State { get; private set; } = new();
@@ -296,6 +302,8 @@ public sealed class FlowEditorStore
 
     public void Load(FlowDesignerLoadResult result, FlowDesignerTarget target)
     {
+        sessionId = Guid.NewGuid();
+        editRevision = sourceRevision = 0;
         undo.Clear(); redo.Clear();
         flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
         State = new FlowEditorState { Resource = result.Resource, Diagram = FlowDesignerDocument.From(result.Resource.Definition), ETag = result.ETag, LocalRevision = result.Resource.DraftRevision ?? 0, SourceText = result.Source, SaveState = FlowSaveState.Saved, Namespace = target.Namespace, PublishedVersion = result.PublishedVersion, IsReadOnly = result.IsReadOnly };
@@ -312,6 +320,7 @@ public sealed class FlowEditorStore
         var definition = command.Apply(resource.Definition);
         if (ReferenceEquals(definition, resource.Definition)) return Task.CompletedTask;
         undo.Push(resource.Definition); redo.Clear();
+        editRevision++;
         var selection = command is RenameStepCommand rename && State.Selection.StepName == rename.OldName
             ? new FlowEditorSelection(rename.NewName)
             : State.Selection;
@@ -354,12 +363,60 @@ public sealed class FlowEditorStore
             pair.First.Outcome == pair.Second.Outcome &&
             SchemaText(pair.First.Schema) == SchemaText(pair.Second.Schema));
     private static string? SchemaText(JsonElement? schema) => schema?.GetRawText();
-    public void SetSource(string source, string? error = null) { State = State with { SourceText = source, SourceError = error, IsDirty = error is null || State.IsDirty }; Changed(); }
+    public void SetSource(string source, string? error = null)
+    {
+        if (source != State.SourceText)
+        {
+            editRevision++;
+            sourceRevision++;
+            State = State with { SourceText = source, HasSourceChanges = true, IsDirty = true, SaveState = FlowSaveState.UnsavedChanges };
+        }
+        State = State with { SourceError = error };
+        Changed();
+    }
+    public void SetSourceError(string? error) { State = State with { SourceError = error }; Changed(); }
+    public FlowEditorSaveSnapshot CaptureSave() => new(sessionId, editRevision, State.LocalRevision, sourceRevision,
+        State.Resource ?? throw new InvalidOperationException("The editor has not loaded a Flow definition."),
+        State.ETag ?? throw new InvalidOperationException("The editor has no draft ETag."), State.SourceText, State.HasSourceChanges);
+    public bool IsCurrent(FlowEditorSaveSnapshot snapshot) => snapshot.SessionId == sessionId;
+    public bool AcknowledgeSave(FlowDraftResponse response, FlowEditorSaveSnapshot snapshot)
+    {
+        if (!IsCurrent(snapshot)) return false;
+        State = State with { ETag = response.ETag, Resource = State.Resource! with { DraftRevision = response.Value.Revision } };
+        Changed();
+        return true;
+    }
     public void MarkSaving() { State = State with { SaveState = FlowSaveState.Saving }; Changed(); }
     public void MarkSaveFailed() { State = State with { SaveState = FlowSaveState.SaveFailed }; Changed(); }
-    public void MarkSaved(FlowDraftResponse response, string source) { State = State with { Resource = new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags, response.Value.Definition, response.Value.Revision) { ScopeRef = response.Value.ScopeRef }, Diagram = FlowDesignerDocument.From(response.Value.Definition, flowCallOutputs), ETag = response.ETag, LocalRevision = response.Value.Revision, SourceText = source, IsDirty = false, SaveState = FlowSaveState.Saved, SourceError = null }; Changed(); }
+    public bool MarkSaved(FlowDraftResponse response, string source, FlowEditorSaveSnapshot snapshot)
+    {
+        if (!IsCurrent(snapshot)) return false;
+        var newerGraph = State.LocalRevision != snapshot.GraphRevision;
+        var newerSource = sourceRevision != snapshot.SourceRevision;
+        // A visual save echoes the submitted graph. Keep live canvas models,
+        // including any endpoint being dragged, when acknowledging that write.
+        var applySourceGraph = snapshot.HasSourceChanges && !newerGraph;
+        var dirty = editRevision != snapshot.EditRevision;
+        State = State with
+        {
+            Resource = !applySourceGraph ? State.Resource! with { DraftRevision = response.Value.Revision }
+                : new(response.Value.FlowId, response.Value.DisplayName, response.Value.Description, response.Value.Tags,
+                    response.Value.Definition, response.Value.Revision)
+                { ScopeRef = response.Value.ScopeRef },
+            Diagram = applySourceGraph ? FlowDesignerDocument.From(response.Value.Definition, flowCallOutputs) : State.Diagram,
+            ETag = response.ETag,
+            LocalRevision = applySourceGraph ? State.LocalRevision + 1 : State.LocalRevision,
+            SourceText = newerSource ? State.SourceText : source,
+            HasSourceChanges = newerSource && State.HasSourceChanges,
+            SourceError = newerSource ? State.SourceError : null,
+            IsDirty = dirty,
+            SaveState = dirty ? FlowSaveState.UnsavedChanges : FlowSaveState.Saved
+        };
+        Changed();
+        return true;
+    }
     public void Undo() { if (!undo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; redo.Push(State.Resource.Definition); ReplaceHistory(definition); }
     public void Redo() { if (!redo.TryPop(out var definition) || State.Resource is null || State.IsReadOnly) return; undo.Push(State.Resource.Definition); ReplaceHistory(definition); }
-    private void ReplaceHistory(FlowGraphDefinition definition) { State = State with { Resource = State.Resource! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition, flowCallOutputs), IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
+    private void ReplaceHistory(FlowGraphDefinition definition) { editRevision++; State = State with { Resource = State.Resource! with { Definition = definition }, Diagram = FlowDesignerDocument.From(definition, flowCallOutputs), LocalRevision = State.LocalRevision + 1, IsDirty = true, SaveState = FlowSaveState.UnsavedChanges }; Changed(); }
     private void Changed() => StateChanged?.Invoke(this, EventArgs.Empty);
 }

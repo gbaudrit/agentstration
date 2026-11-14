@@ -250,4 +250,7 @@
   <data name="Foreach.Help" xml:space="preserve"><value>Connect Process to a branch and return its result to the bottom result port. Each invocation receives one element; results preserve input order.</value></data>
   <data name="TransformFunction" xml:space="preserve"><value>Transformation function</value></data>
   <data name="TransformMappingOnly" xml:space="preserve"><value>JSON mapping</value></data>
+  <data name="DraftChangedDuringSave" xml:space="preserve">
+    <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
+  </data>
 </root>

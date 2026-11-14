@@ -296,7 +296,7 @@ else
 
         @if (Editor.State.Mode is FlowEditorMode.Definition or FlowEditorMode.Split)
         {
-            <FlowSourceEditor Value="@sourceText" ValueChanged="SourceChanged" Error="@Editor.State.SourceError"
+            <FlowSourceEditor Value="@Editor.State.SourceText" ValueChanged="SourceChanged" Error="@Editor.State.SourceError"
                               IsReadOnly="ReadOnly" ApplyRequested="ApplySourceAsync" />
         }
     </section>
