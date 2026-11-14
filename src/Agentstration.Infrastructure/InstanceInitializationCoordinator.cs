@@ -14,8 +14,8 @@ public interface IInstanceInitializationCoordinator
 public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
-    // Reconcile compiled catalogues and JSON acquisition orchestration without a file Bootstrap profile.
-    public int TargetVersion { get; set; } = 11;
+    // Reconcile native Knowledge access contracts, including nullable optional selectors.
+    public int TargetVersion { get; set; } = 12;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

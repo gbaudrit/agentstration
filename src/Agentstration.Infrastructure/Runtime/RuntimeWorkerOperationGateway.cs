@@ -154,6 +154,15 @@ public sealed class RuntimeWorkerOperationGateway(
                 Arguments = request.Arguments?.Clone()
             }, cancellationToken);
         }
+        catch (ToolInputValidationException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code,
+                request.TransientPayloads ? "Ephemeral execution failed." : exception.Message, exception)
+            {
+                ContractFailure = new("tool-input", "tool", exception.Path, exception.Code,
+                    "value matching the Tool input schema", "invalid", Code: exception.Code)
+            };
+        }
         catch (ToolDefinitionInvocationException exception)
         {
             logger.LogWarning("Governed Tool invocation failed with {ErrorCode}: {ErrorDetail}. ExecutionScope {ExecutionScopeRef}, LogicalScope {LogicalScopeRef}, Run {RunId}, Agent {AgentId}, Tool {ToolId}, ToolCall {ToolCallId}, TurnAttempt {TurnAttemptId}",

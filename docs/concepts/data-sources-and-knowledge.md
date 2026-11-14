@@ -119,6 +119,18 @@ the same attempt. Failure preserves the previous active Snapshot.
 | `search_regex` | `pattern`, optional `ignoreCase`, `snapshotId`, `limit`, `contextCharacters`; or `cursor` with optional limit | Matches with `matchRange`, `readRange`, excerpts and `nextCursor` |
 | `get_status` | Optional `snapshotId` to compare | Active versus latest published Snapshot, comparison flags, recorded input freshness, processing/failure evidence and document formats/sizes |
 
+Optional Snapshot, document and continuation selectors accept `null` as absent.
+For current status, call the relay with `{"request":{}}` or
+`{"request":{"snapshotId":null}}`. A supplied Snapshot ID must be non-empty;
+`""` is not a current-Snapshot shortcut. Invalid Tool arguments return a governed
+HTTP 422 with their schema path. The AWP `errorCode` alias remains readable in
+HTTP diagnostics while generic authentication `code` fields stay redacted.
+
+Initialization version 12 reconciles the native nullable selector contracts.
+Previously published relay versions keep their accepted schemas and pins.
+Republish the Knowledge Tool exposure under a new version, such as `1.0.1`, and
+select that ToolSet version for the Agent to use the updated contract.
+
 To read a search hit, pass its result `snapshotId`, match `documentId` and
 `readRange` as the `range` of `read`. Offsets count Unicode scalar characters,
 start inclusive and end exclusive. This is independent of UTF-8 byte offsets and

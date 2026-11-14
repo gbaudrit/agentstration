@@ -37,7 +37,9 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
 
     [TestMethod]
-    public async Task InstanceKnowledgePublishesLogicalToolsAndExecutesAgainstItsOperationalSnapshot()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task InstanceKnowledgePublishesLogicalToolsAndExecutesAgainstItsOperationalSnapshot(bool explicitNullSelectors)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -79,6 +81,15 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         {
             var request = operation.Operation == KnowledgeSourceOperation.SearchRegex
                 ? JsonSerializer.SerializeToElement(new { pattern = "instance-tool-content" }) : Empty;
+            if (explicitNullSelectors)
+            {
+                request = operation.Operation switch
+                {
+                    KnowledgeSourceOperation.SearchRegex => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null,"cursor":null,"preparationId":null,"pattern":"instance-tool-content"}"""),
+                    KnowledgeSourceOperation.Read => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null,"cursor":null,"preparationId":null,"documentId":null,"range":null}"""),
+                    _ => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null}""")
+                };
+            }
             using var executed = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
                 new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
