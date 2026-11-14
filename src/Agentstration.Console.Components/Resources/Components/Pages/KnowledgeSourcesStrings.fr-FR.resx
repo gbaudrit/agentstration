@@ -155,4 +155,8 @@
   <data name="StructuredOutputSelect" xml:space="preserve"><value>Sélectionnez une collection</value></data>
   <data name="StructuredOutputRequired" xml:space="preserve"><value>Ce Storage documentaire nécessite une collection activée autorisant la lecture, les requêtes et la publication immuable. Configurez-en une dans le Storage, puis sélectionnez-la ici.</value></data>
   <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
+  <data name="PublishedExposureVersion" xml:space="preserve"><value>Version publiée : {0}</value></data>
+  <data name="RepublishExposureHelp" xml:space="preserve"><value>Publiez une nouvelle version pour mettre à jour ces Tools. Les versions précédentes restent disponibles. Après publication, sélectionnez la nouvelle version du ToolSet dans vos agents.</value></data>
+  <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publier une nouvelle version des Tools</value></data>
+  <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choisissez une autre version. La version publiée ne peut pas être remplacée.</value></data>
 </root>

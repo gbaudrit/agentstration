@@ -130,6 +130,12 @@ Initialization version 12 reconciles the native nullable selector contracts.
 Previously published relay versions keep their accepted schemas and pins.
 Republish the Knowledge Tool exposure under a new version, such as `1.0.1`, and
 select that ToolSet version for the Agent to use the updated contract.
+In the Console, open the Knowledge Source's **Tools** tab. The publication form
+remains available after the first publication, shows the current version and
+suggests the next patch version. Edit the proposed version and approval choice,
+then select **Publish a new Tool version**. Existing publications remain available;
+a failed publication keeps the previous exposure visible. Inherited Sources show
+their published Tools without owner-only publication controls.
 
 To read a search hit, pass its result `snapshotId`, match `documentId` and
 `readRange` as the `range` of `read`. Offsets count Unicode scalar characters,

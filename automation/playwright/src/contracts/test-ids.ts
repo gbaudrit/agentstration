@@ -226,6 +226,8 @@ export const TestIds = {
     knowledgeSourceTransformationConfiguration: 'knowledge-source-transformation-configuration',
     knowledgeSourceSave: 'knowledge-source-save',
     knowledgeSourcePublishTools: 'knowledge-publish-tools',
+    knowledgeExposureVersion: 'knowledge-tool-exposure-version',
+    knowledgeExposureCurrentVersion: 'knowledge-tool-exposure-current-version',
     knowledgeOutputStorage: 'knowledge-output-storage',
     knowledgeOutputCollection: 'knowledge-output-collection',
     knowledgeDocumentQueryResult: 'knowledge-document-query-result',
