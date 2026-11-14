@@ -268,3 +268,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 227. [ADR-0227 — Data Source document Tools select latest or exact acquisitions](0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
 
 228. [ADR-0228 — Data Source queries evolve independently from Tool exposures](0228-data-source-queries-evolve-independently-from-tool-exposures.md)
+229. [ADR-0229 — General HTTP diagnostics observe bounded streams](0229-http-diagnostics-observe-bounded-streams.md)
+230. [ADR-0230 — HTTP diagnostics use explicit category capture policies](0230-http-diagnostics-use-category-policies.md)
+231. [ADR-0231 — HTTP category switches always enable both payload directions](0231-http-categories-enable-both-bodies.md)

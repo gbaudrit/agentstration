@@ -34,7 +34,6 @@ public partial class FlowDesigner
     private bool loadingResources = true;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
-    private string sourceText = string.Empty;
     private string transitionFrom = string.Empty;
     private string transitionTo = string.Empty;
     private string transitionEvent = "completed";
@@ -143,7 +142,7 @@ public partial class FlowDesigner
     private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef, PublishedVersion);
     private ResourceScopeRef OwnerScope => Editor.State.Resource?.ScopeRef ?? ScopeRef
         ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
-    private bool ReadOnly => IsReadOnly || Editor.State.IsReadOnly;
+    private bool ReadOnly => loadingTarget || IsReadOnly || Editor.State.IsReadOnly;
     private string DraftUrl => Navigation.GetUriWithQueryParameter("version", (string?)null);
 
     private int resourceLoadRevision;
@@ -155,44 +154,60 @@ public partial class FlowDesigner
         var targetKey = $"{target.ScopeRef?.Value}/{target.Namespace.Value}/{target.ResourceId}/{target.PublishedVersion}";
         if (loadedResource == targetKey) return;
         loadedResource = targetKey;
-        var revision = ++resourceLoadRevision;
+        resourceLoadRevision++;
         loadingResources = true;
+        targetCancellation?.Cancel();
+        targetCancellation?.Dispose();
+        autosave?.Cancel();
+        targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        var token = targetCancellation.Token;
+        var targetLoaded = false;
+        loadingTarget = true;
+        saving = publishing = runningDraft = false;
+        publication = null;
         try
         {
-            error = null; flowVersionCatalog.Clear();
-            var loaded = await Backend.LoadAsync(target, cancellation.Token);
-            if (revision != resourceLoadRevision) return;
-            var ownerScope = loaded.Resource.ScopeRef ?? target.ScopeRef
-                ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
-            var loadedAgents = await Resources.GetAgentsAsync(ownerScope, cancellation.Token);
-            if (revision != resourceLoadRevision) return;
-            var loadedFlows = await Resources.GetFlowsAsync(ownerScope, cancellation.Token);
-            if (revision != resourceLoadRevision) return;
-            var loadedTools = await Resources.GetToolsAsync(ownerScope, cancellation.Token);
-            if (revision != resourceLoadRevision) return;
-            var loadedSchemas = await Resources.GetSchemaVersionsAsync(cancellation.Token);
-            if (revision != resourceLoadRevision) return;
-            sourceText = loaded.Source;
+            error = null;
+            flowVersionCatalog.Clear();
+            var loaded = await Backend.LoadAsync(target, token);
+            token.ThrowIfCancellationRequested();
             Editor.Load(loaded, target);
-            agents = routerAgents = loadedAgents; flows = loadedFlows; tools = loadedTools; schemaVersions = loadedSchemas;
-            await RefreshFlowCallOutputsAsync(loaded.Resource.Definition, revision);
-            if (revision != resourceLoadRevision) return;
-            if (!ReadOnly)
-            {
-                var versions = await Resources.GetFlowVersionsAsync(ownerScope, target.Namespace, target.ResourceId, cancellation.Token);
-                if (revision != resourceLoadRevision) return;
-                publishVersion = SuggestedPublishVersion(versions);
-            }
+            targetLoaded = true;
+            var owner = OwnerScope;
+            var loadedAgents = await Resources.GetAgentsAsync(owner, token);
+            token.ThrowIfCancellationRequested();
+            var loadedFlows = await Resources.GetFlowsAsync(owner, token);
+            token.ThrowIfCancellationRequested();
+            var loadedTools = await Resources.GetToolsAsync(owner, token);
+            token.ThrowIfCancellationRequested();
+            var loadedSchemas = await Resources.GetSchemaVersionsAsync(token);
+            token.ThrowIfCancellationRequested();
+            var versions = loaded.IsReadOnly ? [] : await Resources.GetFlowVersionsAsync(owner, target.Namespace, target.ResourceId, token);
+            token.ThrowIfCancellationRequested();
+            agents = routerAgents = loadedAgents;
+            flows = loadedFlows;
+            tools = loadedTools;
+            schemaVersions = loadedSchemas;
+            flowVersions = [];
+            loadingTarget = false;
+            await RefreshFlowCallOutputsAsync(loaded.Resource.Definition);
+            token.ThrowIfCancellationRequested();
+            if (!ReadOnly) publishVersion = SuggestedPublishVersion(versions);
             transitionFrom = loaded.Resource.Definition.EntryStep;
             transitionTo = loaded.Resource.Definition.Steps.Skip(1).FirstOrDefault()?.Name ?? transitionFrom;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception exception)
         {
-            if (revision == resourceLoadRevision) error = exception.Message;
+            if (!token.IsCancellationRequested) error = exception.Message;
         }
         finally
         {
-            if (revision == resourceLoadRevision) loadingResources = false;
+            if (!token.IsCancellationRequested)
+            {
+                loadingTarget = !targetLoaded;
+                loadingResources = false;
+            }
         }
     }
 
@@ -297,75 +312,68 @@ public partial class FlowDesigner
     }
     private void ToggleValidation() => validationExpanded = !validationExpanded;
     private void EditorChanged(object? sender, EventArgs args) => _ = InvokeAsync(StateHasChanged);
-    private void SourceChanged(string source) { if (ReadOnly) return; sourceText = source; Editor.SetSource(source, Editor.State.SourceError); }
+    private void SourceChanged(string source) { if (ReadOnly) return; Editor.SetSource(source, null); }
 
-    private async Task SaveAsync()
-    {
-        if (ReadOnly || Editor.State.Resource is null || Editor.State.ETag is null || !Editor.State.IsDirty) return;
-        try
-        {
-            saving = true; error = null; Editor.MarkSaving();
-            var resource = Editor.State.Resource;
-            var saved = await Backend.SaveDraftAsync(Target, new(resource.DisplayName, resource.Description, resource.Tags, resource.Definition), Editor.State.ETag, cancellation.Token);
-            var source = await Backend.GetSourceAsync(Target, cancellation.Token);
-            sourceText = source.Source; Editor.MarkSaved(saved, source.Source);
-        }
-        catch (Exception exception) { error = exception.Message; Editor.MarkSaveFailed(); }
-        finally { saving = false; }
-    }
+    private Task SaveAsync() => WithSavedDraftAsync();
 
-    private async Task ValidateAsync()
+    private Task ValidateAsync() => WithSavedDraftAsync(async (target, token) =>
     {
-        if (ReadOnly) return;
-        await SaveAsync();
-        if (error is not null) return;
-        Editor.SetIssues((await Backend.ValidateAsync(Target, cancellation.Token)).Issues);
+        var result = await Backend.ValidateAsync(target, token);
+        token.ThrowIfCancellationRequested();
+        Editor.SetIssues(result.Issues);
         validationExpanded = true;
-    }
+    });
+
     private async Task PublishAsync()
     {
         if (ReadOnly || publishing) return;
         publishing = true;
-        error = null;
         publication = null;
+        var token = targetCancellation!.Token;
+        var requestedVersion = publishVersion;
         try
         {
-            if (Editor.State.SourceError is not null)
+            await WithSavedDraftAsync(async (target, operationToken) =>
             {
-                error = T("InvalidSourceBeforePublish");
-                return;
-            }
-            await SaveAsync();
-            if (error is not null) return;
-            var version = await Backend.PublishAsync(Target, new(publishVersion), cancellation.Token);
-            _ = await Resources.GetFlowVersionsAsync(OwnerScope, Namespace, ResourceId, cancellation.Token);
-            flows = await Resources.GetFlowsAsync(OwnerScope, cancellation.Token);
-            publication = new(version.Version, Activated: true);
-            publishVersion = NextVersion(version.Version);
+                var version = await Backend.PublishAsync(target, new(requestedVersion), operationToken);
+                operationToken.ThrowIfCancellationRequested();
+                var owner = OwnerScope;
+                _ = await Resources.GetFlowVersionsAsync(owner, target.Namespace, target.ResourceId, operationToken);
+                var refreshedFlows = await Resources.GetFlowsAsync(owner, operationToken);
+                operationToken.ThrowIfCancellationRequested();
+                flows = refreshedFlows;
+                publication = new(version.Version, Activated: true);
+                publishVersion = NextVersion(version.Version);
+            });
         }
-        catch (FlowDesignerVersionAlreadyPublishedException exception) { error = T("PublishVersionExists", exception.Version); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { publishing = false; }
+        finally { if (!token.IsCancellationRequested) publishing = false; }
     }
     private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; runError = null; runInputValid = true; runInput = ParseInput("{}"); }
     private Task UpdateRunInputValidation(JsonSchemaInputValidationState value) { runInputValid = value.IsValid; return Task.CompletedTask; }
     private async Task RunDraftAsync()
     {
         if (ReadOnly || !runInputValid || runningDraft) return;
+        runningDraft = true;
+        runError = null;
+        var token = targetCancellation!.Token;
+        var input = runInput.Clone();
         try
         {
-            runningDraft = true;
-            runError = null;
-            await SaveAsync();
-            if (error is not null) return;
-            var run = await Backend.RunDraftAsync(Target, new(runInput.Clone(), Trigger: FlowRunTrigger.Manual), cancellation.Token);
-            Navigation.NavigateTo($"/flow-runs/{run.Id}");
+            await WithSavedDraftAsync(async (target, operationToken) =>
+            {
+                try
+                {
+                    var run = await Backend.RunDraftAsync(target, new(input, Trigger: FlowRunTrigger.Manual), operationToken);
+                    operationToken.ThrowIfCancellationRequested();
+                    Navigation.NavigateTo($"/flow-runs/{run.Id}");
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    if (!operationToken.IsCancellationRequested) runError = exception.Message;
+                }
+            });
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            runError = exception.Message;
-        }
-        finally { runningDraft = false; }
+        finally { if (!token.IsCancellationRequested) runningDraft = false; }
     }
     private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
     private static bool TryParseJson(string value, out JsonElement parsed)
@@ -373,31 +381,18 @@ public partial class FlowDesigner
         try { using var document = JsonDocument.Parse(value); parsed = document.RootElement.Clone(); return true; }
         catch (JsonException) { parsed = default; return false; }
     }
-    private async Task ApplySourceAsync(string source)
+    private Task ApplySourceAsync(string source)
     {
-        if (ReadOnly) return;
-        try
-        {
-            Editor.MarkSaving();
-            var saved = await Backend.ReplaceSourceAsync(Target, new(source), Editor.State.ETag!, cancellation.Token);
-            var canonical = await Backend.GetSourceAsync(Target, cancellation.Token);
-            sourceText = canonical.Source;
-            Editor.MarkSaved(saved, canonical.Source);
-            await RefreshFlowCallOutputsAsync(saved.Value.Definition, resourceLoadRevision);
-        }
-        catch (Exception exception)
-        {
-            sourceText = source;
-            Editor.MarkSaveFailed();
-            Editor.SetSource(source, exception.Message);
-        }
+        if (ReadOnly) return Task.CompletedTask;
+        Editor.SetSource(source, null);
+        return WithSavedDraftAsync();
     }
 
     private void Undo() { if (ReadOnly) return; Editor.Undo(); ScheduleAutosave(); }
     private void Redo() { if (ReadOnly) return; Editor.Redo(); ScheduleAutosave(); }
     private void SelectIssue(FlowValidationIssue issue) { if (issue.StepId is not null) Editor.SelectStep(issue.StepId); }
-    private void ScheduleAutosave() { if (ReadOnly) return; autosave?.Cancel(); autosave?.Dispose(); autosave = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token); _ = AutosaveAsync(autosave.Token); }
-    private async Task AutosaveAsync(CancellationToken token) { try { await Task.Delay(TimeSpan.FromSeconds(1.5), token); await SaveAsync(); } catch (OperationCanceledException) { } }
+    private void ScheduleAutosave() { if (ReadOnly) return; autosave?.Cancel(); autosave?.Dispose(); autosave = CancellationTokenSource.CreateLinkedTokenSource(targetCancellation!.Token); _ = AutosaveAsync(autosave.Token); }
+    private async Task AutosaveAsync(CancellationToken token) { try { await Task.Delay(TimeSpan.FromSeconds(1.5), token); await WithSavedDraftAsync(includeSource: false, queuedCancellation: token); } catch (OperationCanceledException) { } }
     private string Unique(string prefix) { var name = prefix; var i = 1; while (Editor.State.Resource!.Definition.Steps.Any(step => step.Name == name)) name = $"{prefix}-{++i}"; return name; }
     private static string UniqueRoute(string prefix, IReadOnlyCollection<FlowRouterCandidate> candidates) { var route = prefix; var i = 1; while (candidates.Any(candidate => candidate.Route == route)) route = $"{prefix}-{++i}"; return route; }
     private static string RouteKey(string value) { var result = new string(value.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-'); return string.IsNullOrWhiteSpace(result) ? "route" : result; }
@@ -417,12 +412,17 @@ public partial class FlowDesigner
     }
     private async Task LoadFlowVersionsAsync(FlowCallStepDefinition call)
     {
-        flowVersions = await Resources.GetFlowVersionsAsync(ResolveFlowScope(call.Flow), call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, cancellation.Token);
-        flowVersionCatalog[FlowKey(call.Flow)] = flowVersions;
-        await SyncFlowCallOutputsAsync(call, flowVersions);
+        var token = targetCancellation!.Token;
+        var versions = await Resources.GetFlowVersionsAsync(ResolveFlowScope(call.Flow), call.Flow.Namespace ?? Namespace, call.Flow.ResourceId, token);
+        token.ThrowIfCancellationRequested();
+        flowVersions = versions;
+        flowVersionCatalog[FlowKey(call.Flow)] = versions;
+        await SyncFlowCallOutputsAsync(call, versions);
     }
-    private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition, int loadRevision)
+    private async Task RefreshFlowCallOutputsAsync(FlowGraphDefinition definition)
     {
+        var loadRevision = resourceLoadRevision;
+        var token = targetCancellation!.Token;
         var resolved = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
         var versionsByTarget = new Dictionary<string, IReadOnlyList<FlowDesignerFlowVersion>>(StringComparer.Ordinal);
         foreach (var call in definition.Steps.OfType<FlowCallStepDefinition>())
@@ -432,7 +432,8 @@ public partial class FlowDesigner
             var key = ResourceKey(targetScope, targetNamespace, call.Flow.ResourceId);
             if (!versionsByTarget.TryGetValue(key, out var versions))
             {
-                versions = await Resources.GetFlowVersionsAsync(targetScope, targetNamespace, call.Flow.ResourceId, cancellation.Token);
+                versions = await Resources.GetFlowVersionsAsync(targetScope, targetNamespace, call.Flow.ResourceId, token);
+                token.ThrowIfCancellationRequested();
                 if (loadRevision != resourceLoadRevision) return;
                 versionsByTarget[key] = versions;
                 flowVersionCatalog[key] = versions;
@@ -440,6 +441,7 @@ public partial class FlowDesigner
             if (ResolveFlowVersion(call, versions) is { NamedOutputs.Count: > 0 } selected)
                 resolved[call.Name] = selected.NamedOutputs;
         }
+        token.ThrowIfCancellationRequested();
         if (loadRevision != resourceLoadRevision) return;
         if (Editor.SetFlowCallOutputs(resolved)) flowCallRenderRevision++;
         if (!ReadOnly)
@@ -594,7 +596,7 @@ public partial class FlowDesigner
         GC.SuppressFinalize(this);
         resourceLoadRevision++;
         Editor.StateChanged -= EditorChanged;
-        autosave?.Cancel(); autosave?.Dispose(); cancellation.Cancel(); cancellation.Dispose();
+        autosave?.Cancel(); autosave?.Dispose(); targetCancellation?.Cancel(); targetCancellation?.Dispose(); cancellation.Cancel(); cancellation.Dispose();
         try
         {
             if (keyboardRegistration is not null)
