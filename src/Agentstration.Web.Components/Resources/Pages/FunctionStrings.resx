@@ -28,4 +28,10 @@
 <data name="Details" xml:space="preserve"><value>Technical details</value></data>
 <data name="Enable"><value>Enable</value></data>
 <data name="Disable"><value>Disable</value></data>
+  <data name="FunctionDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="Native.json.select.Description" xml:space="preserve"><value>Select a JSON value at a JSON Pointer path. Returns the selected object, array or scalar as one value. An empty path selects the root; a missing path fails.</value></data>
+  <data name="Native.json.project.Description" xml:space="preserve"><value>Build an object by selecting and renaming properties from a JSON value. Each name/path pair creates one output property. Selected arrays remain arrays inside that object.</value></data>
+  <data name="Native.collection.filter.Description" xml:space="preserve"><value>Keep array elements whose value at the JSON Pointer path equals the supplied JSON value. Preserves input order. An empty path compares whole elements; a missing path fails.</value></data>
+  <data name="Native.collection.distinct.Description" xml:space="preserve"><value>Remove duplicate array elements using the value at the JSON Pointer path as their key. Keeps the first occurrence and preserves input order. An empty path compares whole elements.</value></data>
+  <data name="Native.artifact.explode.Description" xml:space="preserve"><value>Read JSON Artifact contents and prepare one publishable Artifact per array element or object value at a JSON Pointer path. Expects an Artifact manifest or an object with a content property. arrayItems preserves array order; objectValues sorts property names. Storage happens later in the publication pipeline. itemSchema validates each child; maximumOutputs defaults to 100.</value></data>
 </root>

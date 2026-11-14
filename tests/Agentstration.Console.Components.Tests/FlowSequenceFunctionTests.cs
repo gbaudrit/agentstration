@@ -14,9 +14,9 @@ namespace Agentstration.Web.Tests;
 public sealed partial class KnowledgeSourceEditorTests
 {
     [TestMethod]
-    [DataRow("en-US", "Add a function")]
-    [DataRow("fr-FR", "Ajouter une fonction")]
-    public async Task FunctionSequenceEditsLiteralParametersAlongsideFlowsAndHonorsReadOnly(string locale, string addLabel)
+    [DataRow("en-US", "Add a function", "Select a JSON value")]
+    [DataRow("fr-FR", "Ajouter une fonction", "Extrait une valeur JSON")]
+    public async Task FunctionSequenceEditsLiteralParametersAlongsideFlowsAndHonorsReadOnly(string locale, string addLabel, string description)
     {
         using var culture = new TestCultureScope(locale);
         using var context = CreateContext(new KnowledgeClientStub());
@@ -35,6 +35,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Render(parameters => parameters.Add(value => value.Value, calls));
         Assert.AreEqual("select", calls.Single().Function!.Name);
         Assert.IsNull(calls.Single().Flow);
+        Assert.Contains(description, rendered.Find("[data-testid=function-description]").TextContent);
         Assert.IsEmpty(rendered.FindAll("[data-schema-path='$.value']"));
         rendered.Find("[data-schema-path='$.path'] input, [data-schema-path='$.path'] textarea").Input("${keep.literal}");
         Assert.AreEqual("${keep.literal}", calls.Single().Parameters.GetProperty("path").GetString());
@@ -52,7 +53,7 @@ public sealed partial class KnowledgeSourceEditorTests
                 JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{},"path":{"type":"string","maxLength":1024}},"required":["value","path"],"additionalProperties":false}"""),
                 JsonSerializer.Deserialize<JsonElement>("{}"));
             return Task.FromResult<IReadOnlyList<FunctionChoice>>([new("Select · 1.0.0", new(new("select", "1.0.0", scope), new("native", "1.0.0", scope),
-                descriptor.Id, descriptor.Version, descriptor.InputSchema, descriptor.OutputSchema))]);
+                descriptor.Id, descriptor.Version, descriptor.InputSchema, descriptor.OutputSchema)) { IsBuiltIn = true }]);
         }
         public Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) => throw new NotSupportedException();

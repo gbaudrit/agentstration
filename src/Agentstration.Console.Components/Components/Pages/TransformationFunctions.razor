@@ -39,6 +39,7 @@ else
                 <a href="@Url(item)">@item.Definition.DisplayName</a><ResourceScopeBadge ScopeRef="item.ScopeRef" />
                 @if (item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <span class="status-badge">@T("BuiltIn")</span> }
                 <p><code>@item.Name · @string.Join(", ", item.Definition.Versions.Select(v => v.Version))</code></p>
+                <FunctionDescription Description="@item.Definition.Description" ImplementationId="@ImplementationId(item)" BuiltIn="@(item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn)" />
             </article>
         }
     </section>
@@ -51,6 +52,9 @@ else
     private bool loading;
     private Exception? error;
     private string T(string key) => Localizer[key];
+    private static string? ImplementationId(TransformationFunctionResource resource) => resource.Definition.Versions.LastOrDefault()?.Configuration is { ValueKind: JsonValueKind.Object } configuration
+        && configuration.TryGetProperty("implementation", out var implementation) && implementation.TryGetProperty("id", out var id)
+        && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
     private ResourceScopeRef? Owner => ResourceOwnershipContext.TryGetCurrent(Services);
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync()

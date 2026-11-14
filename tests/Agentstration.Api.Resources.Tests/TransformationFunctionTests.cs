@@ -97,6 +97,10 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
         var resolved = await service.ResolveAsync(new("select", "1.0.0", owner), owner, default);
         var result = await service.InvokeAsync(resolved, owner, Json("""{"value":{"results":[1,2]},"path":"/results"}"""), default);
         Assert.AreEqual(2, result.GetArrayLength());
+        function = await service.PutAsync(function.Value with { Definition = function.Value.Definition with { Description = "Select the alert payload." } }, function.ETag, false, default);
+        Assert.AreEqual("Select the alert payload.", (await service.GetAsync(owner, ResourceNamespace.Default, "select", default))!.Value.Definition.Description);
+        Assert.AreEqual(resolved.Reference, (await service.ResolveAsync(resolved.Reference, owner, default)).Reference);
+        Assert.AreEqual(42, (await service.InvokeAsync(resolved, owner, Json("""{"value":{"id":42},"path":"/id"}"""), default)).GetInt32());
         var outside = await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => service.ResolveAsync(resolved.Reference, ResourceScopeRef.Workspace(Guid.NewGuid()), default));
         Assert.AreEqual("function_use_denied", outside.Code);
         var forged = await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => service.InvokeAsync(resolved with { ImplementationId = "json.project" }, owner, Json("{}"), default));

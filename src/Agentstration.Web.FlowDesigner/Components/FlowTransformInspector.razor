@@ -10,6 +10,8 @@
         @if (Step.Function is { } saved && Functions.All(choice => FunctionKey(choice.Function.Reference) != FunctionKey(saved))) { <option value="@FunctionKey(saved)">@saved.Name · @saved.Version</option> }
         @foreach (var choice in Functions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
     </select></label>
+    @if (SelectedFunction is { } function)
+    { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
     <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
@@ -52,6 +54,8 @@
     [Parameter] public Func<ValidateSchemaInstanceRequest, Task<SchemaFormatValidationResult>>? ValidateSchemaInstanceAsync { get; set; }
 
     private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
+    private FlowDesignerFunction? SelectedFunction => Step.Function is { } reference
+        ? Functions.FirstOrDefault(choice => FunctionKey(choice.Function.Reference) == FunctionKey(reference)) : null;
     private Task SelectFunctionAsync(ChangeEventArgs args)
     {
         if (ReadOnly) return Task.CompletedTask;

@@ -21,6 +21,8 @@
                     @if (function is null) { <option value="@FunctionKey(call.Function)">@call.Function.Name · @T("SequenceUnavailable")</option> }
                     @foreach (var choice in functionOptions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
                 </select></label>
+                @if (function is not null)
+                { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
                 <JsonSchemaInputEditor Schema="@(function is null ? null : FunctionParameters(function.Function.InputSchema))" Value="call.Parameters" ValueChanged="value => SetParametersAsync(position, value)" Disabled="ReadOnly" />
             }
             else

@@ -27,11 +27,13 @@ public sealed partial class KnowledgeSourceEditorTests
         context.Services.AddSingleton<ITransformationFunctionsClient>(client);
         var catalogue = context.Render<TransformationFunctions>();
         Assert.Contains(badge, catalogue.Find("[data-testid=transformation-function-row]").TextContent);
+        Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", catalogue.Find("[data-testid=function-description]").TextContent);
         Assert.IsEmpty(catalogue.FindAll("[data-testid=function-native-kind-create]"));
         Assert.IsFalse(catalogue.FindAll("button").Any(button => button.TextContent == (locale == "fr-FR" ? "Désactiver" : "Disable")));
         var editor = context.Render<TransformationFunctionEditor>(parameters => parameters.Add(value => value.Name, "json-select-builtin"));
         Assert.Contains(help, editor.Find("[role=note]").TextContent);
         Assert.IsTrue(editor.Find("fieldset").HasAttribute("disabled"));
+        Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", editor.Find("[data-testid=function-description]").TextContent);
         await editor.Find("form").SubmitAsync();
         Assert.AreEqual(0, client.SaveCount);
     }

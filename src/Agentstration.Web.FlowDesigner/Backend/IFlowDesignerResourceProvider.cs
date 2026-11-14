@@ -6,7 +6,11 @@ using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
-public sealed record FlowDesignerFunction(string DisplayName, Agentstration.Functions.Contracts.ResolvedTransformationFunction Function);
+public sealed record FlowDesignerFunction(string DisplayName, Agentstration.Functions.Contracts.ResolvedTransformationFunction Function)
+{
+    public string? Description { get; init; }
+    public bool IsBuiltIn { get; init; }
+}
 
 public sealed record FlowDesignerAgent(string Name, string DisplayName, ResourceScopeRef ScopeRef)
 {

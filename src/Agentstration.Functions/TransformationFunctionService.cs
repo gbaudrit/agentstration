@@ -40,6 +40,7 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
     {
         if (value.Definition?.Versions is null || value.Definition.Versions.Any(version => version is null)) throw Error("function_definition_invalid", "A function definition and versions are required.");
         ValidateResource(value, FunctionResourceKinds.TransformationFunction, value.Definition.DisplayName);
+        if (value.Definition.Description?.Length > 4000) throw Error("function_definition_invalid", "The function description must contain at most 4000 characters.");
         Versions(value.Definition.Versions.Select(v => v.Version));
         foreach (var version in value.Definition.Versions) _ = await ResolveVersionAsync(value, version, value.ScopeRef!.Value, ct, plannedKind);
     }

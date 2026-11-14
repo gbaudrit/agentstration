@@ -17,7 +17,7 @@ public sealed class FlowDesignerResourceProvider(
     ITransformationFunctionsClient? functionsClient = null) : IFlowDesignerResourceProvider
 {
     public async Task<IReadOnlyList<FlowDesignerFunction>> GetFunctionsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
-        functionsClient is null ? [] : (await functionsClient.ChoicesAsync(contextScope, cancellationToken)).Select(choice => new FlowDesignerFunction(choice.DisplayName, choice.Function)).ToArray();
+        functionsClient is null ? [] : (await functionsClient.ChoicesAsync(contextScope, cancellationToken)).Select(choice => new FlowDesignerFunction(choice.DisplayName, choice.Function) { Description = choice.Description, IsBuiltIn = choice.IsBuiltIn }).ToArray();
 
     public async Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken)
     {

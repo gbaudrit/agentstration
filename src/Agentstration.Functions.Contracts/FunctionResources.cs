@@ -23,7 +23,10 @@ public sealed record TransformationFunctionVersion(string Version, FunctionRefer
 {
     public string? NativeContractDigest { get; init; }
 }
-public sealed record TransformationFunctionProperties(string DisplayName, IReadOnlyList<TransformationFunctionVersion> Versions, bool Enabled = true);
+public sealed record TransformationFunctionProperties(string DisplayName, IReadOnlyList<TransformationFunctionVersion> Versions, bool Enabled = true)
+{
+    public string? Description { get; init; }
+}
 public sealed record TransformationFunctionResource : Resource
 {
     public required TransformationFunctionProperties Definition { get; init; }

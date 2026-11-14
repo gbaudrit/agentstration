@@ -19,6 +19,14 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
     public const string KindVersion = "1.0.0";
     private static readonly string[] StandardImplementations =
         ["json.select", "json.project", "collection.filter", "collection.distinct", "artifact.explode"];
+    private static readonly IReadOnlyDictionary<string, string> Descriptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["json.select"] = "Select a JSON value at a JSON Pointer path. Returns the selected object, array or scalar as one value. An empty path selects the root; a missing path fails.",
+        ["json.project"] = "Build an object by selecting and renaming properties from a JSON value. Each name/path pair creates one output property. Selected arrays remain arrays inside that object.",
+        ["collection.filter"] = "Keep array elements whose value at the JSON Pointer path equals the supplied JSON value. Preserves input order. An empty path compares whole elements; a missing path fails.",
+        ["collection.distinct"] = "Remove duplicate array elements using the value at the JSON Pointer path as their key. Keeps the first occurrence and preserves input order. An empty path compares whole elements.",
+        ["artifact.explode"] = "Read JSON Artifact contents and prepare one publishable Artifact per array element or object value at a JSON Pointer path. Expects an Artifact manifest or an object with a content property. arrayItems preserves array order; objectValues sorts property names. Storage happens later in the publication pipeline. itemSchema validates each child; maximumOutputs defaults to 100."
+    };
     private readonly SemaphoreSlim gate = new(1, 1);
 
     public async Task<IReadOnlyList<Resource>> EnsureAsync(CancellationToken ct)
@@ -78,9 +86,9 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
                     && FunctionDigests.Compute(existing) != FunctionDigests.Compute(version))
                     throw new InvalidOperationException($"The built-in function '{name}:{version.Version}' changed without a new version.");
             var additions = desired.Where(version => resource.Definition.Versions.All(existing => existing.Version != version.Version)).ToArray();
-            if (stored is null || additions.Length != 0)
+            if (stored is null || additions.Length != 0 || resource.Definition.Description != Descriptions[id])
                 stored = await functions.PutAsync(resource with
-                { Definition = resource.Definition with { Versions = [.. resource.Definition.Versions, .. additions] } }, stored?.ETag, stored is null, ct);
+                { Definition = resource.Definition with { Versions = [.. resource.Definition.Versions, .. additions], Description = Descriptions[id] } }, stored?.ETag, stored is null, ct);
             result.Add(stored!.Value);
         }
         return result;

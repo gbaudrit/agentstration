@@ -18,6 +18,28 @@ namespace Agentstration.Management.Tests;
 public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestBase
 {
     [TestMethod]
+    public async Task StartupReconcilesDescriptionsWithoutChangingFunctionIdentityOrVersionContracts()
+    {
+        await using var factory = Factory();
+        _ = await GetBootstrapContextAsync(factory);
+        using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        using var authority = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core(NativeFunctionPlatformResourceProvisioner.Component));
+        var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
+        var original = (await functions.GetAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "json-select-builtin", default))!;
+        var versionDigest = FunctionDigests.Compute(original.Value.Definition.Versions);
+        _ = await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(ResourceScopeRef.Instance,
+            original.Value with { Definition = original.Value.Definition with { Description = null } }, original.ETag, false, default);
+        var provisioner = factory.Services.GetRequiredService<NativeFunctionPlatformResourceProvisioner>();
+        await provisioner.EnsureAsync(default);
+        var reconciled = (await functions.GetAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, original.Value.Name, default))!;
+        Assert.IsFalse(string.IsNullOrWhiteSpace(reconciled.Value.Definition.Description));
+        Assert.AreEqual(original.Value.Uid, reconciled.Value.Uid);
+        Assert.AreEqual(versionDigest, FunctionDigests.Compute(reconciled.Value.Definition.Versions));
+        await provisioner.EnsureAsync(default);
+        Assert.AreEqual(reconciled.ETag, (await functions.GetAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, original.Value.Name, default))!.ETag);
+    }
+
+    [TestMethod]
     public async Task StartupWithoutFileBootstrapProvisionsOneGovernedInstanceCatalogueAndGrantsInheritedUse()
     {
         await using var factory = Factory().WithWebHostBuilder(builder => builder
@@ -33,6 +55,7 @@ public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestB
         {
             builtins = await functions.ListAsync(ResourceScopeRef.Instance, 0, 100, default);
             Assert.HasCount(5, builtins);
+            Assert.IsTrue(builtins.All(value => !string.IsNullOrWhiteSpace(value.Value.Definition.Description)));
             CollectionAssert.AreEquivalent(new[] { "json-select-builtin", "json-project-builtin", "collection-filter-builtin", "collection-distinct-builtin", "artifact-explode-builtin" }, builtins.Select(value => value.Value.Name).ToArray());
             var kind = (await functions.GetKindAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "native", default))!;
             foreach (var resource in builtins.Select(value => (Resource)value.Value).Append(kind.Value))

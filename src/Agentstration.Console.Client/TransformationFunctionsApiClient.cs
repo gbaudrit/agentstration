@@ -7,7 +7,11 @@ using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
-public sealed record FunctionChoice(string DisplayName, ResolvedTransformationFunction Function);
+public sealed record FunctionChoice(string DisplayName, ResolvedTransformationFunction Function)
+{
+    public string? Description { get; init; }
+    public bool IsBuiltIn { get; init; }
+}
 public interface ITransformationFunctionsClient
 {
     Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct);
@@ -40,7 +44,8 @@ public sealed class TransformationFunctionsApiClient(HttpClient http) : ITransfo
                 await ApiResponse.EnsureSuccessAsync(response, ct);
                 var resolved = await response.Content.ReadFromJsonAsync<ResolvedTransformationFunction>(ct)
                     ?? throw new InvalidOperationException("The function contract is unavailable.");
-                result.Add(new(function.Definition.DisplayName + " · " + version.Version, resolved));
+                result.Add(new(function.Definition.DisplayName + " · " + version.Version, resolved)
+                { Description = function.Definition.Description, IsBuiltIn = function.Governance.Origin.Kind == ResourceOriginKind.BuiltIn });
             }
         return result;
     }

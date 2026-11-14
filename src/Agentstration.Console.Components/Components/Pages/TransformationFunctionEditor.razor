@@ -19,6 +19,8 @@ else
         <fieldset disabled="@(!CanEdit || busy || !interactive)">
             <label>@T("Name")<input @bind="technicalName" disabled="@(original is not null)" required data-testid="function-name" /></label>
             <label>@T("DisplayName")<input @bind="displayName" required /></label>
+            @if (original?.Governance.Origin.Kind != ResourceOriginKind.BuiltIn)
+            { <label>@T("FunctionDescription")<textarea @bind="description" maxlength="4000" data-testid="function-description-input"></textarea></label> }
             <label>@T("Enabled")<input type="checkbox" @bind="enabled" /></label>
             <label>@T("Version")<input @bind="version" required /></label>
             <label>@T("Kind")<select @bind="kindKey" data-testid="function-kind">
@@ -31,6 +33,7 @@ else
             </select></label>
             @if (Selected is { } selected)
             {
+                <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" />
                 <h2>@T("InputSchema")</h2><SchemaDocumentEditor Value="selected.InputSchema" ReadOnly="true" />
                 <h2>@T("OutputSchema")</h2><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" />
             }
@@ -49,7 +52,7 @@ else
     private IReadOnlyList<NativeFunctionDescriptor> implementations = [];
     private TransformationFunctionResource? original;
     private string? etag;
-    private string technicalName = string.Empty, displayName = string.Empty, version = "1.0.0", kindKey = string.Empty, implementationKey = string.Empty;
+    private string technicalName = string.Empty, displayName = string.Empty, description = string.Empty, version = "1.0.0", kindKey = string.Empty, implementationKey = string.Empty;
     private bool enabled = true, loading = true, busy, interactive;
     private Exception? error;
     private ResourceScopeRef? Owner => ScopeRef is null ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
@@ -62,7 +65,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         loading = true; error = null; original = null; etag = null;
-        technicalName = string.Empty; displayName = string.Empty; version = "1.0.0"; kindKey = string.Empty; implementationKey = string.Empty; enabled = true;
+        technicalName = string.Empty; displayName = string.Empty; description = string.Empty; version = "1.0.0"; kindKey = string.Empty; implementationKey = string.Empty; enabled = true;
         try
         {
             kinds = await Client.ListKindsAsync(Owner, cancellation.Token);
@@ -72,6 +75,7 @@ else
                 var snapshot = await Client.GetAsync(new(Name, "", Owner, Namespace is null ? null : ResourceNamespace.Parse(Namespace)), cancellation.Token);
                 original = snapshot.Value; etag = snapshot.ETag;
                 technicalName = original.Name; displayName = original.Definition.DisplayName; enabled = original.Definition.Enabled;
+                description = original.Definition.Description ?? string.Empty;
                 var latest = original.Definition.Versions.Last(); version = latest.Version;
                 kindKey = $"{latest.FunctionKind.ScopeRef ?? original.ScopeRef}|{latest.FunctionKind.Namespace ?? original.Namespace}|{latest.FunctionKind.Name}|{latest.FunctionKind.Version}";
                 var implementation = latest.Configuration.GetProperty("implementation");
@@ -95,7 +99,7 @@ else
             var versions = original?.Definition.Versions.Where(item => item.Version != version).Append(next).ToArray() ?? [next];
             var resource = original ?? new TransformationFunctionResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
                 ScopeRef = owner, Metadata = new() { Name = technicalName, Namespace = Namespace is null ? ResourceNamespace.Default : ResourceNamespace.Parse(Namespace) }, Definition = new(displayName, versions) };
-            await Client.SaveAsync(resource with { Definition = new(displayName, versions, enabled) }, etag, cancellation.Token);
+            await Client.SaveAsync(resource with { Definition = new(displayName, versions, enabled) { Description = string.IsNullOrWhiteSpace(description) ? null : description } }, etag, cancellation.Token);
             Navigation.NavigateTo(ScopedUri("/transformation-functions"));
         }
         catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }

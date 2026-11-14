@@ -16,6 +16,8 @@ Inspect the catalogue under `/function-kinds` and `/transformation-functions`. S
 
 The empty Pointer selects the root. Escape `/` as `~1` and `~` as `~0`. Missing properties, invalid array indices and malformed escapes fail; there is no original-value fallback. Filter and distinct preserve order. Functions have a 1 MiB JSON invocation/result limit; individual functions and consumers may impose smaller bounds.
 
+Each function has an optional resource `description`, editable for user declarations. The standard descriptions are reconciled automatically at Instance scope and shown in English or French after selection in source sequences and the ordinary Transform inspector. Descriptions are presentation metadata: editing one does not change an accepted function version or implementation contract.
+
 ## Calling a function
 
 The ordinary **Transform** step offers a function selector and an input mapping. The mapping supplies its one business argument, for example:
