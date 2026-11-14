@@ -139,6 +139,7 @@
   <data name="SequenceHelp" xml:space="preserve"><value>Functions and Flows run in order. Each receives the previous result and its saved parameters. Only compatible versions can be saved.</value></data>
   <data name="SequenceIdentity" xml:space="preserve"><value>No transformation: preserve the input.</value></data>
   <data name="SequenceUnavailable" xml:space="preserve"><value>The published Flow or its dependencies could not be loaded.</value></data>
+  <data name="SequenceInvalid" xml:space="preserve"><value>The transformation sequence could not be saved. Check that the selected versions are available and their input, parameter and output contracts are compatible.</value></data>
   <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
   <data name="SequenceFlow" xml:space="preserve"><value>Published Flow version</value></data>
   <data name="SequenceUp" xml:space="preserve"><value>Move up</value></data>

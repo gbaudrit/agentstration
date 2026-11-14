@@ -139,6 +139,7 @@
   <data name="SequenceHelp" xml:space="preserve"><value>Les fonctions et les Flows s’exécutent dans cet ordre. Chacun reçoit le résultat précédent et ses paramètres enregistrés. Seules les versions compatibles peuvent être enregistrées.</value></data>
   <data name="SequenceIdentity" xml:space="preserve"><value>Aucune transformation : conserver l’entrée.</value></data>
   <data name="SequenceUnavailable" xml:space="preserve"><value>Le Flow publié ou ses dépendances n’ont pas pu être chargés.</value></data>
+  <data name="SequenceInvalid" xml:space="preserve"><value>La séquence de transformations n’a pas pu être enregistrée. Vérifiez que les versions sélectionnées sont disponibles et que leurs contrats d’entrée, de paramètres et de sortie sont compatibles.</value></data>
   <data name="SequencePosition" xml:space="preserve"><value>Transformation {0}</value></data>
   <data name="SequenceFlow" xml:space="preserve"><value>Version publiée du Flow</value></data>
   <data name="SequenceUp" xml:space="preserve"><value>Monter</value></data>

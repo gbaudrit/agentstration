@@ -170,18 +170,20 @@ public sealed class DataSourceDatasetEditorTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "relative directory prefix")]
-    [DataRow("fr-FR", "préfixe de répertoire relatif")]
-    public async Task SaveFailureShowsLocalizedReasonAndCorrelationWithoutRawValues(string cultureName, string expected)
+    [DataRow("en-US", "data_source_rule_invalid", "relative directory prefix")]
+    [DataRow("fr-FR", "data_source_rule_invalid", "préfixe de répertoire relatif")]
+    [DataRow("en-US", "data_source_composition_invalid", "input, parameter and output contracts are compatible")]
+    [DataRow("fr-FR", "data_source_composition_invalid", "contrats d’entrée, de paramètres et de sortie sont compatibles")]
+    public async Task SaveFailureShowsLocalizedReasonAndCorrelationWithoutRawValues(string cultureName, string code, string expected)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var handler = new DatasetHandler { FailSave = true };
+        using var handler = new DatasetHandler { FailSave = true, SaveFailureCode = code };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
         await rendered.Find("form").SubmitAsync();
-        rendered.WaitForAssertion(() => Assert.AreEqual("data_source_rule_invalid", rendered.Find("[data-testid='dataset-error-code']").TextContent));
+        rendered.WaitForAssertion(() => Assert.AreEqual(code, rendered.Find("[data-testid='dataset-error-code']").TextContent));
         Assert.Contains(expected, rendered.Find("[role='alert']").TextContent);
         Assert.Contains("fixture-error-reference", rendered.Find("[role='alert']").TextContent);
         Assert.DoesNotContain("private-saved-value", rendered.Markup);
@@ -325,6 +327,7 @@ public sealed class DataSourceDatasetEditorTests
         public IReadOnlyList<StorageTypeResource> StorageTypes { get; set; } = [];
         public bool MissingAdapter { get; set; }
         public bool FailSave { get; set; }
+        public string SaveFailureCode { get; set; } = "data_source_rule_invalid";
         public bool StaleType { get; set; }
         public ConnectedServiceOperationTypeResource OperationType => new()
         {
@@ -463,7 +466,7 @@ public sealed class DataSourceDatasetEditorTests
                 if (FailSave)
                 {
                     var failure = new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/data_source_rule_invalid", detail = "private-saved-value" }) };
+                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/" + SaveFailureCode, detail = "private-saved-value" }) };
                     failure.Headers.Add("X-Correlation-ID", "fixture-error-reference");
                     return failure;
                 }

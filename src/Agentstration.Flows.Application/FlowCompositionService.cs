@@ -99,7 +99,14 @@ public sealed class FlowCompositionService(FlowService flows)
                     input = mapping.Clone();
                 }
                 var outputs = child.Graph!.GetOutputs().Where(output => output.Outcome == FlowOutputOutcome.Success).ToArray();
-                if (outputs.Length != 1 || outputs[0].Schema is not { } outputSchema) throw Error("flow_composition_output_ambiguous");
+                if (outputs.Length != 1) throw Error("flow_composition_output_ambiguous");
+                // Dynamic acquisition adapters infer only the generic acquisition Tool contract.
+                // Use the governed Operation contract unless the adapter explicitly declares one.
+                // Ordinary transformation Flows still use their own resolved output schema.
+                var declaredOutput = child.Graph.Steps.OfType<OutputFlowStepDefinition>()
+                    .Single(output => output.Name == outputs[0].Name).Schema ?? child.Graph.OutputSchema;
+                var outputSchema = (call.PassInputDirectly && declaredOutput is null ? reference.OutputSchema : null) ?? outputs[0].Schema
+                    ?? throw Error("flow_composition_output_ambiguous");
                 var resource = await flows.GetExactAsync(child.ScopeRef, child.FlowId, ct) ?? throw Error("flow_composition_child_unavailable");
                 var exact = call with
                 {

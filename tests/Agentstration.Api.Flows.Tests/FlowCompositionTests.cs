@@ -11,6 +11,47 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    [DataRow(false, false, false)]
+    [DataRow(false, true, false)]
+    [DataRow(true, false, false)]
+    [DataRow(true, true, false)]
+    [DataRow(true, true, true)]
+    public async Task OnlyGovernedBoundaryCallsCanSupplyAnUndeclaredOperationOutputContract(bool direct, bool supplyContract, bool declareIncompatibleOutput)
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var child = CompositionChild() with { OutputSchema = declareIncompatibleOutput ? JsonSerializer.SerializeToElement(new { type = "array" }) : null };
+        child = child with
+        {
+            Steps = [child.Steps.OfType<InputFlowStepDefinition>().Single(),
+                new TransformFlowStepDefinition { Name = "read", Schema = JsonSerializer.SerializeToElement(new { }), Mapping = JsonSerializer.SerializeToElement(new { acquired = true }) },
+                new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.read.output}") }],
+            Transitions = [new("input-read", "input", "completed", "read"), new("read-output", "read", "completed", "output")]
+        };
+        await CreatePublishedGraphAsync(fixture, "dynamic-operation", child);
+        var parent = await CreatePublishedGraphAsync(fixture, "dynamic-boundary", CompositionTemplate());
+        var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
+        var bindings = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+        {
+            ["prepare"] = [new() { Flow = new("dynamic-operation")
+                { OutputSchema = supplyContract ? JsonSerializer.SerializeToElement(new { type = "object" }) : null },
+                PassInputDirectly = direct,
+                Parameters = direct ? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { label = "literal" }) }]
+        };
+        var compiler = new FlowCompositionService(fixture.Service);
+        if (direct && supplyContract && !declareIncompatibleOutput)
+        {
+            var compiled = await compiler.ResolveAsync(template, bindings, TestScope.AccessScopeRef, default);
+            Assert.IsNotNull(compiled.Receipt!.Bindings["prepare"].Single().Flow!.OutputSchema);
+            Assert.IsTrue(compiled.Definition.Graph!.Steps.OfType<TransformFlowStepDefinition>().Any(step => step.Name == "extensions" && step.Schema is not null));
+        }
+        else
+        {
+            var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => compiler.ResolveAsync(template, bindings, TestScope.AccessScopeRef, default));
+            Assert.AreEqual("flow_composition_contract_incompatible", error.Code);
+        }
+    }
+
+    [TestMethod]
     [DataRow(65_537, true)]
     [DataRow(1_048_576, true)]
     [DataRow(1_048_577, false)]

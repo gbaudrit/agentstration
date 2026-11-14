@@ -321,8 +321,20 @@ public sealed partial class ConnectedServiceApiTests
         foreach (var dataset in new[] { "alpha", "beta" })
         {
             var parameters = JsonSerializer.SerializeToElement(new { query = new { dataset } });
+            var definition = new DataSourceDatasetProperties(storageReference, new(Write: true), new(operationReference, parameters));
+            // Exercise shared Instance functions where this fixture can read Instance resources.
+            // Tenant administration intentionally keeps its isolated acquisition-only fixture.
+            var transform = dataset == "beta" && ownerKind != "tenant";
+            if (transform) definition = definition with
+            {
+                Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+                {
+                    ["transformations"] = [new() { Function = new("json-project-builtin", "1.0.0", ResourceScopeRef.Instance),
+                        Parameters = JsonSerializer.SerializeToElement(new { properties = new[] { new { name = "dataset", path = "/dataset" } } }) }]
+                }
+            };
             using var save = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(dataset,
-                new() { DisplayName = dataset, Dataset = new(storageReference, new(Write: true), new(operationReference, parameters)) }, ScopeRef: owner));
+                new() { DisplayName = dataset, Dataset = definition }, ScopeRef: owner));
             Assert.AreEqual(HttpStatusCode.Created, save.StatusCode, await save.Content.ReadAsStringAsync());
             using var accepted = await client.PostAsJsonAsync($"/api/datasources/{dataset}/acquisitions?scopeRef={Uri.EscapeDataString(owner.Value)}", new StartDataSourceAcquisitionRequest());
             Assert.AreEqual(HttpStatusCode.Accepted, accepted.StatusCode, await accepted.Content.ReadAsStringAsync());
@@ -335,6 +347,7 @@ public sealed partial class ConnectedServiceApiTests
                     $"/api/datasourceacquisitions/{acquisition.Name}", acquisitionTimeout.Token))!;
             } while (acquisition.CompletedAt is null);
             Assert.AreEqual(DataSourceAcquisitionState.Succeeded, acquisition.State, $"{acquisition.ErrorCode}: {acquisition.ErrorMessage}");
+            if (transform) Assert.AreEqual("json-project-builtin", acquisition.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single().Function!.Name);
             using var read = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content");
             Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
             var content = (await read.Content.ReadFromJsonAsync<StorageObjectContent>())!;

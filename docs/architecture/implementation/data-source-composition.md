@@ -40,6 +40,13 @@ Data Source. Discovery is not offered from the Data Source. A changed reference 
 explicitly; refresh does not rewrite saved pins. Existing profile resources,
 discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
 
+When transformations are configured, the governed acquisition boundary uses the
+selected Operation's validated output schema if its adapter Flow has no declared
+success schema (for example the dynamic OpenAPI adapter). The schema is pinned
+in the accepted composition. A declared adapter schema still takes precedence;
+ordinary transformation Flows must declare their own output contracts. The
+boundary validates its result before the transformation sequence executes.
+
 The integration baseline includes StorageType administration and scoped generic
 grants from #1079, and protected OpenAPI discovery from #1059. Acquisition uses
 the merged `local@1.0.0` contract and current Storage/StorageType Use decisions;

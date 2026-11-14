@@ -898,7 +898,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
     }
 
-    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null)
+    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null, bool declareAcquisitionOutput = true)
     {
         var bootstrap = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
@@ -908,7 +908,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var input = emptyInput ? JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false })
             : JsonSerializer.SerializeToElement(new { type = "object", properties = new { dataset = new { type = "string", minLength = 1 } }, required = new[] { "dataset" }, additionalProperties = false });
         var flow = await PublishAsync(services, "fixture-acquire", DataSourceDatasetCompositionService.FlowContract,
-            operationResult ?? (emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" })));
+            operationResult ?? (emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" })), declareAcquisitionOutput);
         var definitionSchema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = true });
         var type = await services.GetRequiredService<ConnectedServiceOperationTypeManagementService>().CreateAsync(new()
         {
@@ -999,7 +999,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Definition = new() { DisplayName = name, Dataset = new(fixture.Storage, new(Write: true), new(fixture.OperationReference, parameters)) }
     };
 
-    private static async Task<ConnectedServiceDiscoveryFlowReference> PublishAsync(IServiceProvider services, string name, string contract, JsonElement output)
+    private static async Task<ConnectedServiceDiscoveryFlowReference> PublishAsync(IServiceProvider services, string name, string contract, JsonElement output, bool declareOutput = true)
     {
         var schema = contract == KnowledgeFlowContracts.ArtifactTransformation
             ? JsonSerializer.SerializeToElement(new { type = "object", properties = new { bindingName = new { type = "string" }, dataSource = new { type = "object" }, artifacts = new { type = "array" }, configuration = new { type = "object" }, caller = new { type = "object" }, correlationId = new { type = "string" }, transformationId = new { type = "string" } }, required = new[] { "bindingName", "dataSource", "artifacts", "configuration", "caller", "correlationId", "transformationId" } })
@@ -1015,7 +1015,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             {
                 EntryStep = "input",
                 InputSchema = schema,
-                OutputSchema = outputSchema,
+                OutputSchema = declareOutput ? outputSchema : null,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = schema },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }],
                 Transitions = [new("input-output", "input", "completed", "output")]
