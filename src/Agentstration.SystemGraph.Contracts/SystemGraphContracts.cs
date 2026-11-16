@@ -32,7 +32,10 @@ public sealed record SystemGraphNode(
     string Id,
     SystemGraphIdentity Identity,
     string State,
-    SystemGraphEvidence? Evidence = null);
+    SystemGraphEvidence? Evidence = null)
+{
+    public string? DisplayName { get; init; }
+}
 
 public sealed record SystemGraphRelation(
     string Source,

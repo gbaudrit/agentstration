@@ -1,0 +1,9 @@
+.explorer-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; margin:1rem 0; }
+.explorer-scroll { max-width:100%; overflow-x:auto; }
+.explorer-json { white-space:pre-wrap; overflow-wrap:anywhere; max-height:24rem; overflow:auto; }
+form { display:flex; flex-wrap:wrap; align-items:end; gap:.75rem; margin:1rem 0; }
+section { margin:1.5rem 0; }
+li { overflow-wrap:anywhere; margin:.5rem 0; }
+code { overflow-wrap:anywhere; }
+label, input, select { max-width:100%; min-width:0; }
+.panel { min-width:0; max-width:100%; }

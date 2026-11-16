@@ -1,0 +1,23 @@
+{
+  "name": "agentstration-system-explorer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@likec4/core": "1.59.4",
+    "@likec4/layouts": "1.59.4",
+    "@likec4/diagram": "1.59.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "vite": "7.3.1",
+    "typescript": "5.9.3",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "tsx": "4.21.0"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "test": "node --import tsx --test model.test.ts"
+  }
+}

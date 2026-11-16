@@ -12,6 +12,7 @@ using Agentstration.Models;
 using Agentstration.SystemGraph;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Tools;
+using Agentstration.Systems;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Infrastructure;
@@ -32,6 +33,8 @@ internal static class SystemGraphServiceCollectionExtensions
         services.AddSingleton<ISystemGraphContributor, FunctionSystemGraphContributor>();
         services.AddSingleton<ISystemGraphContributor, TriggerSystemGraphContributor>();
         services.AddSingleton<ISystemGraphReadScope, SystemGraphReadScope>();
+        services.AddSingleton<SystemModelService>();
+        services.AddSingleton<ISystemGraphContributor, SystemModelGraphContributor>();
         services.AddSingleton<ISystemGraphAuthorization, SystemGraphAuthorization>();
         services.AddSingleton<SystemGraphQueryService>();
         services.AddSingleton<ISystemGraphQueryService>(provider => provider.GetRequiredService<SystemGraphQueryService>());

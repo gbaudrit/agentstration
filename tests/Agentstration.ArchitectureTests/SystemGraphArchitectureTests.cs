@@ -10,7 +10,7 @@ public sealed class SystemGraphArchitectureTests
     [TestMethod]
     public void SemanticContractsAndQueryHaveNoPresentationOrExecutionDependencies()
     {
-        foreach (var assembly in new[] { typeof(SystemGraphPage).Assembly, typeof(SystemGraphQueryService).Assembly })
+        foreach (var assembly in new[] { typeof(SystemGraphPage).Assembly, typeof(SystemGraphQueryService).Assembly, typeof(Agentstration.Systems.Contracts.SystemResource).Assembly, typeof(Agentstration.Systems.SystemModelService).Assembly })
         {
             var forbiddenAssemblies = new[] { "EntityFramework", "AspNetCore", "LikeC4", "React", "Agentstration.Flows", "Agentstration.Runtime", "Agentstration.Tools", "Agentstration.Web" };
             foreach (var dependency in assembly.GetReferencedAssemblies())

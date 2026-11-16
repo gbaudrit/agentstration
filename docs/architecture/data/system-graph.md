@@ -119,3 +119,34 @@ phases; no raw cross-family edge index is retained.
 Derived pin/reference nodes require binding inspection rights on the consumer that
 discloses them as well as the target. A hidden consumer cannot change public pin
 counts, snapshot digests or paths of an otherwise visible dependency.
+
+## Authored systems and Console exploration
+
+The `Systems` family owns persisted logical `SystemResource` definitions outside
+the projection. A name/description and up to 128 exact resource memberships use the
+existing scoped resource store and ETags. The API `/api/systems` provides filtered
+list/read, create, rename, delete, add-member and remove-member commands. Membership
+requires Discover; mutations require the existing write/delete permissions. Hidden
+members are filtered without private totals. Partial membership edits fail uniformly;
+rename preserves unseen members. Delete removes the System, never member resources.
+Deleted/recreated UIDs are not rebound. Its contributor emits `system-membership`
+edges with `definition.members` provenance; those edges are logical, outside impact
+closure. Discover-only still exposes no executable bindings.
+
+`/system-explorer` uses URL `context`, `namespace`, System-owner `scopeRef` and exact
+semantic `root`. Inventory and neighbor pages use the same neutral API, initially
+80 nodes. Current context is retained when opening family details/Flow Designer;
+owner scope is distinct. The accessible table, inspector and JSON export operate
+on the authorized page, independently of the optional LikeC4 island. Select
+`renderer=list` or disable the diagram to use that alternative.
+
+`Web.SystemExplorer` alone translates identities into LikeC4 Model Builder data,
+then browser WASM layout, then React. Local assets and shadow-root styles isolate
+the renderer. Stable hexadecimal IDs do not use authored names. Layout is bounded,
+disposable and never persisted. Rebuild its committed local bundle with `npm ci`
+and `npm run build` in `src/Agentstration.Web.SystemExplorer/Frontend`; Node is not
+a product runtime dependency. No graphical field enters the semantic API.
+[ADR-0238](../../decisions/0238-authored-systems-and-replaceable-explorer-rendering.md)
+records authority, costs and limitations. New reusable UX scenario #1201 remains
+deferred until explicit UX validation and merged UX PR; existing regressions and
+feature smoke remain required now.

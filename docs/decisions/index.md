@@ -280,3 +280,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 236. [ADR-0236 — SystemGraph is an authorized rebuildable semantic projection](0236-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
 
 237. [ADR-0237 — SystemGraph impact uses authorized family evidence](0237-system-graph-impact-uses-authorized-family-evidence.md)
+238. [ADR-0238 — Authored systems and replaceable Explorer rendering](0238-authored-systems-and-replaceable-explorer-rendering.md)

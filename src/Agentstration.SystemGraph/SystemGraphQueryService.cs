@@ -177,7 +177,7 @@ public sealed class SystemGraphQueryService(
             }
             foreach (var edge in contribution.Relations)
                 if (nodes.ContainsKey(edge.Source) && nodes.ContainsKey(edge.Target)
-                    && access[edge.Source].InspectBindings && access[edge.Target].InspectBindings)
+                    && (edge.Kind == "system-membership" || access[edge.Source].InspectBindings && access[edge.Target].InspectBindings))
                 {
                     relations.Add(edge);
                     if (relations.Count > MaximumRelations) throw new SystemGraphException("system_graph_limit_exceeded");

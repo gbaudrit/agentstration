@@ -1,3 +1,4 @@
+using Agentstration.Systems.Api;
 using Agentstration.SystemGraph.Api;
 using Agentstration.Agents.Api;
 using Agentstration.Artifacts.Api;
@@ -59,6 +60,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapToolsApi();
         app.MapResourcesApi();
         app.MapSystemGraphApi();
+        app.MapSystemsApi();
         app.MapResourcePlanningApi();
         app.MapExtensionsApi();
         app.MapWorkApi();

@@ -20,7 +20,7 @@ public sealed class MainLayoutNavigationTests
 
         AssertNavigation(rendered,
             (string.Empty, [("Overview", "/")]),
-            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Schemas", "/schemas"), ("Transformation functions", "/transformation-functions"), ("Entries", "/entries"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles"), ("Data Source Profiles", "/data-source-profiles")]),
+            ("Design", [("Agents", "/agents"), ("Flows", "/flows"), ("Schemas", "/schemas"), ("Transformation functions", "/transformation-functions"), ("Entries", "/entries"), ("System Explorer", "/system-explorer"), ("Resource plans", "/resource-plans"), ("Model profiles", "/modelprofiles"), ("Data Source Profiles", "/data-source-profiles")]),
             ("Automate", [("Triggers", "/triggers")]),
             ("Operate", [("Conversations", "/conversations"), ("Tasks", "/tasks")]),
             ("Observe", [("Agent instances", "/agent-instances"), ("Agent runs", "/agent-runs"), ("Flow runs", "/flow-runs"), ("Run events", "/run-events")]),

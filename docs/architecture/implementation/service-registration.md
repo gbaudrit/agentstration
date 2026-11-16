@@ -148,12 +148,16 @@ Descriptor tests inspect service type, lifetime, selection and cardinality befor
 ## SystemGraph metadata projection
 
 `Infrastructure/Composition/SystemGraphServiceCollectionExtensions.cs` registers
-eleven explicit family contributors (Agents, Models, Flows, Tools, Schemas, Data
-Sources, Connected Services, Storage, Knowledge, Functions and Triggers), the
+twelve explicit family contributors (Agents, Models, Flows, Tools, Schemas, Data
+Sources, Connected Services, Storage, Knowledge, Functions, Triggers and authored Systems), the
 metadata read scope and current RBAC/Discover/Use adapter. Inventory and impact
 interfaces share one singleton query service and its validated observations.
 `SystemGraph.Contracts` owns neutral projection/contributor contracts;
 `SystemGraph` owns rebuilding, bounded authorized pagination, reverse paths and comparisons;
 `SystemGraph.Api` maps read-only inventory/impact/changes/coverage endpoints through the aggregator.
-There is no graph database, hosted collector or renderer registration.
-See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236/0237.
+`Systems` owns logical grouping commands and its contributor, composed as a singleton
+with the resource store, scope operations and current authorization. `Systems.Api`
+maps its scoped command surface. Console hosts register `SystemExplorerApiClient`;
+the optional `Web.SystemExplorer` island has no application authority.
+There is no graph database or hosted collector.
+See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236/0237/0238.

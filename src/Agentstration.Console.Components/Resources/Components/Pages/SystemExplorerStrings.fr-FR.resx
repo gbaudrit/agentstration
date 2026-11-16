@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title" xml:space="preserve"><value>Explorateur de systèmes</value></data>
+  <data name="Description" xml:space="preserve"><value>Explorez les ressources autorisées et leurs dépendances enregistrées.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
+  <data name="Apply" xml:space="preserve"><value>Appliquer</value></data>
+  <data name="Loading" xml:space="preserve"><value>Chargement des ressources autorisées…</value></data>
+  <data name="Partial" xml:space="preserve"><value>Observation partielle ; les dépendances non prises en charge ou invisibles restent inconnues. Observé le :</value></data>
+  <data name="AllResources" xml:space="preserve"><value>Toutes les ressources</value></data>
+  <data name="Next" xml:space="preserve"><value>Page suivante</value></data>
+  <data name="Export" xml:space="preserve"><value>Exporter cette page en JSON</value></data>
+  <data name="Diagram" xml:space="preserve"><value>Afficher le diagramme</value></data>
+  <data name="Empty" xml:space="preserve"><value>Aucune ressource disponible</value></data>
+  <data name="EmptyHelp" xml:space="preserve"><value>Aucune ressource visible ne correspond à cet espace de noms ou à cette identité.</value></data>
+  <data name="DiagramLabel" xml:space="preserve"><value>Diagramme des dépendances ; les mêmes ressources sont disponibles dans le tableau ci-dessous.</value></data>
+  <data name="DiagramUnavailable" xml:space="preserve"><value>Le diagramme est indisponible. Utilisez le tableau des ressources et l’export JSON.</value></data>
+  <data name="Resources" xml:space="preserve"><value>Ressources</value></data>
+  <data name="Name" xml:space="preserve"><value>Nom</value></data>
+  <data name="Kind" xml:space="preserve"><value>Type</value></data>
+  <data name="Owner" xml:space="preserve"><value>Portée propriétaire</value></data>
+  <data name="State" xml:space="preserve"><value>État</value></data>
+  <data name="Evidence" xml:space="preserve"><value>Génération / publication</value></data>
+  <data name="Neighbors" xml:space="preserve"><value>Explorer les voisins</value></data>
+  <data name="Selection" xml:space="preserve"><value>Ressource sélectionnée</value></data>
+  <data name="OpenDetails" xml:space="preserve"><value>Ouvrir la fiche de la ressource</value></data>
+  <data name="OpenDesigner" xml:space="preserve"><value>Ouvrir le concepteur de flux</value></data>
+  <data name="Relations" xml:space="preserve"><value>Relations enregistrées sur cette page</value></data>
+  <data name="Systems" xml:space="preserve"><value>Systèmes logiques</value></data>
+  <data name="SystemsHelp" xml:space="preserve"><value>L’appartenance décrit un regroupement déclaré. Elle ne crée pas de dépendances d’exécution. Seuls les membres actuellement visibles sont affichés.</value></data>
+  <data name="NewSystem" xml:space="preserve"><value>Nom du nouveau système</value></data>
+  <data name="Create" xml:space="preserve"><value>Créer le système</value></data>
+  <data name="System" xml:space="preserve"><value>Système</value></data>
+  <data name="ChooseSystem" xml:space="preserve"><value>Sélectionner un système</value></data>
+  <data name="Rename" xml:space="preserve"><value>Renommer</value></data>
+  <data name="AddSelected" xml:space="preserve"><value>Ajouter la ressource sélectionnée</value></data>
+  <data name="Remove" xml:space="preserve"><value>Retirer du système</value></data>
+  <data name="Delete" xml:space="preserve"><value>Supprimer le système</value></data>
+  <data name="DeleteHelp" xml:space="preserve"><value>Supprimer ce système logique et ses appartenances ? Les ressources membres seront conservées.</value></data>
+  <data name="ConfirmDelete" xml:space="preserve"><value>Confirmer la suppression</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="LoadFailed" xml:space="preserve"><value>L’inventaire autorisé n’a pas pu être chargé. Actualisez pour réessayer.</value></data>
+  <data name="ChangeFailed" xml:space="preserve"><value>La modification n’a pas pu être appliquée. Actualisez et vérifiez vos droits, les appartenances et la dernière version du système.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>L’export JSON n’a pas pu être téléchargé.</value></data>
+  <data name="Draft" xml:space="preserve"><value>Brouillon</value></data>
+  <data name="Published" xml:space="preserve"><value>Publié</value></data>
+  <data name="RecordedGeneration" xml:space="preserve"><value>Génération enregistrée</value></data>
+  <data name="ReferenceIdentity" xml:space="preserve"><value>Identité référencée</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Métadonnées</value></data>
+  <data name="Membership" xml:space="preserve"><value>Appartenance logique</value></data>
+  <data name="Dependency" xml:space="preserve"><value>Dépendance exacte</value></data>
+  <data name="DynamicDependency" xml:space="preserve"><value>Dépendance dynamique</value></data>
+  <data name="GenerationOf" xml:space="preserve"><value>Génération de la ressource</value></data>
+  <data name="Publication" xml:space="preserve"><value>Publication</value></data>
+  <data name="Relation" xml:space="preserve"><value>Relation</value></data>
+  <data name="Definition" xml:space="preserve"><value>Définition</value></data>
+</root>
