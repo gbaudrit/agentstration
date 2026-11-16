@@ -27,7 +27,8 @@ public static class SystemGraphApiModule
             response.Headers.CacheControl = "no-store";
             try { return Results.Ok(await service.GetCoverageAsync(ct)); }
             catch (SystemGraphException exception) { return GraphProblem(exception); }
-        }).RequireAuthorization(AgentstrationPolicies.CanReadResources).Produces<IReadOnlyList<SystemGraphContributorCoverage>>();
+        }).RequireAuthorization(AgentstrationPolicies.CanReadResources).Produces<IReadOnlyList<SystemGraphContributorCoverage>>()
+            .WithSummary("Describe the currently authorized SystemGraph contributor coverage");
         return endpoints;
     }
 
