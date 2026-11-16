@@ -2,15 +2,22 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Agents;
 using Agentstration.DataSources;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
+using Agentstration.Flows.Contracts;
+using Agentstration.ModelProviders;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools.Contracts;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -19,8 +26,13 @@ public sealed partial class DataSourceDatasetTests
     [TestMethod]
     public async Task MixedContributionToolsetPreviewsWithoutPublicationDescribesAndEnforcesIndependentAccess()
     {
-        await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
+        var model = new KnowledgeToolsetProbeModel();
+        await using var factory = Factory().WithWebHostBuilder(b =>
+        {
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" }));
+            b.ConfigureServices(services => { services.RemoveAll<IChatClientResolver>(); services.AddSingleton<IChatClientResolver>(model); });
+        });
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var fixture = await PrepareAsync(factory.Services);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
@@ -128,5 +140,83 @@ public sealed partial class DataSourceDatasetTests
         Assert.HasCount(3, removed.Tools.Where(t => t.Change == "removed"));
         var exact = await access.QueryDocumentsAsync(id, query with { SnapshotId = a, Contribution = queryPin }, default);
         Assert.HasCount(2, exact.DocumentPage!.Documents);
+        // Real AWP Agent execution with a partial ToolSet assignment: discovery cannot advertise siblings.
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var agent = await agents.PutAgentAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new() { Name = "mixed-knowledge-reader" },
+            ScopeRef = Owner,
+            Definition = new AgentProperties
+            {
+                DisplayName = "Mixed Knowledge reader",
+                Instructions = "Describe the assigned Knowledge and compute the invoice total.",
+                Tools = [],
+                ModelProfile = new("reasoning-default", Owner),
+                RuntimeProfile = new("maf-builtin", Owner),
+                ToolSets = [new() { ToolSet = exposure.Value.ToolSet, Version = "1.0.0", Members = [describedTool.Name, selected.Tool.Name] }]
+            }
+        }, null, true, default);
+        await agents.EnsureExecutionRevisionAsync(agent.Value.Namespace, agent.Value.Name, Owner, agent.Value.Generation, default);
+        model.Snapshot = a;
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var flow = await flows.CreateExactAsync(Owner, new CreateFlowCommand("mixed-knowledge-agent", null, "1.0.0", true,
+            new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
+            {
+                EntryStep = "input",
+                InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+                Steps = [new InputFlowStepDefinition { Name = "input" },
+                    new AgentFlowStepDefinition { Name = "reader", Agent = new(agent.Value.Name, ScopeRef: Owner), InputMapping = JsonSerializer.SerializeToElement("Inspect the invoices") },
+                    new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.reader.output}") }],
+                Transitions = [new("start", "input", "completed", "reader"), new("done", "reader", "success", "output")]
+            }), default, default);
+        await flows.PublishVersionExactAsync(Owner, flow.Value.Id, "1.0.0", true, default);
+        using var submitted = await client.PostAsJsonAsync("/api/flows/mixed-knowledge-agent/runs?scopeRef=/instance",
+            new CreateFlowRunRequest(Empty, "1.0.0") { DefinitionScopeRef = Owner, ExecutionScopeRef = Owner });
+        Assert.AreEqual(HttpStatusCode.Accepted, submitted.StatusCode, await submitted.Content.ReadAsStringAsync());
+        var agentRun = (await submitted.Content.ReadFromJsonAsync<FlowRun>())!;
+        for (var i = 0; i < 600 && agentRun.Status is FlowRunStatus.Pending or FlowRunStatus.Running; i++)
+        { await Task.Delay(20); agentRun = (await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{agentRun.Id}"))!; }
+        Assert.AreEqual(FlowRunStatus.Succeeded, agentRun.Status, JsonSerializer.Serialize(agentRun));
+        Assert.AreEqual(2, model.ObservedAccessCount);
+        Assert.AreEqual(30, model.ObservedTotal);
+    }
+
+    private sealed class KnowledgeToolsetProbeModel : IChatClientResolver, IChatClient
+    {
+        public string? Snapshot { get; set; }
+        public int ObservedAccessCount { get; private set; }
+        public int ObservedTotal { get; private set; }
+        public ValueTask<IChatClient> ResolveAsync(string name, CancellationToken ct = default) => ValueTask.FromResult<IChatClient>(this);
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default)
+        {
+            var history = messages.ToArray();
+            var results = history.SelectMany(m => m.Contents).OfType<FunctionResultContent>().ToArray();
+            var tools = options!.Tools!.OfType<AIFunctionDeclaration>().ToArray();
+            Assert.HasCount(2, tools);
+            if (results.Length > 0)
+            {
+                var described = JsonSerializer.SerializeToElement(results[0].Result);
+                ObservedAccessCount = described.GetProperty("access").GetArrayLength();
+                Assert.AreEqual(2, ObservedAccessCount);
+                Assert.HasCount(1, described.GetProperty("contributions").EnumerateArray());
+            }
+            if (results.Length > 1)
+            {
+                var queryResult = JsonSerializer.SerializeToElement(results[1].Result);
+                ObservedTotal = queryResult.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Total").GetInt32();
+                Assert.AreEqual(30, ObservedTotal);
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "INVOICES_OK")) { FinishReason = ChatFinishReason.Stop });
+            }
+            var tool = tools.Single(t => results.Length == 0 ? t.Name.Contains(".describe.", StringComparison.Ordinal) : t.Name.Contains("query-documents", StringComparison.Ordinal));
+            object request = results.Length == 0 ? new { snapshotId = Snapshot } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                [new FunctionCallContent("knowledge-call-" + results.Length, tool.Name, new Dictionary<string, object?> { ["request"] = request })]))
+            { FinishReason = ChatFinishReason.ToolCalls });
+        }
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public object? GetService(Type type, object? key = null) => type.IsInstanceOfType(this) ? this : null;
+        public void Dispose() { }
     }
 }
