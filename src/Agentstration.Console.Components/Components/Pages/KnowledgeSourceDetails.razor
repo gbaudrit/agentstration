@@ -92,7 +92,7 @@ else if (source is not null && readiness is not null)
     else if (activeTab == DetailsTab.Snapshots)
     {
         <section class="panel form-section" data-testid="knowledge-snapshots">
-        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("Snapshots")</h2><p>@T("SnapshotsHelp")</p></div></div>
+        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("Snapshots")</h2><p>@T("SnapshotsHelp")</p><p>@T("ContentAvailabilityHelp")</p></div></div>
         @if (snapshots.Count == 0) { <p class="muted">@T("NoSnapshots")</p> }
         else
         {
@@ -102,6 +102,7 @@ else if (source is not null && readiness is not null)
                 <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
                     <div><p class="eyebrow">@T("SnapshotDetails")</p><h3>@selectedSnapshotView.Snapshot.Name</h3><p>@T("SnapshotDetailsHelp")</p></div>
                     <dl class="resource-details knowledge-snapshot-provenance">
+                        <dt>@T("ContentAvailability")</dt><dd data-testid="knowledge-content-availability">@T($"ContentAvailability.{selectedSnapshotView.ContentAvailability}")</dd>
                         <dt>@T("Projection")</dt><dd><code>@selectedSnapshotView.Snapshot.ProjectionId</code></dd>
                         <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>

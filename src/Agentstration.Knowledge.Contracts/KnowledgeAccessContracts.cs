@@ -70,6 +70,7 @@ public sealed record KnowledgeAccessResult
 
 public sealed record KnowledgeAccessStatus
 {
+    public KnowledgeContentAvailability ContentAvailability { get; init; } = KnowledgeContentAvailability.Unknown;
     public required Guid SourceUid { get; init; }
     public required string State { get; init; }
     public required DateTimeOffset CheckedAt { get; init; }

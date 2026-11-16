@@ -30,6 +30,7 @@ public sealed partial class KnowledgeAccessService
         {
             SourceUid = source.Uid,
             State = state,
+            ContentAvailability = active?.ContentAvailability ?? KnowledgeContentAvailability.Unknown,
             CheckedAt = clock.GetUtcNow(),
             ActiveExpiresAt = active is not null && source.Definition.Lifecycle?.TimeToLive is { } ttl ? active.Snapshot.PublishedAt + ttl : null,
             AllowExpiredOnRefreshFailure = source.Definition.Lifecycle?.AllowExpiredOnRefreshFailure == true,

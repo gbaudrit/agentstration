@@ -32,6 +32,8 @@ public sealed class KnowledgeSnapshotContentReader(IStoragePublicationGateway pu
     {
         var context = current.Current;
         await authorization.EnsurePermissionAsync(context, AuthorizationPermissions.ArtifactsReadContent, cancellationToken);
+        if (artifact.Content is { } evidence && (evidence.Length != artifact.Length || evidence.Sha256 != artifact.Sha256))
+            throw new KnowledgeAccessException("knowledge_snapshot_content_invalid", "Snapshot content evidence is inconsistent.");
         if (artifact.Length is < 0 or > KnowledgeAccessService.MaximumDocumentBytes)
             throw new KnowledgeAccessException("knowledge_access_document_limit", "The document exceeds the read limit.");
         var maximum = Math.Min(65536, artifact.Content?.Target.Policy.MaximumReadBytes ?? 65536);
@@ -47,9 +49,11 @@ public sealed class KnowledgeSnapshotContentReader(IStoragePublicationGateway pu
                 throw new KnowledgeAccessException("knowledge_access_content_unavailable", "The historical document is unavailable.");
         }
         var result = new byte[(int)artifact.Length];
-        for (var offset = 0; offset < result.Length;)
+        var offset = 0;
+        do
         {
-            var count = Math.Min(maximum, result.Length - offset);
+            // Even empty content must reauthorize and validate its exact retained reference.
+            var count = Math.Min(maximum, Math.Max(1, result.Length - offset));
             ReadOnlyMemory<byte> chunk;
             if (artifact.Content is { } retained)
                 chunk = await publications.ReadAsync(retained, offset, count, cancellationToken);
@@ -58,11 +62,13 @@ public sealed class KnowledgeSnapshotContentReader(IStoragePublicationGateway pu
                 using var workspace = scopes.Push(context);
                 chunk = await durable.ReadAsync(new(context.WorkspaceId), legacy!.Receipt.OpaqueReference, offset, count, cancellationToken);
             }
-            if (chunk.Length < 1 || chunk.Length > count)
+            if (result.Length == 0 && chunk.IsEmpty) break;
+            if (chunk.Length < 1 || chunk.Length > count || chunk.Length > result.Length - offset)
                 throw new KnowledgeAccessException("knowledge_access_content_incomplete", "The historical document is incomplete.");
             chunk.Span.CopyTo(result.AsSpan(offset));
             offset += chunk.Length;
         }
+        while (offset < result.Length);
         if (!string.Equals(Convert.ToHexStringLower(SHA256.HashData(result)), artifact.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new KnowledgeAccessException("knowledge_access_content_integrity", "The historical document differs from its receipt.");
         return result;
@@ -92,7 +98,9 @@ public abstract class KnowledgeAccessMcpTool(KnowledgeAccessService access, Know
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
     public InternalMcpToolDefinition Definition => new(KnowledgeAccessSchemas.ToolName(Operation),
         "Knowledge " + KnowledgeAccessSchemas.Route(Operation),
-        "Native governed Knowledge Snapshot access. Source identity is fixed by its published relay Tool.",
+        Operation == KnowledgeSourceOperation.GetStatus
+            ? "Recorded Knowledge Snapshot status only. Does not check physical content availability, read content or start preparation. Source identity is fixed by its published relay Tool."
+            : "Native governed Knowledge Snapshot access. Source identity is fixed by its published relay Tool.",
         KnowledgeAccessSchemas.Envelope(Operation),
         OutputSchema: Operation == KnowledgeSourceOperation.StructuredQuery ? JsonSerializer.SerializeToElement(new { type = "object" }) : null,
         InitialCategory: KnowledgeBuiltinSchemas.Category, ExposeThroughMcp: false);

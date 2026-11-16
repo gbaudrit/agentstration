@@ -30,6 +30,7 @@ internal static class KnowledgeAccessEndpoints
         sources.MapPost("/{name}/content/status", (string name, string? @namespace, string? scopeRef,
             KnowledgeStatusRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
                 Results.Ok(await service.GetStatusAsync(Id(name, @namespace, scopeRef), body, ct))))
+            .WithSummary("Inspect recorded Knowledge status without checking physical content or starting preparation")
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }
     private static KnowledgeSourceId Id(string name, string? ns, string? scope) => new(name,

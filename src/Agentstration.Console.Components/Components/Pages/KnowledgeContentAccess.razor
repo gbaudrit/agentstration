@@ -45,7 +45,9 @@
     @if (status is not null)
     {
         <section data-testid="knowledge-content-status" role="status">
-            <p>@T($"NativeState.{status.State}") · @status.CheckedAt.ToLocalTime().ToString("g")</p>
+            <p>@T(status.State == "ready" ? "NativeStatusReady" : $"NativeState.{status.State}") · @status.CheckedAt.ToLocalTime().ToString("g")</p>
+            <p data-testid="knowledge-content-availability">@T("ContentAvailability"): @T($"ContentAvailability.{status.ContentAvailability}")</p>
+            <p>@T("ContentAvailabilityHelp")</p>
             <dl><dt>@T("ActiveSnapshot")</dt><dd><code>@(status.ActiveSnapshotId ?? T("None"))</code></dd><dt>@T("NativeLatestPublished")</dt><dd><code>@(status.LatestPublishedSnapshotId ?? T("None"))</code></dd></dl>
             @if (status.ComparedSnapshotId is not null) { <p><code>@status.ComparedSnapshotId</code> · @T("NativeComparison", T(status.IsActive == true ? "Yes" : "No"), T(status.IsLatestPublished == true ? "Yes" : "No"))</p> }
             <p>@T("NativeEvidenceHelp")</p>

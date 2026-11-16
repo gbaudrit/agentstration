@@ -159,4 +159,9 @@
   <data name="RepublishExposureHelp" xml:space="preserve"><value>Publiez une nouvelle version pour mettre à jour ces Tools. Les versions précédentes restent disponibles. Après publication, sélectionnez la nouvelle version du ToolSet dans vos agents.</value></data>
   <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publier une nouvelle version des Tools</value></data>
   <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choisissez une autre version. La version publiée ne peut pas être remplacée.</value></data>
+  <data name="ContentAvailability" xml:space="preserve"><value>Disponibilité du contenu</value></data>
+  <data name="NativeStatusReady" xml:space="preserve"><value>Publication prête</value></data>
+  <data name="ContentAvailability.Unknown" xml:space="preserve"><value>Non vérifiée</value></data>
+  <data name="ContentAvailability.Retired" xml:space="preserve"><value>Retiré</value></data>
+  <data name="ContentAvailabilityHelp" xml:space="preserve"><value>Ces métadonnées ne vérifient pas l’accès au contenu. Sa disponibilité et son intégrité sont contrôlées lors de sa lecture ou d’une requête.</value></data>
 </root>
