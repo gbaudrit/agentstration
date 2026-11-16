@@ -192,10 +192,21 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         await identities.AddTenantAsync(tenant, default);
         await identities.AddWorkspaceAsync(foreign, default);
         var ns = new ResourceNamespace("graph-isolation");
+        StoredResource<ModelProfileResource> shared;
+        Guid[] hiddenConsumers;
+        var workspaceOwner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
         using (scopes.PushSystem())
         {
             await store.PutExactAsync(ResourceScopeRef.Workspace(sibling.Id), Profile("invisible-sibling", ResourceScopeRef.Workspace(sibling.Id), ns), null, true, default);
             await store.PutExactAsync(ResourceScopeRef.Workspace(foreign.Id), Profile("invisible-foreign", ResourceScopeRef.Workspace(foreign.Id), ns), null, true, default);
+            shared = await store.PutExactAsync(ResourceScopeRef.Instance, Profile("shared", ResourceScopeRef.Instance, ns), null, true, default);
+            await policies.PutAsync(new(new(shared.Value.Uid, ResourceScopeRef.Instance, ns, shared.Value.Kind),
+                [new(workspaceOwner, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+            await PutConsumerAsync(workspaceOwner, "visible-consumer");
+            var siblingConsumer = await PutConsumerAsync(ResourceScopeRef.Workspace(sibling.Id), "invisible-sibling-consumer");
+            var foreignConsumer = await PutConsumerAsync(ResourceScopeRef.Workspace(foreign.Id), "invisible-foreign-consumer");
+            hiddenConsumers = [siblingConsumer.Value.Uid, foreignConsumer.Value.Uid];
         }
         using var client = factory.CreateClient();
         SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
@@ -205,6 +216,24 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         Assert.DoesNotContain("invisible", text, StringComparison.Ordinal);
         Assert.DoesNotContain(sibling.Id.ToString(), text, StringComparison.Ordinal);
         Assert.DoesNotContain(foreign.Id.ToString(), text, StringComparison.Ordinal);
+        var root = Uri.EscapeDataString(SystemGraphIds.Definition(shared.Value.Uid));
+        var reverse = (await client.GetFromJsonAsync<SystemGraphPage>($"/api/system-graph?namespace=graph-isolation&root={root}"))!;
+        Assert.HasCount(2, reverse.Nodes);
+        Assert.HasCount(1, reverse.Relations);
+        Assert.IsTrue(reverse.Nodes.Any(node => node.Identity.Name == "visible-consumer"));
+        Assert.IsFalse(reverse.HasMore);
+        foreach (var uid in hiddenConsumers)
+            Assert.DoesNotContain(uid.ToString(), JsonSerializer.Serialize(reverse), StringComparison.Ordinal);
+
+        Task<StoredResource<AgentResource>> PutConsumerAsync(ResourceScopeRef scope, string name) => store.PutExactAsync(scope, new AgentResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            ScopeRef = scope,
+            Metadata = new() { Name = name, Namespace = ns },
+            Generation = 1,
+            Definition = new() { DisplayName = name, Instructions = "deterministic", ModelProfile = new("shared", ResourceScopeRef.Instance, ns) }
+        }, null, true, default);
     }
 
     [TestMethod]
