@@ -56,7 +56,8 @@ public sealed class StoredArtifactReconciliationService(IResourceStore resources
                         snapshot.ProjectionFlowRunId, new(snapshot.KnowledgeSourceScopeRef ?? reference.Target.Consumer.ConsumerScopeRef,
                             snapshot.KnowledgeSourceNamespace, KnowledgeResourceKinds.KnowledgeSource, snapshot.KnowledgeSourceName),
                         snapshot.ProjectionId, entry.MediaType, new(workspaceId, reference.Target, reference.Key, reference.Version,
-                            reference.Length, reference.Sha256, reference) { RecordContract = entry.RecordContract },
+                            reference.Length, reference.Sha256, reference)
+                        { RecordContract = entry.RecordContract },
                         ProducerUid: snapshot.KnowledgeSourceUid, ProducerGeneration: snapshot.KnowledgeSourceGeneration,
                         DataContract: entry.DataContract, Provenance: entry.Provenance), cancellationToken);
                 });
