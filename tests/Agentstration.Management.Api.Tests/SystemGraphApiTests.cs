@@ -36,11 +36,13 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         var agentOwner = ResourceScopeRef.Tenant(context.TenantId);
         var ns = new ResourceNamespace("graph-fixture");
         StoredResource<ModelProfileResource> profile;
+        StoredResource<ModelProfileResource> otherNamespaceProfile;
         StoredResource<AgentRevision> revision;
         Guid flowUid;
         using (scopes.PushSystem())
         {
             profile = await resources.PutExactAsync(ResourceScopeRef.Instance, Profile("same-name", ResourceScopeRef.Instance, ns), null, true, default);
+            otherNamespaceProfile = await resources.PutExactAsync(owner, Profile("same-name", owner, new ResourceNamespace("graph-other")), null, true, default);
             var shadow = await resources.PutExactAsync(owner, Profile("same-name", owner, ns), null, true, default);
             var agent = await resources.PutExactAsync(agentOwner, new AgentResource
             {
@@ -108,6 +110,10 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         Assert.IsNotNull(before);
         Assert.IsNotNull(after);
         Assert.AreEqual(before.Snapshot, after.Snapshot);
+        Assert.IsTrue(before.Nodes.All(node => node.Identity.Namespace == ns));
+        var otherNamespace = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?namespace=graph-other"))!;
+        Assert.AreEqual(otherNamespaceProfile.Value.Uid, otherNamespace.Nodes.Single().Identity.ResourceUid);
+        Assert.IsEmpty(otherNamespace.Relations);
         Assert.IsFalse(before.GloballyComplete);
         var agentRevisionId = SystemGraphIds.Definition(revision.Value.Uid);
         var modelGenerationId = SystemGraphIds.Generation(profile.Value.Uid, 1);
