@@ -368,14 +368,15 @@ public sealed partial class DataSourceDatasetTests
     {
         var content = await services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
-        return json.RootElement.Clone();
+        return json.RootElement[0].Clone();
     }
 
     private static void ConfigureCompositionLifecycleClock(IServiceCollection services, NativeAccessClock clock)
     {
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
         services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
-        services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+        services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+        services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock));
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
         services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));

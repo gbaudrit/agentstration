@@ -101,12 +101,18 @@ public sealed class DataSourceDocumentAccessService(DataSourceAcquisitionService
             var target = ReadTarget(publication.Target, source);
             await documents.ValidatePublicationAsync(publication with { Target = target }, ct);
             var page = await documents.QueryAsync(target, session.Query with { RequestId = Guid.NewGuid().ToString("N") }, ct);
+            var lineage = StorageRecordSets.Members(acquisition.Publication!).Select((member, index) =>
+                new DataSourceDocumentRecord(member.Document!.DocumentId, index)).ToDictionary(member => member.DocumentId, StringComparer.Ordinal);
+            if (page.Documents.Any(document => !lineage.ContainsKey(document.Id)))
+                throw Error("data_source_document_result_outside");
             var next = page.Cursor is null ? null : protector.Protect(JsonSerializer.Serialize(session with
             { Query = session.Query with { Cursor = page.Cursor } }, Json));
             if (next is { Length: > MaximumCursorLength }) throw Error("data_source_document_cursor_limit");
             if (next is null) await ChangeLeaseAsync(acquisition, session.LeaseId, session.Expires, true, ct);
             return new(acquisition.Name, acquisition.Uid, publication.Publication.Id, selection.Contract,
-                page with { Cursor = null }, next, next is null ? null : session.Expires);
+                page with { Cursor = null }, next, next is null ? null : session.Expires)
+            { ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId,
+                Records = page.Documents.Select(document => lineage[document.Id]).ToArray() };
         }
         catch
         {
@@ -178,14 +184,15 @@ public sealed class DataSourceDocumentAccessService(DataSourceAcquisitionService
     {
         if (acquisition.State != DataSourceAcquisitionState.Succeeded || acquisition.ContentRetiredAt is not null
             || acquisition.ContentRetiringAt is not null || acquisition.Content is not { } content
-            || acquisition.Publication?.Document is not { } document || acquisition.Dataset?.Definition.DocumentCollectionUid is not { } collection)
+            || acquisition.Publication is not { Records.DocumentPublication: { } publication } receipt
+            || acquisition.Dataset?.Definition.DocumentCollectionUid is not { } collection)
             throw Error("data_source_document_acquisition_unsupported");
-        var receipt = acquisition.Publication;
-        var publication = document.Publication;
+        var members = StorageRecordSets.Members(receipt);
         if (receipt.Target.DocumentCollectionUid != collection || publication.Target.CollectionUid != collection
             || acquisition.Dataset.Definition.Storage != receipt.Target.Storage || publication.Target.Storage != receipt.Target.Storage
-            || publication.Target.Publication != publication.Publication.Id || publication.Publication.Count != 1
-            || document.DocumentId != content.Key || document.Revision != content.Version
+            || publication.Target.Publication != publication.Publication.Id || publication.Publication.Count != members.Count
+            || members.Any(member => member.Document is not { } document || document.Publication != publication
+                || document.DocumentId != member.Key || document.Revision != member.Version)
             || receipt.Key != content.Key || receipt.Version != content.Version || receipt.Length != content.Length || receipt.Sha256 != content.Sha256
             || publication.QueryProfile.ModelDigest != publication.Publication.SchemaDigest)
             throw Error("data_source_document_publication_inconsistent");

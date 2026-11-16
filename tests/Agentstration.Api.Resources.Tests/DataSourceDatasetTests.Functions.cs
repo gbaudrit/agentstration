@@ -28,7 +28,8 @@ public sealed partial class DataSourceDatasetTests
         source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
         {
             Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
-            { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/results" }) }] }
+            { Function = new("json-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
+                { path = "/results", itemSchema = new SchemaBinding { Inline = new() { Format = "json-schema", Content = JsonSerializer.SerializeToElement(new { type = "object" }) } } }, JsonSerializerOptions.Web) }] }
         } } };
         await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
         using var client = factory.CreateClient();
@@ -54,7 +55,7 @@ public sealed partial class DataSourceDatasetTests
         var snapshot = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot;
         Assert.HasCount(2, snapshot.Artifacts);
         var read = await factory.Services.GetRequiredService<KnowledgeAccessService>().ReadAsync(id, new() { SnapshotId = snapshot.Name }, default);
-        CollectionAssert.AreEquivalent(new[] { "a", "b" }, read.Chunks.Select(chunk => JsonSerializer.Deserialize<JsonElement>(chunk.Content).GetProperty("id").GetString()).ToArray());
+        CollectionAssert.AreEquivalent(new[] { "a", "b" }, read.Chunks.Select(chunk => JsonSerializer.Deserialize<JsonElement>(chunk.Content)[0].GetProperty("id").GetString()).ToArray());
     }
 
     [TestMethod]

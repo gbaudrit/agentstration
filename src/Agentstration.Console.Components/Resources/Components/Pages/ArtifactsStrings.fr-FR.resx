@@ -56,4 +56,10 @@
 <data name="DataContractGenericValidated" xml:space="preserve"><value>La validation se limite au contrat générique déclaré. La structure métier n’est pas vérifiée.</value></data>
 <data name="DataContractParentHash" xml:space="preserve"><value>Empreinte du Schema parent :</value></data>
 <data name="DataContractSelectedHash" xml:space="preserve"><value>Empreinte du schéma sélectionné :</value></data>
+  <data name="Records" xml:space="preserve"><value>Lignes JSON</value></data>
+  <data name="RecordsHelp" xml:space="preserve"><value>Cet artefact contient {0} lignes stockées séparément. Le contenu est vérifié au moment de sa lecture.</value></data>
+  <data name="RecordContract" xml:space="preserve"><value>Contrat des lignes</value></data>
+  <data name="RecordOrdinal" xml:space="preserve"><value>Ligne</value></data>
+  <data name="ReadRecord" xml:space="preserve"><value>Lire la ligne</value></data>
+  <data name="RecordReadFailed" xml:space="preserve"><value>La ligne n’a pas pu être lue ou vérifiée. Ses métadonnées restent disponibles.</value></data>
 </root>

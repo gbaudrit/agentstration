@@ -42,7 +42,7 @@ public sealed partial class DataSourceDatasetTests
         var prefix = $"/api/datasourceacquisitions/{a.Name}/documents";
         var description = (await client.GetFromJsonAsync<DataSourceDocumentDescription>(prefix + "/capabilities"))!;
         Assert.AreEqual(a.Uid, description.AcquisitionUid);
-        Assert.AreEqual(a.Publication!.Document!.Publication.Publication.Id, description.PublicationId);
+        Assert.AreEqual(a.Publication!.Records!.DocumentPublication!.Publication.Id, description.PublicationId);
         var profile = description.Selection.Contract.Profile;
         using var queried = await client.PostAsJsonAsync(prefix + "/query", new DataSourceDocumentQueryRequest { Profile = profile, Query = Empty });
         Assert.AreEqual(HttpStatusCode.OK, queried.StatusCode, await queried.Content.ReadAsStringAsync());

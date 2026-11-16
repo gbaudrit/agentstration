@@ -29,12 +29,13 @@ public sealed partial class DataSourceDatasetTests
     public async Task SourceTtlRefreshesBeforeFallbackAndRejectsAnOverAgeFallback()
     {
         var clock = new NativeAccessClock(TimeProvider.System.GetUtcNow());
-        ControlledContent? controlled = null;
+        ControlledPublications? controlled = null;
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
-            services.AddSingleton<IStorageContentGateway>(p => controlled = new(ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock)));
-            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStoragePublicationGateway>(p => controlled = new(ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock)));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
@@ -127,7 +128,8 @@ public sealed partial class DataSourceDatasetTests
         {
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
             services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
-            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
@@ -233,16 +235,18 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(admitted[0].Value.Name, repeated.Value.Name);
     }
 
-    private sealed class ControlledContent(IStorageContentGateway inner) : IStorageContentGateway
+    private sealed class ControlledPublications(IStoragePublicationGateway inner) : IStoragePublicationGateway
     {
         public bool FailWrites { get; set; }
         public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) => inner.ValidateAsync(target, cancellationToken);
-        public Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit, string? cursor = null, CancellationToken cancellationToken = default) => inner.ListAsync(target, prefix, limit, cursor, cancellationToken);
-        public Task<StorageObject> StatAsync(StorageContentRequest target, string reference, CancellationToken cancellationToken = default) => inner.StatAsync(target, reference, cancellationToken);
-        public Task<StorageObjectContent> ReadAsync(StorageContentRequest target, string reference, long offset, int maximumBytes, CancellationToken cancellationToken = default) => inner.ReadAsync(target, reference, offset, maximumBytes, cancellationToken);
-        public Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => inner.RetireAsync(target, exact, cancellationToken);
-        public Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request, CancellationToken cancellationToken = default) => FailWrites
-            ? throw new StorageException("fixture_write_failed", "Synthetic refresh failure.") : inner.WriteAsync(target, request, cancellationToken);
+        public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId, IReadOnlyList<JsonElement> records,
+            CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => FailWrites
+            ? throw new StorageException("fixture_write_failed", "Synthetic refresh failure.") : inner.PrepareRecordsAsync(target, publicationId, records, cancellationToken, notAfter);
+        public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
+            inner.PrepareAsync(target, publicationId, bytes, cancellationToken);
+        public Task SealAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.SealAsync(reference, cancellationToken);
+        public Task<ReadOnlyMemory<byte>> ReadAsync(StoragePublicationReference reference, long offset, int length, CancellationToken cancellationToken) => inner.ReadAsync(reference, offset, length, cancellationToken);
+        public Task<bool> RetireAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.RetireAsync(reference, cancellationToken);
     }
 
     [TestMethod]
@@ -326,7 +330,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsNull(directAcquisition.Content);
         Assert.IsNull(directAcquisition.Manifest);
         var payload = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadDirectAsync(directAcquisition, directEvidence.DirectInput.RequestId, default);
-        Assert.AreEqual("direct-result", payload.GetProperty("dataset").GetString());
+        Assert.AreEqual("direct-result", payload[0].GetProperty("dataset").GetString());
         await Assert.ThrowsAsync<DataSourceAcquisitionException>(() => factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>()
             .ReadDirectAsync(directAcquisition, "another-projection", default));
         await using var flowDb = await factory.Services.GetRequiredService<IDbContextFactory<FlowDbContext>>().CreateDbContextAsync();

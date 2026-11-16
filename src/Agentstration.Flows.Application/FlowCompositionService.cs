@@ -156,7 +156,12 @@ public sealed class FlowCompositionService(FlowService flows)
                 mapping = JsonSerializer.SerializeToElement("${steps." + name + ".output}");
                 previousSchema = outputSchema;
             }
-            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
+            // Dynamic native results are checked by the existing typed boundary Transform below.
+            // A function such as json.explode returns acquisition records or an Artifact manifest
+            // according to its actual input; an unconstrained descriptor cannot prove that shape statically.
+            var dynamicFunctionOutput = calls.LastOrDefault()?.Function is not null && IsUnconstrained(previousSchema);
+            if (!dynamicFunctionOutput && !FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema))
+                throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
             producedSchemas[point.Name] = IsUnconstrained(point.OutputSchema) ? previousSchema.Clone() : point.OutputSchema.Clone();
             nodes.Add(new TransformFlowStepDefinition
             {

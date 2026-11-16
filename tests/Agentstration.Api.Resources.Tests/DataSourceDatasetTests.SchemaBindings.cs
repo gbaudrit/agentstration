@@ -61,11 +61,11 @@ public sealed partial class DataSourceDatasetTests
             new(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), ResourceNamespace.Default,
                 ArtifactResourceKinds.FlowRunArtifact, acquired.Manifest!.Artifacts.Single().ArtifactId), default))!.Value.Receipt;
         Assert.IsTrue(receipt.DataContract!.Validated);
-        Assert.AreEqual("A", receipt.DataContract.SchemaEvidence!.Version);
-        Assert.AreEqual("/properties/document", receipt.DataContract.SchemaEvidence.SchemaPath);
-        Assert.AreEqual(versionA.Value.DefinitionHash, receipt.DataContract.SchemaEvidence.ParentDefinitionHash);
-        Assert.AreEqual(pin.DefinitionHash, receipt.DataContract.SchemaEvidence.DefinitionHash);
-        Assert.AreEqual("string", receipt.DataContract.Schema!.Value.GetProperty("properties").GetProperty("dataset").GetProperty("type").GetString());
+        Assert.AreEqual("A", receipt.Materialization!.RecordContract!.SchemaEvidence!.Version);
+        Assert.AreEqual("/properties/document", receipt.Materialization!.RecordContract!.SchemaEvidence.SchemaPath);
+        Assert.AreEqual(versionA.Value.DefinitionHash, receipt.Materialization!.RecordContract!.SchemaEvidence.ParentDefinitionHash);
+        Assert.AreEqual(pin.DefinitionHash, receipt.Materialization!.RecordContract!.SchemaEvidence.DefinitionHash);
+        Assert.AreEqual("string", receipt.Materialization!.RecordContract!.Schema!.Value.GetProperty("properties").GetProperty("dataset").GetProperty("type").GetString());
         Assert.IsNotNull(changed);
         using var instance = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         var bindingB = binding with { Reference = binding.Reference! with { Version = "B" } };
@@ -85,7 +85,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual("data_contract_violation", pending.ErrorCode);
         Assert.AreEqual("$.dataset", pending.ContractFailure!.Path);
         Assert.IsNull(pending.Manifest);
-        Assert.AreEqual("A", receipt.DataContract.SchemaEvidence.Version);
+        Assert.AreEqual("A", receipt.Materialization!.RecordContract!.SchemaEvidence.Version);
         var resources = factory.Services.GetRequiredService<IResourceStore>();
         await resources.DeleteExactAsync(new(Owner, parent.Value.Namespace, SchemaResourceKinds.Schema, parent.Value.Name), changed.ETag, default);
         var renamed = await sources.PutAsync(source.Value.Namespace, source.Value.Name, Owner,

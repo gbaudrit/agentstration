@@ -22,6 +22,27 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId,
         ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
         GuardAsync(() => PrepareCoreAsync(target, publicationId, bytes, cancellationToken));
+    public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId,
+        IReadOnlyList<JsonElement> records, CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => GuardAsync<StoragePublicationReference>(async () =>
+    {
+        var aggregate = StorageRecordSets.Encode(records);
+        if (aggregate.Length > target.Policy.MaximumWriteBytes)
+            throw Error("storage_publication_limit", "The record set exceeds the publication limit.");
+        var members = new List<StoragePublicationReference>();
+        for (var index = 0; index < records.Count; index++)
+        {
+            if (notAfter <= clock.GetUtcNow()) throw Error("storage_publication_deadline", "The record publication deadline has expired.");
+            members.Add(await PrepareCoreAsync(target, publicationId + "/" + index.ToString("D3", System.Globalization.CultureInfo.InvariantCulture),
+                StorageDocumentEncoding.Encode(records[index]), cancellationToken, jsonRecord: true));
+        }
+        var first = members[0];
+        return new(first.Target, first.Key[..(first.Key.LastIndexOf('/') + 1)] + Hash(Encoding.UTF8.GetBytes(publicationId)),
+            Hash(aggregate), aggregate.Length, Hash(aggregate))
+        {
+            Binding = first.Binding,
+            Records = new(members.Select(member => new StorageRecordMember(member.Key[(member.Key.LastIndexOf('/') + 1)..], member.Length, member.Sha256)).ToArray())
+        };
+    });
     public Task SealAsync(StoragePublicationReference reference, CancellationToken cancellationToken) =>
         GuardAsync(async () => { await SealCoreAsync(reference, cancellationToken); return true; });
     public Task<ReadOnlyMemory<byte>> ReadAsync(StoragePublicationReference reference, long offset, int length,
@@ -37,6 +58,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         if (!File.Exists(path)) return true;
         _ = await LoadAsync(reference, path, cancellationToken);
         File.Delete(LocalStoragePaths.Checked(path));
+        if (IsJsonRecord(reference)) File.Delete(LocalStoragePaths.Checked(ReceiptPath(path)));
         return true;
     });
 
@@ -54,7 +76,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     }
 
     private async Task<StoragePublicationReference> PrepareCoreAsync(StorageContentRequest target, string publicationId,
-        ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+        ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken, bool jsonRecord = false)
     {
         await ValidateAsync(target, cancellationToken);
         await authorization.EnsurePermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, cancellationToken);
@@ -82,14 +104,14 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
             Binding = new(resolved.Type, resolved.ConnectedService, resolved.ConnectedServiceType,
                 Hash(JsonSerializer.SerializeToUtf8Bytes(resolved.Bindings, Json)),
                 Hash(JsonSerializer.SerializeToUtf8Bytes(new { resolved.Capabilities, resolved.Limits }, Json)),
-                "storage.local.retained-publication/v1")
+                jsonRecord ? "storage.local.retained-json-record/v1" : "storage.local.retained-publication/v1")
         };
         var directory = DirectoryFor(reference);
         Directory.CreateDirectory(directory);
         await using var gate = await LockAsync(directory, cancellationToken);
         // Unsealed crash leftovers are never referenced by a published Snapshot. Cleanup work is bounded.
         foreach (var stale in Directory.EnumerateFiles(directory).Where(file => file.EndsWith(".tmp", StringComparison.Ordinal)
-            || file.EndsWith(".pending.json", StringComparison.Ordinal)).Take(128)
+            || file.EndsWith(".pending.json", StringComparison.Ordinal) || file.EndsWith(".pending.receipt", StringComparison.Ordinal)).Take(128)
             .Where(file => File.GetLastWriteTimeUtc(file) < clock.GetUtcNow().UtcDateTime.AddDays(-1)).Take(16))
             File.Delete(LocalStoragePaths.Checked(stale));
         var sealedPath = FileFor(reference, false);
@@ -104,11 +126,38 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 65536, FileOptions.Asynchronous | FileOptions.WriteThrough))
             {
-                await JsonSerializer.SerializeAsync(stream, new Document(reference, bytes.ToArray()), Json, cancellationToken);
+                if (jsonRecord) await stream.WriteAsync(bytes, cancellationToken);
+                else await JsonSerializer.SerializeAsync(stream, new Document(reference, bytes.ToArray()), Json, cancellationToken);
                 await stream.FlushAsync(cancellationToken);
                 stream.Flush(true);
             }
             cancellationToken.ThrowIfCancellationRequested();
+            if (jsonRecord)
+            {
+                var receiptPath = ReceiptPath(pendingPath);
+                if (File.Exists(receiptPath))
+                {
+                    var saved = await File.ReadAllTextAsync(LocalStoragePaths.Checked(receiptPath), cancellationToken);
+                    if (!JsonElement.DeepEquals(JsonSerializer.Deserialize<JsonElement>(saved), JsonSerializer.SerializeToElement(reference, Json)))
+                        throw Error("storage_publication_integrity", "The record receipt differs from its retained evidence.");
+                }
+                else
+                {
+                    var receiptTemporary = LocalStoragePaths.Checked(Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp"));
+                    try
+                    {
+                        await using (var receipt = new FileStream(receiptTemporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                            65536, FileOptions.Asynchronous | FileOptions.WriteThrough))
+                        {
+                            await JsonSerializer.SerializeAsync(receipt, reference, Json, cancellationToken);
+                            await receipt.FlushAsync(cancellationToken);
+                            receipt.Flush(true);
+                        }
+                        File.Move(receiptTemporary, LocalStoragePaths.Checked(receiptPath));
+                    }
+                    finally { if (File.Exists(receiptTemporary)) File.Delete(receiptTemporary); }
+                }
+            }
             File.Move(temporary, pendingPath);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
@@ -126,6 +175,8 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         var pending = FileFor(reference, true);
         _ = await LoadAsync(reference, pending, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        if (IsJsonRecord(reference) && File.Exists(ReceiptPath(pending)))
+            File.Move(LocalStoragePaths.Checked(ReceiptPath(pending)), LocalStoragePaths.Checked(ReceiptPath(destination)));
         File.Move(pending, destination); // Never overwrite sealed bytes.
     }
 
@@ -159,6 +210,20 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         if (!File.Exists(path)) throw Error("storage_publication_unavailable", "The exact publication is unavailable.");
         await using var stream = File.OpenRead(LocalStoragePaths.Checked(path));
         if (stream.Length > MaximumContentBytes * 3) throw Error("storage_publication_integrity", "Invalid publication size.");
+        if (IsJsonRecord(reference))
+        {
+            var receiptPath = ReceiptPath(path);
+            if (!File.Exists(receiptPath) && path.EndsWith(".pending.json", StringComparison.Ordinal))
+                receiptPath = receiptPath.Replace(".pending.receipt", ".receipt", StringComparison.Ordinal);
+            if (!File.Exists(receiptPath)) throw Error("storage_publication_integrity", "The record receipt is unavailable.");
+            var receipt = await File.ReadAllTextAsync(LocalStoragePaths.Checked(receiptPath), cancellationToken);
+            var bytes = new byte[checked((int)stream.Length)];
+            await stream.ReadExactlyAsync(bytes, cancellationToken);
+            if (bytes.Length != reference.Length || Hash(bytes) != reference.Sha256
+                || !JsonElement.DeepEquals(JsonSerializer.Deserialize<JsonElement>(receipt), JsonSerializer.SerializeToElement(reference, Json)))
+                throw Error("storage_publication_integrity", "The JSON record differs from its retained evidence.");
+            return new(reference, bytes);
+        }
         var value = await JsonSerializer.DeserializeAsync<Document>(stream, Json, cancellationToken);
         if (value?.Content is null || value.Content.Length != reference.Length || Hash(value.Content) != reference.Sha256
             || !JsonElement.DeepEquals(JsonSerializer.SerializeToElement(value.Reference, Json), JsonSerializer.SerializeToElement(reference, Json)))
@@ -184,5 +249,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         && (policy.KeyFrom is null || string.CompareOrdinal(key, policy.KeyFrom) >= 0)
         && (policy.KeyBefore is null || string.CompareOrdinal(key, policy.KeyBefore) < 0);
     private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+    private static bool IsJsonRecord(StoragePublicationReference reference) => reference.Binding?.PublicationContract == "storage.local.retained-json-record/v1";
+    private static string ReceiptPath(string path) => path[..^5] + ".receipt";
     private static StorageException Error(string code, string message) => new(code, message, 409);
 }

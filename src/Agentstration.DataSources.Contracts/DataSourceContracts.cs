@@ -408,6 +408,7 @@ public sealed record DataSourceAcquisitionInput
 
 public sealed record DataSourceAcquisitionResource : Resource
 {
+    public Agentstration.Schemas.ResolvedDataContract? RecordContract { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }
     public required string DataSourceName { get; init; }

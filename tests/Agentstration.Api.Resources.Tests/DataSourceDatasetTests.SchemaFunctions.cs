@@ -52,7 +52,8 @@ public sealed partial class DataSourceDatasetTests
             Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = rawBinding },
             OutputSchemaBinding = adoptFinalSchema ? arrayBinding : null,
             Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
-            { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/results" }) }] }
+            { Function = new("json-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
+                { path = "/results", itemSchema = new SchemaBinding { Reference = rawBinding.Reference! with { SchemaPath = "/properties/results/items" } } }, JsonSerializerOptions.Web) }] }
         } } };
         var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(desired, default);
         using var client = factory.CreateClient();
@@ -70,9 +71,11 @@ public sealed partial class DataSourceDatasetTests
             if (adoptFinalSchema)
             {
                 Assert.AreEqual("array", receipt.DataContract.Schema!.Value.GetProperty("type").GetString());
-                Assert.AreEqual("/properties/results", receipt.DataContract.SchemaEvidence!.SchemaPath);
-                Assert.AreEqual(published.Value.DefinitionHash, receipt.DataContract.SchemaEvidence.ParentDefinitionHash);
-                Assert.AreEqual(source.Value.Definition.Dataset!.OutputSchemaSnapshot!.DefinitionHash, receipt.DataContract.SchemaEvidence.DefinitionHash);
+                Assert.IsNull(receipt.DataContract.SchemaEvidence);
+                var record = receipt.Materialization!.RecordContract!;
+                Assert.AreEqual("/properties/results/items", record.SchemaEvidence!.SchemaPath);
+                Assert.AreEqual(published.Value.DefinitionHash, record.SchemaEvidence.ParentDefinitionHash);
+                Assert.IsTrue(JsonElement.DeepEquals(parent.Value.Definition.Content.GetProperty("properties").GetProperty("results").GetProperty("items"), record.Schema!.Value));
             }
             else Assert.IsNull(receipt.DataContract.SchemaEvidence, "An unconstrained transformation output must not retain the envelope's shared Schema evidence.");
         }
@@ -141,18 +144,19 @@ public sealed partial class DataSourceDatasetTests
         Assert.HasCount(2, snapshot.Artifacts);
         foreach (var artifact in snapshot.Artifacts)
         {
-            if (itemMode == "none") { Assert.IsNull(artifact.DataContract?.SchemaEvidence); continue; }
+            Assert.IsNull(artifact.DataContract?.SchemaEvidence);
+            if (itemMode == "none") { Assert.IsNull(artifact.RecordContract?.SchemaEvidence); continue; }
             Assert.IsTrue(artifact.DataContract!.Validated);
-            Assert.IsTrue(JsonElement.DeepEquals(itemSchema, artifact.DataContract.Schema!.Value));
+            Assert.IsTrue(JsonElement.DeepEquals(itemSchema, artifact.RecordContract!.Schema!.Value));
             if (itemMode is "shared" or "postAggregate" or "flow")
             {
-                var evidence = artifact.DataContract.SchemaEvidence!;
+                var evidence = artifact.RecordContract.SchemaEvidence!;
                 Assert.AreEqual("1.0.0", evidence.Version);
                 Assert.AreEqual("/properties/results/items", evidence.SchemaPath);
                 Assert.AreEqual(published.Value.DefinitionHash, evidence.ParentDefinitionHash);
                 Assert.AreEqual(parent.Value.Uid, evidence.SchemaUid);
             }
-            else Assert.IsNull(artifact.DataContract.SchemaEvidence, "An inline item contract must not claim a published Schema identity.");
+            else Assert.IsNull(artifact.RecordContract.SchemaEvidence, "An inline item contract must not claim a published Schema identity.");
         }
         if (itemMode == "inline")
         {

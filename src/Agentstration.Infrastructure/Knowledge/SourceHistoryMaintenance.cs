@@ -139,11 +139,14 @@ public sealed class SourceHistoryMaintenance(IResourceStore resources, ICurrentR
         {
             if (artifact.Content is not { } reference) { success = false; continue; }
             if (all.Any(other => other.Uid != snapshot.Uid && !retiredIds.Contains(other.Uid)
-                && other.Artifacts.Any(item => item.Content is { } retained && retained.Key == reference.Key
-                    && retained.Target.Storage.StorageUid == reference.Target.Storage.StorageUid && retained.Version == reference.Version
-                    && retained.Document?.Publication.Publication == reference.Document?.Publication.Publication))) continue;
+                && other.Artifacts.Any(item => item.Content is { } retained
+                    && retained.Target.Storage.StorageUid == reference.Target.Storage.StorageUid
+                    && (StorageRecordSets.DocumentPublication(reference) is { } batch
+                        ? StorageRecordSets.DocumentPublication(retained) is { } retainedBatch
+                            && retainedBatch.Target.CollectionUid == batch.Target.CollectionUid && retainedBatch.Publication == batch.Publication
+                        : retained.Key == reference.Key && retained.Version == reference.Version)))) continue;
             var validationTarget = reference.Target with { Consumer = reference.Target.Consumer with { ConsumerScopeRef = Consumer() } };
-            if (reference.Document is null) await content.ValidateAsync(validationTarget, ct);
+            if (StorageRecordSets.DocumentPublication(reference) is null) await content.ValidateAsync(validationTarget, ct);
             else await publications.ValidateAsync(validationTarget, ct);
             success &= await publications.RetireAsync(reference, ct);
         }

@@ -58,6 +58,7 @@ public sealed class FlowRunOutputTests
     [TestMethod]
     public void CatalogueFailureDoesNotHideTheReturnedFlowOutput()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output") { RejectDurableCatalog = true };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");

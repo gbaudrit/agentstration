@@ -29,11 +29,12 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
         var target = new StorageContentRequest(output.Storage, new(consumer, source.Address),
             output.Rule with { Prefix = output.Rule.Prefix + "knowledge/" + source.Uid.ToString("N") + "/" });
         var structured = new List<StorageDocumentValue>();
-        var canonical = new Dictionary<string, byte[]>();
+        var recordMembers = new Dictionary<string, IReadOnlyList<StorageRecordMember>>(StringComparer.Ordinal);
         var result = new List<KnowledgeSnapshotArtifact>();
         foreach (var item in manifest.Artifacts)
         {
             var contract = item.DataContract;
+            var recordContract = item.RecordContract;
             ReadOnlyMemory<byte> bytes;
             var mediaType = item.MediaType ?? "application/octet-stream";
             if (item.Kind == KnowledgeArtifactKind.Inline)
@@ -59,23 +60,46 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                     throw new KnowledgeProjectionException("knowledge_output_integrity", "The durable Artifact content differs from its receipt.");
                 mediaType = artifact.Receipt.MediaType;
                 contract = artifact.Receipt.DataContract ?? contract;
+                recordContract = artifact.Receipt.Materialization?.RecordContract ?? recordContract;
             }
             var digest = Convert.ToHexStringLower(SHA256.HashData(bytes.Span));
             if (item.Digest is { } expected && !string.Equals(expected.Replace("sha256:", "", StringComparison.OrdinalIgnoreCase), digest, StringComparison.OrdinalIgnoreCase))
                 throw new KnowledgeProjectionException("knowledge_output_integrity", "The output digest differs from the declared content.");
             var sourceDigest = digest;
             StoragePublicationReference? reference = null;
+            JsonElement[]? records = null;
+            if (recordContract is null && (output.DocumentCollectionUid is not null || mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)))
+            {
+                using var document = JsonDocument.Parse(bytes);
+                JsonRecordProjection normalized;
+                try { normalized = JsonRecordProjection.Normalize(document.RootElement, contract); }
+                catch (ArgumentException) { throw new KnowledgeProjectionException("knowledge_output_records_required", "JSON publication requires an object or an explicit json.explode record collection."); }
+                recordContract = normalized.RecordContract;
+                bytes = StorageRecordSets.Encode(normalized.Value.EnumerateArray().ToArray());
+            }
+            if (recordContract is not null)
+            {
+                using var document = JsonDocument.Parse(bytes);
+                var projectionRecords = new JsonRecordProjection { Value = document.RootElement.Clone(), RecordContract = recordContract, SelectionPath = "" };
+                projectionRecords.Validate(cancellationToken);
+                records = document.RootElement.EnumerateArray().Select(value => value.Clone()).ToArray();
+                bytes = StorageRecordSets.Encode(records);
+                contract = projectionRecords.CollectionContract;
+                digest = StorageRecordSets.Digest(bytes.Span);
+                mediaType = "application/json";
+            }
             if (output.DocumentCollectionUid is not null)
             {
-                using var json = JsonDocument.Parse(bytes);
-                if (json.RootElement.ValueKind != JsonValueKind.Object)
-                    throw new KnowledgeProjectionException("knowledge_output_document_invalid", "Structured output requires JSON objects.");
                 var id = Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(item.ArtifactId)));
-                var encoded = StorageDocumentEncoding.Encode(json.RootElement);
-                canonical.Add(id, encoded);
-                structured.Add(new(id, string.Empty, json.RootElement.Clone()));
-                bytes = encoded;
-                digest = Convert.ToHexStringLower(SHA256.HashData(encoded));
+                var members = new List<StorageRecordMember>();
+                for (var index = 0; index < records!.Length; index++)
+                {
+                    var memberId = id + "-" + index.ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
+                    var encoded = StorageDocumentEncoding.Encode(records[index]);
+                    structured.Add(new(memberId, string.Empty, records[index]));
+                    members.Add(new(memberId, encoded.Length, StorageRecordSets.Digest(encoded)));
+                }
+                recordMembers.Add(item.ArtifactId, members);
                 mediaType = "application/json";
             }
             if (contract is not null)
@@ -84,12 +108,15 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 _ = DataContracts.ReadText(concrete, Encoding.UTF8.GetString(bytes.Span), "snapshot-output", projection.ProjectionFlowRunId);
                 contract = concrete with { DeclaredMode = contract.DeclaredMode, Validated = true, SchemaEvidence = contract.SchemaEvidence };
             }
-            if (output.DocumentCollectionUid is null) reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
+            if (output.DocumentCollectionUid is null) reference = records is not null
+                ? await publications.PrepareRecordsAsync(target, projection.Name + ":" + item.ArtifactId, records, cancellationToken)
+                : await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
             result.Add(new()
             {
                 ArtifactId = item.ArtifactId,
                 Content = reference,
                 DataContract = contract,
+                RecordContract = recordContract,
                 Length = bytes.Length,
                 Sha256 = digest,
                 MediaType = mediaType,
@@ -124,17 +151,14 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asp.document-publication/1");
             for (var index = 0; index < result.Count; index++)
             {
-                var document = structured[index];
-                var bytes = canonical[document.Id];
+                var members = recordMembers[result[index].ArtifactId];
                 result[index] = result[index] with
-                {
-                    Content = new StoragePublicationReference(target with { DocumentCollectionUid = collection }, document.Id,
-                        publication.Publication.Digest, bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)))
                     {
-                        Binding = binding,
-                        Document = new(publication, document.Id, publication.Publication.Digest)
-                    }
-                };
+                        Content = new(target with { DocumentCollectionUid = collection },
+                            "records-" + StorageRecordSets.Digest(Encoding.UTF8.GetBytes(result[index].ArtifactId)),
+                            publication.Publication.Digest, result[index].Length, result[index].Sha256)
+                        { Binding = binding, Records = new(members, publication) }
+                    };
             }
         }
         // Validate and prepare the complete set before sealing any newly written output.
@@ -143,8 +167,9 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             var sealedPublications = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in result)
             {
-                var identity = item.Content!.Document?.Publication.Publication.Id ?? item.Content.Key;
-                if (sealedPublications.Add(identity)) await publications.SealAsync(item.Content, cancellationToken);
+                var reference = item.Content!;
+                var identity = StorageRecordSets.DocumentPublication(reference)?.Publication.Id ?? reference.Key;
+                if (sealedPublications.Add(identity)) await publications.SealAsync(reference, cancellationToken);
             }
         }
         catch (Agentstration.Storage.StorageException exception) when (exception.Code == "storage_publication_unavailable")
@@ -163,7 +188,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                     artifact = await artifacts.RegisterStoredAsync(new(ArtifactStorageReferences.PublicationIdentity(reference),
                         projection.ProjectionFlowRunId, new(source.ScopeRef!.Value, source.Namespace, source.Kind, source.Name),
                         projection.Name, item.MediaType, new(new(projection.WorkspaceId), reference.Target,
-                            reference.Key, reference.Version, reference.Length, reference.Sha256, reference),
+                            reference.Key, reference.Version, reference.Length, reference.Sha256, reference) { RecordContract = item.RecordContract },
                         ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract,
                         Provenance: manifest.Artifacts.FirstOrDefault(input => input.ArtifactId == item.ArtifactId)?.Provenance), cancellationToken);
                 catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });

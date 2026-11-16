@@ -18,10 +18,11 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
     public const string KindName = "native";
     public const string KindVersion = "1.0.0";
     private static readonly string[] StandardImplementations =
-        ["json.select", "json.project", "collection.filter", "collection.distinct", "artifact.explode"];
+        ["json.select", "json.project", "collection.filter", "collection.distinct", "artifact.explode", "json.explode"];
     private static readonly IReadOnlyDictionary<string, string> Descriptions = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["json.select"] = "Select a JSON value at a JSON Pointer path. Returns the selected object, array or scalar as one value. An empty path selects the root; a missing path fails.",
+        ["json.explode"] = "Select a non-empty array of JSON objects as records of one logical Artifact. path selects the data; itemSchema selects an exact record contract, including a published sub-schema. Document Storage stores separate rows; builtin local Storage stores separate JSON files. At most 100 records and 64 KiB of JSON per Artifact. Existing artifact.explode creates independent Artifacts instead.",
         ["json.project"] = "Build an object by selecting and renaming properties from a JSON value. Each name/path pair creates one output property. Selected arrays remain arrays inside that object.",
         ["collection.filter"] = "Keep array elements whose value at the JSON Pointer path equals the supplied JSON value. Preserves input order. An empty path compares whole elements; a missing path fails.",
         ["collection.distinct"] = "Remove duplicate array elements using the value at the JSON Pointer path as their key. Keeps the first occurrence and preserves input order. An empty path compares whole elements.",

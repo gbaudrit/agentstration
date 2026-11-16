@@ -13,9 +13,9 @@ namespace Agentstration.DataSources;
 public sealed class DataSourceDatasetCompositionService(
     ConnectedServiceOperationService operations,
     IStorageResolver storage,
-    IStorageContentGateway content,
     IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
-    DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null)
+    DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null,
+    IStoragePublicationGateway? publications = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
     internal const int MaximumValueBytes = 64 * 1024;
@@ -58,7 +58,8 @@ public sealed class DataSourceDatasetCompositionService(
                     || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
                     throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
                 var effective = definition.Rule with { Prefix = partition };
-                await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+                if (publications is null) throw Invalid("data_source_record_storage_unavailable", "JSON record publication is unavailable.");
+                await publications.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
             }
         }
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);

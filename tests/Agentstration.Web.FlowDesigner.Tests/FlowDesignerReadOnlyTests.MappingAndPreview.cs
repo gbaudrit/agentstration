@@ -88,6 +88,7 @@ public sealed partial class FlowDesignerReadOnlyTests
     [TestMethod]
     public void OutputMappingCanBeResetToTheIncomingTransitionWithoutChangingTheContract()
     {
+        using var culture = new CultureScope("en-US");
         using var context = CreateContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });

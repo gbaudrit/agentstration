@@ -100,7 +100,7 @@
     private ResourceScopeRef Owner => ResourceScopeRef.Parse(Context.Current?.SelectedScopeRef ?? Source.ScopeRef!.Value.Value);
     private bool CanWrite => Context.HasPermission("resources/write");
     private bool CanEdit => CanWrite && selected?.Value.ScopeRef == Owner;
-    private IEnumerable<DataSourceAcquisitionResource> Retained => Acquisitions.Where(a => a.State == DataSourceAcquisitionState.Succeeded && a.ContentRetiredAt is null && a.Publication?.Document is not null
+    private IEnumerable<DataSourceAcquisitionResource> Retained => Acquisitions.Where(a => a.State == DataSourceAcquisitionState.Succeeded && a.ContentRetiredAt is null && a.Publication?.Records?.DocumentPublication is not null
         && (selected is null || a.LogicalScopeRef == selected.Value.Definition.Selection.AcquisitionScope));
     protected override async Task OnParametersSetAsync()
     {

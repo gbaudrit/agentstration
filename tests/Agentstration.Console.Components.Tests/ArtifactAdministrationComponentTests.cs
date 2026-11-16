@@ -358,6 +358,45 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.IsFalse(rendered.Markup.Contains("opaque-reference", StringComparison.Ordinal));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "JSON records", "Read record", "Record contract")]
+    [DataRow("fr-FR", "Lignes JSON", "Lire la ligne", "Contrat des lignes")]
+    public void RecordMetadataNeedsNoContentReadAndExplicitFailureKeepsTheMetadata(string language, string title, string action, string contractLabel)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = new BunitContext();
+        var client = new ArtifactClient("{\"id\":2}");
+        var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
+        var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "records"), Guid.NewGuid(), 1, "binding");
+        var target = new StorageContentRequest(storage, new(owner, new(ResourceNamespace.Default, "DataSource", "source")), new());
+        var contract = Agentstration.Schemas.DataContracts.Declared(System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }), "root")!;
+        var publication = new StoragePublicationReference(target, "records", "version", 20, new string('a', 64))
+        { Records = new([new("first", 8, new string('a', 64)), new("second", 9, new string('b', 64))]) };
+        client.Durable = client.Durable with { Receipt = client.Durable.Receipt with
+        { Materialization = new(client.Durable.WorkspaceId, target, publication.Key, publication.Version, publication.Length, publication.Sha256, publication)
+            { RecordContract = contract } } };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        rendered.WaitForAssertion(() => Assert.Contains(title, rendered.Markup));
+        Assert.Contains(contractLabel, rendered.Markup);
+        Assert.AreEqual(0, client.RecordReadCount);
+        Assert.AreEqual(0, client.ContentReadCount);
+        var buttons = rendered.FindAll("[data-testid=artifact-records] button");
+        Assert.AreEqual(action, buttons[1].TextContent);
+        buttons[1].Click();
+        rendered.WaitForAssertion(() => Assert.Contains("2", rendered.Find("[data-testid=artifact-record-content]").TextContent));
+        Assert.AreEqual("second", client.SelectedRecord);
+        client.RejectRecordRead = true;
+        rendered.FindAll("[data-testid=artifact-records] button")[0].Click();
+        rendered.WaitForElement("[role=alert]");
+        Assert.Contains(title, rendered.Markup);
+        Assert.Contains(contractLabel, rendered.Markup);
+        Assert.AreEqual(2, rendered.FindAll("[data-testid=artifact-records] tbody tr").Count);
+    }
+
     internal sealed class ArtifactClient : IArtifactsClient
     {
         private readonly byte[] content;
@@ -404,6 +443,17 @@ public sealed class ArtifactAdministrationComponentTests
         public IReadOnlyList<FlowRunArtifactResource>? DurableCatalog { get; set; }
         public bool RejectDurableCatalog { get; set; }
         public bool HasLocalCopy { get; set; } = true;
+        public int RecordReadCount { get; private set; }
+        public string? SelectedRecord { get; private set; }
+        public bool RejectRecordRead { get; set; }
+
+        public Task<ArtifactRecordContent> ReadRecordAsync(FlowRunArtifactId id, string memberId, CancellationToken cancellationToken = default)
+        {
+            RecordReadCount++;
+            SelectedRecord = memberId;
+            return RejectRecordRead ? throw new HttpRequestException("Unavailable")
+                : Task.FromResult(new ArtifactRecordContent(memberId, 0, Convert.ToBase64String(content), true));
+        }
 
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<StagedArtifactView>>([Artifact]);

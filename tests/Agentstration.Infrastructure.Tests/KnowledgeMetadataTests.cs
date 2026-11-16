@@ -289,6 +289,7 @@ public sealed class KnowledgeMetadataTests
                 Guid.NewGuid(), 1, "binding"), new(ownership, source.Address), new());
             var publication = new StorageDocumentPublicationReference(new(target.Storage, target.Consumer, Guid.NewGuid(), new(), "publication-a"),
                 new("publication-a", "digest", artifacts, "schema"), Documents.Profile);
+            if (structured) target = target with { DocumentCollectionUid = publication.Target.CollectionUid };
             Snapshot = new()
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -314,12 +315,15 @@ public sealed class KnowledgeMetadataTests
                     ProducerFlowRunId = "producer",
                     ProducerFlowStepId = "step",
                     StorageFlowRunId = "storage",
-                    MediaType = "text/plain",
-                    Length = Encoding.UTF8.GetByteCount(Text),
-                    Sha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Text))),
-                    Content = structured || index % 2 == 0 ? new(target, "document-" + index, "exact-version", Encoding.UTF8.GetByteCount(Text),
+                    MediaType = structured ? "application/json" : "text/plain",
+                    Length = structured ? 4 : Encoding.UTF8.GetByteCount(Text),
+                    Sha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(structured ? "[{}]" : Text))),
+                    Content = structured ? new(target, "records-" + index, publication.Publication.Digest, 4,
+                        Convert.ToHexStringLower(SHA256.HashData("[{}]"u8)))
+                    { Records = new([new("document-" + index, 2, Convert.ToHexStringLower(SHA256.HashData("{}"u8)))], publication) }
+                    : index % 2 == 0 ? new(target, "document-" + index, "exact-version", Encoding.UTF8.GetByteCount(Text),
                         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Text))))
-                    { Document = structured ? new(publication, "document-" + index, "revision") : null } : null
+                    : null
                 }).ToArray()
             };
             Observed = new()

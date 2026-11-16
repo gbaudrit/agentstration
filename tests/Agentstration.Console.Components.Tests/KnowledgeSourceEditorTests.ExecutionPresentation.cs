@@ -145,6 +145,7 @@ public sealed partial class KnowledgeSourceEditorTests
     [DataRow("{\"artifacts\":[]}", "artifacts")]
     public void CausalOutputsAreReadOnlyOnExpansionAndInTheExactScope(string output, string expected)
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new FlowClientStub();
         using var context = CreateContext(new KnowledgeClientStub(), flows: client);
         context.Services.AddSingleton<Agentstration.Web.Console.IArtifactsClient>(new ArtifactAdministrationComponentTests.ArtifactClient("fixture"));
@@ -165,6 +166,7 @@ public sealed partial class KnowledgeSourceEditorTests
     [TestMethod]
     public void CausalOutputDoesNotRenderAResponseFromAnotherExecutionScope()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new FlowClientStub();
         using var context = CreateContext(new KnowledgeClientStub(), flows: client);
         var root = PresentationRun("root", "root-flow", []);

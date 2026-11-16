@@ -446,6 +446,15 @@ public sealed class ArtifactManagementService(
             || materialization.Sha256 is not { Length: 64 } || !materialization.Sha256.All(char.IsAsciiHexDigit))
             throw Error("artifact_materialization_invalid", "Exact producer, Workspace and content evidence are required.");
         ValidateMediaType(request.MediaType);
+        if (materialization.Publication?.Records is not null)
+        {
+            _ = Agentstration.Storage.Contracts.StorageRecordSets.Members(materialization.Publication);
+            if (materialization.RecordContract?.Schema is not { } recordSchema || request.DataContract?.Schema is not { } collectionSchema
+                || !collectionSchema.TryGetProperty("type", out var type) || type.GetString() != "array"
+                || !collectionSchema.TryGetProperty("items", out var items) || !System.Text.Json.JsonElement.DeepEquals(recordSchema, items)
+                || request.DataContract?.SchemaEvidence is not null)
+                throw Error("artifact_record_contract_invalid", "Record publications require separate record and whole-array contracts.");
+        }
         var reference = ArtifactStorageReferences.Encode(materialization);
         var stat = await (durable ?? throw Error("artifact_materialization_unavailable", "Artifact storage is unavailable."))
             .StatAsync(materialization.WorkspaceId, reference, cancellationToken);

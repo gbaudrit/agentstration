@@ -38,6 +38,10 @@
                 <article><p><code>@match.DocumentId</code> · @T("NativeRange", match.MatchRange.Start, match.MatchRange.End)</p><pre>@match.Excerpt</pre><button class="button-secondary" type="button" disabled="@busy" data-testid="knowledge-read-match" @onclick="() => ReadMatchAsync(match)">@T("NativeReadMatch")</button></article>
             }
             @if (result.DocumentPage is { } page) { <p><code>@result.QueryProfile?.Id / @result.QueryProfile?.Version · @result.QueryProfile?.ModelDigest</code></p><pre data-testid="knowledge-document-query-result">@JsonSerializer.Serialize(page)</pre> }
+            @foreach (var record in result.Records)
+            {
+                <p data-testid="knowledge-record-lineage"><code>@record.DocumentId</code> · @T("RecordArtifact") <code>@record.ArtifactId</code> · @T("RecordOrdinal", record.MemberOrdinal + 1)</p>
+            }
             @if (result.EndOfSelection) { <p>@T("NativeEnd")</p> }
             @if (result.CursorExpiresAt is { } expires && result.NextCursor is not null) { <small>@T("NativeCursorExpiry", expires.ToLocalTime().ToString("g"))</small> }
         </section>

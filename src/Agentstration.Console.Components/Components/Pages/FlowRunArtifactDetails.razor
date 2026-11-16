@@ -85,6 +85,40 @@ else if (artifact is not null)
                 </dl>
             </section>
 
+            @if (artifact.Receipt.Materialization?.Publication?.Records is { } records)
+            {
+                <section class="panel form-section" data-testid="artifact-records">
+                    <h2>@T("Records")</h2>
+                    <p>@T("RecordsHelp", records.Members.Count)</p>
+                    @if (artifact.Receipt.Materialization.RecordContract is { } rowContract)
+                    {
+                        <h3>@T("RecordContract")</h3>
+                        <p>SHA-256 <code>@rowContract.Digest</code></p>
+                        @if (rowContract.SchemaEvidence is { } evidence)
+                        {
+                            <p><a href="@($"/schemas/{Uri.EscapeDataString(evidence.Name)}?scopeRef={Uri.EscapeDataString(evidence.ScopeRef.Value)}&namespace={Uri.EscapeDataString(evidence.Namespace.Value)}&view=versions&version={Uri.EscapeDataString(evidence.Version)}")">@evidence.Namespace/@evidence.Name · @evidence.Version</a> · <code>@evidence.SchemaPath</code></p>
+                            <p>@T("DataContractParentHash") <code>@evidence.ParentDefinitionHash</code></p>
+                            <p>@T("DataContractSelectedHash") <code>@evidence.DefinitionHash</code></p>
+                        }
+                        @if (rowContract.Schema is { } rowSchema) { <pre>@JsonSerializer.Serialize(rowSchema, ContractJson)</pre> }
+                    }
+                    <div class="table-scroll">
+                        <table>
+                            <thead><tr><th>@T("RecordOrdinal")</th><th>@T("Size")</th><th>@T("Actions")</th></tr></thead>
+                            <tbody>
+                                @for (var index = 0; index < records.Members.Count; index++)
+                                {
+                                    var member = records.Members[index];
+                                    <tr><td>@(index + 1)</td><td>@ExactSize(member.Length)</td><td><button type="button" class="button-secondary" disabled="@(readingRecord || !interactive)" @onclick="() => ReadRecordAsync(member.Id)">@T("ReadRecord")</button></td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (recordReadError is not null) { <p role="alert">@recordReadError</p> }
+                    @if (recordContent is not null) { <pre data-testid="artifact-record-content">@recordContent</pre> }
+                </section>
+            }
+
         }
         else if (activeTab == DetailsTab.Content)
         {
@@ -137,6 +171,8 @@ else if (artifact is not null)
     private DetailsTab activeTab;
     private bool loading = true;
     private string? error;
+    private bool interactive, readingRecord;
+    private string? recordContent, recordReadError;
     private FlowRunArtifactId ArtifactId => FlowRunArtifactId.Parse(Id);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
 
@@ -144,6 +180,7 @@ else if (artifact is not null)
     {
         loading = true;
         error = null;
+        recordContent = recordReadError = null;
         try
         {
             artifact = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
@@ -151,6 +188,27 @@ else if (artifact is not null)
         }
         catch (Exception exception) { error = exception.Message; }
         finally { loading = false; }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
+    }
+
+    private async Task ReadRecordAsync(string memberId)
+    {
+        if (readingRecord || !interactive) return;
+        readingRecord = true;
+        recordContent = recordReadError = null;
+        try
+        {
+            var content = await Client.ReadRecordAsync(ArtifactId, memberId, cancellation.Token);
+            recordContent = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64));
+        }
+        catch (Exception) { recordReadError = T("RecordReadFailed"); }
+        finally { readingRecord = false; }
     }
 
     private static string ArtifactName(FlowRunArtifactResource value) => value.Receipt.Provenance.TryGetValue("fileName", out var fileName)

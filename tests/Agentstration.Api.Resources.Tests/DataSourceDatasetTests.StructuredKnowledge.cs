@@ -141,12 +141,13 @@ public sealed partial class DataSourceDatasetTests
         var snapshots = await factory.Services.GetRequiredService<KnowledgeSnapshotService>().ListAsync(id, default);
         Assert.HasCount(2, snapshots);
         Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact =>
-            artifact.DataContract is { Validated: true, MediaType: "application/json" } contract && contract.Digest == contentContract.Digest)));
+            artifact.RecordContract is { MediaType: "application/json" } contract && contract.Digest == contentContract.Digest
+                && artifact.DataContract?.Schema?.GetProperty("type").GetString() == "array")));
 
-        Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact => artifact.Content?.Document is not null)));
+        Assert.IsTrue(snapshots.All(s => s.Snapshot.Artifacts.All(artifact => artifact.Content?.Records?.DocumentPublication is not null)));
         Assert.HasCount(1, await factory.Services.GetRequiredService<DataSourceAcquisitionService>().ListAsync(input.Value.Namespace, input.Value.Name, Owner, default));
         var acquisition = (await factory.Services.GetRequiredService<DataSourceAcquisitionService>().ListAsync(input.Value.Namespace, input.Value.Name, Owner, default)).Single();
-        Assert.IsNotNull(acquisition.Publication?.Document, "JSON acquisition must itself be retained in the selected document Storage.");
+        Assert.IsNotNull(acquisition.Publication?.Records?.DocumentPublication, "JSON acquisition must itself be retained in the selected document Storage.");
         var acquired = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         Assert.AreEqual(acquisition.Content!.Sha256, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Convert.FromBase64String(acquired.ContentBase64))));
     }

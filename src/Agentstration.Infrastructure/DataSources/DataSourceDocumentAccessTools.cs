@@ -67,7 +67,7 @@ public sealed class DataSourceDocumentQueryDefinitionProvider : IInternalMcpTool
 {
     public InternalMcpToolDefinition Definition => Value;
     internal static InternalMcpToolDefinition Value { get; } = new(DataSourceDocumentQueryMcpTool.Name, "Query Data Source acquisition documents",
-        "Governed read-only acquisition query. A relay fixes the source, acquisition stream and versioned query contract. Latest mode accepts an optional acquisitionId; exact mode fixes the acquisition. Cursors stay on the first selected acquisition. Requires current Source Use, runs/read and runs/execute permissions.",
+        "Governed read-only acquisition query. A relay fixes the source, acquisition stream and versioned query contract. Latest mode accepts an optional acquisitionId; exact mode fixes the acquisition. Cursors stay on the first selected acquisition. Results contain individual object records with their logical Artifact identity and member ordinal. Requires current Source Use, runs/read and runs/execute permissions.",
         JsonSerializer.Deserialize<JsonElement>("""
             {"type":"object","properties":{"selection":{"type":"object"},"request":{"type":"object","properties":{
               "profile":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"string"},"encoding":{"type":"string"},"modelDigest":{"type":"string"}},"required":["id","version","encoding","modelDigest"],"additionalProperties":false},
