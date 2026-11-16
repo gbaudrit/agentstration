@@ -134,10 +134,29 @@ else if (source is not null && readiness is not null)
         {
             <h3>@T("ProposedTools")</h3>
             <p class="resource-hint">@T("ToolProposalHelp")</p>
-            @foreach (var issue in proposal.Issues) { <p class="inline-warning"><code>@issue</code></p> }
+            @foreach (var issue in proposal.Issues) { <p class="inline-warning">@ProposalIssueLabel(issue) <code>@issue</code></p> }
             <DataGrid TItem="KnowledgeToolProposal" Items="proposal.Tools">
                 <Header><tr><th>@T("Tool")</th><th>@T("ProposalChange")</th><th>@T("ToolContract")</th></tr></Header>
-                <Row Context="candidate"><tr data-testid="knowledge-proposed-tool"><td><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></td><td>@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p><code>@issue</code></p> }</td><td><details><summary>@T("InspectToolContract")</summary><pre class="runner-json">@candidate.InputSchema.ToString()</pre>@if (candidate.OutputSchema is { } outputSchema) { <pre class="runner-json">@outputSchema.ToString()</pre> }</details></td></tr></Row>
+                <Row Context="candidate">
+                    <tr data-testid="knowledge-proposed-tool">
+                        <td><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></td>
+                        <td>@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p>@ProposalIssueLabel(issue) <code>@issue</code></p> }</td>
+                        <td><details><summary>@T("InspectToolContract")</summary>
+                            @if (candidate.Contribution is { } contribution)
+                            {
+                                <p><strong>@T("ToolFixedContribution")</strong> <code>@contribution.BindingName</code> · <code>@contribution.DataSourceUid</code></p>
+                            }
+                            @if (candidate.Profile is { } profile)
+                            {
+                                <p><strong>@T("ToolFixedQueryProfile")</strong> <code>@profile.Id @profile.Version · @profile.Encoding · @profile.ModelDigest</code></p>
+                            }
+                            <p>@T($"ToolContentEvidence.{candidate.ContentEvidence}")</p>
+                            <h4>@T("ToolInputContract")</h4><pre class="runner-json">@candidate.InputSchema.ToString()</pre>
+                            @if (candidate.OutputSchema is { } outputSchema) { <h4>@T("ToolOutputContract")</h4><pre class="runner-json">@outputSchema.ToString()</pre> }
+                            @if (candidate.DataSchema is { } dataSchema) { <h4>@T("ToolStorageDataSchema")</h4><pre class="runner-json">@dataSchema.ToString()</pre> }
+                        </details></td>
+                    </tr>
+                </Row>
             </DataGrid>
         }
         @if (CanManage)
@@ -557,6 +576,18 @@ else if (source is not null && readiness is not null)
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
     private static string ShortMetricIdentifier(string value) => value.Length > 18 ? $"{value[..18]}…" : value;
     private string OperationLabel(KnowledgeSourceOperation operation) => T($"Operation.{operation}");
+    private string ProposalIssueLabel(string issue) => T(issue switch
+    {
+        "knowledge_source_tool_set_conflict" or "knowledge_source_tool_definition_conflict" => "ToolIssue.NameConflict",
+        "knowledge_contribution_unresolved" => "ToolIssue.UnresolvedContribution",
+        "knowledge_contribution_evidence_unavailable" => "ToolIssue.MissingEvidence",
+        "knowledge_contribution_no_published_members" => "ToolIssue.NoMembers",
+        "knowledge_contribution_text_unsupported" => "ToolIssue.TextUnsupported",
+        "knowledge_read_unsupported" => "ToolIssue.ReadDenied",
+        "knowledge_documents_unavailable" => "ToolIssue.DocumentsUnavailable",
+        "knowledge_contribution_query_unsupported" => "ToolIssue.QueryUnsupported",
+        _ => "ToolIssue.Unavailable"
+    });
     private static string FormatSize(long length) => length < 1024
         ? $"{length:N0} B"
         : length < 1024 * 1024

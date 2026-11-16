@@ -178,4 +178,21 @@
   <data name="ProposalChange.removed" xml:space="preserve"><value>Removed</value></data>
   <data name="ProposalChange.unchanged" xml:space="preserve"><value>Unchanged</value></data>
   <data name="ProposalChange.unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="ToolFixedContribution" xml:space="preserve"><value>Fixed contribution</value></data>
+  <data name="ToolFixedQueryProfile" xml:space="preserve"><value>Fixed query profile</value></data>
+  <data name="ToolInputContract" xml:space="preserve"><value>Tool input contract</value></data>
+  <data name="ToolOutputContract" xml:space="preserve"><value>Tool output contract</value></data>
+  <data name="ToolStorageDataSchema" xml:space="preserve"><value>Declared output Storage schema</value></data>
+  <data name="ToolContentEvidence.published_metadata" xml:space="preserve"><value>Current Snapshot metadata is available. Content availability has not been checked.</value></data>
+  <data name="ToolContentEvidence.declared_json" xml:space="preserve"><value>Declared document model; no published content has been inspected.</value></data>
+  <data name="ToolContentEvidence.not_checked" xml:space="preserve"><value>Content has not been inspected.</value></data>
+  <data name="ToolIssue.NameConflict" xml:space="preserve"><value>A generated Tool or ToolSet name is already used by another resource. Resolve the conflict before publishing.</value></data>
+  <data name="ToolIssue.UnresolvedContribution" xml:space="preserve"><value>Save a valid Data Source binding before publishing this contribution.</value></data>
+  <data name="ToolIssue.MissingEvidence" xml:space="preserve"><value>The Snapshot does not identify this contribution unambiguously. Publish a projection with traceable output before exposing this access.</value></data>
+  <data name="ToolIssue.NoMembers" xml:space="preserve"><value>No published output is attributed to this contribution in the current Snapshot.</value></data>
+  <data name="ToolIssue.TextUnsupported" xml:space="preserve"><value>The published content is not text-readable. Configure a text transformation for read and regex access.</value></data>
+  <data name="ToolIssue.ReadDenied" xml:space="preserve"><value>The output policy does not allow document reads. Review Storage access and the output rule.</value></data>
+  <data name="ToolIssue.DocumentsUnavailable" xml:space="preserve"><value>Structured document metadata is unavailable. Check the output Storage configuration and permissions.</value></data>
+  <data name="ToolIssue.QueryUnsupported" xml:space="preserve"><value>Contribution queries require immutable publications, document selection and a supported query profile.</value></data>
+  <data name="ToolIssue.Unavailable" xml:space="preserve"><value>This operation is unavailable. Review the saved source, output and access settings.</value></data>
 </root>

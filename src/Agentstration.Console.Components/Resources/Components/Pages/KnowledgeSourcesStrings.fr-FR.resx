@@ -178,4 +178,21 @@
   <data name="ProposalChange.removed" xml:space="preserve"><value>Retiré</value></data>
   <data name="ProposalChange.unchanged" xml:space="preserve"><value>Inchangé</value></data>
   <data name="ProposalChange.unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="ToolFixedContribution" xml:space="preserve"><value>Contribution fixée</value></data>
+  <data name="ToolFixedQueryProfile" xml:space="preserve"><value>Profil de requête fixé</value></data>
+  <data name="ToolInputContract" xml:space="preserve"><value>Contrat d’entrée du Tool</value></data>
+  <data name="ToolOutputContract" xml:space="preserve"><value>Contrat de sortie du Tool</value></data>
+  <data name="ToolStorageDataSchema" xml:space="preserve"><value>Schéma déclaré du Storage de sortie</value></data>
+  <data name="ToolContentEvidence.published_metadata" xml:space="preserve"><value>Les métadonnées du Snapshot courant sont disponibles. La disponibilité du contenu n’a pas été vérifiée.</value></data>
+  <data name="ToolContentEvidence.declared_json" xml:space="preserve"><value>Modèle documentaire déclaré ; aucun contenu publié n’a été inspecté.</value></data>
+  <data name="ToolContentEvidence.not_checked" xml:space="preserve"><value>Le contenu n’a pas été inspecté.</value></data>
+  <data name="ToolIssue.NameConflict" xml:space="preserve"><value>Un nom de Tool ou de ToolSet généré est déjà utilisé par une autre ressource. Résolvez le conflit avant de publier.</value></data>
+  <data name="ToolIssue.UnresolvedContribution" xml:space="preserve"><value>Enregistrez une liaison valide vers une Data Source avant de publier cette contribution.</value></data>
+  <data name="ToolIssue.MissingEvidence" xml:space="preserve"><value>Le Snapshot n’identifie pas cette contribution sans ambiguïté. Publiez une projection dont la sortie est traçable avant d’exposer cet accès.</value></data>
+  <data name="ToolIssue.NoMembers" xml:space="preserve"><value>Aucune sortie publiée n’est attribuée à cette contribution dans le Snapshot courant.</value></data>
+  <data name="ToolIssue.TextUnsupported" xml:space="preserve"><value>Le contenu publié n’est pas lisible en texte. Configurez une transformation en texte pour la lecture et la recherche regex.</value></data>
+  <data name="ToolIssue.ReadDenied" xml:space="preserve"><value>La politique de sortie n’autorise pas la lecture des documents. Vérifiez les droits du Storage et la règle de sortie.</value></data>
+  <data name="ToolIssue.DocumentsUnavailable" xml:space="preserve"><value>Les métadonnées des documents structurés sont indisponibles. Vérifiez la configuration et les droits du Storage de sortie.</value></data>
+  <data name="ToolIssue.QueryUnsupported" xml:space="preserve"><value>Les requêtes par contribution exigent des publications immuables, la sélection des documents et un profil de requête compatible.</value></data>
+  <data name="ToolIssue.Unavailable" xml:space="preserve"><value>Cette opération est indisponible. Vérifiez la configuration enregistrée de la source, de la sortie et des droits.</value></data>
 </root>

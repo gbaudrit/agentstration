@@ -67,11 +67,14 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub(source, exposure: ExistingExposure());
         var tool = new Agentstration.Knowledge.Contracts.KnowledgeToolProposal
         {
-            Route = "describe",
-            DefinitionName = "documentation.access.describe",
-            Operation = Agentstration.Knowledge.Contracts.KnowledgeSourceOperation.Describe,
-            DisplayName = "Documentation structure",
-            Description = "Discover the published documentation contributions",
+            Route = "invoices.query_documents",
+            DefinitionName = "documentation.access.invoices.query-documents",
+            Operation = Agentstration.Knowledge.Contracts.KnowledgeSourceOperation.StructuredQuery,
+            DisplayName = "Invoice query",
+            Description = "Query published invoice records",
+            Contribution = new("invoices", source.Uid),
+            Profile = new("odata/4.01", "1.0", "odata-options+json", "declared-model-digest"),
+            DataSchema = System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object", properties = new { invoiceNumber = new { type = "string" } } }),
             InputSchema = System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }),
             ContractDigest = "structure-contract"
         };
@@ -80,7 +83,13 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(p => p.Add(v => v.Name, source.Name));
         rendered.WaitForElement("[data-testid=knowledge-source-tools-tab]").Click();
         rendered.WaitForAssertion(() => Assert.AreEqual(refresh, rendered.Find("[data-testid=knowledge-refresh-tools]").TextContent));
-        Assert.Contains(added, rendered.Find("[data-testid=knowledge-proposed-tool]").TextContent);
+        var proposed = rendered.Find("[data-testid=knowledge-proposed-tool]").TextContent;
+        Assert.Contains(added, proposed);
+        Assert.Contains("invoices", proposed);
+        Assert.Contains(source.Uid.ToString(), proposed);
+        Assert.Contains("declared-model-digest", proposed);
+        Assert.Contains("invoiceNumber", proposed);
+        Assert.Contains(locale == "fr-FR" ? "Contribution fixée" : "Fixed contribution", proposed);
         Assert.IsNull(client.PublishedExposureRequest);
         var calls = client.ProposalCalls;
         client.ToolProposal = client.ToolProposal with { Digest = "proposal-b", Tools = [tool with { Change = "modified", Description = "Changed coverage" }] };
