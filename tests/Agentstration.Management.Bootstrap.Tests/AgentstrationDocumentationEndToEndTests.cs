@@ -109,12 +109,15 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var projection = await worker.AwaitAsync(projectionTask);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
         Assert.IsNotNull(projection.Value.SnapshotName);
-        _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
+        var exposure = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
         var resourceStore = services.GetRequiredService<IResourceStore>();
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.search-regex", "pattern");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.get-status", "snapshotId");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.read", "maxCharacters");
+        KnowledgeSourceToolOperationExposure Operation(KnowledgeSourceOperation operation) =>
+            exposure.Value.Operations.Single(member => member.Operation == operation);
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.SearchRegex).Proposal!.DefinitionName, "pattern");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.GetStatus).Proposal!.DefinitionName, "snapshotId");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.Read).Proposal!.DefinitionName, "maxCharacters");
+        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.Describe).Proposal!.DefinitionName, "snapshotId");
 
         var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -122,7 +125,7 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 new WorkspaceId(workspace.Id),
                 principal.Id,
                 ResourceNamespace.Default,
-                ToolDefinitionService.VersionName("agentstration-documentation.access.search-regex", "1.0.0"),
+                Operation(KnowledgeSourceOperation.SearchRegex).CallableName!,
                 "documentation-search-call",
                 "documentation-search-correlation",
                 JsonSerializer.SerializeToElement(new { request = new { pattern = "Workspace", limit = 5 } }),
