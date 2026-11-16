@@ -1,8 +1,8 @@
 using Agentstration.Artifacts.Contracts;
-using Agentstration.Schemas;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Security.Contracts;
 
 namespace Agentstration.Artifacts;
@@ -461,8 +461,11 @@ public sealed class ArtifactManagementService(
         if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
         if (request.DataContract is { } declaredContract)
-            request = request with { DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
-                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken) };
+            request = request with
+            {
+                DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
+                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken)
+            };
         var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
         var resource = new FlowRunArtifactResource
         {

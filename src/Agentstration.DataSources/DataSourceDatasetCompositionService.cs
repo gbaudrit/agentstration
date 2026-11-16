@@ -1,12 +1,12 @@
 using System.Text.Json;
-using Agentstration.Flows;
 using Agentstration.ConnectedServices;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Flows;
 using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-using Agentstration.Tools;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Storage.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.DataSources;
 
@@ -89,12 +89,18 @@ public sealed class DataSourceDatasetCompositionService(
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
             { ScopeRef = composed.Orchestration.ScopeRef };
             return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
-            { OperationFlow = flow, Composition = composed, OperationOutputSchema = rawOutput,
-                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null) };
+            {
+                OperationFlow = flow,
+                Composition = composed,
+                OperationOutputSchema = rawOutput,
+                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null)
+            };
         }
         catch (FlowValidationException exception)
-        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
-            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic }; }
+        {
+            throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
+            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic };
+        }
         catch (KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
@@ -107,10 +113,17 @@ public sealed class DataSourceDatasetCompositionService(
             prior?.Acquisition.OutputSchemaBinding, prior?.Acquisition.OutputSchemaSnapshot, token);
         var final = await ResolveBindingAsync(dataset.OutputSchemaBinding, "$.dataset.outputSchema", resource,
             prior?.OutputSchemaBinding, prior?.OutputSchemaSnapshot, token);
-        return resource with { Definition = resource.Definition with { Dataset = dataset with
+        return resource with
         {
-            Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw }, OutputSchemaSnapshot = final
-        } } };
+            Definition = resource.Definition with
+            {
+                Dataset = dataset with
+                {
+                    Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw },
+                    OutputSchemaSnapshot = final
+                }
+            }
+        };
     }
 
     private async Task<SchemaBindingSnapshot?> ResolveBindingAsync(SchemaBinding? binding, string path,
@@ -150,8 +163,11 @@ public sealed class DataSourceDatasetCompositionService(
         var snapshot = dataset.OutputSchemaSnapshot;
         if (snapshot?.Source is not { ScopeRef: { } scope, Namespace: { } ns } source
             || snapshot.SchemaUid is not { } uid || snapshot.SchemaGeneration is not { } generation) return contract;
-        return contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
-            snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+        return contract with
+        {
+            SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+            snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash)
+        };
     }
 
     public static void ValidateLifecycle(DataSourceDatasetProperties definition)

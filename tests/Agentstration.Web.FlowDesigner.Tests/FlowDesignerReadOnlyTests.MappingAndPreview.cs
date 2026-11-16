@@ -92,8 +92,12 @@ public sealed partial class FlowDesignerReadOnlyTests
         using var context = CreateContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
-        var output = new Agentstration.Flows.OutputFlowStepDefinition { Name = "completed", Schema = schema,
-            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") };
+        var output = new Agentstration.Flows.OutputFlowStepDefinition
+        {
+            Name = "completed",
+            Schema = schema,
+            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}")
+        };
         Agentstration.Flows.OutputFlowStepDefinition? changed = null;
         var rendered = context.Render<FlowOutputInspector>(parameters => parameters.Add(component => component.Step, output)
             .Add(component => component.ActiveTab, FlowStepSettingsTab.Output)

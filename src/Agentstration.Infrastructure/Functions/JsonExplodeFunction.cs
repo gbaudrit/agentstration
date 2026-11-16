@@ -27,8 +27,11 @@ public sealed class JsonExplodeFunction(ArtifactManagementService artifacts, IAr
         var contract = DataContracts.Declared(JsonSchemaSelection.Select(snapshot!.Content), "function:json.explode/record", "application/json")!;
         if (snapshot.Source is { ScopeRef: { } scope, Namespace: { } ns } source
             && snapshot.SchemaUid is { } uid && snapshot.SchemaGeneration is { } generation)
-            contract = contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
-                snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+            contract = contract with
+            {
+                SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+                snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash)
+            };
         contract = contract with { Validated = true };
         var value = input.GetProperty("value");
         if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("artifacts", out var entries)
@@ -51,11 +54,22 @@ public sealed class JsonExplodeFunction(ArtifactManagementService artifacts, IAr
             { execution.InvocationId, parentId, inputDigest = Convert.ToHexStringLower(SHA256.HashData(bytes.Span)), path, contract.Digest })));
             output.Add(new
             {
-                artifactId = "records-" + identity, kind = "inline", disposition = "publishable", name = "records.json", mediaType = "application/json",
-                contentBase64 = Convert.ToBase64String(content), digest = "sha256:" + digest,
-                dataContract = records.CollectionContract, recordContract = contract,
-                provenance = new Dictionary<string, string> { ["inputArtifactId"] = parentId, ["inputSha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes.Span)),
-                    ["recordSelectionPath"] = path, ["transformation"] = "json.explode@1.0.0" }
+                artifactId = "records-" + identity,
+                kind = "inline",
+                disposition = "publishable",
+                name = "records.json",
+                mediaType = "application/json",
+                contentBase64 = Convert.ToBase64String(content),
+                digest = "sha256:" + digest,
+                dataContract = records.CollectionContract,
+                recordContract = contract,
+                provenance = new Dictionary<string, string>
+                {
+                    ["inputArtifactId"] = parentId,
+                    ["inputSha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes.Span)),
+                    ["recordSelectionPath"] = path,
+                    ["transformation"] = "json.explode@1.0.0"
+                }
             });
         }
         var result = JsonSerializer.SerializeToElement(new { artifacts = output });

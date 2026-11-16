@@ -113,8 +113,14 @@ public sealed partial class KnowledgeSourceEditorTests
 
     private static FlowRun PresentationRun(string id, string flow, IReadOnlyList<FlowStepRun> steps) => new()
     {
-        Id = id, FlowId = new(flow), FlowVersion = "1.0.0", Scope = new(Guid.Empty, new WorkspaceId(FlowClientStub.WorkspaceScope.TargetId!.Value), Guid.Empty) { LogicalScopeRef = ResourceScopeRef.Instance },
-        Status = FlowRunStatus.Running, Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = DateTimeOffset.UnixEpoch, Steps = steps,
+        Id = id,
+        FlowId = new(flow),
+        FlowVersion = "1.0.0",
+        Scope = new(Guid.Empty, new WorkspaceId(FlowClientStub.WorkspaceScope.TargetId!.Value), Guid.Empty) { LogicalScopeRef = ResourceScopeRef.Instance },
+        Status = FlowRunStatus.Running,
+        Input = JsonSerializer.SerializeToElement(new { }),
+        CreatedAt = DateTimeOffset.UnixEpoch,
+        Steps = steps,
         DefinitionSnapshot = new(FlowClientStub.WorkspaceScope, new(flow), "1.0.0", null, new WorkflowFlowDefinition("input", [], [], []), new Dictionary<string, string>(), DateTimeOffset.UnixEpoch)
     };
     [TestMethod]

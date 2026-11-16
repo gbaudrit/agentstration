@@ -51,13 +51,26 @@ public sealed partial class DataSourceDatasetTests
         var explode = new FlowCompositionCall
         {
             Function = new("json-explode-builtin", "1.0.0", Owner),
-            Parameters = JsonSerializer.SerializeToElement(new { path = "/results", itemSchema = new SchemaBinding
-            { Inline = new() { Format = SchemaFormatIds.JsonSchema, Content = StructuredStorageFixture.Schema } } }, JsonSerializerOptions.Web)
+            Parameters = JsonSerializer.SerializeToElement(new
+            {
+                path = "/results",
+                itemSchema = new SchemaBinding
+                { Inline = new() { Format = SchemaFormatIds.JsonSchema, Content = StructuredStorageFixture.Schema } }
+            }, JsonSerializerOptions.Web)
         };
         var desired = Source("record-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Storage = point == "data-source" ? storage : fixture.Storage, DocumentCollectionUid = point == "data-source" ? structured?.Collection : null,
-            Transformations = point == "data-source" ? [explode] : [] } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                {
+                    Storage = point == "data-source" ? storage : fixture.Storage,
+                    DocumentCollectionUid = point == "data-source" ? structured?.Collection : null,
+                    Transformations = point == "data-source" ? [explode] : []
+                }
+            }
+        };
         var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(desired, default);
         var acquired = await AcquireAsync(client, source.Value.Name);
         Assert.HasCount(1, acquired.Manifest!.Artifacts);
@@ -65,10 +78,14 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual("object", acquired.Dataset!.OperationOutputSchema!.Value.GetProperty("type").GetString());
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner,
-            Metadata = new() { Name = "record-knowledge" }, Definition = new()
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "record-knowledge" },
+            Definition = new()
             {
-                DisplayName = "Record knowledge", Output = new(storage, new(Write: true)) { DocumentCollectionUid = structured?.Collection },
+                DisplayName = "Record knowledge",
+                Output = new(storage, new(Write: true)) { DocumentCollectionUid = structured?.Collection },
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
                 DataSources = [new() { Name = "input", DataSource = new(source.Value.Name, Owner), Transformations = point == "binding" ? [explode] : [] }],
                 Transformations = point == "postAggregate" ? [explode] : []
@@ -97,8 +114,12 @@ public sealed partial class DataSourceDatasetTests
         {
             var access = factory.Services.GetRequiredService<KnowledgeAccessService>();
             var description = await access.DescribeDocumentsAsync(id, snapshot.Name, default);
-            var page = await access.QueryDocumentsAsync(id, new() { SnapshotId = snapshot.Name, Profile = description.QueryProfiles.Single(),
-                Query = StructuredStorageFixture.Json("""{"$filter":"value eq 2"}""") }, default);
+            var page = await access.QueryDocumentsAsync(id, new()
+            {
+                SnapshotId = snapshot.Name,
+                Profile = description.QueryProfiles.Single(),
+                Query = StructuredStorageFixture.Json("""{"$filter":"value eq 2"}""")
+            }, default);
             Assert.HasCount(1, page.DocumentPage!.Documents);
             Assert.AreEqual(artifact.ArtifactId, page.Records.Single().ArtifactId);
             Assert.AreEqual(1, page.Records.Single().MemberOrdinal);
@@ -126,20 +147,30 @@ public sealed partial class DataSourceDatasetTests
         {
             var access = factory.Services.GetRequiredService<KnowledgeAccessService>();
             var description = await access.DescribeDocumentsAsync(id, snapshot.Name, default);
-            var firstPage = await access.QueryDocumentsAsync(id, new() { SnapshotId = snapshot.Name,
-                Profile = description.QueryProfiles.Single(), Query = Empty, PageSize = 1 }, default);
+            var firstPage = await access.QueryDocumentsAsync(id, new()
+            {
+                SnapshotId = snapshot.Name,
+                Profile = description.QueryProfiles.Single(),
+                Query = Empty,
+                PageSize = 1
+            }, default);
             Assert.IsNotNull(firstPage.NextCursor);
             var replacement = await PublishAsync(factory.Services, "record-replacement", KnowledgeFlowContracts.ArtifactTransformation,
-                JsonSerializer.SerializeToElement(new { artifacts = new[] { new
+                JsonSerializer.SerializeToElement(new
+                {
+                    artifacts = new[] { new
                 {
                     artifactId = "replacement", kind = "inline", disposition = "publishable", mediaType = "application/json",
                     recordContract = artifact.RecordContract,
                     contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new[]
                     { new { status = "healthy", value = 9 }, new { status = "degraded", value = 8 } }))
-                } } }));
+                } }
+                }));
             await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().PutAsync(id, knowledge.Value.Definition with
-            { DataSources = [knowledge.Value.Definition.DataSources.Single() with
-                { TransformationFlow = new() { Name = replacement.Flow.Name, ScopeRef = Owner, Version = replacement.Version, UseActiveVersion = false } }] }, knowledge.ETag, default);
+            {
+                DataSources = [knowledge.Value.Definition.DataSources.Single() with
+                { TransformationFlow = new() { Name = replacement.Flow.Name, ScopeRef = Owner, Version = replacement.Version, UseActiveVersion = false } }]
+            }, knowledge.ETag, default);
             await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
             var active = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot;
             Assert.AreNotEqual(snapshot.Name, active.Name);

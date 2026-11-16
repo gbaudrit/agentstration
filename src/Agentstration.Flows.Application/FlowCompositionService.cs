@@ -251,7 +251,7 @@ public sealed class FlowCompositionService(FlowService flows)
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static FlowValidationException Incompatible(FlowVersion template, FlowCompositionPointStepDefinition point,
         string boundary, JsonElement actual, JsonElement expected) => new("flow_composition_contract_incompatible", "The configured Flow composition contracts are incompatible.")
-    { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
+        { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
     private static string TypeName(JsonElement schema)
     {
         if (schema.ValueKind != JsonValueKind.Object) return "unknown";

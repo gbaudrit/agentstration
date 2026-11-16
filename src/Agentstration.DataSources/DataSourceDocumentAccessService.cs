@@ -111,8 +111,10 @@ public sealed class DataSourceDocumentAccessService(DataSourceAcquisitionService
             if (next is null) await ChangeLeaseAsync(acquisition, session.LeaseId, session.Expires, true, ct);
             return new(acquisition.Name, acquisition.Uid, publication.Publication.Id, selection.Contract,
                 page with { Cursor = null }, next, next is null ? null : session.Expires)
-            { ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId,
-                Records = page.Documents.Select(document => lineage[document.Id]).ToArray() };
+            {
+                ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId,
+                Records = page.Documents.Select(document => lineage[document.Id]).ToArray()
+            };
         }
         catch
         {
@@ -210,9 +212,13 @@ public sealed class DataSourceDocumentAccessService(DataSourceAcquisitionService
 
     private static DataSourceDocumentSelection Selection(DataSourceAcquisitionResource acquisition, DataSourceDocumentContractPin contract) => new()
     {
-        Source = new(acquisition.DataSourceName, acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace), SourceUid = acquisition.DataSourceUid,
-        AcquisitionScope = acquisition.LogicalScopeRef ?? throw Error("data_source_document_selection_invalid"), Contract = contract,
-        Mode = DataSourceDocumentSelectionModes.Exact, AcquisitionId = acquisition.Name, AcquisitionUid = acquisition.Uid
+        Source = new(acquisition.DataSourceName, acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace),
+        SourceUid = acquisition.DataSourceUid,
+        AcquisitionScope = acquisition.LogicalScopeRef ?? throw Error("data_source_document_selection_invalid"),
+        Contract = contract,
+        Mode = DataSourceDocumentSelectionModes.Exact,
+        AcquisitionId = acquisition.Name,
+        AcquisitionUid = acquisition.Uid
     };
 
     private StorageDocumentTarget ReadTarget(StorageDocumentTarget target, DataSourceResource source) => target with

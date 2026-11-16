@@ -18,7 +18,8 @@ public sealed record JsonRecordProjection
 
     public static ResolvedDataContract Collection(ResolvedDataContract record) => DataContracts.Declared(
         JsonSerializer.SerializeToElement(new { type = "array", minItems = 1, maxItems = MaximumRecords, items = record.Schema }),
-        "json.explode/collection", "application/json")! with { Validated = true };
+        "json.explode/collection", "application/json")! with
+    { Validated = true };
 
     public void Validate(CancellationToken ct = default)
     {
@@ -53,9 +54,11 @@ public sealed record JsonRecordProjection
             throw new ArgumentException("A stored JSON result must be an object, or an explicit json.explode record collection.");
         var result = new JsonRecordProjection
         {
-            Value = JsonSerializer.SerializeToElement(new[] { value }), SelectionPath = "",
+            Value = JsonSerializer.SerializeToElement(new[] { value }),
+            SelectionPath = "",
             RecordContract = (rootContract ?? DataContracts.Declared(JsonSerializer.SerializeToElement(new { type = "object" }),
-                "json-root/record", "application/json")!) with { Validated = true }
+                "json-root/record", "application/json")!) with
+            { Validated = true }
         };
         result.Validate();
         return result;

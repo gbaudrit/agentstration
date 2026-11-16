@@ -35,8 +35,14 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(status, failure.StatusCode);
         Assert.DoesNotContain("PRIVATE", failure.ToString());
         var source = Source("unavailable-documents", inputs, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
-        source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
-        { Storage = storage.Reference, DocumentCollectionUid = storage.Collection } } };
+        source = source with
+        {
+            Definition = source.Definition with
+            {
+                Dataset = source.Definition.Dataset! with
+                { Storage = storage.Reference, DocumentCollectionUid = storage.Collection }
+            }
+        };
         var saved = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
         using var started = await client.PostAsJsonAsync($"/api/datasources/{saved.Value.Name}/acquisitions?scopeRef=/instance", new StartDataSourceAcquisitionRequest());
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);

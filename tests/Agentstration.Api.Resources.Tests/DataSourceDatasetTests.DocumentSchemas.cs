@@ -1,14 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Identity.Contracts;
 using Agentstration.DataSources;
+using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
-using Agentstration.Storage.Contracts;
 using Agentstration.Storage;
-using Microsoft.Extensions.DependencyInjection;
+using Agentstration.Storage.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 

@@ -1,8 +1,8 @@
-using Agentstration.Web.Components.State;
-using Agentstration.Storage.Contracts;
 using System.Text;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,9 +46,20 @@ public sealed class ArtifactAdministrationComponentTests
         using var context = new BunitContext();
         var client = new ArtifactClient("redacted");
         var inputId = Guid.NewGuid().ToString("N");
-        client.Durable = client.Durable with { Receipt = client.Durable.Receipt with { StorageFlowRunId = string.Empty,
-            Provenance = new Dictionary<string, string> { ["inputArtifactId"] = inputId, ["inputArtifactKind"] = "durable",
-                ["processingRunId"] = "flowrun-processing", ["inputSha256"] = new string('a', 64) } } };
+        client.Durable = client.Durable with
+        {
+            Receipt = client.Durable.Receipt with
+            {
+                StorageFlowRunId = string.Empty,
+                Provenance = new Dictionary<string, string>
+                {
+                    ["inputArtifactId"] = inputId,
+                    ["inputArtifactKind"] = "durable",
+                    ["processingRunId"] = "flowrun-processing",
+                    ["inputSha256"] = new string('a', 64)
+                }
+            }
+        };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IArtifactsClient>(client);
@@ -372,9 +383,14 @@ public sealed class ArtifactAdministrationComponentTests
         var contract = Agentstration.Schemas.DataContracts.Declared(System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }), "root")!;
         var publication = new StoragePublicationReference(target, "records", "version", 20, new string('a', 64))
         { Records = new([new("first", 8, new string('a', 64)), new("second", 9, new string('b', 64))]) };
-        client.Durable = client.Durable with { Receipt = client.Durable.Receipt with
-        { Materialization = new(client.Durable.WorkspaceId, target, publication.Key, publication.Version, publication.Length, publication.Sha256, publication)
-            { RecordContract = contract } } };
+        client.Durable = client.Durable with
+        {
+            Receipt = client.Durable.Receipt with
+            {
+                Materialization = new(client.Durable.WorkspaceId, target, publication.Key, publication.Version, publication.Length, publication.Sha256, publication)
+                { RecordContract = contract }
+            }
+        };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IArtifactsClient>(client);

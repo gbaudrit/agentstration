@@ -1,12 +1,12 @@
-using Agentstration.Artifacts.Contracts;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
 using Agentstration.Schemas;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.DataSources;
 
@@ -218,8 +218,11 @@ public sealed class DataSourceDatasetAcquisitionService(
                 else DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset.OutputSchema, output);
                 if (recordProjection is null)
                 {
-                    try { recordProjection = JsonRecordProjection.Normalize(output,
-                        DataSourceDatasetCompositionService.Contract(acquisition.Dataset, $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output")); }
+                    try
+                    {
+                        recordProjection = JsonRecordProjection.Normalize(output,
+                        DataSourceDatasetCompositionService.Contract(acquisition.Dataset, $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output"));
+                    }
                     catch (ArgumentException) { throw Invalid("data_source_record_projection_invalid", "JSON storage requires objects; use json.explode for an array of records."); }
                 }
                 recordContract = recordProjection.RecordContract;
@@ -268,7 +271,8 @@ public sealed class DataSourceDatasetAcquisitionService(
                     await recordPublications.SealAsync(publication, cancellationToken);
                     result = new(publication.Key, publication.Version, publication.Length, publication.Sha256, string.Empty);
                     var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId), publication?.Target ?? target,
-                        result.Key, result.Version, bytes.Length, digest, publication) { RecordContract = recordContract };
+                        result.Key, result.Version, bytes.Length, digest, publication)
+                    { RecordContract = recordContract };
                     var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
                         "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
                         new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
@@ -443,7 +447,8 @@ public sealed class DataSourceDatasetAcquisitionService(
         _ = await ReadAsync(acquisition, 0, 1, cancellationToken);
         var materialization = new ArtifactStorageMaterialization(new(acquisition.WorkspaceId),
             acquisition.Publication?.Target ?? DataSourceDatasetCompositionService.Target(acquisition, execution.ConsumerScope),
-            item.Key, item.Version, item.Length, digest, acquisition.Publication) { RecordContract = acquisition.RecordContract };
+            item.Key, item.Version, item.Length, digest, acquisition.Publication)
+        { RecordContract = acquisition.RecordContract };
         var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
             "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
             new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),

@@ -55,8 +55,11 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
         {
             var resource = kind?.Value ?? new FunctionKindResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind,
-                ScopeRef = scope, Metadata = Metadata(KindName), Definition = new("Native", [])
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = FunctionResourceKinds.FunctionKind,
+                ScopeRef = scope,
+                Metadata = Metadata(KindName),
+                Definition = new("Native", [])
             };
             kind = await functions.PutKindAsync(resource with
             { Definition = resource.Definition with { Versions = [.. resource.Definition.Versions, kindVersion] } }, kind?.ETag, kind is null, ct);
@@ -76,11 +79,14 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
             if (stored is not null) EnsureOwned(stored.Value);
             var desired = descriptors.Select(descriptor => new TransformationFunctionVersion(descriptor.Version, kindReference,
                 JsonSerializer.SerializeToElement(new { implementation = new { id, version = descriptor.Version } }))
-                { NativeContractDigest = FunctionDigests.Compute(descriptor) }).ToArray();
+            { NativeContractDigest = FunctionDigests.Compute(descriptor) }).ToArray();
             var resource = stored?.Value ?? new TransformationFunctionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-                ScopeRef = scope, Metadata = Metadata(name), Definition = new(id, [])
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = FunctionResourceKinds.TransformationFunction,
+                ScopeRef = scope,
+                Metadata = Metadata(name),
+                Definition = new(id, [])
             };
             foreach (var version in desired)
                 if (resource.Definition.Versions.SingleOrDefault(existing => existing.Version == version.Version) is { } existing

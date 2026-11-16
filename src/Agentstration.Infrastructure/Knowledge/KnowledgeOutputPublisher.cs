@@ -153,12 +153,12 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             {
                 var members = recordMembers[result[index].ArtifactId];
                 result[index] = result[index] with
-                    {
-                        Content = new(target with { DocumentCollectionUid = collection },
+                {
+                    Content = new(target with { DocumentCollectionUid = collection },
                             "records-" + StorageRecordSets.Digest(Encoding.UTF8.GetBytes(result[index].ArtifactId)),
                             publication.Publication.Digest, result[index].Length, result[index].Sha256)
-                        { Binding = binding, Records = new(members, publication) }
-                    };
+                    { Binding = binding, Records = new(members, publication) }
+                };
             }
         }
         // Validate and prepare the complete set before sealing any newly written output.
@@ -188,7 +188,8 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                     artifact = await artifacts.RegisterStoredAsync(new(ArtifactStorageReferences.PublicationIdentity(reference),
                         projection.ProjectionFlowRunId, new(source.ScopeRef!.Value, source.Namespace, source.Kind, source.Name),
                         projection.Name, item.MediaType, new(new(projection.WorkspaceId), reference.Target,
-                            reference.Key, reference.Version, reference.Length, reference.Sha256, reference) { RecordContract = item.RecordContract },
+                            reference.Key, reference.Version, reference.Length, reference.Sha256, reference)
+                        { RecordContract = item.RecordContract },
                         ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract,
                         Provenance: manifest.Artifacts.FirstOrDefault(input => input.ArtifactId == item.ArtifactId)?.Provenance), cancellationToken);
                 catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });

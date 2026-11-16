@@ -1,9 +1,9 @@
+using System.Text;
 using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using System.Text;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
@@ -276,14 +276,19 @@ public sealed partial class DataSourceDatasetTests
             var flows = factory.Services.GetRequiredService<FlowService>();
             var contract = (await flows.GetVersionExactAsync(Owner, new("knowledge-projection-builtin"), "1.0.0", default))!.Value.Graph!.OutputSchema!.Value;
             var inputContract = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = contract, parameters = new { type = "object" } }, required = new[] { "value", "parameters" }, additionalProperties = false });
-            var graph = new FlowGraphDefinition { EntryStep = "input", InputSchema = inputContract, OutputSchema = contract,
+            var graph = new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                InputSchema = inputContract,
+                OutputSchema = contract,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputContract },
                     new ForeachArtifactsFlowStepDefinition { Name = "process" },
                     new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { dataset = "${input.content.dataset}", transformed = true }) },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = contract, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],
                 Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
-                    new("return", "body", "completed", "process"), new("done", "process", "completed", "completed"), new("fail", "process", "error", "error")] };
+                    new("return", "body", "completed", "process"), new("done", "process", "completed", "completed"), new("fail", "process", "error", "error")]
+            };
             await flows.CreateExactAsync(Owner, new("direct-artifact-transform", null, "1.0.0", true,
                 new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input), new("completed", FlowNodeKind.Output)], [new("input", "completed")], ["completed"]), Graph: graph), ResourceNamespace.Default, default);
             await flows.PublishVersionExactAsync(Owner, new("direct-artifact-transform"), "1.0.0", true, default);

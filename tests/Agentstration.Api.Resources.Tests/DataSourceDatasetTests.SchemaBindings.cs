@@ -1,9 +1,9 @@
-using System.Text.Json;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.DataSources.Contracts;
+using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -25,11 +25,14 @@ public sealed partial class DataSourceDatasetTests
         var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
         var parent = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema,
-            ScopeRef = Owner, Metadata = new() { Name = "dataset-response" },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "dataset-response" },
             Definition = new()
             {
-                DisplayName = "Dataset response", Format = SchemaFormatIds.JsonSchema,
+                DisplayName = "Dataset response",
+                Format = SchemaFormatIds.JsonSchema,
                 Content = JsonSerializer.Deserialize<JsonElement>("""
                     {"type":"object","properties":{"document":{"type":"object","properties":{"dataset":{"type":"string"}},"required":["dataset"]}}}
                     """)
@@ -38,8 +41,14 @@ public sealed partial class DataSourceDatasetTests
         var versionA = await schemas.PublishAsync(Owner, ResourceNamespace.Default, parent.Value.Name, "A", default);
         var binding = new SchemaBinding { Reference = new() { Name = parent.Value.Name, Version = "A", ScopeRef = Owner, SchemaPath = "/properties/document" } };
         var desired = Source("bound-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = binding } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = binding } }
+            }
+        };
         var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
         var source = await sources.CreateAsync(desired, default);
         var pin = source.Value.Definition.Dataset!.Acquisition.OutputSchemaSnapshot!;
@@ -69,9 +78,15 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsNotNull(changed);
         using var instance = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         var bindingB = binding with { Reference = binding.Reference! with { Version = "B" } };
-        var invalid = desired with { Metadata = new() { Name = "bound-incompatible-output" },
-            Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-            { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = bindingB } } } };
+        var invalid = desired with
+        {
+            Metadata = new() { Name = "bound-incompatible-output" },
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = bindingB } }
+            }
+        };
         var sourceB = await sources.CreateAsync(invalid, default);
         using var started = await client.PostAsJsonAsync($"/api/datasources/{sourceB.Value.Name}/acquisitions?scopeRef=/instance", new StartDataSourceAcquisitionRequest());
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);

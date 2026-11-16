@@ -24,8 +24,15 @@ public sealed class JsonExplodeTests
         using var invocation = context.Enter("accepted", new Dictionary<string, SchemaBindingSnapshot>
         {
             ["itemSchema"] = new("$.itemSchema", SchemaFormatIds.JsonSchema, null, Item, "selected-hash",
-                new() { Name = "envelope", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance, Namespace = ResourceNamespace.Default,
-                    SchemaPath = "/properties/results/items" }, uid, 3) { ParentDefinitionHash = "parent-hash" }
+                new()
+                {
+                    Name = "envelope",
+                    Version = "1.0.0",
+                    ScopeRef = ResourceScopeRef.Instance,
+                    Namespace = ResourceNamespace.Default,
+                    SchemaPath = "/properties/results/items"
+                }, uid, 3)
+            { ParentDefinitionHash = "parent-hash" }
         });
         var function = new JsonExplodeFunction(null!, null!, null!, null!, context);
         var input = Json("""{"value":{"results":[{"id":2},{"id":1}]},"path":"/results","itemSchema":{}}""");
@@ -89,9 +96,13 @@ public sealed class JsonExplodeTests
         var function = new JsonExplodeFunction(null!, null!, null!, null!, context);
         var output = await function.ExecuteAsync(JsonSerializer.SerializeToElement(new
         {
-            value = new { artifacts = new[] { new { artifactId = "source", kind = "inline", recordContract = new { },
-                contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(Json("""[{"results":[{"id":1},{"id":2}]}]"""))) } } },
-            path = "/results", itemSchema = new { }
+            value = new
+            {
+                artifacts = new[] { new { artifactId = "source", kind = "inline", recordContract = new { },
+                contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(Json("""[{"results":[{"id":1},{"id":2}]}]"""))) } }
+            },
+            path = "/results",
+            itemSchema = new { }
         }), default);
         var artifact = output.GetProperty("artifacts").EnumerateArray().Single();
         using var content = JsonDocument.Parse(Convert.FromBase64String(artifact.GetProperty("contentBase64").GetString()!));
@@ -110,13 +121,20 @@ public sealed class JsonExplodeTests
         { Records = new(Enumerable.Range(0, 100).Select(index => new StorageRecordMember("member-" + index, 2, StorageRecordSets.Digest("{}"u8))).ToArray()) };
         var rowContract = DataContracts.Declared(Json("""{"type":"object"}"""), "root")!;
         var location = new ArtifactStorageMaterialization(new(scope.TargetId!.Value), target, reference.Key, reference.Version,
-            reference.Length, reference.Sha256, reference) { RecordContract = rowContract };
+            reference.Length, reference.Sha256, reference)
+        { RecordContract = rowContract };
         var decoded = ArtifactStorageReferences.Parse(ArtifactStorageReferences.Encode(location))!;
         Assert.HasCount(100, StorageRecordSets.Members(decoded.Publication!));
         Assert.IsNull(decoded.RecordContract, "The row schema remains catalogue metadata, outside the physical content reference.");
-        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Members(reference with { Records = reference.Records with
-            { Members = [reference.Records.Members[0], reference.Records.Members[0]] } }));
-        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Members(reference with { Records = reference.Records with
-            { Members = [reference.Records.Members[0] with { Id = "../escape" }] } }));
+        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Members(reference with
+        {
+            Records = reference.Records with
+            { Members = [reference.Records.Members[0], reference.Records.Members[0]] }
+        }));
+        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Members(reference with
+        {
+            Records = reference.Records with
+            { Members = [reference.Records.Members[0] with { Id = "../escape" }] }
+        }));
     }
 }

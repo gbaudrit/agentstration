@@ -25,12 +25,21 @@ public sealed partial class DataSourceDatasetTests
         var inputs = await PrepareAsync(factory.Services, operationResult: JsonSerializer.SerializeToElement(new { results = items }), declareAcquisitionOutput: false);
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(inputs.Context);
         var source = Source("selected-array", inputs, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
-        source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
+        source = source with
         {
-            Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [new()
+            Definition = source.Definition with
+            {
+                Dataset = source.Definition.Dataset! with
+                {
+                    Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+                    {
+                        ["transformations"] = [new()
             { Function = new("json-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
-                { path = "/results", itemSchema = new SchemaBinding { Inline = new() { Format = "json-schema", Content = JsonSerializer.SerializeToElement(new { type = "object" }) } } }, JsonSerializerOptions.Web) }] }
-        } } };
+                { path = "/results", itemSchema = new SchemaBinding { Inline = new() { Format = "json-schema", Content = JsonSerializer.SerializeToElement(new { type = "object" }) } } }, JsonSerializerOptions.Web) }]
+                    }
+                }
+            }
+        };
         await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
@@ -40,10 +49,14 @@ public sealed partial class DataSourceDatasetTests
         var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "", mode = "arrayItems" }) };
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner, Metadata = new() { Name = "root-explosion" },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "root-explosion" },
             Definition = new()
             {
-                DisplayName = "Root explosion", Output = new(inputs.Storage, new(Write: true)),
+                DisplayName = "Root explosion",
+                Output = new(inputs.Storage, new(Write: true)),
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
                 DataSources = [new() { Name = "selected", DataSource = new(source.Name, Owner), RefreshIfNecessary = true, Transformations = onBinding ? [explode] : [] }],
                 Transformations = onBinding ? [] : [explode]
@@ -69,8 +82,11 @@ public sealed partial class DataSourceDatasetTests
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(inputs.Context);
         var input = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(Source("function-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "functions" })), default);
         var untouched = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(Source("untouched-input", inputs, JsonSerializer.SerializeToElement(new { dataset = "untouched" })), default);
-        var batch = JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "batch", kind = "inline", disposition = "publishable", mediaType = "application/json",
-            contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"results\":[{\"id\":\"a\"},{\"id\":\"b\"}]}")) } } });
+        var batch = JsonSerializer.SerializeToElement(new
+        {
+            artifacts = new[] { new { artifactId = "batch", kind = "inline", disposition = "publishable", mediaType = "application/json",
+            contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"results\":[{\"id\":\"a\"},{\"id\":\"b\"}]}")) } }
+        });
         var manifestSchema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"artifacts":{"type":"array"}},"required":["artifacts"],"additionalProperties":false}""");
         async Task<FlowCallReference> ValueFlow(string name, JsonElement output, bool useFunction = false)
         {
@@ -78,7 +94,9 @@ public sealed partial class DataSourceDatasetTests
             var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = manifestSchema, parameters = new { type = "object" } }, required = new[] { "value", "parameters" } });
             await flows.CreateExactAsync(Owner, new(name, null, "1.0.0", true, new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
             {
-                EntryStep = "input", InputSchema = schema, OutputSchema = manifestSchema,
+                EntryStep = "input",
+                InputSchema = schema,
+                OutputSchema = manifestSchema,
                 Steps = useFunction
                     ? [new InputFlowStepDefinition { Name = "input", Schema = schema },
                         new TransformFlowStepDefinition { Name = "batch", Mapping = output },
@@ -94,19 +112,36 @@ public sealed partial class DataSourceDatasetTests
         }
         var normalize = await ValueFlow("normalize-value", batch, useFunction: true);
         var identity = await ValueFlow("identity-value", JsonSerializer.SerializeToElement("${input.value}"));
-        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
-            { path = "/results", itemSchema = new SchemaBinding { Inline = new() { Format = "json-schema",
-                Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}""") } } }, JsonSerializerOptions.Web) };
+        var explode = new FlowCompositionCall
+        {
+            Function = new("artifact-explode-builtin", "1.0.0", Owner),
+            Parameters = JsonSerializer.SerializeToElement(new
+            {
+                path = "/results",
+                itemSchema = new SchemaBinding
+                {
+                    Inline = new()
+                    {
+                        Format = "json-schema",
+                        Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}""")
+                    }
+                }
+            }, JsonSerializerOptions.Web)
+        };
         var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
         var bindings = new List<KnowledgeDataSourceBinding> { new() { Name = "selected", DataSource = new(input.Value.Name, Owner), RefreshIfNecessary = true,
             Transformations = onBinding ? [new() { Flow = normalize }, explode, new() { Flow = identity }] : [new() { Flow = normalize }] } };
         if (onBinding) bindings.Add(new() { Name = "untouched", DataSource = new(untouched.Value.Name, Owner), RefreshIfNecessary = true });
         var source = await sources.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner, Metadata = new() { Name = "function-knowledge" },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "function-knowledge" },
             Definition = new()
             {
-                DisplayName = "Function knowledge", Output = new(inputs.Storage, new(Write: true)),
+                DisplayName = "Function knowledge",
+                Output = new(inputs.Storage, new(Write: true)),
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
                 DataSources = bindings,
                 Transformations = onBinding ? [] : [explode, new() { Flow = identity }]
@@ -124,8 +159,11 @@ public sealed partial class DataSourceDatasetTests
         var failed = explode with { Parameters = JsonSerializer.SerializeToElement(new { path = "/missing" }) };
         var definition = source.Value.Definition;
         await sources.PutAsync(id, onBinding
-            ? definition with { DataSources = definition.DataSources.Select((binding, index) => index == 0
-                ? binding with { Transformations = [new() { Flow = normalize }, failed] } : binding).ToArray() }
+            ? definition with
+            {
+                DataSources = definition.DataSources.Select((binding, index) => index == 0
+                ? binding with { Transformations = [new() { Flow = normalize }, failed] } : binding).ToArray()
+            }
             : definition with { Transformations = [failed] }, source.ETag, default);
         var failure = await Assert.ThrowsAsync<KnowledgeProjectionException>(() => factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default));
         Assert.AreEqual("function_path_not_found", failure.Code);
