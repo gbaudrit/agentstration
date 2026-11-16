@@ -145,6 +145,10 @@ public sealed record ConditionFlowStepDefinition : FlowStepDefinition
 
 public sealed record TransformFlowStepDefinition : FlowStepDefinition
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, SchemaBinding>? FunctionSchemas { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, SchemaBindingSnapshot>? FunctionSchemaSnapshots { get; init; }
     public Agentstration.Functions.Contracts.FunctionReference? Function { get; init; }
     public JsonElement? FunctionInputSchema { get; init; }
     public string Mode { get; init; } = "Mapping";
@@ -219,6 +223,8 @@ public sealed record ToolFlowStepDefinition : FlowStepDefinition
     public JsonElement? ArgumentsMapping { get; init; }
     public Agentstration.Functions.Contracts.ResolvedTransformationFunction? FunctionBinding { get; init; }
     public JsonElement? FunctionParameters { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, SchemaBindingSnapshot>? FunctionSchemaSnapshots { get; init; }
     public JsonElement? FunctionOutputSchema { get; init; }
 }
 

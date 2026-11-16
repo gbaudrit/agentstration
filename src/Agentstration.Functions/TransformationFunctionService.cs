@@ -119,12 +119,26 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
             handler.Descriptor.Id, handler.Descriptor.Version, handler.Descriptor.InputSchema.Clone(), handler.Descriptor.OutputSchema.Clone());
     }
 
-    public async Task<JsonElement> InvokeAsync(ResolvedTransformationFunction accepted, ResourceScopeRef consumer, JsonElement input, CancellationToken ct, string? invocationId = null)
+    public async Task<JsonElement> InvokeAsync(ResolvedTransformationFunction accepted, ResourceScopeRef consumer, JsonElement input, CancellationToken ct, string? invocationId = null,
+        IReadOnlyDictionary<string, Agentstration.Schemas.Contracts.SchemaBindingSnapshot>? schemaBindings = null)
     {
-        using var invocation = execution.Enter(invocationId ?? Guid.NewGuid().ToString("N"));
+        using var invocation = execution.Enter(invocationId ?? Guid.NewGuid().ToString("N"), schemaBindings);
         var resolved = await ResolveAsync(accepted.Reference, consumer, ct);
         if (FunctionDigests.Compute(resolved) != FunctionDigests.Compute(accepted)) throw Error("function_contract_changed", "The accepted function contract has changed.");
         ValidateValue(resolved.InputSchema, input, "function-input");
+        var schemaNames = FunctionInvocationSchemas.SchemaParameters(resolved.InputSchema);
+        if (schemaNames.Any(name => input.TryGetProperty(name, out _) != (schemaBindings?.ContainsKey(name) == true))
+            || schemaBindings?.Keys.Any(name => !schemaNames.Contains(name, StringComparer.Ordinal)) == true)
+            throw Error("function_schema_snapshot_missing", "Schema arguments must be resolved at configuration acceptance before invocation.");
+        if (schemaBindings is { Count: > 0 })
+        {
+            var values = input.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+            foreach (var (name, snapshot) in schemaBindings)
+                values[name] = JsonSerializer.SerializeToElement(new { inline = new { format = snapshot.Format, dialect = snapshot.Dialect,
+                    content = JsonSchemaSelection.Select(snapshot.Content) } });
+            input = JsonSerializer.SerializeToElement(values);
+            ValidateValue(resolved.InputSchema, input, "function-input");
+        }
         var output = await registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).ExecuteAsync(input, ct);
         ValidateValue(resolved.OutputSchema, output, "function-output");
         return output.Clone();

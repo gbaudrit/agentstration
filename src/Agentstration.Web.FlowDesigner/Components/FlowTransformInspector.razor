@@ -2,6 +2,7 @@
 @using Agentstration.Functions.Contracts
 @using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject IStringLocalizer<Agentstration.Web.Components.Pages.FunctionStrings> FunctionLocalizer
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
@@ -13,6 +14,17 @@
     @if (SelectedFunction is { } function)
     { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
     <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
+    @if ((SelectedFunction?.Function.InputSchema ?? Step.FunctionInputSchema) is { } functionSchema)
+    {
+        @foreach (var parameter in FunctionInvocationSchemas.SchemaParameters(functionSchema))
+        {
+            <SchemaBindingEditor @key="parameter" Title="@FunctionLocalizer["SchemaParameter", parameter]"
+                TestId="@($"transform-function-schema-{parameter}")" Binding="@Step.FunctionSchemas?.GetValueOrDefault(parameter)"
+                SchemaVersions="SchemaVersions" ReadOnly="ReadOnly" HelpText="@FunctionLocalizer["OptionalSchemaParameterHelp"]"
+                DefinitionValidator="ValidateSchemaDefinitionAsync" InstanceValidator="ValidateSchemaInstanceAsync"
+                ValueChanged="value => SetFunctionSchemaAsync(parameter, value)" />
+        }
+    }
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {
@@ -56,11 +68,19 @@
     private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
     private FlowDesignerFunction? SelectedFunction => Step.Function is { } reference
         ? Functions.FirstOrDefault(choice => FunctionKey(choice.Function.Reference) == FunctionKey(reference)) : null;
+    private Task SetFunctionSchemaAsync(string parameter, SchemaBindingEditorValue value)
+    {
+        if (ReadOnly) return Task.CompletedTask;
+        var schemas = Step.FunctionSchemas?.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal) ?? [];
+        if (value.Binding is null) schemas.Remove(parameter); else schemas[parameter] = value.Binding;
+        return Changed.InvokeAsync(Step with { FunctionSchemas = schemas.Count == 0 ? null : schemas, FunctionSchemaSnapshots = null });
+    }
     private Task SelectFunctionAsync(ChangeEventArgs args)
     {
         if (ReadOnly) return Task.CompletedTask;
         var selected = Functions.FirstOrDefault(choice => FunctionKey(choice.Function.Reference) == args.Value?.ToString());
         return Changed.InvokeAsync(Step with { Function = selected?.Function.Reference, FunctionInputSchema = selected?.Function.InputSchema, Schema = selected?.Function.OutputSchema,
+            FunctionSchemas = null, FunctionSchemaSnapshots = null,
             Mapping = selected is null ? Step.Mapping : JsonSerializer.SerializeToElement(new { value = "${transition.output}" }) });
     }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;

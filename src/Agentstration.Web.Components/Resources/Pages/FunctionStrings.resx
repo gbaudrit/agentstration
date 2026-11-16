@@ -35,4 +35,6 @@
   <data name="Native.collection.distinct.Description" xml:space="preserve"><value>Remove duplicate array elements using the value at the JSON Pointer path as their key. Keeps the first occurrence and preserves input order. An empty path compares whole elements.</value></data>
   <data name="Native.artifact.explode.Description" xml:space="preserve"><value>Read JSON Artifact contents and prepare one publishable Artifact per array element or object value at a JSON Pointer path. Expects an Artifact manifest or an object with a content property. arrayItems preserves array order; objectValues sorts property names. Storage happens later in the publication pipeline. itemSchema validates each child; maximumOutputs defaults to 100.</value></data>
   <data name="JsonPointerRootHelp" xml:space="preserve"><value>An empty JSON Pointer ("") selects the JSON root. Use “Use empty text” to record that value explicitly.</value></data>
+  <data name="SchemaParameter" xml:space="preserve"><value>Schema for {0}</value></data>
+  <data name="OptionalSchemaParameterHelp" xml:space="preserve"><value>Optional. Without a schema, produced values have no declared business structure validation. Choose an inline schema or an exact published shared schema and optional sub-schema. The choice is resolved and frozen when the Source is saved or the Flow is published.</value></data>
 </root>

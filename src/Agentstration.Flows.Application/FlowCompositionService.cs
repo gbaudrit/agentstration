@@ -14,7 +14,8 @@ public sealed class FlowCompositionService(FlowService flows)
     public const int MaximumCallsPerPoint = 32;
     public const int MaximumCalls = 128;
     public async Task<CompiledFlowComposition> ResolveAsync(FlowVersion template,
-        IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, ResourceScopeRef consumer, CancellationToken ct)
+        IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, ResourceScopeRef consumer, CancellationToken ct,
+        bool acceptedSchemaBindings = false, ResourceNamespace? ownerNamespace = null)
     {
         var templateHash = template.DefinitionHash ?? (template.Graph is { } templateGraph ? FlowDefinitionHash.Compute(templateGraph) : FlowDefinitionHash.Compute(template.Definition));
         template = await flows.CompileFunctionsAsync(template, consumer, ct);
@@ -69,9 +70,12 @@ public sealed class FlowCompositionService(FlowService flows)
                         arguments = mapping.Clone();
                     }
                     var functionName = $"cp-{Hash(point.Name)[..12]}-{calls.Count + 1:D2}";
+                    var schemaSnapshots = await flows.ResolveFunctionSchemasAsync(function.InputSchema, call.Parameters, consumer,
+                        ownerNamespace ?? template.FlowId.Namespace, $"$.compositions[{point.Point}][{calls.Count}].parameters", ct,
+                        call.FunctionSchemaSnapshots, acceptedSchemaBindings);
                     if (template.Graph!.Steps.Any(step => step.Name == functionName)) throw Error("flow_composition_step_conflict");
-                    calls.Add(call with { Function = function.Reference, Parameters = call.Parameters.Clone() });
-                    nodes.Add(FlowService.FunctionStep(functionName, function, arguments, point.DisplayName, parameters: functionParameters));
+                    calls.Add(call with { Function = function.Reference, Parameters = call.Parameters.Clone(), FunctionSchemaSnapshots = schemaSnapshots });
+                    nodes.Add(FlowService.FunctionStep(functionName, function, arguments, point.DisplayName, parameters: functionParameters, schemaSnapshots: schemaSnapshots));
                     addedTransitions.Add(new($"{functionName}-next", functionName, "success", point.Name));
                     if (nodes.Count > 1)
                     {

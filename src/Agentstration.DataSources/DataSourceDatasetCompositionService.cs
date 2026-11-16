@@ -80,7 +80,9 @@ public sealed class DataSourceDatasetCompositionService(
         { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }
         try
         {
-            var composed = await sequences.ResolveAsync(consumer, source.Namespace, root, bindings, cancellationToken);
+            var composed = accepted?.Composition is not null
+                ? await sequences.ResolveAcceptedAsync(consumer, source.Namespace, root, bindings, cancellationToken)
+                : await sequences.ResolveAsync(consumer, source.Namespace, root, bindings, cancellationToken);
             var targetFlow = new ResolvedDataSourceFlowBinding(composed.Orchestration.ResourceId,
                 composed.Orchestration.Namespace ?? source.Namespace, composed.Orchestration.Version!, false,
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))

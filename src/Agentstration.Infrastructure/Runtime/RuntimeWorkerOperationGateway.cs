@@ -231,6 +231,21 @@ public sealed class RuntimeWorkerOperationGateway(
                     }
                     else if (direct.ArgumentsMapping is { } mapping && mapping.TryGetProperty("input", out var expectedInput) && !MatchesFunctionLiterals(expectedInput, functionInput))
                         throw new RuntimeGovernedOperationException("function_parameter_override", "Authored literal function inputs cannot be overridden.");
+                    if (direct.FunctionParameters is null && functionInput.ValueKind == JsonValueKind.Object)
+                    {
+                        var names = Agentstration.Functions.Contracts.FunctionInvocationSchemas.SchemaParameters(function.InputSchema);
+                        if (names.Any(name => functionInput.TryGetProperty(name, out _)))
+                            throw new RuntimeGovernedOperationException("function_schema_override", "Schema arguments cannot be supplied by the Worker.");
+                        if (direct.FunctionSchemaSnapshots is { Count: > 0 } snapshots)
+                        {
+                            var values = functionInput.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+                            foreach (var (name, snapshot) in snapshots)
+                                values.Add(name, JsonSerializer.SerializeToElement(snapshot.Source is { } source
+                                    ? new Agentstration.Schemas.Contracts.SchemaBinding { Reference = source }
+                                    : new Agentstration.Schemas.Contracts.SchemaBinding { Inline = new() { Format = snapshot.Format, Dialect = snapshot.Dialect, Content = snapshot.Content } }, ProcessJson));
+                            functionInput = JsonSerializer.SerializeToElement(values);
+                        }
+                    }
                     arguments = JsonSerializer.SerializeToElement(new { function, input = functionInput }, ProcessJson);
                 }
                 break;

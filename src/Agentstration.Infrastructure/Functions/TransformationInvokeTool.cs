@@ -7,7 +7,8 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Functions;
 
-public sealed class TransformationInvokeTool(TransformationFunctionService functions, ICurrentRequestContext current) : IInternalMcpToolHandler, IInternalMcpToolDefinitionProvider
+public sealed class TransformationInvokeTool(TransformationFunctionService functions, ICurrentRequestContext current,
+    Agentstration.Flows.Storage.Abstractions.IFlowRepository runs) : IInternalMcpToolHandler, IInternalMcpToolDefinitionProvider
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public InternalMcpToolDefinition Definition { get; } = new("transformation.invoke", "Invoke a transformation function", "Execute an exact authorized native transformation function.",
@@ -25,8 +26,21 @@ public sealed class TransformationInvokeTool(TransformationFunctionService funct
         };
         try
         {
+            IReadOnlyDictionary<string, Agentstration.Schemas.Contracts.SchemaBindingSnapshot>? schemaBindings = null;
+            if (FunctionInvocationSchemas.SchemaParameters(function.InputSchema).Count > 0)
+            {
+                var storedRun = invocation.RunId is { } runId
+                    ? await runs.GetRunExactAsync(ResourceScopeRef.Workspace(invocation.WorkspaceId.Value), runId, cancellationToken) : null;
+                var step = storedRun?.Value.DefinitionSnapshot.Graph?.Steps.OfType<Agentstration.Flows.ToolFlowStepDefinition>()
+                    .SingleOrDefault(step => step.Name == invocation.FlowStepId);
+                if (step?.FunctionBinding is not { } accepted || FunctionDigests.Compute(accepted) != FunctionDigests.Compute(function))
+                    throw new Agentstration.Functions.Abstractions.TransformationFunctionException("function_schema_coordinate_invalid",
+                        "Schema-aware function calls require their accepted server-owned Flow step.");
+                schemaBindings = step.FunctionSchemaSnapshots;
+            }
             return await functions.InvokeAsync(function, consumer, invocation.Arguments.GetProperty("input"), cancellationToken,
-                invocation.RunId is { } run ? run + "/" + invocation.FlowStepId : invocation.CallId);
+                invocation.RunId is { } run ? run + "/" + invocation.FlowStepId : invocation.CallId,
+                schemaBindings);
         }
         catch (Agentstration.Functions.Abstractions.TransformationFunctionException error)
         { throw new Agentstration.Runtime.Abstractions.RuntimeGovernedOperationException(error.Code, error.Message); }

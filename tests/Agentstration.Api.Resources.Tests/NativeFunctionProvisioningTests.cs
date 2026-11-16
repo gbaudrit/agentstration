@@ -18,6 +18,27 @@ namespace Agentstration.Management.Tests;
 public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestBase
 {
     [TestMethod]
+    public async Task StartupAddsSchemaBindingVersionWithoutRewritingLegacyArtifactExplosion()
+    {
+        await using var factory = Factory();
+        _ = await GetBootstrapContextAsync(factory);
+        using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        using var authority = factory.Services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core(NativeFunctionPlatformResourceProvisioner.Component));
+        var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
+        var original = (await functions.GetAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "artifact-explode-builtin", default))!;
+        var legacy = original.Value.Definition.Versions.Single(version => version.Version == "1.0.0");
+        await factory.Services.GetRequiredService<IResourceStore>().PutExactAsync(ResourceScopeRef.Instance,
+            original.Value with { Definition = original.Value.Definition with { Versions = [legacy] } }, original.ETag, false, default);
+        await factory.Services.GetRequiredService<NativeFunctionPlatformResourceProvisioner>().EnsureAsync(default);
+        var upgraded = (await functions.GetAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "artifact-explode-builtin", default))!.Value;
+        Assert.AreEqual(original.Value.Uid, upgraded.Uid);
+        Assert.HasCount(2, upgraded.Definition.Versions);
+        Assert.AreEqual(FunctionDigests.Compute(legacy), FunctionDigests.Compute(upgraded.Definition.Versions.Single(version => version.Version == "1.0.0")));
+        var schemaAware = await functions.ResolveAsync(new(upgraded.Name, "2.0.0", ResourceScopeRef.Instance), ResourceScopeRef.Instance, default);
+        CollectionAssert.AreEqual(new[] { "itemSchema" }, FunctionInvocationSchemas.SchemaParameters(schemaAware.InputSchema).ToArray());
+    }
+
+    [TestMethod]
     public async Task StartupReconcilesDescriptionsWithoutChangingFunctionIdentityOrVersionContracts()
     {
         await using var factory = Factory();

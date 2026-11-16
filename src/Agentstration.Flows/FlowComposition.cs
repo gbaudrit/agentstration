@@ -7,6 +7,8 @@ namespace Agentstration.Flows;
 public sealed record FlowCompositionCall
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, Agentstration.Schemas.Contracts.SchemaBindingSnapshot>? FunctionSchemaSnapshots { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public FlowCallReference? Flow { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public Agentstration.Functions.Contracts.FunctionReference? Function { get; init; }
@@ -36,6 +38,11 @@ public sealed record ResolvedFlowComposition(FlowCallReference Orchestration, Js
 
 public interface IFlowCompositionResolver
 {
+    // Accepted receipts originate in server storage, never in caller-authored resource definitions.
+    Task<ResolvedFlowComposition> ResolveAcceptedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings,
+        CancellationToken cancellationToken) => ResolveAsync(consumer, ownerNamespace, orchestration, bindings, cancellationToken);
+
     Task<ResolvedFlowComposition> ResolveAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings,
         CancellationToken cancellationToken);

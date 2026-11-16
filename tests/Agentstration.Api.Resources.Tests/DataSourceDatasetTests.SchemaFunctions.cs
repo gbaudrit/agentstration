@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
 using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
@@ -16,9 +17,15 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task SharedResponseSchemaAndSelectedArrayKeepDistinctEvidenceThroughNativeExplosion(bool adoptFinalSchema)
+    [DataRow(false, "legacy")]
+    [DataRow(true, "legacy")]
+    [DataRow(false, "none")]
+    [DataRow(false, "inline")]
+    [DataRow(false, "shared")]
+    [DataRow(true, "shared")]
+    [DataRow(false, "postAggregate")]
+    [DataRow(false, "flow")]
+    public async Task SharedResponseSchemaAndSelectedArrayKeepDistinctEvidenceThroughNativeExplosion(bool adoptFinalSchema, string itemMode)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -71,6 +78,33 @@ public sealed partial class DataSourceDatasetTests
             else Assert.IsNull(receipt.DataContract.SchemaEvidence, "An unconstrained transformation output must not retain the envelope's shared Schema evidence.");
         }
         var itemSchema = parent.Value.Definition.Content.GetProperty("properties").GetProperty("results").GetProperty("items");
+        var itemBinding = itemMode is "shared" or "postAggregate" or "flow"
+            ? new SchemaBinding { Reference = rawBinding.Reference! with { SchemaPath = "/properties/results/items" } }
+            : new SchemaBinding { Inline = new() { Format = SchemaFormatIds.JsonSchema, Content = itemSchema } };
+        var explodeParameters = new Dictionary<string, object> { ["path"] = "" };
+        if (itemMode != "none") explodeParameters["itemSchema"] = itemMode == "legacy" ? itemSchema : itemBinding;
+        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", itemMode == "legacy" ? "1.0.0" : "2.0.0", Owner),
+            Parameters = JsonSerializer.SerializeToElement(explodeParameters, JsonSerializerOptions.Web) };
+        if (itemMode == "flow")
+        {
+            var flows = factory.Services.GetRequiredService<FlowService>();
+            var envelope = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":"object"},"parameters":{"type":"object"}},"required":["value","parameters"]}""");
+            var manifest = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"artifacts":{"type":"array"}},"required":["artifacts"],"additionalProperties":false}""");
+            await flows.CreateExactAsync(Owner, new("explode-flow", null, "1.0.0", true,
+                new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
+                {
+                    EntryStep = "input", InputSchema = envelope, OutputSchema = manifest,
+                    Steps = [new InputFlowStepDefinition { Name = "input", Schema = envelope },
+                        new TransformFlowStepDefinition { Name = "explode", Function = explode.Function,
+                            Mapping = JsonSerializer.SerializeToElement(new { value = "${input.value}", path = "" }),
+                            FunctionSchemas = new Dictionary<string, SchemaBinding> { ["itemSchema"] = itemBinding } },
+                        new OutputFlowStepDefinition { Name = "output", Schema = manifest, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
+                    Transitions = [new("start", "input", "completed", "explode"), new("done", "explode", "completed", "output")]
+                }), ResourceNamespace.Default, default);
+            var pinnedFlow = await flows.PublishVersionExactAsync(Owner, new("explode-flow"), "1.0.0", true, default);
+            Assert.AreEqual(parent.Value.Uid, pinnedFlow.Value.Graph!.Steps.OfType<TransformFlowStepDefinition>().Single().FunctionSchemaSnapshots!["itemSchema"].SchemaUid);
+            explode = new() { Flow = new("explode-flow", FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: Owner) };
+        }
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner,
@@ -79,10 +113,28 @@ public sealed partial class DataSourceDatasetTests
                 DisplayName = "Shared items", Output = new(fixture.Storage, new(Write: true)),
                 ProjectionFlow = new() { Name = "knowledge-projection-builtin", ScopeRef = Owner },
                 DataSources = [new() { Name = "alerts", DataSource = new(source.Value.Name, Owner), RefreshIfNecessary = true,
-                    Transformations = [new() { Function = new("artifact-explode-builtin", "1.0.0", Owner),
-                        Parameters = JsonSerializer.SerializeToElement(new { path = "", itemSchema }) }] }]
+                    Transformations = itemMode == "postAggregate" ? [] : [explode] }],
+                Transformations = itemMode == "postAggregate" ? [explode] : []
             }
         }, default);
+        if (itemMode is "shared" or "postAggregate" or "flow")
+        {
+            if (itemMode != "flow")
+            {
+                var plan = itemMode == "postAggregate" ? knowledge.Value.Composition!.ProjectionComposition!
+                    : knowledge.Value.Composition!.InputCompositions["alerts"];
+                var frozen = plan.Receipt!.Bindings.Values.SelectMany(value => value).Single(call => call.Function is not null).FunctionSchemaSnapshots!["itemSchema"];
+                Assert.AreEqual(parent.Value.Uid, frozen.SchemaUid);
+                Assert.AreEqual(published.Value.DefinitionHash, frozen.ParentDefinitionHash);
+            }
+            // An incompatible newer publication and even loss of the catalogue entry must not
+            // trigger resolution of a different schema during an already accepted projection.
+            parent = await schemas.PutAsync(Owner, parent.Value.Namespace, parent.Value.Name,
+                parent.Value.Definition with { Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"integer"}""") }, parent.ETag, default);
+            await schemas.PublishAsync(Owner, ResourceNamespace.Default, parent.Value.Name, "2.0.0", default);
+            await factory.Services.GetRequiredService<IResourceStore>().DeleteExactAsync(new(Owner, parent.Value.Namespace,
+                SchemaResourceKinds.Schema, parent.Value.Name), parent.ETag, default);
+        }
         var id = new KnowledgeSourceId(knowledge.Value.Name, ScopeRef: Owner);
         var projection = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State);
@@ -90,9 +142,28 @@ public sealed partial class DataSourceDatasetTests
         Assert.HasCount(2, snapshot.Artifacts);
         foreach (var artifact in snapshot.Artifacts)
         {
+            if (itemMode == "none") { Assert.IsNull(artifact.DataContract?.SchemaEvidence); continue; }
             Assert.IsTrue(artifact.DataContract!.Validated);
             Assert.IsTrue(JsonElement.DeepEquals(itemSchema, artifact.DataContract.Schema!.Value));
-            Assert.IsNull(artifact.DataContract.SchemaEvidence, "An inline item contract must not claim the parent envelope or array's published Schema identity.");
+            if (itemMode is "shared" or "postAggregate" or "flow")
+            {
+                var evidence = artifact.DataContract.SchemaEvidence!;
+                Assert.AreEqual("1.0.0", evidence.Version);
+                Assert.AreEqual("/properties/results/items", evidence.SchemaPath);
+                Assert.AreEqual(published.Value.DefinitionHash, evidence.ParentDefinitionHash);
+                Assert.AreEqual(parent.Value.Uid, evidence.SchemaUid);
+            }
+            else Assert.IsNull(artifact.DataContract.SchemaEvidence, "An inline item contract must not claim a published Schema identity.");
+        }
+        if (itemMode == "inline")
+        {
+            var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
+            var invalid = explode with { Parameters = JsonSerializer.SerializeToElement(new { path = "", itemSchema = new SchemaBinding
+                { Inline = new() { Format = SchemaFormatIds.JsonSchema, Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"integer"}""") } } }, JsonSerializerOptions.Web) };
+            await sources.PutAsync(id, knowledge.Value.Definition with { DataSources = knowledge.Value.Definition.DataSources
+                .Select(binding => binding with { Transformations = [invalid] }).ToArray() }, knowledge.ETag, default);
+            await Assert.ThrowsAsync<KnowledgeProjectionException>(() => factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default));
+            Assert.AreEqual(snapshot.Name, (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot.Name);
         }
     }
 }

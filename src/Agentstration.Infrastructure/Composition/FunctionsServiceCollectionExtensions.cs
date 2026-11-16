@@ -15,6 +15,7 @@ internal static class FunctionsServiceCollectionExtensions
         services.AddSingleton<INativeTransformationFunction, CollectionFilterFunction>();
         services.AddSingleton<INativeTransformationFunction, CollectionDistinctFunction>();
         services.AddSingleton<INativeTransformationFunction, Agentstration.Infrastructure.Functions.ArtifactExplodeFunction>();
+        services.AddSingleton<INativeTransformationFunction>(provider => ActivatorUtilities.CreateInstance<Agentstration.Infrastructure.Functions.ArtifactExplodeFunction>(provider, "1.0.0"));
         services.AddSingleton<NativeFunctionRegistry>();
         services.AddSingleton<NativeFunctionExecutionContext>();
         services.AddSingleton<INativeFunctionExecutionContext>(provider => provider.GetRequiredService<NativeFunctionExecutionContext>());

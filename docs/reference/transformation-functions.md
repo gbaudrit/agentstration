@@ -34,13 +34,29 @@ For acquired JSON `{ "results": [{"id":"a"},{"id":"b"}] }`, select `artifact.exp
 
 If the Data Source already applies `json.select` with `/results`, its stored JSON is the array itself. In the Knowledge binding or before-publication sequence, use `artifact.explode` with `{"path":"","mode":"arrayItems"}` to expand that root array. Reusing `/results` would look for a property that no longer exists.
 
-Shared Schema selection addresses the schema definition, separately from content selection. For an envelope with a `results` array, `/properties/results` selects the array schema and `/properties/results/items` selects an item schema; neither path transforms the payload. A Data Source can adopt the envelope contract for raw acquisition and the array contract for final output after `json.select`. A shape-changing transformation without an explicit final shared binding does not retain the envelope's Schema identity on its result. `artifact.explode` currently accepts an inline `itemSchema`; it validates each child without claiming a shared Schema identity for that inline contract.
+Shared Schema selection addresses the schema definition, separately from content selection. For an envelope with a `results` array, `/properties/results` selects the array schema and `/properties/results/items` selects an item schema; neither path transforms the payload. A Data Source can adopt the envelope contract for raw acquisition and the array contract for final output after `json.select`. A shape-changing transformation without an explicit final shared binding does not retain the envelope's Schema identity on its result. `artifact.explode` version `2.0.0` accepts an optional `itemSchema` binding, either inline or referencing an exact shared Schema version and optional `schemaPath`. Shared bindings retain the parent identity/hash and selected-definition hash on every validated child. Inline bindings do not claim a published Schema identity. Version `1.0.0` retains its original raw inline-schema contract.
 
-Declare `itemSchema` to validate each item's content. The acquisition/envelope schema is not copied onto items. Outputs retain parent identity/digest, path, key and transformation evidence. Empty collections, duplicate object keys, invalid paths, mismatching schemas and output limits fail explicitly. At most 100 output Artifacts are publishable to Knowledge, each at most 64 KiB; a function invocation also bounds aggregate output content to 512 KiB. A larger source still has to satisfy its acquisition and read limits.
+Omit `itemSchema` to explode JSON without a declared business structure; technical content/path/size/output bounds still apply. Declare it to validate each item's content. The acquisition/envelope schema is not copied onto items. Outputs retain parent identity/digest, path, key and transformation evidence. Empty collections, duplicate object keys, invalid paths, mismatching schemas and output limits fail explicitly. At most 100 output Artifacts are publishable to Knowledge, each at most 64 KiB; a function invocation also bounds aggregate output content to 512 KiB. A larger source still has to satisfy its acquisition and read limits.
 
 Inside **For each Artifact**, a content-processing branch can pass `{"value":{"content":"${input.content}"},"path":"/results"}` to the same function. Return its manifest to the bottom result connector. The owner validates and prepares all children before registering them; it does not first capture another durable Artifact containing the complete batch. An explicit output contract applies to each expanded child. Retained input Artifacts remain unchanged.
 
 Knowledge binding transformations run after a retained acquisition is stored, and before Snapshot output publication. Direct input and expanded inline outputs remain transient until final Snapshot publication. Expiry, cancellation or restart never silently reacquires direct input or falls back to storage. Failed publication preserves the active Snapshot and its historical references.
+
+## Schema arguments are resolved before execution
+
+Schema-aware native parameters declare `"x-agentstration-schema-binding": true` in their input-schema property. This is implementation contract metadata, available in the catalogue and reused by the editors and compiler. It does not add a function kind or couple the native SDK to the Schema library.
+
+In a Source sequence, configure `parameters.itemSchema`, for example:
+
+```json
+{"path":"","itemSchema":{"reference":{"name":"alerts-envelope","version":"1.0.0","scopeRef":"/instance","namespace":"default","schemaPath":"/properties/results/items"}}}
+```
+
+The inline alternative is `{"inline":{"format":"json-schema","content":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}}`. With no published compatible Schema, inline and no-schema operation remain available. An explicitly selected missing, inaccessible, unsupported or ambiguous binding rejects the save/publication instead of disabling validation.
+
+For an ordinary Transform, use its schema-parameter editor, stored separately under `functionSchemas.itemSchema`; the runtime `mapping` supplies only data and ordinary arguments. Schema selection is static, not computed from previous step output. Source save and Flow publication resolve the exact parent under the consumer's permissions and validation profile and retain a server-owned snapshot per call. Published Flows also list these snapshots in `schemaBindings`. A new Schema publication does not alter existing calls. Source receipts and Flow Run snapshots carry the selected schema through admission and recovery without another catalogue lookup. Native handlers receive the resolved inline definition; shared provenance is supplied only through the trusted host context. Workers cannot provide or override that evidence.
+
+Instance initialization version 13 adds the builtin `artifact.explode` `2.0.0` version automatically. Existing function/Flow versions and pinned calls are preserved; select `2.0.0` explicitly to adopt the new binding contract. No business Schema resource is implicitly created or published.
 
 ## Explicit iteration
 

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Functions.Abstractions;
+using Agentstration.Functions;
 using Agentstration.Functions.Builtins;
 using Agentstration.Identity.Contracts;
 using Agentstration.Schemas;
@@ -12,11 +13,23 @@ namespace Agentstration.Infrastructure.Functions;
 
 /// <summary>Expands exact readable inputs into an inline manifest; source publication owns final materialization.</summary>
 public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts, IArtifactDurableStore durable,
-    ICurrentRequestContext current, IRequestContextScopeFactory scopes, INativeFunctionExecutionContext execution) : INativeTransformationFunction
+    ICurrentRequestContext current, IRequestContextScopeFactory scopes, NativeFunctionExecutionContext execution,
+    string version = "2.0.0") : INativeTransformationFunction
 {
-    public NativeFunctionDescriptor Descriptor { get; } = FunctionSchemas.Descriptor("artifact.explode", """
+    public NativeFunctionDescriptor Descriptor { get; } = CreateDescriptor(version);
+
+    private static NativeFunctionDescriptor CreateDescriptor(string version)
+    {
+        var descriptor = FunctionSchemas.Descriptor("artifact.explode", """
         {"value":{"anyOf":[{"type":"object","properties":{"artifacts":{"type":"array","maxItems":128}},"required":["artifacts"]},{"type":"object","properties":{"content":{}},"required":["content"],"additionalProperties":false}]},"path":{"type":"string","maxLength":1024},"mode":{"type":"string","enum":["arrayItems","objectValues"],"default":"arrayItems"},"itemSchema":{"type":"object"},"maximumOutputs":{"type":"integer","minimum":1,"maximum":100,"default":100}}
         """, ["value", "path"], """{"type":"object","properties":{"artifacts":{"type":"array","items":{"type":"object","properties":{"artifactId":{"type":"string"}},"required":["artifactId"]}}},"required":["artifacts"],"additionalProperties":false}""");
+        if (version == "1.0.0") return descriptor;
+        var schema = System.Text.Json.Nodes.JsonNode.Parse(descriptor.InputSchema.GetRawText())!;
+        schema["properties"]!["itemSchema"] = System.Text.Json.Nodes.JsonNode.Parse("""
+            {"type":"object","x-agentstration-schema-binding":true,"properties":{"inline":{"type":["object","null"],"properties":{"format":{"type":"string"},"dialect":{"type":["string","null"]},"content":{}},"required":["format","content"],"additionalProperties":false},"reference":{"type":["object","null"],"properties":{"name":{"type":"string","minLength":1},"version":{"type":"string","minLength":1},"scopeRef":{"type":["string","null"]},"namespace":{"type":["string","null"]},"schemaPath":{"type":["string","null"],"maxLength":1024}},"required":["name","version"],"additionalProperties":false}},"additionalProperties":false}
+            """);
+        return descriptor with { Version = version, InputSchema = JsonSerializer.SerializeToElement(schema) };
+    }
 
     public async ValueTask<JsonElement> ExecuteAsync(JsonElement input, CancellationToken cancellationToken)
     {
@@ -32,7 +45,7 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
         var path = input.GetProperty("path").GetString()!;
         var mode = input.TryGetProperty("mode", out var selectedMode) ? selectedMode.GetString() : "arrayItems";
         var maximum = input.TryGetProperty("maximumOutputs", out var selectedMaximum) ? selectedMaximum.GetInt32() : 100;
-        var contract = input.TryGetProperty("itemSchema", out var itemSchema) ? DataContracts.Declared(itemSchema, "function:artifact.explode/item", "application/json") : null;
+        var contract = ItemContract(input);
         var results = new List<JsonElement>();
         var totalBytes = 0;
         var source = input.GetProperty("value");
@@ -85,6 +98,20 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value);
         return JsonSerializer.SerializeToElement(new { artifactId = "inline-" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
             kind = "inline", contentBase64 = Convert.ToBase64String(bytes) });
+    }
+
+    private ResolvedDataContract? ItemContract(JsonElement input)
+    {
+        if (!input.TryGetProperty("itemSchema", out var schema)) return null;
+        if (Descriptor.Version == "1.0.0") return DataContracts.Declared(schema, "function:artifact.explode/item", "application/json");
+        if (execution.SchemaBindings?.TryGetValue("itemSchema", out var snapshot) != true)
+            throw Error("function_schema_snapshot_missing");
+        var contract = DataContracts.Declared(JsonSchemaSelection.Select(snapshot!.Content), "function:artifact.explode/item", "application/json")!;
+        if (snapshot.Source is { ScopeRef: { } scope, Namespace: { } ns } source
+            && snapshot.SchemaUid is { } uid && snapshot.SchemaGeneration is { } generation)
+            contract = contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+                snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+        return contract;
     }
 
     private async Task<ReadOnlyMemory<byte>> ReadAsync(JsonElement item, string id, CancellationToken ct)

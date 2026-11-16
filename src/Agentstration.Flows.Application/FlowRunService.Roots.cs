@@ -26,6 +26,8 @@ public sealed record EnsureRootFlowRunCommand(
     FlowRunScope Scope)
 {
     public bool TransientPayloads { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool AcceptedCompositionSchemas { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
@@ -47,7 +49,7 @@ public sealed partial class FlowRunService
 
         var resolved = await ResolveVersionAsync(command.Scope.AccessScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
-            : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved, command.Compositions, command.Scope.AccessScopeRef, cancellationToken);
+            : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved, command.Compositions, command.Scope.AccessScopeRef, cancellationToken, command.AcceptedCompositionSchemas);
         resolved = composed.Definition;
         ValidateInput(resolved.Graph?.ResolveInputSchema(), command.Input, command.SecretInputs);
         var now = timeProvider.GetUtcNow();

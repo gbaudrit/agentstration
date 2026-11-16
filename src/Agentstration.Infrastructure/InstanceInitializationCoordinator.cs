@@ -15,7 +15,7 @@ public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
     // Reconcile native Knowledge access contracts, including nullable optional selectors.
-    public int TargetVersion { get; set; } = 12;
+    public int TargetVersion { get; set; } = 13;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }
