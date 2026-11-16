@@ -87,6 +87,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             if (output.DocumentCollectionUid is null) reference = await publications.PrepareAsync(target, projection.Name + ":" + item.ArtifactId, bytes, cancellationToken);
             result.Add(new()
             {
+                Contribution = KnowledgeContributions.ForArtifact(source.Uid, projection.Inputs, item.ArtifactId),
                 ArtifactId = item.ArtifactId,
                 Content = reference,
                 DataContract = contract,
@@ -177,4 +178,5 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
         }
         return catalogued;
     }
+
 }

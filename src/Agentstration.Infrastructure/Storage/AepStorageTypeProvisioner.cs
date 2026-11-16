@@ -80,6 +80,7 @@ public sealed class AepStorageTypeProvisioner(StorageTypeManagementService types
             Contribution = new(provider, providerUid, generation, contributionId, version.Version, AepStorageProtocol.Digest(version)),
             Deprecated = version.Deprecated,
             Documents = version.Documents is { } documents ? new(documents.Get, documents.Put, documents.Delete, documents.Query,
-                documents.ImmutablePublications, documents.QueryProfiles.Select(p => new StorageQueryProfile(p.Id, p.Version, p.Encoding)).ToArray()) : null
+                documents.ImmutablePublications, documents.QueryProfiles.Select(p => new StorageQueryProfile(p.Id, p.Version, p.Encoding)).ToArray())
+            { DocumentSelection = documents.DocumentSelection } : null
         };
 }

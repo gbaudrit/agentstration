@@ -172,7 +172,7 @@ public sealed partial class DocumentConformanceTests
         public async ValueTask DisposeAsync() { if (Mcp is not null) await Mcp.DisposeAsync(); if (Factory is not null) await Factory.DisposeAsync(); }
     }
 
-    private sealed class PartitionProvider(PostgreSqlDocumentProvider inner, string partition) : IAspDocumentProvider, IAspDocumentPublisher
+    private sealed class PartitionProvider(PostgreSqlDocumentProvider inner, string partition) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
     {
         private AspDocumentContext Context(AspDocumentContext c) => c with { Store = c.Store with { StoreId = partition + c.Store.StoreId } };
         public string ProviderId => inner.ProviderId; public string ProviderVersion => inner.ProviderVersion;

@@ -8,6 +8,7 @@ public sealed record KnowledgeCharacterRange(long Start, long End);
 
 public sealed record KnowledgeReadRequest
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public string? SnapshotId { get; init; }
     public string? DocumentId { get; init; }
     public KnowledgeCharacterRange? Range { get; init; }
@@ -18,6 +19,7 @@ public sealed record KnowledgeReadRequest
 
 public sealed record KnowledgeRegexRequest
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public string? Pattern { get; init; }
     public bool IgnoreCase { get; init; } = true;
     public string? SnapshotId { get; init; }
@@ -29,6 +31,7 @@ public sealed record KnowledgeRegexRequest
 
 public sealed record KnowledgeDocumentQueryRequest
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public string? SnapshotId { get; init; }
     public string? Cursor { get; init; }
     public string? PreparationId { get; init; }
@@ -51,6 +54,8 @@ public sealed record KnowledgeInputStatus(string BindingName, string? Acquisitio
 
 public sealed record KnowledgeAccessResult
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
+    public IReadOnlyDictionary<string, string> DocumentArtifacts { get; init; } = new Dictionary<string, string>();
     public required string State { get; init; }
     public required Guid SourceUid { get; init; }
     public string? SnapshotId { get; init; }

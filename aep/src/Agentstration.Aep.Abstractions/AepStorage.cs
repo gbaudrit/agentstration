@@ -32,7 +32,11 @@ public sealed record AepStorageTypeVersion(string Version, string SchemaDigest, 
 }
 public sealed record AepStorageQueryProfile(string Id, string Version, string Encoding);
 public sealed record AepStorageDocumentCapabilities(bool Get, bool Put, bool Delete, bool Query,
-    bool ImmutablePublications, IReadOnlyList<AepStorageQueryProfile> QueryProfiles);
+    bool ImmutablePublications, IReadOnlyList<AepStorageQueryProfile> QueryProfiles)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DocumentSelection { get; init; }
+}
 public sealed record AepStorageTypeContribution(string Id, string DisplayName, string PreferredVersion,
     IReadOnlyList<AepStorageTypeVersion> Versions, string? Description = null);
 

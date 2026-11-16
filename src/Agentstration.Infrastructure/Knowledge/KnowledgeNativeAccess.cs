@@ -78,15 +78,24 @@ public sealed class KnowledgeSnapshotContentReader(IStoragePublicationGateway pu
 public sealed class KnowledgeAccessToolResolver(InternalMcpToolProjectionService projection, IResourceStore resources)
     : IKnowledgeAccessToolResolver
 {
-    public async Task<ToolRelayTarget> ResolveAsync(KnowledgeSourceOperation operation, ResourceScopeRef consumer, CancellationToken cancellationToken)
+    public async Task<ToolRelayTarget> ResolveAsync(KnowledgeSourceOperation operation, ResourceScopeRef consumer, CancellationToken cancellationToken) =>
+        (await ResolveManyAsync([operation], consumer, cancellationToken))[operation];
+
+    public async Task<IReadOnlyDictionary<KnowledgeSourceOperation, ToolRelayTarget>> ResolveManyAsync(
+        IReadOnlyCollection<KnowledgeSourceOperation> operations, ResourceScopeRef consumer, CancellationToken cancellationToken)
     {
         var scope = consumer.Kind == ResourceScopeKind.Workspace ? consumer : ResourceScopeRef.Instance;
         await projection.EnsureAsync(scope, ResourceNamespace.Default, cancellationToken);
-        var name = AgentstrationToolProvider.ToolResourceName(KnowledgeAccessSchemas.ToolName(operation));
-        var tool = (await resources.GetExactAsync<ToolResource>(new(scope, ResourceNamespace.Default,
-            ToolResourceKinds.Tool, name), cancellationToken))?.Value
-            ?? throw new KnowledgeSourceValidationException("knowledge_access_tools_unavailable", "The platform Knowledge Tool is unavailable.");
-        return new() { Name = name, ScopeRef = scope, Namespace = ResourceNamespace.Default, Uid = tool.Uid, Generation = tool.Generation };
+        var result = new Dictionary<KnowledgeSourceOperation, ToolRelayTarget>();
+        foreach (var operation in operations.Distinct())
+        {
+            var name = AgentstrationToolProvider.ToolResourceName(KnowledgeAccessSchemas.ToolName(operation));
+            var tool = (await resources.GetExactAsync<ToolResource>(new(scope, ResourceNamespace.Default,
+                ToolResourceKinds.Tool, name), cancellationToken))?.Value
+                ?? throw new KnowledgeSourceValidationException("knowledge_access_tools_unavailable", "The platform Knowledge Tool is unavailable.");
+            result.Add(operation, new() { Name = name, ScopeRef = scope, Namespace = ResourceNamespace.Default, Uid = tool.Uid, Generation = tool.Generation });
+        }
+        return result;
     }
 }
 
@@ -102,7 +111,7 @@ public abstract class KnowledgeAccessMcpTool(KnowledgeAccessService access, Know
             ? "Recorded Knowledge Snapshot status only. Does not check physical content availability, read content or start preparation. Source identity is fixed by its published relay Tool."
             : "Native governed Knowledge Snapshot access. Source identity is fixed by its published relay Tool.",
         KnowledgeAccessSchemas.Envelope(Operation),
-        OutputSchema: Operation == KnowledgeSourceOperation.StructuredQuery ? JsonSerializer.SerializeToElement(new { type = "object" }) : null,
+        OutputSchema: JsonSerializer.SerializeToElement(new { type = "object" }),
         InitialCategory: KnowledgeBuiltinSchemas.Category, ExposeThroughMcp: false);
     private sealed record Source(string Name, string Namespace, string ScopeRef, Guid Uid);
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
@@ -127,6 +136,7 @@ public abstract class KnowledgeAccessMcpTool(KnowledgeAccessService access, Know
             var request = invocation.Arguments.GetProperty("request");
             object result = Operation switch
             {
+                KnowledgeSourceOperation.Describe => await access.DescribeAsync(id, request.Deserialize<KnowledgeDescribeRequest>(Json)!, cancellationToken, invocation.ExposedTools, invocation.CallerKind == ToolDefinitionCallerKind.Agent),
                 KnowledgeSourceOperation.StructuredQuery => await access.QueryDocumentsAsync(id, request.Deserialize<KnowledgeDocumentQueryRequest>(Json)!, cancellationToken),
                 KnowledgeSourceOperation.Read => await access.ReadAsync(id, request.Deserialize<KnowledgeReadRequest>(Json)!, cancellationToken),
                 KnowledgeSourceOperation.SearchRegex => await access.SearchRegexAsync(id, request.Deserialize<KnowledgeRegexRequest>(Json)!, cancellationToken),
@@ -156,3 +166,7 @@ public sealed class KnowledgeContentStatusMcpTool(KnowledgeAccessService access,
 public sealed class KnowledgeDocumentQueryMcpTool(KnowledgeAccessService access, KnowledgeSourceManagementService sources,
     ICurrentRequestContext current) : KnowledgeAccessMcpTool(access, sources, current)
 { protected override KnowledgeSourceOperation Operation => KnowledgeSourceOperation.StructuredQuery; }
+
+public sealed class KnowledgeDescribeMcpTool(KnowledgeAccessService access, KnowledgeSourceManagementService sources,
+    ICurrentRequestContext current) : KnowledgeAccessMcpTool(access, sources, current)
+{ protected override KnowledgeSourceOperation Operation => KnowledgeSourceOperation.Describe; }

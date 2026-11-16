@@ -115,6 +115,7 @@ public sealed class ToolRelayExecutor(
                 PrincipalId = invocation.PrincipalId,
                 RunId = execution?.RuntimeRunId ?? execution?.FlowRunId,
                 FlowStepId = execution?.FlowStepId,
+                ExposedTools = execution?.ExposedTools,
                 AgentId = execution?.AgentId,
                 AgentRevisionId = execution?.AgentRevisionId,
                 AgentVersion = execution?.AgentVersion,

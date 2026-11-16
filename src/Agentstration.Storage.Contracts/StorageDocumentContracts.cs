@@ -6,7 +6,11 @@ namespace Agentstration.Storage.Contracts;
 
 public sealed record StorageQueryProfile(string Id, string Version, string Encoding);
 public sealed record StorageDocumentCapabilities(bool Get, bool Put, bool Delete, bool Query,
-    bool ImmutablePublications, IReadOnlyList<StorageQueryProfile> QueryProfiles);
+    bool ImmutablePublications, IReadOnlyList<StorageQueryProfile> QueryProfiles)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DocumentSelection { get; init; }
+}
 public sealed record StorageDocumentPolicy(bool Get = true, bool Put = false, bool Delete = false,
     bool Query = true, bool Publish = false, int MaximumPageSize = 50, int MaximumDocumentBytes = 65536,
     int MaximumResultBytes = 196608, IReadOnlyList<string>? QueryProfiles = null);
@@ -24,7 +28,11 @@ public sealed record StorageDocumentCollection
     public StorageDocumentPolicy Policy { get; init; } = new(Query: false, QueryProfiles: []);
 }
 public sealed record StorageDocumentTarget(StorageRevisionReference Storage, StorageResolutionContext Consumer,
-    Guid CollectionUid, StorageDocumentPolicy Policy, string? Publication = null);
+    Guid CollectionUid, StorageDocumentPolicy Policy, string? Publication = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? DocumentIds { get; init; }
+}
 public sealed record StorageQueryProfilePin(string Id, string Version, string Encoding, string ModelDigest);
 public sealed record StorageDocumentValue(string Id, string Revision, JsonElement Value);
 public sealed record StorageDocumentQuery(string RequestId, StorageQueryProfilePin Profile, JsonElement Query,

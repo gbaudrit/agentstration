@@ -565,3 +565,26 @@
 }
 
 .knowledge-projection-failure{margin-bottom:16px}
+
+[data-testid="knowledge-source-tool-exposure"] {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+[data-testid="knowledge-source-tool-exposure"] ::deep .data-grid-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+[data-testid="knowledge-proposed-tool"] code,
+[data-testid="knowledge-proposed-tool"] p {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+[data-testid="knowledge-proposed-tool"] pre {
+    max-height: 20rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

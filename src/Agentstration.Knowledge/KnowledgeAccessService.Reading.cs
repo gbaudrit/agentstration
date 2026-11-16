@@ -46,7 +46,8 @@ public sealed partial class KnowledgeAccessService
             if (request.SnapshotId is not null || request.DocumentId is not null || request.Range is not null || request.PreparationId is not null)
                 throw Error("knowledge_access_cursor_parameters");
             token = Open(request.Cursor, "read", source);
-            snapshot = await ContinueAsync(source, token, ct);
+            ContinueContribution(token, request.Contribution);
+            snapshot = SelectReadableContribution(await ContinueAsync(source, token, ct), request.Contribution, token.SingleDocument);
         }
         else
         {
@@ -54,11 +55,12 @@ public sealed partial class KnowledgeAccessService
                 throw Error("knowledge_access_range_requires_snapshot");
             var selected = await SelectAsync(source, request.SnapshotId, request.PreparationId, ct);
             if (selected.Pending is not null) return selected.Pending;
-            snapshot = selected.Snapshot!;
+            snapshot = SelectReadableContribution(selected.Snapshot!, request.Contribution, request.DocumentId is not null);
             var document = request.DocumentId is null ? 0 : Document(snapshot, request.DocumentId);
             token = await SessionAsync(source, snapshot, "read", ct);
             token = token with
             {
+                Contribution = request.Contribution,
                 Document = document,
                 Position = request.Range?.Start ?? 0,
                 End = request.Range?.End,
@@ -89,6 +91,7 @@ public sealed partial class KnowledgeAccessService
         var ended = token.Document == snapshot.Artifacts.Count;
         return new()
         {
+            Contribution = request.Contribution,
             State = "ready",
             SourceUid = source.Uid,
             SnapshotId = snapshot.Name,
@@ -112,7 +115,8 @@ public sealed partial class KnowledgeAccessService
             if (request.Pattern is not null || request.SnapshotId is not null || request.PreparationId is not null
                 || !request.IgnoreCase || request.ContextCharacters != 160) throw Error("knowledge_access_cursor_parameters");
             token = Open(request.Cursor, "regex", source);
-            snapshot = await ContinueAsync(source, token, ct);
+            ContinueContribution(token, request.Contribution);
+            snapshot = SelectContribution(await ContinueAsync(source, token, ct), request.Contribution);
         }
         else
         {
@@ -120,9 +124,9 @@ public sealed partial class KnowledgeAccessService
             _ = Regex(request.Pattern, request.IgnoreCase);
             var selected = await SelectAsync(source, request.SnapshotId, request.PreparationId, ct);
             if (selected.Pending is not null) return selected.Pending;
-            snapshot = selected.Snapshot!;
+            snapshot = SelectContribution(selected.Snapshot!, request.Contribution);
             token = (await SessionAsync(source, snapshot, "regex", ct)) with
-            { Pattern = request.Pattern, IgnoreCase = request.IgnoreCase, ContextCharacters = request.ContextCharacters };
+            { Contribution = request.Contribution, Pattern = request.Pattern, IgnoreCase = request.IgnoreCase, ContextCharacters = request.ContextCharacters };
         }
         if (snapshot.Artifacts.Sum(value => value.Length) > 8 * 1024 * 1024) throw Error("knowledge_access_scan_limit");
         var regex = Regex(token.Pattern ?? throw Error("knowledge_access_cursor_invalid"), token.IgnoreCase);
@@ -163,6 +167,7 @@ public sealed partial class KnowledgeAccessService
         var ended = token.Document >= snapshot.Artifacts.Count;
         return new()
         {
+            Contribution = request.Contribution,
             State = "ready",
             SourceUid = source.Uid,
             SnapshotId = snapshot.Name,

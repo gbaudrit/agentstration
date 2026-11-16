@@ -185,7 +185,7 @@ public sealed partial class DataSourceDatasetTests
         using var exposed = await client.PostAsJsonAsync($"/api/knowledgesources/{id.Value}/tool-exposure?scopeRef=/instance", new PublishKnowledgeSourceToolExposureRequest());
         Assert.AreEqual(HttpStatusCode.Created, exposed.StatusCode, await exposed.Content.ReadAsStringAsync());
         var exposure = (await exposed.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
-        CollectionAssert.AreEquivalent(new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus }, exposure.Operations.Select(value => value.Operation).ToArray());
+        CollectionAssert.AreEquivalent(new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus, KnowledgeSourceOperation.Describe }, exposure.Operations.Select(value => value.Operation).ToArray());
         foreach (var operation in exposure.Operations)
         {
             var definitionName = $"{id.Value}.access.{operation.Route.Replace('_', '-')}";

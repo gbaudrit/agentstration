@@ -61,7 +61,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             instanceScope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, RetrievalToolSetName), cancellationToken)
             ?? throw new InvalidOperationException("The built-in Knowledge retrieval ToolSet was not reconciled.");
         await EnsureTenantAccessAsync(retrievalToolSet.Value, tenantScope, cancellationToken);
-        foreach (var operation in new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus })
+        foreach (var operation in new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus, KnowledgeSourceOperation.Describe, KnowledgeSourceOperation.StructuredQuery })
         {
             var native = await store.GetExactAsync<ToolResource>(new(instanceScope, ResourceNamespace.Default,
                 ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(KnowledgeAccessSchemas.ToolName(operation))), cancellationToken);

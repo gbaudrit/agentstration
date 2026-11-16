@@ -10,6 +10,7 @@ namespace Agentstration.Knowledge.Contracts;
 public static class KnowledgeResourceKinds
 {
     public const string KnowledgeSource = "KnowledgeSource";
+    public const string KnowledgeToolExposureVersion = "KnowledgeToolExposureVersion";
     public const string KnowledgeSourceToolExposure = "KnowledgeSourceToolExposure";
     public const string KnowledgeProjection = "KnowledgeProjection";
     public const string KnowledgeSnapshot = "KnowledgeSnapshot";
@@ -35,7 +36,7 @@ public static class KnowledgeFlowContracts
     };
 }
 
-public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus, StructuredQuery }
+public enum KnowledgeSourceOperation { Search, Query, Read, SearchRegex, GetStatus, StructuredQuery, Describe }
 
 public readonly record struct KnowledgeSourceId(
     string Value,
@@ -86,6 +87,7 @@ public sealed record KnowledgeSourceProperties
 
 public sealed record KnowledgeDataSourceBinding
 {
+    public string? Description { get; init; }
     public required string Name { get; init; }
     public required ResourceReference DataSource { get; init; }
     public ResourceReference? AcquisitionTarget { get; init; }
@@ -177,6 +179,8 @@ public sealed record KnowledgeDataSourceBindingReadiness(
 
 public sealed record KnowledgeSourceToolOperationExposure
 {
+    public string? CallableName { get; init; }
+    public KnowledgeToolProposal? Proposal { get; init; }
     public required KnowledgeSourceOperation Operation { get; init; }
     public required ResourceReference Tool { get; init; }
     public required string Capability { get; init; }
@@ -205,6 +209,7 @@ public sealed record PutKnowledgeSourceRequest(KnowledgeSourceProperties Propert
 public sealed record SetKnowledgeSourceEnabledRequest(bool Enabled);
 public sealed record PublishKnowledgeSourceToolExposureRequest
 {
+    public string? ProposalDigest { get; init; }
     public string Version { get; init; } = "1.0.0";
     public bool RequiresApproval { get; init; }
 }
@@ -374,6 +379,7 @@ public enum KnowledgeContentAvailability { Unknown, Retired }
 
 public sealed record KnowledgeSnapshotArtifact
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public ResolvedDataContract? DataContract { get; init; }
     public StoragePublicationReference? Content { get; init; }
     public required string ArtifactId { get; init; }

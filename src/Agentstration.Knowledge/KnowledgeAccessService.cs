@@ -70,6 +70,7 @@ public sealed partial class KnowledgeAccessService(
         public int ContextCharacters { get; init; }
         public string? RequestKey { get; init; }
         public long SourceGeneration { get; init; }
+        public KnowledgeContributionSelection? Contribution { get; init; }
         public StorageDocumentQuery? DocumentQuery { get; init; }
     }
 

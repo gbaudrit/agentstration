@@ -46,6 +46,7 @@ public sealed partial class KnowledgeAccessService
             if (request.SnapshotId is not null || request.PreparationId is not null || request.Query is not null || request.PageSize is not null)
                 throw Error("knowledge_access_cursor_parameters");
             token = Open(cursor, "documents", source);
+            ContinueContribution(token, request.Contribution);
             query = token.DocumentQuery ?? throw Error("knowledge_access_cursor_invalid");
             if (request.Profile is not null && request.Profile != query.Profile)
                 throw Error("knowledge_access_cursor_parameters");
@@ -58,7 +59,8 @@ public sealed partial class KnowledgeAccessService
             var selection = await SelectAsync(source, request.SnapshotId, request.PreparationId, ct);
             if (selection.Pending is not null) return selection.Pending;
             snapshot = selection.Snapshot!;
-            token = await SessionAsync(source, snapshot, "documents", ct);
+            _ = SelectContribution(snapshot, request.Contribution);
+            token = (await SessionAsync(source, snapshot, "documents", ct)) with { Contribution = request.Contribution };
             // A provider cursor is shorter lived than the general Knowledge read lease.
             var cursorExpiry = clock.GetUtcNow().AddMinutes(4);
             token = token with { Expires = token.Expires < cursorExpiry ? token.Expires : cursorExpiry };
@@ -80,11 +82,16 @@ public sealed partial class KnowledgeAccessService
             Policy = publication.Target.Policy with { Put = false, Delete = false, Publish = false }
         };
         await documents.ValidatePublicationAsync(publication with { Target = target }, ct);
+        var selectedSnapshot = SelectContribution(snapshot, request.Contribution);
+        if (request.Contribution is not null)
+            target = target with { DocumentIds = selectedSnapshot.Artifacts.Select(a => a.Content!.Document!.DocumentId).ToArray() };
         var page = await documents.QueryAsync(target, query with { RequestId = Guid.NewGuid().ToString("N") }, ct);
         var next = page.Cursor is null ? null : Seal(token with { DocumentQuery = query with { Cursor = page.Cursor } });
         if (next is { Length: > 16384 }) throw Error("knowledge_access_cursor_limit");
         return new()
         {
+            Contribution = request.Contribution,
+            DocumentArtifacts = page.Documents.ToDictionary(d => d.Id, d => selectedSnapshot.Artifacts.Single(a => a.Content!.Document!.DocumentId == d.Id).ArtifactId),
             State = "ready",
             SourceUid = source.Uid,
             SnapshotId = snapshot.Name,

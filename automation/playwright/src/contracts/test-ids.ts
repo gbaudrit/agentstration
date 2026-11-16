@@ -183,6 +183,8 @@ export const TestIds = {
     row: 'trigger-row',
   },
   governedKnowledge: {
+    refreshTools: 'knowledge-refresh-tools',
+    proposedTool: 'knowledge-proposed-tool',
     exposure: 'knowledge-source-tool-exposure', toolLink: 'knowledge-tool-link',
     toolSetVersions: 'toolset-versions', toolSetRow: 'toolset-row', toolSetDetails: 'resource-toolset-details', toolSetVersion: 'toolset-version',
     activeAssignments: 'agent-active-toolsets', stagedDelete: 'staged-artifact-delete',

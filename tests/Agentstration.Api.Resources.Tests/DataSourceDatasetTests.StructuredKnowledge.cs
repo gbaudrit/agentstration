@@ -102,7 +102,7 @@ public sealed partial class DataSourceDatasetTests
         var read = await access.ReadAsync(id, new() { SnapshotId = a }, default);
         Assert.IsTrue(read.Chunks.All(c => c.Content.Contains("\"value\":42", StringComparison.Ordinal)));
         var exposure = await factory.Services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(id, "1.0.0", false, default);
-        Assert.HasCount(4, exposure.Value.Operations);
+        Assert.HasCount(5, exposure.Value.Operations);
         var queryTool = exposure.Value.Operations.Single(o => o.Operation == KnowledgeSourceOperation.StructuredQuery).Tool;
         var pinnedTool = await factory.Services.GetRequiredService<IFlowToolContractResolver>().ResolveAsync(
             queryTool.ScopeRef ?? Owner, queryTool.Namespace ?? ResourceNamespace.Default,

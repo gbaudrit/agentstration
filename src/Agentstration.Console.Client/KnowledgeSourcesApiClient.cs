@@ -16,6 +16,7 @@ public interface IKnowledgeSourcesClient
         bool enabled, string etag, CancellationToken cancellationToken = default);
     Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default);
     Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
+    Task<KnowledgeSourceToolProposal?> GetToolProposalAsync(ResourceNamespace ns, string name, CancellationToken ct = default) => Task.FromResult<KnowledgeSourceToolProposal?>(null);
     Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name,
         PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default);
@@ -86,6 +87,9 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
     public Task<KnowledgeSourceReadiness> GetReadinessAsync(ResourceNamespace @namespace, string name,
         CancellationToken cancellationToken = default) =>
         ApiResponse.ReadAsync<KnowledgeSourceReadiness>(httpClient, ChildPath(@namespace, name, "readiness"), cancellationToken);
+
+    public async Task<KnowledgeSourceToolProposal?> GetToolProposalAsync(ResourceNamespace ns, string name, CancellationToken ct = default) =>
+        await ApiResponse.ReadAsync<KnowledgeSourceToolProposal>(httpClient, ChildPath(ns, name, "tool-proposal"), ct);
 
     public async Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name,
         CancellationToken cancellationToken = default)

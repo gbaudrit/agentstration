@@ -21,7 +21,8 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         var capabilities = context.Documents!;
         var model = AspDocumentValidation.Digest(collection.Schema);
         return new(capabilities, From(policy), capabilities.QueryProfiles.Where(p => policy.QueryProfiles!.Contains(p.Id, StringComparer.Ordinal))
-            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model) { SchemaSnapshot = collection.SchemaSnapshot };
+            .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model)
+        { SchemaSnapshot = collection.SchemaSnapshot };
     }
     public Task<StorageDocumentValue> GetAsync(StorageDocumentTarget target, string id, string? revision, CancellationToken ct) =>
         ExecuteAsync(target, "get", async (client, token) => Value(await client.GetAsync(new(Guid.NewGuid().ToString("N"), id, revision), token)), ct);
@@ -37,6 +38,8 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         ExecuteAsync(target, "query", async (client, token) =>
         {
             var result = await client.QueryAsync(new(request.RequestId, Profile(request.Profile), request.Query, request.PageSize, request.Cursor), token);
+            AspValidation.Require(target.DocumentIds is null || result.Documents.All(d => target.DocumentIds.Contains(d.Id, StringComparer.Ordinal)),
+                "invalid_result", "The provider returned a document outside the authorized subset.");
             return new StorageDocumentPage(result.Documents.Select(Value).ToArray(), result.Groups, result.Cursor);
         }, ct);
     public Task<StorageDocumentPublicationReference> PrepareAsync(StorageDocumentTarget target, string publicationId,
@@ -79,6 +82,12 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         try
         {
             var (context, _, policy) = await ResolveAsync(target, operation, timeout.Token);
+            if (target.DocumentIds is not null)
+            {
+                if (context.Documents?.DocumentSelection != true || target.Publication is null || operation is not ("query" or "get" or "inspect"))
+                    throw new AspException("forbidden", "Document subsets require an exact read-only publication.");
+                policy = policy with { DocumentIds = target.DocumentIds, Put = false, Delete = false, Publish = false };
+            }
             var subject = current.ActorPrincipalId?.ToString("N") ?? (current.AccessMode == ControlPlaneAccessMode.System ? "system" : throw new AspException("forbidden", "Authentication is required."));
             var effective = new AspDocumentContext(new(context.Reference.StorageUid.ToString("N"), context.Type.TypeUid.ToString("N"), context.Reference.BindingDigest),
                 new(target.CollectionUid.ToString("N"), target.Publication), subject,
@@ -89,13 +98,16 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
                 WorkspaceId: current.IsInitialized ? current.Current.WorkspaceId : null, ReasonCode: operation), timeout.Token);
             return result;
         }
-        catch (AspException ex) { throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code switch
+        catch (AspException ex)
         {
-            "forbidden" => 403,
-            "backend_timeout" => 504,
-            "backend_connection_refused" or "backend_unavailable" or "provider_unavailable" => 503,
-            _ => ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422
-        }); }
+            throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code switch
+            {
+                "forbidden" => 403,
+                "backend_timeout" => 504,
+                "backend_connection_refused" or "backend_unavailable" or "provider_unavailable" => 503,
+                _ => ex.Code.Contains("conflict", StringComparison.Ordinal) ? 409 : 422
+            });
+        }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new StorageException("storage_documents_timeout", "The document operation timed out.", 504); }
         catch (Exception ex) when (ex is IOException or HttpRequestException or JsonException)
         { throw new StorageException("storage_documents_unavailable", "The exact document provider is unavailable.", 503); }

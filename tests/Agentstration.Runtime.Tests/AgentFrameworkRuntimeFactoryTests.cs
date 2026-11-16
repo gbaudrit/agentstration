@@ -325,7 +325,11 @@ public sealed class AgentFrameworkRuntimeFactoryTests
         };
         var tool = new TestTool();
         var pipeline = new RecordingToolExecutionPipeline();
-        var definition = Definition() with { EffectiveToolNames = [tool.Id] };
+        var definition = Definition() with
+        {
+            EffectiveToolNames = [tool.Id],
+            ToolReferences = [new(tool.Id, ResourceNamespace.Default, ResourceScopeRef.Instance, Guid.NewGuid(), 1)]
+        };
         var runtime = await new AgentFrameworkRuntimeFactory(
                 new RecordingResolver(chatClient),
                 NullLoggerFactory.Instance,
@@ -348,6 +352,7 @@ public sealed class AgentFrameworkRuntimeFactoryTests
             }), default);
 
         Assert.AreEqual("DIRECT_OK", result.Output);
+        Assert.AreEqual(new ResourceReference(tool.Id, ResourceScopeRef.Instance, ResourceNamespace.Default), pipeline.Contexts.Single().ExposedTools!.Single());
         var invocation = pipeline.Contexts.Single();
         Assert.AreEqual(workspaceId, invocation.WorkspaceId);
         Assert.AreEqual("run-direct", invocation.RunId);

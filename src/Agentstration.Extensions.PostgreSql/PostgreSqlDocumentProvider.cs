@@ -13,7 +13,7 @@ using NpgsqlTypes;
 namespace Agentstration.Extensions.PostgreSql;
 
 /// <summary>Fixed extension-owned layout; every statement is partitioned independently of the query.</summary>
-public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElement schema, TimeProvider? timeProvider = null) : IAspDocumentProvider, IAspDocumentPublisher
+public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElement schema, TimeProvider? timeProvider = null) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly ODataDocumentProfile profile = new(schema);
@@ -50,6 +50,7 @@ public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElem
     public async ValueTask<AspDocument> GetAsync(AspDocumentContext context, AspDocumentGet request, CancellationToken ct)
     {
         AspDocumentValidation.Demand(context, "get");
+        AspValidation.Require(context.Policy.DocumentIds is null || context.Policy.DocumentIds.Contains(request.Id, StringComparer.Ordinal), "forbidden", "Document is outside the authorized selection.");
         await using var connection = await OpenAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         await EnsurePublishedAsync(connection, transaction, context, ct);
@@ -103,6 +104,7 @@ public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElem
         var query = profile.Parse(request.Query);
         var builder = new ODataJsonbSql();
         var filter = query.Filter is null ? "TRUE" : builder.Expression(query.Filter);
+        if (context.Policy.DocumentIds is not null) filter = "d.id = ANY(@allowed_documents) AND (" + filter + ")";
         await using var connection = await OpenAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         await EnsurePublishedAsync(connection, transaction, context, ct);
@@ -307,6 +309,8 @@ public sealed class PostgreSqlDocumentProvider(string connectionString, JsonElem
         var command = new NpgsqlCommand(sql, connection, transaction) { CommandTimeout = 10 };
         command.Parameters.AddWithValue("store", context.Store.StoreId); command.Parameters.AddWithValue("binding", context.Store.BindingId);
         command.Parameters.AddWithValue("collection", context.Selection.Collection); command.Parameters.AddWithValue("publication", context.Selection.Publication ?? "");
+        if (context.Policy.DocumentIds is not null)
+            command.Parameters.AddWithValue("allowed_documents", context.Policy.DocumentIds.ToArray());
         return command;
     }
     private async Task EnsurePublishedAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, AspDocumentContext context, CancellationToken ct)

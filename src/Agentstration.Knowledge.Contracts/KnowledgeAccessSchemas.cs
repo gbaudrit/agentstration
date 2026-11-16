@@ -5,12 +5,14 @@ namespace Agentstration.Knowledge.Contracts;
 
 public static class KnowledgeAccessSchemas
 {
+    public const string DescribeTool = "knowledge.content.describe";
     public const string DocumentQueryTool = "knowledge.documents.query";
     public const string ReadTool = "knowledge.content.read";
     public const string RegexTool = "knowledge.content.search-regex";
     public const string StatusTool = "knowledge.content.get-status";
     public static string Route(KnowledgeSourceOperation operation) => operation switch
     {
+        KnowledgeSourceOperation.Describe => "describe",
         KnowledgeSourceOperation.StructuredQuery => "query_documents",
         KnowledgeSourceOperation.Read => "read",
         KnowledgeSourceOperation.SearchRegex => "search_regex",
@@ -19,6 +21,7 @@ public static class KnowledgeAccessSchemas
     };
     public static string ToolName(KnowledgeSourceOperation operation) => operation switch
     {
+        KnowledgeSourceOperation.Describe => DescribeTool,
         KnowledgeSourceOperation.StructuredQuery => DocumentQueryTool,
         KnowledgeSourceOperation.Read => ReadTool,
         KnowledgeSourceOperation.SearchRegex => RegexTool,
@@ -29,10 +32,22 @@ public static class KnowledgeAccessSchemas
     {
         var properties = new JsonObject
         {
-            ["snapshotId"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["minLength"] = 1, ["maxLength"] = 256,
-                ["description"] = "Omit or use null for the current Snapshot. To select or compare a specific Snapshot, use a non-empty snapshotId returned by Knowledge access; an empty string is invalid." }
+            ["snapshotId"] = new JsonObject
+            {
+                ["type"] = new JsonArray("string", "null"),
+                ["minLength"] = 1,
+                ["maxLength"] = 256,
+                ["description"] = "Omit or use null for the current Snapshot. To select or compare a specific Snapshot, use a non-empty snapshotId returned by Knowledge access; an empty string is invalid."
+            }
         };
-        if (operation != KnowledgeSourceOperation.GetStatus)
+        if (operation == KnowledgeSourceOperation.Describe)
+        {
+            properties["exposure"] = new JsonObject { ["type"] = "string", ["maxLength"] = 256 };
+            properties["exposureScope"] = new JsonObject { ["type"] = "string", ["maxLength"] = 128 };
+        }
+        if (operation is KnowledgeSourceOperation.Read or KnowledgeSourceOperation.SearchRegex or KnowledgeSourceOperation.StructuredQuery)
+            properties["contribution"] = JsonNode.Parse("""{"type":"object","properties":{"bindingName":{"type":"string","maxLength":200},"dataSourceUid":{"type":"string","format":"uuid"}},"required":["bindingName","dataSourceUid"],"additionalProperties":false}""");
+        if (operation is not (KnowledgeSourceOperation.GetStatus or KnowledgeSourceOperation.Describe))
         {
             properties["cursor"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["maxLength"] = 16384 };
             properties["preparationId"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["maxLength"] = 16384 };

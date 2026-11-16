@@ -11,6 +11,10 @@ internal static class KnowledgeAccessEndpoints
 {
     public static void Map(RouteGroupBuilder sources)
     {
+        sources.MapPost("/{name}/content/describe", (string name, string? @namespace, string? scopeRef,
+            KnowledgeDescribeRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
+                Results.Ok(await service.DescribeAsync(Id(name, @namespace, scopeRef), body, ct))))
+            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         sources.MapGet("/{name}/content/document-capabilities", (string name, string? @namespace, string? scopeRef,
             string? snapshotId, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
                 Results.Ok(await service.DescribeDocumentsAsync(Id(name, @namespace, scopeRef), snapshotId, ct))))

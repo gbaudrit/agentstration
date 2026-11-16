@@ -57,4 +57,40 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-publish-tools]"));
         Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-tool-exposure-version]"));
     }
+    [TestMethod]
+    [DataRow("en-US", "Refresh proposed Tools", "Added")]
+    [DataRow("fr-FR", "Actualiser les Tools proposés", "Ajouté")]
+    public void ToolProposalRefreshIsIndependentOfPublishedExposureAndPublicationCarriesReviewedDigest(string locale, string refresh, string added)
+    {
+        using var culture = new TestCultureScope(locale);
+        var source = ProjectedSource();
+        var client = new KnowledgeClientStub(source, exposure: ExistingExposure());
+        var tool = new Agentstration.Knowledge.Contracts.KnowledgeToolProposal
+        {
+            Route = "describe",
+            DefinitionName = "documentation.access.describe",
+            Operation = Agentstration.Knowledge.Contracts.KnowledgeSourceOperation.Describe,
+            DisplayName = "Documentation structure",
+            Description = "Discover the published documentation contributions",
+            InputSchema = System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }),
+            ContractDigest = "structure-contract"
+        };
+        client.ToolProposal = new() { SourceUid = source.Uid, SourceGeneration = source.Generation, Digest = "proposal-a", ToolSetName = source.Name + ".access", Ready = true, Tools = [tool] };
+        using var context = CreateContext(client);
+        var rendered = context.Render<KnowledgeSourceDetails>(p => p.Add(v => v.Name, source.Name));
+        rendered.WaitForElement("[data-testid=knowledge-source-tools-tab]").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual(refresh, rendered.Find("[data-testid=knowledge-refresh-tools]").TextContent));
+        Assert.Contains(added, rendered.Find("[data-testid=knowledge-proposed-tool]").TextContent);
+        Assert.IsNull(client.PublishedExposureRequest);
+        var calls = client.ProposalCalls;
+        client.ToolProposal = client.ToolProposal with { Digest = "proposal-b", Tools = [tool with { Change = "modified", Description = "Changed coverage" }] };
+        rendered.Find("[data-testid=knowledge-refresh-tools]").Click();
+        rendered.WaitForAssertion(() => Assert.IsGreaterThan(calls, client.ProposalCalls));
+        Assert.Contains("Changed coverage", rendered.Find("[data-testid=knowledge-proposed-tool]").TextContent);
+        Assert.Contains("1.0.0", rendered.Find("[data-testid=knowledge-tool-exposure-current-version]").TextContent);
+        Assert.IsNull(client.PublishedExposureRequest);
+        rendered.Find("[data-testid=knowledge-publish-tools]").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("proposal-b", client.PublishedExposureRequest?.ProposalDigest));
+    }
+
 }

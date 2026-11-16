@@ -220,6 +220,7 @@ public sealed record ToolDefinitionInvocationContext(
     long? AgentGeneration = null,
     bool HasSensitiveArguments = false)
 {
+    public IReadOnlyCollection<ResourceReference>? ExposedTools { get; init; }
     public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
@@ -302,7 +303,10 @@ public sealed record InternalMcpToolInvocation(
     ToolDefinitionCallerKind CallerKind,
     string? CallerId = null,
     string? RunId = null,
-    string? FlowStepId = null);
+    string? FlowStepId = null)
+{
+    public IReadOnlyCollection<ResourceReference>? ExposedTools { get; init; }
+}
 
 public interface IInternalMcpToolDefinitionProvider
 {

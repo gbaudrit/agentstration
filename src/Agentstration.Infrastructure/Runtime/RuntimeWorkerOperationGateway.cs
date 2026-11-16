@@ -144,6 +144,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 PrincipalId = request.PrincipalId,
                 RunId = request.RunId,
                 FlowStepId = request.StepExecutionId?.ToString("D"),
+                ExposedTools = request.Agent.Tools.Select(t => new ResourceReference(t.Id[(t.Id.LastIndexOf('/') + 1)..],
+                    t.ScopeRef ?? request.ExecutionScopeRef, t.Namespace)).ToArray(),
                 AgentId = request.Agent.AgentId.ToString("D"),
                 AgentVersion = request.Agent.Generation,
                 AgentGeneration = request.Agent.Generation,
@@ -420,10 +422,14 @@ public sealed class RuntimeWorkerOperationGateway(
                 unit is null ? null : new(unit.Key, unit.Ordinal, unit.Descriptor, unit.TotalUnits), stepExecutionId == Guid.Empty ? null : stepExecutionId);
             return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone())
             {
-                FlowId = child.Value.FlowId.Value, FlowNamespace = child.Value.FlowId.Namespace.Value,
+                FlowId = child.Value.FlowId.Value,
+                FlowNamespace = child.Value.FlowId.Namespace.Value,
                 FlowVersion = child.Value.FlowVersion,
-                OutputName = child.Value.OutputName, Outcome = child.Value.Status == FlowRunStatus.Succeeded ? "success" : "error",
-                ErrorCode = child.Value.Error?.Code, ErrorMessage = child.Value.Error?.Message, ErrorDetails = child.Value.Error?.Details,
+                OutputName = child.Value.OutputName,
+                Outcome = child.Value.Status == FlowRunStatus.Succeeded ? "success" : "error",
+                ErrorCode = child.Value.Error?.Code,
+                ErrorMessage = child.Value.Error?.Message,
+                ErrorDetails = child.Value.Error?.Details,
                 ErrorOrigin = child.Value.Error?.Origin is { } origin ? JsonSerializer.SerializeToElement(origin, ProcessJson) : null
             };
         }

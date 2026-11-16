@@ -89,6 +89,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             PrincipalId = scope?.PrincipalId,
             RunId = scope?.ExecutionId,
             FlowStepId = scope?.FlowStepId,
+            ExposedTools = definition.ToolReferences.Select(t => new Agentstration.Resources.ResourceReference(t.Id[(t.Id.LastIndexOf('/') + 1)..], t.ScopeRef, t.Namespace)).ToArray(),
             AgentId = definition.AgentKey,
             AgentVersion = definition.AgentVersion,
             AgentGeneration = generation ?? scope?.AgentGeneration,

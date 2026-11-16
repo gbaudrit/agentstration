@@ -12,9 +12,16 @@ namespace Agentstration.Knowledge;
 public interface IKnowledgeAccessToolResolver
 {
     Task<ToolRelayTarget> ResolveAsync(KnowledgeSourceOperation operation, ResourceScopeRef consumer, CancellationToken cancellationToken);
+    async Task<IReadOnlyDictionary<KnowledgeSourceOperation, ToolRelayTarget>> ResolveManyAsync(
+        IReadOnlyCollection<KnowledgeSourceOperation> operations, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        var result = new Dictionary<KnowledgeSourceOperation, ToolRelayTarget>();
+        foreach (var operation in operations.Distinct()) result.Add(operation, await ResolveAsync(operation, consumer, ct));
+        return result;
+    }
 }
 
-public sealed class KnowledgeSourceToolExposureService(
+public sealed partial class KnowledgeSourceToolExposureService(
     KnowledgeSourceManagementService sources,
     ToolDefinitionService definitions,
     ToolSetService toolSets,
@@ -23,12 +30,10 @@ public sealed class KnowledgeSourceToolExposureService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
-    IKnowledgeAccessToolResolver? nativeTools = null, IStorageDocumentGateway? documents = null)
+    IKnowledgeAccessToolResolver? nativeTools = null, IStorageDocumentGateway? documents = null, KnowledgeSnapshotService? snapshots = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
-    private static readonly KnowledgeSourceOperation[] Operations =
-        [KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus];
 
     public async Task<StoredResource<KnowledgeSourceToolExposureResource>?> GetAsync(
         KnowledgeSourceId id,
@@ -49,7 +54,7 @@ public sealed class KnowledgeSourceToolExposureService(
         KnowledgeSourceId id,
         string version,
         bool requiresApproval,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? proposalDigest = null)
     {
         var administrative = KnowledgeOperationalRead.AdministrativeContext(requestContext);
         var executionScope = administrative is null ? CurrentWorkspaceScope() : ResourceScopeRef.Workspace(administrative.WorkspaceId);
@@ -58,42 +63,42 @@ public sealed class KnowledgeSourceToolExposureService(
         var readiness = await sources.GetReadinessForUseAsync(id, scopeRef, cancellationToken);
         if (!readiness.Ready)
             throw new KnowledgeSourceValidationException("knowledge_source_not_ready", "Only a ready KnowledgeSource can be exposed as Tools.");
-        var supportedOperations = Operations;
-        StorageQueryProfilePin? queryProfile = null;
-        if (source.Value.Definition.Output is { DocumentCollectionUid: { } collection } output)
-        {
-            if (documents is null) throw new KnowledgeSourceValidationException("knowledge_documents_unavailable", "Document capability discovery is unavailable.");
-            var description = await documents.DescribeAsync(new(output.Storage, new(scopeRef, source.Value.Address), collection,
-                new(QueryProfiles: null)), cancellationToken);
-            if (description.Policy.Query && description.Capabilities.ImmutablePublications)
-                queryProfile = description.QueryProfiles.FirstOrDefault();
-            supportedOperations = description.Policy.Get ? Operations : [KnowledgeSourceOperation.GetStatus];
-            if (queryProfile is not null) supportedOperations = [.. supportedOperations, KnowledgeSourceOperation.StructuredQuery];
-        }
+        var proposal = await ProposeAsync(id, cancellationToken);
+        if (proposalDigest is not null && proposalDigest != proposal.Digest)
+            throw new KnowledgeSourceValidationException("knowledge_tool_proposal_stale", "The Tool proposal changed. Refresh and review it before publication.");
+        if (proposal.Issues.FirstOrDefault(issue => issue is "knowledge_source_tool_set_conflict" or "knowledge_source_tool_definition_conflict") is { } conflict)
+            throw new KnowledgeSourceValidationException(conflict, $"A Tool resource name for '{source.Value.Name}' is owned by another resource.");
+        if (!proposal.Ready) throw new KnowledgeSourceValidationException("knowledge_source_not_ready", "The Tool proposal is not ready.");
+        var proposed = proposal.Tools.Where(t => t.Issue is null && t.Change != "removed").ToArray();
+        var exposureName = "exposure-" + Digest(new { source.Value.Uid, proposal.Digest, version, scopeRef })[..32];
         var toolSetName = source.Value.Name + ".access";
         var existingToolSet = await toolSets.GetExactAsync(scopeRef,
             source.Value.Namespace, toolSetName, cancellationToken);
         if (existingToolSet is not null && !IsOwnedBy(existingToolSet.Value.Metadata, source.Value.Uid))
             throw new KnowledgeSourceValidationException("knowledge_source_tool_set_conflict",
                 $"ToolSet '{source.Value.Namespace}/{source.Value.Name}' is not owned by this KnowledgeSource.");
-        var currentDefinitions = new Dictionary<KnowledgeSourceOperation, StoredResource<ToolDefinitionResource>?>();
-        foreach (var operation in supportedOperations)
+        var currentDefinitions = new Dictionary<string, StoredResource<ToolDefinitionResource>?>(StringComparer.Ordinal);
+        foreach (var candidate in proposed)
         {
-            var definitionName = $"{source.Value.Name}.access.{KnowledgeAccessSchemas.Route(operation).Replace('_', '-')}";
+            var definitionName = candidate.DefinitionName;
             var current = await store.GetExactAsync<ToolDefinitionResource>(ScopedResourceAddress.Create(scopeRef,
                 source.Value.Namespace, ToolResourceKinds.ToolDefinition, definitionName), cancellationToken);
             if (current is not null && !IsOwnedBy(current.Value.Metadata, source.Value.Uid))
                 throw new KnowledgeSourceValidationException("knowledge_source_tool_definition_conflict",
                     $"ToolDefinition '{source.Value.Namespace}/{definitionName}' is not owned by this KnowledgeSource.");
-            currentDefinitions.Add(operation, current);
+            currentDefinitions.Add(candidate.Route, current);
         }
-        var operations = new List<KnowledgeSourceToolOperationExposure>(supportedOperations.Length);
-        var members = new List<ToolSetMember>(supportedOperations.Length);
-        foreach (var operation in supportedOperations)
+        var targets = nativeTools is not null
+            ? await nativeTools.ResolveManyAsync(proposed.Select(t => t.Operation).Distinct().ToArray(), scopeRef, cancellationToken)
+            : throw new KnowledgeSourceValidationException("knowledge_access_tools_unavailable", "The platform Knowledge Tools are unavailable.");
+        var operations = new List<KnowledgeSourceToolOperationExposure>(proposed.Length);
+        var members = new List<ToolSetMember>(proposed.Length);
+        foreach (var candidate in proposed)
         {
-            var route = KnowledgeAccessSchemas.Route(operation);
-            var definitionName = $"{source.Value.Name}.access.{route.Replace('_', '-')}";
-            var current = currentDefinitions[operation];
+            var operation = candidate.Operation;
+            var route = candidate.Route;
+            var definitionName = candidate.DefinitionName;
+            var current = currentDefinitions[route];
             _ = await definitions.PutAsync(new ToolDefinitionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -116,17 +121,10 @@ public sealed class KnowledgeSourceToolExposureService(
                 {
                     Version = version,
                     Publish = true,
-                    DisplayName = $"{source.Value.Definition.DisplayName} {route}",
-                    Description = operation switch
-                    {
-                        KnowledgeSourceOperation.StructuredQuery => "Query structured documents in an exact immutable Snapshot. The relay fixes the query profile and model. Initial requests provide query; continuations provide cursor only. No document writes, SQL or physical destination selection. Profile: " + queryProfile!.Id + "/" + queryProfile.Version,
-                        KnowledgeSourceOperation.Read => "Read Unicode character chunks. Without a Snapshot or cursor, prepare current data if necessary. Continue with cursor only; a cursor stays on the same Snapshot. Reuse search_regex snapshotId, documentId and readRange as range.",
-                        KnowledgeSourceOperation.SearchRegex => "Search a Snapshot using a bounded .NET non-backtracking regular expression. May be called before read; prepares data if necessary. Returns Unicode matchRange and readRange for read. Continue with cursor only. Unsupported lookarounds and backreferences are rejected.",
-                        _ => "Inspect active and latest published Snapshots and input freshness without starting acquisition or projection. Call with request {} or {snapshotId: null} for current status. Only supply a non-empty snapshotId returned by Knowledge access to compare a specific Snapshot. Freshness is recorded evidence, not a guarantee about the remote origin."
-                    },
+                    DisplayName = candidate.DisplayName,
+                    Description = candidate.Description,
                     RequiresApproval = requiresApproval,
-                    Target = nativeTools is not null ? await nativeTools.ResolveAsync(operation, scopeRef, cancellationToken)
-                        : throw new KnowledgeSourceValidationException("knowledge_access_tools_unavailable", "The platform Knowledge Tools are unavailable."),
+                    Target = targets[operation],
                     Bindings = [new LiteralToolArgumentBinding
                     {
                         Path = "/source", Value = JsonSerializer.SerializeToElement(new
@@ -134,9 +132,13 @@ public sealed class KnowledgeSourceToolExposureService(
                             name = source.Value.Name, @namespace = source.Value.Namespace.Value,
                             scopeRef = source.Value.ScopeRef!.Value.Value, uid = source.Value.Uid
                         })
-                    }, .. operation == KnowledgeSourceOperation.StructuredQuery
-                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/profile", Value = JsonSerializer.SerializeToElement(queryProfile, Json) } }
-                        : []]
+                    }, .. candidate.Profile is not null
+                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/profile", Value = JsonSerializer.SerializeToElement(candidate.Profile, Json) } } : [],
+                    .. candidate.Contribution is not null
+                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/contribution", Value = JsonSerializer.SerializeToElement(candidate.Contribution, Json) } } : [],
+                    .. operation == KnowledgeSourceOperation.Describe
+                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/exposure", Value = JsonSerializer.SerializeToElement(exposureName, Json) },
+                            new LiteralToolArgumentBinding { Path = "/request/exposureScope", Value = JsonSerializer.SerializeToElement(scopeRef.Value, Json) } } : []]
                 }
             }, current?.ETag, current is null, cancellationToken);
 
@@ -145,6 +147,8 @@ public sealed class KnowledgeSourceToolExposureService(
             var capability = $"knowledge.{route}";
             operations.Add(new KnowledgeSourceToolOperationExposure
             {
+                CallableName = ToolDefinitionService.VersionName(definitionName, version),
+                Proposal = candidate,
                 Operation = operation,
                 Tool = tool,
                 Capability = capability,
@@ -152,6 +156,25 @@ public sealed class KnowledgeSourceToolExposureService(
             });
             members.Add(new ToolSetMember { Tool = tool, Capability = capability, Route = route });
         }
+
+        var latest = await sources.ResolveForUseAsync(id, scopeRef, cancellationToken);
+        if (latest.Value.Generation != proposal.SourceGeneration || latest.Value.Uid != proposal.SourceUid)
+            throw new KnowledgeSourceValidationException("knowledge_tool_proposal_stale", "Refresh and review the changed configuration.");
+        var evidence = new KnowledgeToolExposureVersion
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeToolExposureVersion,
+            Metadata = new() { Name = exposureName, Namespace = source.Value.Namespace },
+            ScopeRef = scopeRef,
+            SourceUid = source.Value.Uid,
+            DisplayName = source.Value.Definition.DisplayName,
+            Description = source.Value.Definition.Description,
+            Version = version,
+            Proposal = proposal,
+            Operations = operations
+        };
+        _ = await scopeOperations.WriteAsync(evidence, scopeRef, AuthorizationPermissions.ResourcesWrite,
+            token => store.CreateImmutableAsync(evidence, token), cancellationToken);
 
         var toolSetDefinition = new ToolSetProperties
         {

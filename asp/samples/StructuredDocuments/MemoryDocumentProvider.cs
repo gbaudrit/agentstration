@@ -6,7 +6,7 @@ using Agentstration.Asp.OData;
 namespace Asp.Samples.StructuredDocuments;
 
 /// <summary>Bounded conformance fixture, not a durable production store.</summary>
-public sealed class MemoryDocumentProvider(JsonElement schema, TimeProvider clock) : IAspDocumentProvider, IAspDocumentPublisher
+public sealed class MemoryDocumentProvider(JsonElement schema, TimeProvider clock) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
 {
     private readonly ODataDocumentProfile profile = new(schema);
     private readonly object gate = new();
@@ -23,6 +23,7 @@ public sealed class MemoryDocumentProvider(JsonElement schema, TimeProvider cloc
     public ValueTask<AspDocument> GetAsync(AspDocumentContext context, AspDocumentGet request, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested(); AspDocumentValidation.Demand(context, "get");
+        AspValidation.Require(context.Policy.DocumentIds is null || context.Policy.DocumentIds.Contains(request.Id, StringComparer.Ordinal), "forbidden", "Document is outside the authorized selection.");
         lock (gate)
         {
             Published(context);
@@ -64,6 +65,7 @@ public sealed class MemoryDocumentProvider(JsonElement schema, TimeProvider cloc
         {
             Published(context); var partition = Partition(context);
             selected = documents.Where(p => p.Key.StartsWith(partition, StringComparison.Ordinal)).Select(p => p.Value)
+                .Where(d => context.Policy.DocumentIds is null || context.Policy.DocumentIds.Contains(d.Id, StringComparer.Ordinal))
                 .Where(d => query.Filter is null || ODataDocumentQuery.Evaluate(query.Filter, d.Value) is true).ToList();
         }
         selected.Sort(query.CompareDocuments);

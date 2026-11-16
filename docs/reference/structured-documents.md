@@ -271,3 +271,45 @@ See ADRs [0220](../decisions/0220-asp-document-capabilities-and-open-query-profi
 [0223](../decisions/0223-postgresql-jsonb-is-an-autonomous-asp-provider.md),
 [0224](../decisions/0224-structured-snapshots-pin-immutable-document-publications.md)
 and [0225](../decisions/0225-structured-storage-does-not-define-memory-policy.md).
+
+### Knowledge Tool proposals and contribution selection
+
+`GET /api/knowledgesources/{name}/tool-proposal` calculates proposed access Tools
+from the saved source and metadata. It returns a `digest`, source identity and
+generation, readiness/issues, and per-Tool route, description, contracts,
+contribution/profile selection and comparison state. It does not publish or read
+content. Existing namespace/scope/context conventions apply.
+
+Send that digest as `proposalDigest` with the version and approval setting to
+`POST /api/knowledgesources/{name}/tool-exposure`. A changed reviewed proposal
+returns `409` with `knowledge_tool_proposal_stale`; refresh and review before
+retrying. Legacy explicit publication calls without a digest still calculate
+current eligibility, but do not assert a previous review.
+
+Every new exposure includes a source-owned describe relay. Its immutable
+`exposure` and `exposureScope` are fixed internally. The caller uses
+`{ "request": {} }`, or provides `request.snapshotId`. The native REST operation
+is `POST /api/knowledgesources/{name}/content/describe`. Discovery returns recorded
+metadata and exact published access references, including their callable names.
+Agent calls are filtered by the trusted assigned Tool inventory, not an inventory
+supplied in business arguments. An unavailable or retired Snapshot is reported
+as metadata, without granting content access or initiating preparation.
+
+Contribution access relays also fix `request.contribution` and, for structured
+queries, `request.profile`. Read/search/query APIs retain their source-wide mode
+when contribution is absent. A selected contribution is identified by its binding
+name and exact Data Source UID within the source. The returned `snapshotId`
+allows callers to reuse one publication across operations. Cursors additionally
+bind the contribution and cannot be transferred to another contribution Tool.
+Structured pages include `documentArtifacts` to map returned record IDs to their
+logical Snapshot Artifacts.
+
+`StorageDocumentCapabilities.DocumentSelection` advertises implemented trusted
+read-only document subsets. The gateway requires this capability and an exact
+publication for a non-null `StorageDocumentTarget.DocumentIds`. ASP's corresponding
+policy set is bounded to 100 unique logical IDs; null means unrestricted within
+the already authorized collection/publication, while an empty set selects no
+records. Intersection never widens a set. Subset policies cannot authorize
+mutation/publication and fail for providers without explicit subset support.
+PostgreSQL applies the parameterized restriction before aggregates and paging.
+No IDs or physical selectors become caller-editable relay arguments.

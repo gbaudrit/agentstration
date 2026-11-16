@@ -64,6 +64,7 @@ else
                 {
                     <div class="form-grid knowledge-binding-card" data-testid="knowledge-source-binding">
                         <label><span>@T("BindingName")</span><input @bind="binding.Name" maxlength="128" /></label>
+                        <label><span>@T("ContributionDescription")</span><textarea @bind="binding.Description" maxlength="2000" rows="2"></textarea></label>
                         <label><span>@T("DataSource")</span><select value="@binding.DataSourceKey" @onchange="args => ChangeDataSourceAsync(binding, args)" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
                         @if (TargetOptions(binding).Count > 0) { <label><span>@T("AcquisitionTarget")</span><select @bind="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</select></label> }
                         <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
@@ -315,7 +316,7 @@ else
             AcquisitionTarget = string.IsNullOrWhiteSpace(value.AcquisitionTargetName) ? null
                 : new(value.AcquisitionTargetName, TargetOptions(value).Single(target => target.Target.Name == value.AcquisitionTargetName).Target.ScopeRef, dataSource.Namespace),
             Transformations = value.Transformations,
-            TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
+            Description = value.Description, TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
             MaximumAge = ParseMaximumAge(value.MaximumAgeText), RefreshIfNecessary = value.RefreshIfNecessary,
             AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAge = value.AllowStaleOnRefreshFailure ? ParseMaximumAge(value.MaximumFallbackAgeText) : null };
     }
@@ -400,6 +401,7 @@ else
     }
     private sealed class BindingModel
     {
+        public string? Description { get; set; }
         public string Name { get; set; } = string.Empty;
         public string DataSourceKey { get; set; } = string.Empty;
         public string AcquisitionTargetName { get; set; } = string.Empty;
@@ -421,6 +423,7 @@ else
             AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
             TransformationFlowKey = transformationFlowKey,
             Transformations = value.Transformations,
+            Description = value.Description,
             Configuration = value.Configuration.Clone(),
             Required = value.Required,
             RefreshIfNecessary = value.RefreshIfNecessary,

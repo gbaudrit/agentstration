@@ -8,7 +8,7 @@ import { LoginPage } from './login.page.js';
 interface Exposure {
   toolSet: { name: string };
   toolSetVersion: string;
-  operations: { route: string; tool: { name: string } }[];
+  operations: { route: string; tool: { name: string }; proposal: { definitionName: string } }[];
 }
 
 export interface AgentPinEvidence {
@@ -18,6 +18,7 @@ export interface AgentPinEvidence {
   revision: unknown;
   agentUrl: string;
   selected: string;
+  definitionName: string;
 }
 
 export class GovernedKnowledgePage {
@@ -33,12 +34,13 @@ export class GovernedKnowledgePage {
     await this.page.goto(url.toString());
     const exposurePanel = this.page.getByTestId(TestIds.governedKnowledge.exposure);
     await exposurePanel.getByRole('button', { name: text.publishExposure, exact: true }).click();
-    await expect(exposurePanel.getByTestId(TestIds.governedKnowledge.toolLink)).toHaveCount(3);
+    await expect(exposurePanel.getByTestId(TestIds.governedKnowledge.toolLink)).toHaveCount(4);
     const response = await this.page.request.get(`${consoleUrl}/api/knowledgesources/${knowledge}/tool-exposure?scopeRef=${encodeURIComponent(scope)}`);
     await status(response, 200);
     const exposure = await response.json() as Exposure;
     expect(exposure.toolSetVersion).toBe('1.0.0');
-    expect(exposure.operations).toHaveLength(3);
+    expect(exposure.operations).toHaveLength(4);
+    expect(exposure.operations.some(item => item.route === 'describe')).toBe(true);
     await exposurePanel.getByRole('link', { name: text.openToolSet, exact: true }).click();
     await expect(this.publishedTools).toBeVisible();
     const version = this.page.getByTestId(TestIds.governedKnowledge.toolSetVersion);
@@ -62,7 +64,7 @@ export class GovernedKnowledgePage {
     await status(response, 200);
     const exposure = await response.json() as Exposure;
     // The materialized search member is chosen by its invariant capability route.
-    const search = exposure.operations.find(item => item.route === 'search_regex');
+    const search = exposure.operations.find(item => item.route.endsWith('.search_regex'));
     expect(search).toBeDefined();
     const selected = search!.tool.name;
     const excluded = exposure.operations.filter(item => item.tool.name !== selected).map(item => item.tool.name);
@@ -111,7 +113,7 @@ export class GovernedKnowledgePage {
     expect(revision.definition.effectiveToolNames).toEqual([selected]);
     await editor.openTools();
     await expect(this.page.getByTestId(TestIds.agentEditor.toolConfiguration).locator('input[type="checkbox"]:checked')).toHaveCount(1);
-    return { toolSetName: exposure.toolSet.name, excluded, revisionUrl, revision, agentUrl: this.page.url(), selected };
+    return { toolSetName: exposure.toolSet.name, excluded, revisionUrl, revision, agentUrl: this.page.url(), selected, definitionName: search!.proposal.definitionName };
   }
 
   public async broadenDraft(evidence: AgentPinEvidence, text: ExpectedText['governedKnowledge']): Promise<void> {
@@ -136,7 +138,7 @@ export class GovernedKnowledgePage {
     const originalVersion = await (await this.get(consoleUrl, `${path}/versions/1.0.0`, scope)).json() as unknown;
     const current = await this.get(consoleUrl, path, scope);
     const toolSet = await current.json() as { definition: { members: unknown[] } & Record<string, unknown> };
-    const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${knowledge}.access.search-regex`, scope)).json() as { definition: Record<string, unknown> };
+    const definition = await (await this.get(consoleUrl, `/api/tooldefinitions/${evidence.definitionName}`, scope)).json() as { definition: Record<string, unknown> };
     const additionalName = `${knowledge}.additional-search`;
     await this.post(consoleUrl, '/api/tooldefinitions', scope, {
       name: additionalName, namespace: 'default', properties: { ...definition.definition, displayName: additionalName, publish: true },
@@ -151,7 +153,7 @@ export class GovernedKnowledgePage {
     await status(updated, 200);
     const latest = await (await this.get(consoleUrl, `${path}/versions/2.0.0`, scope)).json() as { members: { toolName: string }[] };
     expect(latest.members.map(member => member.toolName)).toContain(additionalTool);
-    expect(latest.members).toHaveLength(4);
+    expect(latest.members).toHaveLength(5);
     expect(await (await this.get(consoleUrl, `${path}/versions/1.0.0`, scope)).json()).toEqual(originalVersion);
 
     await this.openToolSet(consoleUrl, evidence.toolSetName, scope);
@@ -196,7 +198,7 @@ export class GovernedKnowledgePage {
     await this.openTools(consoleUrl, unavailable, scope);
     const exposure = this.page.getByTestId(TestIds.governedKnowledge.exposure);
     await expect(exposure.getByRole('button', { name: text.publishExposure, exact: true })).toBeDisabled();
-    await expect(exposure.locator('.inline-warning')).toBeVisible();
+    await expect(exposure.locator('.inline-warning').filter({ hasText: text.notReadyHelp })).toBeVisible();
     const rejected = await this.post(consoleUrl, `/api/knowledgesources/${unavailable}/tool-exposure`, scope, { version: '1.0.0' }, 422);
     expect((await rejected.json() as { type: string }).type).toContain('knowledge_source_not_ready');
 
@@ -209,8 +211,8 @@ export class GovernedKnowledgePage {
     }, 201);
     const foreign = await (await this.get(consoleUrl, `/api/toolsets/${conflict}.access`, scope)).json() as unknown;
     await this.openTools(consoleUrl, conflict, scope);
-    await exposure.getByRole('button', { name: text.publishExposure, exact: true }).click();
-    await expect(this.page.locator('.form-alert-danger[role="status"]')).toContainText(conflict);
+    await expect(exposure.getByRole('button', { name: text.publishExposure, exact: true })).toBeDisabled();
+    await expect(exposure.locator('.inline-warning').filter({ hasText: 'knowledge_source_tool_set_conflict' })).toBeVisible();
     const conflicting = await this.post(consoleUrl, `/api/knowledgesources/${conflict}/tool-exposure`, scope, { version: '1.0.0' }, 422);
     expect((await conflicting.json() as { type: string }).type).toContain('knowledge_source_tool_set_conflict');
     expect(await (await this.get(consoleUrl, `/api/toolsets/${conflict}.access`, scope)).json()).toEqual(foreign);
