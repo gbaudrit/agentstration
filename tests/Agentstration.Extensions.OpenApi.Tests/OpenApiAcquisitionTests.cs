@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
 using Agentstration.Extensions.OpenApi;
+using Agentstration.Schemas;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,112 @@ namespace Agentstration.Extensions.OpenApi.Tests;
 
 public sealed partial class OpenApiExtensionTests
 {
+    [TestMethod]
+    [DataRow("{}")]
+    [DataRow("{\"type\":\"any\"}")]
+    public async Task DiscoveryProjectsUnconstrainedRecordFieldsWithoutLosingDeclaredStructureOrEvidence(string additionalProperties)
+    {
+        var contract = RecordContract(additionalProperties);
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "open-records", default);
+        var operation = discovery.Operations.Single();
+        Assert.IsFalse(discovery.Diagnostics.Any(d => d.Code == "openapi_acquisition_schema_unsupported"));
+        Assert.AreEqual(additionalProperties.Contains("any", StringComparison.Ordinal),
+            discovery.Diagnostics.Any(d => d.Code == "openapi_compatibility_type_any"));
+        var input = operation.Definition.GetProperty("inputSchema");
+        Assert.AreEqual("dataset_id", input.GetProperty("properties").GetProperty("path").GetProperty("required")[0].GetString());
+        Assert.AreEqual(100, input.GetProperty("properties").GetProperty("query").GetProperty("properties").GetProperty("limit").GetProperty("maximum").GetInt32());
+        var output = operation.Definition.GetProperty("outputSchema");
+        Assert.AreEqual("integer", output.GetProperty("properties").GetProperty("total_count").GetProperty("type").GetString());
+        var record = output.GetProperty("properties").GetProperty("results").GetProperty("items");
+        Assert.AreEqual("object", record.GetProperty("type").GetString());
+        Assert.AreEqual("string", record.GetProperty("properties").GetProperty("_id").GetProperty("type").GetString());
+        Assert.AreEqual("date-time", record.GetProperty("properties").GetProperty("_timestamp").GetProperty("format").GetString());
+        var size = record.GetProperty("properties").GetProperty("_size");
+        Assert.IsFalse(size.TryGetProperty("format", out _));
+        Assert.AreEqual((decimal)long.MinValue, size.GetProperty("minimum").GetDecimal());
+        Assert.AreEqual((decimal)long.MaxValue, size.GetProperty("maximum").GetDecimal());
+        Assert.AreEqual(JsonValueKind.True, record.GetProperty("additionalProperties").ValueKind);
+        var outputContract = DataContracts.Declared(output, "records");
+        DataContracts.Validate(outputContract, JsonSerializer.Deserialize<JsonElement>("""
+            {"total_count":1,"results":[{"_id":"synthetic","_timestamp":"2026-11-16T12:00:00Z","_size":42,
+              "title":"Alert","nested":{"flag":true},"tags":[1,null]}]}
+            """), "records");
+        foreach (var invalid in new[] { """{"total_count":"invalid","results":[]}""",
+            """{"results":[{"_timestamp":"invalid"}]}""", """{"results":[{"_size":9223372036854775808}]}""" })
+            Assert.Throws<DataContractException>(() => DataContracts.Validate(outputContract, JsonSerializer.Deserialize<JsonElement>(invalid), "records"));
+        var evidence = operation.Definition.GetProperty("responseShape").GetProperty("x-agentstration-response");
+        Assert.AreEqual("#/components/schemas/records", evidence.GetProperty("nativeDefinition").GetProperty("$ref").GetString());
+        var parsed = Parser().Parse(contract, "application/json", new("https://origin.example.test/openapi.json"));
+        Assert.AreEqual(parsed.Descriptor.Sha256, evidence.GetProperty("contractDigest").GetString());
+        Assert.IsTrue(JsonNode.DeepEquals(JsonNode.Parse(additionalProperties),
+            parsed.Document["components"]?["schemas"]?["record"]?["additionalProperties"]));
+    }
+
+    [TestMethod]
+    [DataRow("{\"type\":\"string\"}")]
+    [DataRow("{\"type\":\"any\",\"maxLength\":3}")]
+    [DataRow("{\"type\":\"any\",\"enum\":[\"fixed\"]}")]
+    public async Task DiscoveryDoesNotDropConstraintsOnAdditionalRecordFields(string additionalProperties)
+    {
+        var contract = RecordContract(additionalProperties);
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "constrained-records", default);
+        Assert.Contains("openapi_acquisition_schema_unsupported", discovery.Diagnostics.Select(d => d.Code));
+        Assert.IsFalse(discovery.Operations.Single().Definition.TryGetProperty("outputSchema", out _));
+    }
+
+    // Synthetic contract reproducing Opendatasoft's referenced records and legacy open-field declaration.
+    private static string RecordContract(string additionalProperties) => """
+        {"openapi":"3.0.3","info":{"title":"Records","version":"1"},"paths":{
+          "/datasets/{dataset_id}/records":{"get":{"operationId":"getRecords","parameters":[
+            {"name":"dataset_id","in":"path","required":true,"schema":{"type":"string"}},
+            {"name":"limit","in":"query","schema":{"type":"integer","minimum":-1,"maximum":100,"default":10}}],
+            "responses":{"200":{"description":"Records","content":{"application/json; charset=utf-8":{
+              "schema":{"$ref":"#/components/schemas/records"}}}}}}}},
+          "components":{"schemas":{
+            "records":{"type":"object","properties":{"total_count":{"type":"integer"},
+              "results":{"type":"array","items":{"$ref":"#/components/schemas/record"}}}},
+            "record":{"type":"object","properties":{"_id":{"type":"string"},"_timestamp":{"type":"string","format":"dateTime"},
+              "_size":{"type":"integer","format":"int64"}},"additionalProperties":ADDITIONAL}}}}
+        """.Replace("ADDITIONAL", additionalProperties, StringComparison.Ordinal);
+
+    [TestMethod]
+    [DataRow("int32", -2147483648L, 2147483647L)]
+    [DataRow("int64", long.MinValue, long.MaxValue)]
+    public async Task DiscoveryPreservesIntegerFormatBoundsAndStricterDeclaredLimits(string format, long minimum, long maximum)
+    {
+        var contract = AcquisitionContract.Replace("{\"type\":\"object\"}",
+            "{\"type\":\"integer\",\"format\":\"" + format + "\"}", StringComparison.Ordinal);
+        await VerifyAsync(contract, minimum, maximum);
+        await VerifyAsync(contract.Replace("\"type\":\"integer\"", "\"minimum\":0,\"maximum\":10,\"type\":\"integer\"", StringComparison.Ordinal), 0, 10);
+
+        async Task VerifyAsync(string source, long expectedMinimum, long expectedMaximum)
+        {
+            var discovery = await Service((_, _) => Task.FromResult(Response(source, "application/json")))
+                .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "integer-width", default);
+            var output = discovery.Operations.Single(o => o.Definition.GetProperty("operationId").GetString() == "getItems").Definition.GetProperty("outputSchema");
+            Assert.AreEqual((decimal)expectedMinimum, output.GetProperty("minimum").GetDecimal());
+            Assert.AreEqual((decimal)expectedMaximum, output.GetProperty("maximum").GetDecimal());
+            var resolved = DataContracts.Declared(output, "integer-width");
+            DataContracts.Validate(resolved, JsonSerializer.SerializeToElement(expectedMaximum), "integer-width");
+            Assert.Throws<DataContractException>(() => DataContracts.Validate(resolved, JsonSerializer.SerializeToElement((decimal)expectedMaximum + 1), "integer-width"));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("{\"type\":\"string\",\"format\":\"uuid\"}")]
+    [DataRow("{\"type\":\"string\",\"format\":\"int64\"}")]
+    [DataRow("{\"type\":[\"integer\",\"null\"],\"format\":\"int64\"}")]
+    public async Task DiscoveryDoesNotPublishUnenforceableFormatConstraints(string schema)
+    {
+        var contract = AcquisitionContract.Replace("{\"type\":\"object\"}", schema, StringComparison.Ordinal);
+        var discovery = await Service((_, _) => Task.FromResult(Response(contract, "application/json")))
+            .DiscoverConnectionAsync("https://origin.example.test", ["/openapi.json"], null, "unsupported-format", default);
+        Assert.Contains("openapi_acquisition_schema_unsupported", discovery.Diagnostics.Select(d => d.Code));
+        Assert.IsFalse(discovery.Operations.Single(o => o.Definition.GetProperty("operationId").GetString() == "getItems").Definition.TryGetProperty("outputSchema", out _));
+    }
+
     [TestMethod]
     [DataRow("application/json; charset=utf-8", "200")]
     [DataRow("Application/JSON; charset=UTF-8", "200")]

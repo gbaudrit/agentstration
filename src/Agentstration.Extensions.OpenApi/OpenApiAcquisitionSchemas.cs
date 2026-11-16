@@ -103,6 +103,15 @@ internal static class OpenApiAcquisitionSchemas
                     result[key] = children;
                 }
                 else if (key == "items") result[key] = Schema(value, depth + 1);
+                else if (key == "additionalProperties" && Resolve(value) is JsonObject additional)
+                {
+                    // Open records may use {} or the parser's legacy {"type":"any"} compatibility form.
+                    // Both mean unrestricted fields; constrained schemas still require an unsupported profile.
+                    if (additional.Count != 0 && !(additional.Count == 1 && additional["type"] is JsonValue type
+                        && type.TryGetValue<string>(out var name) && name.Equals("any", StringComparison.OrdinalIgnoreCase)))
+                        throw Unsupported();
+                    result[key] = true;
+                }
                 else if (key is "type" or "required" or "additionalProperties" or "enum" or "minItems" or "maxItems"
                     or "minLength" or "maxLength" or "pattern" or "format" or "minimum" or "maximum"
                     or "title" or "description" or "default" or "examples") result[key] = value?.DeepClone();
@@ -110,8 +119,35 @@ internal static class OpenApiAcquisitionSchemas
             }
             if (result.Count == 0) return AnyJson();
             if (!result.ContainsKey("type") || result["additionalProperties"] is JsonObject) throw Unsupported();
+            ProjectFormat(result);
             return result;
         }
+    }
+    private static void ProjectFormat(JsonObject schema)
+    {
+        if (!schema.TryGetPropertyValue("format", out var node)) return;
+        if (node is not JsonValue value || !value.TryGetValue<string>(out var format)) throw Unsupported();
+        if (format is "uri" or "date-time") return;
+        var type = schema["type"] is JsonValue typeValue && typeValue.TryGetValue<string>(out var name) ? name : null;
+        if (format == "dateTime" && type == "string")
+        {
+            schema["format"] = "date-time";
+            return;
+        }
+        if (format is not ("int32" or "int64") || type != "integer") throw Unsupported();
+        // Preserve OpenAPI integer widths through constraints enforced by the native JSON Schema validator.
+        decimal minimum = format == "int32" ? int.MinValue : long.MinValue;
+        decimal maximum = format == "int32" ? int.MaxValue : long.MaxValue;
+        foreach (var (property, limit) in new[] { ("minimum", minimum), ("maximum", maximum) })
+        {
+            if (schema[property] is { } bound)
+            {
+                if (bound is not JsonValue number || !number.TryGetValue<decimal>(out var declared)) throw Unsupported();
+                schema[property] = property == "minimum" ? Math.Max(declared, limit) : Math.Min(declared, limit);
+            }
+            else schema[property] = limit;
+        }
+        schema.Remove("format");
     }
     private static JsonObject Object() => new() { ["type"] = "object", ["properties"] = new JsonObject(), ["required"] = new JsonArray(), ["additionalProperties"] = false };
     private static JsonObject AnyJson() => new() { ["type"] = new JsonArray("object", "array", "string", "number", "boolean", "null") };

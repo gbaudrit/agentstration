@@ -224,6 +224,8 @@ public sealed partial class OpenApiService
                 contractCount++;
                 var parsed = parser.Parse(Encoding.UTF8.GetString(fetched.Value.Content), fetched.Value.MediaType, candidate);
                 var contract = parsed.Descriptor;
+                if (contract.Diagnostics.Any(item => item.Code == "openapi_compatibility_type_any"))
+                    diagnostics.Add(new("openapi_compatibility_type_any", "Non-standard schema type 'any' was interpreted as an unconstrained schema for validation."));
                 foreach (var operation in contract.Operations)
                 {
                     if (!operation.Eligible)
