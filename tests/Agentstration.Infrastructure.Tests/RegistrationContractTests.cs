@@ -1,4 +1,5 @@
 using Agentstration.Agents;
+using Agentstration.SystemGraph.Contracts;
 using Agentstration.Extensions.Aep;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
@@ -35,6 +36,7 @@ public sealed class RegistrationContractTests
         var services = CreateServices("Deterministic", false);
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
+            [typeof(ISystemGraphContributor)] = (3, ServiceLifetime.Singleton),
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
@@ -75,6 +77,9 @@ public sealed class RegistrationContractTests
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);
+        AssertSingleton<ISystemGraphQueryService>(services);
+        AssertSingleton<ISystemGraphAuthorization>(services);
+        AssertSingleton<ISystemGraphReadScope>(services);
         var frameworkHost = services.Single(descriptor => descriptor.ServiceType == typeof(IHostedService));
         Assert.AreEqual("Microsoft.AspNetCore.DataProtection.Internal.DataProtectionHostedService", frameworkHost.ImplementationType?.FullName);
         Assert.AreEqual(ServiceLifetime.Singleton, frameworkHost.Lifetime);
@@ -151,6 +156,9 @@ public sealed class RegistrationContractTests
         services.AddSingleton<TimeProvider>(clock);
         services.AddAgentstration(Path.GetTempPath(), enableHostedServices: false);
         AssertSingleton<TimeProvider>(services);
+        AssertSingleton<ISystemGraphQueryService>(services);
+        AssertSingleton<ISystemGraphAuthorization>(services);
+        AssertSingleton<ISystemGraphReadScope>(services);
         Assert.AreSame(clock, services.Single(descriptor => descriptor.ServiceType == typeof(TimeProvider)).ImplementationInstance);
     }
 

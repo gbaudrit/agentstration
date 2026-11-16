@@ -144,3 +144,14 @@ Quartz hosting preserves its significant order: logging initialization, SQLite s
 Testing disables the optional application/scheduler worker set by default; `Agentstration:Testing:HostedServicesEnabled` enables it. `Agentstration:Testing:OpenTelemetryEnabled` independently controls server telemetry. The transport security audit service remains registered under either worker setting. Cleanup retains ownership of only its private paths/pools. Endpoint mapping and ordered initialization remain outside registration.
 
 Descriptor tests inspect service type, lifetime, selection and cardinality before provider construction, then validate SQLite/PostgreSQL and deterministic/Managed graphs with `ValidateOnBuild` and `ValidateScopes`. Host lifecycle tests cover workers/telemetry. New registrations belong in the appropriate owner and must update tests when these contracts change.
+
+## SystemGraph metadata projection
+
+`Infrastructure/Composition/SystemGraphServiceCollectionExtensions.cs` registers
+the explicit Agent, Model/Runtime Profile and Flow contributors, the metadata read
+scope, current RBAC/Discover/Use adapter and singleton query service.
+`SystemGraph.Contracts` owns neutral projection/contributor contracts;
+`SystemGraph` owns rebuilding and bounded authorized pagination;
+`SystemGraph.Api` maps the read-only endpoint through the aggregator.
+There is no graph database, hosted collector or renderer registration.
+See [Semantic SystemGraph](../data/system-graph.md) and ADR-0235.

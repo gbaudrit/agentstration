@@ -5,6 +5,7 @@ namespace Agentstration.Flows.Storage.Abstractions;
 
 public sealed record StoredFlow(FlowResource Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record StoredFlowVersion(FlowVersion Value, string ETag, DateTimeOffset UpdatedAt);
+public sealed record FlowVersionPage(IReadOnlyList<StoredFlowVersion> Items, bool HasMore);
 public sealed record FlowPage(IReadOnlyList<StoredFlow> Items, bool HasMore);
 public sealed record StoredFlowRun(FlowRun Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record StoredFlowDraft(FlowDraft Value, string ETag, DateTimeOffset UpdatedAt);
@@ -24,6 +25,17 @@ public interface IFlowRepository
     Task<StoredFlowVersion> CreateVersionAsync(FlowVersion version, CancellationToken cancellationToken);
     Task<StoredFlowVersion?> GetVersionExactAsync(ResourceScopeRef scopeRef, FlowId id, string version, CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredFlowVersion>> ListVersionsExactAsync(ResourceScopeRef scopeRef, FlowId id, CancellationToken cancellationToken);
+    async Task<FlowVersionPage> ListVersionsPageExactAsync(ResourceScopeRef scopeRef, FlowId id,
+        int skip, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 200);
+        var values = (await ListVersionsExactAsync(scopeRef, id, cancellationToken))
+            .OrderBy(value => value.Value.Version, StringComparer.Ordinal).Skip(skip).Take(take + 1).ToArray();
+        return new(values.Take(take).ToArray(), values.Length > take);
+    }
+
 
     Task<StoredFlow?> GetAsync(WorkspaceId workspaceId, FlowId id, CancellationToken cancellationToken) =>
         GetExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), id, cancellationToken);

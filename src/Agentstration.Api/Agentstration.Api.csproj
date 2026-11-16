@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.SystemGraph.Api/Agentstration.SystemGraph.Api.csproj" />
     <ProjectReference Include="../Agentstration.Functions.Api/Agentstration.Functions.Api.csproj" />
 
     <ProjectReference Include="../Agentstration.Storage.Api/Agentstration.Storage.Api.csproj" />

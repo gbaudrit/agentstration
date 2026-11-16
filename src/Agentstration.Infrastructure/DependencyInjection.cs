@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddAgentstrationInternalTools(context);
         services.AddAgentstrationDataAndKnowledge(context);
         services.AddAgentstrationFlowPlane();
+        services.AddAgentstrationSystemGraph();
         return services;
     }
 

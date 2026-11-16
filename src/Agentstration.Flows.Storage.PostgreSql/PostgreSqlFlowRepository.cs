@@ -181,6 +181,20 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return documents.Select(ToVersion).ToArray();
     }
 
+    public async Task<FlowVersionPage> ListVersionsPageExactAsync(ResourceScopeRef scopeRef, FlowId id,
+        int skip, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 200);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var prefix = FlowPrefix(scopeRef, id);
+        var documents = await context.Documents.AsNoTracking()
+            .Where(value => value.Key.StartsWith(prefix) && value.Kind == VersionKind)
+            .OrderBy(value => value.Version).Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        return new(documents.Take(take).Select(ToVersion).ToArray(), documents.Length > take);
+    }
+
     public async Task<StoredFlowRun> CreateRunAsync(FlowRun run, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
