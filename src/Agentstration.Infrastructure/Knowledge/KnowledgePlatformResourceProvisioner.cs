@@ -26,7 +26,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     IResourceGovernanceContext governance)
 {
     public const string DatasetOrchestrationFlowName = "data-source-orchestration-builtin";
-    public const string DatasetOrchestrationFlowVersion = "1.2.0";
+    public const string CompositionFlowVersion = "1.0.0";
     public const string KnowledgeOrchestrationFlowName = "knowledge-orchestration-builtin";
     public const string TransformationSequenceFlowName = "content-transformation-sequence-builtin";
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
@@ -532,7 +532,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 Schema = result,
                 OutputMapping = JsonSerializer.SerializeToElement("${steps." + sequence + ".output}")
             });
-            await CreateAndPublishFlowAsync(scope, name, name, contract, null, boundary == "acquisition" ? DatasetOrchestrationFlowVersion : "1.0.0", new()
+            await CreateAndPublishFlowAsync(scope, name, name, contract, null, CompositionFlowVersion, new()
             {
                 EntryStep = "input",
                 InputSchema = boundary is null ? result : value,

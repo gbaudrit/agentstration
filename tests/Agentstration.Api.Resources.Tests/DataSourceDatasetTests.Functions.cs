@@ -7,6 +7,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -93,7 +94,8 @@ public sealed partial class DataSourceDatasetTests
         var normalize = await ValueFlow("normalize-value", batch, useFunction: true);
         var identity = await ValueFlow("identity-value", JsonSerializer.SerializeToElement("${input.value}"));
         var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new
-            { path = "/results", itemSchema = new { type = "object", properties = new { id = new { type = "string" } }, required = new[] { "id" } } }) };
+            { path = "/results", itemSchema = new SchemaBinding { Inline = new() { Format = "json-schema",
+                Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}""") } } }, JsonSerializerOptions.Web) };
         var sources = factory.Services.GetRequiredService<KnowledgeSourceManagementService>();
         var bindings = new List<KnowledgeDataSourceBinding> { new() { Name = "selected", DataSource = new(input.Value.Name, Owner), RefreshIfNecessary = true,
             Transformations = onBinding ? [new() { Flow = normalize }, explode, new() { Flow = identity }] : [new() { Flow = normalize }] } };

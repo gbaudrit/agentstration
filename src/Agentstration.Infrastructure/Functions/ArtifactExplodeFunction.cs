@@ -13,23 +13,11 @@ namespace Agentstration.Infrastructure.Functions;
 
 /// <summary>Expands exact readable inputs into an inline manifest; source publication owns final materialization.</summary>
 public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts, IArtifactDurableStore durable,
-    ICurrentRequestContext current, IRequestContextScopeFactory scopes, NativeFunctionExecutionContext execution,
-    string version = "2.0.0") : INativeTransformationFunction
+    ICurrentRequestContext current, IRequestContextScopeFactory scopes, NativeFunctionExecutionContext execution) : INativeTransformationFunction
 {
-    public NativeFunctionDescriptor Descriptor { get; } = CreateDescriptor(version);
-
-    private static NativeFunctionDescriptor CreateDescriptor(string version)
-    {
-        var descriptor = FunctionSchemas.Descriptor("artifact.explode", """
-        {"value":{"anyOf":[{"type":"object","properties":{"artifacts":{"type":"array","maxItems":128}},"required":["artifacts"]},{"type":"object","properties":{"content":{}},"required":["content"],"additionalProperties":false}]},"path":{"type":"string","maxLength":1024},"mode":{"type":"string","enum":["arrayItems","objectValues"],"default":"arrayItems"},"itemSchema":{"type":"object"},"maximumOutputs":{"type":"integer","minimum":1,"maximum":100,"default":100}}
+    public NativeFunctionDescriptor Descriptor { get; } = FunctionSchemas.Descriptor("artifact.explode", """
+        {"value":{"anyOf":[{"type":"object","properties":{"artifacts":{"type":"array","maxItems":128}},"required":["artifacts"]},{"type":"object","properties":{"content":{}},"required":["content"],"additionalProperties":false}]},"path":{"type":"string","maxLength":1024},"mode":{"type":"string","enum":["arrayItems","objectValues"],"default":"arrayItems"},"itemSchema":{"type":"object","x-agentstration-schema-binding":true,"properties":{"inline":{"type":["object","null"],"properties":{"format":{"type":"string"},"dialect":{"type":["string","null"]},"content":{}},"required":["format","content"],"additionalProperties":false},"reference":{"type":["object","null"],"properties":{"name":{"type":"string","minLength":1},"version":{"type":"string","minLength":1},"scopeRef":{"type":["string","null"]},"namespace":{"type":["string","null"]},"schemaPath":{"type":["string","null"],"maxLength":1024}},"required":["name","version"],"additionalProperties":false}},"additionalProperties":false},"maximumOutputs":{"type":"integer","minimum":1,"maximum":100,"default":100}}
         """, ["value", "path"], """{"type":"object","properties":{"artifacts":{"type":"array","items":{"type":"object","properties":{"artifactId":{"type":"string"}},"required":["artifactId"]}}},"required":["artifacts"],"additionalProperties":false}""");
-        if (version == "1.0.0") return descriptor;
-        var schema = System.Text.Json.Nodes.JsonNode.Parse(descriptor.InputSchema.GetRawText())!;
-        schema["properties"]!["itemSchema"] = System.Text.Json.Nodes.JsonNode.Parse("""
-            {"type":"object","x-agentstration-schema-binding":true,"properties":{"inline":{"type":["object","null"],"properties":{"format":{"type":"string"},"dialect":{"type":["string","null"]},"content":{}},"required":["format","content"],"additionalProperties":false},"reference":{"type":["object","null"],"properties":{"name":{"type":"string","minLength":1},"version":{"type":"string","minLength":1},"scopeRef":{"type":["string","null"]},"namespace":{"type":["string","null"]},"schemaPath":{"type":["string","null"],"maxLength":1024}},"required":["name","version"],"additionalProperties":false}},"additionalProperties":false}
-            """);
-        return descriptor with { Version = version, InputSchema = JsonSerializer.SerializeToElement(schema) };
-    }
 
     public async ValueTask<JsonElement> ExecuteAsync(JsonElement input, CancellationToken cancellationToken)
     {
@@ -102,8 +90,7 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
 
     private ResolvedDataContract? ItemContract(JsonElement input)
     {
-        if (!input.TryGetProperty("itemSchema", out var schema)) return null;
-        if (Descriptor.Version == "1.0.0") return DataContracts.Declared(schema, "function:artifact.explode/item", "application/json");
+        if (!input.TryGetProperty("itemSchema", out _)) return null;
         if (execution.SchemaBindings?.TryGetValue("itemSchema", out var snapshot) != true)
             throw Error("function_schema_snapshot_missing");
         var contract = DataContracts.Declared(JsonSchemaSelection.Select(snapshot!.Content), "function:artifact.explode/item", "application/json")!;

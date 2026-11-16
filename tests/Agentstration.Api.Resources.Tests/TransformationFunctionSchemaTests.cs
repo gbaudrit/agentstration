@@ -45,7 +45,7 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
         for (var index = 0; index < invalid.Length; index++)
         {
             var (binding, code) = invalid[index];
-            var function = new Agentstration.Functions.Contracts.FunctionReference("artifact-explode-builtin", "2.0.0", owner);
+            var function = new Agentstration.Functions.Contracts.FunctionReference("artifact-explode-builtin", "1.0.0", owner);
             var call = new FlowCompositionCall { Function = function,
                 Parameters = JsonSerializer.SerializeToElement(new { path = "", itemSchema = binding }, JsonSerializerOptions.Web),
                 FunctionSchemaSnapshots = new Dictionary<string, SchemaBindingSnapshot> { ["itemSchema"] = snapshot } };
@@ -69,7 +69,7 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
             Assert.AreEqual(code, flowError.Code, $"Flow binding {index}");
         }
         var functionContract = await factory.Services.GetRequiredService<Agentstration.Functions.TransformationFunctionService>()
-            .ResolveAsync(new("artifact-explode-builtin", "2.0.0", owner), owner, default);
+            .ResolveAsync(new("artifact-explode-builtin", "1.0.0", owner), owner, default);
         await flows.CreateExactAsync(owner, new("forged-function-snapshot", null, "1.0.0", true,
             new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
             {

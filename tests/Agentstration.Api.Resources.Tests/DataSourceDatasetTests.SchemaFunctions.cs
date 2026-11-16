@@ -17,10 +17,9 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    [DataRow(false, "legacy")]
-    [DataRow(true, "legacy")]
     [DataRow(false, "none")]
     [DataRow(false, "inline")]
+    [DataRow(true, "inline")]
     [DataRow(false, "shared")]
     [DataRow(true, "shared")]
     [DataRow(false, "postAggregate")]
@@ -82,8 +81,8 @@ public sealed partial class DataSourceDatasetTests
             ? new SchemaBinding { Reference = rawBinding.Reference! with { SchemaPath = "/properties/results/items" } }
             : new SchemaBinding { Inline = new() { Format = SchemaFormatIds.JsonSchema, Content = itemSchema } };
         var explodeParameters = new Dictionary<string, object> { ["path"] = "" };
-        if (itemMode != "none") explodeParameters["itemSchema"] = itemMode == "legacy" ? itemSchema : itemBinding;
-        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", itemMode == "legacy" ? "1.0.0" : "2.0.0", Owner),
+        if (itemMode != "none") explodeParameters["itemSchema"] = itemBinding;
+        var explode = new FlowCompositionCall { Function = new("artifact-explode-builtin", "1.0.0", Owner),
             Parameters = JsonSerializer.SerializeToElement(explodeParameters, JsonSerializerOptions.Web) };
         if (itemMode == "flow")
         {
