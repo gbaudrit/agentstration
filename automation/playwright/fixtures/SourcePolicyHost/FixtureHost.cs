@@ -47,7 +47,8 @@ internal sealed class PolicyFactory : WebApplicationFactory<Program>
             services.AddSingleton<IStartupFilter, PolicyControl>();
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton<IStorageContentGateway>(p => p.GetRequiredService<ControlledContent>());
-            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, p.GetRequiredService<PolicyClock>()));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, p.GetRequiredService<PolicyClock>()));
+            services.AddSingleton<IStoragePublicationGateway, ControlledPublications>();
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, p.GetRequiredService<PolicyClock>()));
@@ -106,4 +107,18 @@ internal sealed class ControlledContent : IStorageContentGateway
     public Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => inner.RetireAsync(target, exact, cancellationToken);
     public Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request, CancellationToken cancellationToken = default) => FailWrites
         ? throw new StorageException("fixture_refresh_failed", "Synthetic offline acquisition refresh failure.") : inner.WriteAsync(target, request, cancellationToken);
+}
+
+internal sealed class ControlledPublications(IServiceProvider services, PolicyClock clock, ControlledContent content) : IStoragePublicationGateway
+{
+    private readonly IStoragePublicationGateway inner = ActivatorUtilities.CreateInstance<StoragePublicationGateway>(services, clock);
+    public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken) => inner.ValidateAsync(target, cancellationToken);
+    public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId, IReadOnlyList<JsonElement> records,
+        CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => content.FailWrites
+        ? throw new StorageException("fixture_refresh_failed", "Synthetic offline acquisition refresh failure.")
+        : inner.PrepareRecordsAsync(target, publicationId, records, cancellationToken, notAfter);
+    public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) => inner.PrepareAsync(target, publicationId, bytes, cancellationToken);
+    public Task SealAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.SealAsync(reference, cancellationToken);
+    public Task<ReadOnlyMemory<byte>> ReadAsync(StoragePublicationReference reference, long offset, int length, CancellationToken cancellationToken) => inner.ReadAsync(reference, offset, length, cancellationToken);
+    public Task<bool> RetireAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.RetireAsync(reference, cancellationToken);
 }
