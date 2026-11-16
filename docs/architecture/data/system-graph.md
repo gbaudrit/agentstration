@@ -2,7 +2,7 @@
 
 SystemGraph is the read-only cross-family metadata projection introduced by
 [#1196](https://github.com/gbaudrit/agentstration/issues/1196).
-[ADR-0235](../../decisions/0235-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
+[ADR-0236](../../decisions/0236-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
 records authority, identities, contributors, authorization and consistency.
 Families retain ownership of definitions, publications, grants and lifecycle.
 

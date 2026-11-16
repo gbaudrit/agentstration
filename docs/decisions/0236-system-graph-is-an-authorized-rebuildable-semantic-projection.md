@@ -1,4 +1,4 @@
-# ADR-0235: SystemGraph is an authorized rebuildable semantic projection
+# ADR-0236: SystemGraph is an authorized rebuildable semantic projection
 
 ## Status
 

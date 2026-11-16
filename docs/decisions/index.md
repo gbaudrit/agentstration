@@ -277,4 +277,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 233. [ADR-0233 — Native function catalogue and explicit iteration](0233-native-function-catalogue-and-explicit-iteration.md)
 234. [ADR-0234 — Knowledge consultation reads only metadata](0234-knowledge-consultation-reads-only-metadata.md)
 
-235. [ADR-0235 — SystemGraph is an authorized rebuildable semantic projection](0235-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
+236. [ADR-0236 — SystemGraph is an authorized rebuildable semantic projection](0236-system-graph-is-an-authorized-rebuildable-semantic-projection.md)

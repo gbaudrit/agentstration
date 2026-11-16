@@ -154,4 +154,4 @@ scope, current RBAC/Discover/Use adapter and singleton query service.
 `SystemGraph` owns rebuilding and bounded authorized pagination;
 `SystemGraph.Api` maps the read-only endpoint through the aggregator.
 There is no graph database, hosted collector or renderer registration.
-See [Semantic SystemGraph](../data/system-graph.md) and ADR-0235.
+See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236.
