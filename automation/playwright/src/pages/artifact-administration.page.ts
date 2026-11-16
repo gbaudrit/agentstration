@@ -130,7 +130,7 @@ export class ArtifactAdministrationPage {
     await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toContainText('Schema-driven source');
     const protectedContent = await this.page.getByTestId(TestIds.artifacts.stagedContent).innerText();
     await this.assertMetadataOnlyTokenIsDenied(consoleUrl, stagedId, protectedContent);
-    await this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab).click();
+    await this.openStagedRetention(text.newExpiration);
     const expirationInput = this.page.getByLabel(text.newExpiration, { exact: true });
     // Add a calendar day to the server-rendered local value; this field has no UTC offset.
     const requestedDate = new Date(`${await expirationInput.inputValue()}:00Z`);
@@ -141,7 +141,7 @@ export class ArtifactAdministrationPage {
     await this.page.getByRole('button', { name: text.extendRetention, exact: true }).click();
     await expect.poll(async () => Date.parse((await read()).expiresAt)).toBeGreaterThan(Date.parse(original.expiresAt));
     await this.page.reload();
-    await this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab).click();
+    await this.openStagedRetention(text.newExpiration);
     await expect(expirationInput).toHaveValue(expiration);
     const leaseResponse = await this.page.request.post(`${api}/leases`, {
       data: { consumerKind: 'flow', consumerId: 'knowledge-browser-consumer', operations: [0, 1], expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() },
@@ -188,6 +188,15 @@ export class ArtifactAdministrationPage {
 
   private async openStagedContent(): Promise<void> {
     await this.selectTab(TestIds.artifacts.stagedContentTab, TestIds.artifacts.stagedContentPanel);
+  }
+
+  private async openStagedRetention(label: string): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
+      await expect(this.page.getByLabel(label, { exact: true })).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
 
   private async selectTab(tabTestId: string, panelTestId: string): Promise<void> {
