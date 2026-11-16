@@ -345,7 +345,7 @@ internal sealed partial class AwpAssignmentExecutor(
                         output = JsonSerializer.SerializeToElement(conditionResult);
                         eventName = conditionResult ? "true" : "false";
                         break;
-                    case ArtifactTransformFlowStepDefinition processing:
+                    case ForeachArtifactsFlowStepDefinition processing:
                         try
                         {
                             output = await ProcessArtifactsAsync(session, material, processing, context, step,
@@ -361,25 +361,27 @@ internal sealed partial class AwpAssignmentExecutor(
                             errorDetails = FailureDetails(exception);
                         }
                         break;
-                    case TransformFlowStepDefinition { Processing: { } processDefinition } processTransform:
+                    case ForeachFlowStepDefinition iteration:
                         try
                         {
-                            var processInput = processTransform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)
-                                ? await EvaluateExpressionAsync(processTransform.Expression!, context, cancellationToken) ?? JsonSerializer.SerializeToElement<object?>(null)
-                                : processTransform.Mapping is { } processMapping
-                                    ? await ResolveJsonAsync(processMapping, context, cancellationToken)
-                                    : transitionOutput ?? material.Input;
-                            var units = FlowProcessRegions.Partition(processInput, processDefinition);
-                            output = await ProcessValuesAsync(session, step, units, processDefinition.MaximumConcurrency,
-                                childRunIds, childExecutions, cancellationToken);
-                            DataContracts.Validate(DataContracts.Declared(processTransform.Schema, $"flow:{material.RunId}/step:{processTransform.Name}/output"),
-                                output.Value, "transform-output", material.RunId, processTransform.Name);
+                            var collection = iteration.ItemsMapping is { } itemsMapping
+                                ? await ResolveJsonAsync(itemsMapping, context, cancellationToken) : transitionOutput ?? material.Input;
+                            if (iteration.Partition is null && (collection.ValueKind != JsonValueKind.Array || collection.GetArrayLength() > iteration.MaximumItems))
+                                throw new AwpExecutionNotSupportedException("foreach_collection_invalid", "Foreach requires a bounded JSON array.");
+                            var items = iteration.Partition is { } partition
+                                ? FlowProcessRegions.Partition(collection, partition).ToArray()
+                                : collection.EnumerateArray().Select(item => item.Clone()).ToArray();
+                            foreach (var item in items)
+                                DataContracts.Validate(DataContracts.Declared(iteration.ItemSchema, "foreach-item"), item, "foreach-item", material.RunId, iteration.Name);
+                            output = await ProcessValuesAsync(session, step, items, iteration.Partition?.MaximumConcurrency ?? iteration.MaximumConcurrency, childRunIds, childExecutions, cancellationToken);
+                            if (iteration.ResultSchema is { } resultSchema)
+                                foreach (var result in output.Value.EnumerateArray())
+                                    DataContracts.Validate(DataContracts.Declared(resultSchema, "foreach-result"), result, "foreach-result", material.RunId, iteration.Name);
                         }
                         catch (Exception exception) when (exception is not OperationCanceledException)
                         {
                             output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "error";
-                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code,
-                                AwpClientException authority => authority.Code, _ => "process_failed" };
+                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, AwpClientException authority => authority.Code, _ => "foreach_failed" };
                             errorMessage = exception.Message; errorDetails = FailureDetails(exception);
                             errorOrigin = (exception as AwpExecutionNotSupportedException)?.Origin;
                         }
@@ -788,7 +790,7 @@ internal sealed partial class AwpAssignmentExecutor(
     }
 
     private async Task<JsonElement> ProcessArtifactsAsync(AwpAssignmentSession session,
-        AwpRootFlowExecutionMaterial material, ArtifactTransformFlowStepDefinition definition,
+        AwpRootFlowExecutionMaterial material, ForeachArtifactsFlowStepDefinition definition,
         FlowExecutionContext context, AwpFlowStepLocation step, List<string> childRunIds,
         List<AwpChildExecutionResult> childExecutions, List<InvocationDataContracts> artifactContracts, CancellationToken cancellationToken)
     {
@@ -810,6 +812,7 @@ internal sealed partial class AwpAssignmentExecutor(
         var entries = items.EnumerateArray().ToArray();
         var executions = new AwpChildExecutionResult?[entries.Length];
         var contractsByUnit = new InvocationDataContracts?[entries.Length];
+        var outputCounts = new int[entries.Length];
         try
         {
         await RunProcessUnitsAsync(session, step, entries.Length, definition.MaximumConcurrency ?? 1, async index =>
@@ -843,8 +846,10 @@ internal sealed partial class AwpAssignmentExecutor(
                 var output = definition.ResultMapping is { } resultMapping
                     ? await ResolveJsonAsync(resultMapping, resultContext, cancellationToken)
                     : child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null);
-                await session.Client.ProcessArtifactAsync(new(session.Context,
-                    step.StepExecutionId, index, "prepare", output), cancellationToken);
+                var prepared = (await session.Client.ProcessArtifactAsync(new(session.Context,
+                    step.StepExecutionId, index, "prepare", output), cancellationToken)).Result;
+                outputCounts[index] = prepared.TryGetProperty("outputCount", out var count) ? count.GetInt32()
+                    : prepared.TryGetProperty("artifacts", out var replayOutputs) ? replayOutputs.GetArrayLength() : 1;
             }
             catch
             {
@@ -867,9 +872,15 @@ internal sealed partial class AwpAssignmentExecutor(
             failed.Result.ErrorMessage ?? "Artifact processing failed.") { Details = failed.Result.ErrorDetails, Origin = failed.Result.ErrorOrigin };
 
         // No retained output Artifact is registered until every processing region has succeeded.
+        if (outputCounts.Sum() > definition.MaximumOutputArtifacts)
+            throw new AwpExecutionNotSupportedException("artifact_processing_expansion_limit", "The complete output set exceeds the configured Artifact count.");
         for (var outputIndex = 0; outputIndex < entries.Length; outputIndex++)
-            results.Add((await session.Client.ProcessArtifactAsync(new(session.Context,
-                step.StepExecutionId, outputIndex, "finish", JsonSerializer.SerializeToElement(new { })), cancellationToken)).Result);
+        {
+            var finalized = (await session.Client.ProcessArtifactAsync(new(session.Context,
+                step.StepExecutionId, outputIndex, "finish", JsonSerializer.SerializeToElement(new { })), cancellationToken)).Result;
+            if (finalized.TryGetProperty("artifacts", out var expanded)) results.AddRange(expanded.EnumerateArray().Select(item => item.Clone()));
+            else results.Add(finalized);
+        }
         for (var contractIndex = 0; contractIndex < artifactContracts.Count; contractIndex++)
             if (artifactContracts[contractIndex].ExpectedOutput is { } validated)
                 artifactContracts[contractIndex] = artifactContracts[contractIndex] with { ExpectedOutput = validated with { Validated = true } };

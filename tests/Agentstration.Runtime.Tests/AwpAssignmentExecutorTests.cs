@@ -38,7 +38,7 @@ public sealed partial class AwpAssignmentExecutorTests
         };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
             new InputFlowStepDefinition { Name = "input" },
-            new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
+            new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("start", "input", "completed", "process"), new("done", "process", "completed", "completed"), new("failed", "process", "error", "failure")] };
@@ -57,7 +57,7 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactTransformationAdaptsGenericToolInputAndPreparesAllResultsBeforePublishing()
     {
-        var processing = new ArtifactTransformFlowStepDefinition { Name = "process",
+        var processing = new ForeachArtifactsFlowStepDefinition { Name = "process",
             ArtifactsMapping = JsonSerializer.SerializeToElement("${input}"),
             ProcessingInputMapping = JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }),
             ResultMapping = JsonSerializer.SerializeToElement("${input.answer}") };
@@ -88,7 +88,7 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactProcessingFailureCannotPublishAPartialResult()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
+        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("failed", "process", "error", "failure")] };
         var handler = new GraphHandler(TestNow) { ChildOutcome = "error" };

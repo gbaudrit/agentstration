@@ -10,10 +10,24 @@ public static class FlowCompositionSchema
     public const int MaximumParametersLength = 65_536;
     public const int MaximumValueLength = 1_048_576;
 
-    public static bool IsAssignable(JsonElement output, JsonElement input, int depth = 0) => FlowSchemaCompatibility.IsAssignable(output, input, depth);
-    public static void ValidateValue(JsonElement schema, JsonElement value, int depth = 0, Func<JsonElement, bool>? isProtectedString = null)
+    public static bool IsAssignable(JsonElement output, JsonElement input, int depth = 0)
     {
-        if (depth > 12 || !IsSupported(schema)) throw Invalid();
+        if (depth > 12) return false;
+        if (input.ValueKind == JsonValueKind.Object && !input.EnumerateObject().Any()) return output.ValueKind == JsonValueKind.Object;
+        // A root type guarantee is sufficient for a receiver without narrower constraints.
+        // Nested unions or format annotations cannot invalidate that type implication.
+        if (IsSupported(input) && input.TryGetProperty("type", out var expectedType) && expectedType.ValueKind == JsonValueKind.String
+            && input.EnumerateObject().All(property => property.Name is "type" or "title" or "description" or "$schema" or "default" or "examples")
+            && output.ValueKind == JsonValueKind.Object && output.TryGetProperty("type", out var actual) && actual.ValueKind == JsonValueKind.String)
+        {
+            var expected = expectedType.GetString();
+            return actual.GetString() == expected || actual.GetString() == "integer" && expected == "number";
+        }
+        return FlowSchemaCompatibility.IsAssignable(output, input, depth);
+    }
+    public static void ValidateValue(JsonElement schema, JsonElement value, int depth = 0, Func<JsonElement, bool>? isProtectedString = null, bool allowDynamicSchema = false)
+    {
+        if (depth > 12 || !allowDynamicSchema && !IsSupported(schema)) throw Invalid();
         if (value.GetRawText().Length > MaximumValueLength)
             throw new FlowValidationException("flow_composition_value_too_large", "The composition value exceeds its bounded payload budget.")
             { ContractFailure = new("composition-input", "composition", "$", "value_size", "bounded value", "oversized", Code: "flow_composition_value_too_large") };

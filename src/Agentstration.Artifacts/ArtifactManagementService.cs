@@ -480,7 +480,7 @@ public sealed class ArtifactManagementService(
                 MediaType = request.MediaType,
                 Length = materialization.Length,
                 Sha256 = materialization.Sha256,
-                Provenance = new Dictionary<string, string> { ["provider"] = "storage", ["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin") }
+                Provenance = StoredProvenance(request)
             },
             CreatedAt = timeProvider.GetUtcNow()
         };
@@ -506,6 +506,20 @@ public sealed class ArtifactManagementService(
             || !SameReceipt(existing.Value.Receipt, resource.Receipt))
             throw Error("artifact_storage_receipt_conflict", "The Artifact identity already has different producer or materialization evidence.");
         return existing.Value;
+    }
+
+    private static IReadOnlyDictionary<string, string> StoredProvenance(RegisterStoredArtifactRequest request)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (request.Provenance is { } provenance)
+        {
+            if (provenance.Count > 32 || provenance.Any(pair => pair.Key.Length > 128 || pair.Value.Length > 2048))
+                throw new ArtifactValidationException("artifact_provenance_invalid", "Artifact provenance must be bounded metadata.");
+            foreach (var pair in provenance) result.Add(pair.Key, pair.Value);
+        }
+        result["provider"] = "storage";
+        result["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin");
+        return result;
     }
 
     public async Task<IReadOnlyList<StoredResource<FlowRunArtifactResource>>> ListFlowRunArtifactsAsync(CancellationToken cancellationToken)

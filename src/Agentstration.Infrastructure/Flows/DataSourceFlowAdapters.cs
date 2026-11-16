@@ -328,6 +328,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
                 Compositions = request.Compositions,
+                AcceptedCompositionSchemas = true,
                 TransientPayloads = request.TransientPayloads
             }, cancellationToken);
             return Snapshot(stored.Value);

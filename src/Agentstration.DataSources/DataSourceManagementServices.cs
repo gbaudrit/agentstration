@@ -13,6 +13,8 @@ namespace Agentstration.DataSources;
 public sealed class DataSourceValidationException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
+    public string? CompositionErrorCode { get; init; }
+    public Agentstration.Flows.FlowCompositionDiagnostic? CompositionDiagnostic { get; init; }
 }
 
 public sealed class DataSourceProfileService(

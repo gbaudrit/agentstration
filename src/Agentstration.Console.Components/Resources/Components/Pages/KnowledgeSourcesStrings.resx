@@ -18,7 +18,8 @@
   <data name="SelectRetrievalFlow" xml:space="preserve"><value>Select a retrieval Flow</value></data>
   <data name="ProjectionInputs" xml:space="preserve"><value>Projection inputs</value></data>
   <data name="DataSourceBindings" xml:space="preserve"><value>Data Source bindings</value></data>
-  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Bind one or more governed Data Sources. Each input may optionally be prepared by a compatible transformation Flow.</value></data>
+  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Bind one or more governed Data Sources. Each input can have its own sequence of compatible functions and Flows.</value></data>
+  <data name="BindingTransformations" xml:space="preserve"><value>Transformations for this Data Source</value></data>
   <data name="AddDataSource" xml:space="preserve"><value>Add a Data Source</value></data>
   <data name="NoDataSourceBindings" xml:space="preserve"><value>Add at least one Data Source input.</value></data>
   <data name="BindingName" xml:space="preserve"><value>Binding name</value></data>
@@ -154,4 +155,8 @@
   <data name="StructuredOutputSelect" xml:space="preserve"><value>Select a collection</value></data>
   <data name="StructuredOutputRequired" xml:space="preserve"><value>This document Storage requires an enabled collection allowing read, query and immutable publication. Configure one on the Storage, then select it here.</value></data>
   <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
+  <data name="PublishedExposureVersion" xml:space="preserve"><value>Published version: {0}</value></data>
+  <data name="RepublishExposureHelp" xml:space="preserve"><value>Publish a new version to update these Tools. Earlier versions stay available. Select the new ToolSet version in your Agents after publication.</value></data>
+  <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publish a new Tool version</value></data>
+  <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choose a different version. The published version cannot be overwritten.</value></data>
 </root>

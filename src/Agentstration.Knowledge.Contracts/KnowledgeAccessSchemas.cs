@@ -29,20 +29,21 @@ public static class KnowledgeAccessSchemas
     {
         var properties = new JsonObject
         {
-            ["snapshotId"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 256 }
+            ["snapshotId"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["minLength"] = 1, ["maxLength"] = 256,
+                ["description"] = "Omit or use null for the current Snapshot. To select or compare a specific Snapshot, use a non-empty snapshotId returned by Knowledge access; an empty string is invalid." }
         };
         if (operation != KnowledgeSourceOperation.GetStatus)
         {
-            properties["cursor"] = new JsonObject { ["type"] = "string", ["maxLength"] = 16384 };
-            properties["preparationId"] = new JsonObject { ["type"] = "string", ["maxLength"] = 16384 };
+            properties["cursor"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["maxLength"] = 16384 };
+            properties["preparationId"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["maxLength"] = 16384 };
         }
         if (operation == KnowledgeSourceOperation.Read)
         {
-            properties["documentId"] = new JsonObject { ["type"] = "string", ["maxLength"] = 256 };
+            properties["documentId"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["maxLength"] = 256 };
             properties["maxCharacters"] = Integer(1, 32768);
             properties["range"] = new JsonObject
             {
-                ["type"] = "object",
+                ["type"] = new JsonArray("object", "null"),
                 ["properties"] = new JsonObject
                 { ["start"] = Integer(0, 1048576), ["end"] = Integer(0, 1048576) },
                 ["required"] = new JsonArray("start", "end"),
@@ -51,7 +52,7 @@ public static class KnowledgeAccessSchemas
         }
         if (operation == KnowledgeSourceOperation.SearchRegex)
         {
-            properties["pattern"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 512 };
+            properties["pattern"] = new JsonObject { ["type"] = new JsonArray("string", "null"), ["minLength"] = 1, ["maxLength"] = 512 };
             properties["ignoreCase"] = new JsonObject { ["type"] = "boolean" };
             properties["limit"] = Integer(1, 100);
             properties["contextCharacters"] = Integer(0, 1000);
@@ -60,6 +61,7 @@ public static class KnowledgeAccessSchemas
         {
             properties["query"] = new JsonObject();
             properties["pageSize"] = Integer(1, 100);
+            properties["pageSize"]!["type"] = new JsonArray("integer", "null");
             properties["profile"] = JsonNode.Parse("""{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"string"},"encoding":{"type":"string"},"modelDigest":{"type":"string"}},"required":["id","version","encoding","modelDigest"],"additionalProperties":false}""");
         }
         return JsonSerializer.SerializeToElement(new JsonObject

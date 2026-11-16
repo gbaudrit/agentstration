@@ -412,7 +412,7 @@ public sealed class KnowledgeSourceManagementService(
                 await flows.ValidatePinnedAsync(composition.ProjectionFlow, cancellationToken);
                 foreach (var plan in composition.InputCompositions.Values.Concat(composition.ProjectionComposition is { } global ? [global] : []))
                     _ = await ResolveSequenceAsync(resource, plan.Orchestration,
-                        plan.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), cancellationToken);
+                        plan.Receipt?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), cancellationToken, accepted: true);
                 foreach (var transformation in composition.TransformationFlows.Values)
                     await flows.ValidatePinnedAsync(transformation, cancellationToken);
             }
@@ -571,10 +571,15 @@ public sealed class KnowledgeSourceManagementService(
     }
 
     private async Task<ResolvedFlowComposition> ResolveSequenceAsync(KnowledgeSourceResource resource,
-        FlowCallReference root, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken ct)
+        FlowCallReference root, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken ct, bool accepted = false)
     {
         if (sequences is null) throw new KnowledgeSourceValidationException("knowledge_source_composition_unavailable", "Flow composition is unavailable.");
-        try { return await sequences.ResolveAsync(RequireScope(resource), resource.Namespace, root, bindings, ct); }
+        try { return accepted
+            ? await sequences.ResolveAcceptedAsync(RequireScope(resource), resource.Namespace, root, bindings, ct)
+            : await sequences.ResolveAsync(RequireScope(resource), resource.Namespace, root, bindings, ct); }
+        catch (FlowValidationException exception) when (exception.Code.StartsWith("schema_", StringComparison.Ordinal)
+            || exception.Code.StartsWith("function_schema_", StringComparison.Ordinal))
+        { throw new KnowledgeSourceValidationException(exception.Code, exception.Message); }
         catch (Exception exception) when (exception is FlowValidationException or KeyNotFoundException)
         { throw new KnowledgeSourceValidationException("knowledge_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }

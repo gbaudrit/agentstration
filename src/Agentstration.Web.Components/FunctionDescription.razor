@@ -1,0 +1,26 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <p class="muted" aria-live="polite" data-testid="function-description">@Text</p>
+    @if (ImplementationId is "json.select" or "artifact.explode")
+    {
+        <p class="muted">@Localizer["JsonPointerRootHelp"]</p>
+    }
+}
+
+@code {
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? ImplementationId { get; set; }
+    [Parameter] public bool BuiltIn { get; set; }
+    private string? Text
+    {
+        get
+        {
+            if (!BuiltIn || string.IsNullOrEmpty(ImplementationId)) return Description;
+            var text = Localizer[$"Native.{ImplementationId}.Description"];
+            return text.ResourceNotFound ? Description : text.Value;
+        }
+    }
+}

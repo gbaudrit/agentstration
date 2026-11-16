@@ -202,10 +202,12 @@ public sealed class DataSourceDatasetAcquisitionService(
             {
                 await ValidateExecutionAsync(acquisition, cancellationToken);
                 if (run.Output is not { } output) throw Invalid("data_source_output_missing", "The operation returned no content.");
+                if (output.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(output).Length > DataSourceDatasetCompositionService.MaximumValueBytes)
+                    throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
                 if (acquisition.Dataset!.OutputSchemaSnapshot is not null)
                     DataContracts.Validate(DataSourceDatasetCompositionService.Contract(acquisition.Dataset, acquisition.Name), output,
                         "acquisition-output", acquisition.FlowRunId);
-                else DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset.OutputSchema, output);
+                else DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset.OutputSchema, output);
                 var bytes = acquisition.Dataset.Definition.DocumentCollectionUid is null
                     ? JsonSerializer.SerializeToUtf8Bytes(output) : DataSourceDocumentStorage.Encode(output);
                 if (acquisition.Dataset.Definition.Storage is null)

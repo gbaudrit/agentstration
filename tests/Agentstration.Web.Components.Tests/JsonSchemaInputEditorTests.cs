@@ -9,6 +9,43 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class JsonSchemaInputEditorTests
 {
     [TestMethod]
+    [DataRow("en-US", "empty allowed", "Use empty text")]
+    [DataRow("fr-FR", "vide autorisé", "Utiliser un texte vide")]
+    public void RequiredTextCanExplicitlyRecordAnEmptyValueWhenTheSchemaAllowsIt(string locale, string marker, string action)
+    {
+        var previousCulture = System.Globalization.CultureInfo.CurrentUICulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo(locale);
+            using var context = Context();
+            JsonElement value = default;
+            JsonSchemaInputValidationState? validation = null;
+            var rendered = context.Render<JsonSchemaInputEditor>(parameters => parameters
+                .Add(component => component.Schema, Json("""{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string","minLength":1}},"required":["path"]}"""))
+                .Add(component => component.Value, Json("{}"))
+                .Add(component => component.ValueChanged, next => value = next)
+                .Add(component => component.ValidationChanged, next => validation = next));
+
+            rendered.WaitForAssertion(() => Assert.IsFalse(validation?.IsValid));
+            var path = rendered.Find("[data-schema-path='$.path']");
+            Assert.Contains(marker, path.TextContent);
+            Assert.IsEmpty(rendered.Find("[data-schema-path='$.name']").QuerySelectorAll(".schema-presence-action"));
+            var button = rendered.Find("[data-schema-path='$.path'] button.schema-presence-action");
+            Assert.AreEqual(action, button.TextContent);
+            button.Click();
+
+            rendered.WaitForAssertion(() => Assert.IsTrue(validation?.IsValid));
+            Assert.AreEqual(string.Empty, value.GetProperty("path").GetString());
+            rendered.Find("[data-testid='schema-raw-mode']").Click();
+            StringAssert.Contains(rendered.Find("textarea").GetAttribute("value"), "\"path\": \"\"");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = previousCulture;
+        }
+    }
+
+    [TestMethod]
     public void ARenderableSchemaSelectedAfterFallbackOpensTheGeneratedForm()
     {
         using var context = new BunitContext();

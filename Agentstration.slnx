@@ -29,6 +29,13 @@
   <Folder Name="/awp/">
     <Project Path="awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
   </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Agentstration.Functions.Abstractions/Agentstration.Functions.Abstractions.csproj" />
+    <Project Path="src/Agentstration.Functions.Api/Agentstration.Functions.Api.csproj" />
+    <Project Path="src/Agentstration.Functions.Builtins/Agentstration.Functions.Builtins.csproj" />
+    <Project Path="src/Agentstration.Functions.Contracts/Agentstration.Functions.Contracts.csproj" />
+    <Project Path="src/Agentstration.Functions/Agentstration.Functions.csproj" />
+  </Folder>
   <Folder Name="/src/Agents/">
     <Project Path="src/Agentstration.Agents.Api/Agentstration.Agents.Api.csproj" />
     <Project Path="src/Agentstration.Agents.Contracts/Agentstration.Agents.Contracts.csproj" />
@@ -201,6 +208,7 @@
     <Project Path="src/Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />

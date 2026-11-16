@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Functions.Abstractions/Agentstration.Functions.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+  </ItemGroup>
+</Project>

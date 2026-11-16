@@ -122,13 +122,19 @@ else if (source is not null && readiness is not null)
     {
         <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
         <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
-        @if (exposure is null)
+        @if (exposure is not null)
         {
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
-            @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
+            <p data-testid="knowledge-tool-exposure-current-version">@T("PublishedExposureVersion", exposure.ToolSetVersion)</p>
+            <p class="resource-hint">@T("RepublishExposureHelp")</p>
         }
-        else
+        @if (CanManage)
+        {
+            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" @bind:event="oninput" disabled="@(busy || !interactive)" data-testid="knowledge-tool-exposure-version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" disabled="@(busy || !interactive)" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
+            <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!CanPublishTools)">@(busy ? T("Publishing") : T(exposure is null ? "PublishExposure" : "PublishNewExposureVersion"))</button></div>
+            @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
+            @if (exposure is not null && string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal)) { <p class="inline-warning">@T("NewExposureVersionRequired")</p> }
+        }
+        @if (exposure is not null)
         {
             <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
                 <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
@@ -194,6 +200,8 @@ else if (source is not null && readiness is not null)
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<DetailsTab> VisibleTabs => [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, .. (CanManage ? [DetailsTab.Access] : Array.Empty<DetailsTab>()), DetailsTab.Yaml];
     private bool CanManage => source is not null && ResourceOwnershipContext.CanManage(source.ScopeRef ?? ResourceScopeRef.Instance, Services);
+    private bool CanPublishTools => interactive && CanManage && readiness?.Ready == true && !busy && !string.IsNullOrWhiteSpace(version)
+        && (exposure is null || !string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal));
     private string ToolSetUrl => exposure is null ? "/tools/sets" : ScopedToolUrl(
         exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
             ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
@@ -246,6 +254,7 @@ else if (source is not null && readiness is not null)
             etag = sourceSnapshot.ETag;
             readiness = await readinessTask;
             exposure = await exposureTask;
+            version = exposure is null ? "1.0.0" : NextExposureVersion(exposure.ToolSetVersion);
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault();
             snapshots = (await snapshotsTask).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
@@ -349,7 +358,7 @@ else if (source is not null && readiness is not null)
     };
     private async Task PublishAsync()
     {
-        if (busy) return;
+        if (!CanPublishTools) return;
         busy = true;
         failed = false;
         message = null;
@@ -357,11 +366,15 @@ else if (source is not null && readiness is not null)
         {
             exposure = (await Client.PublishExposureAsync(SourceNamespace, Name,
                 new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval }, cancellation.Token)).Value;
+            version = NextExposureVersion(exposure.ToolSetVersion);
             message = T("ExposurePublished");
         }
         catch (Exception exception) { failed = true; message = exception.Message; }
         finally { busy = false; }
     }
+    private static string NextExposureVersion(string current) => System.Version.TryParse(current, out var parsed)
+        && parsed.Build >= 0 && parsed.Revision < 0 && parsed.Build < int.MaxValue
+            ? $"{parsed.Major}.{parsed.Minor}.{parsed.Build + 1}" : string.Empty;
     private async Task RunActionAsync(Func<Task> action, string success)
     {
         if (busy) return;
@@ -540,7 +553,7 @@ else if (source is not null && readiness is not null)
         var sequence = source?.Composition?.InputCompositions.GetValueOrDefault(binding.Name)?.Receipt?.Bindings.GetValueOrDefault("transformations")
             ?? source?.Definition.DataSources.FirstOrDefault(value => value.Name == binding.Name)?.Transformations ?? [];
         if (sequence.Count > 0)
-            return string.Join(" → ", sequence.Select(call => $"{call.Flow.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
+            return string.Join(" → ", sequence.Select(call => call.Function is { } function ? $"{function.Namespace ?? source!.Namespace}/{function.Name}:{function.Version}" : $"{call.Flow!.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
         return binding.Transformation is { } flow ? $"{flow.Namespace}/{flow.Name}:{flow.Version}" : T("IdentityTransformation");
     }
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";

@@ -38,7 +38,7 @@ public sealed partial class FlowRunService
             string.Equals(value.Name, stepDefinitionId, StringComparison.Ordinal))
             ?? throw new FlowValidationException("child_flow_step_invalid", "The assigned StepDefinition was not found.");
         if (purpose is "artifactProcessing" or "process" && step.Region() is { } region
-            && (purpose != "artifactProcessing" || step is ArtifactTransformFlowStepDefinition)
+            && (purpose != "artifactProcessing" || step is ForeachArtifactsFlowStepDefinition)
             && iteration is >= 0 && iteration < region.MaximumUnits)
         {
             var unit = processUnit ?? new FlowProcessUnit($"unit-{iteration.Value}", iteration.Value);
@@ -59,7 +59,7 @@ public sealed partial class FlowRunService
             var origin = new FlowProcessRunOrigin(definition, parent.Value.Id, step.Name, processAttempt,
                 ownerStepExecutionId, unit.Key, unit.Ordinal, unit.Descriptor);
             // Preserve existing Artifact child URLs and scoped capability identity.
-            var childId = ChildFlowRunId(parent.Value, stepDefinitionId + (step is ArtifactTransformFlowStepDefinition ? "-artifact" : ":process"), processAttempt, iteration);
+            var childId = ChildFlowRunId(parent.Value, stepDefinitionId + (step is ForeachArtifactsFlowStepDefinition ? "-artifact" : ":process"), processAttempt, iteration);
             var priorAdmission = parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Process;
             if (priorAdmission is { Closed: true } && priorAdmission.Attempt == processAttempt
                 && !priorAdmission.Units.Any(value => value.Key == unit.Key && value.Ordinal == unit.Ordinal))
@@ -67,11 +67,11 @@ public sealed partial class FlowRunService
             await ReserveDescendantAsync(parent.Value, childId, cancellationToken);
             await AdmitProcessUnitAsync(parent.Value, region, origin, childId, unit.TotalUnits,
                 purpose == "process" || processUnit is not null, cancellationToken);
-            var processingContext = step is ArtifactTransformFlowStepDefinition artifact
+            var processingContext = step is ForeachArtifactsFlowStepDefinition artifact
                 ? new FlowArtifactProcessingContext(parent.Value.Id, artifact.Name, processAttempt, iteration.Value, artifact.Mode == ArtifactProcessingMode.Access)
                 : null;
             return await EnsureChildFlowRunAsync(parent.Value, inlineCall, input, childId, cancellationToken, version,
-                processingContext, contractContext ?? (step is TransformFlowStepDefinition ? new InvocationDataContracts() : null), origin);
+                processingContext, contractContext ?? (step is ForeachFlowStepDefinition ? new InvocationDataContracts() : null), origin);
         }
         var call = purpose switch
         {

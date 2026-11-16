@@ -8,6 +8,22 @@ namespace Agentstration.Runtime.Tests;
 public sealed partial class AwpAssignmentExecutorTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ForeachPassesEachElementDirectlyAndPreservesOrder(bool empty)
+    {
+        var graph = ProcessGraph(new());
+        graph = graph with { Steps = graph.Steps.Select(step => step.Name == "partition"
+            ? new ForeachFlowStepDefinition { Name = step.Name, MaximumConcurrency = 3 } : step).ToArray() };
+        var values = empty ? Array.Empty<int>() : new[] { 3, 1, 2 };
+        var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(values));
+        Assert.AreEqual("success", result.Outcome);
+        CollectionAssert.AreEqual(values, result.Output!.Value.EnumerateArray().Select(value => value.GetInt32()).ToArray());
+        Assert.HasCount(values.Length, handler.ChildRequests);
+        Assert.HasCount(1, handler.CloseProcessRequests);
+    }
+
+    [TestMethod]
     [DataRow(FlowProcessPartition.Batches)]
     [DataRow(FlowProcessPartition.TextChunks)]
     public async Task GenericProcessRunsWholeChainsInStableUnitOrderAndClosesAdmission(FlowProcessPartition partition)
@@ -106,10 +122,10 @@ public sealed partial class AwpAssignmentExecutorTests
         while (Interlocked.CompareExchange(ref target, value, current) != current);
     }
 
-    private static FlowGraphDefinition ProcessGraph(TransformProcessDefinition process) => new()
+    private static FlowGraphDefinition ProcessGraph(ForeachPartitionDefinition process) => new()
     {
         EntryStep = "partition",
-        Steps = [new TransformFlowStepDefinition { Name = "partition", Processing = process },
+        Steps = [new ForeachFlowStepDefinition { Name = "partition", Partition = process },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
             new OutputFlowStepDefinition { Name = "failed", Outcome = FlowOutputOutcome.Error }],
         Transitions = [new("done", "partition", "completed", "completed"), new("error", "partition", "error", "failed")]

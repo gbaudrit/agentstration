@@ -51,7 +51,7 @@ public sealed class ImplicitProcessExecutionTests
             {
                 EntryStep = "input",
                 Steps = [new InputFlowStepDefinition { Name = "input" },
-                    new TransformFlowStepDefinition { Name = "partition", DisplayName = "Process fragments", Processing = new()
+                    new ForeachFlowStepDefinition { Name = "partition", DisplayName = "Process fragments", Partition = new()
                         { Partition = FlowProcessPartition.TextChunks, UnitSize = 2, MaximumConcurrency = 2, MaximumUnits = 3 } },
                     new ToolFlowStepDefinition { Name = "body", Tool = new(AgentstrationToolProvider.ToolResourceName("test.process.unit"), ScopeRef: ResourceScopeRef.Instance),
                         ArgumentsMapping = JsonSerializer.SerializeToElement(new { text = "${input}" }) },

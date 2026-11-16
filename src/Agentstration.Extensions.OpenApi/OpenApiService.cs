@@ -111,7 +111,7 @@ public sealed partial class OpenApiService(
             {
                 var choices = ResponseSchemas(contract, operation);
                 var declared = DeclaredResponseStatus(contract, operation, (int)response.StatusCode);
-                if (selectedStatus != declared || !string.Equals(selector.ResponseMediaType, responseMediaType, StringComparison.OrdinalIgnoreCase)
+                if (selectedStatus != declared || !string.Equals(ResponseMediaTypeOf(selector.ResponseMediaType), responseMediaType, StringComparison.OrdinalIgnoreCase)
                     || !choices.Any(c => c.Status == selectedStatus && string.Equals(c.MediaType, selector.ResponseMediaType, StringComparison.OrdinalIgnoreCase)))
                     throw Error("openapi_response_selection_mismatch", "The response differs from the selected response contract.");
             }

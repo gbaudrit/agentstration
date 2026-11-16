@@ -273,3 +273,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 231. [ADR-0231 — HTTP category switches always enable both payload directions](0231-http-categories-enable-both-bodies.md)
 
 232. [ADR-0232 — Tool relays can omit optional inputs](0232-tool-relays-can-omit-optional-inputs.md)
+
+233. [ADR-0233 — Native function catalogue and explicit iteration](0233-native-function-catalogue-and-explicit-iteration.md)

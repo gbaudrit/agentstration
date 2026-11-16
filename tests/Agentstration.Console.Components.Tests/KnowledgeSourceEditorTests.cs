@@ -863,6 +863,8 @@ public sealed partial class KnowledgeSourceEditorTests
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
         public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
+        public PublishKnowledgeSourceToolExposureRequest? PublishedExposureRequest { get; private set; }
+        public bool RejectExposurePublication { get; set; }
         public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<KnowledgeSourceResource>>(source is null ? [] : [source]);
         public Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
@@ -906,7 +908,13 @@ public sealed partial class KnowledgeSourceEditorTests
                 [new("documentation", DataSourceScope, Guid.NewGuid(), true, null, null)]));
         }
         public Task<KnowledgeSourceToolExposureResource?> GetExposureAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(exposure);
-        public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<KnowledgeSourceToolExposureResource>> PublishExposureAsync(ResourceNamespace @namespace, string name, PublishKnowledgeSourceToolExposureRequest request, CancellationToken cancellationToken = default)
+        {
+            PublishedExposureRequest = request;
+            if (RejectExposurePublication) throw new HttpRequestException("Publication rejected.");
+            exposure = (exposure ?? ExistingExposure()) with { ToolSetVersion = request.Version };
+            return Task.FromResult(new ResourceSnapshot<KnowledgeSourceToolExposureResource>(exposure, "\"published\""));
+        }
         public Task<IReadOnlyList<KnowledgeProjectionResource>> GetProjectionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
         {
             ProjectionReads++;

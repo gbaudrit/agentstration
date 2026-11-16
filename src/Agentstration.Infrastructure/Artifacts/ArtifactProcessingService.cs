@@ -34,10 +34,11 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private sealed record WriteReceipt(string Id, string Digest, int Revision);
     private sealed record Session(Input Input, string OutputId, string OutputName, string MediaType,
         int Revision, int? CompletedRevision, DateTimeOffset ExpiresAt, IReadOnlyList<WriteReceipt> Writes,
-        string? DurableReference = null, JsonElement? Result = null, string? DirectOutput = null, ResolvedDataContract? Contract = null);
+        string? DurableReference = null, JsonElement? Result = null, string? DirectOutput = null, ResolvedDataContract? Contract = null,
+        IReadOnlyList<string>? ExpansionKeys = null, string? ExpansionDigest = null, IReadOnlyDictionary<string, string>? OutputProvenance = null);
     private sealed record Cursor(string Session, string Side, int Revision, int Offset);
 
-    public async Task<InvocationDataContracts> ContractsAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step, int index, CancellationToken token)
+    public async Task<InvocationDataContracts> ContractsAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step, int index, CancellationToken token)
     {
         await EnsureExecutionAccessAsync(owner, token);
         using var operational = scopes.Push(current.Current);
@@ -48,7 +49,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         return new(session.Input.Contract, session.Contract, step.Mode == ArtifactProcessingMode.Access, step.ResultMapping is not null);
     }
 
-    public async Task<JsonElement> ExecuteOwnerAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step,
+    public async Task<JsonElement> ExecuteOwnerAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step,
         int index, string action, JsonElement arguments, CancellationToken token)
     {
         if (index < 0 || index >= step.MaximumArtifacts || owner.Status.IsTerminal()) throw Error("artifact_processing_scope_invalid");
@@ -142,6 +143,12 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             EnsureLive(session);
             if (action == "abort")
             {
+                foreach (var childKey in session.ExpansionKeys ?? [])
+                {
+                    if (await LoadAsync(owner, childKey, token) is not { } child) continue;
+                    if (child.Result is null && !owner.TransientPayloads) await artifacts.PurgeAsync(StagedArtifactId.Parse(child.OutputId), token);
+                    await SaveAsync(owner, childKey, child with { ExpiresAt = clock.GetUtcNow(), DirectOutput = null }, token);
+                }
                 if (session.Result is null && !owner.TransientPayloads) await artifacts.PurgeAsync(StagedArtifactId.Parse(session.OutputId), token);
                 await SaveAsync(owner, key, session with { ExpiresAt = clock.GetUtcNow(),
                     DirectOutput = owner.TransientPayloads ? string.Empty : null, Input = session.Input with { DirectContent = null }, Result = null }, token);
@@ -149,6 +156,25 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             }
             if (action is not ("prepare" or "finish")) throw Error("artifact_processing_action_invalid");
             if (session.Result is { } result) return result.Clone();
+            if (action == "prepare" && arguments.ValueKind == JsonValueKind.Object && arguments.EnumerateObject().Count() == 1
+                && arguments.TryGetProperty("artifacts", out var expansion) && expansion.ValueKind == JsonValueKind.Array)
+            {
+                session = await PrepareExpansionAsync(owner, step, key, session, arguments, token);
+                return Element(new { prepared = true, outputCount = session.ExpansionKeys!.Count });
+            }
+            if (session.ExpansionKeys is { } children)
+            {
+                if (action == "prepare") return Element(new { prepared = true, outputCount = children.Count });
+                var outputs = new List<JsonElement>();
+                foreach (var childKey in children)
+                {
+                    var child = await LoadAsync(owner, childKey, token) ?? throw Error("artifact_processing_output_unavailable");
+                    outputs.Add(await FinalizeAsync(owner, step, attempt, index, childKey, child, token));
+                }
+                var manifest = Element(new { artifacts = outputs });
+                await SaveAsync(owner, key, session with { Result = manifest }, token);
+                return manifest;
+            }
             if (step.Mode == ArtifactProcessingMode.Content && session.CompletedRevision is null)
             {
                 var outputText = arguments.ValueKind == JsonValueKind.String ? arguments.GetString()! : arguments.GetRawText();
@@ -168,62 +194,125 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 session = session with { Contract = expectedContract with { Validated = true } };
                 await SaveAsync(owner, key, session, token);
             }
-            if (action == "prepare") return Element(new { prepared = true, revision = session.Revision });
-            if (owner.TransientPayloads)
-            {
-                var bytes = Utf8.GetBytes(session.DirectOutput!);
-                // The existing Knowledge inline publication contract is bounded to 64 KiB.
-                if (bytes.Length > 65536) throw Error("artifact_processing_direct_output_too_large");
-                var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
-                    name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                    contentBase64 = Convert.ToBase64String(bytes) });
-                await SaveAsync(owner, key, session with { Result = manifest }, token);
-                return manifest;
-            }
-            var outputStage = (await artifacts.GetStagedAsync(StagedArtifactId.Parse(session.OutputId), null,
-                ArtifactLeaseOperation.Read, token))?.Value ?? throw Error("artifact_processing_output_unavailable");
-            var reference = session.DurableReference;
-            if (reference is null)
-            {
-                reference = await selectableStorage.CreateReferenceAsync(owner.WorkspaceId, Hash(key + ":" + outputStage.Sha256),
-                    outputStage.Length, outputStage.Sha256!, token);
-                session = session with { DurableReference = reference };
-                await SaveAsync(owner, key, session, token);
-            }
-            ArtifactBackendStat? existing = null;
-            try { existing = await durable.StatAsync(owner.WorkspaceId, reference, token); }
-            catch (ArtifactValidationException exception) when (exception.Code == "flow_run_artifact_content_not_found") { }
-            if (existing is not null && (existing.Length != outputStage.Length || existing.Sha256 != outputStage.Sha256))
-                throw Error("artifact_processing_output_changed");
-            if (existing is null) await durable.ResetAsync(owner.WorkspaceId, reference, token);
-            long offset = existing?.Length ?? 0;
-            var maximumWrite = await selectableStorage.MaximumChunkBytesAsync(owner.WorkspaceId, reference, true, token);
-            while (offset < outputStage.Length)
-            {
-                var chunk = await artifacts.ReadAsync(outputStage.ArtifactId, offset,
-                    (int)Math.Min(maximumWrite, outputStage.Length - offset), null, token);
-                var bytes = Convert.FromBase64String(chunk.ContentBase64);
-                if (bytes.Length == 0) throw Error("artifact_processing_output_incomplete");
-                offset = await durable.WriteAsync(owner.WorkspaceId, reference, offset, bytes, token);
-            }
-            var stat = await durable.StatAsync(owner.WorkspaceId, reference, token);
-            var materialization = await selectableStorage.DescribeReferenceAsync(owner.WorkspaceId, reference, token);
-            var registered = await artifacts.CompleteFlowRunArtifactAsync(outputStage.ArtifactId, new(owner.Id, step.Name,
-                new() { StorageFlowRunId = string.Empty, OpaqueReference = reference,
-                    Materialization = materialization, DataContract = session.Contract, MediaType = session.MediaType, Length = stat.Length, Sha256 = stat.Sha256,
-                    Provenance = new Dictionary<string, string> { ["fileName"] = session.OutputName,
-                        ["inputArtifactId"] = session.Input.Id, ["inputArtifactKind"] = session.Input.Kind, ["inputSha256"] = session.Input.Sha256,
-                        ["processingRunId"] = ProcessingRunId(owner, step, attempt, index), ["provider"] = "artifact-processing" } }), token);
-            var manifestItem = Element(new { artifactId = registered.Value.ArtifactId.ToString(), kind = "durable",
-                disposition = "publishable", name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + stat.Sha256 });
-            await SaveAsync(owner, key, session with { Result = manifestItem }, token);
-            return manifestItem;
+            if (action == "prepare") return Element(new { prepared = true, revision = session.Revision, outputCount = 1 });
+            return await FinalizeAsync(owner, step, attempt, index, key, session, token);
         }
         catch (ArtifactValidationException exception) { throw Error(exception.Code); }
         catch (FlowValidationException exception) { throw Error(exception.Code); }
         catch (AuthorizationDeniedException) { throw Error("artifact_processing_access_denied"); }
         catch (StorageException exception) { throw Error(exception.Code); }
         finally { gate.Release(); }
+    }
+
+    private async Task<Session> PrepareExpansionAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step,
+        string key, Session session, JsonElement manifest, CancellationToken token)
+    {
+        var digest = Hash(manifest.GetRawText());
+        if (session.ExpansionDigest is { } prior && prior != digest) throw Error("artifact_processing_write_replay_conflict");
+        if (session.ExpansionKeys is not null) return session;
+        var entries = manifest.GetProperty("artifacts").EnumerateArray().ToArray();
+        if (step.OutputMediaType is { } media && !media.Equals("application/json", StringComparison.OrdinalIgnoreCase) && !media.EndsWith("+json", StringComparison.OrdinalIgnoreCase))
+            throw Error("artifact_processing_expansion_invalid");
+        if (entries.Length < 1 || entries.Length > step.MaximumOutputArtifacts) throw Error("artifact_processing_expansion_limit");
+        var prepared = new List<(byte[] Bytes, ResolvedDataContract? Contract, IReadOnlyDictionary<string, string> Provenance)>();
+        var total = 0;
+        foreach (var entry in entries)
+        {
+            token.ThrowIfCancellationRequested();
+            if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("kind", out var kind) || kind.GetString() != "inline"
+                || !entry.TryGetProperty("contentBase64", out var encoded) || encoded.ValueKind != JsonValueKind.String
+                || encoded.GetString() is not { Length: <= 87384 } base64) throw Error("artifact_processing_expansion_invalid");
+            var bytes = Convert.FromBase64String(base64);
+            total = checked(total + bytes.Length);
+            if (bytes.Length > 65536 || total > step.MaximumOutputBytes) throw Error("artifact_processing_output_too_large");
+            ValidateContent("application/json", Utf8.GetString(bytes));
+            var contract = entry.TryGetProperty("dataContract", out var declared) && declared.ValueKind == JsonValueKind.Object
+                ? declared.Deserialize<ResolvedDataContract>(Json) : null;
+            if (contract is not null) _ = DataContracts.ReadText(contract, Utf8.GetString(bytes), "artifact-expansion-output", owner.Id, step.Name);
+            if (step.OutputContract is not null && session.Contract is { } expected)
+            {
+                _ = DataContracts.ReadText(expected, Utf8.GetString(bytes), "artifact-expansion-output", owner.Id, step.Name);
+                contract = expected;
+            }
+            var provenance = entry.TryGetProperty("provenance", out var metadata) && metadata.ValueKind == JsonValueKind.Object
+                ? metadata.Deserialize<Dictionary<string, string>>(Json) ?? [] : new Dictionary<string, string>();
+            if (provenance.Count > 32 || provenance.Any(pair => pair.Key.Length > 128 || pair.Value.Length > 2048)) throw Error("artifact_processing_expansion_invalid");
+            provenance["inputArtifactId"] = session.Input.Id;
+            provenance["inputSha256"] = session.Input.Sha256;
+            prepared.Add((bytes, contract, provenance));
+        }
+        var keys = new List<string>();
+        foreach (var output in prepared)
+        {
+            var childKey = Hash(key + ":expansion:" + keys.Count + ":" + digest);
+            var name = "item-" + keys.Count + ".json";
+            var id = owner.TransientPayloads ? "expanded-" + childKey
+                : (await StageAsync(owner, step, childKey, name, "application/json", output.Bytes, session.Input, token)).ArtifactId.ToString();
+            var child = session with { Input = session.Input with { DirectContent = null }, OutputId = id, OutputName = name,
+                MediaType = "application/json", Revision = 0, CompletedRevision = 0, Writes = [], DurableReference = null, Result = null,
+                Contract = output.Contract is null ? null : output.Contract with { Validated = true }, OutputProvenance = output.Provenance,
+                DirectOutput = owner.TransientPayloads ? Utf8.GetString(output.Bytes) : null };
+            await SaveAsync(owner, childKey, child, token);
+            keys.Add(childKey);
+        }
+        session = session with { ExpansionKeys = keys, ExpansionDigest = digest };
+        await SaveAsync(owner, key, session, token);
+        return session;
+    }
+
+    private async Task<JsonElement> FinalizeAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step,
+        int attempt, int index, string key, Session session, CancellationToken token)
+    {
+        if (session.Result is { } existingResult) return existingResult.Clone();
+        if (owner.TransientPayloads)
+        {
+            var bytes = Utf8.GetBytes(session.DirectOutput!);
+            // The existing Knowledge inline publication contract is bounded to 64 KiB.
+            if (bytes.Length > 65536) throw Error("artifact_processing_direct_output_too_large");
+            var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
+                name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, provenance = session.OutputProvenance, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                contentBase64 = Convert.ToBase64String(bytes) });
+            await SaveAsync(owner, key, session with { Result = manifest }, token);
+            return manifest;
+        }
+        var outputStage = (await artifacts.GetStagedAsync(StagedArtifactId.Parse(session.OutputId), null,
+            ArtifactLeaseOperation.Read, token))?.Value ?? throw Error("artifact_processing_output_unavailable");
+        var reference = session.DurableReference;
+        if (reference is null)
+        {
+            reference = await selectableStorage.CreateReferenceAsync(owner.WorkspaceId, Hash(key + ":" + outputStage.Sha256),
+                outputStage.Length, outputStage.Sha256!, token);
+            session = session with { DurableReference = reference };
+            await SaveAsync(owner, key, session, token);
+        }
+        ArtifactBackendStat? existing = null;
+        try { existing = await durable.StatAsync(owner.WorkspaceId, reference, token); }
+        catch (ArtifactValidationException exception) when (exception.Code == "flow_run_artifact_content_not_found") { }
+        if (existing is not null && (existing.Length != outputStage.Length || existing.Sha256 != outputStage.Sha256))
+            throw Error("artifact_processing_output_changed");
+        if (existing is null) await durable.ResetAsync(owner.WorkspaceId, reference, token);
+        long offset = existing?.Length ?? 0;
+        var maximumWrite = await selectableStorage.MaximumChunkBytesAsync(owner.WorkspaceId, reference, true, token);
+        while (offset < outputStage.Length)
+        {
+            var chunk = await artifacts.ReadAsync(outputStage.ArtifactId, offset,
+                (int)Math.Min(maximumWrite, outputStage.Length - offset), null, token);
+            var bytes = Convert.FromBase64String(chunk.ContentBase64);
+            if (bytes.Length == 0) throw Error("artifact_processing_output_incomplete");
+            offset = await durable.WriteAsync(owner.WorkspaceId, reference, offset, bytes, token);
+        }
+        var stat = await durable.StatAsync(owner.WorkspaceId, reference, token);
+        var materialization = await selectableStorage.DescribeReferenceAsync(owner.WorkspaceId, reference, token);
+        var registered = await artifacts.CompleteFlowRunArtifactAsync(outputStage.ArtifactId, new(owner.Id, step.Name,
+            new() { StorageFlowRunId = string.Empty, OpaqueReference = reference,
+                Materialization = materialization, DataContract = session.Contract, MediaType = session.MediaType, Length = stat.Length, Sha256 = stat.Sha256,
+                Provenance = new Dictionary<string, string>(session.OutputProvenance ?? new Dictionary<string, string>()) { ["fileName"] = session.OutputName,
+                    ["inputArtifactId"] = session.Input.Id, ["inputArtifactKind"] = session.Input.Kind, ["inputSha256"] = session.Input.Sha256,
+                    ["processingRunId"] = ProcessingRunId(owner, step, attempt, index), ["provider"] = "artifact-processing" } }), token);
+        var manifestItem = Element(new { artifactId = registered.Value.ArtifactId.ToString(), kind = "durable",
+            disposition = "publishable", name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + stat.Sha256 });
+        await SaveAsync(owner, key, session with { Result = manifestItem }, token);
+        return manifestItem;
     }
 
     public async Task<JsonElement> ExecuteToolAsync(FlowRun processingRun, string action, JsonElement arguments, CancellationToken token)
@@ -240,7 +329,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             || processingRun.Status.IsTerminal() || processingRun.RootFlowRunId != (owner.RootFlowRunId ?? owner.Id)
             || Math.Max(1, owner.Steps.Single(value => value.StepName == context.OwnerStepName).Attempt) != context.Attempt)
             throw Error("artifact_processing_scope_invalid");
-        var step = owner.DefinitionSnapshot.Graph!.Steps.OfType<ArtifactTransformFlowStepDefinition>()
+        var step = owner.DefinitionSnapshot.Graph!.Steps.OfType<ForeachArtifactsFlowStepDefinition>()
             .Single(value => value.Name == context.OwnerStepName);
         if (step.Mode != ArtifactProcessingMode.Access) throw Error("artifact_processing_access_not_enabled");
         var key = Key(owner, step.Name, context.Attempt, context.Index);
@@ -333,7 +422,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         finally { gate.Release(); }
     }
 
-    private async Task<Session> WriteAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step, string key,
+    private async Task<Session> WriteAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step, string key,
         Session session, JsonElement arguments, CancellationToken token)
     {
         var command = Text(arguments, "requestId");
@@ -441,7 +530,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         catch (DecoderFallbackException) { throw Error("artifact_processing_utf8_required"); }
     }
 
-    private async Task<StagedArtifactResource> StageAsync(FlowRun owner, ArtifactTransformFlowStepDefinition step,
+    private async Task<StagedArtifactResource> StageAsync(FlowRun owner, ForeachArtifactsFlowStepDefinition step,
         string identity, string name, string media, ReadOnlyMemory<byte> bytes, Input input, CancellationToken token)
     {
         if (owner.TransientPayloads) throw Error("direct_intermediate_storage_refused");
@@ -515,7 +604,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     private SemaphoreSlim Gate(string key) => gates[(int)(Convert.ToUInt32(key[..8], 16) % (uint)gates.Length)];
     private void EnsureLive(Session session) { if (session.ExpiresAt <= clock.GetUtcNow()) throw Error("artifact_processing_expired"); }
     private static string Key(FlowRun owner, string step, int attempt, int index) => Hash($"{owner.ExecutionScopeRef.Value}:{owner.Id}:{step}:{attempt}:{index}");
-    private static string ProcessingRunId(FlowRun owner, ArtifactTransformFlowStepDefinition step, int attempt, int index) =>
+    private static string ProcessingRunId(FlowRun owner, ForeachArtifactsFlowStepDefinition step, int attempt, int index) =>
         "flowrun-child-" + Hash($"{owner.Scope.ScopeRef.Value}:{owner.Id}:{step.Name}-artifact:{attempt}:{index}")[..32];
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static JsonElement Element<T>(T value) => JsonSerializer.SerializeToElement(value, Json);

@@ -18,7 +18,8 @@
   <data name="SelectRetrievalFlow" xml:space="preserve"><value>Sélectionner un Flow de retrieval</value></data>
   <data name="ProjectionInputs" xml:space="preserve"><value>Entrées de la projection</value></data>
   <data name="DataSourceBindings" xml:space="preserve"><value>Liaisons aux sources de données</value></data>
-  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Associez une ou plusieurs sources de données gouvernées. Chaque entrée peut être préparée par un Flow de transformation compatible.</value></data>
+  <data name="DataSourceBindingsHelp" xml:space="preserve"><value>Associez une ou plusieurs sources de données gouvernées. Chaque entrée peut avoir sa propre séquence de fonctions et de Flows compatibles.</value></data>
+  <data name="BindingTransformations" xml:space="preserve"><value>Transformations de cette source de données</value></data>
   <data name="AddDataSource" xml:space="preserve"><value>Ajouter une source de données</value></data>
   <data name="NoDataSourceBindings" xml:space="preserve"><value>Ajoutez au moins une source de données en entrée.</value></data>
   <data name="BindingName" xml:space="preserve"><value>Nom de la liaison</value></data>
@@ -154,4 +155,8 @@
   <data name="StructuredOutputSelect" xml:space="preserve"><value>Sélectionnez une collection</value></data>
   <data name="StructuredOutputRequired" xml:space="preserve"><value>Ce Storage documentaire nécessite une collection activée autorisant la lecture, les requêtes et la publication immuable. Configurez-en une dans le Storage, puis sélectionnez-la ici.</value></data>
   <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
+  <data name="PublishedExposureVersion" xml:space="preserve"><value>Version publiée : {0}</value></data>
+  <data name="RepublishExposureHelp" xml:space="preserve"><value>Publiez une nouvelle version pour mettre à jour ces Tools. Les versions précédentes restent disponibles. Après publication, sélectionnez la nouvelle version du ToolSet dans vos agents.</value></data>
+  <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publier une nouvelle version des Tools</value></data>
+  <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choisissez une autre version. La version publiée ne peut pas être remplacée.</value></data>
 </root>

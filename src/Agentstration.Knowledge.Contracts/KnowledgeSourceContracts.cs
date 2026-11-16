@@ -226,6 +226,7 @@ public enum KnowledgeArtifactKind { Staged, Durable, Inline }
 
 public sealed record KnowledgeProjectionArtifact
 {
+    public IReadOnlyDictionary<string, string> Provenance { get; init; } = new Dictionary<string, string>();
     public ResolvedDataContract? DataContract { get; init; }
     public required string ArtifactId { get; init; }
     public required KnowledgeArtifactKind Kind { get; init; }

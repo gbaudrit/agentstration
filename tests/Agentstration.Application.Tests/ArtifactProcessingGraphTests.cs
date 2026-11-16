@@ -13,7 +13,7 @@ public sealed class ArtifactProcessingGraphTests
     public void AbsentParallelismPreservesLegacyGraphSerializationAndBoundaryIdentity()
     {
         var graph = Graph();
-        var owner = graph.Steps.OfType<ArtifactTransformFlowStepDefinition>().Single();
+        var owner = graph.Steps.OfType<ForeachArtifactsFlowStepDefinition>().Single();
         var json = JsonSerializer.Serialize<FlowStepDefinition>(owner, LegacyJson);
         Assert.DoesNotContain("maximumConcurrency", json);
         var body = FlowArtifactProcessingGraph.Extract(graph, owner);
@@ -28,7 +28,7 @@ public sealed class ArtifactProcessingGraphTests
         var graph = Graph();
         var result = await new FlowGraphValidator(new References()).ValidateAsync(graph, new(false), default);
         Assert.IsTrue(result.IsValid, string.Join("; ", result.Issues.Select(issue => issue.Code)));
-        var step = graph.Steps.OfType<ArtifactTransformFlowStepDefinition>().Single();
+        var step = graph.Steps.OfType<ForeachArtifactsFlowStepDefinition>().Single();
         var body = FlowArtifactProcessingGraph.Extract(graph, step);
         CollectionAssert.AreEquivalent(new[] { "artifact_processing_input", "agent", "tool", "map", "child", "error", "artifact_processing_result" }, body.Steps.Select(value => value.Name).ToArray());
         Assert.AreEqual("artifact_processing_result", body.Transitions.Single(edge => edge.FromStep == "child" && edge.Event == "completed").ToStep);
@@ -52,7 +52,7 @@ public sealed class ArtifactProcessingGraphTests
             "missing-entry" => graph with { Transitions = graph.Transitions.Where(edge => edge.Event != "process").ToArray() },
             "cycle" => graph with { Transitions = [.. graph.Transitions, new("cycle", "map", "completed", "agent")] },
             "outside-entry" => graph with { Transitions = [.. graph.Transitions, new("outside", "input", "completed", "tool")] },
-            _ => graph with { Steps = graph.Steps.Select(step => step is ArtifactTransformFlowStepDefinition processing ? processing with { MaximumArtifacts = 129 } : step).ToArray() }
+            _ => graph with { Steps = graph.Steps.Select(step => step is ForeachArtifactsFlowStepDefinition processing ? processing with { MaximumArtifacts = 129 } : step).ToArray() }
         };
         var result = await new FlowGraphValidator(new References()).ValidateAsync(graph, new(false), default);
         Assert.IsFalse(result.IsValid);
@@ -63,7 +63,7 @@ public sealed class ArtifactProcessingGraphTests
     {
         EntryStep = "input",
         Steps = [new InputFlowStepDefinition { Name = "input" },
-            new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input.artifacts}") },
+            new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input.artifacts}") },
             new AgentFlowStepDefinition { Name = "agent", Agent = new("anonymize") },
             new ToolFlowStepDefinition { Name = "tool", Tool = new("generic-tool") },
             new TransformFlowStepDefinition { Name = "map", Mapping = JsonSerializer.SerializeToElement("${transition.output}") },

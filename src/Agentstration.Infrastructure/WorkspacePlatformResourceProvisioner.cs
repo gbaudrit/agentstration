@@ -27,6 +27,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     InternalMcpToolProjectionService internalTools,
     ConnectedServicePlatformResourceProvisioner connectedServiceTypes,
     StoragePlatformResourceProvisioner storageTypes,
+    Agentstration.Infrastructure.Functions.NativeFunctionPlatformResourceProvisioner functions,
     LocalStorageDefaultsProvisioner localStorage,
     ArtifactPlatformResourceProvisioner artifacts,
     KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
@@ -38,6 +39,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
             await connectedServiceTypes.EnsureAsync(cancellationToken);
             await storageTypes.EnsureAsync(cancellationToken);
+            await functions.EnsureAsync(cancellationToken);
         }
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
@@ -55,6 +57,7 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await connectedServiceTypes.EnsureAsync(cancellationToken);
         await storageTypes.EnsureAsync(cancellationToken);
+        await functions.EnsureTenantAccessAsync(ResourceScopeRef.Tenant(tenantId), cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
         await localStorage.EnsureAsync(workspace, cancellationToken);

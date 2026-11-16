@@ -26,6 +26,7 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<DateTimeMcpTool>(services);
+        AddInternalTool<Agentstration.Infrastructure.Functions.TransformationInvokeTool>(services);
         AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
         services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
         services.AddSingleton<ConnectedServiceBoundValues>();
