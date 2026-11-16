@@ -15,7 +15,7 @@ public sealed class SystemGraphQueryService(
     IEnumerable<ISystemGraphContributor> contributors,
     ISystemGraphAuthorization authorization,
     TimeProvider timeProvider,
-    ISystemGraphReadScope? metadataScope = null) : ISystemGraphQueryService
+    ISystemGraphReadScope? metadataScope = null) : ISystemGraphQueryService, ISystemGraphImpactService
 {
     private const int MaximumNodes = 10000;
     private const int MaximumRelations = 20000;
@@ -37,15 +37,9 @@ public sealed class SystemGraphQueryService(
         if (query.Limit is < 1 or > 200 || query.Root is not null && query.Limit < 2 || query.Root?.Length > 512 || query.Cursor?.Length > 2048)
             throw new SystemGraphException("system_graph_query_invalid");
         cancellationToken.ThrowIfCancellationRequested();
-        var context = await authorization.GetContextAsync(cancellationToken);
-        var first = await ReadAsync(context, query, cancellationToken);
-        // Independent stores have no shared transaction. Validate the authorized read set again.
-        var currentContext = await authorization.GetContextAsync(cancellationToken);
-        var second = await ReadAsync(currentContext, query, cancellationToken);
-        if (context.AuthorizationKey != currentContext.AuthorizationKey || first.Digest != second.Digest)
-            throw new SystemGraphException("system_graph_changed");
+        var (currentContext, second) = await ObserveAsync(query, cancellationToken);
         var snapshot = second.Digest;
-        var queryKey = Digest(JsonSerializer.Serialize(new { context.AuthorizationKey, query.Namespace, query.Root, query.Limit }, JsonOptions));
+        var queryKey = Digest(JsonSerializer.Serialize(new { currentContext.AuthorizationKey, query.Namespace, query.Root, query.Limit }, JsonOptions));
         var offset = query.Cursor is null ? 0 : ReadCursor(query.Cursor, snapshot, queryKey);
         var rootNode = query.Root is { } rootId ? second.Nodes.FirstOrDefault(node => node.Id == rootId) : null;
         var candidates = rootNode is null ? second.Nodes : second.Nodes.Where(node => node.Id != rootNode.Id).ToArray();
@@ -60,7 +54,79 @@ public sealed class SystemGraphQueryService(
         var hierarchy = (currentContext.Hierarchy ?? []).Where(scope => scopeRefs.Contains(scope.Scope))
             .Select(scope => scope with { Parent = scope.Parent is { } parent && scopeRefs.Contains(parent) ? parent : null })
             .OrderBy(scope => scope.Scope.Value, StringComparer.Ordinal).ToArray();
-        return new(selected, relations, snapshot, timeProvider.GetUtcNow(), "initial-families-authorized-slice", false, hasMore, cursor) { Scopes = hierarchy };
+        return new(selected, relations, snapshot, timeProvider.GetUtcNow(), "family-contributors-authorized-slice", false, hasMore, cursor) { Scopes = hierarchy };
+    }
+
+    public async Task<SystemGraphImpactResult> AnalyzeAsync(SystemGraphImpactQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (string.IsNullOrWhiteSpace(query.Root) || query.Root.Length > 512 || query.MaximumDepth is < 1 or > 32 || query.MaximumPaths is < 1 or > 1000)
+            throw new SystemGraphException("system_graph_query_invalid");
+        try
+        {
+            var (_, projection) = await ObserveAsync(new(query.Namespace), cancellationToken);
+            return SystemGraphImpactAnalyzer.Analyze(query, projection.Nodes, projection.Relations, projection.Digest, timeProvider.GetUtcNow(), cancellationToken);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (SystemGraphException) { throw; }
+        catch (Exception) { throw new SystemGraphException("system_graph_unavailable"); }
+    }
+
+    public async Task<IReadOnlyList<SystemGraphContributorCoverage>> GetCoverageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = await authorization.GetContextAsync(cancellationToken);
+            return [.. families.Select(family => family.Coverage), new("entries", [], ["native-entry-identity-port-not-available"])];
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (SystemGraphException) { throw; }
+        catch (Exception) { throw new SystemGraphException("system_graph_unavailable"); }
+    }
+
+    private async Task<(SystemGraphReadContext Context, Projection Projection)> ObserveAsync(SystemGraphQuery query, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var context = await authorization.GetContextAsync(ct);
+        var first = await ReadAsync(context, query, ct);
+        // Independent stores have no shared transaction. Validate the authorized read set again.
+        var current = await authorization.GetContextAsync(ct);
+        var second = await ReadAsync(current, query, ct);
+        if (context.AuthorizationKey != current.AuthorizationKey || first.Digest != second.Digest)
+            throw new SystemGraphException("system_graph_changed");
+        return (current, second);
+    }
+
+    public async Task<SystemGraphChangeResult> CompareAsync(SystemGraphChangeQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (string.IsNullOrWhiteSpace(query.From) || string.IsNullOrWhiteSpace(query.To) || query.From.Length > 512 || query.To.Length > 512
+            || query.MaximumDepth is < 1 or > 32 || query.MaximumPaths is < 1 or > 1000)
+            throw new SystemGraphException("system_graph_query_invalid");
+        try
+        {
+            var (_, projection) = await ObserveAsync(new(query.Namespace), cancellationToken);
+            var from = projection.Nodes.FirstOrDefault(node => node.Id == query.From);
+            var to = projection.Nodes.FirstOrDefault(node => node.Id == query.To);
+            var observedAt = timeProvider.GetUtcNow();
+            var available = from is not null && to is not null;
+            var before = SystemGraphImpactAnalyzer.Analyze(new(available ? query.From : "", query.Namespace, query.MaximumDepth, query.MaximumPaths),
+                projection.Nodes, projection.Relations, projection.Digest, observedAt, cancellationToken);
+            var after = SystemGraphImpactAnalyzer.Analyze(new(available ? query.To : "", query.Namespace, query.MaximumDepth, query.MaximumPaths),
+                projection.Nodes, projection.Relations, projection.Digest, observedAt, cancellationToken);
+            var assessment = !available ? "unavailable" : from!.Identity.ResourceUid != to!.Identity.ResourceUid ? "different-identities"
+                : from.Identity.Kind == "DataSourceQuery" && from.State == "publication" && to.State == "publication"
+                    && from.Evidence?.ContractHash is { } previousContract && to.Evidence?.ContractHash is { } currentContract
+                    ? previousContract == currentContract ? "compatible-query-contract" : "query-contract-changed"
+                : (from.State == "recorded-generation" || to.State == "recorded-generation") && from.Evidence?.Generation is { } previousGeneration && to.Evidence?.Generation is { } currentGeneration && previousGeneration != currentGeneration
+                    ? "generation-drift"
+                : from.Id == to.Id ? "same-observation" : "publication-compatibility-unknown";
+            return new(assessment, before, after);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (SystemGraphException) { throw; }
+        catch (Exception) { throw new SystemGraphException("system_graph_unavailable"); }
     }
 
     private async Task<Projection> ReadAsync(SystemGraphReadContext context, SystemGraphQuery query, CancellationToken ct)
@@ -72,13 +138,23 @@ public sealed class SystemGraphQueryService(
             throw new SystemGraphException("system_graph_unavailable");
         await foreach (var contribution in ReadSourcesAsync(context, ct))
         {
+            var bindingsAllowed = true;
+            if (contribution.BindingOwner is { } owner)
+            {
+                using (metadataScope?.Enter())
+                {
+                    var ownerAccess = await authorization.EvaluateAsync(owner, context, ct);
+                    bindingsAllowed = ownerAccess.Discover && ownerAccess.InspectBindings;
+                }
+            }
             foreach (var node in contribution.Nodes)
             {
+                if (!bindingsAllowed && node.Id != contribution.BindingOwnerNodeId) continue;
                 if (query.Namespace is { } ns && node.Identity.Namespace != ns) continue;
                 SystemGraphAccess allowed;
                 using (metadataScope?.Enter())
                     allowed = await authorization.EvaluateAsync(node.Identity, context, ct);
-                if (!allowed.Discover || node.State == "recorded-generation" && !allowed.InspectBindings) continue;
+                if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings) continue;
                 var visible = allowed.InspectBindings ? node : node with { Evidence = null };
                 if (nodes.TryGetValue(node.Id, out var existing) && existing != visible)
                     throw new SystemGraphException("system_graph_changed");
@@ -90,6 +166,15 @@ public sealed class SystemGraphQueryService(
         // A second bounded source pass filters endpoints before retaining any relation.
         // Hidden endpoints therefore cannot consume the public relation budget.
         await foreach (var contribution in ReadSourcesAsync(context, ct))
+        {
+            if (contribution.BindingOwner is { } owner)
+            {
+                using (metadataScope?.Enter())
+                {
+                    var ownerAccess = await authorization.EvaluateAsync(owner, context, ct);
+                    if (!ownerAccess.Discover || !ownerAccess.InspectBindings) continue;
+                }
+            }
             foreach (var edge in contribution.Relations)
                 if (nodes.ContainsKey(edge.Source) && nodes.ContainsKey(edge.Target)
                     && access[edge.Source].InspectBindings && access[edge.Target].InspectBindings)
@@ -97,6 +182,7 @@ public sealed class SystemGraphQueryService(
                     relations.Add(edge);
                     if (relations.Count > MaximumRelations) throw new SystemGraphException("system_graph_limit_exceeded");
                 }
+        }
         var visibleRelations = relations.ToArray();
         if (query.Root is { } root)
         {
@@ -114,7 +200,11 @@ public sealed class SystemGraphQueryService(
         var ordered = nodes.Values.OrderBy(node => node.Id, StringComparer.Ordinal).ToArray();
         var edges = visibleRelations.OrderBy(edge => edge.Source, StringComparer.Ordinal)
             .ThenBy(edge => edge.Target, StringComparer.Ordinal).ThenBy(edge => edge.Kind, StringComparer.Ordinal)
-            .ThenBy(edge => edge.SourceField, StringComparer.Ordinal).ThenBy(edge => edge.Resolution, StringComparer.Ordinal).ToArray();
+            .ThenBy(edge => edge.SourceField, StringComparer.Ordinal).ThenBy(edge => edge.Resolution, StringComparer.Ordinal)
+            .ThenBy(edge => edge.Assessment, StringComparer.Ordinal).ThenBy(edge => edge.SelectedPublication, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TargetField, StringComparer.Ordinal).ThenBy(edge => edge.ExpectedHash, StringComparer.Ordinal)
+            .ThenBy(edge => edge.ParentHash, StringComparer.Ordinal).ThenBy(edge => edge.BindingHash, StringComparer.Ordinal)
+            .ThenBy(edge => edge.CapabilityHash, StringComparer.Ordinal).ToArray();
         return new(ordered, edges, Digest(JsonSerializer.Serialize(new { Nodes = ordered, Relations = edges }, JsonOptions)));
     }
 

@@ -5,9 +5,12 @@ using Agentstration.SystemGraph.Contracts;
 
 namespace Agentstration.Flows.Application;
 
-public sealed class FlowSystemGraphContributor(IFlowRepository flows) : ISystemGraphContributor
+public sealed record FlowToolGraphIdentity(SystemGraphIdentity Identity, long Generation);
+
+public sealed class FlowSystemGraphContributor(IFlowRepository flows, IFlowToolContractResolver? toolReferences = null) : ISystemGraphContributor
 {
     public string Family => "flows";
+    public SystemGraphContributorCoverage Coverage => new(Family, ["agent-router-revisions", "flow-call-uid-publications", "function-publications", "schema-publications", "live-owner-relative-tool-bindings"], ["legacy-composite-without-uids", "active-flow-selection-not-a-recorded-pin", "toolroute-without-recorded-toolset-uid"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -29,11 +32,23 @@ public sealed class FlowSystemGraphContributor(IFlowRepository flows) : ISystemG
                         cancellationToken.ThrowIfCancellationRequested();
                         var version = publication.Value;
                         var node = new SystemGraphNode(SystemGraphIds.Publication(flow.Uid, version.Version), identity, "publication",
-                            new(ETag: publication.ETag, Publication: version.Version, Hash: version.DefinitionHash, OriginKind: version.Governance.Origin.Kind.ToString()));
+                            new(ETag: publication.ETag, Publication: version.Version, Hash: version.DefinitionHash, OriginKind: version.Governance.Origin.Kind.ToString()) { PublishedAt = version.PublishedAt });
                         var edges = new List<SystemGraphRelation> { new(definition.Id, node.Id, "publication") };
-                        foreach (var (revisionUid, path) in References(version))
-                            edges.Add(new(node.Id, SystemGraphIds.Definition(revisionUid), "exact-dependency", path, "recorded-pin"));
-                        yield return new([node], edges);
+                        var nodes = new List<SystemGraphNode> { node };
+                        edges.AddRange(SchemaReferences(version, node.Id));
+                        foreach (var (targetId, path) in References(version))
+                            edges.Add(new(node.Id, targetId, "exact-dependency", path, "recorded-pin"));
+                        if (toolReferences is not null)
+                            foreach (var step in version.Graph?.Steps.OfType<ToolFlowStepDefinition>() ?? [])
+                            {
+                                var target = await toolReferences.InspectDependencyAsync(scope, flow.Id.Namespace, step.Tool, cancellationToken);
+                                if (target is null) continue;
+                                var id = SystemGraphIds.Generation(target.Identity.ResourceUid, target.Generation);
+                                nodes.Add(new(id, target.Identity, "recorded-generation", new(target.Generation)));
+                                edges.Add(new(id, SystemGraphIds.Definition(target.Identity.ResourceUid), "generation-of"));
+                                edges.Add(new(node.Id, id, "dynamic-dependency", $"graph.steps[{step.Name}].tool", "owner-relative-runtime"));
+                            }
+                        yield return new(nodes, edges) { BindingOwner = node.Identity, BindingOwnerNodeId = node.Id };
                     }
                     if (!versionPage.HasMore) break;
                 }
@@ -42,21 +57,44 @@ public sealed class FlowSystemGraphContributor(IFlowRepository flows) : ISystemG
         }
     }
 
-    private static IEnumerable<(Guid RevisionUid, string Path)> References(FlowVersion version)
+    private static IEnumerable<SystemGraphRelation> SchemaReferences(FlowVersion version, string source)
+    {
+        foreach (var binding in version.SchemaBindings ?? new Dictionary<string, Agentstration.Schemas.Contracts.SchemaBindingSnapshot>())
+            if (Relation(binding.Value, binding.Key) is { } relation) yield return relation;
+        foreach (var step in version.Graph?.Steps ?? [])
+        {
+            var schemas = step switch { TransformFlowStepDefinition transform => transform.FunctionSchemaSnapshots, ToolFlowStepDefinition tool => tool.FunctionSchemaSnapshots, _ => null };
+            foreach (var binding in schemas ?? new Dictionary<string, Agentstration.Schemas.Contracts.SchemaBindingSnapshot>())
+                if (Relation(binding.Value, $"graph.steps[{step.Name}].functionSchemas[{binding.Key}]") is { } relation) yield return relation;
+        }
+        SystemGraphRelation? Relation(Agentstration.Schemas.Contracts.SchemaBindingSnapshot binding, string field) =>
+            binding is { SchemaUid: { } uid, Source: { } schema } ? new(source, SystemGraphIds.Publication(uid, schema.Version), "exact-dependency", field, "recorded-schema")
+            { SelectedPublication = schema.Version, TargetField = schema.SchemaPath, ExpectedHash = binding.DefinitionHash, ParentHash = binding.ParentDefinitionHash } : null;
+    }
+
+    private static IEnumerable<(string TargetId, string Path)> References(FlowVersion version)
     {
         if (version.Graph is { } graph)
         {
             foreach (var step in graph.Steps)
             {
+                var flowCall = step switch { FlowCallStepDefinition call => call.Flow, RepeatFlowStepDefinition repeat => repeat.Flow, _ => null };
+                if (flowCall is { VersionStrategy: FlowCallVersionStrategy.Exact, ResourceUid: { } flowUid, Version: { } flowVersion })
+                    yield return (SystemGraphIds.Publication(flowUid, flowVersion), $"graph.steps[{step.Name}].flow");
+                var function = step switch { TransformFlowStepDefinition transform => transform.Function, ToolFlowStepDefinition tool => tool.FunctionBinding?.Reference, _ => null };
+                if (function is { Uid: { } functionUid })
+                    yield return (SystemGraphIds.Publication(functionUid, function.Version), $"graph.steps[{step.Name}].function");
+                if (step.ArtifactOutput?.StorageFlow is { VersionStrategy: FlowCallVersionStrategy.Exact, ResourceUid: { } storageFlowUid, Version: { } storageVersion })
+                    yield return (SystemGraphIds.Publication(storageFlowUid, storageVersion), $"graph.steps[{step.Name}].artifactOutput.storageFlow");
                 if (step is AgentFlowStepDefinition agent && agent.Agent.RevisionUid is { } uid)
-                    yield return (uid, $"graph.steps[{step.Name}].agent");
+                    yield return (SystemGraphIds.Definition(uid), $"graph.steps[{step.Name}].agent");
                 if (step is RouterFlowStepDefinition router)
                 {
                     foreach (var candidate in router.Candidates)
                         if (candidate.Agent.RevisionUid is { } candidateUid)
-                            yield return (candidateUid, $"graph.steps[{step.Name}].candidates[{candidate.Route}].agent");
+                            yield return (SystemGraphIds.Definition(candidateUid), $"graph.steps[{step.Name}].candidates[{candidate.Route}].agent");
                     if (router.Fallback?.RevisionUid is { } fallback)
-                        yield return (fallback, $"graph.steps[{step.Name}].fallback");
+                        yield return (SystemGraphIds.Definition(fallback), $"graph.steps[{step.Name}].fallback");
                 }
             }
             yield break;
@@ -73,7 +111,7 @@ public sealed class FlowSystemGraphContributor(IFlowRepository flows) : ISystemG
         foreach (var target in targets)
         {
             if (target.Kind == FlowTargetKind.Agent && target.RevisionUid is { } uid)
-                yield return (uid, $"definition.targets[{index}]");
+                yield return (SystemGraphIds.Definition(uid), $"definition.targets[{index}]");
             index++;
         }
     }

@@ -9,6 +9,7 @@ namespace Agentstration.Models;
 public sealed class ModelSystemGraphContributor(IResourceStore resources) : ISystemGraphContributor
 {
     public string Family => "models-and-runtime-profiles";
+    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-profile-definitions"], ["provider-execution-availability"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {

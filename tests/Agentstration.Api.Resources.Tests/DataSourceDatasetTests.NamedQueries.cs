@@ -1,3 +1,4 @@
+using Agentstration.SystemGraph.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -34,14 +35,22 @@ public sealed partial class DataSourceDatasetTests
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false,
             StructuredStorageFixture.Json("""{"type":"object","properties":{"dataset":{"type":"string"}}}"""));
         var desired = Source("named-query-source", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Storage = storage.Reference, DocumentCollectionUid = storage.Collection, Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Storage = storage.Reference, DocumentCollectionUid = storage.Collection, Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } }
+            }
+        };
         var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(desired, default);
         var acquisition = await AcquireAsync(client, source.Value.Name);
         var selection = (await factory.Services.GetRequiredService<DataSourceDocumentAccessService>().DescribeAsync(default, acquisition.Name, default)).Selection;
         var query = new DataSourceQueryResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQuery, ScopeRef = Owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceQuery,
+            ScopeRef = Owner,
             Metadata = new() { Name = "only-alpha" },
             Definition = new() { DisplayName = "Only alpha", Selection = selection, Query = StructuredStorageFixture.Json("""{"$filter":"dataset eq 'alpha'"}""") }
         };
@@ -72,7 +81,8 @@ public sealed partial class DataSourceDatasetTests
         var flow = await flows.CreateExactAsync(Owner, new CreateFlowCommand("named-query-consumer", null, "1.0.0", true,
             new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
             {
-                EntryStep = "input", InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+                EntryStep = "input",
+                InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
                 Steps = [new InputFlowStepDefinition { Name = "input" },
                     new ToolFlowStepDefinition { Name = "invoke", Tool = new(dynamicTool.Name, ScopeRef: Owner), ArgumentsMapping = Empty },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = JsonSerializer.SerializeToElement("${steps.invoke.output}") }],
@@ -91,6 +101,15 @@ public sealed partial class DataSourceDatasetTests
         var b = await service.PublishAsync(Owner, query.Namespace, query.Name, "1.0.0", draft.ETag, default);
         Assert.AreEqual(a.ContractDigest, b.ContractDigest);
         Assert.IsTrue(b.PublishedAt > a.PublishedAt);
+        var dynamicPublicationId = SystemGraphIds.Publication(publishedBefore.Value.Uid, "1.0.0");
+        var bGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, b.Version))))!;
+        var selectionEdge = bGraph.Relations.Single(edge => edge.Source == dynamicPublicationId && edge.Target == SystemGraphIds.Publication(query.Uid, b.Version));
+        Assert.AreEqual("latest-published-at", selectionEdge.Resolution);
+        Assert.AreEqual("compatible-dynamic-no-republication", selectionEdge.Assessment);
+        Assert.IsFalse(bGraph.Nodes.Any(node => node.Identity.Name == "alpha-exact"));
+        var aGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, a.Version))))!;
+        Assert.IsTrue(aGraph.Nodes.Any(node => node.Identity.Name == "alpha-exact"));
+        Assert.IsFalse(aGraph.Relations.Any(edge => edge.Source == dynamicPublicationId));
         var after = await RunNamedQueryToolAsync(client, dynamicTool);
         Assert.AreEqual("1.0.0", after.Query.Version, "Latest means publication order, not semantic version order.");
         Assert.HasCount(0, after.Result.Page.Documents);
@@ -124,8 +143,12 @@ public sealed partial class DataSourceDatasetTests
         definitionResponse.EnsureSuccessStatusCode();
         var beforeEdit = (await definitionResponse.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
         var changed = (RelayToolDefinitionProperties)beforeEdit.Definition with
-        { DisplayName = "Edited alpha query", Version = "2.0.0", Publish = false,
-            Bindings = [.. beforeEdit.Definition.Bindings, new OmittedToolArgumentBinding { Path = "/request" }] };
+        {
+            DisplayName = "Edited alpha query",
+            Version = "2.0.0",
+            Publish = false,
+            Bindings = [.. beforeEdit.Definition.Bindings, new OmittedToolArgumentBinding { Path = "/request" }]
+        };
         using var editRequest = new HttpRequestMessage(HttpMethod.Put, editPath)
         { Content = JsonContent.Create(new PutToolDefinitionRequest(changed)) };
         editRequest.Headers.IfMatch.Add(definitionResponse.Headers.ETag!);
@@ -151,6 +174,11 @@ public sealed partial class DataSourceDatasetTests
         draft = await service.UpdateAsync(Owner, query.Namespace, query.Name, draft.Value.Definition with
         { Query = StructuredStorageFixture.Json("""{"$select":"dataset"}""") }, draft.ETag, default);
         _ = await service.PublishAsync(Owner, query.Namespace, query.Name, "2.0.0", draft.ETag, default);
+        var changedRoot = Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, "2.0.0"));
+        var changedGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + changedRoot))!;
+        Assert.IsTrue(changedGraph.Relations.Any(edge => edge.Source == dynamicPublicationId && edge.Assessment == "contract-mismatch"));
+        Assert.DoesNotContain("$select", JsonSerializer.Serialize(changedGraph), StringComparison.Ordinal);
+        Assert.DoesNotContain("dataset eq", JsonSerializer.Serialize(changedGraph), StringComparison.Ordinal);
         using var incompatible = await client.PostAsJsonAsync($"/api/tools/{dynamicTool.Name}/run?scopeRef=/instance", new RunToolRequest(Empty, ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, incompatible.StatusCode);
         Assert.Contains("data_source_query_contract_mismatch", await incompatible.Content.ReadAsStringAsync());
@@ -168,8 +196,11 @@ public sealed partial class DataSourceDatasetTests
             var denied = await Assert.ThrowsAsync<DataSourceValidationException>(() => service.ResolveAsync(reference, default));
             Assert.AreEqual("data_source_query_access_denied", denied.Code);
         }
-        _ = await policyStore.PutAsync(policy.Policy with { Grants = [new(workspace,
-            [Agentstration.ResourceManagement.Contracts.ResourceAccessAction.Discover, Agentstration.ResourceManagement.Contracts.ResourceAccessAction.Use])] }, policy.ETag, default);
+        _ = await policyStore.PutAsync(policy.Policy with
+        {
+            Grants = [new(workspace,
+            [Agentstration.ResourceManagement.Contracts.ResourceAccessAction.Discover, Agentstration.ResourceManagement.Contracts.ResourceAccessAction.Use])]
+        }, policy.ETag, default);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
         {
             var shared = await service.ResolveAsync(reference with { Version = "9.0.0" }, default);
@@ -206,8 +237,14 @@ public sealed partial class DataSourceDatasetTests
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false,
             StructuredStorageFixture.Json("""{"type":"object","properties":{"dataset":{"type":"string"}}}"""));
         var desired = Source("query-pagination", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Storage = storage.Reference, DocumentCollectionUid = storage.Collection, Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Storage = storage.Reference, DocumentCollectionUid = storage.Collection, Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } }
+            }
+        };
         var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
         var source = await sources.CreateAsync(desired, default);
         var a = await AcquireAsync(client, source.Value.Name);
@@ -215,8 +252,11 @@ public sealed partial class DataSourceDatasetTests
         var service = factory.Services.GetRequiredService<DataSourceQueryService>();
         var query = await service.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQuery, ScopeRef = Owner,
-            Metadata = new() { Name = "paginated-alpha" }, Definition = new()
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceQuery,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "paginated-alpha" },
+            Definition = new()
             { DisplayName = "Paginated alpha", Selection = description.Selection, Query = StructuredStorageFixture.Json("""{"$filter":"dataset eq 'alpha'"}""") }
         }, default);
         _ = await service.PublishAsync(Owner, default, query.Value.Name, "A", query.ETag, default);
@@ -228,8 +268,13 @@ public sealed partial class DataSourceDatasetTests
         { Query = StructuredStorageFixture.Json("""{"$filter":"dataset eq 'beta'"}""") }, query.ETag, default);
         _ = await service.PublishAsync(Owner, default, query.Value.Name, "B", changed.ETag, default);
         _ = await sources.PutAsync(source.Value.Namespace, source.Value.Name, Owner, source.Value.Definition with
-        { Dataset = source.Value.Definition.Dataset! with { Acquisition = source.Value.Definition.Dataset.Acquisition with
-        { Parameters = JsonSerializer.SerializeToElement(new { dataset = "beta" }) } } }, source.ETag, default);
+        {
+            Dataset = source.Value.Definition.Dataset! with
+            {
+                Acquisition = source.Value.Definition.Dataset.Acquisition with
+                { Parameters = JsonSerializer.SerializeToElement(new { dataset = "beta" }) }
+            }
+        }, source.ETag, default);
         var b = await AcquireAsync(client, source.Value.Name);
         var tampered = await Assert.ThrowsAsync<DataSourceValidationException>(() => service.ExecuteAsync(reference, new() { Cursor = "broken" }, null, null, default));
         Assert.AreEqual("data_source_query_cursor_invalid", tampered.Code);

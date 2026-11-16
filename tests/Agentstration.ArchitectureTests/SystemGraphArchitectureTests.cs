@@ -30,5 +30,16 @@ public sealed class SystemGraphArchitectureTests
         Assert.AreEqual(typeof(Task<SystemGraphPage>), methods[0].ReturnType);
         Assert.AreEqual("QueryAsync", methods[0].Name);
         Assert.IsFalse(typeof(SystemGraphPage).GetProperties().Any(property => property.PropertyType == typeof(SystemGraphContribution)));
+        CollectionAssert.AreEquivalent(new[] { "AnalyzeAsync", "CompareAsync", "GetCoverageAsync" },
+            typeof(ISystemGraphImpactService).GetMethods().Select(method => method.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void SystemGraphTransportHasNoConsoleOrRendererDependency()
+    {
+        var assembly = typeof(Agentstration.SystemGraph.Api.SystemGraphApiModule).Assembly;
+        foreach (var dependency in assembly.GetReferencedAssemblies())
+            foreach (var name in new[] { "LikeC4", "React", "FlowDesigner", "Console.Components" })
+                Assert.IsFalse(dependency.Name!.Contains(name, StringComparison.OrdinalIgnoreCase), dependency.Name);
     }
 }

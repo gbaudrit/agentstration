@@ -14,23 +14,9 @@ public sealed class FlowToolContractResolver(IResourceReferenceResolver referenc
     public async Task<FlowToolReference> ResolveAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
         FlowToolReference reference, CancellationToken cancellationToken)
     {
-        // Match the exact reference-reading scope used by governed Flow Tool execution.
-        // ResolveAsync still checks the referencing Flow's ancestor chain before any read.
-        using var exact = current.AccessMode == ControlPlaneAccessMode.System ? null : reference.ScopeRef?.Kind switch
-        {
-            ResourceScopeKind.Instance => requestScopes.PushInstance(current.Current),
-            ResourceScopeKind.Tenant when reference.ScopeRef.Value.TargetId == current.Current.TenantId => requestScopes.PushTenantAdministration(current.Current),
-            _ => null
-        };
-        StoredResource<ToolResource>? stored;
-        try
-        {
-            stored = await references.ResolveAsync<ToolResource>(new(reference.ResourceId, reference.ScopeRef, reference.Namespace),
-            ownerNamespace, ToolResourceKinds.Tool, ownerScopeRef, cancellationToken)
+        using var exact = EnterReferenceScope(reference);
+        var stored = await ReadToolAsync(ownerScopeRef, ownerNamespace, reference, cancellationToken)
             ?? throw new FlowValidationException("tool_not_found", "The Flow Tool was not found.");
-        }
-        catch (ResourceReferenceAmbiguousException exception) { throw new FlowValidationException("tool_reference_ambiguous", exception.Message); }
-        catch (ResourceReferenceOutsideScopeException exception) { throw new FlowValidationException("tool_reference_outside_scope", exception.Message); }
         var tool = stored.Value;
         var scope = tool.ScopeRef ?? ownerScopeRef;
         if (tool.Definition.Schema is not { Input: { } input, Output: { } output })
@@ -44,5 +30,37 @@ public sealed class FlowToolContractResolver(IResourceReferenceResolver referenc
         _ = DataContracts.Declared(input, $"tool:{tool.Address}/input");
         _ = DataContracts.Declared(output, $"tool:{tool.Address}/output");
         return reference with { Namespace = tool.Namespace, ScopeRef = scope, InputSchema = input.Clone(), OutputSchema = output.Clone() };
+    }
+
+    public async Task<FlowToolGraphIdentity?> InspectDependencyAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        FlowToolReference reference, CancellationToken cancellationToken)
+    {
+        using var exact = EnterReferenceScope(reference);
+        StoredResource<ToolResource>? stored;
+        try { stored = await ReadToolAsync(ownerScopeRef, ownerNamespace, reference, cancellationToken); }
+        catch (FlowValidationException) { return null; }
+        return stored is null ? null : new(new(stored.Value.Uid, stored.Value.ScopeRef ?? ownerScopeRef,
+            stored.Value.Namespace, stored.Value.Kind, stored.Value.Name), stored.Value.Generation);
+    }
+
+    // Preserve the execution resolver's original scope for BOTH Tool and provider reads.
+    private IDisposable? EnterReferenceScope(FlowToolReference reference) =>
+        current.AccessMode == ControlPlaneAccessMode.System ? null : reference.ScopeRef?.Kind switch
+        {
+            ResourceScopeKind.Instance => requestScopes.PushInstance(current.Current),
+            ResourceScopeKind.Tenant when reference.ScopeRef.Value.TargetId == current.Current.TenantId => requestScopes.PushTenantAdministration(current.Current),
+            _ => null
+        };
+
+    private async Task<StoredResource<ToolResource>?> ReadToolAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        FlowToolReference reference, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await references.ResolveAsync<ToolResource>(new(reference.ResourceId, reference.ScopeRef, reference.Namespace),
+                ownerNamespace, ToolResourceKinds.Tool, ownerScopeRef, cancellationToken);
+        }
+        catch (ResourceReferenceAmbiguousException exception) { throw new FlowValidationException("tool_reference_ambiguous", exception.Message); }
+        catch (ResourceReferenceOutsideScopeException exception) { throw new FlowValidationException("tool_reference_outside_scope", exception.Message); }
     }
 }

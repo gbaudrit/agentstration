@@ -32,7 +32,7 @@ return `system_graph_cursor_invalid` (400); changing observations return
 `system_graph_unavailable` (503). Raw exception details are never returned.
 Cancellation uses the request token.
 
-## Initial coverage
+## Family coverage
 
 | Owner | Evidence |
 | --- | --- |
@@ -40,11 +40,46 @@ Cancellation uses the request token.
 | Models / Runtime Profiles | Current exact ModelProfile and RuntimeProfile metadata. |
 | Agents | Definitions, owner-relative profile declarations, immutable revisions, recorded profile generations and revision hashes. |
 | Flows | Definitions, immutable versions and recorded Agent revision UIDs in direct, routing, workflow and orchestration definitions and top-level Agent/router graph steps. |
+| Tools | Provider metadata, relay generations, ToolDefinition publications and ToolSet member pins. |
+| Schemas / Functions | Schema publications and family-owned function/type versions and digests. |
+| Data Sources | Profile Tool/provider pins, dataset operation/Storage pins, Query publications and contract digests. |
+| Connected Services / Storage | Type contracts, operation/service generations, value references, provider contributions and collection Schema pins. |
+| Knowledge | Source input pins, Snapshot history and recorded input/output Storage and binding identities. |
+| Triggers | Recorded Flow UID/version targets. |
 
 Inspection reads recorded publication pins; it never invokes the publication-time
-Agent resolver. Nested composition, Tools, ToolSets, Queries, Knowledge, Storage,
-complete reverse paths and impact belong to #1197. Missing pins and unsupported
-relations do not prove no dependency exists. No content or provider is probed.
+Agent resolver. Flow-call/composition/function/schema references require recorded
+UID evidence. Direct Flow Tool references use the existing owner-relative lookup
+and remain explicitly dynamic. Missing pins and unsupported relations do not prove
+no dependency exists. No content or provider is probed.
+
+`GET /api/system-graph/coverage` reports static supported and unavailable evidence.
+Historical Flow bindings without UIDs, opaque settings and native Entry identity
+integration remain unavailable. #1189 proposal refresh is not invented. Coverage
+limitations are not empty dependency findings.
+
+## Reverse impact and change comparison
+
+`GET /api/system-graph/impact?root=<graph-id>` explains authorized reverse paths.
+Optional `namespace`, `maximumDepth` (1–32, default 16) and `maximumPaths` (1–1,000,
+default 200) bound the request. Paths retain source fields and selection reasons;
+cycles and truncation are explicit. Traversal follows executable dependencies,
+generation links and publication membership. Declared, logical, operational and
+Parameter/Secret value-reference edges do not enter publication closure.
+
+`GET /api/system-graph/changes?from=<graph-id>&to=<graph-id>` compares selected
+generations/publications and their paths within one authorized observation. It
+distinguishes identity replacement, generation drift, compatible/changed Query
+contracts and unknown publication compatibility. It accepts the same bounds and
+namespace filter. Missing and invisible selections are indistinguishable. These
+read-only APIs are not reconciliation plans or permission grants.
+
+Query Tool extraction shares invocation publication selection: exact stays exact;
+latest means publication time, including a lower semantic version published later.
+Compatible filter/order changes need no Tool/Flow republication. Incompatible
+latest fails contract comparison without older fallback. Query bodies and literal
+values are omitted. [ADR-0237](../../decisions/0237-system-graph-impact-uses-authorized-family-evidence.md)
+records these rules.
 
 ## Multiple versions
 
@@ -80,3 +115,7 @@ Each authorized observation collects nodes first, then scans relations and retai
 only those with authorized endpoints before applying the relation budget. Hidden
 relations cannot exhaust that public budget. The second observation repeats both
 phases; no raw cross-family edge index is retained.
+
+Derived pin/reference nodes require binding inspection rights on the consumer that
+discloses them as well as the target. A hidden consumer cannot change public pin
+counts, snapshot digests or paths of an otherwise visible dependency.

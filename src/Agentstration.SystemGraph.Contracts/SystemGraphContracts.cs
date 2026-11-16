@@ -20,7 +20,13 @@ public sealed record SystemGraphEvidence(
     string? ETag = null,
     string? Publication = null,
     string? Hash = null,
-    string? OriginKind = null);
+    string? OriginKind = null)
+{
+    public Guid? PublicationUid { get; init; }
+    public string? ContractHash { get; init; }
+    public bool? Enabled { get; init; }
+    public DateTimeOffset? PublishedAt { get; init; }
+}
 
 public sealed record SystemGraphNode(
     string Id,
@@ -33,7 +39,16 @@ public sealed record SystemGraphRelation(
     string Target,
     string Kind,
     string? SourceField = null,
-    string? Resolution = null);
+    string? Resolution = null)
+{
+    public string? Assessment { get; init; }
+    public string? SelectedPublication { get; init; }
+    public string? TargetField { get; init; }
+    public string? ExpectedHash { get; init; }
+    public string? ParentHash { get; init; }
+    public string? BindingHash { get; init; }
+    public string? CapabilityHash { get; init; }
+}
 
 public sealed record SystemGraphPage(
     IReadOnlyList<SystemGraphNode> Nodes,
@@ -58,14 +73,21 @@ public interface ISystemGraphQueryService
 // Contributor contracts are in-process metadata ports, never HTTP index/export surfaces.
 public sealed record SystemGraphContribution(
     IReadOnlyList<SystemGraphNode> Nodes,
-    IReadOnlyList<SystemGraphRelation> Relations);
+    IReadOnlyList<SystemGraphRelation> Relations)
+{
+    public SystemGraphIdentity? BindingOwner { get; init; }
+    public string? BindingOwnerNodeId { get; init; }
+}
 
 public interface ISystemGraphContributor
 {
     string Family { get; }
+    SystemGraphContributorCoverage Coverage => new(Family, ["exact-resource-metadata"], ["unresolved-relations-remain-unknown"]);
     IAsyncEnumerable<SystemGraphContribution> ReadAsync(
         ResourceScopeRef scope, CancellationToken cancellationToken);
 }
+
+public sealed record SystemGraphContributorCoverage(string Family, IReadOnlyList<string> Supported, IReadOnlyList<string> Unavailable);
 
 public sealed record SystemGraphReadContext(string AuthorizationKey, IReadOnlyList<ResourceScopeRef> Scopes, IReadOnlyList<ResourceScopeRef>? ReadableScopes = null, IReadOnlyList<SystemGraphScope>? Hierarchy = null);
 public sealed record SystemGraphAccess(bool Discover, bool InspectBindings);

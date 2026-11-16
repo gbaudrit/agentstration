@@ -278,3 +278,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 234. [ADR-0234 — Knowledge consultation reads only metadata](0234-knowledge-consultation-reads-only-metadata.md)
 
 236. [ADR-0236 — SystemGraph is an authorized rebuildable semantic projection](0236-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
+
+237. [ADR-0237 — SystemGraph impact uses authorized family evidence](0237-system-graph-impact-uses-authorized-family-evidence.md)

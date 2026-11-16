@@ -11,6 +11,7 @@ namespace Agentstration.Agents;
 public sealed class AgentSystemGraphContributor(IResourceStore resources, IResourceReferenceResolver references) : ISystemGraphContributor
 {
     public string Family => "agents";
+    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "schema-publications", "agent-revisions"], ["opaque-middleware-and-settings"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -39,15 +40,22 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
             var source = ResourceSystemGraph.Node(revision, state: "publication", publication: revision.AgentVersion.ToString(CultureInfo.InvariantCulture), hash: revision.DefinitionHash);
             var nodes = new List<SystemGraphNode> { source };
             var relations = new List<SystemGraphRelation> { new(SystemGraphIds.Definition(revision.AgentUid), source.Id, "publication") };
-            foreach (var (pin, field) in new[] { (revision.Definition.ModelProfilePin, "definition.modelProfile"), (revision.Definition.RuntimeProfilePin, "definition.runtimeProfile") })
+            foreach (var (pin, field) in new[] { (revision.Definition.ModelProfilePin, "definition.modelProfile"), (revision.Definition.RuntimeProfilePin, "definition.runtimeProfile") }
+                .Concat(revision.Definition.ToolPins.Select((pin, index) => ((ResolvedResourceDependency?)pin, $"definition.tools[{index}]"))))
             {
                 if (pin is null) continue; // Legacy/unresolved evidence is not resolved or invented here.
                 var id = SystemGraphIds.Generation(pin.Uid, pin.Generation);
-                nodes.Add(new(id, new(pin.Uid, pin.ScopeRef, pin.Namespace, pin.Kind, pin.Name), "recorded-generation", new(pin.Generation, Publication: pin.Version)));
+                nodes.Add(new(id, new(pin.Uid, pin.ScopeRef, pin.Namespace, pin.Kind, pin.Name), "recorded-generation", new(pin.Generation)));
                 relations.Add(new(id, SystemGraphIds.Definition(pin.Uid), "generation-of"));
-                relations.Add(new(source.Id, id, "exact-dependency", field, "recorded-pin"));
+                relations.Add(new(source.Id, id, "exact-dependency", field, "recorded-pin") { SelectedPublication = pin.Version });
             }
-            yield return new(nodes, relations);
+            foreach (var assignment in revision.Definition.ToolSetAssignments)
+                relations.Add(new(source.Id, SystemGraphIds.Publication(assignment.ToolSetUid, assignment.Version), "exact-dependency", "definition.toolSets", "recorded-pin"));
+            foreach (var schema in revision.Definition.SchemaBindings)
+                if (schema.Value.SchemaUid is { } uid && schema.Value.Source is { } reference)
+                    relations.Add(new(source.Id, SystemGraphIds.Publication(uid, reference.Version), "exact-dependency", schema.Key, "recorded-schema")
+                    { SelectedPublication = reference.Version, TargetField = reference.SchemaPath, ExpectedHash = schema.Value.DefinitionHash, ParentHash = schema.Value.ParentDefinitionHash });
+            yield return new(nodes, relations) { BindingOwner = source.Identity, BindingOwnerNodeId = source.Id };
         }
     }
 }

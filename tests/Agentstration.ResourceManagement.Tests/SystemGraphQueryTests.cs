@@ -232,6 +232,22 @@ public sealed class SystemGraphQueryTests
         await AssertCodeAsync("system_graph_query_invalid", () => fixture.Service.QueryAsync(new(Root: "missing", Limit: 1), default));
     }
 
+    [TestMethod]
+    public async Task HiddenConsumerCannotRevealPinsOfAnOtherwiseVisibleDependency()
+    {
+        var fixture = new Fixture();
+        var baseline = await fixture.Service.QueryAsync(new(), default);
+        var hidden = Node(Guid.NewGuid(), "private-consumer");
+        fixture.Access.Hidden.Add(hidden.Identity.ResourceUid);
+        var pin = fixture.First with { Id = SystemGraphIds.Generation(fixture.First.Identity.ResourceUid, 37), State = "recorded-generation", Evidence = new(37) };
+        fixture.Contributor.Items.Add(new([hidden, pin], [new(hidden.Id, pin.Id, "exact-dependency"), new(pin.Id, fixture.First.Id, "generation-of")])
+        { BindingOwner = hidden.Identity, BindingOwnerNodeId = hidden.Id });
+        var current = await fixture.Service.QueryAsync(new(), default);
+        Assert.AreEqual(baseline.Snapshot, current.Snapshot);
+        Assert.AreEqual(JsonSerializer.Serialize(baseline.Nodes), JsonSerializer.Serialize(current.Nodes));
+        Assert.AreEqual(JsonSerializer.Serialize(baseline.Relations), JsonSerializer.Serialize(current.Relations));
+    }
+
     private static async Task AssertCodeAsync(string expected, Func<Task<SystemGraphPage>> action)
     {
         var exception = await Assert.ThrowsExactlyAsync<SystemGraphException>(action);
