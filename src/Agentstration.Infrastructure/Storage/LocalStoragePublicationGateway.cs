@@ -3,13 +3,15 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Asp.Abstractions;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Local retained publications use a separate namespace from mutable ASP objects.</summary>
-public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IStorageContentGateway content,
+public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IStorageContentGateway content, IResourceStore resources,
     LocalStoragePaths paths, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IStoragePublicationGateway
 {
     private const int MaximumPublications = 1024;
@@ -65,9 +67,12 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     private async Task ValidateCoreAsync(StorageContentRequest target, CancellationToken cancellationToken)
     {
         var resolved = await resolver.ResolveAsync(target.Storage, target.Consumer, cancellationToken);
-        if (resolved.Type.Type.ScopeRef != Agentstration.Resources.ResourceScopeRef.Instance
-            || resolved.Type.Type.Name != StoragePlatformResourceProvisioner.LocalTypeName
-            || resolved.Type.Type.Namespace is { } ns && ns != Agentstration.Resources.ResourceNamespace.Default
+        var reference = resolved.Type.Type;
+        var type = (await resources.GetExactAsync<StorageTypeResource>(new(reference.ScopeRef!.Value,
+            reference.Namespace ?? ResourceNamespace.Default, StorageResourceKinds.StorageType, reference.Name), cancellationToken))?.Value;
+        // Use the same protected Core adapter identity as the content gateway, including scoped Core types.
+        if (type?.Uid != resolved.Type.TypeUid
+            || type.Governance.ManagedBy is not { Kind: ResourceManagementAuthorityKind.Core, Reference: "storage.local" }
             || resolved.Type.Version != StoragePlatformResourceProvisioner.LocalTypeVersion)
             throw Error("storage_publication_unsupported", "This Storage has no retained publication implementation.");
         await content.ValidateAsync(target, cancellationToken);

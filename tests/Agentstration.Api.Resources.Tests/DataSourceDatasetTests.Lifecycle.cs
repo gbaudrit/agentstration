@@ -240,7 +240,7 @@ public sealed partial class DataSourceDatasetTests
         public bool FailWrites { get; set; }
         public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) => inner.ValidateAsync(target, cancellationToken);
         public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId, IReadOnlyList<JsonElement> records,
-            CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => FailWrites
+            CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => FailWrites && target.Consumer.Consumer.Kind == DataSourceResourceKinds.DataSource
             ? throw new StorageException("fixture_write_failed", "Synthetic refresh failure.") : inner.PrepareRecordsAsync(target, publicationId, records, cancellationToken, notAfter);
         public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
             inner.PrepareAsync(target, publicationId, bytes, cancellationToken);

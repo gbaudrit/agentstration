@@ -256,7 +256,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Assert.AreNotEqual(fixture.Storage.StorageUid, published.Artifacts[0].Content!.Target.Storage.StorageUid);
         Assert.IsNotNull(published.Artifacts[0].Content!.Binding);
         Assert.AreEqual(original.Definition.Type.TypeUid, published.Artifacts[0].Content!.Binding!.Type.TypeUid);
-        Assert.AreEqual("storage.local.retained-publication/v1", published.Artifacts[0].Content!.Binding!.PublicationContract);
+        Assert.AreEqual("storage.local.retained-json-record/v1", published.Artifacts[0].Content!.Binding!.PublicationContract);
         var catalog = await client.GetFromJsonAsync<FlowRunArtifactResource[]>("/api/artifacts/flow-run-artifacts");
         Assert.IsNotNull(catalog);
         foreach (var entry in published.Artifacts)
@@ -266,7 +266,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             Assert.AreEqual(completed.Value.ProjectionFlowRunId, record.ProducerFlowRunId);
             Assert.AreEqual(completed.Value.Name, record.ProducerExecutionId);
             Assert.AreEqual(output.Value.Uid, record.Receipt.Materialization!.Target.Storage.StorageUid);
-            Assert.AreEqual(entry.Content, record.Receipt.Materialization.Publication);
+            Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(entry.Content),
+                JsonSerializer.SerializeToElement(record.Receipt.Materialization.Publication)));
         }
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
         {
@@ -276,7 +277,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
         var publications = factory.Services.GetRequiredService<IStoragePublicationGateway>();
         var bytes = await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default);
-        Assert.AreEqual(Encoding.UTF8.GetString(transformedBytes), Encoding.UTF8.GetString(bytes.Span));
+        var retainedJson = "[" + Encoding.UTF8.GetString(transformedBytes) + "]";
+        Assert.AreEqual(retainedJson, Encoding.UTF8.GetString(bytes.Span));
         var retry = await projections.StartAsync(new(created.Value.Name, ScopeRef: Owner), request, default);
         Assert.AreEqual(completed.Value.Uid, retry.Value.Uid);
         var retrieved = await factory.Services.GetRequiredService<KnowledgeRetrievalService>().SearchAsync(
@@ -285,13 +287,13 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Assert.IsNotEmpty(retrieved.Items);
         var next = await projections.StartAsync(new(created.Value.Name, ScopeRef: Owner), new() { IdempotencyKey = "next-publication" }, default);
         Assert.AreNotEqual(published.Name, next.Value.SnapshotName);
-        Assert.AreEqual(Encoding.UTF8.GetString(transformedBytes), Encoding.UTF8.GetString((await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default)).Span));
+        Assert.AreEqual(retainedJson, Encoding.UTF8.GetString((await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default)).Span));
         await Assert.ThrowsAsync<KnowledgeProjectionException>(() => projections.StartAsync(new(created.Value.Name, ScopeRef: Owner),
             request with { Parameters = JsonSerializer.SerializeToElement(new { changed = true }) }, default));
         var active = (await snapshots.GetActiveAsync(new(created.Value.Name, ScopeRef: Owner), default))!.Snapshot;
         Assert.AreEqual(next.Value.SnapshotName, active.Name);
-        await Assert.ThrowsAsync<StorageException>(() => publications.PrepareAsync(published.Artifacts[0].Content!.Target,
-            completed.Value.Name + ":normalized-alpha", Encoding.UTF8.GetBytes("changed"), default));
+        await Assert.ThrowsAsync<StorageException>(() => publications.PrepareRecordsAsync(published.Artifacts[0].Content!.Target,
+            completed.Value.Name + ":normalized-alpha", [JsonSerializer.SerializeToElement(new { changed = true })], default));
         var shared = await sources.CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -766,7 +768,9 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                     new(retainedKnowledge.Name, ScopeRef: Owner), new() { IdempotencyKey = "restart-publication" }, default)).Value;
                 retainedSnapshot = (await second.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(
                     new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;
-                Assert.AreEqual(second.Services.GetRequiredService<SealedOutputInterruption>().SealedContent![0].Content, retainedSnapshot.Artifacts[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(
+                    JsonSerializer.SerializeToElement(second.Services.GetRequiredService<SealedOutputInterruption>().SealedContent![0].Content),
+                    JsonSerializer.SerializeToElement(retainedSnapshot.Artifacts[0].Content)));
                 // Inject an interrupted final activation/completion, then replace the actual host.
                 using (scopes.Push(fixture.Context))
                 {
@@ -802,7 +806,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 Assert.AreEqual(retainedProjection.Uid, recovered.Value.Uid);
                 var active = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;
                 Assert.AreEqual(retainedSnapshot.Uid, active.Uid);
-                Assert.AreEqual(retainedSnapshot.Artifacts[0].Content, active.Artifacts[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(retainedSnapshot.Artifacts[0].Content),
+                    JsonSerializer.SerializeToElement(active.Artifacts[0].Content)));
                 var retrieved = await third.Services.GetRequiredService<KnowledgeRetrievalService>().SearchAsync(new(retainedKnowledge.Name, ScopeRef: Owner), new() { Query = "retained" }, default);
                 Assert.IsNotEmpty(retrieved.Items);
                 var acquisitions = third.Services.GetRequiredService<DataSourceAcquisitionService>();
@@ -830,7 +835,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 await third.Services.GetRequiredService<StoredArtifactReconciliationService>().ReconcileAsync(default);
                 var reconciled = await acquisitions.ListAsync(source.Namespace, source.Name, Owner, default);
                 Assert.HasCount(1, reconciled);
-                Assert.AreEqual(contentBefore, reconciled[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(contentBefore),
+                    JsonSerializer.SerializeToElement(reconciled[0].Content)));
                 Assert.AreEqual(acquisitionArtifactId, reconciled[0].Manifest!.Artifacts.Single().ArtifactId);
                 Assert.AreEqual(history[0].CompletedAt, reconciled[0].CompletedAt);
                 var after = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(

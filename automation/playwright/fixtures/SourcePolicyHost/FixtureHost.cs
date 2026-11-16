@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Knowledge;
@@ -114,7 +115,7 @@ internal sealed class ControlledPublications(IServiceProvider services, PolicyCl
     private readonly IStoragePublicationGateway inner = ActivatorUtilities.CreateInstance<StoragePublicationGateway>(services, clock);
     public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken) => inner.ValidateAsync(target, cancellationToken);
     public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId, IReadOnlyList<JsonElement> records,
-        CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => content.FailWrites
+        CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => content.FailWrites && target.Consumer.Consumer.Kind == DataSourceResourceKinds.DataSource
         ? throw new StorageException("fixture_refresh_failed", "Synthetic offline acquisition refresh failure.")
         : inner.PrepareRecordsAsync(target, publicationId, records, cancellationToken, notAfter);
     public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) => inner.PrepareAsync(target, publicationId, bytes, cancellationToken);

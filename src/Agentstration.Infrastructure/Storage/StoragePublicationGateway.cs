@@ -58,9 +58,9 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
     {
         if (reference.Records is not null)
         {
-            _ = StorageRecordSets.Members(reference);
+            var members = RecordMembers(reference);
             if (reference.Records.DocumentPublication is { } batch) await documents.SealAsync(batch, ct);
-            else foreach (var member in StorageRecordSets.Members(reference)) await local.SealAsync(member, ct);
+            else foreach (var member in members) await local.SealAsync(member, ct);
         }
         else if (reference.Document is { } document) await documents.SealAsync(document.Publication, ct);
         else await local.SealAsync(reference, ct);
@@ -71,7 +71,7 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
         {
             if (offset < 0 || offset > reference.Length || length < 1 || length > reference.Target.Policy.MaximumReadBytes)
                 throw new StorageException("storage_publication_range_invalid", "The record read exceeds its bounds.");
-            var members = StorageRecordSets.Members(reference);
+            var members = RecordMembers(reference);
             using var aggregate = new MemoryStream();
             aggregate.WriteByte((byte)'[');
             foreach (var member in members)
@@ -110,7 +110,7 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
     {
         if (reference.Records is not null)
         {
-            var members = StorageRecordSets.Members(reference);
+            var members = RecordMembers(reference);
             if (reference.Records.DocumentPublication is { } batch) { await documents.RetireAsync(batch, ct); return true; }
             var success = true;
             foreach (var member in members) success &= await local.RetireAsync(member, ct);
@@ -119,6 +119,13 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
         if (reference.Document is not { } document) return await local.RetireAsync(reference, ct);
         await documents.RetireAsync(document.Publication, ct); return true;
     }
+    private static IReadOnlyList<StoragePublicationReference> RecordMembers(StoragePublicationReference reference)
+    {
+        try { return StorageRecordSets.Members(reference); }
+        catch (ArgumentException)
+        { throw new StorageException("storage_record_reference_invalid", "The exact record membership evidence is inconsistent."); }
+    }
+
     private StorageDocumentTarget ReadTarget(StorageDocumentTarget target)
     {
         var scope = current.AccessMode switch
