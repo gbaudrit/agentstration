@@ -816,7 +816,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 Assert.AreEqual(accepted.Uid, history[0].Uid);
                 var content = await third.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(history[0], 0, 65536, default);
                 Assert.Contains("retained", Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
-                // Simulate pre-upgrade native history: bytes and Snapshot exist, Artifact metadata is absent.
+                // Recover missing catalog metadata from the exact current-format publication evidence.
                 var resourceStore = third.Services.GetRequiredService<IResourceStore>();
                 var snapshotBefore = JsonSerializer.Serialize(active);
                 var contentBefore = history[0].Content;
@@ -847,6 +847,12 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                     var catalog = await third.Services.GetRequiredService<ArtifactManagementService>().ListFlowRunArtifactsAsync(default);
                     Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == acquisitionArtifactId));
                     Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == active.Artifacts[0].ArtifactId));
+                    var rebuilt = catalog.Single(item => item.Value.ArtifactId.ToString() == active.Artifacts[0].ArtifactId).Value;
+                    Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(active.Artifacts[0].RecordContract),
+                        JsonSerializer.SerializeToElement(rebuilt.Receipt.Materialization!.RecordContract)));
+                    Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(active.Artifacts[0].DataContract),
+                        JsonSerializer.SerializeToElement(rebuilt.Receipt.DataContract)));
+                    Assert.AreEqual(active.Artifacts[0].Provenance["publication"], rebuilt.Receipt.Provenance["publication"]);
                 }
 
             }

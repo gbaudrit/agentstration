@@ -124,8 +124,8 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 ProducerFlowStepId = string.Empty,
                 StorageFlowRunId = string.Empty,
                 Provenance = output.DocumentCollectionUid is null
-                    ? new Dictionary<string, string> { ["publication"] = projection.Name }
-                    : new Dictionary<string, string>
+                    ? new Dictionary<string, string>(item.Provenance) { ["publication"] = projection.Name }
+                    : new Dictionary<string, string>(item.Provenance)
                     {
                         ["publication"] = projection.Name,
                         ["sourceArtifactId"] = item.ArtifactId,
@@ -191,7 +191,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                             reference.Key, reference.Version, reference.Length, reference.Sha256, reference)
                         { RecordContract = item.RecordContract },
                         ProducerUid: source.Uid, ProducerGeneration: source.Generation, DataContract: item.DataContract,
-                        Provenance: manifest.Artifacts.FirstOrDefault(input => input.ArtifactId == item.ArtifactId)?.Provenance), cancellationToken);
+                        Provenance: item.Provenance), cancellationToken);
                 catalogued.Add(item with { ArtifactId = artifact.ArtifactId.ToString() });
             }
         }
