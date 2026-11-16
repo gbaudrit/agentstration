@@ -220,7 +220,13 @@ public sealed class InferenceTimeoutTests
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) disposed.Cancel();
+            if (disposing)
+            {
+                disposed.Cancel();
+                // A deadline can dispose the native response before the delayed body read starts.
+                // Disposal stops that stream too; acknowledge it without waiting for a read that cannot occur.
+                cancelled.TrySetResult();
+            }
             base.Dispose(disposing);
         }
 
