@@ -40,7 +40,7 @@
             @if (result.DocumentPage is { } page) { <p><code>@result.QueryProfile?.Id / @result.QueryProfile?.Version · @result.QueryProfile?.ModelDigest</code></p><pre data-testid="knowledge-document-query-result">@JsonSerializer.Serialize(page)</pre> }
             @foreach (var record in result.Records)
             {
-                <p data-testid="knowledge-record-lineage"><code>@record.DocumentId</code> · @T("RecordArtifact") <code>@record.ArtifactId</code> · @T("RecordOrdinal", record.MemberOrdinal + 1)</p>
+                <p class="knowledge-record-lineage" data-testid="knowledge-record-lineage"><code>@record.DocumentId</code> · @T("RecordArtifact") <code>@record.ArtifactId</code> · @T("RecordOrdinal", record.MemberOrdinal + 1)</p>
             }
             @if (result.EndOfSelection) { <p>@T("NativeEnd")</p> }
             @if (result.CursorExpiresAt is { } expires && result.NextCursor is not null) { <small>@T("NativeCursorExpiry", expires.ToLocalTime().ToString("g"))</small> }

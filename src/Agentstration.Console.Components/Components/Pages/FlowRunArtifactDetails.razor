@@ -87,7 +87,7 @@ else if (artifact is not null)
 
             @if (artifact.Receipt.Materialization?.Publication?.Records is { } records)
             {
-                <section class="panel form-section" data-testid="artifact-records">
+                <section class="panel form-section artifact-records" data-testid="artifact-records">
                     <h2>@T("Records")</h2>
                     <p>@T("RecordsHelp", records.Members.Count)</p>
                     @if (artifact.Receipt.Materialization.RecordContract is { } rowContract)

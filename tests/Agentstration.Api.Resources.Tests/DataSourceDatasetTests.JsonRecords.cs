@@ -27,7 +27,16 @@ public sealed partial class DataSourceDatasetTests
     [DataRow("data-source", true)]
     [DataRow("binding", true)]
     [DataRow("postAggregate", true)]
-    public async Task JsonExplodeKeepsOneArtifactWithIndependentRecords(string point, bool documentStorage)
+    public Task JsonExplodeKeepsOneArtifactWithIndependentRecords(string point, bool documentStorage) =>
+        VerifyJsonRecordProjectionAsync(point, documentStorage, false);
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public Task PostgreSqlJsonExplodePublishesIndependentRecords(bool knowledgeBinding) =>
+        VerifyJsonRecordProjectionAsync(knowledgeBinding ? "binding" : "data-source", true, true);
+
+    private async Task VerifyJsonRecordProjectionAsync(string point, bool documentStorage, bool postgres)
     {
         await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
@@ -37,7 +46,7 @@ public sealed partial class DataSourceDatasetTests
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
-        await using var structured = documentStorage ? await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false) : null;
+        await using var structured = documentStorage ? await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, postgres) : null;
         var storage = structured?.Reference ?? fixture.Storage;
         var explode = new FlowCompositionCall
         {
