@@ -204,8 +204,14 @@ public sealed class KnowledgeMetadataTests
         var result = await tool.ExecuteAsync(new(fixture.Caller.TenantId, new(fixture.Caller.WorkspaceId),
             fixture.Caller.PrincipalId, "status-call", null, JsonSerializer.SerializeToElement(new
             {
-                source = new { name = fixture.Source.Name, @namespace = fixture.Source.Namespace.Value,
-                    scopeRef = fixture.Source.ScopeRef!.Value.Value, uid = fixture.Source.Uid }, request = new { }
+                source = new
+                {
+                    name = fixture.Source.Name,
+                    @namespace = fixture.Source.Namespace.Value,
+                    scopeRef = fixture.Source.ScopeRef!.Value.Value,
+                    uid = fixture.Source.Uid
+                },
+                request = new { }
             }), ToolDefinitionCallerKind.Console), default);
         Assert.AreEqual("ready", result!.Value.GetProperty("state").GetString());
         Assert.AreEqual(0, fixture.Publications.Reads.Count);
@@ -269,8 +275,12 @@ public sealed class KnowledgeMetadataTests
             var ownership = owner switch { "instance" => ResourceScopeRef.Instance, "tenant" => ResourceScopeRef.Tenant(Caller.TenantId), _ => execution };
             var source = new KnowledgeSourceResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource,
-                Metadata = new() { Name = "knowledge" }, Uid = Guid.NewGuid(), Generation = 1, ScopeRef = ownership,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSource,
+                Metadata = new() { Name = "knowledge" },
+                Uid = Guid.NewGuid(),
+                Generation = 1,
+                ScopeRef = ownership,
                 Definition = new() { DisplayName = "Knowledge" }
             };
             Id = new(source.Name, ScopeRef: ownership);
@@ -281,17 +291,31 @@ public sealed class KnowledgeMetadataTests
                 new("publication-a", "digest", artifacts, "schema"), Documents.Profile);
             Snapshot = new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
-                Metadata = new() { Name = "snapshot-a" }, Uid = Guid.NewGuid(), ScopeRef = execution,
-                KnowledgeSourceUid = source.Uid, KnowledgeSourceScopeRef = ownership, KnowledgeSourceName = source.Name,
-                KnowledgeSourceNamespace = source.Namespace, KnowledgeSourceGeneration = source.Generation,
-                RequestHash = "request", PublishedAt = Clock.GetUtcNow(), PublishedBy = Caller.PrincipalId,
-                ProjectionId = "projection", ProjectionUid = Guid.NewGuid(), ProjectionFlowRunId = "run",
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
+                Metadata = new() { Name = "snapshot-a" },
+                Uid = Guid.NewGuid(),
+                ScopeRef = execution,
+                KnowledgeSourceUid = source.Uid,
+                KnowledgeSourceScopeRef = ownership,
+                KnowledgeSourceName = source.Name,
+                KnowledgeSourceNamespace = source.Namespace,
+                KnowledgeSourceGeneration = source.Generation,
+                RequestHash = "request",
+                PublishedAt = Clock.GetUtcNow(),
+                PublishedBy = Caller.PrincipalId,
+                ProjectionId = "projection",
+                ProjectionUid = Guid.NewGuid(),
+                ProjectionFlowRunId = "run",
                 ProjectionFlow = new("projection", ResourceNamespace.Default, "1", false, null, null),
                 Artifacts = Enumerable.Range(0, artifacts).Select(index => new KnowledgeSnapshotArtifact
                 {
-                    ArtifactId = "document-" + index, ProducerFlowRunId = "producer", ProducerFlowStepId = "step",
-                    StorageFlowRunId = "storage", MediaType = "text/plain", Length = Encoding.UTF8.GetByteCount(Text),
+                    ArtifactId = "document-" + index,
+                    ProducerFlowRunId = "producer",
+                    ProducerFlowStepId = "step",
+                    StorageFlowRunId = "storage",
+                    MediaType = "text/plain",
+                    Length = Encoding.UTF8.GetByteCount(Text),
                     Sha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Text))),
                     Content = structured || index % 2 == 0 ? new(target, "document-" + index, "exact-version", Encoding.UTF8.GetByteCount(Text),
                         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Text))))
@@ -300,9 +324,13 @@ public sealed class KnowledgeMetadataTests
             };
             Observed = new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
-                Metadata = new() { Name = "snapshot-state-" + source.Uid.ToString("N") }, ScopeRef = execution,
-                KnowledgeSourceUid = source.Uid, ActiveSnapshotName = Snapshot.Name, ActiveSnapshotUid = Snapshot.Uid
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
+                Metadata = new() { Name = "snapshot-state-" + source.Uid.ToString("N") },
+                ScopeRef = execution,
+                KnowledgeSourceUid = source.Uid,
+                ActiveSnapshotName = Snapshot.Name,
+                ActiveSnapshotUid = Snapshot.Uid
             };
             Store.Add(source); Store.Add(Snapshot); Store.Add(Observed);
             var sources = new KnowledgeSourceManagementService(Store, null!, null!, null!, Context, new Audit(), Clock);
@@ -316,7 +344,9 @@ public sealed class KnowledgeMetadataTests
 
         public IDisposable Push() => owner switch
         {
-            "instance" => Context.PushInstance(Caller), "tenant" => Context.PushTenantAdministration(Caller), _ => Context.Push(Caller)
+            "instance" => Context.PushInstance(Caller),
+            "tenant" => Context.PushTenantAdministration(Caller),
+            _ => Context.Push(Caller)
         };
     }
 

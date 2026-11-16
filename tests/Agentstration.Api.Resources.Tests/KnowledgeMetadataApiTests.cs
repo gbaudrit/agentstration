@@ -35,8 +35,11 @@ public sealed class KnowledgeMetadataApiTests : ResourceManagementApiTestBase
         var store = factory.Services.GetRequiredService<IResourceStore>();
         var source = (await store.PutExactAsync(owner, new KnowledgeSourceResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource,
-            Metadata = new() { Name = "metadata-only" }, ScopeRef = owner, Generation = 1,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = KnowledgeResourceKinds.KnowledgeSource,
+            Metadata = new() { Name = "metadata-only" },
+            ScopeRef = owner,
+            Generation = 1,
             Definition = new() { DisplayName = "Metadata only" }
         }, null, true, default)).Value;
         var target = new StorageContentRequest(new(new(owner, ResourceNamespace.Default, "Storage", "unavailable"),
@@ -48,26 +51,44 @@ public sealed class KnowledgeMetadataApiTests : ResourceManagementApiTestBase
             {
                 active = (await store.CreateImmutableAsync(new KnowledgeSnapshotResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
-                    Metadata = new() { Name = "snapshot-" + index }, ScopeRef = workspace,
-                    KnowledgeSourceUid = source.Uid, KnowledgeSourceScopeRef = owner, KnowledgeSourceName = source.Name,
-                    KnowledgeSourceNamespace = source.Namespace, KnowledgeSourceGeneration = source.Generation,
-                    RequestHash = "request", PublishedAt = DateTimeOffset.UnixEpoch.AddMinutes(index), PublishedBy = context.PrincipalId,
-                    ProjectionId = "projection-" + index, ProjectionUid = Guid.NewGuid(), ProjectionFlowRunId = "run-" + index,
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = KnowledgeResourceKinds.KnowledgeSnapshot,
+                    Metadata = new() { Name = "snapshot-" + index },
+                    ScopeRef = workspace,
+                    KnowledgeSourceUid = source.Uid,
+                    KnowledgeSourceScopeRef = owner,
+                    KnowledgeSourceName = source.Name,
+                    KnowledgeSourceNamespace = source.Namespace,
+                    KnowledgeSourceGeneration = source.Generation,
+                    RequestHash = "request",
+                    PublishedAt = DateTimeOffset.UnixEpoch.AddMinutes(index),
+                    PublishedBy = context.PrincipalId,
+                    ProjectionId = "projection-" + index,
+                    ProjectionUid = Guid.NewGuid(),
+                    ProjectionFlowRunId = "run-" + index,
                     ProjectionFlow = new("projection", ResourceNamespace.Default, "1", false, null, null),
                     Artifacts = Enumerable.Range(0, 256).Select(document => new KnowledgeSnapshotArtifact
                     {
-                        ArtifactId = "document-" + document, ProducerFlowRunId = "producer", ProducerFlowStepId = "step",
-                        StorageFlowRunId = "storage", MediaType = "application/json", Length = 2, Sha256 = "digest",
+                        ArtifactId = "document-" + document,
+                        ProducerFlowRunId = "producer",
+                        ProducerFlowStepId = "step",
+                        StorageFlowRunId = "storage",
+                        MediaType = "application/json",
+                        Length = 2,
+                        Sha256 = "digest",
                         Content = new(target, "document-" + document, "exact-version", 2, "digest")
                     }).ToArray()
                 }, default)).Value;
             }
             _ = await store.PutExactAsync(workspace, new KnowledgeSnapshotObservedResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
-                Metadata = new() { Name = "snapshot-state-" + source.Uid.ToString("N") }, ScopeRef = workspace,
-                KnowledgeSourceUid = source.Uid, ActiveSnapshotName = active.Name, ActiveSnapshotUid = active.Uid
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = KnowledgeResourceKinds.KnowledgeSnapshotObservedState,
+                Metadata = new() { Name = "snapshot-state-" + source.Uid.ToString("N") },
+                ScopeRef = workspace,
+                KnowledgeSourceUid = source.Uid,
+                ActiveSnapshotName = active.Name,
+                ActiveSnapshotUid = active.Uid
             }, null, true, default);
         }
         using var client = factory.CreateClient();

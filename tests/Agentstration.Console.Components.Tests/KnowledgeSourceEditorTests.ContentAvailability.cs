@@ -18,7 +18,9 @@ public sealed partial class KnowledgeSourceEditorTests
         {
             ContentStatus = new()
             {
-                SourceUid = Guid.NewGuid(), State = "ready", CheckedAt = DateTimeOffset.UnixEpoch,
+                SourceUid = Guid.NewGuid(),
+                State = "ready",
+                CheckedAt = DateTimeOffset.UnixEpoch,
                 ContentAvailability = availability
             }
         };

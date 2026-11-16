@@ -1,8 +1,8 @@
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -243,9 +243,13 @@ public sealed partial class OpenApiService
                         var externalId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{candidate.AbsoluteUri}\n{operation.OperationId}{suffix}")));
                         var definition = new Dictionary<string, object?>
                         {
-                            ["contractUri"] = candidate.AbsoluteUri, ["contractDigest"] = contract.Sha256,
-                            ["server"] = contract.Servers[0], ["operationId"] = operation.OperationId,
-                            ["method"] = operation.Method, ["path"] = operation.Path, ["readOnly"] = operation.ReadOnly
+                            ["contractUri"] = candidate.AbsoluteUri,
+                            ["contractDigest"] = contract.Sha256,
+                            ["server"] = contract.Servers[0],
+                            ["operationId"] = operation.OperationId,
+                            ["method"] = operation.Method,
+                            ["path"] = operation.Path,
+                            ["readOnly"] = operation.ReadOnly
                         };
                         if (operation.RequestShape is { } input) definition["requestShape"] = input;
                         if (operation.ResponseShape is { } output) definition["responseShape"] = output;
