@@ -275,3 +275,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 232. [ADR-0232 — Tool relays can omit optional inputs](0232-tool-relays-can-omit-optional-inputs.md)
 
 233. [ADR-0233 — Native function catalogue and explicit iteration](0233-native-function-catalogue-and-explicit-iteration.md)
+234. [ADR-0234 — Knowledge consultation reads only metadata](0234-knowledge-consultation-reads-only-metadata.md)

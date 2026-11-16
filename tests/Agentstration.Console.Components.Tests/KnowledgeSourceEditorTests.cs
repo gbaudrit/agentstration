@@ -501,9 +501,11 @@ public sealed partial class KnowledgeSourceEditorTests
     }
 
     [TestMethod]
-    public void DetailsExposesSnapshotArtifactsForConsultation()
+    [DataRow("en-US", "Not checked")]
+    [DataRow("fr-FR", "Non vérifiée")]
+    public void DetailsExposesSnapshotArtifactsForConsultation(string cultureName, string availability)
     {
-        using var culture = new TestCultureScope("en-US");
+        using var culture = new TestCultureScope(cultureName);
         var snapshot = ExistingSnapshot();
         using var context = CreateContext(new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot]));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
@@ -516,6 +518,7 @@ public sealed partial class KnowledgeSourceEditorTests
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshot-row']"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshot-details']"));
+            Assert.AreEqual(availability, rendered.Find("[data-testid='knowledge-content-availability']").TextContent);
             var artifactLink = rendered.Find("[data-testid='knowledge-snapshot-artifact-row'] td a");
             Assert.AreEqual("/artifacts/durable/artifact-0123456789abcdef", artifactLink.GetAttribute("href"));
             Assert.AreEqual("artifact-0123456789abcdef", artifactLink.GetAttribute("title"));
@@ -955,6 +958,9 @@ public sealed partial class KnowledgeSourceEditorTests
         public Task<IReadOnlyList<KnowledgeSnapshotView>> GetSnapshotsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) => Task.FromResult(Snapshots);
         public Task<KnowledgeSnapshotView> SelectActiveSnapshotAsync(ResourceNamespace @namespace, string name, string snapshotName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public string? NativeSourceName { get; private set; }
+        public KnowledgeAccessStatus? ContentStatus { get; init; }
+        public Task<KnowledgeAccessStatus> GetContentStatusAsync(ResourceNamespace @namespace, string name, KnowledgeStatusRequest request, CancellationToken cancellationToken = default) =>
+            ContentStatus is null ? throw new NotSupportedException() : Task.FromResult(ContentStatus);
         public Task<KnowledgeAccessResult> SearchRegexAsync(ResourceNamespace @namespace, string name, KnowledgeRegexRequest request, CancellationToken cancellationToken = default)
         {
             NativeSourceName = name;

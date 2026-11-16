@@ -155,6 +155,19 @@ Regex uses .NET non-backtracking syntax: lookarounds and backreferences are
 unsupported; scalar-splitting matches fail explicitly. Binary formats need an
 explicit transformation into supported UTF-8 text during preparation.
 
+Source consultation, Snapshot history/details and `get_status` read persisted
+metadata only. They do not probe publications, read Artifact bytes, open provider
+sessions or resolve Secrets. Content availability is reported separately as
+`Unknown` (shown as **Not checked**) or metadata-known `Retired`. An active Snapshot
+and a `ready` status do not guarantee current provider health or permission to
+read content. `CheckedAt` dates the metadata evaluation, not a content probe.
+
+Actual reads check the selected Artifact's exact version, current access and
+integrity; unrelated Artifacts are not pre-read. Structured queries validate the
+exact pinned publication before running the query. Failures leave publication
+metadata and the active selection intact. See
+[ADR-0234](../decisions/0234-knowledge-consultation-reads-only-metadata.md).
+
 `get_status` never triggers acquisition or projection. Its freshness evidence
 comes from the active Snapshot's recorded acquisitions; it does not verify remote
 origin changes. The active Snapshot can be older than the latest published one

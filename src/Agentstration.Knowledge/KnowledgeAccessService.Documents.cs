@@ -12,7 +12,12 @@ public sealed partial class KnowledgeAccessService
         StorageDocumentTarget target;
         if (snapshotId is not null)
         {
-            var snapshot = await ExactAsync(source, snapshotId, ct);
+            KnowledgeSnapshotResource snapshot;
+            try { snapshot = (await snapshots.GetAsync(new(snapshotId, source.Namespace), ct)).Snapshot; }
+            catch (KnowledgeSnapshotException exception) { throw Error(exception.Code); }
+            if (snapshot.KnowledgeSourceUid != source.Uid
+                || snapshot.KnowledgeSourceScopeRef is { } pinnedScope && pinnedScope != source.ScopeRef)
+                throw Error("knowledge_snapshot_source_mismatch");
             var publication = snapshot.Artifacts.FirstOrDefault()?.Content?.Document?.Publication
                 ?? throw Error("knowledge_snapshot_documents_unsupported");
             target = publication.Target;

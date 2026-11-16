@@ -370,6 +370,8 @@ public sealed record KnowledgeArtifactTransformationInput
 
 public enum KnowledgeSnapshotLifecycleState { Active, Superseded, Unavailable, Retired, Retiring }
 
+public enum KnowledgeContentAvailability { Unknown, Retired }
+
 public sealed record KnowledgeSnapshotArtifact
 {
     public ResolvedDataContract? DataContract { get; init; }
@@ -421,7 +423,10 @@ public sealed record KnowledgeSnapshotObservedResource : Resource
 
 public sealed record KnowledgeSnapshotView(
     KnowledgeSnapshotResource Snapshot,
-    KnowledgeSnapshotLifecycleState LifecycleState);
+    KnowledgeSnapshotLifecycleState LifecycleState)
+{
+    public KnowledgeContentAvailability ContentAvailability { get; init; } = KnowledgeContentAvailability.Unknown;
+}
 
 public sealed record SelectActiveKnowledgeSnapshotRequest(string SnapshotName);
 
