@@ -1,3 +1,6 @@
+using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
+using Agentstration.Tools;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
@@ -39,11 +42,95 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         StoredResource<ModelProfileResource> otherNamespaceProfile;
         StoredResource<AgentRevision> revision;
         Guid flowUid;
+        Guid toolUid;
+        Guid toolSetUid;
         using (scopes.PushSystem())
         {
             profile = await resources.PutExactAsync(ResourceScopeRef.Instance, Profile("same-name", ResourceScopeRef.Instance, ns), null, true, default);
             otherNamespaceProfile = await resources.PutExactAsync(owner, Profile("same-name", owner, new ResourceNamespace("graph-other")), null, true, default);
             var shadow = await resources.PutExactAsync(owner, Profile("same-name", owner, ns), null, true, default);
+            var provider = await resources.PutExactAsync(agentOwner, new ToolProviderResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-provider", Namespace = ns },
+                Generation = 1,
+                Definition = new() { DisplayName = "Source provider", ProviderType = ToolProviderType.Mcp }
+            }, null, true, default);
+            var tool = await resources.PutExactAsync(agentOwner, new ToolResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.Tool,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-tool", Namespace = ns },
+                Generation = 1,
+                Definition = new() { DisplayName = "Source tool", Version = "1.0.0", Provider = new(provider.Value.Name, agentOwner, ns) }
+            }, null, true, default);
+            toolUid = tool.Value.Uid;
+            var toolSet = await resources.PutExactAsync(agentOwner, new ToolSetResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolSet,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-set", Namespace = ns },
+                Generation = 1,
+                Definition = new() { DisplayName = "Source set" }
+            }, null, true, default);
+            toolSetUid = toolSet.Value.Uid;
+            await resources.CreateImmutableAsync(new ToolSetVersionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolSetVersion,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-set-v1", Namespace = ns },
+                Generation = 1,
+                ToolSetUid = toolSetUid,
+                ToolSetName = toolSet.Value.Name,
+                ToolSetGeneration = 1,
+                Version = "1.0.0",
+                DefinitionHash = "toolset-hash",
+                PublishedAt = DateTimeOffset.UnixEpoch,
+                Members = [new() { Capability = "search", Route = "source-route", ToolName = tool.Value.Name, ToolNamespace = ns,
+                    ToolScopeRef = agentOwner, ToolUid = toolUid, ToolGeneration = 1, ProviderName = provider.Value.Name,
+                    ProviderNamespace = ns, ProviderScopeRef = agentOwner, ProviderUid = provider.Value.Uid, ProviderGeneration = 1,
+                    ExternalToolId = "source", InputSchema = JsonSerializer.SerializeToElement(new { }) }]
+            }, default);
+            foreach (var resource in new Resource[] { provider.Value, tool.Value, toolSet.Value })
+                await policies.PutAsync(new(new(resource.Uid, agentOwner, ns, resource.Kind), [new(owner, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+            var schema = await resources.PutExactAsync(agentOwner, new SchemaResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SchemaResourceKinds.Schema,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-schema", Namespace = ns },
+                Generation = 1,
+                Definition = new()
+                {
+                    DisplayName = "Source schema",
+                    Format = "json-schema",
+                    Content = JsonSerializer.SerializeToElement(new { type = "object", description = "private-schema-body" })
+                }
+            }, null, true, default);
+            await resources.CreateImmutableAsync(new SchemaVersionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SchemaResourceKinds.SchemaVersion,
+                ScopeRef = agentOwner,
+                Metadata = new() { Name = "source-schema-v1", Namespace = ns },
+                Generation = 1,
+                SchemaUid = schema.Value.Uid,
+                SchemaName = schema.Value.Name,
+                SchemaNamespace = ns,
+                SchemaGeneration = 1,
+                Version = "1.0.0",
+                Format = "json-schema",
+                Content = schema.Value.Definition.Content,
+                DefinitionHash = "parent-hash",
+                PublishedAt = DateTimeOffset.UnixEpoch
+            }, default);
+            await policies.PutAsync(new(new(schema.Value.Uid, agentOwner, ns, schema.Value.Kind),
+                [new(owner, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
             var agent = await resources.PutExactAsync(agentOwner, new AgentResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
@@ -79,6 +166,15 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
                     ModelProfileNamespace = ns,
                     ModelProfilePin = new(profile.Value.Uid, ResourceScopeRef.Instance, ns, ModelResourceKinds.ModelProfile, "same-name", 1),
                     RuntimeProfileName = "maf-builtin",
+                    SchemaBindings = new Dictionary<string, SchemaBindingSnapshot>
+                    {
+                        ["definition.inputSchema"] = new("definition.inputSchema", "json-schema", null,
+                            JsonSerializer.SerializeToElement(new { type = "object", description = "private-schema-body" }), "selected-hash",
+                            new() { Name = schema.Value.Name, Namespace = ns, ScopeRef = agentOwner, Version = "1.0.0", SchemaPath = "/properties/result" }, schema.Value.Uid, 1)
+                        { ParentDefinitionHash = "parent-hash" }
+                    },
+                    ToolSetAssignments = [new() { ToolSetUid = toolSetUid, ToolSetScopeRef = agentOwner, ToolSetName = "source-set",
+                        ToolSetNamespace = ns, ToolSetGeneration = 1, Version = "1.0.0", DefinitionHash = "toolset-hash", Members = ["source-route"] }],
                     EffectiveToolNames = [],
                     MiddlewareIds = [],
                     ContextProviderIds = [],
@@ -118,8 +214,21 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         var agentRevisionId = SystemGraphIds.Definition(revision.Value.Uid);
         var modelGenerationId = SystemGraphIds.Generation(profile.Value.Uid, 1);
         Assert.IsTrue(before.Relations.Any(edge => edge.Source == agentRevisionId && edge.Target == modelGenerationId && edge.Kind == "exact-dependency"));
+        var schemaEvidence = before.Relations.Single(edge => edge.Source == agentRevisionId && edge.SourceField == "definition.inputSchema");
+        Assert.AreEqual("selected-hash", schemaEvidence.ExpectedHash);
+        Assert.AreEqual("parent-hash", schemaEvidence.ParentHash);
+        Assert.AreEqual("/properties/result", schemaEvidence.TargetField);
+        Assert.AreEqual("1.0.0", schemaEvidence.SelectedPublication);
+        Assert.DoesNotContain("private-schema-body", JsonSerializer.Serialize(before), StringComparison.Ordinal);
         Assert.IsTrue(before.Relations.Any(edge => edge.Source == SystemGraphIds.Publication(flowUid, "1.0") && edge.Target == agentRevisionId));
         Assert.IsTrue(before.Nodes.Any(node => node.Id == SystemGraphIds.Publication(flowUid, "2.0") && node.Evidence?.Hash == "flow-hash-v2"));
+        var impact = (await client.GetFromJsonAsync<SystemGraphImpactResult>("/api/system-graph/impact?namespace=graph-fixture&root=" + Uri.EscapeDataString(SystemGraphIds.Definition(toolUid))))!;
+        Assert.IsFalse(impact.GloballyComplete);
+        var chain = impact.Paths.Single(path => path.Nodes[^1] == SystemGraphIds.Publication(flowUid, "1.0"));
+        Assert.Contains(SystemGraphIds.Publication(toolSetUid, "1.0.0"), chain.Nodes);
+        Assert.Contains(agentRevisionId, chain.Nodes);
+        Assert.IsTrue(chain.Relations.Any(edge => edge.SourceField == "members[source-route].tool"));
+        Assert.IsFalse(impact.Nodes.Any(node => node.Identity.ResourceUid == otherNamespaceProfile.Value.Uid));
         using (scopes.PushSystem())
         {
             Assert.AreEqual("flow-hash", (await flows.GetVersionExactAsync(owner, new("consumer-flow", ns), "1.0", default))!.Value.DefinitionHash);
@@ -212,7 +321,43 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
             await PutConsumerAsync(workspaceOwner, "visible-consumer");
             var siblingConsumer = await PutConsumerAsync(ResourceScopeRef.Workspace(sibling.Id), "invisible-sibling-consumer");
             var foreignConsumer = await PutConsumerAsync(ResourceScopeRef.Workspace(foreign.Id), "invisible-foreign-consumer");
-            hiddenConsumers = [siblingConsumer.Value.Uid, foreignConsumer.Value.Uid];
+            var ancestorScope = ResourceScopeRef.Tenant(context.TenantId);
+            var ancestorConsumer = await PutConsumerAsync(ancestorScope, "invisible-ancestor-consumer");
+            var ancestorRevision = await store.CreateImmutableAsync(new AgentRevision
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = AgentResourceKinds.AgentRevision,
+                ScopeRef = ancestorScope,
+                Metadata = new() { Name = "invisible-ancestor-revision", Namespace = ns },
+                Generation = 1,
+                AgentUid = ancestorConsumer.Value.Uid,
+                AgentName = ancestorConsumer.Value.Name,
+                AgentNamespace = ns,
+                AgentVersion = 1,
+                DefinitionHash = "private-hash",
+                CreatedAt = now,
+                ProvisioningState = ProvisioningState.Succeeded,
+                Definition = new()
+                {
+                    AgentId = ancestorConsumer.Value.Uid,
+                    AgentKey = ancestorConsumer.Value.Name,
+                    AgentVersion = 1,
+                    DisplayName = "Private",
+                    Description = "",
+                    EffectiveInstructions = "private",
+                    ModelProfileName = "shared",
+                    ModelProfileNamespace = ns,
+                    ModelProfilePin = new(shared.Value.Uid, ResourceScopeRef.Instance, ns, shared.Value.Kind, shared.Value.Name, 1),
+                    RuntimeProfileName = "maf-builtin",
+                    EffectiveToolNames = [],
+                    MiddlewareIds = [],
+                    ContextProviderIds = [],
+                    Capabilities = [],
+                    Handler = "prompt-agent",
+                    DefinitionHash = "private-hash"
+                }
+            }, default);
+            hiddenConsumers = [siblingConsumer.Value.Uid, foreignConsumer.Value.Uid, ancestorConsumer.Value.Uid, ancestorRevision.Value.Uid];
         }
         using var client = factory.CreateClient();
         SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
@@ -271,8 +416,11 @@ public sealed class SystemGraphApiTests : ModelManagementApiTestBase
         client.DefaultRequestHeaders.Add("X-Agentstration-Workspace", bootstrap.WorkspaceId.ToString());
         var response = await client.GetAsync("/api/system-graph");
         Assert.AreEqual(canRead ? HttpStatusCode.OK : HttpStatusCode.Forbidden, response.StatusCode, await response.Content.ReadAsStringAsync());
+        foreach (var route in new[] { "/api/system-graph/impact?root=missing", "/api/system-graph/changes?from=missing&to=missing", "/api/system-graph/coverage" })
+            Assert.AreEqual(canRead ? HttpStatusCode.OK : HttpStatusCode.Forbidden, (await client.GetAsync(route)).StatusCode, route);
         await identities.RemoveRoleAssignmentAsync(assignment.Id, default);
         Assert.AreEqual(HttpStatusCode.Forbidden, (await client.GetAsync("/api/system-graph")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Forbidden, (await client.GetAsync("/api/system-graph/impact?root=missing")).StatusCode);
     }
 
     public sealed class GraphTestAuthenticationHandler(

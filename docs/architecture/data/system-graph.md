@@ -32,7 +32,7 @@ return `system_graph_cursor_invalid` (400); changing observations return
 `system_graph_unavailable` (503). Raw exception details are never returned.
 Cancellation uses the request token.
 
-## Initial coverage
+## Family coverage
 
 | Owner | Evidence |
 | --- | --- |
@@ -40,11 +40,46 @@ Cancellation uses the request token.
 | Models / Runtime Profiles | Current exact ModelProfile and RuntimeProfile metadata. |
 | Agents | Definitions, owner-relative profile declarations, immutable revisions, recorded profile generations and revision hashes. |
 | Flows | Definitions, immutable versions and recorded Agent revision UIDs in direct, routing, workflow and orchestration definitions and top-level Agent/router graph steps. |
+| Tools | Provider metadata, relay generations, ToolDefinition publications and ToolSet member pins. |
+| Schemas / Functions | Schema publications and family-owned function/type versions and digests. |
+| Data Sources | Profile Tool/provider pins, dataset operation/Storage pins, Query publications and contract digests. |
+| Connected Services / Storage | Type contracts, operation/service generations, value references, provider contributions and collection Schema pins. |
+| Knowledge | Source input pins, Snapshot history and recorded input/output Storage and binding identities. |
+| Triggers | Recorded Flow UID/version targets. |
 
 Inspection reads recorded publication pins; it never invokes the publication-time
-Agent resolver. Nested composition, Tools, ToolSets, Queries, Knowledge, Storage,
-complete reverse paths and impact belong to #1197. Missing pins and unsupported
-relations do not prove no dependency exists. No content or provider is probed.
+Agent resolver. Flow-call/composition/function/schema references require recorded
+UID evidence. Direct Flow Tool references use the existing owner-relative lookup
+and remain explicitly dynamic. Missing pins and unsupported relations do not prove
+no dependency exists. No content or provider is probed.
+
+`GET /api/system-graph/coverage` reports static supported and unavailable evidence.
+Historical Flow bindings without UIDs, opaque settings and native Entry identity
+integration remain unavailable. #1189 proposal refresh is not invented. Coverage
+limitations are not empty dependency findings.
+
+## Reverse impact and change comparison
+
+`GET /api/system-graph/impact?root=<graph-id>` explains authorized reverse paths.
+Optional `namespace`, `maximumDepth` (1–32, default 16) and `maximumPaths` (1–1,000,
+default 200) bound the request. Paths retain source fields and selection reasons;
+cycles and truncation are explicit. Traversal follows executable dependencies,
+generation links and publication membership. Declared, logical, operational and
+Parameter/Secret value-reference edges do not enter publication closure.
+
+`GET /api/system-graph/changes?from=<graph-id>&to=<graph-id>` compares selected
+generations/publications and their paths within one authorized observation. It
+distinguishes identity replacement, generation drift, compatible/changed Query
+contracts and unknown publication compatibility. It accepts the same bounds and
+namespace filter. Missing and invisible selections are indistinguishable. These
+read-only APIs are not reconciliation plans or permission grants.
+
+Query Tool extraction shares invocation publication selection: exact stays exact;
+latest means publication time, including a lower semantic version published later.
+Compatible filter/order changes need no Tool/Flow republication. Incompatible
+latest fails contract comparison without older fallback. Query bodies and literal
+values are omitted. [ADR-0237](../../decisions/0237-system-graph-impact-uses-authorized-family-evidence.md)
+records these rules.
 
 ## Multiple versions
 
@@ -80,3 +115,115 @@ Each authorized observation collects nodes first, then scans relations and retai
 only those with authorized endpoints before applying the relation budget. Hidden
 relations cannot exhaust that public budget. The second observation repeats both
 phases; no raw cross-family edge index is retained.
+
+Derived pin/reference nodes require binding inspection rights on the consumer that
+discloses them as well as the target. A hidden consumer cannot change public pin
+counts, snapshot digests or paths of an otherwise visible dependency.
+
+## Authored systems and Console exploration
+
+The `Systems` family owns persisted logical `SystemResource` definitions outside
+the projection. A name/description and up to 128 exact resource memberships use the
+existing scoped resource store and ETags. The API `/api/systems` provides filtered
+list/read, create, rename, delete, add-member and remove-member commands. Membership
+requires Discover; mutations require the existing write/delete permissions. Hidden
+members are filtered without private totals. Partial membership edits fail uniformly;
+rename preserves unseen members. Delete removes the System, never member resources.
+Deleted/recreated UIDs are not rebound. Its contributor emits `system-membership`
+edges with `definition.members` provenance; those edges are logical, outside impact
+closure. Discover-only still exposes no executable bindings.
+
+`/system-explorer` uses URL `context`, `namespace`, System-owner `scopeRef` and exact
+semantic `root`. Inventory and neighbor pages use the same neutral API, initially
+80 nodes. Current context is retained when opening family details/Flow Designer;
+owner scope is distinct. The accessible table, inspector and JSON export operate
+on the authorized page, independently of the optional LikeC4 island. Select
+`renderer=list` or disable the diagram to use that alternative.
+
+`Web.SystemExplorer` alone translates identities into LikeC4 Model Builder data,
+then browser WASM layout, then React. Local assets and shadow-root styles isolate
+the renderer. Stable hexadecimal IDs do not use authored names. Layout is bounded,
+disposable and never persisted. Rebuild its committed local bundle with `npm ci`
+and `npm run build` in `src/Agentstration.Web.SystemExplorer/Frontend`; Node is not
+a product runtime dependency. No graphical field enters the semantic API.
+[ADR-0238](../../decisions/0238-authored-systems-and-replaceable-explorer-rendering.md)
+records authority, costs and limitations. New reusable UX scenario #1201 remains
+deferred until explicit UX validation and merged UX PR; existing regressions and
+feature smoke remain required now.
+
+## Selected reconciliation review
+
+`Reconciliation` consumes authorized neutral impact/inventory ports. POST
+`/api/system-reconciliation/preview` reviews an exact source pair and up to 32
+explicit consumers/target version proposals. `/revalidate` recomputes current
+authorized relevant evidence against the reviewed fingerprint. No source resource,
+publication, value, grant or runtime state is mutated. The result is always partial
+and non-executable; compatible dynamic Query changes are no-op, incompatible
+contracts block, Agent adoption awaits #1031's approved primitive, and other
+publication requires reviewed conditional family commands.
+
+`/system-explorer/reconciliation` presents comparison, explicit consumer selection,
+ordered review and revalidation. Its fingerprint covers relevant identity, pin,
+current authoring ETag, relation and choice evidence; unrelated changes do not by
+themselves stale the review. During construction, a final impact observation and
+context check detect concurrent changes. Neighbor-slice hashes are not compared to
+whole-observation hashes. See [ADR-0239](../../decisions/0239-reconciliation-preview-reviews-selected-authorized-evidence.md).
+Durable selective execution and receipts remain an explicit remaining part of #1199;
+no generic ChangeSet or renderer command substitutes for them. Deferred scenario
+#1202 retains its maintainer-validation and merge gates.
+
+## Separate operational evidence
+
+GET /api/system-operations and private /hubs/system-operations streams compose
+authorized volatile facts for one exact graph node. The opt-in Explorer panel and
+ephemeral diagram notes consume the same separate facts. Semantic graph/export
+data is unchanged. Disconnect or revocation clears facts; epoch/sequence guards
+require a fresh snapshot after gaps or reconnecting (toggle the overlay off/on).
+
+Scope, actor and RBAC are server-derived and rechecked before delivery. Native
+identity, owner, namespace, invocation and version filters precede sample limits.
+Direct Agent/AgentRevision Runtime runs and newly attested Flow publications are
+supported. Older Flow publications remain unknown for Flow-identity metrics. Recorded Agent
+bindings and native assignment coordinates are shown separately, without becoming
+direct Agent metrics. WorkItem backlinks require exact current authorized execution proof.
+Drill-down opens existing scoped Runtime/Flow details.
+
+Samples contain active runs and terminal runs updated within the selected window,
+observed counts, mean completed-run duration, direct reported tokens and explicit
+coverage. Missing evidence is null, never zero/healthy. Worker presence requires
+current Platform administrator authority and reveals no global load/count.
+Attempt, lease expiry, fencing and presence remain distinct.
+
+Console defaults are 15 minutes / 50 runs; server bounds are 1–1440 minutes /
+100 runs, eight attempts per run and 64 private streams globally / eight per actor /
+one per connection. One-frame backpressure avoids queued ticks. Optional OTel
+dimensions are bounded family/coverage, never resource/run/worker IDs.
+
+Runtime/Flow can retain physical Workspace and explicit logical Instance/Tenant
+coordinates separately. Both are displayed; definition owner remains distinct.
+The accepted ADR-0180 exact-scope drift is recorded without inferring new scope
+or rewriting history. See [ADR-0240](../../decisions/0240-system-operations-is-a-separate-authorized-volatile-overlay.md).
+Scenario #1203 retains its explicit UX validation and merge gates.
+
+
+### Recorded Flow bindings and attested invocations
+
+The operational facts have a separate FlowBindings collection for Agent roots.
+A consumer Flow can be in another namespace; its stored binding must still match
+the exact selected Agent owner/namespace/UID and requested revision/hash/generation.
+Logical/physical invocation scope, tenant and actor filters precede the SQL sample
+limit. This association is not an assertion that the Agent executed.
+
+Invocation groups require distinct native turn IDs for the same run and participant,
+one unambiguous recorded identity, a known attempt/session/fencing proof and, when
+present, an exact StepExecution run/version/execution-hash coordinate. Child runs
+retain their own run coordinate within the root assignment. Groups from sibling
+runs or participants are excluded before counting. Missing legacy hashes and
+ambiguous bindings produce unknown evidence, never a name-based inference.
+
+These facts use durable assignment metadata without invoking an execution-material
+resolver. Consumer Flow state, observed turns and direct-run metrics are separate.
+At most 100 binding associations and eight groups per binding are shown; flags
+report truncation. The panel offers scoped Flow/step drill-down in both locales.
+Neither these associations nor their live updates enter semantic graph JSON or
+publication/impact closure. See ADR-0240.

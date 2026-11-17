@@ -41,25 +41,23 @@ export class FlowDesignerPage {
           type: 'output', name: 'completed', displayName: 'Completed', outcome: 'success',
           outputMapping: '${transition.output}',
         },
-        {
-          type: 'output', name: 'error', displayName: 'Error', outcome: 'error',
-          code: 'FLOW_ERROR', message: 'The Flow failed.', outputMapping: '${transition.output}',
-        },
       ],
       transitions: [
         { id: 'input-completed-completed', fromStep: 'input', event: 'completed', toStep: 'completed' },
-        { id: 'input-error-error', fromStep: 'input', event: 'error', toStep: 'error' },
       ],
       designer: {
         preferredLayout: 'Horizontal',
         nodePositions: {
           input: { x: 80, y: 220 },
           completed: { x: 520, y: 120 },
-          error: { x: 520, y: 360 },
         },
       },
     };
     await this.updateDraft(consoleUrl, name, created, definition);
+    // Prove the initial graph is valid before exercising the validation dock.
+    const validation = await this.page.request.post(consoleUrl + '/api/flows/' + encodeURIComponent(name) + '/validate');
+    expect(validation.status(), await validation.text()).toBe(200);
+    expect(await validation.json()).toEqual({ isValid: true, issues: [] });
     await this.open(consoleUrl, 'default', name);
     await expect(this.node('Input')).toBeVisible();
     return name;

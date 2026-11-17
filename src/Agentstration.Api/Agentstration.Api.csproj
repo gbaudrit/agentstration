@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.SystemOperations.Api/Agentstration.SystemOperations.Api.csproj" />
+    <ProjectReference Include="../Agentstration.Reconciliation.Api/Agentstration.Reconciliation.Api.csproj" />
+
+    <ProjectReference Include="../Agentstration.Systems.Api/Agentstration.Systems.Api.csproj" />
     <ProjectReference Include="../Agentstration.SystemGraph.Api/Agentstration.SystemGraph.Api.csproj" />
     <ProjectReference Include="../Agentstration.Functions.Api/Agentstration.Functions.Api.csproj" />
 

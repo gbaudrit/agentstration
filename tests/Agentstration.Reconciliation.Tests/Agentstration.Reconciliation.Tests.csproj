@@ -1,0 +1,3 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup><ProjectReference Include="../../src/Agentstration.Reconciliation/Agentstration.Reconciliation.csproj" /></ItemGroup>
+</Project>

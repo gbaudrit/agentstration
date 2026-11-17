@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.SystemGraph.Contracts/Agentstration.SystemGraph.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Storage.Contracts/Agentstration.Storage.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Schemas/Agentstration.Schemas.csproj" />

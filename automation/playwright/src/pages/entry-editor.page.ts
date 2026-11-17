@@ -54,16 +54,37 @@ export class EntryEditorPage {
   public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/entries/${encodeURIComponent(name)}?view=definition`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
-    await this.definitionFields.waitFor({ state: 'visible' });
+    await this.page.locator(`[data-testid="${TestIds.entryEditor.definitionFields}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
   public async saveDraft(): Promise<void> {
+    const url = new URL(this.page.url());
+    const namespaceMatch = url.pathname.match(/^\/namespaces\/([^/]+)\/entries\//);
+    const namespace = namespaceMatch ? decodeURIComponent(namespaceMatch[1]) : 'default';
+    const name = await this.page.getByTestId(TestIds.entryEditor.name).inputValue();
+    const displayName = await this.page.getByTestId(TestIds.entryEditor.displayName).inputValue();
+    const endpoint = new URL('/api/namespaces/' + encodeURIComponent(namespace) + '/management/entries/' + encodeURIComponent(name), url).toString();
+    const previousState = await this.status.getAttribute('data-state');
+    const scope = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
+    const headers = scope ? { 'X-Agentstration-Context': scope } : undefined;
+    const existing = await this.page.request.get(endpoint, { headers });
+    const revision = existing.ok() ? (await existing.json() as { value: { revision: number } }).value.revision : 0;
+    if (!existing.ok()) expect(existing.status()).toBe(404);
     await this.page.getByTestId(TestIds.entryEditor.saveDraft).click();
-    await expect(this.status).toHaveAttribute('data-state', 'draft');
+    await expect.poll(async () => {
+      const response = await this.page.request.get(endpoint, { headers });
+      if (!response.ok()) return false;
+      const draft = (await response.json() as { value: { revision: number; displayName: string } }).value;
+      return draft.revision > revision && draft.displayName === displayName;
+    }).toBe(true);
+    await expect(this.status).toHaveAttribute('data-state', previousState === 'published' ? 'published' : 'draft');
   }
 
   public async fillIdentity(entry: Pick<EntryDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
-    await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.name), entry.name);
+    const name = this.page.getByTestId(TestIds.entryEditor.name);
+    await expect(this.page.getByTestId(TestIds.entryEditor.displayName)).toBeEditable();
+    if (await name.isEditable()) await fillAndCommit(name, entry.name);
+    else await expect(name).toHaveValue(entry.name);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.displayName), entry.displayName);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.description), entry.description);
   }

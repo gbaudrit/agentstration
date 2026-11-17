@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title" xml:space="preserve"><value>System Explorer</value></data>
+  <data name="Description" xml:space="preserve"><value>Explore authorized resources and their recorded dependencies.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading authorized resources…</value></data>
+  <data name="Partial" xml:space="preserve"><value>Partial observation; unsupported or invisible dependencies remain unknown. Observed:</value></data>
+  <data name="AllResources" xml:space="preserve"><value>All resources</value></data>
+  <data name="Next" xml:space="preserve"><value>Next page</value></data>
+  <data name="Export" xml:space="preserve"><value>Export this page as JSON</value></data>
+  <data name="Diagram" xml:space="preserve"><value>Show diagram</value></data>
+  <data name="Empty" xml:space="preserve"><value>No resources available</value></data>
+  <data name="EmptyHelp" xml:space="preserve"><value>No visible resource matches this namespace or identity.</value></data>
+  <data name="DiagramLabel" xml:space="preserve"><value>Resource dependency diagram; the same resources are available in the table below.</value></data>
+  <data name="DiagramUnavailable" xml:space="preserve"><value>The diagram is unavailable. Use the resource table and JSON export.</value></data>
+  <data name="Resources" xml:space="preserve"><value>Resources</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Kind" xml:space="preserve"><value>Kind</value></data>
+  <data name="Owner" xml:space="preserve"><value>Owner scope</value></data>
+  <data name="State" xml:space="preserve"><value>State</value></data>
+  <data name="Evidence" xml:space="preserve"><value>Generation / publication</value></data>
+  <data name="Neighbors" xml:space="preserve"><value>Explore neighbors</value></data>
+  <data name="Selection" xml:space="preserve"><value>Selected resource</value></data>
+  <data name="OpenDetails" xml:space="preserve"><value>Open resource details</value></data>
+  <data name="OpenDesigner" xml:space="preserve"><value>Open Flow Designer</value></data>
+  <data name="Relations" xml:space="preserve"><value>Recorded relationships on this page</value></data>
+  <data name="Systems" xml:space="preserve"><value>Logical systems</value></data>
+  <data name="SystemsHelp" xml:space="preserve"><value>Membership describes an authored grouping. It does not create execution dependencies. Only currently visible members are shown.</value></data>
+  <data name="NewSystem" xml:space="preserve"><value>New system name</value></data>
+  <data name="Create" xml:space="preserve"><value>Create system</value></data>
+  <data name="System" xml:space="preserve"><value>System</value></data>
+  <data name="ChooseSystem" xml:space="preserve"><value>Select a system</value></data>
+  <data name="Rename" xml:space="preserve"><value>Rename</value></data>
+  <data name="AddSelected" xml:space="preserve"><value>Add selected resource</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove membership</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete system</value></data>
+  <data name="DeleteHelp" xml:space="preserve"><value>Delete this logical system and its memberships? Member resources will be preserved.</value></data>
+  <data name="ConfirmDelete" xml:space="preserve"><value>Confirm deletion</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="LoadFailed" xml:space="preserve"><value>The authorized inventory could not be loaded. Refresh to try again.</value></data>
+  <data name="ChangeFailed" xml:space="preserve"><value>The change could not be applied. Refresh and check your permissions, memberships and the latest system version.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>The JSON export could not be downloaded.</value></data>
+  <data name="Draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="Published" xml:space="preserve"><value>Published</value></data>
+  <data name="RecordedGeneration" xml:space="preserve"><value>Recorded generation</value></data>
+  <data name="ReferenceIdentity" xml:space="preserve"><value>Referenced identity</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Metadata</value></data>
+  <data name="Membership" xml:space="preserve"><value>Logical membership</value></data>
+  <data name="Dependency" xml:space="preserve"><value>Exact dependency</value></data>
+  <data name="DynamicDependency" xml:space="preserve"><value>Dynamic dependency</value></data>
+  <data name="GenerationOf" xml:space="preserve"><value>Generation of resource</value></data>
+  <data name="Publication" xml:space="preserve"><value>Publication</value></data>
+  <data name="Relation" xml:space="preserve"><value>Relationship</value></data>
+  <data name="Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="ReconTitle" xml:space="preserve"><value>Reconciliation preview</value></data>
+  <data name="ReconDescription" xml:space="preserve"><value>Review a dependency change and the explicitly selected consumers.</value></data>
+  <data name="ReconBack" xml:space="preserve"><value>Back to System Explorer</value></data>
+  <data name="ReconReadOnly" xml:space="preserve"><value>This review performs no adoption or publication. Execution is currently unavailable.</value></data>
+  <data name="ReconFrom" xml:space="preserve"><value>Previous dependency evidence</value></data>
+  <data name="ReconTo" xml:space="preserve"><value>Target dependency evidence</value></data>
+  <data name="ReconChoose" xml:space="preserve"><value>Select an exact identity</value></data>
+  <data name="ReconInspect" xml:space="preserve"><value>Inspect affected consumers</value></data>
+  <data name="ReconConsumers" xml:space="preserve"><value>Selected consumers</value></data>
+  <data name="ReconConsumerHelp" xml:space="preserve"><value>Choose the exact consumers to review. Versions are proposals and are not published by this review.</value></data>
+  <data name="ReconNoConsumers" xml:space="preserve"><value>No authorized consumer is available in this bounded result. Missing evidence does not prove absence of impact.</value></data>
+  <data name="ReconProposedVersion" xml:space="preserve"><value>Proposed new publication version</value></data>
+  <data name="ReconPreview" xml:space="preserve"><value>Build review</value></data>
+  <data name="ReconReview" xml:space="preserve"><value>Dependency review</value></data>
+  <data name="ReconCurrent" xml:space="preserve"><value>The reviewed evidence and your current read access are unchanged. Execution remains unavailable.</value></data>
+  <data name="ReconPartial" xml:space="preserve"><value>Coverage is partial. This review cannot certify a globally complete or executable plan.</value></data>
+  <data name="ReconDigest" xml:space="preserve"><value>Review fingerprint</value></data>
+  <data name="ReconBindings" xml:space="preserve"><value>Inspect recorded bindings</value></data>
+  <data name="ReconBefore" xml:space="preserve"><value>Previous evidence</value></data>
+  <data name="ReconAfter" xml:space="preserve"><value>Current evidence</value></data>
+  <data name="ReconRevalidate" xml:space="preserve"><value>Revalidate review</value></data>
+  <data name="ReconFailed" xml:space="preserve"><value>The review could not be completed or its evidence changed. Reload and build a fresh review.</value></data>
+  <data name="ReconNoOp" xml:space="preserve"><value>No publication needed</value></data>
+  <data name="ReconAdopt" xml:space="preserve"><value>Dependency adoption</value></data>
+  <data name="ReconPublish" xml:space="preserve"><value>New publication</value></data>
+  <data name="ReconBlocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="ReconUnknown" xml:space="preserve"><value>Unknown or unsupported evidence</value></data>
+  <data name="ReconCompatible" xml:space="preserve"><value>The compatible dynamic binding requires no downstream publication.</value></data>
+  <data name="ReconSame" xml:space="preserve"><value>Both selections refer to the same observation.</value></data>
+  <data name="ReconMismatch" xml:space="preserve"><value>The selected latest contract is incompatible; no older fallback was selected.</value></data>
+  <data name="ReconAgentUnavailable" xml:space="preserve"><value>Agent adoption requires an approved adoption and publication policy.</value></data>
+  <data name="ReconConditionalUnavailable" xml:space="preserve"><value>A reviewed conditional publication command is required for this family.</value></data>
+  <data name="ReconUnavailable" xml:space="preserve"><value>Some selected evidence is unavailable in your current context.</value></data>
+  <data name="ReconCycle" xml:space="preserve"><value>A dependency cycle prevents safe ordering.</value></data>
+  <data name="ReconTruncated" xml:space="preserve"><value>A bounded evidence read was truncated.</value></data>
+  <data name="ReconAuthoringSource" xml:space="preserve"><value>Current consumer definition</value></data>
+  <data name="OpsTitle" xml:space="preserve"><value>Operational evidence</value></data>
+  <data name="OpsEnable" xml:space="preserve"><value>Enable live overlay</value></data>
+  <data name="OpsLive" xml:space="preserve"><value>Live, authorized sample</value></data>
+  <data name="OpsUnavailable" xml:space="preserve"><value>Disconnected or unavailable. Disable and enable to reconnect.</value></data>
+  <data name="OpsWindow" xml:space="preserve"><value>Active runs now and terminal runs updated within the last 15 minutes; at most 50 attested runs.</value></data>
+  <data name="OpsSampled" xml:space="preserve"><value>Last observed</value></data>
+  <data name="OpsInvocation" xml:space="preserve"><value>Invocation scope</value></data>
+  <data name="OpsDataScope" xml:space="preserve"><value>Stored execution scope</value></data>
+  <data name="OpsPublication" xml:space="preserve"><value>Publication</value></data>
+  <data name="OpsProvisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsDependencies" xml:space="preserve"><value>Observed dependency pins</value></data>
+  <data name="OpsWorkers" xml:space="preserve"><value>Worker presence</value></data>
+  <data name="OpsObserved" xml:space="preserve"><value>Observed in this sample</value></data>
+  <data name="OpsActive" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsSucceeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsFailed" xml:space="preserve"><value>Failed or timed out</value></data>
+  <data name="OpsCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsDuration" xml:space="preserve"><value>Mean duration per completed run</value></data>
+  <data name="OpsUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsTokens" xml:space="preserve"><value>Reported input / output tokens</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Metrics unavailable: no authorized, attested direct run in this sample.</value></data>
+  <data name="OpsPartial" xml:space="preserve"><value>Partial evidence; no global health conclusion.</value></data>
+  <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
+  <data name="OpsPlacement" xml:space="preserve"><value>Assignment</value></data>
+  <data name="OpsAttempt" xml:space="preserve"><value>Attempt / worker</value></data>
+  <data name="OpsLease" xml:space="preserve"><value>Lease expires</value></data>
+  <data name="OpsFencing" xml:space="preserve"><value>Fencing generation</value></data>
+  <data name="OpsState_unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsState_unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="OpsState_online" xml:space="preserve"><value>Online</value></data>
+  <data name="OpsState_offline" xml:space="preserve"><value>Offline</value></data>
+  <data name="OpsState_stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="OpsState_draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="OpsState_definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="OpsState_publication" xml:space="preserve"><value>Published version</value></data>
+  <data name="OpsState_published" xml:space="preserve"><value>Published</value></data>
+  <data name="OpsState_recorded-generation" xml:space="preserve"><value>Recorded generation</value></data>
+  <data name="OpsState_reference-identity" xml:space="preserve"><value>Identity reference</value></data>
+  <data name="OpsState_observed-pins-current" xml:space="preserve"><value>Observed pins match current generations</value></data>
+  <data name="OpsState_observed-pins-stale" xml:space="preserve"><value>Observed pins are stale</value></data>
+  <data name="OpsState_observed-consumers-stale" xml:space="preserve"><value>Observed consumers retain older generations</value></data>
+  <data name="OpsState_attested-window" xml:space="preserve"><value>Attested sample</value></data>
+  <data name="OpsState_bounded-sample" xml:space="preserve"><value>Result limit reached</value></data>
+  <data name="OpsState_family-unsupported" xml:space="preserve"><value>No operational adapter for this family</value></data>
+  <data name="OpsState_run-read-required" xml:space="preserve"><value>Run read permission required</value></data>
+  <data name="OpsState_pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="OpsState_running" xml:space="preserve"><value>Running</value></data>
+  <data name="OpsState_waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="OpsState_succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsState_failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="OpsState_cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsState_timed-out" xml:space="preserve"><value>Timed out</value></data>
+  <data name="OpsState_assigned" xml:space="preserve"><value>Assigned</value></data>
+  <data name="OpsState_active" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsState_interrupted" xml:space="preserve"><value>Interrupted</value></data>
+  <data name="OpsState_reported-complete" xml:space="preserve"><value>All token counts reported</value></data>
+  <data name="OpsState_reported-partial" xml:space="preserve"><value>Partial reported token counts</value></data>
+  <data name="OpsState_ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="OpsState_reconciling" xml:space="preserve"><value>Reconciling</value></data>
+  <data name="OpsState_provisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsState_deleting" xml:space="preserve"><value>Deleting</value></data>
+  <data name="OpsState_notprovisioned" xml:space="preserve"><value>Not provisioned</value></data>
+<data name="OpsConnecting" xml:space="preserve"><value>Connecting to authorized evidence…</value></data>
+<data name="OpsStale" xml:space="preserve"><value>Evidence is stale. Facts were cleared; disable and enable to reconnect.</value></data>
+  <data name="OpsFlowBindingsTitle" xml:space="preserve"><value>Flow binding evidence</value></data>
+  <data name="OpsFlowBindingsHelp" xml:space="preserve"><value>These Flow Runs recorded this exact Agent binding. This association does not prove execution and is excluded from direct-run metrics. Turn and step evidence is shown only when attested by the assignment ledger.</value></data>
+  <data name="OpsFlowBindingsPartial" xml:space="preserve"><value>The Flow binding sample limit was reached.</value></data>
+  <data name="OpsConsumerState" xml:space="preserve"><value>Consumer Flow state</value></data>
+  <data name="OpsParticipant" xml:space="preserve"><value>Recorded participant</value></data>
+  <data name="OpsBoundRevision" xml:space="preserve"><value>Recorded Agent version / revision UID</value></data>
+  <data name="OpsInvocationUnknown" xml:space="preserve"><value>No attested invocation coordinates in this sample.</value></data>
+  <data name="OpsInvocationsPartial" xml:space="preserve"><value>At most eight invocation groups are shown for this binding.</value></data>
+  <data name="OpsStepExecution" xml:space="preserve"><value>Step execution</value></data>
+  <data name="OpsTurns" xml:space="preserve"><value>Observed distinct turns</value></data>
+  <data name="OpsSession" xml:space="preserve"><value>Worker session</value></data>
+</root>

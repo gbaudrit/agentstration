@@ -148,10 +148,39 @@ Descriptor tests inspect service type, lifetime, selection and cardinality befor
 ## SystemGraph metadata projection
 
 `Infrastructure/Composition/SystemGraphServiceCollectionExtensions.cs` registers
-the explicit Agent, Model/Runtime Profile and Flow contributors, the metadata read
-scope, current RBAC/Discover/Use adapter and singleton query service.
+twelve explicit family contributors (Agents, Models, Flows, Tools, Schemas, Data
+Sources, Connected Services, Storage, Knowledge, Functions, Triggers and authored Systems), the
+metadata read scope and current RBAC/Discover/Use adapter. Inventory and impact
+interfaces share one singleton query service and its validated observations.
 `SystemGraph.Contracts` owns neutral projection/contributor contracts;
-`SystemGraph` owns rebuilding and bounded authorized pagination;
-`SystemGraph.Api` maps the read-only endpoint through the aggregator.
-There is no graph database, hosted collector or renderer registration.
-See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236.
+`SystemGraph` owns rebuilding, bounded authorized pagination, reverse paths and comparisons;
+`SystemGraph.Api` maps read-only inventory/impact/changes/coverage endpoints through the aggregator.
+`Systems` owns logical grouping commands and its contributor, composed as a singleton
+with the resource store, scope operations and current authorization. `Systems.Api`
+maps its scoped command surface. Console hosts register `SystemExplorerApiClient`;
+the optional `Web.SystemExplorer` island has no application authority.
+There is no graph database or hosted collector.
+See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236/0237/0238.
+
+`AddAgentstrationSystemGraph` also composes one `IReconciliationPreviewService`
+owned by `Reconciliation`. It uses only neutral graph/authorization ports and has
+no mutation, family lifecycle or persistence dependency. `Reconciliation.Api`
+maps preview/revalidation; both Console hosts register `ReconciliationApiClient`.
+ADR-0239 records this read-only boundary and the remaining execution prerequisites.
+
+SystemOperations adds singleton read-model, current-authorization and family-evidence
+ports in the same composition entry point. Its core depends only on neutral
+SystemGraph/operational contracts; Infrastructure owns Runtime/Flow/Work/resource
+adapters. SystemOperations.Api owns its HTTP endpoint, bounded private SignalR hub
+and subscription quotas. Both Console hosts register SystemOperationsClient using
+their existing authenticated realtime configurator. The standalone host registers
+the optional bounded-dimension meter/activity source. No collector, operational
+database or new hosted worker is introduced. See ADR-0240.
+
+
+SystemFlowBindingReader is a singleton Infrastructure adapter composed with the
+existing FlowRunService and IRuntimeWorkerAssignmentStore. It reads exact attested
+Agent bindings after family-owned actor/scope filters and projects only native
+turn/step/attempt/session coordinates. It never calls the execution-material
+resolver or the general materializing Agent-instance observer. The neutral core
+keeps these associations separate from direct-run aggregation.

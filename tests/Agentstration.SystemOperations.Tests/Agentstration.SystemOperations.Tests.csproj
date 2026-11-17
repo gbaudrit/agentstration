@@ -1,0 +1,7 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.SystemOperations/Agentstration.SystemOperations.csproj" />
+    <ProjectReference Include="../../src/Agentstration.SystemOperations.Api/Agentstration.SystemOperations.Api.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
+  </ItemGroup>
+</Project>

@@ -118,7 +118,8 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
-            [typeof(ISystemGraphContributor)] = 3,
+            [typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService)] = 1,
+            [typeof(ISystemGraphContributor)] = 12,
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
@@ -149,6 +150,7 @@ public sealed class StandaloneRegistrationContractTests
             .ToArray();
         Assert.HasCount(0, duplicates, string.Join(Environment.NewLine, duplicates));
         AssertSingleDescriptor<ISystemGraphQueryService>(services, ServiceLifetime.Singleton);
+        AssertSingleDescriptor<ISystemGraphImpactService>(services, ServiceLifetime.Singleton);
         AssertSingleDescriptor<ISystemGraphAuthorization>(services, ServiceLifetime.Singleton);
         AssertSingleDescriptor<ISystemGraphReadScope>(services, ServiceLifetime.Singleton);
     }

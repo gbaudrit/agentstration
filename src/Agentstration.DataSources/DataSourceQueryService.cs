@@ -133,11 +133,19 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
             if (previous.Count > 0 && now <= previous[0].PublishedAt) now = previous[0].PublishedAt.AddTicks(1);
             var published = new DataSourceQueryVersionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQueryVersion,
-                Metadata = new() { Name = VersionName(name, version), Namespace = ns }, ScopeRef = scope, Generation = 1,
-                QueryUid = draft.Value.Uid, QueryName = name, QueryGeneration = draft.Value.Generation,
-                Version = version, Definition = draft.Value.Definition, ContractDigest = Contract(draft.Value.Definition),
-                DefinitionDigest = Digest(draft.Value.Definition), PublishedAt = now
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSourceQueryVersion,
+                Metadata = new() { Name = VersionName(name, version), Namespace = ns },
+                ScopeRef = scope,
+                Generation = 1,
+                QueryUid = draft.Value.Uid,
+                QueryName = name,
+                QueryGeneration = draft.Value.Generation,
+                Version = version,
+                Definition = draft.Value.Definition,
+                ContractDigest = Contract(draft.Value.Definition),
+                DefinitionDigest = Digest(draft.Value.Definition),
+                PublishedAt = now
             };
             return (await resources.CreateImmutableAsync(published, token)).Value;
         }, ct);
@@ -155,8 +163,16 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
                 execution.ConsumerScope, ResourceAccessAction.Use, ct);
             if (!decision.Allowed) throw Error("data_source_query_access_denied");
         }
+        return await SelectPublicationAsync(owner, reference.Version, ct);
+    }
+
+    // Shared metadata selection for invocation and family-owned graph extraction. No content access.
+    internal async Task<DataSourceQueryVersionResource> SelectPublicationAsync(DataSourceQueryResource owner, string? selectedVersion, CancellationToken ct)
+    {
+        var scope = owner.ScopeRef!.Value;
+        var ns = owner.Namespace;
         DataSourceQueryVersionResource? version;
-        if (reference.Version is { } selected)
+        if (selectedVersion is { } selected)
         {
             Version(selected);
             using var authorizedVersion = scopes.PushSystem();
@@ -201,8 +217,11 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
         }
         var result = await documents.QueryAsync(selection, new()
         {
-            Profile = selection.Contract.Profile, Query = innerCursor is null ? version.Definition.Query : null,
-            PageSize = innerCursor is null ? request.PageSize : null, AcquisitionId = request.AcquisitionId, Cursor = innerCursor
+            Profile = selection.Contract.Profile,
+            Query = innerCursor is null ? version.Definition.Query : null,
+            PageSize = innerCursor is null ? request.PageSize : null,
+            AcquisitionId = request.AcquisitionId,
+            Cursor = innerCursor
         }, ct);
         var exact = reference with { Version = version.Version };
         var next = result.NextCursor is null ? null : protector.Protect(JsonSerializer.Serialize(new Continuation("query/v1",
@@ -223,8 +242,12 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
         if (value is null || value.Selection?.Contract?.Profile is null || string.IsNullOrWhiteSpace(value.DisplayName) || value.DisplayName.Length > 200
             || value.Query.ValueKind != JsonValueKind.Object || JsonSerializer.SerializeToUtf8Bytes(value.Query).Length > 8192)
             throw Error("data_source_query_invalid");
-        return value with { Query = value.Query.Clone(), Selection = value.Selection with
-        { Mode = DataSourceDocumentSelectionModes.Latest, AcquisitionId = null, AcquisitionUid = null } };
+        return value with
+        {
+            Query = value.Query.Clone(),
+            Selection = value.Selection with
+            { Mode = DataSourceDocumentSelectionModes.Latest, AcquisitionId = null, AcquisitionUid = null }
+        };
     }
     internal static string Contract(DataSourceQueryProperties value)
     {

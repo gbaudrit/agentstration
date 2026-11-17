@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
-import { fillAndCommit } from './controls.js';
+import { fillAndCommit, selectFirstAvailable } from './controls.js';
 
 type DistributionMarker = keyof Pick<typeof TestIds.distribution,
   'extensions' | 'extensionDetails' | 'sourceProviders' | 'sourceProviderDetails' |
@@ -18,6 +18,36 @@ export interface PackProjectDefinition {
 
 export class DistributionPage {
   public constructor(private readonly page: Page) {}
+
+  public async applyProvenanceBootstrapProfile(consoleUrl: string): Promise<void> {
+    const identityResponse = await this.page.request.get(new URL('/api/identity/context', consoleUrl).toString());
+    expect(identityResponse.ok()).toBeTruthy();
+    const { context } = await identityResponse.json() as { context: { tenantId: string; workspaceId: string } };
+    const target = { tenantId: context.tenantId, workspaceId: context.workspaceId };
+    const profile = 'playwright-bootstrap-provenance';
+    const profiles = [profile];
+    const bindings = [];
+    for (const [name, targetKind] of [['assistant-model', 'modelProfile'], ['assistant-runtime', 'runtimeProfile']] as const) {
+      const response = await this.page.request.post(new URL('/api/bootstrap/binding-targets', consoleUrl).toString(), { data: { target, targetKind, profiles } });
+      expect(response.ok()).toBeTruthy();
+      const options = await response.json() as Array<{ name: string; namespace: string; scopeRef: string | null; planned: boolean }>;
+      const selected = options.filter(option => !option.planned).sort((a, b) => a.name.localeCompare(b.name))[0];
+      if (!selected) throw new Error('The provenance bootstrap fixture requires an existing ' + targetKind + '.');
+      bindings.push({ profile, name, target: { name: selected.name, namespace: selected.namespace, scopeRef: selected.scopeRef } });
+    }
+    const selection = { profiles, target, bindings };
+    const previewResponse = await this.page.request.post(new URL('/api/bootstrap/profiles/preview', consoleUrl).toString(), { data: selection });
+    expect(previewResponse.ok()).toBeTruthy();
+    const preview = await previewResponse.json() as { digest: string; canApply: boolean };
+    expect(preview.canApply).toBe(true);
+    const applied = await this.page.request.post(new URL('/api/bootstrap/applications', consoleUrl).toString(), { data: { ...selection, expectedDigest: preview.digest } });
+    expect(applied.status()).toBe(201);
+    const receipt = await applied.json() as { definition: { error: string | null } };
+    expect(receipt.definition.error).toBeNull();
+    const entry = await this.page.request.get(new URL('/api/namespaces/playwright.bootstrap-provenance-source/management/entries/ask-bootstrap-provenance', consoleUrl).toString());
+    expect(entry.status()).toBe(200);
+  }
+
 
   public async open(consoleUrl: string, path: string, marker: DistributionMarker): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
@@ -101,8 +131,20 @@ export class DistributionPage {
   }
 
   public async installPackProject(): Promise<string> {
-    await this.page.getByTestId(TestIds.distribution.packProjectInstall).click();
-    await this.page.getByTestId(TestIds.distribution.packProjectStatus).waitFor({ state: 'visible' });
+    for (const binding of await this.page.locator('.studio-bindings select').all()) {
+      if (await binding.inputValue()) continue;
+      const options = await binding.locator('option').evaluateAll(elements => elements
+        .filter(element => !(element as HTMLOptionElement).disabled && (element as HTMLOptionElement).value)
+        .map(element => (element as HTMLOptionElement).value));
+      await selectFirstAvailable(binding, options, 'Pack resource binding');
+    }
+    const status = this.page.getByTestId(TestIds.distribution.packProjectStatus);
+    const previous = await status.innerText();
+    const install = this.page.getByTestId(TestIds.distribution.packProjectInstall);
+    await expect(install).toBeEnabled();
+    await install.click();
+    await expect(status).toHaveAttribute('data-state', 'success');
+    await expect(status).not.toHaveText(previous);
     return this.page.getByTestId(TestIds.distribution.packProjectNamespace).innerText();
   }
 
