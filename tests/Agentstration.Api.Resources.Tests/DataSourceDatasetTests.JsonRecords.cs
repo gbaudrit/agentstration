@@ -194,7 +194,9 @@ public sealed partial class DataSourceDatasetTests
                 Assert.HasCount(2, (await records.GetAsync(artifactId, default)).Members);
                 await Assert.ThrowsAsync<AuthorizationDeniedException>(() => records.ReadAsync(artifactId, member.Id, 0, 65536, default));
             }
-            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context with { WorkspaceId = Guid.NewGuid() }))
+            var otherContext = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+            Assert.AreNotEqual(fixture.Context.WorkspaceId, otherContext.WorkspaceId);
+            using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(otherContext))
             {
                 await Assert.ThrowsAsync<ArtifactValidationException>(() => records.GetAsync(artifactId, default));
             }

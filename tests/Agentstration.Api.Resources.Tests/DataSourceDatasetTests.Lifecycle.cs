@@ -282,8 +282,9 @@ public sealed partial class DataSourceDatasetTests
                 InputSchema = inputContract,
                 OutputSchema = contract,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputContract },
-                    new ForeachArtifactsFlowStepDefinition { Name = "process" },
-                    new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { dataset = "${input.content.dataset}", transformed = true }) },
+                    new ForeachArtifactsFlowStepDefinition { Name = "process", OutputContract = new()
+                        { Schema = JsonSerializer.SerializeToElement(new { type = "object" }) } },
+                    new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { records = "${input.content}", transformed = true }) },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = contract, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],
                 Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),

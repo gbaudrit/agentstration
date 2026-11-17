@@ -4,12 +4,14 @@ using Agentstration.DataSources;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Flows;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -26,7 +28,11 @@ public sealed partial class DataSourceDatasetTests
     [DataRow(false, "flow")]
     public async Task SharedResponseSchemaAndSelectedArrayKeepDistinctEvidenceThroughNativeExplosion(bool adoptFinalSchema, string itemMode)
     {
-        await using var factory = Factory();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton(p => new BeforeProjectionExecution(ActivatorUtilities.CreateInstance<KnowledgeProjectionFlowGateway>(p)));
+            services.AddSingleton<IKnowledgeProjectionFlowGateway>(p => p.GetRequiredService<BeforeProjectionExecution>());
+        }));
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var fixture = await PrepareAsync(factory.Services, operationResult: JsonSerializer.SerializeToElement(new
         { results = new[] { new { id = "a" }, new { id = "b" } } }), declareAcquisitionOutput: false);
@@ -153,11 +159,15 @@ public sealed partial class DataSourceDatasetTests
             }
             // An incompatible newer publication and even loss of the catalogue entry must not
             // trigger resolution of a different schema during an already accepted projection.
-            parent = await schemas.PutAsync(Owner, parent.Value.Namespace, parent.Value.Name,
-                parent.Value.Definition with { Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"integer"}""") }, parent.ETag, default);
-            await schemas.PublishAsync(Owner, ResourceNamespace.Default, parent.Value.Name, "2.0.0", default);
-            await factory.Services.GetRequiredService<IResourceStore>().DeleteExactAsync(new(Owner, parent.Value.Namespace,
-                SchemaResourceKinds.Schema, parent.Value.Name), parent.ETag, default);
+            factory.Services.GetRequiredService<BeforeProjectionExecution>().BeforeNextExecution = async token =>
+            {
+                using var administration = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
+                parent = await schemas.PutAsync(Owner, parent.Value.Namespace, parent.Value.Name,
+                    parent.Value.Definition with { Content = JsonSerializer.Deserialize<JsonElement>("""{"type":"integer"}""") }, parent.ETag, token);
+                await schemas.PublishAsync(Owner, ResourceNamespace.Default, parent.Value.Name, "2.0.0", token);
+                await factory.Services.GetRequiredService<IResourceStore>().DeleteExactAsync(new(Owner, parent.Value.Namespace,
+                    SchemaResourceKinds.Schema, parent.Value.Name), parent.ETag, token);
+            };
         }
         var id = new KnowledgeSourceId(knowledge.Value.Name, ScopeRef: Owner);
         var projection = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
@@ -199,6 +209,20 @@ public sealed partial class DataSourceDatasetTests
             }, knowledge.ETag, default);
             await Assert.ThrowsAsync<KnowledgeProjectionException>(() => factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default));
             Assert.AreEqual(snapshot.Name, (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot.Name);
+        }
+    }
+
+    private sealed class BeforeProjectionExecution(KnowledgeProjectionFlowGateway inner) : IKnowledgeProjectionFlowGateway
+    {
+        public Func<CancellationToken, Task>? BeforeNextExecution { get; set; }
+        public async Task<KnowledgeProjectionFlowRunResult> ExecuteAsync(KnowledgeProjectionFlowRunRequest request, CancellationToken token)
+        {
+            if (BeforeNextExecution is { } callback)
+            {
+                BeforeNextExecution = null;
+                await callback(token);
+            }
+            return await inner.ExecuteAsync(request, token);
         }
     }
 }
