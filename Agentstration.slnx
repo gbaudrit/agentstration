@@ -35,6 +35,9 @@
     <Project Path="src/Agentstration.Functions.Builtins/Agentstration.Functions.Builtins.csproj" />
     <Project Path="src/Agentstration.Functions.Contracts/Agentstration.Functions.Contracts.csproj" />
     <Project Path="src/Agentstration.Functions/Agentstration.Functions.csproj" />
+    <Project Path="src/Agentstration.Reconciliation.Api/Agentstration.Reconciliation.Api.csproj" />
+    <Project Path="src/Agentstration.Reconciliation.Contracts/Agentstration.Reconciliation.Contracts.csproj" />
+    <Project Path="src/Agentstration.Reconciliation/Agentstration.Reconciliation.csproj" />
     <Project Path="src/Agentstration.SystemGraph.Api/Agentstration.SystemGraph.Api.csproj" />
     <Project Path="src/Agentstration.SystemGraph.Contracts/Agentstration.SystemGraph.Contracts.csproj" />
     <Project Path="src/Agentstration.SystemGraph/Agentstration.SystemGraph.csproj" />
@@ -215,7 +218,9 @@
     <Project Path="src/Agentstration.Workplace.Api/Agentstration.Workplace.Api.csproj" />
     <Project Path="src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Agentstration.Reconciliation.Tests/Agentstration.Reconciliation.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Flows.Tests/Agentstration.Api.Flows.Tests.csproj" />

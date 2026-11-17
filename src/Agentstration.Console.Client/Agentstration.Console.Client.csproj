@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Reconciliation.Contracts/Agentstration.Reconciliation.Contracts.csproj" />
+
     <ProjectReference Include="../Agentstration.SystemGraph.Contracts/Agentstration.SystemGraph.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Systems.Contracts/Agentstration.Systems.Contracts.csproj" />
 

@@ -56,4 +56,40 @@
   <data name="Publication" xml:space="preserve"><value>Publication</value></data>
   <data name="Relation" xml:space="preserve"><value>Relation</value></data>
   <data name="Definition" xml:space="preserve"><value>Définition</value></data>
+  <data name="ReconTitle" xml:space="preserve"><value>Prévisualisation de réconciliation</value></data>
+  <data name="ReconDescription" xml:space="preserve"><value>Examinez une modification de dépendance et les consommateurs explicitement sélectionnés.</value></data>
+  <data name="ReconBack" xml:space="preserve"><value>Retour à l’explorateur de systèmes</value></data>
+  <data name="ReconReadOnly" xml:space="preserve"><value>Cette revue ne réalise aucune adoption ni publication. L’exécution est actuellement indisponible.</value></data>
+  <data name="ReconFrom" xml:space="preserve"><value>Preuve précédente de la dépendance</value></data>
+  <data name="ReconTo" xml:space="preserve"><value>Preuve cible de la dépendance</value></data>
+  <data name="ReconChoose" xml:space="preserve"><value>Sélectionner une identité exacte</value></data>
+  <data name="ReconInspect" xml:space="preserve"><value>Examiner les consommateurs concernés</value></data>
+  <data name="ReconConsumers" xml:space="preserve"><value>Consommateurs sélectionnés</value></data>
+  <data name="ReconConsumerHelp" xml:space="preserve"><value>Choisissez les consommateurs exacts à examiner. Les versions sont des propositions et ne sont pas publiées par cette revue.</value></data>
+  <data name="ReconNoConsumers" xml:space="preserve"><value>Aucun consommateur autorisé n’est disponible dans ce résultat borné. L’absence de preuve ne démontre pas une absence d’impact.</value></data>
+  <data name="ReconProposedVersion" xml:space="preserve"><value>Version proposée pour la nouvelle publication</value></data>
+  <data name="ReconPreview" xml:space="preserve"><value>Préparer la revue</value></data>
+  <data name="ReconReview" xml:space="preserve"><value>Revue des dépendances</value></data>
+  <data name="ReconCurrent" xml:space="preserve"><value>Les preuves examinées et votre accès actuel en lecture sont inchangés. L’exécution reste indisponible.</value></data>
+  <data name="ReconPartial" xml:space="preserve"><value>La couverture est partielle. Cette revue ne peut certifier un plan globalement complet ou exécutable.</value></data>
+  <data name="ReconDigest" xml:space="preserve"><value>Empreinte de la revue</value></data>
+  <data name="ReconBindings" xml:space="preserve"><value>Examiner les liaisons enregistrées</value></data>
+  <data name="ReconBefore" xml:space="preserve"><value>Preuves précédentes</value></data>
+  <data name="ReconAfter" xml:space="preserve"><value>Preuves actuelles</value></data>
+  <data name="ReconRevalidate" xml:space="preserve"><value>Revalider la revue</value></data>
+  <data name="ReconFailed" xml:space="preserve"><value>La revue n’a pas pu être terminée ou ses preuves ont changé. Rechargez et préparez une nouvelle revue.</value></data>
+  <data name="ReconNoOp" xml:space="preserve"><value>Aucune publication nécessaire</value></data>
+  <data name="ReconAdopt" xml:space="preserve"><value>Adoption de dépendance</value></data>
+  <data name="ReconPublish" xml:space="preserve"><value>Nouvelle publication</value></data>
+  <data name="ReconBlocked" xml:space="preserve"><value>Bloqué</value></data>
+  <data name="ReconUnknown" xml:space="preserve"><value>Preuve inconnue ou non prise en charge</value></data>
+  <data name="ReconCompatible" xml:space="preserve"><value>La liaison dynamique compatible ne nécessite aucune publication en aval.</value></data>
+  <data name="ReconSame" xml:space="preserve"><value>Les deux sélections désignent la même observation.</value></data>
+  <data name="ReconMismatch" xml:space="preserve"><value>Le dernier contrat sélectionné est incompatible ; aucun repli vers une version antérieure n’a été choisi.</value></data>
+  <data name="ReconAgentUnavailable" xml:space="preserve"><value>L’adoption par un Agent nécessite une politique d’adoption et de publication validée.</value></data>
+  <data name="ReconConditionalUnavailable" xml:space="preserve"><value>Une commande de publication conditionnelle validée est nécessaire pour cette famille.</value></data>
+  <data name="ReconUnavailable" xml:space="preserve"><value>Certaines preuves sélectionnées sont indisponibles dans votre contexte actuel.</value></data>
+  <data name="ReconCycle" xml:space="preserve"><value>Un cycle de dépendances empêche un ordonnancement sûr.</value></data>
+  <data name="ReconTruncated" xml:space="preserve"><value>Une lecture bornée des preuves a été tronquée.</value></data>
+  <data name="ReconAuthoringSource" xml:space="preserve"><value>Définition actuelle du consommateur</value></data>
 </root>

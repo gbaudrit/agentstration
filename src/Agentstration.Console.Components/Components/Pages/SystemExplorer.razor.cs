@@ -69,6 +69,8 @@ public partial class SystemExplorer
     private void ChangeOwner(ChangeEventArgs args) => Navigate(RootQuery, resourceNamespace.Value, args.Value?.ToString());
     private void Navigate(string? root, string? ns, string? owner) => Navigation.NavigateTo(QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
     { ["context"] = ContextQuery ?? NavigationContext.ScopeRef ?? contextScope.Value, ["scopeRef"] = owner, ["namespace"] = ns, ["root"] = root, ["renderer"] = showDiagram ? null : "list" }));
+    private string ReconciliationUrl(string root) => QueryHelpers.AddQueryString("/system-explorer/reconciliation", new Dictionary<string, string?>
+    { ["context"] = contextScope.Value, ["namespace"] = resourceNamespace.Value, ["root"] = root });
     private string ExplorerUrl(string? root) => QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
     { ["context"] = contextScope.Value, ["scopeRef"] = ownerScope.Value, ["namespace"] = resourceNamespace.Value, ["root"] = root, ["renderer"] = showDiagram ? null : "list" });
     private void ChangeSystem(ChangeEventArgs args)

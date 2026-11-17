@@ -56,4 +56,40 @@
   <data name="Publication" xml:space="preserve"><value>Publication</value></data>
   <data name="Relation" xml:space="preserve"><value>Relationship</value></data>
   <data name="Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="ReconTitle" xml:space="preserve"><value>Reconciliation preview</value></data>
+  <data name="ReconDescription" xml:space="preserve"><value>Review a dependency change and the explicitly selected consumers.</value></data>
+  <data name="ReconBack" xml:space="preserve"><value>Back to System Explorer</value></data>
+  <data name="ReconReadOnly" xml:space="preserve"><value>This review performs no adoption or publication. Execution is currently unavailable.</value></data>
+  <data name="ReconFrom" xml:space="preserve"><value>Previous dependency evidence</value></data>
+  <data name="ReconTo" xml:space="preserve"><value>Target dependency evidence</value></data>
+  <data name="ReconChoose" xml:space="preserve"><value>Select an exact identity</value></data>
+  <data name="ReconInspect" xml:space="preserve"><value>Inspect affected consumers</value></data>
+  <data name="ReconConsumers" xml:space="preserve"><value>Selected consumers</value></data>
+  <data name="ReconConsumerHelp" xml:space="preserve"><value>Choose the exact consumers to review. Versions are proposals and are not published by this review.</value></data>
+  <data name="ReconNoConsumers" xml:space="preserve"><value>No authorized consumer is available in this bounded result. Missing evidence does not prove absence of impact.</value></data>
+  <data name="ReconProposedVersion" xml:space="preserve"><value>Proposed new publication version</value></data>
+  <data name="ReconPreview" xml:space="preserve"><value>Build review</value></data>
+  <data name="ReconReview" xml:space="preserve"><value>Dependency review</value></data>
+  <data name="ReconCurrent" xml:space="preserve"><value>The reviewed evidence and your current read access are unchanged. Execution remains unavailable.</value></data>
+  <data name="ReconPartial" xml:space="preserve"><value>Coverage is partial. This review cannot certify a globally complete or executable plan.</value></data>
+  <data name="ReconDigest" xml:space="preserve"><value>Review fingerprint</value></data>
+  <data name="ReconBindings" xml:space="preserve"><value>Inspect recorded bindings</value></data>
+  <data name="ReconBefore" xml:space="preserve"><value>Previous evidence</value></data>
+  <data name="ReconAfter" xml:space="preserve"><value>Current evidence</value></data>
+  <data name="ReconRevalidate" xml:space="preserve"><value>Revalidate review</value></data>
+  <data name="ReconFailed" xml:space="preserve"><value>The review could not be completed or its evidence changed. Reload and build a fresh review.</value></data>
+  <data name="ReconNoOp" xml:space="preserve"><value>No publication needed</value></data>
+  <data name="ReconAdopt" xml:space="preserve"><value>Dependency adoption</value></data>
+  <data name="ReconPublish" xml:space="preserve"><value>New publication</value></data>
+  <data name="ReconBlocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="ReconUnknown" xml:space="preserve"><value>Unknown or unsupported evidence</value></data>
+  <data name="ReconCompatible" xml:space="preserve"><value>The compatible dynamic binding requires no downstream publication.</value></data>
+  <data name="ReconSame" xml:space="preserve"><value>Both selections refer to the same observation.</value></data>
+  <data name="ReconMismatch" xml:space="preserve"><value>The selected latest contract is incompatible; no older fallback was selected.</value></data>
+  <data name="ReconAgentUnavailable" xml:space="preserve"><value>Agent adoption requires an approved adoption and publication policy.</value></data>
+  <data name="ReconConditionalUnavailable" xml:space="preserve"><value>A reviewed conditional publication command is required for this family.</value></data>
+  <data name="ReconUnavailable" xml:space="preserve"><value>Some selected evidence is unavailable in your current context.</value></data>
+  <data name="ReconCycle" xml:space="preserve"><value>A dependency cycle prevents safe ordering.</value></data>
+  <data name="ReconTruncated" xml:space="preserve"><value>A bounded evidence read was truncated.</value></data>
+  <data name="ReconAuthoringSource" xml:space="preserve"><value>Current consumer definition</value></data>
 </root>

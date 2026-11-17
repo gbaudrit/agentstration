@@ -161,3 +161,9 @@ maps its scoped command surface. Console hosts register `SystemExplorerApiClient
 the optional `Web.SystemExplorer` island has no application authority.
 There is no graph database or hosted collector.
 See [Semantic SystemGraph](../data/system-graph.md) and ADR-0236/0237/0238.
+
+`AddAgentstrationSystemGraph` also composes one `IReconciliationPreviewService`
+owned by `Reconciliation`. It uses only neutral graph/authorization ports and has
+no mutation, family lifecycle or persistence dependency. `Reconciliation.Api`
+maps preview/revalidation; both Console hosts register `ReconciliationApiClient`.
+ADR-0239 records this read-only boundary and the remaining execution prerequisites.

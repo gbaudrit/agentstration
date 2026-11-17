@@ -150,3 +150,24 @@ a product runtime dependency. No graphical field enters the semantic API.
 records authority, costs and limitations. New reusable UX scenario #1201 remains
 deferred until explicit UX validation and merged UX PR; existing regressions and
 feature smoke remain required now.
+
+## Selected reconciliation review
+
+`Reconciliation` consumes authorized neutral impact/inventory ports. POST
+`/api/system-reconciliation/preview` reviews an exact source pair and up to 32
+explicit consumers/target version proposals. `/revalidate` recomputes current
+authorized relevant evidence against the reviewed fingerprint. No source resource,
+publication, value, grant or runtime state is mutated. The result is always partial
+and non-executable; compatible dynamic Query changes are no-op, incompatible
+contracts block, Agent adoption awaits #1031's approved primitive, and other
+publication requires reviewed conditional family commands.
+
+`/system-explorer/reconciliation` presents comparison, explicit consumer selection,
+ordered review and revalidation. Its fingerprint covers relevant identity, pin,
+current authoring ETag, relation and choice evidence; unrelated changes do not by
+themselves stale the review. During construction, a final impact observation and
+context check detect concurrent changes. Neighbor-slice hashes are not compared to
+whole-observation hashes. See [ADR-0239](../../decisions/0239-reconciliation-preview-reviews-selected-authorized-evidence.md).
+Durable selective execution and receipts remain an explicit remaining part of #1199;
+no generic ChangeSet or renderer command substitutes for them. Deferred scenario
+#1202 retains its maintainer-validation and merge gates.
