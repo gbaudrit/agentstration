@@ -92423,33 +92423,34 @@ const gst = { forSpecification(e) {
 function by(e) {
   return "n" + Array.from(new TextEncoder().encode(e), (n) => n.toString(16).padStart(2, "0")).join("");
 }
-function vst(e, n = {}) {
+function vst(e, n = {}, r = {}) {
   if (e.nodes.length > 100) throw new Error("explorer_page_limit");
-  const r = /* @__PURE__ */ new Map();
-  let o = gst.specification({ elements: { resource: {} } });
-  for (const i of [...e.nodes].sort((a, s) => a.id < s.id ? -1 : a.id > s.id ? 1 : 0)) {
-    if (r.has(by(i.id))) throw new Error("explorer_duplicate_identity");
-    r.set(by(i.id), i.id), o = o.model(({ resource: a }, s) => s(a(by(i.id), { title: (i.displayName ?? i.identity.name).replace(/[\x00-\x1f]/g, " ").slice(0, 200), description: i.identity.kind })));
+  const o = /* @__PURE__ */ new Map();
+  let i = gst.specification({ elements: { resource: {} } });
+  for (const a of [...e.nodes].sort((s, l) => s.id < l.id ? -1 : s.id > l.id ? 1 : 0)) {
+    if (o.has(by(a.id))) throw new Error("explorer_duplicate_identity");
+    o.set(by(a.id), a.id), i = i.model(({ resource: s }, l) => l(s(by(a.id), { title: (a.displayName ?? a.identity.name).replace(/[\x00-\x1f]/g, " ").slice(0, 200), description: a.identity.kind + (Object.hasOwn(r, a.id) && typeof r[a.id] == "string" ? `
+` + r[a.id].replace(/[\x00-\x1f]/g, " ").slice(0, 300) : "") })));
   }
-  for (const i of e.relations) {
-    const a = by(i.source), s = by(i.target);
-    r.has(a) && r.has(s) && a !== s && (o = o.model(({ rel: l }, c) => c(l(a, s, { title: n[i.kind] ?? n.relationship ?? i.kind }))));
+  for (const a of e.relations) {
+    const s = by(a.source), l = by(a.target);
+    o.has(s) && o.has(l) && s !== l && (i = i.model(({ rel: c }, u) => u(c(s, l, { title: n[a.kind] ?? n.relationship ?? a.kind }))));
   }
-  return o = o.views(({ view: i, $include: a }, s) => s(i("topology").with(a("*")))), { model: o.toLikeC4Model(), ids: r };
+  return i = i.views(({ view: a, $include: s }, l) => l(a("topology").with(s("*")))), { model: i.toLikeC4Model(), ids: o };
 }
 const og = /* @__PURE__ */ new WeakMap();
-async function Cst(e, n, r, o) {
+async function Cst(e, n, r, o, i = null) {
   if (cY(e), n.nodes.length === 0) return !0;
-  const i = { root: the.createRoot(e), graphviz: new zde() };
-  og.set(e, i);
+  const a = { root: the.createRoot(e), graphviz: new zde() };
+  og.set(e, a);
   try {
-    const { model: a, ids: s } = vst(n, r), l = await ist(a, { graphviz: i.graphviz, concurrency: 1, timeout: 2e4, throwOnTimeout: !0 });
-    return og.get(e) !== i ? !1 : (i.root.render(/* @__PURE__ */ y.jsx(snt, { likec4model: l, children: /* @__PURE__ */ y.jsx(wnt, { viewId: "topology", injectFontCss: !1, controls: !1, enableSearch: !1, enableFocusMode: !1, enableElementDetails: !1, enableRelationshipDetails: !1, enableNotations: !1, showNavigationButtons: !1, nodesSelectable: !0, onNodeClick: (c) => {
-      const u = s.get(c.id);
-      u && og.get(e) === i && o.invokeMethodAsync("SelectNode", u);
+    const { model: s, ids: l } = vst(n, r, i ?? {}), c = await ist(s, { graphviz: a.graphviz, concurrency: 1, timeout: 2e4, throwOnTimeout: !0 });
+    return og.get(e) !== a ? !1 : (a.root.render(/* @__PURE__ */ y.jsx(snt, { likec4model: c, children: /* @__PURE__ */ y.jsx(wnt, { viewId: "topology", injectFontCss: !1, controls: !1, enableSearch: !1, enableFocusMode: !1, enableElementDetails: !1, enableRelationshipDetails: !1, enableNotations: !1, showNavigationButtons: !1, nodesSelectable: !0, onNodeClick: (u) => {
+      const f = l.get(u.id);
+      f && og.get(e) === a && o.invokeMethodAsync("SelectNode", f);
     }, style: { height: "100%", width: "100%" } }) })), !0);
   } catch {
-    return og.get(e) === i && cY(e), !1;
+    return og.get(e) === a && cY(e), !1;
   }
 }
 function cY(e) {

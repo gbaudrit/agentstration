@@ -24,3 +24,9 @@ test('bounded pages and duplicate IDs fail before layout',()=>{
  assert.throws(()=>buildModel({nodes:Array.from({length:101},(_,i)=>node(String(i))),relations:[]}),/explorer_page_limit/);
  assert.throws(()=>buildModel({nodes:[node('a'),node('a')],relations:[]}),/explorer_duplicate_identity/);
 });
+test('volatile localized overlay notes do not alter graph input or canonical mapping',()=>{
+ const input:GraphPage={nodes:[node('resource:a')],relations:[]}; const before=JSON.stringify(input);
+ const plain=buildModel(input); const decorated=buildModel(input,{}, {'resource:a':'Observed: 1; <img src=x>', 'hidden':'private'});
+ assert.equal([...decorated.model.elements()].length,1);
+ assert.deepEqual([...plain.ids],[...decorated.ids]); assert.equal(JSON.stringify(input),before);
+});

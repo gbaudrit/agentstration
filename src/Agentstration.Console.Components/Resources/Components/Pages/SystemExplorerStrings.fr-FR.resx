@@ -92,4 +92,79 @@
   <data name="ReconCycle" xml:space="preserve"><value>Un cycle de dépendances empêche un ordonnancement sûr.</value></data>
   <data name="ReconTruncated" xml:space="preserve"><value>Une lecture bornée des preuves a été tronquée.</value></data>
   <data name="ReconAuthoringSource" xml:space="preserve"><value>Définition actuelle du consommateur</value></data>
+  <data name="OpsTitle" xml:space="preserve"><value>Données opérationnelles</value></data>
+  <data name="OpsEnable" xml:space="preserve"><value>Activer la supervision en direct</value></data>
+  <data name="OpsLive" xml:space="preserve"><value>Échantillon autorisé en direct</value></data>
+  <data name="OpsUnavailable" xml:space="preserve"><value>Déconnecté ou indisponible. Désactivez puis réactivez pour reconnecter.</value></data>
+  <data name="OpsWindow" xml:space="preserve"><value>Exécutions actives et exécutions terminées mises à jour depuis 15 minutes ; au plus 50 exécutions avec identité attestée.</value></data>
+  <data name="OpsSampled" xml:space="preserve"><value>Dernière observation</value></data>
+  <data name="OpsInvocation" xml:space="preserve"><value>Scope d’appel</value></data>
+  <data name="OpsDataScope" xml:space="preserve"><value>Scope de stockage de l’exécution</value></data>
+  <data name="OpsPublication" xml:space="preserve"><value>Publication</value></data>
+  <data name="OpsProvisioning" xml:space="preserve"><value>Provisionnement</value></data>
+  <data name="OpsDependencies" xml:space="preserve"><value>Dépendances enregistrées observées</value></data>
+  <data name="OpsWorkers" xml:space="preserve"><value>Présence des workers</value></data>
+  <data name="OpsObserved" xml:space="preserve"><value>Observées dans cet échantillon</value></data>
+  <data name="OpsActive" xml:space="preserve"><value>Actives</value></data>
+  <data name="OpsSucceeded" xml:space="preserve"><value>Réussies</value></data>
+  <data name="OpsFailed" xml:space="preserve"><value>Échouées ou expirées</value></data>
+  <data name="OpsCancelled" xml:space="preserve"><value>Annulées</value></data>
+  <data name="OpsDuration" xml:space="preserve"><value>Durée moyenne par exécution terminée</value></data>
+  <data name="OpsUnknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="OpsTokens" xml:space="preserve"><value>Tokens d’entrée / sortie rapportés</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Métriques indisponibles : aucun run direct autorisé avec identité attestée dans cet échantillon.</value></data>
+  <data name="OpsPartial" xml:space="preserve"><value>Données partielles ; aucune conclusion sur la santé globale.</value></data>
+  <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
+  <data name="OpsPlacement" xml:space="preserve"><value>Affectation</value></data>
+  <data name="OpsAttempt" xml:space="preserve"><value>Tentative / worker</value></data>
+  <data name="OpsLease" xml:space="preserve"><value>Expiration du bail</value></data>
+  <data name="OpsFencing" xml:space="preserve"><value>Génération de protection</value></data>
+  <data name="OpsState_unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="OpsState_unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="OpsState_online" xml:space="preserve"><value>En ligne</value></data>
+  <data name="OpsState_offline" xml:space="preserve"><value>Hors ligne</value></data>
+  <data name="OpsState_stale" xml:space="preserve"><value>Obsolète</value></data>
+  <data name="OpsState_draft" xml:space="preserve"><value>Brouillon</value></data>
+  <data name="OpsState_definition" xml:space="preserve"><value>Définition</value></data>
+  <data name="OpsState_publication" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="OpsState_published" xml:space="preserve"><value>Publié</value></data>
+  <data name="OpsState_recorded-generation" xml:space="preserve"><value>Génération enregistrée</value></data>
+  <data name="OpsState_reference-identity" xml:space="preserve"><value>Référence d’identité</value></data>
+  <data name="OpsState_observed-pins-current" xml:space="preserve"><value>Les dépendances observées correspondent aux générations courantes</value></data>
+  <data name="OpsState_observed-pins-stale" xml:space="preserve"><value>Les dépendances observées sont obsolètes</value></data>
+  <data name="OpsState_observed-consumers-stale" xml:space="preserve"><value>Des consommateurs observés conservent des générations antérieures</value></data>
+  <data name="OpsState_attested-window" xml:space="preserve"><value>Échantillon attesté</value></data>
+  <data name="OpsState_bounded-sample" xml:space="preserve"><value>Limite de résultats atteinte</value></data>
+  <data name="OpsState_family-unsupported" xml:space="preserve"><value>Pas d’adaptateur opérationnel pour cette famille</value></data>
+  <data name="OpsState_run-read-required" xml:space="preserve"><value>Droit de lecture des exécutions requis</value></data>
+  <data name="OpsState_pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="OpsState_running" xml:space="preserve"><value>En cours</value></data>
+  <data name="OpsState_waiting" xml:space="preserve"><value>En attente</value></data>
+  <data name="OpsState_succeeded" xml:space="preserve"><value>Réussi</value></data>
+  <data name="OpsState_failed" xml:space="preserve"><value>Échoué</value></data>
+  <data name="OpsState_cancelled" xml:space="preserve"><value>Annulé</value></data>
+  <data name="OpsState_timed-out" xml:space="preserve"><value>Expiré</value></data>
+  <data name="OpsState_assigned" xml:space="preserve"><value>Affecté</value></data>
+  <data name="OpsState_active" xml:space="preserve"><value>Actif</value></data>
+  <data name="OpsState_interrupted" xml:space="preserve"><value>Interrompu</value></data>
+  <data name="OpsState_reported-complete" xml:space="preserve"><value>Tous les compteurs de tokens sont rapportés</value></data>
+  <data name="OpsState_reported-partial" xml:space="preserve"><value>Compteurs de tokens partiellement rapportés</value></data>
+  <data name="OpsState_ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="OpsState_reconciling" xml:space="preserve"><value>Réconciliation en cours</value></data>
+  <data name="OpsState_provisioning" xml:space="preserve"><value>Provisionnement</value></data>
+  <data name="OpsState_deleting" xml:space="preserve"><value>Suppression en cours</value></data>
+  <data name="OpsState_notprovisioned" xml:space="preserve"><value>Non provisionné</value></data>
+<data name="OpsConnecting" xml:space="preserve"><value>Connexion aux données autorisées…</value></data>
+<data name="OpsStale" xml:space="preserve"><value>Les données sont obsolètes et ont été effacées ; désactivez puis réactivez pour reconnecter.</value></data>
+  <data name="OpsFlowBindingsTitle" xml:space="preserve"><value>Bindings enregistrés par les Flow</value></data>
+  <data name="OpsFlowBindingsHelp" xml:space="preserve"><value>Ces Flow Runs ont enregistré ce binding exact d’Agent. Cette association ne prouve pas une exécution et reste exclue des métriques des runs directs. Les données de tour et de step apparaissent uniquement si le journal d’affectation les atteste.</value></data>
+  <data name="OpsFlowBindingsPartial" xml:space="preserve"><value>La limite de l’échantillon de bindings Flow est atteinte.</value></data>
+  <data name="OpsConsumerState" xml:space="preserve"><value>État du Flow consommateur</value></data>
+  <data name="OpsParticipant" xml:space="preserve"><value>Participant enregistré</value></data>
+  <data name="OpsBoundRevision" xml:space="preserve"><value>Version d’Agent / UID de révision enregistrés</value></data>
+  <data name="OpsInvocationUnknown" xml:space="preserve"><value>Aucune coordonnée d’invocation attestée dans cet échantillon.</value></data>
+  <data name="OpsInvocationsPartial" xml:space="preserve"><value>Au plus huit groupes d’invocation sont affichés pour ce binding.</value></data>
+  <data name="OpsStepExecution" xml:space="preserve"><value>Exécution de step</value></data>
+  <data name="OpsTurns" xml:space="preserve"><value>Tours distincts observés</value></data>
+  <data name="OpsSession" xml:space="preserve"><value>Session du worker</value></data>
 </root>

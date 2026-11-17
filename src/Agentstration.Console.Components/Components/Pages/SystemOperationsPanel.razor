@@ -1,0 +1,167 @@
+@using Agentstration.Resources
+@using Agentstration.SystemOperations.Contracts
+@implements IAsyncDisposable
+@inject ISystemOperationsClient Client
+@inject TimeProvider Clock
+@inject ILogger<SystemOperationsPanel> Logger
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SystemExplorerStrings> Localizer
+<section class="panel" aria-label="@T("OpsTitle")" data-testid="system-operations">
+    <h3>@T("OpsTitle")</h3>
+    <label><input type="checkbox" checked="@enabled" @onchange="ToggleAsync" /> @T("OpsEnable")</label>
+    @if (enabled)
+    {
+        <p role="status">@T(connecting ? "OpsConnecting" : stale ? "OpsStale" : live ? "OpsLive" : "OpsUnavailable")</p>
+        <p>@T("OpsWindow")</p>
+        @if (buffer.Facts is { } facts)
+        {
+            <dl>
+                <dt>@T("OpsSampled")</dt><dd>@buffer.SampledAt?.ToLocalTime().ToString("G")</dd>
+                <dt>@T("OpsInvocation")</dt><dd><code>@facts.InvocationScope.Value</code></dd>
+                <dt>@T("OpsDataScope")</dt><dd><code>@facts.DataScope.Value</code></dd>
+                <dt>@T("OpsPublication")</dt><dd>@State(facts.PublicationState)</dd>
+                <dt>@T("OpsProvisioning")</dt><dd>@State(facts.ProvisioningState)</dd>
+                <dt>@T("OpsDependencies")</dt><dd>@State(facts.DependencyState)</dd>
+                <dt>@T("OpsWorkers")</dt><dd>@State(facts.WorkerPresence)</dd>
+            </dl>
+            @if (facts.Metrics is { } metrics)
+            {
+                <p>@T("OpsObserved"): @T("OpsActive") @metrics.ObservedActive · @T("OpsSucceeded") @metrics.ObservedSucceeded · @T("OpsFailed") @metrics.ObservedFailed · @T("OpsCancelled") @metrics.ObservedCancelled</p>
+                <p>@T("OpsDuration"): @(metrics.MeanCompletedDurationMilliseconds?.ToString("N0") ?? T("OpsUnknown")) ms</p>
+                <p>@T("OpsTokens"): @(metrics.ReportedInputTokens?.ToString() ?? T("OpsUnknown")) / @(metrics.ReportedOutputTokens?.ToString() ?? T("OpsUnknown")) · @State(metrics.TokenCoverage)</p>
+            }
+            else { <p>@T("OpsNoMetrics")</p> }
+            <p>@State(facts.Coverage) · @T("OpsPartial")</p>
+            <ul>
+                @foreach (var run in facts.Runs)
+                {
+                    <li @key="(run.Family, run.DataScope, run.RunId)">
+                        <a href="@RunUrl(run)">@run.Family · @run.RunId</a> · @State(run.State)
+                        @if (run.WorkItemId is not null) { <span>@T("OpsWorkItem"): <code>@run.WorkItemId</code></span> }
+                        @foreach (var placement in run.Placements)
+                        {
+                            <p>@T("OpsPlacement"): <code>@placement.AssignmentId</code> · @State(placement.State)</p>
+                            @foreach (var attempt in placement.Attempts)
+                            {
+                                <p>@T("OpsAttempt"): <code>@attempt.AttemptId</code> · @if (facts.CanInspectWorkerDetails) { <a href="@WorkerUrl(attempt.WorkerId)"><code>@attempt.WorkerId</code></a> }
+                                else { <code>@attempt.WorkerId</code> } · @State(attempt.AttemptState)
+                                · @T("OpsLease"): @attempt.LeaseExpiresAt.ToLocalTime().ToString("G") · @T("OpsFencing"): @attempt.FencingGeneration
+                                · @State(attempt.Presence)</p>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+            @if (facts.FlowBindings.Count > 0)
+            {
+                <h4>@T("OpsFlowBindingsTitle")</h4><p>@T("OpsFlowBindingsHelp")</p>
+                @if (facts.MoreFlowBindings) { <p>@T("OpsFlowBindingsPartial")</p> }
+                <ul data-testid="system-flow-bindings">
+                    @foreach (var binding in facts.FlowBindings)
+                    {
+                        <li @key="(binding.FlowRunId, binding.ParticipantId, binding.RevisionUid)">
+                            <a href="@BindingUrl(binding)">@binding.FlowRunId</a>
+                            · @T("OpsConsumerState"): @State(binding.FlowRunState)
+                            <p>@T("OpsParticipant"): <code>@binding.ParticipantId</code></p>
+                            <p>@T("OpsBoundRevision"): @binding.Generation · <code>@binding.RevisionUid</code></p>
+                            @if (binding.Invocations.Count == 0) { <p>@T("OpsInvocationUnknown")</p> }
+                            @if (binding.MoreInvocations) { <p>@T("OpsInvocationsPartial")</p> }
+                            @foreach (var invocation in binding.Invocations)
+                            {
+                                <p>
+                                    @if (invocation.StepExecutionId is not null)
+                                    { <a href="@BindingUrl(binding, invocation.StepDefinitionId)">@T("OpsStepExecution"): <code>@invocation.StepExecutionId</code></a> }
+                                    @T("OpsTurns"): @invocation.ObservedTurns
+                                    · @T("OpsAttempt"): <code>@invocation.AttemptId</code>
+                                    · @if (facts.CanInspectWorkerDetails) { <a href="@WorkerUrl(invocation.WorkerId)"><code>@invocation.WorkerId</code></a> }
+                                    else { <code>@invocation.WorkerId</code> } · @T("OpsSession"): <code>@invocation.SessionId</code>
+                                    · @T("OpsFencing"): @invocation.FencingGeneration · @State(invocation.AttemptState) · @State(invocation.Presence)
+                                </p>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+        }
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public string Root { get; set; } = "";
+    [Parameter] public ResourceScopeRef Context { get; set; }
+    [Parameter] public ResourceNamespace Namespace { get; set; }
+    [Parameter] public EventCallback<SystemOperationalFacts?> Changed { get; set; }
+    private readonly SystemOperationsBuffer buffer = new();
+    private CancellationTokenSource? cancellation;
+    private Task? watch;
+    private bool enabled, live, disposed, connecting, stale;
+    private string? selection;
+    private string T(string key) => Localizer[key];
+    private string State(string value) => Localizer["OpsState_" + value.ToLowerInvariant()].ResourceNotFound ? T("OpsUnknown") : T("OpsState_" + value.ToLowerInvariant());
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = Context.Value + "/" + Namespace.Value + "/" + Root;
+        if (selection == key) return;
+        selection = key;
+        await StopAsync();
+        if (enabled) Start();
+    }
+    private async Task ToggleAsync(ChangeEventArgs args)
+    {
+        enabled = args.Value is true;
+        await StopAsync();
+        if (enabled) Start();
+    }
+    private void Start()
+    {
+        connecting = true; stale = false;
+        var pending = cancellation = new();
+        watch = WatchAsync(new(Root, Namespace), Context, pending);
+    }
+    private async Task WatchAsync(SystemOperationsQuery query, ResourceScopeRef context, CancellationTokenSource pending)
+    {
+        try
+        {
+            await using var frames = Client.WatchAsync(context, query, pending.Token).GetAsyncEnumerator(pending.Token);
+            while (true)
+            {
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), Clock);
+                using var expire = deadline.Token.Register(pending.Cancel);
+                try { if (!await frames.MoveNextAsync()) break; }
+                catch (OperationCanceledException) when (deadline.IsCancellationRequested) { stale = live; break; }
+                var frame = frames.Current;
+                if (disposed || pending != cancellation || pending.IsCancellationRequested) return;
+                var before = buffer.Facts;
+                if (!buffer.Apply(frame, query.Root)) break;
+                live = true; connecting = false;
+                if (!ReferenceEquals(before, buffer.Facts)) await Changed.InvokeAsync(buffer.Facts);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
+        catch (Exception error) { Logger.LogWarning(error, "System operational updates are unavailable."); }
+        finally
+        {
+            if (!disposed && pending == cancellation)
+            {
+                live = false; connecting = false; buffer.Clear(); await Changed.InvokeAsync(null);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+    private async Task StopAsync()
+    {
+        var previous = cancellation; cancellation = null;
+        previous?.Cancel();
+        if (watch is not null) await watch;
+        previous?.Dispose(); watch = null; buffer.Clear(); live = false; connecting = false; stale = false;
+        if (!disposed) await Changed.InvokeAsync(null);
+    }
+    private string RunUrl(SystemRunEvidence run) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+        (run.Family == "flow" ? "/flow-runs/" : "/runs/") + Uri.EscapeDataString(run.RunId),
+        new Dictionary<string, string?> { ["context"] = Context.Value, ["scopeRef"] = run.DataScope.Value });
+    private string BindingUrl(SystemFlowBindingEvidence binding, string? step = null) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+        "/flow-runs/" + Uri.EscapeDataString(binding.FlowRunId), new Dictionary<string, string?>
+        { ["context"] = Context.Value, ["scopeRef"] = binding.DataScope.Value, ["step"] = step });
+    private string WorkerUrl(Guid worker) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/settings/runtime-workers/" + worker.ToString("D"), "context", Context.Value);
+    public async ValueTask DisposeAsync() { disposed = true; await StopAsync(); }
+}

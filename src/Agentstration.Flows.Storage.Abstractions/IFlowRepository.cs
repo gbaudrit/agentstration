@@ -12,8 +12,16 @@ public sealed record StoredFlowDraft(FlowDraft Value, string ETag, DateTimeOffse
 public sealed record StoredInputRequest(InputRequest Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record FlowRunPage(IReadOnlyList<StoredFlowRun> Items, bool HasMore);
 
+public sealed record FlowRunIdentityQuery(FlowRunScope Invocation, ResourceScopeRef DefinitionOwner, ResourceNamespace Namespace,
+    Guid ResourceUid, string? Version, DateTimeOffset WindowStart, int Take = 100, string? DefinitionHash = null);
+
+public sealed record FlowRunAgentBindingQuery(FlowRunScope Invocation, ResourceScopeRef AgentOwner, ResourceNamespace AgentNamespace,
+    Guid AgentUid, Guid? RevisionUid, long? Generation, string? DefinitionHash, DateTimeOffset WindowStart, int Take = 100);
+
 public interface IFlowRepository
 {
+    Task<FlowRunPage> ListRunsByAgentBindingAsync(FlowRunAgentBindingQuery query, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The store does not support attested Agent bindings.");
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredFlow> CreateAsync(FlowResource resource, CancellationToken cancellationToken);
     Task<StoredFlow?> GetByUidAsync(Guid uid, CancellationToken cancellationToken);
@@ -59,6 +67,8 @@ public interface IFlowRepository
         GetRunExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, cancellationToken);
     Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken);
     Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
+    Task<FlowRunPage> ListRunsByIdentityAsync(FlowRunIdentityQuery query, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact Flow execution identity projection is unavailable.");
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     /// <summary>
     /// Lists recoverable runs after an exclusive, immutable run key in storage order. Pass null for

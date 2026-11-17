@@ -167,3 +167,20 @@ owned by `Reconciliation`. It uses only neutral graph/authorization ports and ha
 no mutation, family lifecycle or persistence dependency. `Reconciliation.Api`
 maps preview/revalidation; both Console hosts register `ReconciliationApiClient`.
 ADR-0239 records this read-only boundary and the remaining execution prerequisites.
+
+SystemOperations adds singleton read-model, current-authorization and family-evidence
+ports in the same composition entry point. Its core depends only on neutral
+SystemGraph/operational contracts; Infrastructure owns Runtime/Flow/Work/resource
+adapters. SystemOperations.Api owns its HTTP endpoint, bounded private SignalR hub
+and subscription quotas. Both Console hosts register SystemOperationsClient using
+their existing authenticated realtime configurator. The standalone host registers
+the optional bounded-dimension meter/activity source. No collector, operational
+database or new hosted worker is introduced. See ADR-0240.
+
+
+SystemFlowBindingReader is a singleton Infrastructure adapter composed with the
+existing FlowRunService and IRuntimeWorkerAssignmentStore. It reads exact attested
+Agent bindings after family-owned actor/scope filters and projects only native
+turn/step/attempt/session coordinates. It never calls the execution-material
+resolver or the general materializing Agent-instance observer. The neutral core
+keeps these associations separate from direct-run aggregation.

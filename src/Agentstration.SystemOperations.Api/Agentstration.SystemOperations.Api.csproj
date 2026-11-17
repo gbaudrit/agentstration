@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="../ApiModuleGlobalUsings.cs" Link="GlobalUsings.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Agentstration.Api.Contracts/Agentstration.Api.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.SystemOperations/Agentstration.SystemOperations.csproj" />
+    <ProjectReference Include="../Agentstration.SystemGraph/Agentstration.SystemGraph.csproj" />
+  </ItemGroup>
+</Project>

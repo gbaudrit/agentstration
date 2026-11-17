@@ -41,6 +41,9 @@
     <Project Path="src/Agentstration.SystemGraph.Api/Agentstration.SystemGraph.Api.csproj" />
     <Project Path="src/Agentstration.SystemGraph.Contracts/Agentstration.SystemGraph.Contracts.csproj" />
     <Project Path="src/Agentstration.SystemGraph/Agentstration.SystemGraph.csproj" />
+    <Project Path="src/Agentstration.SystemOperations.Api/Agentstration.SystemOperations.Api.csproj" />
+    <Project Path="src/Agentstration.SystemOperations.Contracts/Agentstration.SystemOperations.Contracts.csproj" />
+    <Project Path="src/Agentstration.SystemOperations/Agentstration.SystemOperations.csproj" />
     <Project Path="src/Agentstration.Systems.Api/Agentstration.Systems.Api.csproj" />
     <Project Path="src/Agentstration.Systems.Contracts/Agentstration.Systems.Contracts.csproj" />
     <Project Path="src/Agentstration.Systems/Agentstration.Systems.csproj" />
@@ -220,6 +223,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Agentstration.Reconciliation.Tests/Agentstration.Reconciliation.Tests.csproj" />
+    <Project Path="tests/Agentstration.SystemOperations.Tests/Agentstration.SystemOperations.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Api/">
     <Project Path="tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj" />

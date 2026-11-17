@@ -143,20 +143,6 @@ function lifecycleSurface(id: string, component: string, routes: readonly string
 
 export const applicationSurfaces: readonly ApplicationSurface[] = [
   {
-    id: 'source-content-lifecycle', host: 'console', source: `${consolePages}/DataSourceDatasetEditor.razor`,
-    routes: ['/data-sources/new', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
-    fixtureKeys: ['source-policy-clock', 'native-read-only-operation', 'builtin-storage'],
-    pageObject: 'src/pages/source-policies.page.ts', journey: 'exercise-source-policies',
-    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1116,
-  },
-  {
-    id: 'source-flow-composition', host: 'console', source: `${consolePages}/KnowledgeSourceEditor.razor`,
-    routes: ['/flows/{FlowId}/designer', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
-    fixtureKeys: ['native-read-only-operation', 'composable-transformations', 'builtin-storage'],
-    pageObject: 'src/pages/source-composition.page.ts', journey: 'exercise-source-composition',
-    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1118,
-  },
-  {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
     pageObject: 'src/pages/product.pages.ts', journey: 'authenticate-console',
     specification: 'tests/console-authentication.spec.ts', coverage: 'covered',
@@ -317,10 +303,21 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 424),
   {
     id: 'tool-definition-editor', host: 'console', source: `${consolePages}/ToolDefinitionEditor.razor`,
-    routes: ['/tools/definitions/new', '/tools/definitions/{Name}'], fixtureKeys: ['name'],
+    routes: ['/tools/definitions/{Name}'], fixtureKeys: ['name'],
     pageObject: 'src/pages/schema-contracts.page.ts', journey: 'exercise-schema-contract-bindings',
     specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
   },
+  {
+    id: 'new-tool-definition', host: 'console', source: `${consolePages}/NewToolDefinition.razor`,
+    routes: ['/tools/definitions/new'], fixtureKeys: [],
+    pageObject: 'src/pages/schema-contracts.page.ts', journey: 'exercise-schema-contract-bindings',
+    specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
+  },
+  // Inventory registration only: reusable journeys remain gated by their maintainer UX review and merged PR.
+  planned('system-explorer', `${consolePages}/SystemExplorer.razor`, ['/system-explorer'], 1201),
+  planned('system-reconciliation', `${consolePages}/SystemReconciliation.razor`, ['/system-explorer/reconciliation'], 1202),
+  planned('transformation-functions', `${consolePages}/TransformationFunctions.razor`, ['/function-kinds', '/transformation-functions'], 1177),
+  planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1177, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
   coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], ['name']),

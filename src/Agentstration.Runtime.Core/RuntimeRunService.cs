@@ -121,6 +121,13 @@ public sealed class RuntimeRunService(
     public Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         runs.ListExactAsync(scopeRef, agentResourceId, skip, take, cancellationToken);
 
+    public async Task<IReadOnlyList<StoredRuntimeRun>> ListByIdentityAsync(RuntimeRunScope scope, RuntimeRunIdentityQuery query, CancellationToken ct)
+    {
+        if (scope.ScopeRef != query.ExecutionScope) throw new RuntimeRunValidationException("execution_scope_not_authorized", "The execution scope does not match.");
+        await AuthorizeReadAsync(scope, ct);
+        return await runs.ListByIdentityAsync(query, ct);
+    }
+
     public async Task DeleteAsync(WorkspaceId workspaceId, string runId, string expectedETag, CancellationToken cancellationToken)
         => await DeleteExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, expectedETag, cancellationToken);
 

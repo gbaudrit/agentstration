@@ -23,6 +23,10 @@ public sealed partial class FlowRunService
         return await repository.GetRunAsync(scope, runId, cancellationToken);
     }
 
+    public Task<FlowRunPage> ListByAgentBindingAsync(FlowRunAgentBindingQuery query, CancellationToken ct) => repository.ListRunsByAgentBindingAsync(query, ct);
+
+    public Task<FlowRunPage> ListByIdentityAsync(FlowRunIdentityQuery query, CancellationToken ct) => repository.ListRunsByIdentityAsync(query, ct);
+
     public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
         repository.ListRunsAsync(scope, flowId, status, skip, take, cancellationToken);
 

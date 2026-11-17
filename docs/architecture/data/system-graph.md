@@ -171,3 +171,59 @@ whole-observation hashes. See [ADR-0239](../../decisions/0239-reconciliation-pre
 Durable selective execution and receipts remain an explicit remaining part of #1199;
 no generic ChangeSet or renderer command substitutes for them. Deferred scenario
 #1202 retains its maintainer-validation and merge gates.
+
+## Separate operational evidence
+
+GET /api/system-operations and private /hubs/system-operations streams compose
+authorized volatile facts for one exact graph node. The opt-in Explorer panel and
+ephemeral diagram notes consume the same separate facts. Semantic graph/export
+data is unchanged. Disconnect or revocation clears facts; epoch/sequence guards
+require a fresh snapshot after gaps or reconnecting (toggle the overlay off/on).
+
+Scope, actor and RBAC are server-derived and rechecked before delivery. Native
+identity, owner, namespace, invocation and version filters precede sample limits.
+Direct Agent/AgentRevision Runtime runs and newly attested Flow publications are
+supported. Older Flow publications remain unknown for Flow-identity metrics. Recorded Agent
+bindings and native assignment coordinates are shown separately, without becoming
+direct Agent metrics. WorkItem backlinks require exact current authorized execution proof.
+Drill-down opens existing scoped Runtime/Flow details.
+
+Samples contain active runs and terminal runs updated within the selected window,
+observed counts, mean completed-run duration, direct reported tokens and explicit
+coverage. Missing evidence is null, never zero/healthy. Worker presence requires
+current Platform administrator authority and reveals no global load/count.
+Attempt, lease expiry, fencing and presence remain distinct.
+
+Console defaults are 15 minutes / 50 runs; server bounds are 1–1440 minutes /
+100 runs, eight attempts per run and 64 private streams globally / eight per actor /
+one per connection. One-frame backpressure avoids queued ticks. Optional OTel
+dimensions are bounded family/coverage, never resource/run/worker IDs.
+
+Runtime/Flow can retain physical Workspace and explicit logical Instance/Tenant
+coordinates separately. Both are displayed; definition owner remains distinct.
+The accepted ADR-0180 exact-scope drift is recorded without inferring new scope
+or rewriting history. See [ADR-0240](../../decisions/0240-system-operations-is-a-separate-authorized-volatile-overlay.md).
+Scenario #1203 retains its explicit UX validation and merge gates.
+
+
+### Recorded Flow bindings and attested invocations
+
+The operational facts have a separate FlowBindings collection for Agent roots.
+A consumer Flow can be in another namespace; its stored binding must still match
+the exact selected Agent owner/namespace/UID and requested revision/hash/generation.
+Logical/physical invocation scope, tenant and actor filters precede the SQL sample
+limit. This association is not an assertion that the Agent executed.
+
+Invocation groups require distinct native turn IDs for the same run and participant,
+one unambiguous recorded identity, a known attempt/session/fencing proof and, when
+present, an exact StepExecution run/version/execution-hash coordinate. Child runs
+retain their own run coordinate within the root assignment. Groups from sibling
+runs or participants are excluded before counting. Missing legacy hashes and
+ambiguous bindings produce unknown evidence, never a name-based inference.
+
+These facts use durable assignment metadata without invoking an execution-material
+resolver. Consumer Flow state, observed turns and direct-run metrics are separate.
+At most 100 binding associations and eight groups per binding are shown; flags
+report truncation. The panel offers scoped Flow/step drill-down in both locales.
+Neither these associations nor their live updates enter semantic graph JSON or
+publication/impact closure. See ADR-0240.
