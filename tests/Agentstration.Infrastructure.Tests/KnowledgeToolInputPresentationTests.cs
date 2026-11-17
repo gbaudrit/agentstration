@@ -6,7 +6,7 @@ using Agentstration.Tools;
 namespace Agentstration.Infrastructure.Tests;
 
 [TestClass]
-public sealed class KnowledgeToolInputPresentationTests
+public sealed partial class KnowledgeToolInputPresentationTests
 {
     private static readonly JsonElement Published = JsonSerializer.Deserialize<JsonElement>("""
         {"type":"object","properties":{"request":{"type":"object","properties":{"query":{},"pageSize":{"type":["integer","null"],"minimum":1,"maximum":100},"cursor":{"type":"string"}},"additionalProperties":false}},"required":[],"additionalProperties":false}

@@ -57,9 +57,11 @@ public sealed record KnowledgeContributionDescription(KnowledgeContributionSelec
     public string Input { get; init; } = Selection.BindingName;
     public string? DescribeTool { get; init; }
     public bool InputFixed { get; init; }
-    public JsonElement DescribeArguments => InputFixed
-        ? JsonSerializer.SerializeToElement(new { request = new { } })
-        : JsonSerializer.SerializeToElement(new { request = new { input = Input } });
+    public bool FlatArguments { get; init; }
+    public JsonElement DescribeArguments => FlatArguments
+        ? InputFixed ? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { input = Input })
+        : InputFixed ? JsonSerializer.SerializeToElement(new { request = new { } })
+            : JsonSerializer.SerializeToElement(new { request = new { input = Input } });
     public string? Description { get; init; }
     public string DescriptionSource { get; init; } = "published";
     public IReadOnlyList<string> MediaTypes { get; init; } = [];

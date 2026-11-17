@@ -85,6 +85,7 @@ public sealed partial class KnowledgeAccessService
                 Input = available.Where(t => t.Contribution == selection).Select(KnowledgeContributions.InputId).FirstOrDefault(value => value is not null) ?? selection.BindingName,
                 DescribeTool = inputDescribe?.CallableName ?? operations.FirstOrDefault(o => o.Operation == KnowledgeSourceOperation.Describe && o.Proposal?.Contribution is null)?.CallableName,
                 InputFixed = inputDescribe is not null,
+                FlatArguments = KnowledgeToolMetadataService.UsesFlatArguments(candidate.InputSchema),
                 RecordSchemas = detailed ? artifacts.Where(a => a.RecordContract?.Schema is not null)
                     .Select(a => a.RecordContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
                 Description = business.Description,
@@ -101,7 +102,8 @@ public sealed partial class KnowledgeAccessService
                 .Select(o => o with { Proposal = null }).ToArray(), contributions)
         {
             DetailLevel = detailed ? "input" : "overview",
-            InvocationInstructions = KnowledgeToolMetadataService.ArgumentGuidance.Trim(),
+            InvocationInstructions = (available.Any(tool => KnowledgeToolMetadataService.UsesFlatArguments(tool.InputSchema))
+                ? KnowledgeToolMetadataService.FlatArgumentGuidance : KnowledgeToolMetadataService.ArgumentGuidance).Trim(),
             ToolSummaries = available.Select(t => new KnowledgeToolSummary(t.Route, t.Operation, t.DisplayName, null, t.Contribution)).ToArray()
         };
         if (System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result, Json).Length > 196608)

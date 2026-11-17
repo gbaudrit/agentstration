@@ -430,7 +430,7 @@ public sealed class ToolDefinitionExecutor(
         }
         if (stored.Value.Definition is RelayToolDefinitionProperties relay)
         {
-            try { ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings); }
+            try { ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings, relay.InputEnvelope); }
             catch (ToolDefinitionValidationException exception) { throw new ToolDefinitionInvocationException(exception.Code, exception.Message); }
             ToolInputSchemaValidator.Validate(relay.InputSchema, invocation.Arguments, invocation.ExecutionContext?.SecretInputs);
             return stored;

@@ -70,7 +70,8 @@ source ToolSet includes its describe Tool. A literal relay binding fixes that
 exposure identity. Describe without `input` returns a lightweight catalogue: effective business
 purpose, available input identities, formats and assigned Tool references. It
 omits full Tool contracts, schemas and document-ID lists. Each exposed input has
-its own describe relay with fixed input selection and a `{ "request": {} }` call.
+its own describe relay with fixed input selection and an empty `{}` call in new
+publications.
 Discovery returns explicit input names/identifiers, assigned describe callable
 names and complete argument examples. The source-wide describe also accepts an
 exact exposed route identifier or unambiguous binding name for older exposures.
@@ -109,8 +110,22 @@ and trace counters report presentation coverage without storing prompts/content.
 Direct MAF creation and AWP materialization use this same boundary.
 This runtime presentation does not rewrite authored instructions, revision hashes,
 Tool references, published schemas, approval flags or grants. For an exact pinned
-OData profile, model presentation narrows the generic `request.query` value to
-its supported object/string-option schema and requires the `request` envelope.
+OData profile, model presentation narrows the generic `query` value to its
+supported object/string-option schema. New access publications expose optional
+arguments directly at Tool level (`snapshotId`, `pageSize`, `query`, `cursor`,
+etc.), with no public `request` wrapper. Existing operation validation retains
+initial-query and continuation rules. An explicit relay `inputEnvelope` names the
+sole remaining object property after fixed-binding projection. Publication derives
+the flat public schema from that object; execution and simulation wrap caller
+arguments before injecting protected source/profile/contribution bindings and
+validating the complete native contract. Fixed inputs remain uncallable, and
+unknown fields, duplicate properties and the old wrapper are rejected for a flat
+publication. No caller values are moved heuristically or repaired in the runtime.
+Old publications without this setting retain their wrapped contracts. Discovery
+examples and system guidance use the actual assigned layout, including mixed
+versions. Flat adoption requires a newly published ToolSet and explicit consumer
+pin update; no initialization bump or migration is needed. The relay editor
+preserves the setting and previews the correct contract when deriving a draft.
 The same presentation applies to detailed discovery and AWP model material;
 publication and authoritative execution retain their immutable contracts.
 

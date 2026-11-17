@@ -131,26 +131,20 @@ public sealed partial class KnowledgeSourceToolExposureService
             var profile = operation == KnowledgeSourceOperation.StructuredQuery ? description?.QueryProfiles.FirstOrDefault() : null;
             var help = operation switch
             {
-                KnowledgeSourceOperation.Describe when selection is not null => "Describe this fixed input's schemas and access contracts with request: {}. The input is fixed by this Tool; do not supply request.input. Optionally reuse an exact request.snapshotId. Metadata only: no content reads or preparation.",
-                KnowledgeSourceOperation.Describe => "Discover the available inputs with request: {} before accessing Knowledge data. Use each returned describeTool and describeArguments for detailed input contracts. Metadata only: no content reads or preparation.",
-                KnowledgeSourceOperation.GetStatus => "Inspect recorded Snapshot status and input freshness without reading content or starting preparation. request accepts {}.",
+                KnowledgeSourceOperation.Describe when selection is not null => "Describe this fixed input's schemas and access contracts with {}. The input is fixed by this Tool; do not supply input. Optionally reuse an exact snapshotId. Metadata only: no content reads or preparation.",
+                KnowledgeSourceOperation.Describe => "Discover the available inputs with {} before accessing Knowledge data. Use each returned describeTool and describeArguments for detailed input contracts. Metadata only: no content reads or preparation.",
+                KnowledgeSourceOperation.GetStatus => "Inspect recorded Snapshot status and input freshness without reading content or starting preparation. Accepts {}.",
                 KnowledgeSourceOperation.Read => "Read bounded Unicode chunks of text-readable content in this contribution only. Binary documents require a configured text transformation. Reuse the snapshotId, documentId and readRange from its search. Without snapshotId, prepare current data if needed. Continue with cursor only.",
                 KnowledgeSourceOperation.SearchRegex => "Search text-readable content in this contribution only with a bounded .NET non-backtracking regular expression (no lookarounds/backreferences). Returns exact snapshotId, documentId and ranges for read. Continue with cursor only.",
                 _ => "Query this contribution's immutable structured records only using the fixed profile/model. Initial request supplies query; continuations supply cursor only. Filtering, ordering, selection and aggregates depend on the supported profile. No SQL, writes or destination selection."
             };
             if (profile is { Id: "odata/4.01" })
-                help += " Query encoding: odata-options+json, e.g. query: {}. Supports the reviewed $filter/$select/$orderby and simple $apply aggregate/groupby subset on declared fields. Use request.pageSize for pages; $top/$skip, joins and expansion are unsupported.";
+                help += " Query encoding: odata-options+json, e.g. query: {}. Supports the reviewed $filter/$select/$orderby and simple $apply aggregate/groupby subset on declared fields. Use pageSize for pages; $top/$skip, joins and expansion are unsupported.";
             var input = JsonNode.Parse(KnowledgeAccessSchemas.Input(operation).GetRawText())!.AsObject();
             var properties = input["properties"]!.AsObject();
             properties.Remove("contribution"); properties.Remove("profile"); properties.Remove("exposure"); properties.Remove("exposureScope");
             if (operation == KnowledgeSourceOperation.Describe && selection is not null) properties.Remove("input");
-            var schema = JsonSerializer.SerializeToElement(new JsonObject
-            {
-                ["type"] = "object",
-                ["properties"] = new JsonObject { ["request"] = input },
-                ["required"] = new JsonArray("request"),
-                ["additionalProperties"] = false
-            });
+            var schema = JsonSerializer.SerializeToElement(input);
             var proposal = new KnowledgeToolProposal
             {
                 Route = route,
@@ -158,7 +152,7 @@ public sealed partial class KnowledgeSourceToolExposureService
                 Operation = operation,
                 Contribution = selection,
                 DisplayName = name + " · " + KnowledgeAccessSchemas.Route(operation),
-                Description = KnowledgeToolMetadataService.Format(name, businessDescription, help, profile),
+                Description = KnowledgeToolMetadataService.Format(name, businessDescription, help, profile, flatArguments: true),
                 BusinessDescription = businessDescription,
                 Usage = help,
                 InputSchema = schema,

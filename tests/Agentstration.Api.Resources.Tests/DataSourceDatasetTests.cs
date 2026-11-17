@@ -73,7 +73,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var exposure = (await response.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
         Assert.AreEqual(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), exposure.ScopeRef);
         Assert.AreEqual(Owner, exposure.ToolSet.ScopeRef);
-        Assert.HasCount(4, exposure.Operations);
+        Assert.HasCount(5, exposure.Operations);
         Assert.IsTrue(exposure.Operations.All(value => value.Tool.ScopeRef == Owner));
         using var reloaded = await client.GetAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance");
         Assert.AreEqual(HttpStatusCode.OK, reloaded.StatusCode);
@@ -91,7 +91,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 };
             }
             using var executed = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
+                new RunToolRequest(request, ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
             var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
             Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
@@ -102,8 +102,10 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 _ => "instance-tool-content"
             },
                 result.Output!.Value.GetRawText());
+            var substituted = request.Deserialize<Dictionary<string, object?>>()!;
+            substituted["source"] = new { name = "substituted" };
             using var overrideSource = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request, source = new { name = "substituted" } }), ToolRunMode.Execute));
+                new RunToolRequest(JsonSerializer.SerializeToElement(substituted), ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideSource.StatusCode);
         }
 

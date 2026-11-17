@@ -2,8 +2,8 @@ using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
 using Microsoft.Extensions.Logging;
@@ -26,6 +26,8 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
         var sources = new List<object>();
         var knownTools = 0;
         var unavailableSources = 0;
+        var hasFlatTools = false;
+        var hasEnvelopedTools = false;
         foreach (var tool in presentation.Tools)
         {
             tools.Add(tool);
@@ -34,13 +36,17 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
                 ToolResourceKinds.ToolDefinitionVersion, tool.ExternalId), cancellationToken))?.Value;
             if (published is null || !published.Metadata.Annotations.ContainsKey("agentstration.io/knowledge-source-uid")) continue;
             knownTools++;
+            var flatArguments = KnowledgeToolMetadataService.UsesFlatArguments(tool.InputSchema);
+            hasFlatTools |= flatArguments;
+            hasEnvelopedTools |= !flatArguments;
+            var discoveryArguments = JsonSerializer.SerializeToElement<object>(flatArguments ? new { } : new { request = new { } });
             var selection = KnowledgeToolMetadataService.Selection(published);
             var usage = published.Metadata.Annotations.GetValueOrDefault(KnowledgeToolMetadataService.UsageAnnotation)
                 ?? published.Definition.Description ?? string.Empty;
             var profile = KnowledgeToolMetadataService.Profile(published);
             var inputSchema = KnowledgeToolMetadataService.InputSchemaForModel(tool.InputSchema, profile);
             // Invocation guidance comes from the assigned immutable Tool contract and does not require live Source metadata.
-            tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(published.Definition.DisplayName, null, usage, profile), inputSchema);
+            tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(published.Definition.DisplayName, null, usage, profile, flatArguments), inputSchema);
             var operation = published.Metadata.Annotations.GetValueOrDefault("agentstration.io/knowledge-operation");
             var describes = operation == "describe" || operation?.EndsWith(".describe", StringComparison.Ordinal) == true;
             KnowledgeSourceResource? source = null;
@@ -54,15 +60,16 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
             if (source is null)
             {
                 unavailableSources++;
-                if (describes) sources.Add(new { DescribeTool = tool.Name, MetadataStatus = "unavailable" });
+                if (describes) sources.Add(new { DescribeTool = tool.Name, DescribeArguments = discoveryArguments, MetadataStatus = "unavailable" });
                 continue;
             }
             var business = await metadata.DescriptionAsync(source, selection, null, cancellationToken);
             tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(selection?.BindingName ?? source.Definition.DisplayName,
-                business.Description, usage, profile), inputSchema);
+                business.Description, usage, profile, flatArguments), inputSchema);
             if (describes)
                 sources.Add(new
                 {
+                    DescribeArguments = discoveryArguments,
                     source.Name,
                     Namespace = source.Namespace.Value,
                     Scope = source.ScopeRef!.Value.Value,
@@ -83,15 +90,17 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
         var instructions = presentation.Instructions;
         if (sources.Count > 0)
             instructions += "\n\nKnowledge Sources assigned to this Agent:\n" + JsonSerializer.Serialize(sources) + "\n"
-                + "For a question requiring Knowledge data, discover every Knowledge Source available through the assigned Tools and call its describe Tool with request: {} before the first data access. "
-                + "Source-level discovery lists inputs and their business descriptions. For detailed schemas, fields, supported operations and limits, call the selected input's returned describeTool with its describeArguments. Per-input describe Tools already fix the input and accept request: {}; do not supply request.input. When only source-level describe is assigned, copy contributions[].input into request.input instead of guessing an input from Tool names. "
+                + "For a question requiring Knowledge data, discover every Knowledge Source available through the assigned Tools and call its describe Tool with the catalogue DescribeArguments before the first data access. "
+                + "Source-level discovery lists inputs and their business descriptions. For detailed schemas, fields, supported operations and limits, call the selected input's returned describeTool with its describeArguments. Per-input describe Tools already fix the input; use their returned describeArguments without adding an input selector. When only source-level describe is assigned, use its returned describeArguments rather than guessing an input from Tool names. "
                 + "Consult data from every exposed input before synthesizing the answer, using focused searches, reads or queries for the request. Do not stop after the first successful source. Discovery alone is not a data consultation. "
                 + "If another assigned Tool is needed, issue its structured Tool call now and continue from its result in this execution. Do not finish with only a plan, proposed next steps or a promise to call a Tool later. Finish with the requested answer, or state a specific blocker or missing information that prevents completion. "
                 + "Identify any unavailable or unconsulted source/input and state the resulting coverage limits. Never claim to have consulted data when only its description was obtained. Respect the assigned access boundaries, pagination and operation limits. "
                 + "Only fields declared in the described record schema are queryable columns; text embedded in a field does not add columns. Use assigned search/read Tools for unstructured content when available. "
                 + "Reuse descriptions already obtained in this context for the same ToolSet version and exact Snapshot; refresh when that evidence changes. "
-                + "Use the exact assigned Tool names and declared fields. Reuse returned Snapshot identifiers as request.snapshotId to keep related calls coherent.";
-        if (sources.Count > 0) instructions += KnowledgeToolMetadataService.ArgumentGuidance;
+                + "Use the exact assigned Tool names and declared fields. Reuse returned Snapshot identifiers in the snapshotId field at the exact position declared by each Tool to keep related calls coherent.";
+        if (sources.Count > 0) instructions += hasFlatTools && hasEnvelopedTools
+            ? " Assigned Tools use different argument layouts. Follow each Tool's own input schema and description; do not transfer a request wrapper between versions."
+            : hasFlatTools ? KnowledgeToolMetadataService.FlatArgumentGuidance : KnowledgeToolMetadataService.ArgumentGuidance;
         return new(instructions, tools);
     }
 

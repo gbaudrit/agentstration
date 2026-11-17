@@ -79,7 +79,7 @@ public sealed partial class ToolDefinitionService(
             {
                 Definition = relay with
                 {
-                    InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings),
+                    InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings, relay.InputEnvelope),
                     OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
                     RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
                 }

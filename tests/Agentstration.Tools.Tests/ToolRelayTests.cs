@@ -6,7 +6,7 @@ using Agentstration.Tools;
 namespace Agentstration.Tools.Tests;
 
 [TestClass]
-public sealed class ToolRelayTests
+public sealed partial class ToolRelayTests
 {
     private static readonly JsonElement Schema = Json("""
         {"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"},"path":{"type":"string"}},"required":["id","path"],"additionalProperties":false},"optional":{"type":"string"}},"required":["store"],"additionalProperties":false}
@@ -145,6 +145,7 @@ public sealed class ToolRelayTests
             Definition = new RelayToolDefinitionProperties
             {
                 DisplayName = "Relay",
+                InputEnvelope = "store",
                 Target = new() { Name = "source", ScopeRef = scope, Uid = Guid.NewGuid(), Generation = 7 },
                 Bindings = [Literal("/store/id", "\"hr\""), new OmittedToolArgumentBinding { Path = "/optional" }]
             }
@@ -152,7 +153,7 @@ public sealed class ToolRelayTests
         var yaml = ResourceManifestSerializer.ToYaml(resource);
         StringAssert.Contains(yaml, "toolKind: relay");
         var parsed = ResourceManifestSerializer.FromYaml<ToolDefinitionResource>(yaml);
-        Assert.IsInstanceOfType<RelayToolDefinitionProperties>(parsed.Definition);
+        Assert.AreEqual("store", Assert.IsInstanceOfType<RelayToolDefinitionProperties>(parsed.Definition).InputEnvelope);
         Assert.IsInstanceOfType<LiteralToolArgumentBinding>(parsed.Definition.Bindings[0]);
         Assert.IsInstanceOfType<OmittedToolArgumentBinding>(parsed.Definition.Bindings[1]);
         Assert.IsFalse(yaml.Contains("implementation:", StringComparison.Ordinal));

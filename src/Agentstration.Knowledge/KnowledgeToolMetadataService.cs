@@ -21,7 +21,11 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
     public const string UsageAnnotation = "agentstration.io/knowledge-operation-help";
     public const string ArgumentGuidance = " Always place arguments inside request, for example {\"request\":{\"snapshotId\":\"<returned id>\"}}. Never send snapshotId beside request. Omit request.snapshotId initially; for related calls, only reuse a returned id and add this Tool's declared fields inside request. For input details, copy the describeTool and describeArguments returned by discovery. Per-input describe Tools already fix their input; do not supply request.input.";
 
+    public const string FlatArgumentGuidance = " Pass declared arguments directly as Tool properties; do not add a request wrapper. Omit snapshotId initially; for related calls, only reuse an exact returned snapshotId. For input details, copy the describeTool and describeArguments returned by discovery. Per-input describe Tools already fix their input and accept {}; do not supply input.";
+
     public const string ODataQueryGuidance = " Query encoding: odata-options+json. request.query is an object whose option names include the dollar prefix: $filter, $select, $orderby or $apply, with string values. Use OData operators eq/ne/gt/ge/lt/le and and/or, not == or SQL. Example shape: {\"request\":{\"pageSize\":10,\"query\":{\"$filter\":\"status eq 'open'\",\"$select\":\"status,value\"}}}. Replace example fields with exact fields from this input's described schema; do not invent field names. Use request.pageSize for pages; continue with request.cursor only. The supported aggregate/groupby subset uses $apply; $top/$skip, joins and expansion are unsupported.";
+
+    public const string FlatODataQueryGuidance = " Query encoding: odata-options+json. query is an object whose option names include the dollar prefix: $filter, $select, $orderby or $apply, with string values. Use OData operators eq/ne/gt/ge/lt/le and and/or, not == or SQL. Example shape: {\"pageSize\":10,\"query\":{\"$filter\":\"status eq 'open'\",\"$select\":\"status,value\"}}. Replace example fields with exact fields from this input's described schema; do not invent field names. Use pageSize for pages; continue with cursor only. The supported aggregate/groupby subset uses $apply; $top/$skip, joins and expansion are unsupported.";
 
     public async Task<KnowledgeSourceResource?> ResolveSourceAsync(ToolDefinitionVersionResource publication, CancellationToken ct)
     {
@@ -64,26 +68,34 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
             InputSchema = InputSchemaForModel(tool.InputSchema, tool.Profile),
             BusinessDescription = business.Description,
             DisplayName = name + " · " + KnowledgeAccessSchemas.Route(tool.Operation),
-            Description = Format(name, business.Description, tool.Usage ?? tool.Description, tool.Profile)
+            Description = Format(name, business.Description, tool.Usage ?? tool.Description, tool.Profile, UsesFlatArguments(tool.InputSchema))
         };
     }
 
-    public static string Format(string name, string? business, string usage, StorageQueryProfilePin? profile = null) =>
+    public static bool UsesFlatArguments(JsonElement schema) => schema.ValueKind == JsonValueKind.Object
+        && schema.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object
+        && !properties.TryGetProperty("request", out _);
+
+    public static string Format(string name, string? business, string usage, StorageQueryProfilePin? profile = null, bool flatArguments = false) =>
         (string.IsNullOrWhiteSpace(business) ? name + ": " + usage : name + ": " + business + "\n" + usage)
-        + (profile?.Id == "odata/4.01" ? ODataQueryGuidance : string.Empty) + ArgumentGuidance;
+        + (profile?.Id == "odata/4.01" ? flatArguments ? FlatODataQueryGuidance : ODataQueryGuidance : string.Empty)
+        + (flatArguments ? FlatArgumentGuidance : ArgumentGuidance);
 
     // Presentation may narrow a pinned profile's accepted input language, never widen the published relay.
     public static JsonElement InputSchemaForModel(JsonElement schema, StorageQueryProfilePin? profile)
     {
         if (profile is not { Id: "odata/4.01", Encoding: "odata-options+json" }
-            || !schema.TryGetProperty("properties", out var properties)
-            || !properties.TryGetProperty("request", out var request)
-            || !request.TryGetProperty("properties", out var requestProperties)
+            || !schema.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object) return schema;
+        var flatArguments = UsesFlatArguments(schema);
+        var argumentSchema = flatArguments ? schema : properties.GetProperty("request");
+        if (!argumentSchema.TryGetProperty("properties", out var requestProperties)
             || !requestProperties.TryGetProperty("query", out _)) return schema;
         var root = JsonNode.Parse(schema.GetRawText())!.AsObject();
-        var requestNode = root["properties"]!["request"]!.AsObject();
+        var requestNode = flatArguments ? root : root["properties"]!["request"]!.AsObject();
         var fields = requestNode["properties"]!.AsObject();
-        requestNode["description"] = "Call arguments. Put all parameters here, including pageSize as a JSON number. No parameters belong beside request.";
+        requestNode["description"] = flatArguments
+            ? "Tool arguments. Pass snapshotId, pageSize, query or cursor directly; do not add a request wrapper."
+            : "Call arguments. Put all parameters here, including pageSize as a JSON number. No parameters belong beside request.";
         fields["query"] = new JsonObject
         {
             ["type"] = "object",
@@ -98,10 +110,15 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
             ["additionalProperties"] = false
         };
         if (fields["pageSize"] is JsonObject pageSize)
-            pageSize["description"] = "Optional JSON integer, for example 50. Put it inside request; never use a quoted string.";
-        var required = root["required"] as JsonArray ?? new JsonArray();
-        if (!required.Any(value => value?.GetValue<string>() == "request")) required.Add("request");
-        root["required"] = required.DeepClone();
+            pageSize["description"] = flatArguments
+                ? "Optional JSON integer, for example 50. Pass it directly as pageSize; never use a quoted string."
+                : "Optional JSON integer, for example 50. Put it inside request; never use a quoted string.";
+        if (!flatArguments)
+        {
+            var required = root["required"] as JsonArray ?? new JsonArray();
+            if (!required.Any(value => value?.GetValue<string>() == "request")) required.Add("request");
+            root["required"] = required.DeepClone();
+        }
         return JsonSerializer.SerializeToElement(root);
 
         static JsonObject Option(int maximum) => new() { ["type"] = "string", ["maxLength"] = maximum };

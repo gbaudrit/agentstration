@@ -10,7 +10,7 @@ public static class ToolRelayArguments
     public const int MaximumBindings = 64;
     public const int MaximumPayloadLength = 65_536;
 
-    public static JsonElement PublicSchema(JsonElement source, IReadOnlyList<ToolArgumentBinding> bindings)
+    public static JsonElement PublicSchema(JsonElement source, IReadOnlyList<ToolArgumentBinding> bindings, string? inputEnvelope = null)
     {
         ValidatePaths(bindings);
         if (source.GetRawText().Length > MaximumPayloadLength) throw Invalid("The source schema exceeds the relay size limit.");
@@ -32,6 +32,15 @@ public static class ToolRelayArguments
                 throw Invalid("A Secret binding requires an explicitly string-typed source property.");
         }
         Prune(root, bindings.Select(value => (Segments(value.Path), value is not OmittedToolArgumentBinding)).ToArray());
+        if (inputEnvelope is not null)
+        {
+            ValidateEnvelope(inputEnvelope);
+            if (root["properties"] is not JsonObject properties || properties.Count != 1
+                || properties[inputEnvelope] is not JsonObject envelope || envelope["type"]?.GetValueKind() != JsonValueKind.String
+                || envelope["type"]!.GetValue<string>() != "object")
+                throw Invalid("An input envelope must be the only remaining caller property and have an object schema.");
+            return JsonSerializer.SerializeToElement(envelope);
+        }
         return JsonSerializer.SerializeToElement(root);
     }
 
@@ -49,11 +58,12 @@ public static class ToolRelayArguments
         return current.Clone();
     }
 
-    public static void ValidateCaller(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings)
+    public static void ValidateCaller(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings, string? inputEnvelope = null)
     {
         if (caller.ValueKind != JsonValueKind.Object || caller.GetRawText().Length > MaximumPayloadLength)
             throw Invalid("Relay input must be a bounded JSON object.");
         RejectDuplicateProperties(caller, 0);
+        if (inputEnvelope is not null) caller = Wrap(caller, inputEnvelope);
         foreach (var binding in bindings)
         {
             var current = caller;
@@ -71,13 +81,13 @@ public static class ToolRelayArguments
 
     public static JsonElement Reconstruct(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings,
         IReadOnlyDictionary<string, JsonElement> values, JsonElement sourceSchema,
-        IReadOnlyList<SecretInputReference>? secretInputs = null)
+        IReadOnlyList<SecretInputReference>? secretInputs = null, string? inputEnvelope = null)
     {
         ValidatePaths(bindings);
-        ValidateCaller(caller, bindings);
-        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings), caller, secretInputs); }
+        ValidateCaller(caller, bindings, inputEnvelope);
+        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings, inputEnvelope), caller, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Caller input does not satisfy the effective relay contract."); }
-        var root = JsonNode.Parse(caller.GetRawText())!.AsObject();
+        var root = JsonNode.Parse((inputEnvelope is null ? caller : Wrap(caller, inputEnvelope)).GetRawText())!.AsObject();
         foreach (var binding in bindings)
         {
             if (binding is OmittedToolArgumentBinding) continue;
@@ -101,6 +111,18 @@ public static class ToolRelayArguments
         try { ToolInputSchemaValidator.Validate(sourceSchema, result, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Reconstructed Tool input does not satisfy its pinned source contract."); }
         return result;
+    }
+
+    private static JsonElement Wrap(JsonElement caller, string inputEnvelope)
+    {
+        ValidateEnvelope(inputEnvelope);
+        return JsonSerializer.SerializeToElement(new JsonObject { [inputEnvelope] = JsonNode.Parse(caller.GetRawText()) });
+    }
+
+    private static void ValidateEnvelope(string inputEnvelope)
+    {
+        if (string.IsNullOrWhiteSpace(inputEnvelope) || inputEnvelope.Length > 128)
+            throw Invalid("An input envelope must name one bounded source object property.");
     }
 
     public static string[] Segments(string path)

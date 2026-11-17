@@ -104,6 +104,9 @@ public sealed record AcquisitionToolDefinitionProperties : ToolDefinitionPropert
 public sealed record RelayToolDefinitionProperties : ToolDefinitionProperties
 {
     public required ToolRelayTarget Target { get; init; }
+    /// <summary>Expose the remaining fields of one source object directly; reconstruction restores this envelope.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? InputEnvelope { get; init; }
 }
 
 public sealed record ToolRelayTarget

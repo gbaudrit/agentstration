@@ -128,6 +128,7 @@ public sealed partial class KnowledgeSourceToolExposureService(
                     Description = candidate.Description,
                     RequiresApproval = requiresApproval,
                     Target = targets[operation],
+                    InputEnvelope = "request",
                     Bindings = [new LiteralToolArgumentBinding
                     {
                         Path = "/source", Value = JsonSerializer.SerializeToElement(new

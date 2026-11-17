@@ -7,10 +7,10 @@ using Agentstration.DataSources;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
-using Agentstration.ModelProviders;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
+using Agentstration.ModelProviders;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Tools.Contracts;
@@ -130,7 +130,7 @@ public sealed partial class DataSourceDatasetTests
         async Task<JsonElement> Run(ResourceReference tool, object request)
         {
             using var response = await client.PostAsJsonAsync($"/api/tools/{tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
+                new RunToolRequest(JsonSerializer.SerializeToElement(request), ToolRunMode.Execute));
             Assert.IsTrue(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
             var result = (await response.Content.ReadFromJsonAsync<RunToolResponse>())!;
             Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
@@ -196,6 +196,14 @@ public sealed partial class DataSourceDatasetTests
         var alias = overview.GetProperty("contributions").EnumerateArray().Single(c => c.GetProperty("selection").GetProperty("bindingName").GetString() == "invoices").GetProperty("input").GetString();
         var aliased = await Run(describedTool, new { snapshotId = a, input = alias });
         Assert.AreEqual("invoices", aliased.GetProperty("contributions")[0].GetProperty("selection").GetProperty("bindingName").GetString());
+
+        var invoiceQuery = exposure.Value.Operations.Single(operation => operation.Operation == KnowledgeSourceOperation.StructuredQuery
+            && operation.Proposal!.Contribution!.BindingName == "invoices").Tool;
+        var firstPage = await Run(invoiceQuery, new { snapshotId = a, pageSize = 1, query = new { } });
+        Assert.AreEqual(1, firstPage.GetProperty("documentPage").GetProperty("documents").GetArrayLength());
+        var nextPage = await Run(invoiceQuery, new { cursor = firstPage.GetProperty("nextCursor").GetString() });
+        Assert.AreEqual(1, nextPage.GetProperty("documentPage").GetProperty("documents").GetArrayLength());
+        Assert.AreEqual(a, nextPage.GetProperty("snapshotId").GetString());
 
         // Real AWP Agent execution with a partial ToolSet assignment: discovery cannot advertise siblings.
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
@@ -281,11 +289,11 @@ public sealed partial class DataSourceDatasetTests
             foreach (var declaration in tools)
             {
                 var properties = declaration.JsonSchema.GetProperty("properties");
-                Assert.IsFalse(properties.TryGetProperty("snapshotId", out _));
-                Assert.IsTrue(properties.GetProperty("request").GetProperty("properties").TryGetProperty("snapshotId", out _));
-                StringAssert.Contains(declaration.Description!, "request.snapshotId");
+                Assert.IsFalse(properties.TryGetProperty("request", out _));
+                Assert.IsTrue(properties.TryGetProperty("snapshotId", out _));
+                StringAssert.Contains(declaration.Description!, "do not add a request wrapper");
             }
-            StringAssert.Contains(options.Instructions!, "Never send snapshotId beside request");
+            StringAssert.Contains(options.Instructions!, "do not add a request wrapper");
             StringAssert.Contains(options.Instructions!, "Knowledge Sources assigned to this Agent");
             StringAssert.Contains(options.Instructions!, "mixed-knowledge");
             Assert.IsFalse(options.Instructions!.Contains("unassigned-knowledge", StringComparison.Ordinal));
@@ -293,7 +301,7 @@ public sealed partial class DataSourceDatasetTests
             StringAssert.Contains(options.Instructions!, "Consult data from every exposed input");
             StringAssert.Contains(options.Instructions!, "Discovery alone is not a data consultation");
             var queryDeclaration = tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal));
-            var querySchema = queryDeclaration.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query");
+            var querySchema = queryDeclaration.JsonSchema.GetProperty("properties").GetProperty("query");
             Assert.AreEqual("object", querySchema.GetProperty("type").GetString());
             Assert.IsTrue(querySchema.GetProperty("properties").TryGetProperty("$filter", out _));
             var queryDescription = queryDeclaration.Description!;
@@ -303,7 +311,7 @@ public sealed partial class DataSourceDatasetTests
             if (results.Length > 0)
             {
                 var described = JsonSerializer.SerializeToElement(results[0].Result);
-                StringAssert.Contains(described.GetProperty("invocationInstructions").GetString()!, "request.snapshotId");
+                StringAssert.Contains(described.GetProperty("invocationInstructions").GetString()!, "do not add a request wrapper");
                 ObservedAccessCount = described.GetProperty("access").GetArrayLength();
                 Assert.AreEqual(3, ObservedAccessCount);
                 Assert.HasCount(1, described.GetProperty("contributions").EnumerateArray());
@@ -331,12 +339,12 @@ public sealed partial class DataSourceDatasetTests
                 : t.Name.Contains("query-documents", StringComparison.Ordinal));
             if (results.Length == 1)
             {
-                Assert.IsFalse(tool.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").TryGetProperty("input", out _));
-                Assert.IsEmpty(input.GetProperty("describeArguments").GetProperty("request").EnumerateObject());
+                Assert.IsFalse(tool.JsonSchema.GetProperty("properties").TryGetProperty("input", out _));
+                Assert.IsEmpty(input.GetProperty("describeArguments").EnumerateObject());
             }
             object request = results.Length < 2 ? new { snapshotId = Snapshot } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                [new FunctionCallContent("knowledge-call-" + results.Length, tool.Name, new Dictionary<string, object?> { ["request"] = request })]))
+                [new FunctionCallContent("knowledge-call-" + results.Length, tool.Name, JsonSerializer.Deserialize<Dictionary<string, object?>>(JsonSerializer.Serialize(request)))]))
             { FinishReason = ChatFinishReason.ToolCalls });
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default) => throw new NotSupportedException();

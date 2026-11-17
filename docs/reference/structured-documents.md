@@ -290,13 +290,21 @@ Every new exposure includes a source-owned describe relay. Its immutable
 `exposure` and `exposureScope` are fixed internally. The caller uses
 `{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
 then calls the selected input's returned `describeTool` with `describeArguments`
-(normally `{ "request": {} }`) for its contracts (`detailLevel: "input"`).
+(normally `{}` for new publications) for its contracts (`detailLevel: "input"`).
 The input-level Tool pins the exact published input internally; callers cannot
-supply or override `request.input`. Both describe tiers accept `request.snapshotId`.
+supply or override the fixed `input`. New publications accept `snapshotId` directly
+at Tool level. Other declared access parameters (`pageSize`, `cursor`, `pattern`,
+`documentId`, etc.) also sit directly at Tool level; `query` remains a structured
+object. The schema leaves these parameters optional. Initial query calls require
+`query` (use `{}` for no filter); continuations require `cursor` alone. The existing
+operation validators enforce these conditional rules and defaults.
 Each contribution exposes `name` (the binding name), `input` (its published route
 identifier), `describeTool`, `inputFixed` and the complete `describeArguments`.
 For an older exposure with no input-level describe member, discovery points to
-the assigned source-wide describe Tool and includes `request.input` in its example.
+the assigned source-wide describe Tool and includes the selector in its exact
+argument layout. Existing versions retain their `request` envelope; discovery and
+model instructions follow each assigned immutable contract. To adopt the flat
+layout, refresh the proposal, publish a new version and update the consumer pin.
 The source-wide describe still accepts exact exposed route identifiers or
 unambiguous binding names; unknown, ambiguous and unassigned inputs are refused. Discovery also returns
 `invocationInstructions` with complete argument-envelope examples. Detailed input
@@ -304,10 +312,14 @@ metadata separates whole-Artifact `schemas` from object-level `recordSchemas`.
 One Artifact may contain several records; contribution queries select its exact
 member IDs, and `documentArtifacts`/`records` retain the logical Artifact and
 member ordinal across pages. Access relays
-use the same envelope, for example
-`{ "request": { "snapshotId": "<returned id>", "query": {} } }`.
-A returned top-level `snapshotId` belongs inside `request` on the next call.
-For `odata/4.01`, `request.query` uses dollar-prefixed option names and OData
+use flat arguments for new publications, for example
+`{ "snapshotId": "<returned id>", "pageSize": 50, "query": {} }`.
+The relay explicitly publishes `inputEnvelope: request` and reconstructs the native
+request on the server before injecting its protected source/profile/contribution
+bindings. It validates the flat public input and the reconstructed native input;
+callers cannot supply a `request` wrapper or override fixed fields. No runtime
+argument repair or model-only schema flattening is involved.
+For `odata/4.01`, `query` uses dollar-prefixed option names and OData
 expressions, such as `"$filter": "status eq 'open'"`, using fields from discovery.
 `filter` and SQL-style `==` are not supported.
 The overview returns

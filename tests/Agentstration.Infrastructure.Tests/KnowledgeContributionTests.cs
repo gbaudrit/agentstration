@@ -1,12 +1,12 @@
 using System.Text;
 using System.Text.Json;
-using Agentstration.Knowledge;
 using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Knowledge;
+using Agentstration.Knowledge.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
-using Agentstration.Knowledge.Contracts;
-using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Tests;
 
@@ -175,22 +175,31 @@ public sealed partial class KnowledgeMetadataTests
 
     }
     [TestMethod]
-    [DataRow("workspace", false, false)]
-    [DataRow("tenant", false, false)]
-    [DataRow("instance", false, false)]
-    [DataRow("instance", true, false)]
-    [DataRow("instance", false, true)]
-    public async Task RuntimeDiscoveryAndODataSchemasRefreshOldPublicationsInEachOwnerScope(string owner, bool replaceSource, bool noRequestContext)
+    [DataRow("workspace", false, false, false, false)]
+    [DataRow("workspace", false, false, true, false)]
+    [DataRow("tenant", false, false, false, false)]
+    [DataRow("tenant", false, false, true, false)]
+    [DataRow("instance", false, false, false, false)]
+    [DataRow("instance", false, false, true, false)]
+    [DataRow("instance", true, false, false, false)]
+    [DataRow("instance", true, false, true, false)]
+    [DataRow("instance", false, true, false, false)]
+    [DataRow("instance", false, true, true, false)]
+    [DataRow("instance", false, false, true, true)]
+    public async Task RuntimeDiscoveryAndODataSchemasRefreshOldPublicationsInEachOwnerScope(string owner, bool replaceSource, bool noRequestContext, bool flatArguments, bool mixedArguments)
     {
         var f = new Fixture(owner);
         using var scope = noRequestContext ? null : f.Push();
         var original = JsonSerializer.Deserialize<JsonElement>("""
             {"type":"object","properties":{"request":{"type":"object","properties":{"query":{}},"additionalProperties":false}},"additionalProperties":false}
             """);
+        var wrappedOriginal = original;
+        if (flatArguments) original = original.GetProperty("properties").GetProperty("request");
         var profile = new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model");
         var tools = new List<IAgentTool>();
         foreach (var operation in new[] { "describe", "input.query_documents" })
         {
+            var toolSchema = mixedArguments && operation != "describe" ? wrappedOriginal : original;
             var name = "knowledge-" + operation.Replace('.', '-');
             var bindings = new List<ToolArgumentBinding> { new LiteralToolArgumentBinding
             {
@@ -226,18 +235,18 @@ public sealed partial class KnowledgeMetadataTests
                 {
                     DisplayName = "Published",
                     Description = "Old usage",
-                    InputSchema = original,
+                    InputSchema = toolSchema,
                     Bindings = bindings,
                     Target = new() { Name = "native", ScopeRef = f.Source.ScopeRef!.Value, Uid = Guid.NewGuid(), Generation = 1 }
                 }
             });
-            tools.Add(new PresentationProbeTool(name, original, f.Source.ScopeRef));
+            tools.Add(new PresentationProbeTool(name, toolSchema, f.Source.ScopeRef));
         }
         if (replaceSource) f.Store.Add(f.Source with { Uid = Guid.NewGuid(), Definition = f.Source.Definition with { Description = "Private replacement Source purpose" } });
         var enricher = new KnowledgeAgentPresentationEnricher(f.Store, new KnowledgeToolMetadataService(f.Store, f.Sources, f.Context), f.Context);
         var result = await enricher.EnrichAsync(new("Authored instructions", tools), default);
         StringAssert.Contains(result.Instructions, "Knowledge Sources assigned");
-        StringAssert.Contains(result.Instructions, "Never send snapshotId beside request");
+        StringAssert.Contains(result.Instructions, mixedArguments ? "Assigned Tools use different argument layouts" : flatArguments ? "do not add a request wrapper" : "Never send snapshotId beside request");
         StringAssert.Contains(result.Instructions, "Consult data from every exposed input");
         StringAssert.Contains(result.Instructions, "issue its structured Tool call now");
         StringAssert.Contains(result.Instructions, "Do not finish with only a plan");
@@ -249,13 +258,14 @@ public sealed partial class KnowledgeMetadataTests
             Assert.IsFalse(result.Tools.Any(tool => tool.Description!.Contains("Private replacement Source purpose", StringComparison.Ordinal)));
         }
         var query = result.Tools.Single(tool => tool.Name.Contains("query", StringComparison.Ordinal));
-        Assert.AreEqual("object", query.InputSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query").GetProperty("type").GetString());
+        var arguments = flatArguments && !mixedArguments ? query.InputSchema : query.InputSchema.GetProperty("properties").GetProperty("request");
+        Assert.AreEqual("object", arguments.GetProperty("properties").GetProperty("query").GetProperty("type").GetString());
         StringAssert.Contains(query.Description!, "eq/ne/gt/ge/lt/le");
         Assert.IsTrue(query.RequiresApproval);
         Assert.AreEqual(tools[1].Id, query.Id);
         Assert.AreEqual(tools[1].ExternalId, query.ExternalId);
         Assert.AreEqual(tools[1].ScopeRef, query.ScopeRef);
-        Assert.IsTrue(JsonElement.DeepEquals(original, tools[1].InputSchema));
+        Assert.IsTrue(JsonElement.DeepEquals(mixedArguments ? wrappedOriginal : original, tools[1].InputSchema));
         Assert.AreEqual(0, f.Store.Writes);
         Assert.AreEqual(0, f.Publications.Reads.Count);
         Assert.AreEqual(0, f.Resolver.Calls);
