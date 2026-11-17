@@ -15,7 +15,7 @@ public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
     // Seed the initial native function catalogue and Knowledge contracts.
-    public int TargetVersion { get; set; } = 8;
+    public int TargetVersion { get; set; } = 9;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

@@ -1,8 +1,8 @@
 using Agentstration.Artifacts.Contracts;
-using Agentstration.Schemas;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Security.Contracts;
 
 namespace Agentstration.Artifacts;
@@ -446,14 +446,26 @@ public sealed class ArtifactManagementService(
             || materialization.Sha256 is not { Length: 64 } || !materialization.Sha256.All(char.IsAsciiHexDigit))
             throw Error("artifact_materialization_invalid", "Exact producer, Workspace and content evidence are required.");
         ValidateMediaType(request.MediaType);
+        if (materialization.Publication?.Records is not null)
+        {
+            _ = Agentstration.Storage.Contracts.StorageRecordSets.Members(materialization.Publication);
+            if (materialization.RecordContract?.Schema is not { } recordSchema || request.DataContract?.Schema is not { } collectionSchema
+                || !collectionSchema.TryGetProperty("type", out var type) || type.GetString() != "array"
+                || !collectionSchema.TryGetProperty("items", out var items) || !System.Text.Json.JsonElement.DeepEquals(recordSchema, items)
+                || request.DataContract?.SchemaEvidence is not null)
+                throw Error("artifact_record_contract_invalid", "Record publications require separate record and whole-array contracts.");
+        }
         var reference = ArtifactStorageReferences.Encode(materialization);
         var stat = await (durable ?? throw Error("artifact_materialization_unavailable", "Artifact storage is unavailable."))
             .StatAsync(materialization.WorkspaceId, reference, cancellationToken);
         if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
         if (request.DataContract is { } declaredContract)
-            request = request with { DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
-                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken) };
+            request = request with
+            {
+                DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
+                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken)
+            };
         var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
         var resource = new FlowRunArtifactResource
         {

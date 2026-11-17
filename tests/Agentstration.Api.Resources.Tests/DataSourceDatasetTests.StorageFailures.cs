@@ -17,7 +17,7 @@ public sealed partial class DataSourceDatasetTests
     [DataRow("backend_connection_refused", 503)]
     [DataRow("backend_unavailable", 503)]
     [DataRow("backend_timeout", 504)]
-    public async Task StructuredAcquisitionRetainsBackendFailureAcrossTheProtectedBinding(string reason, int status)
+    public async Task StructuredAcquisitionRetriesTransientBackendFailureWithItsAcceptedIdentity(string reason, int status)
     {
         await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
@@ -35,19 +35,30 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(status, failure.StatusCode);
         Assert.DoesNotContain("PRIVATE", failure.ToString());
         var source = Source("unavailable-documents", inputs, JsonSerializer.SerializeToElement(new { dataset = "alerts" }));
-        source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
-        { Storage = storage.Reference, DocumentCollectionUid = storage.Collection } } };
+        source = source with
+        {
+            Definition = source.Definition with
+            {
+                Dataset = source.Definition.Dataset! with
+                { Storage = storage.Reference, DocumentCollectionUid = storage.Collection }
+            }
+        };
         var saved = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
         using var started = await client.PostAsJsonAsync($"/api/datasources/{saved.Value.Name}/acquisitions?scopeRef=/instance", new StartDataSourceAcquisitionRequest());
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);
         var acquisition = (await started.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>())!;
-        for (var attempt = 0; attempt < 300 && acquisition.State != DataSourceAcquisitionState.Failed; attempt++)
+        for (var attempt = 0; attempt < 300 && acquisition.WriteNotAfter is null; attempt++)
         {
             await Task.Delay(50);
             acquisition = (await client.GetFromJsonAsync<DataSourceAcquisitionResource>($"/api/datasourceacquisitions/{acquisition.Name}"))!;
         }
-        Assert.AreEqual(DataSourceAcquisitionState.Failed, acquisition.State);
-        Assert.AreEqual("storage_documents_" + reason, acquisition.ErrorCode);
+        Assert.IsNotNull(acquisition.WriteNotAfter);
+        Assert.IsTrue(acquisition.State is DataSourceAcquisitionState.Pending or DataSourceAcquisitionState.Running);
         Assert.IsNull(acquisition.Manifest);
+        storage.Bindings.FailureCode = null;
+        var recovered = await WaitAsync(client, acquisition.Name);
+        Assert.AreEqual(acquisition.Uid, recovered.Uid);
+        Assert.HasCount(1, recovered.Manifest!.Artifacts);
+        Assert.HasCount(1, recovered.Publication!.Records!.Members);
     }
 }

@@ -53,6 +53,16 @@ Retrieval Flows also declare their supported operations through `definition.meta
 
 ### Artifact storage contracts
 
+JSON record publications retain one logical Artifact with ordered member identifiers,
+lengths and SHA-256 digests. A whole-content read returns the canonical record array.
+`GET /api/artifacts/flow-run-artifacts/{id}/records` enumerates persisted metadata;
+`GET /api/artifacts/flow-run-artifacts/{id}/records/{memberId}/content?offset=0&length=65536`
+explicitly authorizes and verifies only the selected record. No endpoint accepts a
+physical path or replacement Storage target. The Artifact receipt carries separate
+whole-array and record contracts; document query responses associate each returned
+document with its logical Artifact and member ordinal. File Storage does not gain
+document-query capabilities. See [ADR-0235](../decisions/0235-json-record-projection.md).
+
 `artifact.storage.write/v1` receives a staged Artifact identity plus the authoritative producer Flow Run and step identities. It returns a normalized durable receipt used to complete a `FlowRunArtifact`. `artifact.storage.read/v1` performs the inverse operation and materializes durable content as a new governed local copy.
 
 ### Read acquired durable content from an Agent

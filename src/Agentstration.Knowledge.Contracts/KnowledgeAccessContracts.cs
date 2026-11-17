@@ -41,6 +41,7 @@ public sealed record KnowledgeStatusRequest(string? SnapshotId = null);
 public sealed record KnowledgeAccessDocument(string DocumentId, string MediaType, long Bytes, bool TextReadable);
 public sealed record KnowledgeReadChunk(string DocumentId, string MediaType, KnowledgeCharacterRange Range, string Content, bool EndOfDocument);
 public sealed record KnowledgeRegexMatch(string DocumentId, KnowledgeCharacterRange MatchRange, KnowledgeCharacterRange ReadRange, string Excerpt);
+public sealed record KnowledgeDocumentRecord(string DocumentId, string ArtifactId, int MemberOrdinal);
 public sealed record KnowledgeInputStatus(string BindingName, string? AcquisitionId, DateTimeOffset? AcquiredAt,
     bool Fresh, bool RefreshRequired, bool Required)
 {
@@ -66,6 +67,7 @@ public sealed record KnowledgeAccessResult
     public bool EndOfSelection { get; init; }
     public StorageDocumentPage? DocumentPage { get; init; }
     public StorageQueryProfilePin? QueryProfile { get; init; }
+    public IReadOnlyList<KnowledgeDocumentRecord> Records { get; init; } = [];
 }
 
 public sealed record KnowledgeAccessStatus

@@ -18,7 +18,8 @@ public sealed partial class KnowledgeAccessService
             if (snapshot.KnowledgeSourceUid != source.Uid
                 || snapshot.KnowledgeSourceScopeRef is { } pinnedScope && pinnedScope != source.ScopeRef)
                 throw Error("knowledge_snapshot_source_mismatch");
-            var publication = snapshot.Artifacts.FirstOrDefault()?.Content?.Document?.Publication
+            var publication = snapshot.Artifacts.FirstOrDefault()?.Content?.Records?.DocumentPublication;
+            publication = publication
                 ?? throw Error("knowledge_snapshot_documents_unsupported");
             target = publication.Target;
         }
@@ -64,11 +65,13 @@ public sealed partial class KnowledgeAccessService
             token = token with { Expires = token.Expires < cursorExpiry ? token.Expires : cursorExpiry };
             query = new(Guid.NewGuid().ToString("N"), request.Profile, request.Query.Value, request.PageSize ?? 50);
         }
-        var references = snapshot.Artifacts.Select(a => a.Content?.Document?.Publication).ToArray();
+        var members = snapshot.Artifacts.SelectMany(a => a.Content is { } content ? StorageRecordSets.Members(content) : []).ToArray();
+        var references = members.Select(content => content.Document?.Publication).ToArray();
+        if (snapshot.Artifacts.Any(a => a.Content?.Records?.DocumentPublication is null)) throw Error("knowledge_snapshot_documents_unsupported");
         if (references.Length == 0 || references.Any(r => r is null)) throw Error("knowledge_snapshot_documents_unsupported");
         var publication = references[0]!;
-        if (publication.Publication.Count != snapshot.Artifacts.Count
-            || snapshot.Artifacts.Select(a => a.Content!.Document!.DocumentId).Distinct(StringComparer.Ordinal).Count() != snapshot.Artifacts.Count
+        if (publication.Publication.Count != members.Length
+            || members.Select(content => content.Document!.DocumentId).Distinct(StringComparer.Ordinal).Count() != members.Length
             || references.Any(r => r!.QueryProfile != publication.QueryProfile || r.Publication != publication.Publication || r.Target.Storage != publication.Target.Storage
             || r.Target.CollectionUid != publication.Target.CollectionUid || r.Target.Publication != publication.Target.Publication))
             throw Error("knowledge_snapshot_documents_inconsistent");
@@ -81,6 +84,11 @@ public sealed partial class KnowledgeAccessService
         };
         await documents.ValidatePublicationAsync(publication with { Target = target }, ct);
         var page = await documents.QueryAsync(target, query with { RequestId = Guid.NewGuid().ToString("N") }, ct);
+        var lineage = snapshot.Artifacts.SelectMany(artifact => StorageRecordSets.Members(artifact.Content!)
+            .Select((member, index) => new KnowledgeDocumentRecord(member.Document!.DocumentId, artifact.ArtifactId, index)))
+            .ToDictionary(member => member.DocumentId, StringComparer.Ordinal);
+        if (page.Documents.Any(document => !lineage.ContainsKey(document.Id)))
+            throw Error("knowledge_snapshot_documents_outside");
         var next = page.Cursor is null ? null : Seal(token with { DocumentQuery = query with { Cursor = page.Cursor } });
         if (next is { Length: > 16384 }) throw Error("knowledge_access_cursor_limit");
         return new()
@@ -91,6 +99,7 @@ public sealed partial class KnowledgeAccessService
             PublishedAt = snapshot.PublishedAt,
             DocumentPage = page with { Cursor = null },
             QueryProfile = query.Profile,
+            Records = page.Documents.Select(document => lineage[document.Id]).ToArray(),
             NextCursor = next,
             CursorExpiresAt = next is null ? null : token.Expires,
             EndOfSelection = next is null

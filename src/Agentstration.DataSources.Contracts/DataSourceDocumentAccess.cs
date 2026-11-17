@@ -49,7 +49,12 @@ public sealed record DataSourceDocumentQueryRequest
 
 public sealed record DataSourceDocumentQueryResult(string AcquisitionId, Guid AcquisitionUid,
     string PublicationId, DataSourceDocumentContractPin Contract, StorageDocumentPage Page,
-    string? NextCursor = null, DateTimeOffset? CursorExpiresAt = null);
+    string? NextCursor = null, DateTimeOffset? CursorExpiresAt = null)
+{
+    public string? ArtifactId { get; init; }
+    public IReadOnlyList<DataSourceDocumentRecord> Records { get; init; } = [];
+}
+public sealed record DataSourceDocumentRecord(string DocumentId, int MemberOrdinal);
 
 public sealed record PublishDataSourceDocumentToolRequest(string Version, StorageQueryProfilePin Profile,
     string Mode = DataSourceDocumentSelectionModes.Latest, bool RequiresApproval = false);

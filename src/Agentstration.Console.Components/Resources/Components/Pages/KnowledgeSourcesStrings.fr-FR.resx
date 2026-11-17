@@ -164,4 +164,7 @@
   <data name="ContentAvailability.Unknown" xml:space="preserve"><value>Non vérifiée</value></data>
   <data name="ContentAvailability.Retired" xml:space="preserve"><value>Retiré</value></data>
   <data name="ContentAvailabilityHelp" xml:space="preserve"><value>Ces métadonnées ne vérifient pas l’accès au contenu. Sa disponibilité et son intégrité sont contrôlées lors de sa lecture ou d’une requête.</value></data>
+  <data name="RecordArtifact" xml:space="preserve"><value>Artefact</value></data>
+  <data name="RecordOrdinal" xml:space="preserve"><value>Ligne {0}</value></data>
+  <data name="RecordCount" xml:space="preserve"><value>{0} lignes JSON</value></data>
 </root>

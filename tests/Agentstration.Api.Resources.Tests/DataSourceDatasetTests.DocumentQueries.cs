@@ -4,16 +4,16 @@ using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
-using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-using Agentstration.Storage;
-using Agentstration.Tools.Contracts;
 using Agentstration.Infrastructure.Storage;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
+using Agentstration.Tools.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -33,16 +33,25 @@ public sealed partial class DataSourceDatasetTests
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false,
             StructuredStorageFixture.Json("""{"type":"object","properties":{"dataset":{"type":"string"}}}"""));
         var desired = Source("queryable-dataset", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Storage = storage.Reference, DocumentCollectionUid = storage.Collection,
-            Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                {
+                    Storage = storage.Reference,
+                    DocumentCollectionUid = storage.Collection,
+                    Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) }
+                }
+            }
+        };
         var management = factory.Services.GetRequiredService<DataSourceManagementService>();
         var source = await management.CreateAsync(desired, default);
         var a = await AcquireAsync(client, source.Value.Name);
         var prefix = $"/api/datasourceacquisitions/{a.Name}/documents";
         var description = (await client.GetFromJsonAsync<DataSourceDocumentDescription>(prefix + "/capabilities"))!;
         Assert.AreEqual(a.Uid, description.AcquisitionUid);
-        Assert.AreEqual(a.Publication!.Document!.Publication.Publication.Id, description.PublicationId);
+        Assert.AreEqual(a.Publication!.Records!.DocumentPublication!.Publication.Id, description.PublicationId);
         var profile = description.Selection.Contract.Profile;
         using var queried = await client.PostAsJsonAsync(prefix + "/query", new DataSourceDocumentQueryRequest { Profile = profile, Query = Empty });
         Assert.AreEqual(HttpStatusCode.OK, queried.StatusCode, await queried.Content.ReadAsStringAsync());
@@ -85,8 +94,11 @@ public sealed partial class DataSourceDatasetTests
                 new() { Profile = profile, Cursor = firstPage.NextCursor }, default));
         }
         var changed = await management.PutAsync(source.Value.Namespace, source.Value.Name, Owner,
-            source.Value.Definition with { Dataset = source.Value.Definition.Dataset! with
-            { Acquisition = source.Value.Definition.Dataset.Acquisition with { Parameters = JsonSerializer.SerializeToElement(new { dataset = "beta" }) } } }, source.ETag, default);
+            source.Value.Definition with
+            {
+                Dataset = source.Value.Definition.Dataset! with
+                { Acquisition = source.Value.Definition.Dataset.Acquisition with { Parameters = JsonSerializer.SerializeToElement(new { dataset = "beta" }) } }
+            }, source.ETag, default);
         var b = await AcquireAsync(client, source.Value.Name);
         Assert.AreNotEqual(a.Uid, b.Uid);
         var secondPage = await access.QueryAsync(dynamicSelection, new() { Profile = profile, Cursor = firstPage.NextCursor }, default);
@@ -144,7 +156,9 @@ public sealed partial class DataSourceDatasetTests
         var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
         var parent = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema, ScopeRef = Owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = Owner,
             Metadata = new() { Name = "query-contract" },
             Definition = new() { DisplayName = "Query contract", Format = SchemaFormatIds.JsonSchema, Content = schema }
         }, default);
@@ -156,16 +170,28 @@ public sealed partial class DataSourceDatasetTests
         var storageB = (await factory.Services.GetRequiredService<StorageManagementService>().CreateAsync(storageA.Storage with
         {
             Metadata = new() { Name = "version-b-documents" },
-            Definition = storageA.Storage.Definition with { Collections = storageA.Storage.Definition.Collections.Select(collection =>
-                collection.Name == "shared" ? collection with { SchemaBinding = Binding("B"), SchemaSnapshot = null } : collection).ToArray() }
+            Definition = storageA.Storage.Definition with
+            {
+                Collections = storageA.Storage.Definition.Collections.Select(collection =>
+                collection.Name == "shared" ? collection with { SchemaBinding = Binding("B"), SchemaSnapshot = null } : collection).ToArray()
+            }
         }, default)).Value;
         var referenceB = new StorageRevisionReference(new(Owner, storageB.Namespace, storageB.Kind, storageB.Name),
             storageB.Uid, storageB.Generation, StorageDigests.Binding(storageB.Definition));
         var management = factory.Services.GetRequiredService<DataSourceManagementService>();
         var desired = Source("versioned-query", fixture, JsonSerializer.SerializeToElement(new { dataset = "original" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Storage = storageA.Reference, DocumentCollectionUid = storageA.Collection,
-            Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                {
+                    Storage = storageA.Reference,
+                    DocumentCollectionUid = storageA.Collection,
+                    Lifecycle = new() { KeepHistory = true, HistoryRetention = TimeSpan.FromDays(1) }
+                }
+            }
+        };
         var source = await management.CreateAsync(desired, default);
         var a = await AcquireAsync(client, source.Value.Name);
         var access = factory.Services.GetRequiredService<DataSourceDocumentAccessService>();

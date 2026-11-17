@@ -1,11 +1,10 @@
 using System.Text.Json;
-using Agentstration.Schemas.Contracts;
 using System.Text.Json.Serialization;
 using Agentstration.ConnectedServices.Contracts;
-using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-
 using Agentstration.Flows;
+using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.DataSources.Contracts;
 
@@ -408,6 +407,7 @@ public sealed record DataSourceAcquisitionInput
 
 public sealed record DataSourceAcquisitionResource : Resource
 {
+    public Agentstration.Schemas.ResolvedDataContract? RecordContract { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }
     public required string DataSourceName { get; init; }

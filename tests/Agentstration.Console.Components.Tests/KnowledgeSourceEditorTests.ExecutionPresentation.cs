@@ -113,8 +113,14 @@ public sealed partial class KnowledgeSourceEditorTests
 
     private static FlowRun PresentationRun(string id, string flow, IReadOnlyList<FlowStepRun> steps) => new()
     {
-        Id = id, FlowId = new(flow), FlowVersion = "1.0.0", Scope = new(Guid.Empty, new WorkspaceId(FlowClientStub.WorkspaceScope.TargetId!.Value), Guid.Empty) { LogicalScopeRef = ResourceScopeRef.Instance },
-        Status = FlowRunStatus.Running, Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = DateTimeOffset.UnixEpoch, Steps = steps,
+        Id = id,
+        FlowId = new(flow),
+        FlowVersion = "1.0.0",
+        Scope = new(Guid.Empty, new WorkspaceId(FlowClientStub.WorkspaceScope.TargetId!.Value), Guid.Empty) { LogicalScopeRef = ResourceScopeRef.Instance },
+        Status = FlowRunStatus.Running,
+        Input = JsonSerializer.SerializeToElement(new { }),
+        CreatedAt = DateTimeOffset.UnixEpoch,
+        Steps = steps,
         DefinitionSnapshot = new(FlowClientStub.WorkspaceScope, new(flow), "1.0.0", null, new WorkflowFlowDefinition("input", [], [], []), new Dictionary<string, string>(), DateTimeOffset.UnixEpoch)
     };
     [TestMethod]
@@ -145,6 +151,7 @@ public sealed partial class KnowledgeSourceEditorTests
     [DataRow("{\"artifacts\":[]}", "artifacts")]
     public void CausalOutputsAreReadOnlyOnExpansionAndInTheExactScope(string output, string expected)
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new FlowClientStub();
         using var context = CreateContext(new KnowledgeClientStub(), flows: client);
         context.Services.AddSingleton<Agentstration.Web.Console.IArtifactsClient>(new ArtifactAdministrationComponentTests.ArtifactClient("fixture"));
@@ -165,6 +172,7 @@ public sealed partial class KnowledgeSourceEditorTests
     [TestMethod]
     public void CausalOutputDoesNotRenderAResponseFromAnotherExecutionScope()
     {
+        using var culture = new TestCultureScope("en-US");
         var client = new FlowClientStub();
         using var context = CreateContext(new KnowledgeClientStub(), flows: client);
         var root = PresentationRun("root", "root-flow", []);

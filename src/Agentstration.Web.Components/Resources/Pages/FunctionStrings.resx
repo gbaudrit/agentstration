@@ -37,4 +37,5 @@
   <data name="JsonPointerRootHelp" xml:space="preserve"><value>An empty JSON Pointer ("") selects the JSON root. Use “Use empty text” to record that value explicitly.</value></data>
   <data name="SchemaParameter" xml:space="preserve"><value>Schema for {0}</value></data>
   <data name="OptionalSchemaParameterHelp" xml:space="preserve"><value>Optional. Without a schema, produced values have no declared business structure validation. Choose an inline schema or an exact published shared schema and optional sub-schema. The choice is resolved and frozen when the Source is saved or the Flow is published.</value></data>
+  <data name="Native.json.explode.Description" xml:space="preserve"><value>Select a non-empty array of JSON objects at a JSON Pointer path and validate each record against an exact itemSchema. Keeps one logical Artifact, with independently queryable JSONB rows in document Storage or separate JSON files in local Storage. Limits: 100 records and 64 KiB per Artifact. Accepts acquisition JSON or an Artifact manifest.</value></data>
 </root>
