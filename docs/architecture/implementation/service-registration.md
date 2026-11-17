@@ -152,9 +152,11 @@ twelve explicit family contributors (Agents, Models, Flows, Tools, Schemas, Data
 Sources, Connected Services, Storage, Knowledge, Functions, Triggers and authored Systems), the
 metadata read scope and current RBAC/Discover/Use adapter. Inventory and impact
 interfaces share one singleton query service and its validated observations.
+The same singleton implements `ISystemGraphStreamService` for finite provisional
+NDJSON exploration; strict observation/cursor contracts remain separate.
 `SystemGraph.Contracts` owns neutral projection/contributor contracts;
 `SystemGraph` owns rebuilding, bounded authorized pagination, reverse paths and comparisons;
-`SystemGraph.Api` maps read-only inventory/impact/changes/coverage endpoints through the aggregator.
+`SystemGraph.Api` maps read-only inventory/stream/impact/changes/coverage endpoints through the aggregator.
 `Systems` owns logical grouping commands and its contributor, composed as a singleton
 with the resource store, scope operations and current authorization. `Systems.Api`
 maps its scoped command surface. Console hosts register `SystemExplorerApiClient`;

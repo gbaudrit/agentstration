@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Net.Http.Json;
 using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
@@ -8,6 +10,16 @@ namespace Agentstration.Web.Console;
 public interface ISystemExplorerClient
 {
     Task<SystemGraphPage> ReadAsync(ResourceScopeRef context, ResourceNamespace ns, string? root, string? cursor, CancellationToken ct);
+    async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        // Compatibility for existing clients supplying a bounded, already authorized page.
+        var page = await ReadAsync(context, ns, root, null, ct);
+        var epoch = Guid.NewGuid();
+        yield return new(epoch, 1, "start", page.ObservedAt, [], [], []);
+        yield return new(epoch, 2, "append", page.ObservedAt, page.Nodes, page.Relations, page.Scopes);
+        yield return new(epoch, 3, "complete", page.ObservedAt, [], [], [], Truncated: page.HasMore);
+    }
     Task<IReadOnlyList<SystemView>> ListAsync(ResourceScopeRef context, ResourceScopeRef owner, ResourceNamespace ns, CancellationToken ct);
     Task<SystemView> CreateAsync(ResourceScopeRef context, CreateSystemRequest value, CancellationToken ct);
     Task<SystemView> RenameAsync(ResourceScopeRef context, SystemView value, string displayName, CancellationToken ct);
@@ -16,8 +28,30 @@ public interface ISystemExplorerClient
     Task DeleteAsync(ResourceScopeRef context, SystemView value, CancellationToken ct);
 }
 
-public sealed class SystemExplorerApiClient(HttpClient http) : ISystemExplorerClient
+public sealed class SystemExplorerApiClient(HttpClient http, TimeProvider? timeProvider = null) : ISystemExplorerClient
 {
+    public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        using var request = Request(HttpMethod.Get, "api/system-graph/stream?namespace=" + Escape(ns.Value)
+            + (root is null ? "" : "&root=" + Escape(root)), context, null, null);
+        request.Headers.Accept.ParseAdd("application/x-ndjson");
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        await ApiResponse.EnsureSuccessAsync(response, ct);
+        await using var body = await response.Content.ReadAsStreamAsync(ct);
+        using var idle = new CancellationTokenSource(TimeSpan.FromSeconds(30), timeProvider ?? TimeProvider.System);
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, idle.Token);
+        using var reader = new StreamReader(body);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        while (await reader.ReadLineAsync(lifetime.Token) is { } line)
+        {
+            idle.CancelAfter(TimeSpan.FromSeconds(30));
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            yield return JsonSerializer.Deserialize<SystemGraphStreamFrame>(line, options)
+                ?? throw new JsonException("The graph stream frame is empty.");
+        }
+    }
+
     public Task<SystemGraphPage> ReadAsync(ResourceScopeRef context, ResourceNamespace ns, string? root, string? cursor, CancellationToken ct) =>
         ApiResponse.ReadAsync<SystemGraphPage>(http, $"api/system-graph?namespace={Escape(ns.Value)}&limit=80" +
             (root is null ? "" : $"&root={Escape(root)}") + (cursor is null ? "" : $"&cursor={Escape(cursor)}"), context, ct);

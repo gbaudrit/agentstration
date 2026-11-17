@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class SystemExplorerTests
+public sealed partial class SystemExplorerTests
 {
     [TestMethod]
     [DataRow("en-US", "System Explorer", "Open resource details")]

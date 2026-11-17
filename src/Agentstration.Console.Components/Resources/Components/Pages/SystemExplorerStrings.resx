@@ -11,7 +11,7 @@
   <data name="Partial" xml:space="preserve"><value>Partial observation; unsupported or invisible dependencies remain unknown. Observed:</value></data>
   <data name="AllResources" xml:space="preserve"><value>All resources</value></data>
   <data name="Next" xml:space="preserve"><value>Next page</value></data>
-  <data name="Export" xml:space="preserve"><value>Export this page as JSON</value></data>
+  <data name="Export" xml:space="preserve"><value>Export received resources as JSON</value></data>
   <data name="Diagram" xml:space="preserve"><value>Show diagram</value></data>
   <data name="Empty" xml:space="preserve"><value>No resources available</value></data>
   <data name="EmptyHelp" xml:space="preserve"><value>No visible resource matches this namespace or identity.</value></data>
@@ -167,4 +167,9 @@
   <data name="OpsStepExecution" xml:space="preserve"><value>Step execution</value></data>
   <data name="OpsTurns" xml:space="preserve"><value>Observed distinct turns</value></data>
   <data name="OpsSession" xml:space="preserve"><value>Worker session</value></data>
+  <data name="LoadingProgress" xml:space="preserve"><value>Loading — {0} authorized resources received.</value></data>
+  <data name="WindowCount" xml:space="preserve"><value>{0} displayed / {1} received</value></data>
+  <data name="Previous" xml:space="preserve"><value>Previous resources</value></data>
+  <data name="SystemsLoadFailed" xml:space="preserve"><value>Logical systems could not be loaded. Resource exploration remains available.</value></data>
+  <data name="LimitReached" xml:space="preserve"><value>The observation reached its limit. Narrow the context or namespace to explore the remaining resources.</value></data>
 </root>

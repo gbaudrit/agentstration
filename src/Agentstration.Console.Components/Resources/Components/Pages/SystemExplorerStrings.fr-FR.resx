@@ -11,7 +11,7 @@
   <data name="Partial" xml:space="preserve"><value>Observation partielle ; les dépendances non prises en charge ou invisibles restent inconnues. Observé le :</value></data>
   <data name="AllResources" xml:space="preserve"><value>Toutes les ressources</value></data>
   <data name="Next" xml:space="preserve"><value>Page suivante</value></data>
-  <data name="Export" xml:space="preserve"><value>Exporter cette page en JSON</value></data>
+  <data name="Export" xml:space="preserve"><value>Exporter les ressources reçues en JSON</value></data>
   <data name="Diagram" xml:space="preserve"><value>Afficher le diagramme</value></data>
   <data name="Empty" xml:space="preserve"><value>Aucune ressource disponible</value></data>
   <data name="EmptyHelp" xml:space="preserve"><value>Aucune ressource visible ne correspond à cet espace de noms ou à cette identité.</value></data>
@@ -167,4 +167,9 @@
   <data name="OpsStepExecution" xml:space="preserve"><value>Exécution de step</value></data>
   <data name="OpsTurns" xml:space="preserve"><value>Tours distincts observés</value></data>
   <data name="OpsSession" xml:space="preserve"><value>Session du worker</value></data>
+  <data name="LoadingProgress" xml:space="preserve"><value>Chargement en cours — {0} ressources autorisées reçues.</value></data>
+  <data name="WindowCount" xml:space="preserve"><value>{0} affichées / {1} reçues</value></data>
+  <data name="Previous" xml:space="preserve"><value>Ressources précédentes</value></data>
+  <data name="SystemsLoadFailed" xml:space="preserve"><value>Les systèmes logiques n’ont pas pu être chargés. L’exploration des ressources reste disponible.</value></data>
+  <data name="LimitReached" xml:space="preserve"><value>L’observation a atteint sa limite. Affinez le contexte ou l’espace de noms pour explorer les autres ressources.</value></data>
 </root>

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Http.Features;
 using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Web.Security;
@@ -14,6 +16,11 @@ public static class SystemGraphApiModule
             .RequireAuthorization(AgentstrationPolicies.CanReadResources)
             .Produces<SystemGraphPage>()
             .WithSummary("Query a bounded authorized semantic SystemGraph slice");
+        endpoints.MapGet("/api/system-graph/stream", StreamAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources)
+            .Produces<SystemGraphStreamFrame>(contentType: "application/x-ndjson")
+            .WithSummary("Stream bounded authorized provisional SystemGraph observations")
+            .WithDescription("Finite newline-delimited JSON batches for progressive exploration. Not an atomic snapshot or a reconciliation read set. Errors clear the observation; no resume cursor is issued.");
         endpoints.MapGet("/api/system-graph/impact", ImpactAsync)
             .RequireAuthorization(AgentstrationPolicies.CanReadResources)
             .Produces<SystemGraphImpactResult>()
@@ -30,6 +37,32 @@ public static class SystemGraphApiModule
         }).RequireAuthorization(AgentstrationPolicies.CanReadResources).Produces<IReadOnlyList<SystemGraphContributorCoverage>>()
             .WithSummary("Describe the currently authorized SystemGraph contributor coverage");
         return endpoints;
+    }
+
+    private static async Task<IResult> StreamAsync(string? @namespace, string? root, int? maximumNodes,
+        ISystemGraphStreamService service, HttpResponse response, CancellationToken ct)
+    {
+        response.Headers.CacheControl = "no-store";
+        try
+        {
+            ResourceNamespace? ns = @namespace is null ? null : ResourceNamespace.Parse(@namespace);
+            await using var frames = service.ReadStreamAsync(new(ns, root, maximumNodes ?? 10000), ct).GetAsyncEnumerator(ct);
+            // Initial authorization and validation precede the first response byte.
+            if (!await frames.MoveNextAsync()) return Results.Empty;
+            response.ContentType = "application/x-ndjson; charset=utf-8";
+            response.Headers["X-Accel-Buffering"] = "no";
+            response.HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            do
+            {
+                await JsonSerializer.SerializeAsync(response.Body, frames.Current, options, ct);
+                await response.WriteAsync("\n", ct);
+                await response.Body.FlushAsync(ct);
+            } while (await frames.MoveNextAsync());
+            return Results.Empty;
+        }
+        catch (ArgumentException) when (!response.HasStarted) { return Results.Problem(statusCode: 400, title: "system_graph_query_invalid"); }
+        catch (SystemGraphException exception) when (!response.HasStarted) { return GraphProblem(exception); }
     }
 
     private static async Task<IResult> ChangesAsync(string from, string to, string? @namespace, int? maximumDepth, int? maximumPaths,

@@ -3,20 +3,27 @@ import {createRoot,Root} from 'react-dom/client';
 import {LikeC4ModelProvider,ReactLikeC4} from '@likec4/diagram';
 import {layoutLikeC4Model,GraphvizWasmAdapter} from '@likec4/layouts';
 import {buildModel,GraphPage} from './model';
+import {DiagramRenderQueue,DiagramRenderInput} from './render-queue';
 type Callback={invokeMethodAsync(method:string,id:string):Promise<void>};
-type Mount={root:Root; graphviz:GraphvizWasmAdapter};
+type Mount={root:Root; graphviz:GraphvizWasmAdapter; queue:DiagramRenderQueue};
 const mounts=new WeakMap<HTMLElement,Mount>();
-export async function render(element:HTMLElement,page:GraphPage,labels:Record<string,string>,callback:Callback,overlayNotes:Record<string,string>|null=null):Promise<boolean> {
-  dispose(element);
-  if(page.nodes.length===0)return true;
-  const mount:Mount={root:createRoot(element),graphviz:new GraphvizWasmAdapter()};
-  mounts.set(element,mount);
-  try {
-    const {model,ids}=buildModel(page,labels,overlayNotes??{});
-    const layouted=await layoutLikeC4Model(model,{graphviz:mount.graphviz,concurrency:1,timeout:20000,throwOnTimeout:true});
-    if(mounts.get(element)!==mount)return false;
-    mount.root.render(<LikeC4ModelProvider likec4model={layouted}><ReactLikeC4 viewId="topology" injectFontCss={false} controls={false} enableSearch={false} enableFocusMode={false} enableElementDetails={false} enableRelationshipDetails={false} enableNotations={false} showNavigationButtons={false} nodesSelectable onNodeClick={(node)=>{const id=ids.get(node.id);if(id&&mounts.get(element)===mount)void callback.invokeMethodAsync('SelectNode',id);}} style={{height:'100%',width:'100%'}} /></LikeC4ModelProvider>);
-    return true;
-  } catch { if(mounts.get(element)===mount)dispose(element);return false; }
+async function apply(element:HTMLElement,mount:Mount,input:DiagramRenderInput,current:()=>boolean):Promise<boolean>{
+ const {model,ids}=buildModel(input.page,input.labels,input.notes);
+ const layouted=await layoutLikeC4Model(model,{graphviz:mount.graphviz,concurrency:1,timeout:20000,throwOnTimeout:true});
+ if(!current()||mounts.get(element)!==mount)return true;
+ mount.root.render(<LikeC4ModelProvider likec4model={layouted}><ReactLikeC4 viewId="topology" injectFontCss={false} controls={false} enableSearch={false} enableFocusMode={false} enableElementDetails={false} enableRelationshipDetails={false} enableNotations={false} showNavigationButtons={false} nodesSelectable onNodeClick={(node)=>{const id=ids.get(node.id);if(id&&current()&&mounts.get(element)===mount)input.select(id);}} style={{height:'100%',width:'100%'}} /></LikeC4ModelProvider>);
+ return true;
 }
-export function dispose(element:HTMLElement) {const previous=mounts.get(element);if(previous){mounts.delete(element);previous.root.unmount();previous.graphviz.dispose();element.replaceChildren();}}
+export function render(element:HTMLElement,page:GraphPage,labels:Record<string,string>,callback:Callback,overlayNotes:Record<string,string>|null=null):Promise<boolean> {
+ if(page.nodes.length===0){dispose(element);return Promise.resolve(true);}
+ let mount=mounts.get(element);
+ if(!mount){
+  const created:Mount={root:createRoot(element),graphviz:new GraphvizWasmAdapter(),queue:new DiagramRenderQueue((input,current)=>apply(element,created,input,current))};
+  mounts.set(element,created);mount=created;
+ }
+ return mount.queue.enqueue({page,labels,notes:overlayNotes??{},select:id=>{void callback.invokeMethodAsync('SelectNode',id);}});
+}
+export function dispose(element:HTMLElement) {
+ const previous=mounts.get(element);
+ if(previous){mounts.delete(element);previous.queue.dispose();previous.root.unmount();previous.graphviz.dispose();element.replaceChildren();}
+}

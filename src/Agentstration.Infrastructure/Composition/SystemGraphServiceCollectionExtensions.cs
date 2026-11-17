@@ -49,6 +49,7 @@ internal static class SystemGraphServiceCollectionExtensions
         services.AddSingleton<ISystemOperationsService, SystemOperationsService>();
         services.AddSingleton<IReconciliationPreviewService, ReconciliationPreviewService>();
         services.AddSingleton<ISystemGraphQueryService>(provider => provider.GetRequiredService<SystemGraphQueryService>());
+        services.AddSingleton<ISystemGraphStreamService>(provider => provider.GetRequiredService<SystemGraphQueryService>());
         services.AddSingleton<ISystemGraphImpactService>(provider => provider.GetRequiredService<SystemGraphQueryService>());
         return services;
     }

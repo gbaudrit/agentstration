@@ -30,3 +30,11 @@ THIRD_PARTY_NOTICES.txt. The generated module retains upstream license comments.
 The adapter tests cover mapping, hostile names, layout, semantic immutability,
 unknown endpoints and size/duplicate rejection. Real browser smoke additionally
 checks selection, text escaping, no external requests and disposal.
+
+Progressive arrivals reuse the current React/Graphviz mount. One active layout and
+one latest pending request bound work; intermediate pending requests are coalesced.
+The previously rendered graph remains until another layout commits. Disposal makes
+old layouts unable to commit. Console windows stay at 80 nodes, so a large received
+catalogue never bypasses the adapter's 100-node guard. Unchanged windows and
+heartbeat-only frames do not invoke layout. Stream consistency belongs to the
+application and client observation buffer, never to this renderer.

@@ -11,11 +11,11 @@ public sealed class SystemGraphException(string code) : Exception(code)
 }
 
 /// <summary>Rebuilds and authorizes metadata; owns no family state or execution capability.</summary>
-public sealed class SystemGraphQueryService(
+public sealed partial class SystemGraphQueryService(
     IEnumerable<ISystemGraphContributor> contributors,
     ISystemGraphAuthorization authorization,
     TimeProvider timeProvider,
-    ISystemGraphReadScope? metadataScope = null) : ISystemGraphQueryService, ISystemGraphImpactService
+    ISystemGraphReadScope? metadataScope = null) : ISystemGraphQueryService, ISystemGraphImpactService, ISystemGraphStreamService
 {
     private const int MaximumNodes = 10000;
     private const int MaximumRelations = 20000;

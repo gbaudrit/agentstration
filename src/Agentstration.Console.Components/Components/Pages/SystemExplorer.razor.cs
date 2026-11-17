@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Systems.Contracts;
+using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.JSInterop;
@@ -23,46 +24,125 @@ public partial class SystemExplorer
     private string namespaceInput = ResourceNamespace.DefaultValue, newLabel = "", renameLabel = "";
     private ResourceScopeRef contextScope, ownerScope;
     private ResourceNamespace resourceNamespace = ResourceNamespace.Default;
-    private SystemGraphPage? page;
+    private SystemGraphPage? page, diagramPage;
+    private int windowOffset;
+    private bool systemsLoading, truncated, contextReady;
     private IReadOnlyDictionary<string, string>? overlayNotes;
     private SystemGraphNode? selected;
     private IReadOnlyList<SystemView> systems = [];
     private SystemView? system;
     private string T(string key) => Localizer[key];
-    protected override Task OnParametersSetAsync()
+    private bool reloadRequested;
+    protected override void OnParametersSet()
     {
         showDiagram = RendererQuery != "list";
-        return LoadAsync(null);
+        cancellation?.Cancel();
+        ++revision;
+        loading = true; contextReady = false; page = null; diagramPage = null; selected = null; overlayNotes = null;
+        system = null; systems = []; error = null; actionError = null;
+        reloadRequested = true;
     }
-    private Task RefreshAsync() => LoadAsync(null);
-    private Task NextAsync() => LoadAsync(page?.NextCursor);
-    private async Task LoadAsync(string? cursor)
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Prerender remains a fast loading shell. Fetch only once the interactive
+        // renderer can paint batches and run the optional diagram island.
+        if (!reloadRequested) return Task.CompletedTask;
+        reloadRequested = false;
+        return LoadAsync();
+    }
+    private Task RefreshAsync() => LoadAsync();
+    private bool HasRoot => page?.Nodes.Any(node => node.Id == RootQuery) == true;
+    private int WindowCapacity => HasRoot ? 79 : 80;
+    private bool HasNextWindow => page is not null && page.Nodes.Count - (HasRoot ? 1 : 0) > windowOffset + WindowCapacity;
+    private bool MutationBlocked => busy || loading || systemsLoading;
+    private Task NextAsync() => ChangeWindow(WindowCapacity);
+    private Task PreviousAsync() => ChangeWindow(-WindowCapacity);
+    private Task ChangeWindow(int delta)
+    {
+        windowOffset = Math.Max(0, windowOffset + delta);
+        selected = page?.Nodes.FirstOrDefault(node => node.Id == RootQuery);
+        overlayNotes = null; diagramFailed = false;
+        RefreshWindow();
+        return Task.CompletedTask;
+    }
+    private void RefreshWindow()
+    {
+        if (page is null) { diagramPage = null; return; }
+        var root = page.Nodes.FirstOrDefault(node => node.Id == RootQuery);
+        var visible = page.Nodes.Where(node => node.Id != root?.Id).Skip(windowOffset).Take(root is null ? 80 : 79).ToArray();
+        if (root is not null) visible = [root, .. visible];
+        var ids = visible.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
+        var edges = page.Relations.Where(edge => ids.Contains(edge.Source) && ids.Contains(edge.Target)).ToArray();
+        // Arrivals outside the current window and heartbeat timestamps do not restart layout.
+        if (diagramPage is null || !diagramPage.Nodes.SequenceEqual(visible) || !diagramPage.Relations.SequenceEqual(edges))
+            diagramPage = page with { Nodes = visible, Relations = edges };
+    }
+    private async Task LoadAsync()
     {
         cancellation?.Cancel(); cancellation?.Dispose();
         var pending = cancellation = new();
         var current = ++revision;
         var selectedSystem = system?.Uid;
-        loading = true; overlayNotes = null; page = null; selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
+        loading = true; overlayNotes = null; page = null; diagramPage = null; windowOffset = 0; truncated = false;
+        selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
+        Task groups = Task.CompletedTask;
+        var buffer = new SystemGraphStreamBuffer();
         try
         {
             var context = await ContextProvider.GetAsync(pending.Token);
             var actor = ResourceScopeRef.Parse(ContextQuery ?? context.SelectedScopeRef);
             var owner = ResourceScopeRef.Parse(OwnerQuery ?? actor.Value);
-            var ns = ResourceNamespace.Parse(NamespaceQuery ?? ResourceNamespace.DefaultValue);
-            var graph = await Client.ReadAsync(actor, ns, RootQuery, cursor, pending.Token);
-            var groups = await Client.ListAsync(actor, owner, ns, pending.Token);
             if (current != revision) return;
-            contextScope = actor; ownerScope = owner; resourceNamespace = ns; namespaceInput = ns.Value;
+            contextScope = actor; ownerScope = owner; contextReady = true;
+            namespaceInput = NamespaceQuery ?? ResourceNamespace.DefaultValue;
+            var ns = ResourceNamespace.Parse(namespaceInput);
+            resourceNamespace = ns;
             canWrite = context.Permissions.Contains("resources/write"); canDelete = context.Permissions.Contains("resources/delete");
-            page = graph; systems = groups;
-            selected = graph.Nodes.FirstOrDefault(node => node.Id == RootQuery);
-            system = groups.FirstOrDefault(value => value.Uid == selectedSystem);
-            renameLabel = system?.DisplayName ?? "";
-            confirmDelete = false;
+            groups = LoadSystemsAsync(actor, owner, ns, selectedSystem, current, pending.Token);
+            await foreach (var frame in Client.StreamAsync(actor, ns, RootQuery, pending.Token))
+            {
+                if (current != revision) return;
+                if (!buffer.Apply(frame)) throw new InvalidOperationException("The graph observation was invalidated.");
+                if (frame.Kind == "heartbeat") continue;
+                page = buffer.Page;
+                truncated = buffer.Truncated;
+                selected ??= page?.Nodes.FirstOrDefault(node => node.Id == RootQuery);
+                RefreshWindow();
+                if (buffer.Complete) loading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+            if (!buffer.Complete) throw new InvalidOperationException("The graph observation ended before completion.");
         }
         catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
-        catch (Exception) { if (current == revision) error = T("LoadFailed"); }
-        finally { if (current == revision) loading = false; }
+        catch (Exception)
+        {
+            if (current == revision)
+            {
+                buffer.Clear(); page = null; diagramPage = null; selected = null; overlayNotes = null;
+                system = null; systems = []; error = T("LoadFailed");
+            }
+        }
+        finally
+        {
+            if (current == revision) { loading = false; await InvokeAsync(StateHasChanged); }
+            await groups;
+        }
+    }
+    private async Task LoadSystemsAsync(ResourceScopeRef actor, ResourceScopeRef owner, ResourceNamespace ns,
+        Guid? selectedSystem, long current, CancellationToken ct)
+    {
+        systemsLoading = true;
+        try
+        {
+            var groups = await Client.ListAsync(actor, owner, ns, ct);
+            if (current != revision || error is not null || ct.IsCancellationRequested) return;
+            systems = groups;
+            system = groups.FirstOrDefault(value => value.Uid == selectedSystem);
+            renameLabel = system?.DisplayName ?? ""; confirmDelete = false;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (Exception) { if (current == revision && error is null) actionError = T("SystemsLoadFailed"); }
+        finally { if (current == revision) { systemsLoading = false; await InvokeAsync(StateHasChanged); } }
     }
     private Task Select(string id) { if (selected?.Id != id) overlayNotes = null; selected = page?.Nodes.FirstOrDefault(node => node.Id == id); return Task.CompletedTask; }
     private void OperationalChanged(Agentstration.SystemOperations.Contracts.SystemOperationalFacts? facts)
@@ -72,6 +152,7 @@ public partial class SystemExplorer
         string State(string state) => Localizer["OpsState_" + state.ToLowerInvariant()].ResourceNotFound ? T("OpsUnknown") : T("OpsState_" + state.ToLowerInvariant());
         var note = $"{T("OpsPublication")}: {State(facts.PublicationState)}; {T("OpsProvisioning")}: {State(facts.ProvisioningState)}; {T("OpsDependencies")}: {State(facts.DependencyState)}; {T("OpsWorkers")}: {State(facts.WorkerPresence)}. ";
         note += facts.Metrics is { } metrics ? $"{T("OpsActive")}: {metrics.ObservedActive}; {T("OpsFailed")}: {metrics.ObservedFailed}. {T("OpsPartial")}" : T("OpsNoMetrics");
+        if (overlayNotes?.GetValueOrDefault(facts.NodeId) == note) return;
         overlayNotes = new Dictionary<string, string> { [facts.NodeId] = note };
 
     }
@@ -103,10 +184,10 @@ public partial class SystemExplorer
     private Task DeleteAsync() => ChangeAsync(async token => { await Client.DeleteAsync(contextScope, system!, token); return null; });
     private async Task ChangeAsync(Func<CancellationToken, Task<SystemView?>> change)
     {
-        if (busy || cancellation is null) return;
+        if (MutationBlocked || cancellation is null) return;
         var current = revision;
         busy = true; actionError = null;
-        try { var updated = await change(cancellation.Token); if (current == revision) { system = updated; await LoadAsync(null); } }
+        try { var updated = await change(cancellation.Token); if (current == revision) { system = updated; await LoadAsync(); } }
         catch (OperationCanceledException) when (current != revision || cancellation.IsCancellationRequested) { }
         catch (Exception) { if (current == revision) actionError = T("ChangeFailed"); }
         finally { busy = false; }

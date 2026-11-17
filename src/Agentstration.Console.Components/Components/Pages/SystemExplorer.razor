@@ -15,31 +15,35 @@
     <Actions><button type="button" class="button-secondary" @onclick="RefreshAsync" disabled="@busy">@T("Refresh")</button></Actions>
 </PageHeader>
 <form @onsubmit="ApplyNamespace" @onsubmit:preventDefault>
-    <label>@T("Namespace") <input @bind="namespaceInput" maxlength="63" /></label>
-    <button class="button-secondary" type="submit">@T("Apply")</button>
+    <label>@T("Namespace") <input @bind="namespaceInput" maxlength="63" disabled="@(!contextReady)" /></label>
+    <button class="button-secondary" type="submit" disabled="@(!contextReady)">@T("Apply")</button>
 </form>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (page is not null)
+@if (loading && page is null) { <LoadingState Message="@T("Loading")" /> }
+@if (error is not null) { <ErrorState Message="@error" /> }
+@if (page is not null)
 {
+    @if (loading) { <p class="explorer-loading" role="status">@Localizer["LoadingProgress", page.Nodes.Count]</p> }
+    @if (truncated) { <p role="status">@T("LimitReached")</p> }
     <p class="muted" role="status">@T("Partial") <time datetime="@(page.ObservedAt.ToString("O"))">@(page.ObservedAt.LocalDateTime.ToString("g"))</time></p>
     <p><code>@contextScope.Value</code> · <code>@resourceNamespace.Value</code></p>
     <div class="explorer-actions">
         <a class="button-secondary" href="@ExplorerUrl(null)">@T("AllResources")</a>
-        @if (page.HasMore && page.NextCursor is not null) { <button class="button-secondary" type="button" @onclick="NextAsync" disabled="@busy">@T("Next")</button> }
+        @if (windowOffset > 0) { <button class="button-secondary" type="button" @onclick="PreviousAsync">@T("Previous")</button> }
+        @if (HasNextWindow) { <button class="button-secondary" type="button" @onclick="NextAsync">@T("Next")</button> }
+        <span role="status">@Localizer["WindowCount", diagramPage?.Nodes.Count ?? 0, page.Nodes.Count]</span>
         <button class="button-secondary" type="button" @onclick="ExportAsync">@T("Export")</button>
         <label><input type="checkbox" @bind="showDiagram" /> @T("Diagram")</label>
     </div>
     @if (actionError is not null) { <ErrorState Message="@actionError" /> }
-    @if (page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
-    else
+    @if (!loading && page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
+    else if (page.Nodes.Count > 0)
     {
-        @if (showDiagram && !diagramFailed) { <SystemGraphDiagram @key="page" Page="page" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
+        @if (showDiagram && !diagramFailed) { <SystemGraphDiagram @key="(revision, windowOffset)" Page="diagramPage!" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
         @if (diagramFailed) { <p role="status">@T("DiagramUnavailable")</p> }
-        <section aria-label="@T("Resources")">
+        <section aria-label="@T("Resources")" aria-busy="@loading">
             <h2>@T("Resources")</h2>
             <div class="explorer-scroll"><table class="data-grid"><thead><tr><th>@T("Name")</th><th>@T("Kind")</th><th>@T("Owner")</th><th>@T("State")</th><th>@T("Evidence")</th><th></th></tr></thead><tbody>
-            @foreach (var node in page.Nodes)
+            @foreach (var node in diagramPage!.Nodes)
             {
                 <tr @key="node.Id" data-testid="explorer-node" aria-selected="@(selected?.Id == node.Id)"><td><button type="button" class="text-button" @onclick="() => Select(node.Id)">@(node.DisplayName ?? node.Identity.Name)</button><br /><code>@node.Identity.Namespace/@node.Identity.Name</code></td><td><code>@node.Identity.Kind</code></td><td><code>@node.Identity.OwnerScope.Value</code></td><td>@NodeState(node.State)</td><td><code>@(node.Evidence?.Publication ?? node.Evidence?.Generation?.ToString() ?? "—")</code></td><td><a href="@ExplorerUrl(node.Id)">@T("Neighbors")</a></td></tr>
             }
@@ -67,7 +71,7 @@ else if (page is not null)
         </select></label>
         @if (canWrite && ownerScope == contextScope)
         {
-            <form @onsubmit="CreateAsync" @onsubmit:preventDefault><label>@T("NewSystem") <input @bind="newLabel" maxlength="200" required /></label><button class="button-primary" type="submit" disabled="@busy">@T("Create")</button></form>
+            <form @onsubmit="CreateAsync" @onsubmit:preventDefault><label>@T("NewSystem") <input @bind="newLabel" maxlength="200" required /></label><button class="button-primary" type="submit" disabled="@MutationBlocked">@T("Create")</button></form>
         }
         <label>@T("System") <select aria-label="@T("System")" value="@(system?.Uid.ToString() ?? "")" @onchange="ChangeSystem"><option value="">@T("ChooseSystem")</option>@foreach (var value in systems) { <option value="@value.Uid">@value.DisplayName</option> }</select></label>
         @if (system is not null)
@@ -75,17 +79,17 @@ else if (page is not null)
             <p><code>@system.Namespace/@system.Name</code> · <code>@system.Uid</code></p>
             @if (canWrite && ownerScope == contextScope)
             {
-                <form @onsubmit="RenameAsync" @onsubmit:preventDefault><label>@T("Name") <input @bind="renameLabel" maxlength="200" required /></label><button class="button-secondary" type="submit" disabled="@busy">@T("Rename")</button></form>
+                <form @onsubmit="RenameAsync" @onsubmit:preventDefault><label>@T("Name") <input @bind="renameLabel" maxlength="200" required /></label><button class="button-secondary" type="submit" disabled="@MutationBlocked">@T("Rename")</button></form>
                 @if (selected is not null && selected.Id == SystemGraphIds.Definition(selected.Identity.ResourceUid) && selected.Identity.ResourceUid != system.Uid)
-                { <button class="button-secondary" type="button" disabled="@busy" @onclick="AddMemberAsync">@T("AddSelected")</button> }
+                { <button class="button-secondary" type="button" disabled="@MutationBlocked" @onclick="AddMemberAsync">@T("AddSelected")</button> }
             }
             <ul>@foreach (var member in system.Members)
             { <li @key="member.Uid"><a href="@ExplorerUrl(SystemGraphIds.Definition(member.Uid))">@member.Kind · @member.Namespace/@member.Name</a> <code>@member.ScopeRef.Value</code>
-                @if (canWrite && ownerScope == contextScope) { <button type="button" class="text-button" disabled="@busy" @onclick="() => RemoveMemberAsync(member.Uid)">@T("Remove")</button> }</li> }</ul>
+                @if (canWrite && ownerScope == contextScope) { <button type="button" class="text-button" disabled="@MutationBlocked" @onclick="() => RemoveMemberAsync(member.Uid)">@T("Remove")</button> }</li> }</ul>
             @if (canDelete && ownerScope == contextScope)
             {
                 @if (!confirmDelete) { <button type="button" class="button-secondary" @onclick="() => confirmDelete = true">@T("Delete")</button> }
-                else { <p>@T("DeleteHelp")</p><button type="button" class="button-danger" disabled="@busy" @onclick="DeleteAsync">@T("ConfirmDelete")</button><button type="button" class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button> }
+                else { <p>@T("DeleteHelp")</p><button type="button" class="button-danger" disabled="@MutationBlocked" @onclick="DeleteAsync">@T("ConfirmDelete")</button><button type="button" class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button> }
             }
         }
     </section>

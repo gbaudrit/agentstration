@@ -134,22 +134,41 @@ edges with `definition.members` provenance; those edges are logical, outside imp
 closure. Discover-only still exposes no executable bindings.
 
 `/system-explorer` uses URL `context`, `namespace`, System-owner `scopeRef` and exact
-semantic `root`. Inventory and neighbor pages use the same neutral API, initially
-80 nodes. Current context is retained when opening family details/Flow Designer;
-owner scope is distinct. The accessible table, inspector and JSON export operate
-on the authorized page, independently of the optional LikeC4 island. Select
-`renderer=list` or disable the diagram to use that alternative.
+semantic `root`. It loads only after the first interactive render, through the
+separate finite `GET /api/system-graph/stream` NDJSON endpoint. An authorized start
+frame precedes family enumeration, the first node contribution arrives immediately,
+and later batches carry up to 20 nodes or 100 relations. Five-second context-checked
+heartbeats and a client 30-second idle deadline replace full-body buffering for
+this route. The strict inventory/cursor, impact and reconciliation APIs keep their
+existing consistency checks.
 
-`Web.SystemExplorer` alone translates identities into LikeC4 Model Builder data,
-then browser WASM layout, then React. Local assets and shadow-root styles isolate
-the renderer. Stable hexadecimal IDs do not use authored names. Layout is bounded,
-disposable and never persisted. Rebuild its committed local bundle with `npm ci`
-and `npm run build` in `src/Agentstration.Web.SystemExplorer/Frontend`; Node is not
-a product runtime dependency. No graphical field enters the semantic API.
+Stream observations are provisional, bounded to 10,000 authorized nodes / 20,000
+relations, and never globally complete. Data batches recheck current context,
+affected identities, binding owners and both endpoints; completion checks emitted
+identities again. Visible metadata change, detected revocation, sequence gaps, transport
+failure or incomplete EOF invalidate and clear the whole client observation.
+Truncation is explicit. A stream observation identifier is not a strict snapshot
+digest or reconciliation read set. There is no persistent index or resume cursor.
+
+Received resources remain visible during loading. Table and diagram use local
+80-node windows, preserving the root for neighbour views; next/previous windows
+reuse received data. JSON exports only the authorized resources actually received.
+Family detail/Flow Designer links retain current context and exact owner. Logical
+System listing loads independently. The neutral table, inspector and export work
+with `renderer=list` or the optional diagram disabled.
+
+`Web.SystemExplorer` alone translates neutral identities into LikeC4 Model Builder,
+browser WASM layout and React. It retains the current graph during layout and
+coalesces pending batches, with one active layout and one latest pending request.
+Unchanged windows and heartbeat frames do not relayout. Disposal prevents a late
+old-context layout from committing. The adapter remains capped at 100 nodes and
+20 seconds. Local assets/shadow-root styles isolate the renderer; no graphical
+field or persisted layout enters the semantic model. Node is a build dependency.
 [ADR-0238](../../decisions/0238-authored-systems-and-replaceable-explorer-rendering.md)
-records authority, costs and limitations. New reusable UX scenario #1201 remains
-deferred until explicit UX validation and merged UX PR; existing regressions and
-feature smoke remain required now.
+and [ADR-0241](../../decisions/0241-system-explorer-streams-provisional-authorized-observations.md)
+record authority, progressive delivery and limits. New reusable UX scenario #1201
+remains deferred until explicit UX validation and merged owning UX PRs; existing
+regressions and implementation smoke remain required now.
 
 ## Selected reconciliation review
 
