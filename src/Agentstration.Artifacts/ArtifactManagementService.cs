@@ -731,7 +731,9 @@ public sealed class ArtifactManagementService(
         if (contract.MediaType is { } expected && !string.Equals(expected, mediaType, StringComparison.OrdinalIgnoreCase))
             throw DataContracts.Failure("data_contract_media_mismatch", "artifact-publication", contract.Origin, "$", "media_type", expected, mediaType);
         if (contract.Schema is null && !DataContracts.IsJsonMediaType(mediaType)) return contract with { Validated = true };
-        if (length > DataContracts.MaximumValueCharacters)
+        // Admission is bounded by the owning Storage or staging policy. Schema validation
+        // only requires that the admitted content fits its in-memory representation.
+        if (length > int.MaxValue)
             throw DataContracts.Failure("data_contract_value_too_large", "artifact-publication", contract.Origin, "$", "value_size", "bounded value", "oversized");
         using var content = new MemoryStream();
         while (content.Length < length)

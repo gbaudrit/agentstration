@@ -228,10 +228,10 @@ public sealed class DataSourceDatasetAcquisitionService(
                 recordContract = recordProjection.RecordContract;
                 output = recordProjection.Value;
                 var bytes = StorageRecordSets.Encode(output.EnumerateArray().ToArray());
+                if (bytes.Length > compositions.MaximumValueBytes)
+                    throw Invalid("data_source_output_too_large", "The normalized output exceeds the bounded JSON payload limit.");
                 if (acquisition.Dataset.Definition.Storage is null)
                 {
-                    if (bytes.Length > compositions.MaximumValueBytes)
-                        throw Invalid("data_source_output_too_large", "The direct output exceeds the bounded handoff limit.");
                     directResult = new(bytes.Length, Digest(bytes), clock.GetUtcNow().AddMinutes(5), acquisition.IdempotencyKey ?? acquisition.Name);
                 }
                 else

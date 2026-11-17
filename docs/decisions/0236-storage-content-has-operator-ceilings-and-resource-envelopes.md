@@ -34,12 +34,25 @@ mistaking product payload sizes for wire chunks. ASP and AEP keep their standalo
 64 KiB content wire/contribution ceilings. The integrated `asp.documents/1`
 contracts, document collections, query profiles, immutable document publications
 and remote adapters remain unchanged. Their document/result limits and the
-64 KiB aggregate JSON record-set profile are independent of product content limits.
-Local record publications also honor narrower operator ceilings. Server
-configuration cannot grant missing capabilities or widen a record-set profile.
+JSON record-set cardinality/shape contracts are independent of product content limits.
+Native record projections, aggregate encoding and local record publications use
+the configured byte budgets without a second fixed payload ceiling. Native
+transformation invocation budgets are configured separately under
+`Agentstration:FunctionContent`; Flow composition values use
+`Agentstration:FlowContent`. Server configuration cannot grant missing
+capabilities or widen a remote protocol profile.
 
-Local `1.0.0` keeps a stable 16 MiB supported payload ceiling independent of host
-configuration. Its unreleased schema/contract is updated in place for the
+Foreach Artifact input/output byte budgets remain resource rules but have no
+additional fixed publication ceiling. Console numeric editors use the same
+positive-value contract, and execution enforces the configured object budget.
+Shared schema validation checks the admitted value's structure without imposing
+an additional fixed payload ceiling.
+History maintenance retains the exact publication policy in the receipt when
+retiring content, including when it is narrower than its consumer's rule.
+
+Local `1.0.0` adds no payload/page ceiling below the contracts' numeric range.
+Its envelope schema requires positive limits; omitted numeric policy fields add
+no restriction to operator options. Its unreleased schema/contract is updated in place for the
 maintainer-authorized reseed. No existing resource is silently rebound or reset.
 The new default server content budget is 10 MiB and default transfer chunks remain
 64 KiB. The previous 64 KiB local publication profile in ADR-0207/0208 is superseded
@@ -47,13 +60,15 @@ by these configured bounds; those records remain unchanged.
 
 ## Consequences
 
-- Invalid or excessive configuration fails during composition, before storage
+- Non-positive or inconsistent configuration fails during composition, before storage
   initialization. Environment variables use the standard double-underscore names.
 - Resources retain their own envelopes. Raising the server ceiling does not
   widen an existing envelope or consumer rule; lowering it can refuse operations
   that previously fit. Changes take effect after restarting the authority.
-- Supported in-memory payloads remain bounded to 16 MiB, and local decoded object
-  capacity to 1 GiB. ASP wire schemas, buffer sizes, agent text-read windows and
+- No additional fixed upper ceiling is imposed on operator options. Byte, chunk,
+  page and count options use positive `Int32` values; decoded local capacity uses
+  positive `Int64` values and must cover the object budget. Defaults are fallbacks,
+  not validation maxima. ASP wire schemas, buffer sizes, agent text-read windows and
   unrelated schema, parameter, token and retrieval-scan limits remain separate.
 - The existing local JSON object backend still rewrites bounded state atomically;
   this change does not add a streaming object database or a new persistence layer.

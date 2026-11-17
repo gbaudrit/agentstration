@@ -81,7 +81,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         var page = state.Objects.Values.Select(e => e.Item)
             .Where(item => AspValidation.Allows(context.Policy, item.Key) && item.Key.StartsWith(prefix, StringComparison.Ordinal)
                 && (after is null || string.CompareOrdinal(item.Key, after) > 0))
-            .OrderBy(item => item.Key, StringComparer.Ordinal).Take(limit + 1).ToArray();
+            .OrderBy(item => item.Key, StringComparer.Ordinal).Take(limit == int.MaxValue ? limit : limit + 1).ToArray();
         return new(page.Take(limit).ToArray(), page.Length > limit ? page[limit - 1].Key : null);
     }
 
@@ -111,7 +111,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
             65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
         // The byte quota counts decoded content; state also contains base64 and bounded metadata/receipts.
-        var maximumStateBytes = limits.LocalMaximumStoreBytes * 2L
+        var maximumStateBytes = limits.LocalMaximumStoreBytes * 2m
             + ((long)limits.LocalMaximumObjects + limits.LocalMaximumReceipts) * 4096 + 65536;
         AspValidation.Require(stream.Length <= maximumStateBytes, "storage_state_invalid", "The local storage state exceeds its bound.");
         var state = await JsonSerializer.DeserializeAsync<State>(stream, Json, cancellationToken)

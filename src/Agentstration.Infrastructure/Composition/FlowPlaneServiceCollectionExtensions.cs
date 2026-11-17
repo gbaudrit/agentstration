@@ -13,8 +13,9 @@ namespace Agentstration.Infrastructure;
 
 internal static class FlowPlaneServiceCollectionExtensions
 {
-    internal static IServiceCollection AddAgentstrationFlowPlane(this IServiceCollection services)
+    internal static IServiceCollection AddAgentstrationFlowPlane(this IServiceCollection services, AgentstrationCompositionContext context)
     {
+        services.AddSingleton(context.Options.FlowContent);
         services.AddSingleton<IFlowScopeHierarchy, ResourceFlowScopeHierarchy>();
         services.AddSingleton<IFlowDiscoveryPolicy, FlowDiscoveryPolicy>();
         services.AddSingleton<IFlowUsePolicy, FlowUsePolicy>();

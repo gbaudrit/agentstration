@@ -37,6 +37,11 @@ public sealed class StorageTypeComponentTests
         var page = context.Render<StorageTypeEditor>();
         page.WaitForElement("[data-testid=storage-type-display-name]").Change("My storage type");
         page.Find("[data-testid=storage-type-name]").Change("my-storage-type");
+        var limits = page.FindAll("input[type=number]");
+        Assert.IsTrue(limits.All(input => !input.HasAttribute("max")));
+        limits[0].Change("1001");
+        page.FindAll("input[type=number]")[1].Change("17825792");
+        page.FindAll("input[type=number]")[2].Change("17825792");
         page.Find("form").Submit();
         page.WaitForAssertion(() => Assert.IsNotNull(client.Created));
         var version = client.Created!.Properties.Versions.Single();
@@ -44,6 +49,7 @@ public sealed class StorageTypeComponentTests
         Assert.AreEqual(StorageDigests.Schema(version.EnvelopeSchema), version.EnvelopeSchemaDigest);
         Assert.IsNull(version.Contribution);
         Assert.IsFalse(version.Capabilities.Write);
+        Assert.AreEqual(new StorageLimits(1001, 17825792, 17825792), version.Limits);
         Assert.IsEmpty(client.Created.Properties.UsePolicy.Grants);
         Assert.AreEqual(Scope, client.Created.ScopeRef);
     }

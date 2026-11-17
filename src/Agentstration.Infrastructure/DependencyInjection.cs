@@ -23,7 +23,7 @@ public static class DependencyInjection
         services.AddAgentstrationPacks(context);
         services.AddAgentstrationSources(context);
         services.AddAgentstrationSchemas();
-        services.AddAgentstrationFunctions();
+        services.AddAgentstrationFunctions(context);
         services.AddAgentstrationTools();
         services.AddAgentstrationTriggerScheduling(context);
         services.AddAgentstrationRuntimeRuns(context);
@@ -31,7 +31,7 @@ public static class DependencyInjection
         services.AddAgentstrationWorkPlane();
         services.AddAgentstrationInternalTools(context);
         services.AddAgentstrationDataAndKnowledge(context);
-        services.AddAgentstrationFlowPlane();
+        services.AddAgentstrationFlowPlane(context);
         return services;
     }
 

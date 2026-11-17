@@ -56,7 +56,6 @@ public sealed class DataContractException(string code, DataContractFailure failu
 public static partial class DataContracts
 {
     public const int MaximumSchemaCharacters = 65_536;
-    public const int MaximumValueCharacters = 16 * 1024 * 1024;
     private static readonly BuiltinJsonSchemaFormatHandler Handler = new();
     private static readonly JsonSerializerOptions FailureJson = new(JsonSerializerDefaults.Web);
     public static DataContractFailure? ParseFailure(string? details)
@@ -122,8 +121,6 @@ public static partial class DataContracts
         if (contract?.Schema is not { } schema) return;
         if (value.ValueKind == JsonValueKind.Undefined)
             throw Failure("data_contract_violation", boundary, contract.Origin, "$", "required", "defined value", "absent", runId, stepName);
-        if (value.GetRawText().Length > MaximumValueCharacters)
-            throw Failure("data_contract_value_too_large", boundary, contract.Origin, "$", "value_size", "bounded value", "oversized", runId, stepName);
         var validation = isProtectedString is null ? Handler.ValidateInstanceAsync(schema, value, null, default)
             : Handler.ValidateSymbolicStringsAsync(schema, value, isProtectedString, default);
         var result = validation.AsTask().GetAwaiter().GetResult();

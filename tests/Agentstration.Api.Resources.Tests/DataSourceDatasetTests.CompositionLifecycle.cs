@@ -53,6 +53,9 @@ public sealed partial class DataSourceDatasetTests
         var history = factory.Services.GetRequiredService<SourceHistoryMaintenance>();
         var first = await projections.StartAsync(id, new(), default);
         var firstAcquisition = (await acquisitions.GetAsync(source.Value.Namespace, first.Value.Inputs.Single().AcquisitionId, default)).Value;
+        Assert.IsLessThan(firstAcquisition.Dataset!.Definition.Rule.MaximumWriteBytes,
+            firstAcquisition.Publication!.Target.Policy.MaximumWriteBytes,
+            "Retirement must preserve the publication's effective budget when the consumer rule is wider.");
         var firstSnapshot = await snapshots.GetAsync(new(first.Value.SnapshotName!), default);
         var originalSnapshot = JsonSerializer.Serialize(firstSnapshot.Snapshot);
         var retained = firstSnapshot.Snapshot.Artifacts.Single().Content!;

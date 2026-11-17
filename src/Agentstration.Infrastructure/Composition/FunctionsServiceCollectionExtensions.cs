@@ -8,8 +8,9 @@ namespace Agentstration.Infrastructure;
 
 internal static class FunctionsServiceCollectionExtensions
 {
-    internal static IServiceCollection AddAgentstrationFunctions(this IServiceCollection services)
+    internal static IServiceCollection AddAgentstrationFunctions(this IServiceCollection services, AgentstrationCompositionContext context)
     {
+        services.AddSingleton(context.Options.FunctionContent);
         services.AddSingleton<INativeTransformationFunction, JsonSelectFunction>();
         services.AddSingleton<INativeTransformationFunction, JsonProjectFunction>();
         services.AddSingleton<INativeTransformationFunction, CollectionFilterFunction>();

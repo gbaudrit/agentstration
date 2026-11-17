@@ -10,8 +10,10 @@ namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Retains the established Artifact publication boundary while selecting the actual representation explicitly.</summary>
 public sealed class StoragePublicationGateway(LocalStoragePublicationGateway local, IStorageDocumentGateway documents,
-    IStorageResolver storages, ICurrentRequestContext current, TimeProvider? clock = null) : IStoragePublicationGateway
+    IStorageResolver storages, ICurrentRequestContext current, TimeProvider? clock = null,
+    StorageContentOptions? options = null) : IStoragePublicationGateway
 {
+    private readonly StorageContentOptions limits = options ?? new();
     public async Task ValidateAsync(StorageContentRequest target, CancellationToken ct)
     {
         if (target.DocumentCollectionUid is not { } collection) { await local.ValidateAsync(target, ct); return; }
@@ -32,7 +34,7 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
         IReadOnlyList<JsonElement> records, CancellationToken ct, DateTimeOffset? notAfter = null)
     {
         var aggregate = StorageRecordSets.Encode(records);
-        if (aggregate.Length > target.Policy.MaximumWriteBytes)
+        if (aggregate.Length > Math.Min(limits.MaximumObjectBytes, Math.Min(limits.MaximumWriteBytes, target.Policy.MaximumWriteBytes)))
             throw new StorageException("storage_publication_limit", "The record set exceeds the publication limit.");
         if (target.DocumentCollectionUid is not { } collection) return await local.PrepareRecordsAsync(target, id, records, ct, notAfter);
         await ValidateAsync(target, ct);
@@ -69,7 +71,8 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
     {
         if (reference.Records is not null)
         {
-            if (offset < 0 || offset > reference.Length || length < 1 || length > reference.Target.Policy.MaximumReadBytes)
+            if (reference.Length > limits.MaximumObjectBytes || offset < 0 || offset > reference.Length
+                || length < 1 || length > Math.Min(limits.MaximumReadBytes, reference.Target.Policy.MaximumReadBytes))
                 throw new StorageException("storage_publication_range_invalid", "The record read exceeds its bounds.");
             var members = RecordMembers(reference);
             using var aggregate = new MemoryStream();
@@ -80,7 +83,8 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
                 long position = 0;
                 do
                 {
-                    var chunk = await ReadAsync(member, position, (int)Math.Min(member.Length - position, Math.Min(65536, member.Target.Policy.MaximumReadBytes)), ct);
+                    var chunk = await ReadAsync(member, position, (int)Math.Min(member.Length - position,
+                        Math.Min(limits.TransferChunkBytes, Math.Min(limits.MaximumReadBytes, member.Target.Policy.MaximumReadBytes))), ct);
                     if (chunk.Length == 0 || chunk.Length > member.Length - position)
                         throw new StorageException("storage_record_integrity", "The record member is incomplete.");
                     await aggregate.WriteAsync(chunk, ct);

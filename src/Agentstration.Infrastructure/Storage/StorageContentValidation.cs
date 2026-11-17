@@ -8,7 +8,12 @@ namespace Agentstration.Infrastructure.Storage;
 internal static class StorageContentValidation
 {
     internal static AspAccessPolicy WirePolicy(AspAccessPolicy policy, int chunkBytes = AspProtocol.MaxContentBytes) =>
-        policy with { MaxReadBytes = Math.Min(policy.MaxReadBytes, chunkBytes), MaxWriteBytes = Math.Min(policy.MaxWriteBytes, chunkBytes) };
+        policy with
+        {
+            MaxReadBytes = Math.Min(policy.MaxReadBytes, chunkBytes),
+            MaxWriteBytes = Math.Min(policy.MaxWriteBytes, chunkBytes),
+            MaxPageSize = Math.Min(policy.MaxPageSize, AspProtocol.MaxPageSize)
+        };
 
     internal static void Policy(AspAccessPolicy policy)
     {

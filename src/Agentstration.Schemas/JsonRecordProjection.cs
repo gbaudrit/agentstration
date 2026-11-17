@@ -8,7 +8,6 @@ public sealed record JsonRecordProjection
 {
     public const string Format = "json.records/v1";
     public const int MaximumRecords = 100;
-    public const int MaximumBytes = 65536;
     [JsonPropertyName("$agentstration")] public string Contract { get; init; } = Format;
     public required JsonElement Value { get; init; }
     public required ResolvedDataContract RecordContract { get; init; }
@@ -24,8 +23,7 @@ public sealed record JsonRecordProjection
     public void Validate(CancellationToken ct = default)
     {
         if (Contract != Format || SelectionPath is null || RecordContract is null || SelectionPath.Length > 1024 || Value.ValueKind != JsonValueKind.Array
-            || Value.GetArrayLength() is < 1 or > MaximumRecords || RecordContract.Schema is null
-            || JsonSerializer.SerializeToUtf8Bytes(Value).Length > MaximumBytes)
+            || Value.GetArrayLength() is < 1 or > MaximumRecords || RecordContract.Schema is null)
             throw new ArgumentException("A JSON record projection requires a bounded non-empty object collection and its record contract.");
         var declared = DataContracts.Declared(RecordContract.Schema, RecordContract.Origin, RecordContract.MediaType)!;
         if (declared.Digest != RecordContract.Digest)

@@ -10,9 +10,9 @@ using Agentstration.Schemas;
 namespace Agentstration.Functions;
 
 public sealed class TransformationFunctionService(IResourceStore store, IResourceScopeOperations scopes,
-    IResourceAccessPolicyService access, NativeFunctionRegistry registry, NativeFunctionExecutionContext execution) : ITransformationFunctionResolver
+    IResourceAccessPolicyService access, NativeFunctionRegistry registry, NativeFunctionExecutionContext execution,
+    FunctionContentOptions? options = null) : ITransformationFunctionResolver
 {
-    public const int MaximumValueBytes = 1024 * 1024;
     public static JsonElement NativeDefinitionSchema => NativeFunctionKindContract.DefinitionSchema;
 
     public Task<IReadOnlyList<StoredResource<TransformationFunctionResource>>> ListAsync(ResourceScopeRef scope, int skip, int take, CancellationToken ct) =>
@@ -125,7 +125,7 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
         using var invocation = execution.Enter(invocationId ?? Guid.NewGuid().ToString("N"), schemaBindings);
         var resolved = await ResolveAsync(accepted.Reference, consumer, ct);
         if (FunctionDigests.Compute(resolved) != FunctionDigests.Compute(accepted)) throw Error("function_contract_changed", "The accepted function contract has changed.");
-        ValidateValue(resolved.InputSchema, input, "function-input");
+        ValidateValue(resolved.InputSchema, input, "function-input", (options ?? new()).MaximumValueBytes);
         var schemaNames = FunctionInvocationSchemas.SchemaParameters(resolved.InputSchema);
         if (schemaNames.Any(name => input.TryGetProperty(name, out _) != (schemaBindings?.ContainsKey(name) == true))
             || schemaBindings?.Keys.Any(name => !schemaNames.Contains(name, StringComparer.Ordinal)) == true)
@@ -137,16 +137,17 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
                 values[name] = JsonSerializer.SerializeToElement(new { inline = new { format = snapshot.Format, dialect = snapshot.Dialect,
                     content = JsonSchemaSelection.Select(snapshot.Content) } });
             input = JsonSerializer.SerializeToElement(values);
-            ValidateValue(resolved.InputSchema, input, "function-input");
+            ValidateValue(resolved.InputSchema, input, "function-input", (options ?? new()).MaximumValueBytes);
         }
         var output = await registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).ExecuteAsync(input, ct);
-        ValidateValue(resolved.OutputSchema, output, "function-output");
+        ValidateValue(resolved.OutputSchema, output, "function-output", (options ?? new()).MaximumValueBytes);
         return output.Clone();
     }
 
-    public static void ValidateValue(JsonElement schema, JsonElement value, string boundary)
+    public static void ValidateValue(JsonElement schema, JsonElement value, string boundary,
+        int maximumValueBytes = FunctionContentOptions.DefaultMaximumValueBytes)
     {
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumValueBytes)
             throw Error("function_value_too_large", "The function value exceeds the bounded JSON invocation limit.");
         DataContracts.Validate(DataContracts.Declared(schema, boundary), value, boundary);
     }

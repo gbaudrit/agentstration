@@ -28,7 +28,10 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         IReadOnlyList<JsonElement> records, CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => GuardAsync<StoragePublicationReference>(async () =>
     {
         var aggregate = StorageRecordSets.Encode(records);
-        if (aggregate.Length > Math.Min(limits.MaximumObjectBytes, Math.Min(limits.MaximumWriteBytes, target.Policy.MaximumWriteBytes)))
+        var resolved = await resolver.ResolveAsync(target.Storage, target.Consumer, cancellationToken);
+        var envelope = resolved.Envelope.Deserialize<StorageContentPolicy>(Json)!;
+        if (aggregate.Length > Math.Min(Math.Min(limits.MaximumObjectBytes, limits.MaximumWriteBytes),
+                Math.Min(target.Policy.MaximumWriteBytes, Math.Min(resolved.Limits.MaximumWriteBytes, envelope.MaximumWriteBytes))))
             throw Error("storage_publication_limit", "The record set exceeds the publication limit.");
         var members = new List<StoragePublicationReference>();
         for (var index = 0; index < records.Count; index++)
@@ -214,7 +217,10 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     {
         if (!File.Exists(path)) throw Error("storage_publication_unavailable", "The exact publication is unavailable.");
         await using var stream = File.OpenRead(LocalStoragePaths.Checked(path));
-        if (stream.Length > limits.MaximumObjectBytes * 3L) throw Error("storage_publication_integrity", "Invalid publication size.");
+        var maximumFileBytes = IsJsonRecord(reference) ? limits.MaximumObjectBytes
+            : JsonSerializer.SerializeToUtf8Bytes(new Document(reference, []), Json).LongLength
+                + ((limits.MaximumObjectBytes + 2L) / 3) * 4;
+        if (stream.Length > maximumFileBytes) throw Error("storage_publication_integrity", "Invalid publication size.");
         if (IsJsonRecord(reference))
         {
             var receiptPath = ReceiptPath(path);

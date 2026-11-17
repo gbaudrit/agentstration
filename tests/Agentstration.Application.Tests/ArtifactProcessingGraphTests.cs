@@ -59,6 +59,20 @@ public sealed class ArtifactProcessingGraphTests
         Assert.IsTrue(result.Issues.Any(issue => issue.Code == code), string.Join("; ", result.Issues.Select(issue => issue.Code)));
     }
 
+    [TestMethod]
+    [DataRow(2 * 1024 * 1024, 17 * 1024 * 1024, true)]
+    [DataRow(int.MaxValue, int.MaxValue, true)]
+    [DataRow(0, 1, false)]
+    [DataRow(1, 0, false)]
+    public async Task ArtifactByteBudgetsHaveNoAdditionalPublicationCeiling(int inputBytes, int outputBytes, bool valid)
+    {
+        var graph = Graph();
+        graph = graph with { Steps = graph.Steps.Select(step => step is ForeachArtifactsFlowStepDefinition processing
+            ? processing with { MaximumContentBytes = inputBytes, MaximumOutputBytes = outputBytes } : step).ToArray() };
+        var result = await new FlowGraphValidator(new References()).ValidateAsync(graph, new(false), default);
+        Assert.AreEqual(valid, result.IsValid, string.Join("; ", result.Issues.Select(issue => issue.Code)));
+    }
+
     private static FlowGraphDefinition Graph() => new()
     {
         EntryStep = "input",

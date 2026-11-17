@@ -196,7 +196,8 @@ public sealed partial class FlowRunService(
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
     IFlowStepArtifactCapture? configuredArtifactCapture = null,
     FlowService? flowDefinitions = null,
-    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null,
+    FlowContentOptions? contentOptions = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null

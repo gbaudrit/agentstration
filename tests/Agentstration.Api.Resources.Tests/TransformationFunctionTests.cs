@@ -8,6 +8,7 @@ using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Agentstration.Management.Tests;
 
@@ -76,11 +77,13 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
     [TestMethod]
     public async Task ResourcesResolveExactNativeImplementationsAndPreserveImmutableVersions()
     {
-        await using var factory = Factory();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.UseSetting(
+            $"{FunctionContentOptions.SectionName}:MaximumValueBytes", (2 * 1024 * 1024).ToString(System.Globalization.CultureInfo.InvariantCulture)));
         var context = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var service = factory.Services.GetRequiredService<TransformationFunctionService>();
         var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        Assert.AreEqual(2 * 1024 * 1024, factory.Services.GetRequiredService<FunctionContentOptions>().MaximumValueBytes);
         var kind = await service.PutKindAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind, ScopeRef = owner,
@@ -97,6 +100,12 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
         var resolved = await service.ResolveAsync(new("select", "1.0.0", owner), owner, default);
         var result = await service.InvokeAsync(resolved, owner, Json("""{"value":{"results":[1,2]},"path":"/results"}"""), default);
         Assert.AreEqual(2, result.GetArrayLength());
+        var largeValue = new string('x', 1024 * 1024);
+        Assert.AreEqual(largeValue, (await service.InvokeAsync(resolved, owner,
+            JsonSerializer.SerializeToElement(new { value = largeValue, path = "" }), default)).GetString());
+        var tooLarge = await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => service.InvokeAsync(resolved, owner,
+            JsonSerializer.SerializeToElement(new { value = new string('x', 2 * 1024 * 1024), path = "" }), default));
+        Assert.AreEqual("function_value_too_large", tooLarge.Code);
         function = await service.PutAsync(function.Value with { Definition = function.Value.Definition with { Description = "Select the alert payload." } }, function.ETag, false, default);
         Assert.AreEqual("Select the alert payload.", (await service.GetAsync(owner, ResourceNamespace.Default, "select", default))!.Value.Definition.Description);
         Assert.AreEqual(resolved.Reference, (await service.ResolveAsync(resolved.Reference, owner, default)).Reference);

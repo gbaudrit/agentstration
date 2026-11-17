@@ -76,6 +76,10 @@ public sealed class StorageExecutionTests
         var envelopeLimit = await Assert.ThrowsAsync<StorageException>(() => gateway.WriteAsync(Target(changed.Value, scope),
             write with { RequestId = "envelope-limit", Key = "notes/envelope", ContentBase64 = Convert.ToBase64String(new byte[5]) }));
         Assert.AreEqual("storage_content_limit_exceeded", envelopeLimit.Code);
+        var aggregateLimit = await Assert.ThrowsAsync<StorageException>(() => publications.PrepareRecordsAsync(Target(changed.Value, scope),
+            "envelope-record-limit", [JsonSerializer.SerializeToElement(new { }), JsonSerializer.SerializeToElement(new { })], default));
+        Assert.AreEqual("storage_publication_limit", aggregateLimit.Code,
+            "The complete record collection must fit the Storage envelope, even when each member fits separately.");
     }
 
     [TestMethod]
@@ -93,6 +97,62 @@ public sealed class StorageExecutionTests
             .PrepareRecordsAsync(target, "record-set-too-large",
                 [JsonSerializer.SerializeToElement(new { content = new string('x', 64) })], default));
         Assert.AreEqual("storage_publication_limit", failure.Code);
+    }
+
+    [TestMethod]
+    public async Task ConfiguredBudgetsAboveFormerCeilingsReachTheLocalGatewayAndRecordPublications()
+    {
+        var limits = new StorageContentOptions
+        {
+            MaximumObjectBytes = 17 * 1024 * 1024, MaximumWriteBytes = 17 * 1024 * 1024,
+            MaximumReadBytes = 17 * 1024 * 1024, TransferChunkBytes = 128 * 1024,
+            MaximumPageSize = 1001, LocalMaximumStoreBytes = long.MaxValue
+        };
+        await using var factory = await FixtureAsync(limits);
+        var services = factory.Services;
+        var context = await InstanceContextAsync(services, factory.Context);
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var resource = (await services.GetRequiredService<StorageManagementService>().GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        var target = Target(resource.Value, ResourceScopeRef.Instance);
+        var gateway = services.GetRequiredService<IStorageContentGateway>();
+        var bytes = new byte[limits.MaximumObjectBytes];
+        bytes[^1] = 42;
+        var item = await gateway.WriteAsync(target, new("above-former-ceiling",
+            services.GetRequiredService<TimeProvider>().GetUtcNow().AddMinutes(1), "notes/large", Convert.ToBase64String(bytes)));
+        CollectionAssert.AreEqual(bytes, Convert.FromBase64String((await gateway.ReadAsync(target, item.Reference, 0, bytes.Length)).ContentBase64));
+        Assert.HasCount(1, (await gateway.ListAsync(target, "notes/", limits.MaximumPageSize)).Objects);
+
+        var record = JsonSerializer.SerializeToElement(new { content = new string('x', limits.TransferChunkBytes) });
+        var publications = services.GetRequiredService<IStoragePublicationGateway>();
+        var publication = await publications.PrepareRecordsAsync(target, "large-record", [record], default);
+        await publications.SealAsync(publication, default);
+        var expected = StorageRecordSets.Encode([record]);
+        CollectionAssert.AreEqual(expected, (await publications.ReadAsync(publication, 0, expected.Length, default)).ToArray());
+        var materialized = new ArtifactStorageMaterialization(new(context.WorkspaceId), publication.Target,
+            publication.Key, publication.Version, publication.Length, publication.Sha256, publication);
+        CollectionAssert.AreEqual(expected, (await services.GetRequiredService<StorageMaterializedArtifactReader>()
+            .ReadAsync(new(context.WorkspaceId), materialized, 0, expected.Length, default)).ToArray());
+    }
+
+    [TestMethod]
+    public async Task PublicationMetadataDoesNotConsumeTheConfiguredContentBudget()
+    {
+        await using var factory = await FixtureAsync(new()
+            { MaximumObjectBytes = 8, MaximumWriteBytes = 8, MaximumReadBytes = 8, TransferChunkBytes = 8 });
+        var services = factory.Services;
+        var context = await InstanceContextAsync(services, factory.Context);
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var resource = (await services.GetRequiredService<StorageManagementService>().GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        var target = Target(resource.Value, ResourceScopeRef.Instance);
+        var publications = services.GetRequiredService<IStoragePublicationGateway>();
+        var bytes = "12345678"u8.ToArray();
+        var publication = await publications.PrepareAsync(target, "small-budget", bytes, default);
+        await publications.SealAsync(publication, default);
+        CollectionAssert.AreEqual(bytes, (await publications.ReadAsync(publication, 0, bytes.Length, default)).ToArray());
+        Assert.AreEqual("storage_publication_limit", (await Assert.ThrowsAsync<StorageException>(() =>
+            publications.PrepareAsync(target, "too-large", new byte[9], default))).Code);
     }
 
     [TestMethod]
@@ -254,9 +314,13 @@ public sealed class StorageExecutionTests
             { Envelope = System.Text.Json.JsonSerializer.SerializeToElement(new { prefix = "../outside" }) }
         }, default));
         Assert.AreEqual("storage_configuration_invalid", invalid.Code);
+        var invalidPolicy = await Assert.ThrowsAsync<StorageException>(() => gateway.ListAsync(target with
+        { Policy = target.Policy with { MaximumPageSize = 0 } }, "notes/", 10));
+        Assert.AreEqual("storage_content_invalid_policy", invalidPolicy.Code);
         var widening = await Assert.ThrowsAsync<StorageException>(() => gateway.ListAsync(target with
-        { Policy = target.Policy with { MaximumPageSize = 101 } }, "notes/", 10));
-        Assert.AreEqual("storage_content_invalid_policy", widening.Code);
+        { Policy = target.Policy with { MaximumPageSize = 101 } }, "notes/", 101));
+        Assert.AreEqual("storage_content_limit_exceeded", widening.Code,
+            "A larger consumer budget cannot widen the configured operator or Storage ceiling.");
     }
 
     [TestMethod]
