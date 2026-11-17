@@ -34,29 +34,35 @@ internal sealed class WorkspacePlatformResourceProvisioner(
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
-        using (scopes.PushSystem())
-        {
-            await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
-            await connectedServiceTypes.EnsureAsync(cancellationToken);
-            await storageTypes.EnsureAsync(cancellationToken);
-            await functions.EnsureAsync(cancellationToken);
-        }
+        using var systemScope = scopes.PushSystem();
+        await EnsureInstancePrerequisitesAsync(cancellationToken);
+        await functions.EnsureAsync(cancellationToken);
         var tenants = await identities.ListTenantsAsync(cancellationToken);
         foreach (var tenant in tenants.Where(value => value.Status == TenantStatus.Active))
         {
             var workspaces = await identities.ListWorkspacesAsync(tenant.Id, cancellationToken);
             foreach (var workspace in workspaces.Where(value => value.Status is WorkspaceStatus.Initializing or WorkspaceStatus.Active))
-                await EnsureAsync(tenant.Id, workspace.Id, cancellationToken);
+                await EnsureWorkspaceResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
         }
     }
 
     public async Task EnsureAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
     {
         using var systemScope = scopes.PushSystem();
+        await EnsureInstancePrerequisitesAsync(cancellationToken);
+        await EnsureWorkspaceResourcesAsync(tenantId, workspaceId, cancellationToken);
+    }
+
+    private async Task EnsureInstancePrerequisitesAsync(CancellationToken cancellationToken)
+    {
         // Flow publication snapshots Tool contracts, so project the adapters before their Flows.
         await internalTools.EnsureAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, cancellationToken);
         await connectedServiceTypes.EnsureAsync(cancellationToken);
         await storageTypes.EnsureAsync(cancellationToken);
+    }
+
+    private async Task EnsureWorkspaceResourcesAsync(Guid tenantId, Guid workspaceId, CancellationToken cancellationToken)
+    {
         await functions.EnsureTenantAccessAsync(ResourceScopeRef.Tenant(tenantId), cancellationToken);
         var workspace = await identities.GetWorkspaceAsync(tenantId, workspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{workspaceId:D}' no longer exists.");
