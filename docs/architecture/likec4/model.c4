@@ -145,6 +145,10 @@ model {
         description 'Flow definitions, typed resource-bound composition points, immutable publications, admission-pinned child sequences, durable Flow Runs, and provider-neutral graph execution'
       }
 
+      systemOperations = component 'System operational read model' {
+        description 'Separate authorized volatile samples and private bounded streams; Infrastructure adapts exact Runtime, Flow, Work and worker evidence without execution authority'
+      }
+
       runtime = component 'Runtime execution' {
         description 'Durable technical Runs, agent materialization, model resolution, attempts, and normalized events'
       }
@@ -284,4 +288,7 @@ model {
   agentstration.server.resources -> aepExtensions 'Enrolls and catalogs contributions'
   agentstration.server.runtime -> aepExtensions 'Invokes model contributions'
   agentstration.server.tools -> aepExtensions 'Discovers and invokes Tool contributions'
+  agentstration.server.systemOperations -> agentstration.server.runtime 'Reads exact authorized Runtime and placement evidence'
+  agentstration.server.systemOperations -> agentstration.server.flow 'Reads attested Flow execution evidence'
+
 }

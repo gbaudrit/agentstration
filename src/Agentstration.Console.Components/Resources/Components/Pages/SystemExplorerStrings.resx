@@ -92,4 +92,68 @@
   <data name="ReconCycle" xml:space="preserve"><value>A dependency cycle prevents safe ordering.</value></data>
   <data name="ReconTruncated" xml:space="preserve"><value>A bounded evidence read was truncated.</value></data>
   <data name="ReconAuthoringSource" xml:space="preserve"><value>Current consumer definition</value></data>
+  <data name="OpsTitle" xml:space="preserve"><value>Operational evidence</value></data>
+  <data name="OpsEnable" xml:space="preserve"><value>Enable live overlay</value></data>
+  <data name="OpsLive" xml:space="preserve"><value>Live, authorized sample</value></data>
+  <data name="OpsUnavailable" xml:space="preserve"><value>Disconnected or unavailable. Disable and enable to reconnect.</value></data>
+  <data name="OpsWindow" xml:space="preserve"><value>Active runs now and terminal runs updated within the last 15 minutes; at most 50 attested runs.</value></data>
+  <data name="OpsSampled" xml:space="preserve"><value>Last observed</value></data>
+  <data name="OpsInvocation" xml:space="preserve"><value>Invocation scope</value></data>
+  <data name="OpsDataScope" xml:space="preserve"><value>Stored execution scope</value></data>
+  <data name="OpsPublication" xml:space="preserve"><value>Publication</value></data>
+  <data name="OpsProvisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsDependencies" xml:space="preserve"><value>Observed dependency pins</value></data>
+  <data name="OpsWorkers" xml:space="preserve"><value>Worker presence</value></data>
+  <data name="OpsObserved" xml:space="preserve"><value>Observed in this sample</value></data>
+  <data name="OpsActive" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsSucceeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsFailed" xml:space="preserve"><value>Failed or timed out</value></data>
+  <data name="OpsCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsDuration" xml:space="preserve"><value>Mean duration per completed run</value></data>
+  <data name="OpsUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsTokens" xml:space="preserve"><value>Reported input / output tokens</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Metrics unavailable: no authorized, attested run in this sample.</value></data>
+  <data name="OpsPartial" xml:space="preserve"><value>Partial evidence; no global health conclusion.</value></data>
+  <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
+  <data name="OpsPlacement" xml:space="preserve"><value>Assignment</value></data>
+  <data name="OpsAttempt" xml:space="preserve"><value>Attempt / worker</value></data>
+  <data name="OpsLease" xml:space="preserve"><value>Lease expires</value></data>
+  <data name="OpsFencing" xml:space="preserve"><value>Fencing generation</value></data>
+  <data name="OpsState_unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsState_unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="OpsState_online" xml:space="preserve"><value>Online</value></data>
+  <data name="OpsState_offline" xml:space="preserve"><value>Offline</value></data>
+  <data name="OpsState_stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="OpsState_draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="OpsState_definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="OpsState_publication" xml:space="preserve"><value>Published version</value></data>
+  <data name="OpsState_published" xml:space="preserve"><value>Published</value></data>
+  <data name="OpsState_recorded-generation" xml:space="preserve"><value>Recorded generation</value></data>
+  <data name="OpsState_reference-identity" xml:space="preserve"><value>Identity reference</value></data>
+  <data name="OpsState_observed-pins-current" xml:space="preserve"><value>Observed pins match current generations</value></data>
+  <data name="OpsState_observed-pins-stale" xml:space="preserve"><value>Observed pins are stale</value></data>
+  <data name="OpsState_observed-consumers-stale" xml:space="preserve"><value>Observed consumers retain older generations</value></data>
+  <data name="OpsState_attested-window" xml:space="preserve"><value>Attested sample</value></data>
+  <data name="OpsState_bounded-sample" xml:space="preserve"><value>Result limit reached</value></data>
+  <data name="OpsState_family-unsupported" xml:space="preserve"><value>No operational adapter for this family</value></data>
+  <data name="OpsState_run-read-required" xml:space="preserve"><value>Run read permission required</value></data>
+  <data name="OpsState_pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="OpsState_running" xml:space="preserve"><value>Running</value></data>
+  <data name="OpsState_waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="OpsState_succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsState_failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="OpsState_cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsState_timed-out" xml:space="preserve"><value>Timed out</value></data>
+  <data name="OpsState_assigned" xml:space="preserve"><value>Assigned</value></data>
+  <data name="OpsState_active" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsState_interrupted" xml:space="preserve"><value>Interrupted</value></data>
+  <data name="OpsState_reported-complete" xml:space="preserve"><value>All token counts reported</value></data>
+  <data name="OpsState_reported-partial" xml:space="preserve"><value>Partial reported token counts</value></data>
+  <data name="OpsState_ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="OpsState_reconciling" xml:space="preserve"><value>Reconciling</value></data>
+  <data name="OpsState_provisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsState_deleting" xml:space="preserve"><value>Deleting</value></data>
+  <data name="OpsState_notprovisioned" xml:space="preserve"><value>Not provisioned</value></data>
+<data name="OpsConnecting" xml:space="preserve"><value>Connecting to authorized evidence…</value></data>
+<data name="OpsStale" xml:space="preserve"><value>Evidence is stale. Facts were cleared; disable and enable to reconnect.</value></data>
 </root>

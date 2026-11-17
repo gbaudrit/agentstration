@@ -20,8 +20,10 @@ public sealed class SystemExplorerTests
         using var currentCulture = new TestCultureScope(culture);
         using var context = new BunitContext();
         var client = new Client();
+        context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISystemExplorerClient>(client);
+        context.Services.AddSingleton<ISystemOperationsClient>(new OperationsClient());
         context.Services.AddSingleton<IConsoleContextProvider>(new Provider(client.Owner));
         context.Services.AddSingleton<IConsoleNavigationContext>(new Navigation(client.Owner));
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -33,6 +35,7 @@ public sealed class SystemExplorerTests
         Assert.HasCount(2, page.FindAll("[data-testid=explorer-node]"));
         Assert.IsEmpty(page.FindAll("img[src=x]"));
         await page.FindAll("[data-testid=explorer-node] button")[0].ClickAsync();
+        Assert.AreEqual(page.Find("[data-testid=explorer-selection] p code").TextContent, page.FindComponent<SystemOperationsPanel>().Instance.Root);
         var first = page.Find("[data-testid=explorer-selection] a").GetAttribute("href")!;
         Assert.Contains("scopeRef=%2Finstance", first);
         Assert.Contains("context=%2Fworkspaces%2F", first);
@@ -46,6 +49,11 @@ public sealed class SystemExplorerTests
         Assert.IsEmpty(page.FindAll("[aria-label*='diagram']"));
     }
 
+    private sealed class OperationsClient : ISystemOperationsClient
+    {
+        public IAsyncEnumerable<Agentstration.SystemOperations.Contracts.SystemOperationsFrame> WatchAsync(ResourceScopeRef context,
+            Agentstration.SystemOperations.Contracts.SystemOperationsQuery query, CancellationToken ct) => throw new AssertFailedException("Overlay is opt-in.");
+    }
     private sealed class Navigation(ResourceScopeRef owner) : IConsoleNavigationContext
     {
         public string? ScopeRef => owner.Value;

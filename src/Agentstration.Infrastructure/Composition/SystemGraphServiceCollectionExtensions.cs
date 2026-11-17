@@ -1,3 +1,6 @@
+using Agentstration.SystemOperations;
+using Agentstration.SystemOperations.Contracts;
+using Agentstration.Infrastructure.SystemOperations;
 using Agentstration.Reconciliation;
 using Agentstration.Reconciliation.Contracts;
 using Agentstration.Triggers;
@@ -39,6 +42,10 @@ internal static class SystemGraphServiceCollectionExtensions
         services.AddSingleton<ISystemGraphContributor, SystemModelGraphContributor>();
         services.AddSingleton<ISystemGraphAuthorization, SystemGraphAuthorization>();
         services.AddSingleton<SystemGraphQueryService>();
+        services.AddSingleton<SystemOperationsTelemetry>();
+        services.AddSingleton<ISystemOperationsAccess, SystemOperationsAccess>();
+        services.AddSingleton<ISystemOperationsEvidenceReader, SystemOperationsEvidenceReader>();
+        services.AddSingleton<ISystemOperationsService, SystemOperationsService>();
         services.AddSingleton<IReconciliationPreviewService, ReconciliationPreviewService>();
         services.AddSingleton<ISystemGraphQueryService>(provider => provider.GetRequiredService<SystemGraphQueryService>());
         services.AddSingleton<ISystemGraphImpactService>(provider => provider.GetRequiredService<SystemGraphQueryService>());

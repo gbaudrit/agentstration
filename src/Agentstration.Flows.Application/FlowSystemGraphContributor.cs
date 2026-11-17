@@ -31,6 +31,7 @@ public sealed class FlowSystemGraphContributor(IFlowRepository flows, IFlowToolC
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var version = publication.Value;
+                        if (version.ResourceUid is { } attested && attested != flow.Uid) continue;
                         var node = new SystemGraphNode(SystemGraphIds.Publication(flow.Uid, version.Version), identity, "publication",
                             new(ETag: publication.ETag, Publication: version.Version, Hash: version.DefinitionHash, OriginKind: version.Governance.Origin.Kind.ToString()) { PublishedAt = version.PublishedAt });
                         var edges = new List<SystemGraphRelation> { new(definition.Id, node.Id, "publication") };

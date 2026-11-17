@@ -24,6 +24,7 @@ public partial class SystemExplorer
     private ResourceScopeRef contextScope, ownerScope;
     private ResourceNamespace resourceNamespace = ResourceNamespace.Default;
     private SystemGraphPage? page;
+    private IReadOnlyDictionary<string, string>? overlayNotes;
     private SystemGraphNode? selected;
     private IReadOnlyList<SystemView> systems = [];
     private SystemView? system;
@@ -41,7 +42,7 @@ public partial class SystemExplorer
         var pending = cancellation = new();
         var current = ++revision;
         var selectedSystem = system?.Uid;
-        loading = true; page = null; selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
+        loading = true; overlayNotes = null; page = null; selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
         try
         {
             var context = await ContextProvider.GetAsync(pending.Token);
@@ -63,7 +64,17 @@ public partial class SystemExplorer
         catch (Exception) { if (current == revision) error = T("LoadFailed"); }
         finally { if (current == revision) loading = false; }
     }
-    private Task Select(string id) { selected = page?.Nodes.FirstOrDefault(node => node.Id == id); return Task.CompletedTask; }
+    private Task Select(string id) { if (selected?.Id != id) overlayNotes = null; selected = page?.Nodes.FirstOrDefault(node => node.Id == id); return Task.CompletedTask; }
+    private void OperationalChanged(Agentstration.SystemOperations.Contracts.SystemOperationalFacts? facts)
+    {
+        if (facts is null) { overlayNotes = null; return; }
+        if (facts.NodeId != selected?.Id) return;
+        string State(string state) => Localizer["OpsState_" + state.ToLowerInvariant()].ResourceNotFound ? T("OpsUnknown") : T("OpsState_" + state.ToLowerInvariant());
+        var note = $"{T("OpsPublication")}: {State(facts.PublicationState)}; {T("OpsProvisioning")}: {State(facts.ProvisioningState)}; {T("OpsDependencies")}: {State(facts.DependencyState)}; {T("OpsWorkers")}: {State(facts.WorkerPresence)}. ";
+        note += facts.Metrics is { } metrics ? $"{T("OpsActive")}: {metrics.ObservedActive}; {T("OpsFailed")}: {metrics.ObservedFailed}. {T("OpsPartial")}" : T("OpsNoMetrics");
+        overlayNotes = new Dictionary<string, string> { [facts.NodeId] = note };
+
+    }
     private void DiagramFailed() => diagramFailed = true;
     private void ApplyNamespace() => Navigate(null, namespaceInput, ownerScope.Value);
     private void ChangeOwner(ChangeEventArgs args) => Navigate(RootQuery, resourceNamespace.Value, args.Value?.ToString());

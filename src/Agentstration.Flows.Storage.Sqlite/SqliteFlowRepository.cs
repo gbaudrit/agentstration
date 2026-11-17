@@ -272,6 +272,32 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         }).ToArray();
     }
 
+    public async Task<FlowRunPage> ListRunsByIdentityAsync(FlowRunIdentityQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.ResourceUid == Guid.Empty || query.Take is < 1 or > 200)
+            throw new ArgumentException("A bounded exact Flow identity is required.", nameof(query));
+        var scope = query.Invocation;
+        var uid = query.ResourceUid.ToString("D");
+        var version = query.Version ?? "";
+        var hash = query.DefinitionHash ?? "";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM "FlowResources"
+            WHERE "ScopeRef" = {scope.ScopeRef.Value} AND "Kind" = 'run'
+              AND "TenantId" = {scope.TenantId} AND "PrincipalId" = {scope.PrincipalId}
+              AND "Namespace" = {query.Namespace.Value}
+              AND json_extract("Payload", '$.definitionSnapshot.scopeRef') = {query.DefinitionOwner.Value}
+              AND json_extract("Payload", '$.definitionSnapshot.resourceUid') = {uid}
+              AND ({version} = '' OR "Version" = {version})
+              AND COALESCE(json_extract("Payload", '$.scope.logicalScopeRef'), "ScopeRef") = {scope.AccessScopeRef.Value}
+              AND ({hash} = '' OR json_extract("Payload", '$.definitionSnapshot.definitionHash') = {hash})
+              AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "Status" NOT IN ({(int)FlowRunStatus.Succeeded},{(int)FlowRunStatus.Failed},{(int)FlowRunStatus.Cancelled},{(int)FlowRunStatus.TimedOut}))
+            ORDER BY "UpdatedAt" DESC, "Key" DESC LIMIT {query.Take + 1}
+            """).AsNoTracking().ToArrayAsync(cancellationToken);
+        return new(documents.Take(query.Take).Select(ToRun).ToArray(), documents.Length > query.Take);
+    }
+
     public async Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);

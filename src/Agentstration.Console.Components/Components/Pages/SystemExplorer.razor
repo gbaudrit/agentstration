@@ -34,7 +34,7 @@ else if (page is not null)
     @if (page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
     else
     {
-        @if (showDiagram && !diagramFailed) { <SystemGraphDiagram @key="page" Page="page" RelationshipLabels="RelationshipLabels" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
+        @if (showDiagram && !diagramFailed) { <SystemGraphDiagram @key="page" Page="page" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
         @if (diagramFailed) { <p role="status">@T("DiagramUnavailable")</p> }
         <section aria-label="@T("Resources")">
             <h2>@T("Resources")</h2>
@@ -52,6 +52,7 @@ else if (page is not null)
                 @if (DetailsUrl(selected) is { } url) { <a class="button-secondary" href="@url">@T("OpenDetails")</a> }
                 @if (selected.Identity.Kind == "Flow") { <a class="button-secondary" href="@DetailsUrl(selected, true)">@T("OpenDesigner")</a> }
                 <a class="button-secondary" href="@ReconciliationUrl(selected.Id)">@T("ReconTitle")</a>
+                <SystemOperationsPanel @key="selected.Id" Root="@selected.Id" Context="contextScope" Namespace="resourceNamespace" Changed="OperationalChanged" />
                 <pre class="explorer-json">@JsonSerializer.Serialize(selected, JsonOptions)</pre>
                 <h3>@T("Relations")</h3>
                 <ul>@foreach (var edge in page.Relations.Where(edge => edge.Source == selected.Id || edge.Target == selected.Id))

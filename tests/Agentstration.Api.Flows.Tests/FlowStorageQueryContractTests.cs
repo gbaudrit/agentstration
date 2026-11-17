@@ -176,6 +176,34 @@ public sealed partial class FlowTests
         }
     }
 
+    [TestMethod]
+    public async Task SqliteOperationalFlowQueryFiltersNativeIdentityAndActorBeforeTakingBoundedSample()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var uid = Guid.NewGuid();
+        var run = CreateStoredRun("own-attested", new("same-name"), FlowRunStatus.Pending);
+        run = run with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = uid, ScopeRef = ResourceScopeRef.Instance } };
+        await fixture.Repository.CreateRunAsync(run, default);
+        for (var index = 0; index < 6; index++)
+        {
+            var foreign = run with { Id = $"foreign-{index}" };
+            foreign = index switch
+            {
+                0 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = Guid.NewGuid() } },
+                1 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = null } },
+                2 => foreign with { Scope = run.Scope with { PrincipalId = Guid.NewGuid() } },
+                3 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ScopeRef = run.Scope.ScopeRef } },
+                4 => foreign with { Scope = run.Scope with { LogicalScopeRef = ResourceScopeRef.Instance } },
+                _ => foreign with { FlowVersion = "999.0.0" }
+            };
+            await fixture.Repository.CreateRunAsync(foreign, default);
+        }
+        var page = await fixture.Repository.ListRunsByIdentityAsync(new(run.Scope, ResourceScopeRef.Instance,
+            run.FlowId.Namespace, uid, run.FlowVersion, DateTimeOffset.MinValue, 1), default);
+        Assert.HasCount(1, page.Items); Assert.IsFalse(page.HasMore);
+        Assert.AreEqual(run.Id, page.Items[0].Value.Id);
+    }
+
     private static FlowRun CreateStoredRun(string id, FlowId flowId, FlowRunStatus status)
     {
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));
