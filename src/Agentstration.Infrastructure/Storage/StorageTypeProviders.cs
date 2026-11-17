@@ -59,16 +59,18 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
                         Version = LocalTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
                         EnvelopeSchemaDigest = StorageDigests.Schema(LocalEnvelopeSchema), EnvelopeSchema = LocalEnvelopeSchema,
                         Capabilities = new() { List = true, Stat = true, Read = true, Write = true },
-                        Limits = new(100, StorageContentOptions.SupportedMaximumBytes, StorageContentOptions.SupportedMaximumBytes)
+                        // Local has no provider ceiling below the contract's numeric range.
+                        // Runtime operator options and resource policies supply the actual bounds.
+                        Limits = new(int.MaxValue, int.MaxValue, int.MaxValue)
                     }
                 ]
             }
         }, cancellationToken);
     }
 
-    public static JsonElement LocalEnvelopeSchema { get; } = EnvelopeSchema(StorageContentOptions.SupportedMaximumBytes);
+    public static JsonElement LocalEnvelopeSchema { get; } = EnvelopeSchema();
 
-    private static JsonElement EnvelopeSchema(int maximumBytes) => JsonSerializer.SerializeToElement(new
+    private static JsonElement EnvelopeSchema() => JsonSerializer.SerializeToElement(new
     {
         type = "object",
         additionalProperties = false,
@@ -79,9 +81,9 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
             ["read"] = new { type = "boolean" },
             ["write"] = new { type = "boolean" },
             ["prefix"] = new { type = "string", maxLength = 256 },
-            ["maximumPageSize"] = new { type = "integer", minimum = 1, maximum = 100 },
-            ["maximumReadBytes"] = new { type = "integer", minimum = 1, maximum = maximumBytes },
-            ["maximumWriteBytes"] = new { type = "integer", minimum = 1, maximum = maximumBytes },
+            ["maximumPageSize"] = new { type = "integer", minimum = 1 },
+            ["maximumReadBytes"] = new { type = "integer", minimum = 1 },
+            ["maximumWriteBytes"] = new { type = "integer", minimum = 1 },
             ["keyFrom"] = new { type = "string", maxLength = 256 },
             ["keyBefore"] = new { type = "string", maxLength = 256 }
         }

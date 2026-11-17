@@ -97,7 +97,7 @@ public sealed partial class FlowRunService
     {
         var resolved = await ResolveVersionAsync(scope.AccessScopeRef, flowId, version, null, cancellationToken);
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
-            : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
+            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved,
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
         ValidateInput(resolved.Graph?.ResolveInputSchema(), input);

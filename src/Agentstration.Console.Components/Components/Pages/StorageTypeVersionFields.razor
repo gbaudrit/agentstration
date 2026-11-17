@@ -19,9 +19,9 @@
         <label><InputCheckbox @bind-Value="Draft.StableVersions" />@T("Capability.StableVersions")</label>
         <label><InputCheckbox @bind-Value="Draft.DurableRetention" />@T("Capability.DurableRetention")</label>
         <label><InputCheckbox @bind-Value="Draft.Deprecated" />@T("Deprecated")</label>
-        <label><span>@T("Type.MaximumPageSize")</span><InputNumber @bind-Value="Draft.MaximumPageSize" min="1" max="1000" /></label>
-        <label><span>@T("Type.MaximumReadBytes")</span><InputNumber @bind-Value="Draft.MaximumReadBytes" min="1" max="16777216" /></label>
-        <label><span>@T("Type.MaximumWriteBytes")</span><InputNumber @bind-Value="Draft.MaximumWriteBytes" min="1" max="16777216" /></label>
+        <label><span>@T("Type.MaximumPageSize")</span><InputNumber @bind-Value="Draft.MaximumPageSize" min="1" /></label>
+        <label><span>@T("Type.MaximumReadBytes")</span><InputNumber @bind-Value="Draft.MaximumReadBytes" min="1" /></label>
+        <label><span>@T("Type.MaximumWriteBytes")</span><InputNumber @bind-Value="Draft.MaximumWriteBytes" min="1" /></label>
     </div>
 </section>
 @code {

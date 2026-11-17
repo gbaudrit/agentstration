@@ -23,7 +23,7 @@ public sealed class ArtifactRecordService(ArtifactManagementService artifacts, I
         var artifact = (await artifacts.GetFlowRunArtifactForContentReadAsync(id, true, ct))?.Value
             ?? throw Error("flow_run_artifact_not_found");
         if (admission is not null) await admission.EnsureAsync(id, ct);
-        if (offset < 0 || length is < 1 or > StorageRecordSets.MaximumBytes || memberId.Length is < 1 or > 80)
+        if (offset < 0 || length < 1 || memberId.Length is < 1 or > 80)
             throw Error("artifact_record_range_invalid");
         var location = artifact.Receipt.Materialization;
         if (location?.Publication?.Records is not { } records) throw Error("artifact_records_unavailable");

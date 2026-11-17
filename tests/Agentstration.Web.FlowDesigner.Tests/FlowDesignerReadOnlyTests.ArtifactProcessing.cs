@@ -129,6 +129,31 @@ public sealed partial class FlowDesignerReadOnlyTests
         Assert.IsTrue(rendered.Find("[data-testid='artifact-input-mapping']").HasAttribute("disabled"));
     }
     [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ArtifactByteBudgetInputsAcceptValuesAboveFormerFixedCeilings(string language)
+    {
+        using var culture = new CultureScope(language);
+        using var context = CreateContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        ForeachArtifactsFlowStepDefinition? changed = null;
+        var step = new ForeachArtifactsFlowStepDefinition { Name = "transform" };
+        var rendered = context.Render<FlowArtifactTransformInspector>(parameters => parameters
+            .Add(component => component.Step, step)
+            .Add(component => component.ActiveTab, FlowStepSettingsTab.Configuration)
+            .Add(component => component.Changed, value => changed = (ForeachArtifactsFlowStepDefinition)value));
+        var input = rendered.Find("input[value='65536']");
+        var output = rendered.Find("input[value='8388608']");
+        Assert.IsFalse(input.HasAttribute("max"));
+        Assert.IsFalse(output.HasAttribute("max"));
+        input.Change("17825792");
+        Assert.AreEqual(17825792, changed?.MaximumContentBytes);
+        output.Change("17825792");
+        Assert.AreEqual(17825792, changed?.MaximumOutputBytes);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "enter your own")]
     [DataRow("fr-FR", "valeur libre")]
     public void ArtifactMediaTypeOffersSuggestionsAndPreservesCustomValues(string language, string help)

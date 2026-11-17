@@ -69,7 +69,7 @@ public sealed class SourceHistoryMaintenance(IResourceStore resources, ICurrentR
                 }
                 var target = DataSourceDatasetCompositionService.Target(item, consumer);
                 var retired = item.Publication is { } publication
-                    ? await publications.RetireAsync(publication with { Target = target }, ct)
+                    ? await publications.RetireAsync(publication, ct)
                     : await content.RetireAsync(target, item.Content!, ct);
                 _ = await InWorkspaceAsync(() => resources.PutExactAsync(item.ScopeRef!.Value, claimed.Value with
                 {

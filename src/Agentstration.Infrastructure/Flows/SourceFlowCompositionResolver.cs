@@ -4,7 +4,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class SourceFlowCompositionResolver(FlowService flows) : IFlowCompositionResolver
+public sealed class SourceFlowCompositionResolver(FlowService flows, FlowContentOptions? contentOptions = null) : IFlowCompositionResolver
 {
     public async Task<ResolvedFlowComposition> ResolveAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken cancellationToken)
@@ -17,7 +17,7 @@ public sealed class SourceFlowCompositionResolver(FlowService flows) : IFlowComp
     private async Task<ResolvedFlowComposition> ResolveCoreAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, bool accepted, CancellationToken cancellationToken)
     {
-        var compiler = new FlowCompositionService(flows);
+        var compiler = new FlowCompositionService(flows, contentOptions);
         var template = await compiler.ResolveCallAsync(orchestration, consumer, ownerNamespace, cancellationToken);
         foreach (var binding in bindings.Where(pair => pair.Value.Any(call => call.PassInputDirectly)))
         {

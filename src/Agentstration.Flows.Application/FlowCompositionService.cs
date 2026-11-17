@@ -9,7 +9,7 @@ namespace Agentstration.Flows.Application;
 public sealed record CompiledFlowComposition(FlowVersion Definition, FlowCompositionReceipt? Receipt);
 
 /// <summary>Expands declared points into ordinary, exact-version governed child calls at admission.</summary>
-public sealed class FlowCompositionService(FlowService flows)
+public sealed class FlowCompositionService(FlowService flows, FlowContentOptions? contentOptions = null)
 {
     public const int MaximumCallsPerPoint = 32;
     public const int MaximumCalls = 128;
@@ -60,7 +60,8 @@ public sealed class FlowCompositionService(FlowService flows)
                     if (function.InputSchema.TryGetProperty("properties", out var functionProperties) && functionProperties.TryGetProperty("value", out var functionValue))
                     {
                         if (!FunctionValueCompatible(previousSchema, functionValue)) throw Error("flow_composition_function_input_incompatible");
-                        FlowCompositionSchema.ValidateValue(Agentstration.Functions.Contracts.FunctionInvocationSchemas.Parameters(function.InputSchema), call.Parameters, allowDynamicSchema: true);
+                        FlowCompositionSchema.ValidateValue(Agentstration.Functions.Contracts.FunctionInvocationSchemas.Parameters(function.InputSchema), call.Parameters,
+                            allowDynamicSchema: true, maximumValueBytes: (contentOptions ?? new()).MaximumValueBytes);
                         arguments = JsonSerializer.SerializeToElement(new { value = mapping.Clone() });
                         functionParameters = call.Parameters.Clone();
                     }
@@ -106,7 +107,7 @@ public sealed class FlowCompositionService(FlowService flows)
                     if (!inputSchema.TryGetProperty("properties", out var properties) || !properties.TryGetProperty("value", out var value)
                         || !properties.TryGetProperty("parameters", out var parameters)) throw Incompatible(template, point, "flowInputEnvelope", previousSchema, inputSchema);
                     if (!FlowCompositionSchema.IsAssignable(previousSchema, value)) throw Incompatible(template, point, "flowInput", previousSchema, value);
-                    FlowCompositionSchema.ValidateValue(parameters, call.Parameters);
+                    FlowCompositionSchema.ValidateValue(parameters, call.Parameters, maximumValueBytes: (contentOptions ?? new()).MaximumValueBytes);
                     input = mapping.Clone();
                 }
                 var outputs = child.Graph!.GetOutputs().Where(output => output.Outcome == FlowOutputOutcome.Success).ToArray();

@@ -80,11 +80,22 @@ public sealed class JsonExplodeTests
             "An acquired object stays intact when no explicit record transformation has run.");
         Assert.ThrowsExactly<ArgumentException>(() => JsonRecordProjection.Normalize(Json("[{}]"), null));
         Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Encode(Enumerable.Repeat(Json("{}"), 101).ToArray()));
-        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Encode([JsonSerializer.SerializeToElement(new { text = new string('x', 65536) })]));
         Assert.ThrowsExactly<ArgumentException>(() => (normalized with { RecordContract = rootContract with { Digest = "forged" } }).Validate());
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         Assert.ThrowsExactly<OperationCanceledException>(() => normalized.Validate(cancelled.Token));
+    }
+
+    [TestMethod]
+    public void RecordContractsDoNotImposeASecondPayloadBudget()
+    {
+        var record = JsonSerializer.SerializeToElement(new { text = new string('x', 128 * 1024) });
+        var projection = JsonRecordProjection.Normalize(record, null);
+        var decoded = JsonRecordProjection.Parse(JsonSerializer.SerializeToElement(projection))!;
+        var bytes = StorageRecordSets.Encode(decoded.Value.EnumerateArray().ToArray());
+        Assert.IsGreaterThan(65536, bytes.Length);
+        using var content = JsonDocument.Parse(bytes);
+        Assert.IsTrue(JsonElement.DeepEquals(record, content.RootElement[0]));
     }
 
     [TestMethod]
@@ -136,5 +147,11 @@ public sealed class JsonExplodeTests
             Records = reference.Records with
             { Members = [reference.Records.Members[0] with { Id = "../escape" }] }
         }));
+        Assert.ThrowsExactly<ArgumentException>(() => StorageRecordSets.Members(reference with
+        {
+            Length = long.MaxValue,
+            Records = reference.Records with
+            { Members = reference.Records.Members.Select(member => member with { Length = long.MaxValue }).ToArray() }
+        }), "Forged size evidence must be rejected without overflowing when fixed byte ceilings are removed.");
     }
 }

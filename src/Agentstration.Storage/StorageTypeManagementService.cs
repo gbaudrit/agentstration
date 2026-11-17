@@ -223,9 +223,9 @@ public sealed class StorageTypeManagementService(
                     throw new StorageException("storage_requirement_invalid", "Invalid requirement type, protection or format.");
             }
             if (version.Capabilities is null || version.Limits is null
-                || version.Limits.MaximumPageSize is < 1 or > 1000
-                || version.Limits.MaximumReadBytes is < 1 or > StorageContentOptions.SupportedMaximumBytes
-                || version.Limits.MaximumWriteBytes is < 1 or > StorageContentOptions.SupportedMaximumBytes
+                || version.Limits.MaximumPageSize < 1
+                || version.Limits.MaximumReadBytes < 1
+                || version.Limits.MaximumWriteBytes < 1
                 || (version.Capabilities.DurableRetention && !version.Capabilities.StableVersions))
                 throw new StorageException("storage_capabilities_invalid", "Invalid capabilities or bounded limits.");
             var authority = governance.Current?.ManagedBy ?? resource.Governance.ManagedBy;

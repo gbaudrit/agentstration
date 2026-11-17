@@ -247,8 +247,8 @@ public sealed partial class FlowGraphValidator(IFlowResourceReferenceResolver re
                 ValidateSchemaContract(transform.Schema, transform.SchemaBinding, "schema", transform.Name, issues);
                 break;
             case ForeachArtifactsFlowStepDefinition processing:
-                if (processing.MaximumOutputArtifacts is < 1 or > 100 || processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes is < 1 or > 1_048_576
-                    || processing.MaximumOutputBytes is < 1 or > 16_777_216 || !Enum.IsDefined(processing.Mode))
+                if (processing.MaximumOutputArtifacts is < 1 or > 100 || processing.MaximumConcurrency is < 1 or > 16 || processing.MaximumArtifacts is < 1 or > 128 || processing.MaximumContentBytes < 1
+                    || processing.MaximumOutputBytes < 1 || !Enum.IsDefined(processing.Mode))
                     issues.Add(Error("artifact_processing_limits_invalid", "Artifact processing limits are outside their supported bounds.", step.Name));
                 if (processing.OutputContract is { } outputContract)
                 {

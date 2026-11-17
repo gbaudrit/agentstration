@@ -23,7 +23,6 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
     IRequestContextScopeFactory scopes, Agentstration.Storage.StorageContentOptions? options = null) : IDisposable
 {
     private const string RuntimeType = "artifact-processing-v1";
-    private const int MaximumInputBytes = 16 * 1024 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly UTF8Encoding Utf8 = new(false, true);
     // Bounded stripes serialize retrying and concurrent Tools in the standalone authority.
@@ -68,7 +67,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 if (session is null)
                 {
                     var input = await ResolveInputAsync(arguments, owner, key, token);
-                    if (input.Length > MaximumInputBytes || step.Mode == ArtifactProcessingMode.Content && input.Length > step.MaximumContentBytes)
+                    if (input.Length > (options ?? new()).MaximumObjectBytes || step.Mode == ArtifactProcessingMode.Content && input.Length > step.MaximumContentBytes)
                         throw Error("artifact_processing_content_too_large");
                     var body = step.Mode == ArtifactProcessingMode.Content && step.ResultMapping is null
                         && owner.DefinitionSnapshot.Graph!.Transitions.Any(edge => edge.FromStep == step.Name && edge.Event == "process")
@@ -215,16 +214,19 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             throw Error("artifact_processing_expansion_invalid");
         if (entries.Length < 1 || entries.Length > step.MaximumOutputArtifacts) throw Error("artifact_processing_expansion_limit");
         var prepared = new List<(byte[] Bytes, ResolvedDataContract? Contract, IReadOnlyDictionary<string, string> Provenance)>();
-        var total = 0;
+        var total = 0L;
         foreach (var entry in entries)
         {
             token.ThrowIfCancellationRequested();
             if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("kind", out var kind) || kind.GetString() != "inline"
                 || !entry.TryGetProperty("contentBase64", out var encoded) || encoded.ValueKind != JsonValueKind.String
-                || encoded.GetString() is not { Length: <= 87384 } base64) throw Error("artifact_processing_expansion_invalid");
+                || encoded.GetString() is not { } base64) throw Error("artifact_processing_expansion_invalid");
+            if (base64.Length > (((options ?? new()).MaximumObjectBytes + 2L) / 3) * 4)
+                throw Error("artifact_processing_output_too_large");
             var bytes = Convert.FromBase64String(base64);
             total = checked(total + bytes.Length);
-            if (bytes.Length > 65536 || total > step.MaximumOutputBytes) throw Error("artifact_processing_output_too_large");
+            if (bytes.Length > (options ?? new()).MaximumObjectBytes || total > step.MaximumOutputBytes)
+                throw Error("artifact_processing_output_too_large");
             ValidateContent("application/json", Utf8.GetString(bytes));
             var contract = entry.TryGetProperty("dataContract", out var declared) && declared.ValueKind == JsonValueKind.Object
                 ? declared.Deserialize<ResolvedDataContract>(Json) : null;
@@ -293,6 +295,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         if (existing is null) await durable.ResetAsync(owner.WorkspaceId, reference, token);
         long offset = existing?.Length ?? 0;
         var maximumWrite = await selectableStorage.MaximumChunkBytesAsync(owner.WorkspaceId, reference, true, token);
+        // Staging reads may use smaller buffers than the destination's configured transfer budget.
+        maximumWrite = Math.Min(maximumWrite, ArtifactManagementService.MaximumChunkBytes);
         while (offset < outputStage.Length)
         {
             var chunk = await artifacts.ReadAsync(outputStage.ArtifactId, offset,

@@ -11,6 +11,20 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    [DataRow(2 * 1024 * 1024)]
+    [DataRow(17 * 1024 * 1024)]
+    public void CompositionUsesTheConfiguredSerializedByteBudget(int contentBytes)
+    {
+        var schema = JsonSerializer.SerializeToElement(new { type = "string" });
+        var value = JsonSerializer.SerializeToElement(new string('x', contentBytes));
+        var size = JsonSerializer.SerializeToUtf8Bytes(value).Length;
+        FlowCompositionSchema.ValidateValue(schema, value, maximumValueBytes: size);
+        var failure = Assert.ThrowsExactly<FlowValidationException>(() =>
+            FlowCompositionSchema.ValidateValue(schema, value, maximumValueBytes: size - 1));
+        Assert.AreEqual("flow_composition_value_too_large", failure.Code);
+    }
+
+    [TestMethod]
     public async Task CompositionDiagnosticsIdentifyTheFailingBoundaryWithoutCopyingInputValues()
     {
         await using var fixture = await FlowFixture.CreateAsync();
@@ -83,10 +97,10 @@ public sealed partial class FlowTests
         using var document = JsonDocument.Parse("{\"value\":\"" + new string('x', length - 12) + "\"}");
         Assert.AreEqual(length, document.RootElement.GetRawText().Length);
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
-        if (accepted) FlowCompositionSchema.ValidateValue(schema, document.RootElement);
+        if (accepted) FlowCompositionSchema.ValidateValue(schema, document.RootElement, maximumValueBytes: 1_048_576);
         else
         {
-            var error = Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(schema, document.RootElement));
+            var error = Assert.ThrowsExactly<FlowValidationException>(() => FlowCompositionSchema.ValidateValue(schema, document.RootElement, maximumValueBytes: 1_048_576));
             Assert.AreEqual("flow_composition_value_too_large", error.Code);
         }
     }

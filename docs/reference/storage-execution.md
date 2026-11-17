@@ -35,10 +35,10 @@ immutability and explicit consumer pins remain enforced.
 Configuration is `{}`. The local envelope uses `StorageContentPolicy` fields:
 `list`, `stat`, `read`, `write`, `prefix`, `maximumPageSize`, `maximumReadBytes`,
 `maximumWriteBytes`, `keyFrom` and `keyBefore`. Missing fields use the contract
-defaults; write defaults to false. Both schema and pure local restriction
+defaults; omitted numeric limits add no restriction to the server budgets, and write defaults to false. Both schema and pure local restriction
 validation run during management, without resolving a Secret or touching content.
 
-The type supports up to 16 MiB per read/write, subject to operator and resource limits.
+The local type adds no payload or page ceiling below the contracts' numeric range.
 Defaults are 10 MiB per read/write and content object, 100 items/page, 1,024 current objects,
 64 MiB total current content and 512 outstanding write receipts per Storage.
 Expired receipts are pruned at a subsequent write. Capacity refusal is explicit.
@@ -66,17 +66,21 @@ Configure the authoritative server in `appsettings.json` or environment variable
     "DataSourceContent": {
       "MaximumValueBytes": 10485760,
       "MaximumHttpResponseBytes": 10485760
-    }
+    },
+    "FunctionContent": { "MaximumValueBytes": 10485760 },
+    "FlowContent": { "MaximumValueBytes": 10485760 }
   }
 }
 ```
 
 For example, `Agentstration__StorageContent__MaximumWriteBytes=10485760` sets the
 server write ceiling to 10 MiB. Restart the authority to apply configuration.
-Invalid values fail during composition. Supported payload/object budgets are
-1–16,777,216 bytes; transfer chunks are 1–65,536 bytes and pages are 1–100 objects.
-Local decoded object capacity must be at least the configured object budget and
-at most 1 GiB; count quotas accept 1–100,000. Publication count is per Storage and
+Invalid values fail during composition. All budgets and quotas must be positive;
+local decoded object capacity must be at least the configured object budget.
+There is no additional hard-coded upper ceiling: byte, chunk, page and count
+options use positive `Int32` values, and store capacity uses positive `Int64` values.
+The values in the example are defaults, not maximum supported values.
+Publication count is per Storage and
 execution Workspace; object, decoded-byte and receipt quotas apply to the mutable
 local object backend, independently of retained publications and native Artifact files.
 
@@ -104,15 +108,23 @@ The integrated ASP remote adapters and standalone protocols are unchanged. Conte
 wire/contribution ceilings remain 64 KiB and advertised remote type/provider limits
 still apply. Structured documents keep their separate `maximumDocumentBytes` and
 `maximumResultBytes` policies; these content settings do not widen document/query
-limits. JSON record collections retain their 64 KiB aggregate profile ceiling and
-also obey narrower local operator budgets. A server setting cannot widen that
-profile or a remote capability.
+limits. Native JSON record collections use the configured acquisition and Storage
+budgets, without a separate 64 KiB aggregate payload ceiling. The existing record
+cardinality and shape contracts remain enforced. A server setting cannot widen
+a remote capability.
 
 `MaximumHttpResponseBytes` counts raw bytes from builtin HTTP GET acquisitions.
 `MaximumValueBytes` counts the complete serialized JSON operation input/output.
 Wrapping a response in JSON, escaping text and UTF-8 encoding add bytes: a body
 that fits its HTTP budget can still exceed its dataset budget. Storage and
-publication limits apply separately. Agent text-read windows, retrieval scan
+publication limits apply separately. `FunctionContent:MaximumValueBytes` controls
+serialized native transformation inputs/outputs, including JSON wrappers and
+record metadata. Configure it alongside the acquisition budget when a dataset
+uses transformations. `FlowContent:MaximumValueBytes` controls serialized values
+passed into child Flow compositions. Foreach Artifact input/output byte budgets are positive
+Flow rules, without a second fixed publication ceiling; execution still enforces
+the configured Storage object budget. The Console type and Flow editors accept
+these larger values. Agent text-read windows, retrieval scan
 budgets, configuration schemas and ordinary file buffers retain their own bounds.
 
 The local `1.0.0` schema/contract is updated for a maintainer-authorized reseed.

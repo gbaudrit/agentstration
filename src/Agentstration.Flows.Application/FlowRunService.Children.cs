@@ -194,12 +194,13 @@ public sealed partial class FlowRunService
             ?? contractContext?.ExpectedOutput ?? (inlineVersion is null ? parent.ContractContext?.ExpectedOutput : null);
         input = DataContracts.BindOutputParameter(input, resolved.Graph?.ResolveInputSchema(), outputExpectation, "flow-input", parent.Id, call.Name);
         if (call.CompositionPoint is not null && resolved.Graph?.InputSchema is { } contract)
-            FlowCompositionSchema.ValidateValue(contract, input, isProtectedString: value => SecretInputs.IsReference(value, parent.SecretInputs));
+            FlowCompositionSchema.ValidateValue(contract, input, isProtectedString: value => SecretInputs.IsReference(value, parent.SecretInputs),
+                maximumValueBytes: (contentOptions ?? new()).MaximumValueBytes);
         if (call.CompositionParameters is { } parameters && (!input.TryGetProperty("parameters", out var actualParameters)
             || !JsonElement.DeepEquals(parameters, actualParameters)))
             throw new FlowValidationException("flow_composition_parameters_changed", "Accepted composition parameters cannot be replaced.");
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
-            : await new FlowCompositionService(flowDefinitions).ResolveAsync(resolved,
+            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved,
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(), parent.Scope.AccessScopeRef, cancellationToken);
         resolved = composed.Definition;
         ValidateInput(resolved.Graph?.ResolveInputSchema(), input, parent.SecretInputs);

@@ -15,7 +15,8 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
     [TestMethod]
     public async Task SourceAcceptanceAndFlowPublicationRejectUnresolvableBindingsAndIgnoreCallerSnapshots()
     {
-        await using var factory = Factory();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.UseSetting(
+            $"{Agentstration.Functions.FunctionContentOptions.SectionName}:MaximumValueBytes", "1048576"));
         var context = await GetBootstrapContextAsync(factory);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
         var owner = ResourceScopeRef.Instance;

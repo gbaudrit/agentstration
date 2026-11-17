@@ -91,7 +91,7 @@ public static class AspValidation
 
     public static byte[] Content(string content, int limit)
     {
-        Require(content is not null && content.Length <= ((limit + 2) / 3) * 4, "limit_exceeded", "Content exceeds the payload limit.");
+        Require(content is not null && content.Length <= ((limit + 2L) / 3) * 4, "limit_exceeded", "Content exceeds the payload limit.");
         try
         {
             var bytes = Convert.FromBase64String(content);

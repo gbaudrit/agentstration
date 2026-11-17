@@ -10,8 +10,7 @@ public sealed record DataSourceContentOptions
 
     public void Validate()
     {
-        if (MaximumValueBytes is < 1 or > 16 * 1024 * 1024
-            || MaximumHttpResponseBytes is < 1 or > 16 * 1024 * 1024)
-            throw new InvalidOperationException($"{SectionName} byte limits must be between 1 and 16777216.");
+        if (MaximumValueBytes < 1 || MaximumHttpResponseBytes < 1)
+            throw new InvalidOperationException($"{SectionName} byte limits must be positive.");
     }
 }

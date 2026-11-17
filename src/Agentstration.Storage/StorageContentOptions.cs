@@ -6,7 +6,6 @@ namespace Agentstration.Storage;
 public sealed record StorageContentOptions
 {
     public const string SectionName = "Agentstration:StorageContent";
-    public const int SupportedMaximumBytes = 16 * 1024 * 1024;
     public int MaximumReadBytes { get; init; } = 10 * 1024 * 1024;
     public int MaximumWriteBytes { get; init; } = 10 * 1024 * 1024;
     public int MaximumObjectBytes { get; init; } = 10 * 1024 * 1024;
@@ -19,13 +18,10 @@ public sealed record StorageContentOptions
 
     public void Validate()
     {
-        if (MaximumReadBytes is < 1 or > SupportedMaximumBytes
-            || MaximumWriteBytes is < 1 or > SupportedMaximumBytes
-            || MaximumObjectBytes is < 1 or > SupportedMaximumBytes
-            || TransferChunkBytes is < 1 or > 65536 || MaximumPageSize is < 1 or > 100
-            || LocalMaximumStoreBytes < MaximumObjectBytes || LocalMaximumStoreBytes > 1024L * 1024 * 1024
-            || LocalMaximumObjects is < 1 or > 100000 || LocalMaximumReceipts is < 1 or > 100000
-            || LocalMaximumPublications is < 1 or > 100000)
+        if (MaximumReadBytes < 1 || MaximumWriteBytes < 1 || MaximumObjectBytes < 1
+            || TransferChunkBytes < 1 || MaximumPageSize < 1
+            || LocalMaximumStoreBytes < MaximumObjectBytes
+            || LocalMaximumObjects < 1 || LocalMaximumReceipts < 1 || LocalMaximumPublications < 1)
             throw new InvalidOperationException($"{SectionName} contains invalid content limits or local capacities.");
     }
 
@@ -34,9 +30,7 @@ public sealed record StorageContentOptions
 
     public static void ValidatePolicy(StorageContentPolicy policy)
     {
-        if (policy.MaximumReadBytes is < 1 or > SupportedMaximumBytes
-            || policy.MaximumWriteBytes is < 1 or > SupportedMaximumBytes
-            || policy.MaximumPageSize is < 1 or > 100)
-            throw new StorageException("storage_content_invalid_policy", "Content policy limits are outside the supported bounds.");
+        if (policy.MaximumReadBytes < 1 || policy.MaximumWriteBytes < 1 || policy.MaximumPageSize < 1)
+            throw new StorageException("storage_content_invalid_policy", "Content policy limits must be positive.");
     }
 }

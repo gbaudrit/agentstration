@@ -22,7 +22,7 @@ public sealed class DataSourceDocumentStorage(IStorageResolver storages, IStorag
     public async Task<StorageObjectContent> ReadAsync(StoragePublicationReference reference, StorageObject item,
         long offset, int maximumBytes, CancellationToken ct)
     {
-        if (offset < 0 || offset > reference.Length || maximumBytes is < 1 or > StorageRecordSets.MaximumBytes
+        if (offset < 0 || offset > reference.Length || maximumBytes < 1
             || reference.Target.Policy.MaximumReadBytes < 1)
             throw Invalid("data_source_content_range_invalid", "The acquired content read exceeds its bounds.");
         var bytes = await publications.ReadAsync(reference, offset, Math.Min(maximumBytes, reference.Target.Policy.MaximumReadBytes), ct);

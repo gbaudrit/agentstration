@@ -7,15 +7,13 @@ namespace Agentstration.Storage.Contracts;
 public static class StorageRecordSets
 {
     public const int MaximumRecords = 100;
-    public const int MaximumBytes = 65536;
     public static string Digest(ReadOnlySpan<byte> bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public static byte[] Encode(IReadOnlyList<JsonElement> records)
     {
         if (records.Count is < 1 or > MaximumRecords || records.Any(value => value.ValueKind != JsonValueKind.Object))
             throw new ArgumentException("A record set requires one to one hundred JSON objects.", nameof(records));
-        var bytes = StorageDocumentEncoding.Encode(JsonSerializer.SerializeToElement(records));
-        if (bytes.Length > MaximumBytes) throw new ArgumentException("The JSON record set exceeds its aggregate limit.", nameof(records));
-        return bytes;
+        // Admission budgets belong to the acquisition/publication services, not this encoding contract.
+        return StorageDocumentEncoding.Encode(JsonSerializer.SerializeToElement(records));
     }
 
     public static IReadOnlyList<StoragePublicationReference> Members(StoragePublicationReference reference)
@@ -24,10 +22,10 @@ public static class StorageRecordSets
         if (reference.Document is not null || records.Members is null || records.Members.Count is < 1 or > MaximumRecords
             || records.Members.Any(member => member is null || member.Id is null || member.Id.Length is < 1 or > 80
                 || member.Id.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-')
-                || member.Length is < 2 or > MaximumBytes || member.Sha256 is null || member.Sha256.Length != 64 || !member.Sha256.All(char.IsAsciiHexDigit))
+                || member.Length < 2 || member.Sha256 is null || member.Sha256.Length != 64 || !member.Sha256.All(char.IsAsciiHexDigit))
             || records.Members.Select(member => member.Id).Distinct(StringComparer.Ordinal).Count() != records.Members.Count
-            || reference.Length != records.Members.Sum(member => member.Length) + records.Members.Count + 1
-            || reference.Length > MaximumBytes || reference.Sha256 is null || reference.Sha256.Length != 64 || !reference.Sha256.All(char.IsAsciiHexDigit)
+            || reference.Length != records.Members.Sum(member => (decimal)member.Length) + records.Members.Count + 1
+            || reference.Sha256 is null || reference.Sha256.Length != 64 || !reference.Sha256.All(char.IsAsciiHexDigit)
             || reference.Key is null)
             throw new ArgumentException("Invalid JSON record membership evidence.", nameof(reference));
         var publication = records.DocumentPublication;
