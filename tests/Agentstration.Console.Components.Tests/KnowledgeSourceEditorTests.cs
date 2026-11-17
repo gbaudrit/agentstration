@@ -205,7 +205,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("REST documentation");
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] select").Change(
             $"{DataSourceScope.Value}|default|documentation");
-        rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea")
+        rendered.Find("[data-testid='knowledge-source-transformation-configuration'] textarea")
             .Input("{\"format\":\"markdown\"}");
         rendered.Find("[data-testid='knowledge-source-binding-maximum-age']").Change("25:30:45");
         rendered.Find("[data-testid='knowledge-binding-refresh']").Change(true);
@@ -255,7 +255,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Invalid source");
         rendered.Find("[data-testid='knowledge-source-data-source-bindings'] select").Change(
             $"{DataSourceScope.Value}|default|documentation");
-        rendered.Find("[data-testid='knowledge-source-data-source-bindings'] textarea").Input("[]");
+        rendered.Find("[data-testid='knowledge-source-transformation-configuration'] textarea").Input("[]");
 
         rendered.WaitForAssertion(() =>
         {
@@ -868,6 +868,21 @@ public sealed partial class KnowledgeSourceEditorTests
         public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
         public PublishKnowledgeSourceToolExposureRequest? PublishedExposureRequest { get; private set; }
         public bool RejectExposurePublication { get; set; }
+        public KnowledgeSourceToolProposal? ToolProposal { get; set; }
+        public int ProposalCalls { get; private set; }
+        public Task<KnowledgeSourceToolProposal?> GetToolProposalAsync(ResourceNamespace ns, string name, CancellationToken ct = default)
+        {
+            ProposalCalls++;
+            return Task.FromResult<KnowledgeSourceToolProposal?>(ToolProposal ?? new()
+            {
+                SourceUid = source?.Uid ?? Guid.Empty,
+                SourceGeneration = source?.Generation ?? 1,
+                Digest = "reviewed-proposal",
+                ToolSetName = name + ".access",
+                Ready = !DependenciesStale
+            });
+        }
+
         public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<KnowledgeSourceResource>>(source is null ? [] : [source]);
         public Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>

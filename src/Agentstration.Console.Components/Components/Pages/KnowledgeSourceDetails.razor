@@ -128,6 +128,37 @@ else if (source is not null && readiness is not null)
             <p data-testid="knowledge-tool-exposure-current-version">@T("PublishedExposureVersion", exposure.ToolSetVersion)</p>
             <p class="resource-hint">@T("RepublishExposureHelp")</p>
         }
+        <div class="form-actions"><button class="button-secondary" type="button" data-testid="knowledge-refresh-tools" disabled="@(!interactive || refreshingTools || busy)" @onclick="RefreshToolsAsync">@T("RefreshToolProposal")</button></div>
+        @if (proposalError is not null) { <p class="inline-warning" role="status">@proposalError</p> }
+        @if (toolProposal is { } proposal)
+        {
+            <h3>@T("ProposedTools")</h3>
+            <p class="resource-hint">@T("ToolProposalHelp")</p>
+            @foreach (var issue in proposal.Issues) { <p class="inline-warning">@ProposalIssueLabel(issue) <code>@issue</code></p> }
+            <DataGrid TItem="KnowledgeToolProposal" Items="proposal.Tools">
+                <Header><tr><th>@T("Tool")</th><th>@T("ProposalChange")</th><th>@T("ToolContract")</th></tr></Header>
+                <Row Context="candidate">
+                    <tr data-testid="knowledge-proposed-tool">
+                        <td><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></td>
+                        <td>@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p>@ProposalIssueLabel(issue) <code>@issue</code></p> }</td>
+                        <td><details><summary>@T("InspectToolContract")</summary>
+                            @if (candidate.Contribution is { } contribution)
+                            {
+                                <p><strong>@T("ToolFixedContribution")</strong> <code>@contribution.BindingName</code> · <code>@contribution.DataSourceUid</code></p>
+                            }
+                            @if (candidate.Profile is { } profile)
+                            {
+                                <p><strong>@T("ToolFixedQueryProfile")</strong> <code>@profile.Id @profile.Version · @profile.Encoding · @profile.ModelDigest</code></p>
+                            }
+                            <p>@T($"ToolContentEvidence.{candidate.ContentEvidence}")</p>
+                            <h4>@T("ToolInputContract")</h4><pre class="runner-json">@candidate.InputSchema.ToString()</pre>
+                            @if (candidate.OutputSchema is { } outputSchema) { <h4>@T("ToolOutputContract")</h4><pre class="runner-json">@outputSchema.ToString()</pre> }
+                            @if (candidate.DataSchema is { } dataSchema) { <h4>@T("ToolStorageDataSchema")</h4><pre class="runner-json">@dataSchema.ToString()</pre> }
+                        </details></td>
+                    </tr>
+                </Row>
+            </DataGrid>
+        }
         @if (CanManage)
         {
             <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" @bind:event="oninput" disabled="@(busy || !interactive)" data-testid="knowledge-tool-exposure-version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" disabled="@(busy || !interactive)" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
@@ -171,6 +202,9 @@ else if (source is not null && readiness is not null)
     private KnowledgeSourceResource? source;
     private KnowledgeSourceReadiness? readiness;
     private KnowledgeSourceToolExposureResource? exposure;
+    private KnowledgeSourceToolProposal? toolProposal;
+    private bool refreshingTools;
+    private string? proposalError;
     private IReadOnlyList<KnowledgeProjectionResource> projections = [];
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
@@ -201,7 +235,7 @@ else if (source is not null && readiness is not null)
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<DetailsTab> VisibleTabs => [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, .. (CanManage ? [DetailsTab.Access] : Array.Empty<DetailsTab>()), DetailsTab.Yaml];
     private bool CanManage => source is not null && ResourceOwnershipContext.CanManage(source.ScopeRef ?? ResourceScopeRef.Instance, Services);
-    private bool CanPublishTools => interactive && CanManage && readiness?.Ready == true && !busy && !string.IsNullOrWhiteSpace(version)
+    private bool CanPublishTools => interactive && CanManage && readiness?.Ready == true && toolProposal?.Ready == true && !busy && !refreshingTools && !string.IsNullOrWhiteSpace(version)
         && (exposure is null || !string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal));
     private string ToolSetUrl => exposure is null ? "/tools/sets" : ScopedToolUrl(
         exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
@@ -255,6 +289,7 @@ else if (source is not null && readiness is not null)
             etag = sourceSnapshot.ETag;
             readiness = await readinessTask;
             exposure = await exposureTask;
+            await RefreshToolsAsync();
             version = exposure is null ? "1.0.0" : NextExposureVersion(exposure.ToolSetVersion);
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault();
@@ -357,6 +392,16 @@ else if (source is not null && readiness is not null)
         Metadata = source.Metadata,
         Definition = source.Definition
     };
+    private async Task RefreshToolsAsync()
+    {
+        if (refreshingTools) return;
+        refreshingTools = true;
+        proposalError = null;
+        try { toolProposal = await Client.GetToolProposalAsync(SourceNamespace, Name, cancellation.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { toolProposal = null; proposalError = T("ToolProposalRefreshFailed"); }
+        finally { refreshingTools = false; }
+    }
     private async Task PublishAsync()
     {
         if (!CanPublishTools) return;
@@ -366,9 +411,10 @@ else if (source is not null && readiness is not null)
         try
         {
             exposure = (await Client.PublishExposureAsync(SourceNamespace, Name,
-                new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval }, cancellation.Token)).Value;
+                new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval, ProposalDigest = toolProposal?.Digest }, cancellation.Token)).Value;
             version = NextExposureVersion(exposure.ToolSetVersion);
             message = T("ExposurePublished");
+            await RefreshToolsAsync();
         }
         catch (Exception exception) { failed = true; message = exception.Message; }
         finally { busy = false; }
@@ -530,6 +576,18 @@ else if (source is not null && readiness is not null)
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
     private static string ShortMetricIdentifier(string value) => value.Length > 18 ? $"{value[..18]}…" : value;
     private string OperationLabel(KnowledgeSourceOperation operation) => T($"Operation.{operation}");
+    private string ProposalIssueLabel(string issue) => T(issue switch
+    {
+        "knowledge_source_tool_set_conflict" or "knowledge_source_tool_definition_conflict" => "ToolIssue.NameConflict",
+        "knowledge_contribution_unresolved" => "ToolIssue.UnresolvedContribution",
+        "knowledge_contribution_evidence_unavailable" => "ToolIssue.MissingEvidence",
+        "knowledge_contribution_no_published_members" => "ToolIssue.NoMembers",
+        "knowledge_contribution_text_unsupported" => "ToolIssue.TextUnsupported",
+        "knowledge_read_unsupported" => "ToolIssue.ReadDenied",
+        "knowledge_documents_unavailable" => "ToolIssue.DocumentsUnavailable",
+        "knowledge_contribution_query_unsupported" => "ToolIssue.QueryUnsupported",
+        _ => "ToolIssue.Unavailable"
+    });
     private static string FormatSize(long length) => length < 1024
         ? $"{length:N0} B"
         : length < 1024 * 1024

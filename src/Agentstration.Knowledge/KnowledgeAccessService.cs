@@ -36,7 +36,8 @@ public sealed partial class KnowledgeAccessService(
     KnowledgeSourceManagementService sources, KnowledgeSnapshotService snapshots, KnowledgeProjectionService projections,
     IResourceStore resources, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
     IAuthorizationService authorization, IKnowledgeSnapshotContentReader content,
-    IKnowledgeAccessTokenProtector protector, TimeProvider clock, IKnowledgeAccessLifetime? lifetime = null, ISecurityAuditWriter? audit = null, IStorageDocumentGateway? documents = null)
+    IKnowledgeAccessTokenProtector protector, TimeProvider clock, IKnowledgeAccessLifetime? lifetime = null, ISecurityAuditWriter? audit = null, IStorageDocumentGateway? documents = null,
+    KnowledgeToolMetadataService? metadata = null)
 {
     public const string SessionKind = "KnowledgeReadSession";
     public const int MaximumCharacters = 32_768;
@@ -70,6 +71,7 @@ public sealed partial class KnowledgeAccessService(
         public int ContextCharacters { get; init; }
         public string? RequestKey { get; init; }
         public long SourceGeneration { get; init; }
+        public KnowledgeContributionSelection? Contribution { get; init; }
         public StorageDocumentQuery? DocumentQuery { get; init; }
     }
 

@@ -192,6 +192,14 @@ public sealed class KnowledgeSourceManagementService(
     {
         var scopeRef = RequireScope(existing.Value);
         var changed = existing.Value with { Definition = definition };
+        if (!rebindDependencies && KnowledgeDefinitionSemantics.ExecutionEquals(existing.Value.Definition, definition))
+        {
+            ValidateStructure(changed);
+            var editorial = await scopeOperations.WriteAsync(changed, scopeRef, AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(scopeRef, changed, etag, false, token), cancellationToken);
+            await AuditAsync(auditAction, scopeRef, cancellationToken);
+            return editorial;
+        }
         var updated = await scopeOperations.WriteAsync(changed, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             KnowledgeSourceReadiness readiness;
@@ -353,6 +361,8 @@ public sealed class KnowledgeSourceManagementService(
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in resource.Definition.DataSources)
         {
+            if (binding.Description?.Length > MaximumDescriptionLength) throw new KnowledgeSourceValidationException("knowledge_binding_description_invalid", "The contribution description exceeds its bound.");
+
             if (string.IsNullOrWhiteSpace(binding.Name) || !names.Add(binding.Name))
                 throw new KnowledgeSourceValidationException("knowledge_source_data_source_binding_invalid",
                     "Data Source binding names must be non-empty and unique.");
@@ -574,9 +584,12 @@ public sealed class KnowledgeSourceManagementService(
         FlowCallReference root, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken ct, bool accepted = false)
     {
         if (sequences is null) throw new KnowledgeSourceValidationException("knowledge_source_composition_unavailable", "Flow composition is unavailable.");
-        try { return accepted
+        try
+        {
+            return accepted
             ? await sequences.ResolveAcceptedAsync(RequireScope(resource), resource.Namespace, root, bindings, ct)
-            : await sequences.ResolveAsync(RequireScope(resource), resource.Namespace, root, bindings, ct); }
+            : await sequences.ResolveAsync(RequireScope(resource), resource.Namespace, root, bindings, ct);
+        }
         catch (FlowValidationException exception) when (exception.Code.StartsWith("schema_", StringComparison.Ordinal)
             || exception.Code.StartsWith("function_schema_", StringComparison.Ordinal))
         { throw new KnowledgeSourceValidationException(exception.Code, exception.Message); }

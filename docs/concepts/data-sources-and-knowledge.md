@@ -296,3 +296,64 @@ document APIs remain available and do not address acquisition publications.
 
 See [ADR-0227](../decisions/0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
 and [ADR-0228](../decisions/0228-data-source-queries-evolve-independently-from-tool-exposures.md).
+
+## Discover and access Knowledge contributions
+
+A Knowledge Source's **Tools** view separates the proposed access surface from
+its published exposure. **Refresh proposed Tools** calculates the list from saved
+configuration and authorized metadata, without publishing, acquiring, projecting
+or reading content. Inspect each Tool's description and input/output contract,
+and compare added, modified, removed, unchanged or unavailable operations with
+the last publication. An unresolved capability is not a confirmed removal.
+Publication checks the reviewed proposal digest; refresh and review again after
+a relevant configuration or capability change.
+
+Newly published ToolSets include **describe**, recorded status, and eligible
+access Tools for each configured Data Source contribution. Descriptions explain
+business coverage to the Agent. An input inherits its
+Data Source description unless an input-specific override is supplied. Editorial
+changes become visible on the next describe/context preparation without
+republishing Tools. Display-name/description edits keep executable generations
+and dependency pins unchanged; ETags and audit records still track the update.
+Text-readable output supports bounded
+read/regex access; compatible structured output additionally supports the fixed
+query profile/model when its provider implements governed document subsets.
+Discovery is part of the same ToolSet assigned to an Agent. Calling `describe`
+with an empty request lists inputs and their business
+purpose with compact assigned Tool references. Each input exposes its `name`,
+`input` identifier and exact `describeTool`/`describeArguments`. Calling that
+input-level Tool with `{ "request": {} }` retrieves its schemas and detailed
+contracts; its input is fixed and cannot be overridden. Older exposures may use
+the source-wide describe with an exact exposed input identifier or unambiguous
+binding name. `request.snapshotId` selects exact retained Snapshot evidence. The
+system prompt lists assigned discovery Tools, guides the Agent through discovery
+before first data access, and requires consulting every available input before
+synthesis while reporting coverage gaps. Discovery alone is not data consultation.
+It reuses metadata already obtained for the same version/Snapshot. Invocation
+instructions from published contracts remain present if live editorial Source
+metadata is unavailable, without granting any extra access. Discovery does
+not make unassigned
+Tools callable or prove current provider health. Large descriptions fail at an
+explicit bound rather than silently reporting incomplete structure as complete.
+
+Tools access the final projected Knowledge content, not the upstream acquisition
+operations. Read/search/query and aggregate results are constrained to their
+fixed contribution. Two bindings of the same Data Source remain distinct.
+Transformations which produce a merged ensemble without unique input membership
+are represented as derived output; unavailable separation is diagnosed. Document
+inputs may be explicitly transformed into JSON records for a compatible
+structured output; there is no automatic binary document extraction or vector
+search.
+
+Reuse the returned `snapshotId` for subsequent contribution calls when a question
+requires one publication context. Continue with the returned cursor only; the
+relay supplies its fixed contribution/profile automatically. An explicit
+historical reference never switches to the active Snapshot. Discovery retains
+individual acquisition dates, since a composite Snapshot does not imply that its
+inputs were acquired simultaneously.
+
+Existing immutable Tools/ToolSets and Agent/Flow pins are not rewritten. Publish
+and explicitly adopt a new exposure to use contribution-specific access. Older
+native relay contracts which no longer match their platform source fail
+explicitly and require republication; historical Snapshot content remains intact.
+See [ADR-0237](../decisions/0237-knowledge-toolsets-describe-and-restrict-contributions.md).

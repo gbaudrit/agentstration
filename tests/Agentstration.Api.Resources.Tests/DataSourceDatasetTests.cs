@@ -73,7 +73,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var exposure = (await response.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
         Assert.AreEqual(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), exposure.ScopeRef);
         Assert.AreEqual(Owner, exposure.ToolSet.ScopeRef);
-        Assert.HasCount(3, exposure.Operations);
+        Assert.HasCount(5, exposure.Operations);
         Assert.IsTrue(exposure.Operations.All(value => value.Tool.ScopeRef == Owner));
         using var reloaded = await client.GetAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance");
         Assert.AreEqual(HttpStatusCode.OK, reloaded.StatusCode);
@@ -91,14 +91,21 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 };
             }
             using var executed = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
+                new RunToolRequest(request, ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
             var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
             Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
-            Assert.Contains(operation.Operation == KnowledgeSourceOperation.GetStatus ? "activeSnapshotId" : "instance-tool-content",
+            Assert.Contains(operation.Operation switch
+            {
+                KnowledgeSourceOperation.GetStatus => "activeSnapshotId",
+                KnowledgeSourceOperation.Describe => "contributions",
+                _ => "instance-tool-content"
+            },
                 result.Output!.Value.GetRawText());
+            var substituted = request.Deserialize<Dictionary<string, object?>>()!;
+            substituted["source"] = new { name = "substituted" };
             using var overrideSource = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request, source = new { name = "substituted" } }), ToolRunMode.Execute));
+                new RunToolRequest(JsonSerializer.SerializeToElement(substituted), ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideSource.StatusCode);
         }
 
@@ -319,10 +326,12 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             .SearchAsync(new(created.Value.Name, ScopeRef: Owner), new() { Query = "alpha" }, default));
         var revisedInput = await management.PutAsync(first.Value.Namespace, first.Value.Name, Owner,
             first.Value.Definition with { DisplayName = "Revised input" }, first.ETag, default);
-        await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() => sources.PutExactAsync(Owner, new(shared.Value.Name),
-            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default));
-        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), shared.Value.Definition,
-            shared.ETag, default, rebindDependencies: true);
+        Assert.AreEqual(first.Value.Generation, revisedInput.Value.Generation);
+        var editedShared = await sources.PutExactAsync(Owner, new(shared.Value.Name),
+            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default);
+        Assert.AreEqual(shared.Value.Generation, editedShared.Value.Generation);
+        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), editedShared.Value.Definition,
+            editedShared.ETag, default, rebindDependencies: true);
         Assert.AreEqual(revisedInput.Value.Generation, explicitlyRebound.Value.Composition!.DataSources.Single().DataSourceGeneration);
         var renamed = await factory.Services.GetRequiredService<StorageManagementService>().PutExactAsync(Owner, output.Value.Namespace,
             output.Value.Name, output.Value.Definition with { DisplayName = "Edited Storage" }, output.ETag, default);

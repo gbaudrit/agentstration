@@ -16,7 +16,7 @@ using Agentstration.Tools;
 namespace Agentstration.Infrastructure.Tests;
 
 [TestClass]
-public sealed class KnowledgeMetadataTests
+public sealed partial class KnowledgeMetadataTests
 {
     [TestMethod]
     [DataRow("workspace", 1, 1)]

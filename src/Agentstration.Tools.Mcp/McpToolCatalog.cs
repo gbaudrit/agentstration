@@ -454,7 +454,8 @@ public sealed class McpToolInvoker(
                     callerKind,
                     callerId,
                     context.RunId,
-                    context.FlowStepId), cancellationToken)), null);
+                    context.FlowStepId)
+                { ExposedTools = context.ExposedTools }, cancellationToken)), null);
             if (internalTools is null) throw new ToolResolutionException("internal_tool_executor_unavailable", "The Agentstration ToolDefinition executor is unavailable.");
             var result = await internalTools.Value.ExecuteAsync(new ToolDefinitionInvocation(
                 tenantId,
@@ -506,7 +507,8 @@ public sealed class McpToolInvoker(
         var callerKind = CallerKind(context);
         var callerId = context.AgentId is not null ? $"agent:{context.AgentId}" : context.RunId is not null ? $"flow:{context.RunId}" : context.OwnerKind == ToolExecutionOwnerKind.Console ? $"console:{principalId:D}" : null;
         var invocation = new InternalMcpToolInvocation(tenantId, workspaceId, principalId, context.ToolCallId, context.CorrelationId,
-            resolved.Value, callerKind, callerId, context.RunId, context.FlowStepId);
+            resolved.Value, callerKind, callerId, context.RunId, context.FlowStepId)
+        { ExposedTools = context.ExposedTools };
         var builtIn = builtInTools?.Value.SingleOrDefault(value => string.Equals(value.Definition.Name, externalId, StringComparison.Ordinal));
         if (builtIn is not null)
             return new ToolInvocationResult(resolved.Protect(await builtIn.ExecuteAsync(invocation, cancellationToken)), null);
@@ -598,7 +600,7 @@ public sealed class McpToolInvoker(
         context.OwnerKind == ToolExecutionOwnerKind.FlowRun ? context.RunId : null,
         context.FlowStepId,
         context.InvocationId, context.AgentVersion, context.AgentGeneration, context.HasSensitiveArguments)
-    { SecretInputs = context.SecretInputs, TransientPayloads = context.TransientPayloads };
+    { SecretInputs = context.SecretInputs, TransientPayloads = context.TransientPayloads, ExposedTools = context.ExposedTools };
 
     private static ToolDefinitionCallerKind CallerKind(ToolExecutionContext context) => context.OwnerKind switch
     {

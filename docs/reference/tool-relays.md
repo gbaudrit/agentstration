@@ -73,6 +73,24 @@ Flow definitions use `toolKind: flow` and their `flow` reference. Acquisition de
 
 A Flow-backed source retains its declared Flow version strategy. An exact Flow reference fixes that dependency; an active-version reference deliberately follows the Flow's active version under the existing Flow rules. Choose an exact Flow reference when the relay must reproduce a specific Flow implementation.
 
+## Flat public arguments over a native envelope
+
+A relay can set `definition.inputEnvelope: request` when, after fixed-input
+projection, its only remaining caller property is an object named `request`.
+The published Tool exposes that object's fields directly. For example, callers
+send `{ "snapshotId": "returned-id", "query": {} }`; the server restores
+`request` before injecting fixed inputs and validating the exact native contract.
+Empty arguments become an empty envelope, with operation-specific defaults and
+conditional validation retained. The old wrapped form is rejected by the flat
+public schema. Duplicate properties and attempts to supply fixed fields remain
+invalid. Execution and simulation use the same reconstruction.
+
+This setting is part of the immutable relay publication. Older versions without
+it retain their existing contract and pins. The relay editor preserves the setting
+when editing or deriving a draft and previews its actual public schema. Newly
+published Knowledge Source access Tools use this form; consumers adopt a new
+ToolSet version explicitly.
+
 ## Connected Services, Storage and acquisition composition
 
 The integration baseline includes [#1060](https://github.com/gbaudrit/agentstration/pull/1060), [#1061](https://github.com/gbaudrit/agentstration/pull/1061), [#1062](https://github.com/gbaudrit/agentstration/pull/1062), [#1063](https://github.com/gbaudrit/agentstration/pull/1063), [#1080](https://github.com/gbaudrit/agentstration/pull/1080) and the subsequent [#1079](https://github.com/gbaudrit/agentstration/pull/1079) Storage type/grant administration. Relays reuse their shared value editor and existing resource authorization, including UID-bound generic Discover/Use overlays and conditional access-policy writes. They add no Connected Service or Storage connection-binding resolver.

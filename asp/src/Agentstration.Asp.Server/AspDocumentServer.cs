@@ -58,6 +58,8 @@ public sealed class AspDocumentServer(
                 "forbidden", "The authorized target differs from the request.");
             var context = grant with { Policy = AspDocumentValidation.Intersect(binding.Policy, grant.Policy) };
             AspDocumentValidation.Demand(context, operation);
+            AspValidation.Require(context.Policy.DocumentIds is null || binding.Provider is IAspDocumentSubsetProvider,
+                "unsupported_capability", "The provider does not implement governed document subsets.");
             var result = await ExecuteAsync(binding.Provider, context, operation, call.Arguments, timeout.Token);
             var reply = Reply(id, result);
             AspValidation.Require(JsonSerializer.SerializeToUtf8Bytes(reply.StructuredContent).Length <= context.Policy.MaximumResultBytes,
@@ -85,7 +87,8 @@ public sealed class AspDocumentServer(
                     provider.DocumentSchema, AspDocumentValidation.Digest(provider.DocumentSchema), provider is IAspDocumentPublisher,
                     provider.ConfigurationSchema);
             case "get":
-                var get = AspValidation.Parse<AspDocumentGet>(args); AspDocumentValidation.Identity(get.Id);
+                var get = AspValidation.Parse<AspDocumentGet>(args);
+                AspValidation.Require(context.Policy.DocumentIds is null || context.Policy.DocumentIds.Contains(get.Id, StringComparer.Ordinal), "forbidden", "Document is outside the authorized selection."); AspDocumentValidation.Identity(get.Id);
                 return Check(await provider.GetAsync(context, get, ct), context, get.Id, get.Revision);
             case "put":
                 var put = AspValidation.Parse<AspDocumentPut>(args); AspDocumentValidation.Identity(put.Id);

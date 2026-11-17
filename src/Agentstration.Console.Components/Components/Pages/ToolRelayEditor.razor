@@ -200,6 +200,7 @@ else
             {
                 snapshot = await Definitions.GetAsync(Name, ResourceNamespace.Parse(NamespaceQuery), cancellation.Token);
                 var relay = (RelayToolDefinitionProperties)snapshot.Value.Definition;
+                inputEnvelope = relay.InputEnvelope;
                 name = snapshot.Value.Name; resourceNamespace = snapshot.Value.Namespace.Value; displayName = relay.DisplayName;
                 description = relay.Description ?? ""; relayVersion = relay.Version; enabled = relay.Enabled; requiresApproval = relay.RequiresApproval; timeout = relay.InvocationTimeoutSeconds;
                 versions = await Definitions.GetVersionsAsync(name, snapshot.Value.Namespace, cancellation.Token);
@@ -292,13 +293,15 @@ else
         _ => throw new InvalidOperationException(T("RelayBindingInvalid"))
     }).ToArray();
 
+    private string? inputEnvelope;
+
     private void Preview()
     {
         reviewing = false; validationError = null;
         try
         {
             if (VisibleRows.Any(row => row.Missing && row.Kind != "caller")) throw new InvalidOperationException(T("RelayBindingInvalid"));
-            if (selected?.Definition.Schema is { } schema) preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, BuildBindings()));
+            if (selected?.Definition.Schema is { } schema) preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, BuildBindings(), inputEnvelope));
         }
         catch (Exception exception) { validationError = exception.Message; preview = ""; }
     }
@@ -318,7 +321,7 @@ else
             var properties = new RelayToolDefinitionProperties
             {
                 DisplayName = displayName, Description = description, Version = relayVersion, Enabled = enabled,
-                RequiresApproval = requiresApproval, InvocationTimeoutSeconds = timeout, Bindings = BuildBindings(),
+                RequiresApproval = requiresApproval, InvocationTimeoutSeconds = timeout, Bindings = BuildBindings(), InputEnvelope = inputEnvelope,
                 Target = new() { Name = selected.Name, Namespace = selected.Namespace, ScopeRef = selected.ScopeRef!.Value, Uid = selected.Uid, Generation = selected.Generation }
             };
             snapshot = snapshot is null
@@ -357,6 +360,7 @@ else
     private void NewDraft(ToolDefinitionVersionResource version)
     {
         baseline = version;
+        inputEnvelope = (version.Definition as RelayToolDefinitionProperties)?.InputEnvelope;
         sourceUpdateRequested = false;
         displayName = version.Definition.DisplayName; description = version.Definition.Description ?? "";
         requiresApproval = version.Definition.RequiresApproval; timeout = version.Definition.InvocationTimeoutSeconds;

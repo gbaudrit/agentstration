@@ -185,9 +185,59 @@ public sealed class OllamaReasoningPropagationTests
             new GenAiObservabilityOptions { Enabled = false }, NullLoggerFactory.Instance, NullLogger<ChatClientResolver>.Instance);
     }
 
-    private static RuntimeWorkerOperationGateway CreateGateway(IChatClientResolver resolver) => new(
-        resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System,
+    private static RuntimeWorkerOperationGateway CreateGateway(IChatClientResolver resolver, TimeProvider? clock = null) => new(
+        resolver, null!, null!, null!, null!, null!, null!, null!, null!, clock ?? TimeProvider.System,
         new CurrentRequestContext(), NullLogger<RuntimeWorkerOperationGateway>.Instance);
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(true, true)]
+    public async Task WorkerKnowledgeSchemasAndInstructionsReachTheNativeOllamaRequest(bool streaming, bool flatArguments)
+    {
+        using var capture = new NativeRequestHandler();
+        await using var extension = new OllamaExtensionFactory(capture);
+        using var http = extension.CreateClient();
+        var reference = DateTimeOffset.Parse("2026-11-17T14:33:19+00:00", System.Globalization.CultureInfo.InvariantCulture);
+        var gateway = CreateGateway(CreateResolver(http, new ModelReasoningOptions { Mode = ReasoningMode.Disabled }), new FixedReferenceTime(reference));
+        var profile = new Agentstration.Storage.Contracts.StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model");
+        var published = JsonSerializer.Deserialize<JsonElement>("""
+            {"type":"object","properties":{"request":{"type":"object","properties":{"query":{},"pageSize":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false}
+            """);
+        if (flatArguments) published = published.GetProperty("properties").GetProperty("request");
+        var schema = Agentstration.Knowledge.KnowledgeToolMetadataService.InputSchemaForModel(published, profile);
+        var description = Agentstration.Knowledge.KnowledgeToolMetadataService.Format("records", null, "Query records.", profile, flatArguments);
+        var instructions = "Discover the selected input before querying." + (flatArguments ? Agentstration.Knowledge.KnowledgeToolMetadataService.FlatArgumentGuidance : Agentstration.Knowledge.KnowledgeToolMetadataService.ArgumentGuidance);
+        var request = WorkerRequest();
+        request = request with
+        {
+            Agent = request.Agent with
+            {
+                Instructions = instructions,
+                Tools = [new RuntimeExecutionToolMaterial("records-query", default, "records_query", description, schema, null, false, "agentstration", null, "records-query")]
+            }
+        };
+        if (streaming)
+        {
+            await foreach (var _ in gateway.StreamModelAsync(request, default)) { }
+        }
+        else await gateway.InvokeModelAsync(request, default);
+        var function = capture.LastRequest.GetProperty("tools").EnumerateArray().Single().GetProperty("function");
+        Assert.AreEqual("records_query", function.GetProperty("name").GetString());
+        StringAssert.Contains(function.GetProperty("description").GetString()!, flatArguments ? "do not add a request wrapper" : "request.snapshotId");
+        var parameters = function.GetProperty("parameters");
+        Assert.IsTrue(JsonElement.DeepEquals(schema, parameters));
+        var system = capture.LastRequest.GetProperty("messages").EnumerateArray().Where(message => message.GetProperty("role").GetString() == "system");
+        Assert.IsTrue(system.Any(message => message.GetProperty("content").GetString()!.Contains(flatArguments ? "do not add a request wrapper" : "Never send snapshotId", StringComparison.Ordinal)));
+        Assert.IsTrue(system.Any(message => message.GetProperty("content").GetString()!.Contains("Runtime reference time (UTC): 2026-11-17T14:33:19.0000000+00:00", StringComparison.Ordinal)));
+        Assert.AreEqual(instructions, request.Agent.Instructions);
+    }
+
+    private sealed class FixedReferenceTime(DateTimeOffset reference) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => reference;
+    }
 
     private static RuntimeGovernedModelRequest WorkerRequest() => new(
         new("material", "agent", Guid.NewGuid(), "agent", 1, "revision", "hash", "handler",

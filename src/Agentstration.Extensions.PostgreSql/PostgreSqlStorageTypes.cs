@@ -40,7 +40,7 @@ public static class PostgreSqlStorageTypes
             AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema, true, Requirements,
             new(false, false, false, false), new(100, 65536, 65536),
             new(AspDocuments.Profile, "documents", "aspdoc", "postgresql-jsonb", Version))
-        { Documents = new(true, true, true, true, true, [new(ODataDocumentProfile.Id, ODataDocumentProfile.Version, ODataDocumentProfile.Encoding)]) }])];
+        { Documents = new(true, true, true, true, true, [new(ODataDocumentProfile.Id, ODataDocumentProfile.Version, ODataDocumentProfile.Encoding)]) { DocumentSelection = true } }])];
 }
 
 /// <summary>Independent service contribution; Storage binds compatible exports, never this contributor's identity.</summary>

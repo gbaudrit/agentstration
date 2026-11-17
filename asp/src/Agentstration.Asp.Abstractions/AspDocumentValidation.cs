@@ -17,6 +17,13 @@ public static class AspDocumentValidation
     {
         ArgumentNullException.ThrowIfNull(policy);
         Identity(policy.Collection);
+        if (policy.DocumentIds is { } ids)
+        {
+            AspValidation.Require(ids.Count <= 100 && ids.Distinct(StringComparer.Ordinal).Count() == ids.Count,
+                "invalid_policy", "Document selection exceeds its bound or contains duplicates.");
+            foreach (var id in ids) Identity(id);
+            AspValidation.Require(!policy.Put && !policy.Delete && !policy.Publish, "invalid_policy", "A document subset is read-only.");
+        }
         AspValidation.Require(policy.MaximumPageSize is > 0 and <= 100
             && policy.MaximumDocumentBytes is > 0 and <= AspDocuments.MaximumDocumentBytes
             && policy.MaximumResultBytes is >= AspDocuments.MaximumDocumentBytes and <= AspDocuments.MaximumResultBytes
@@ -41,6 +48,8 @@ public static class AspDocumentValidation
             MaximumPageSize = Math.Min(maximum.MaximumPageSize, grant.MaximumPageSize),
             MaximumDocumentBytes = Math.Min(maximum.MaximumDocumentBytes, grant.MaximumDocumentBytes),
             MaximumResultBytes = Math.Min(maximum.MaximumResultBytes, grant.MaximumResultBytes),
+            DocumentIds = maximum.DocumentIds is null ? grant.DocumentIds : grant.DocumentIds is null ? maximum.DocumentIds
+                : maximum.DocumentIds.Intersect(grant.DocumentIds, StringComparer.Ordinal).ToArray(),
             QueryProfiles = profiles
         };
     }
@@ -48,7 +57,8 @@ public static class AspDocumentValidation
     public static bool IsNarrower(AspDocumentPolicy candidate, AspDocumentPolicy maximum)
     {
         var effective = Intersect(maximum, candidate);
-        return effective with { QueryProfiles = candidate.QueryProfiles } == candidate
+        return effective with { QueryProfiles = candidate.QueryProfiles, DocumentIds = candidate.DocumentIds } == candidate
+            && (effective.DocumentIds is null ? candidate.DocumentIds is null : candidate.DocumentIds is not null && effective.DocumentIds.SequenceEqual(candidate.DocumentIds, StringComparer.Ordinal))
             && effective.QueryProfiles!.SequenceEqual(candidate.QueryProfiles!, StringComparer.Ordinal);
     }
 

@@ -102,14 +102,14 @@ public sealed partial class DataSourceDatasetTests
         var read = await access.ReadAsync(id, new() { SnapshotId = a }, default);
         Assert.IsTrue(read.Chunks.All(c => c.Content.Contains("\"value\":42", StringComparison.Ordinal)));
         var exposure = await factory.Services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(id, "1.0.0", false, default);
-        Assert.HasCount(4, exposure.Value.Operations);
+        Assert.HasCount(6, exposure.Value.Operations);
         var queryTool = exposure.Value.Operations.Single(o => o.Operation == KnowledgeSourceOperation.StructuredQuery).Tool;
         var pinnedTool = await factory.Services.GetRequiredService<IFlowToolContractResolver>().ResolveAsync(
             queryTool.ScopeRef ?? Owner, queryTool.Namespace ?? ResourceNamespace.Default,
             new(queryTool.Name, queryTool.Namespace, queryTool.ScopeRef), default);
         Assert.AreEqual("object", pinnedTool.OutputSchema!.Value.GetProperty("type").GetString());
         using var toolCall = await client.PostAsJsonAsync($"/api/tools/{queryTool.Name}/run?scopeRef=/instance",
-            new RunToolRequest(JsonSerializer.SerializeToElement(new { request = new { snapshotId = a, query = new { } } }), ToolRunMode.Execute));
+            new RunToolRequest(JsonSerializer.SerializeToElement(new { snapshotId = a, query = new { } }), ToolRunMode.Execute));
         Assert.IsTrue(toolCall.IsSuccessStatusCode, await toolCall.Content.ReadAsStringAsync());
         var toolResult = (await toolCall.Content.ReadFromJsonAsync<RunToolResponse>())!;
         Assert.AreEqual("completed", toolResult.Status, JsonSerializer.Serialize(toolResult));

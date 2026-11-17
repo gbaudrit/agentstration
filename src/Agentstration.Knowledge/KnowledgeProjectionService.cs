@@ -619,6 +619,7 @@ public sealed class KnowledgeProjectionService(
                     $"Artifact '{value.ArtifactId}' does not match its declared digest.");
             return new KnowledgeSnapshotArtifact
             {
+                Contribution = KnowledgeContributions.ForArtifact(source.Uid, projection.Inputs, value.ArtifactId),
                 ArtifactId = value.ArtifactId,
                 DataContract = value.DataContract,
                 ProducerFlowRunId = value.ProducerFlowRunId,

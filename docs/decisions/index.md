@@ -280,3 +280,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 235. [ADR-0235 — One Artifact owns a collection of JSON records](0235-json-record-projection.md)
 
 236. [ADR-0236 — Storage content has operator ceilings and resource envelopes](0236-storage-content-has-operator-ceilings-and-resource-envelopes.md)
+
+237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)

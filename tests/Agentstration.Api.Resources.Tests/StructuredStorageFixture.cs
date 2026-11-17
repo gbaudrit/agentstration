@@ -225,7 +225,7 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
             return await client.SendAsync(forwarded, ct);
         }
     }
-    private sealed class MemoryIdentity(MemoryDocumentProvider inner) : IAspDocumentProvider, IAspDocumentPublisher
+    private sealed class MemoryIdentity(MemoryDocumentProvider inner) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
     {
         public string ProviderId => "postgresql-jsonb";
         public string ProviderVersion => "1.0.0";

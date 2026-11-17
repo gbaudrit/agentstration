@@ -214,14 +214,16 @@ selects complete response documents containing a matching alert; it does not
 flatten, trim or count individual array entries. JSON strings retain the profile's
 string comparison semantics even when their date-time format is validated.
 
-Publishing one document per array element requires an explicit normalization
-processor producing a multi-Artifact manifest. The current standard Flow catalog
-does not yet provide a turnkey deterministic operation for that split. Generic
-mapping, Artifact processing and array batches alone do not provide it. The
-structured acquisition/schema corrections do not add this separate operation or
-infer completeness of the OpenAPI acquisition's Artifact contract. The builtin
-HTTP acquisition has a different output envelope (`mediaType` and textual
-`content`); consumers must use the actual operation's output shape.
+Publishing one queryable record per array element uses `json.explode` with
+`path: /results` and the exact item schema. Configure it in Data Source or
+Knowledge binding transformations before materialization. One logical Artifact
+retains the collection identity, while Storage materializes independent records;
+`artifact.explode` separately creates multiple Artifacts. Schema selection alone
+does not extract data. The collection query model must describe the stored record,
+for example the sub-schema `/properties/results/items`, rather than the acquisition
+envelope. See [transformation functions](transformation-functions.md).
+The builtin HTTP acquisition has a different output envelope (`mediaType` and
+textual `content`); consumers must use the actual operation's output shape.
 
 ## Structured Knowledge
 
@@ -271,3 +273,110 @@ See ADRs [0220](../decisions/0220-asp-document-capabilities-and-open-query-profi
 [0223](../decisions/0223-postgresql-jsonb-is-an-autonomous-asp-provider.md),
 [0224](../decisions/0224-structured-snapshots-pin-immutable-document-publications.md)
 and [0225](../decisions/0225-structured-storage-does-not-define-memory-policy.md).
+
+### Knowledge Tool proposals and contribution selection
+
+`GET /api/knowledgesources/{name}/tool-proposal` calculates proposed access Tools
+from the saved source and metadata. It returns a `digest`, source identity and
+generation, readiness/issues, and per-Tool route, description, contracts,
+contribution/profile selection and comparison state. It does not publish or read
+content. Existing namespace/scope/context conventions apply.
+
+Send that digest as `proposalDigest` with the version and approval setting to
+`POST /api/knowledgesources/{name}/tool-exposure`. A changed reviewed proposal
+returns `409` with `knowledge_tool_proposal_stale`; refresh and review before
+retrying. Legacy explicit publication calls without a digest still calculate
+current eligibility, but do not assert a previous review.
+
+Every new exposure includes a source-owned describe relay. Its immutable
+`exposure` and `exposureScope` are fixed internally. The caller uses
+`{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
+then calls the selected input's returned `describeTool` with `describeArguments`
+(normally `{}` for new publications) for its contracts (`detailLevel: "input"`).
+The input-level Tool pins the exact published input internally; callers cannot
+supply or override the fixed `input`. New publications accept `snapshotId` directly
+at Tool level. Other declared access parameters (`pageSize`, `cursor`, `pattern`,
+`documentId`, etc.) also sit directly at Tool level; `query` remains a structured
+object. The schema leaves these parameters optional. Initial query calls require
+`query` (use `{}` for no filter); continuations require `cursor` alone. The existing
+operation validators enforce these conditional rules and defaults.
+Each contribution exposes `name` (the binding name), `input` (its published route
+identifier), `describeTool`, `inputFixed` and the complete `describeArguments`.
+For an older exposure with no input-level describe member, discovery points to
+the assigned source-wide describe Tool and includes the selector in its exact
+argument layout. Existing versions retain their `request` envelope; discovery and
+model instructions follow each assigned immutable contract. To adopt the flat
+layout, refresh the proposal, publish a new version and update the consumer pin.
+The source-wide describe still accepts exact exposed route identifiers or
+unambiguous binding names; unknown, ambiguous and unassigned inputs are refused. Discovery also returns
+`invocationInstructions` with complete argument-envelope examples. Detailed input
+metadata separates whole-Artifact `schemas` from object-level `recordSchemas`.
+One Artifact may contain several records; contribution queries select its exact
+member IDs, and `documentArtifacts`/`records` retain the logical Artifact and
+member ordinal across pages. Access relays
+use flat arguments for new publications, for example
+`{ "snapshotId": "<returned id>", "pageSize": 50, "query": {} }`.
+The relay explicitly publishes `inputEnvelope: request` and reconstructs the native
+request on the server before injecting its protected source/profile/contribution
+bindings. It validates the flat public input and the reconstructed native input;
+callers cannot supply a `request` wrapper or override fixed fields. No runtime
+argument repair or model-only schema flattening is involved.
+For `odata/4.01`, `query` uses dollar-prefixed option names and OData
+expressions, such as `"$filter": "status eq 'open'"`, using fields from discovery.
+`filter` and SQL-style `==` are not supported. Query guidance uses shape-only
+examples and requires actual field paths from the Tool's `dataSchema` and values
+from the request or observed data. Fields declared under an array's `items` are
+not root-level columns. For an envelope model, `any`/`all` select whole matching
+documents without trimming or sorting their nested arrays; use record extraction
+before publication when filtering, sorting and paging individual items is needed.
+The overview returns
+`toolSummaries` and input descriptions while omitting full `tools` contracts,
+contribution schemas and document-ID lists. Detailed selection refuses unknown
+or unassigned inputs with `knowledge_describe_input_not_exposed`. The native REST operation
+is `POST /api/knowledgesources/{name}/content/describe`. Discovery returns recorded
+metadata and exact published access references, including their callable names.
+Agent calls are filtered by the trusted assigned Tool inventory, not an inventory
+supplied in business arguments. An unavailable or retired Snapshot is reported
+as metadata, without granting content access or initiating preparation.
+
+Business descriptions are live metadata: a nonempty input override wins over
+the bound Data Source description. Updating these descriptions/display names
+preserves executable generations and existing publications; ETags still change.
+Presentation is refreshed for runtime Tool descriptions and for describe calls.
+The runtime system prompt lists only Knowledge Sources with an actually assigned
+describe Tool and instructs the Agent to discover all available sources/inputs,
+consult each exposed input with focused data operations before synthesis, and
+report unavailable or unconsulted inputs. Discovery alone is not data consultation.
+The Agent is instructed to invoke needed Tools rather than end with a plan or a
+promise of future calls, and to finish with the requested result or a specific
+blocker. Runtime continuation still depends on actual structured Tool calls;
+a text-only response with finish reason `stop` is a completed model response,
+not proof that an output-token ceiling was reached.
+The authoritative AWP model gateway adds its current UTC reference time to model
+instructions, using the server TimeProvider. Relative dates can use this reference
+and an explicitly supplied user/source time zone. This per-call context does not
+rewrite the authored Agent revision or immutable execution material.
+Invocation guidance from the assigned immutable Tool remains available when live
+Source metadata cannot be resolved; it grants no extra data or metadata access.
+Server logs and material-resolution trace tags report presentation coverage and
+unavailable metadata counts without logging prompts or content.
+Executable selections/contracts remain pinned to their published versions.
+
+Contribution access relays also fix `request.contribution` and, for structured
+queries, `request.profile`. Read/search/query APIs retain their source-wide mode
+when contribution is absent. A selected contribution is identified by its binding
+name and exact Data Source UID within the source. The returned `snapshotId`
+allows callers to reuse one publication across operations. Cursors additionally
+bind the contribution and cannot be transferred to another contribution Tool.
+Structured pages include `documentArtifacts` to map returned record IDs to their
+logical Snapshot Artifacts.
+
+`StorageDocumentCapabilities.DocumentSelection` advertises implemented trusted
+read-only document subsets. The gateway requires this capability and an exact
+publication for a non-null `StorageDocumentTarget.DocumentIds`. ASP's corresponding
+policy set is bounded to 100 unique logical IDs; null means unrestricted within
+the already authorized collection/publication, while an empty set selects no
+records. Intersection never widens a set. Subset policies cannot authorize
+mutation/publication and fail for providers without explicit subset support.
+PostgreSQL applies the parameterized restriction before aggregates and paging.
+No IDs or physical selectors become caller-editable relay arguments.

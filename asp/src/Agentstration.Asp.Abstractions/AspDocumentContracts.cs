@@ -23,7 +23,11 @@ public sealed record AspDocumentPolicy(string Collection, bool Get = true, bool 
     bool Delete = false, bool Query = true, bool Publish = false, int MaximumPageSize = 50,
     int MaximumDocumentBytes = AspDocuments.MaximumDocumentBytes,
     int MaximumResultBytes = AspDocuments.MaximumResultBytes,
-    IReadOnlyList<string>? QueryProfiles = null);
+    IReadOnlyList<string>? QueryProfiles = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? DocumentIds { get; init; }
+}
 public sealed record AspDocumentContext(AspStoreRef Store, AspDocumentSelection Selection,
     string Subject, string AuthorizationRevision, AspDocumentPolicy Policy);
 public sealed record AspDocumentDescription(string AspVersion, string Profile, AspStoreRef Store,
@@ -65,6 +69,9 @@ public interface IAspDocumentProvider
     ValueTask<AspDocumentProviderPage> QueryAsync(AspDocumentContext context, AspDocumentQuery request,
         string? position, CancellationToken ct);
 }
+
+/// <summary>Provider enforces DocumentIds before filtering, aggregation and pagination.</summary>
+public interface IAspDocumentSubsetProvider;
 
 public interface IAspDocumentPublisher
 {

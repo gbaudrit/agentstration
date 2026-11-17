@@ -20,6 +20,25 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ToolRelayEditorTests
 {
+    [TestMethod]
+    public void EditingAFlatRelayPreservesItsEnvelopeAndPublicPreview()
+    {
+        using var handler = new ApiHandler("""{"type":"object","properties":{"source":{"type":"string"},"request":{"type":"object","properties":{"snapshotId":{"type":"string"},"query":{"type":"object"}},"additionalProperties":false}},"required":["source","request"],"additionalProperties":false}""")
+        {
+            InputEnvelope = "request",
+            InitialBindings = [new LiteralToolArgumentBinding { Path = "/source", Value = JsonSerializer.SerializeToElement("fixed") }]
+        };
+        using var context = Context(handler);
+        var page = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var preview = page.WaitForElement("[data-testid='relay-public-schema']");
+        var schema = JsonSerializer.Deserialize<JsonElement>(preview.TextContent);
+        Assert.IsFalse(schema.GetProperty("properties").TryGetProperty("request", out _));
+        Assert.IsTrue(schema.GetProperty("properties").TryGetProperty("snapshotId", out _));
+        page.Find("[data-testid='relay-save-draft']").Click();
+        page.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
+        Assert.AreEqual("request", Assert.IsInstanceOfType<RelayToolDefinitionProperties>(handler.Saved!.Properties).InputEnvelope);
+    }
+
     private static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
     [TestMethod]
@@ -377,6 +396,7 @@ public sealed class ToolRelayEditorTests
         }
         public ToolResource Source { get; } = Tool("source.v2.4.0", "2.4.0", """{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}}},"query":{"type":"string"}},"required":["query"]}""");
         public ToolResource Incompatible { get; } = Tool("source.v3.0.0", "3.0.0", """{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}""");
+        public string? InputEnvelope { get; init; }
         public int Publications { get; private set; }
         public PutToolDefinitionRequest? Saved { get; private set; }
         public List<string> Writes { get; } = [];
@@ -428,7 +448,8 @@ public sealed class ToolRelayEditorTests
                 DisplayName = "HR relay",
                 Version = "1.2.0",
                 Target = new() { Name = Source.Name, ScopeRef = Scope, Uid = Source.Uid, Generation = Source.Generation },
-                Bindings = InitialBindings
+                Bindings = InitialBindings,
+                InputEnvelope = InputEnvelope
             };
             if (path.EndsWith("/versions", StringComparison.Ordinal))
             {
