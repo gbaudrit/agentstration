@@ -87,7 +87,7 @@ public sealed class AwpAssignmentProjection(
                 : SafeAssignmentFailureMessage(errorCode, result.ErrorMessage),
                 functionalFailure ? StringProperty(terminalPayload, "errorDetails")
                     : stored.Value.Steps.LastOrDefault(value => value.Error?.Details is not null)?.Error?.Details ?? assignment.CurrentAttempt?.ErrorDetails)
-                { Origin = stored.Value.Steps.LastOrDefault(value => value.Error is not null)?.Error?.Origin },
+            { Origin = stored.Value.Steps.LastOrDefault(value => value.Error is not null)?.Error?.Origin },
             CompletedAt = now,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,
@@ -238,7 +238,8 @@ public sealed class AwpAssignmentProjection(
                     Artifacts = artifacts.Count > 0 ? artifacts : current.Artifacts,
                     ArtifactStorageFlowRunId = artifactStorageFlowRunId ?? current.ArtifactStorageFlowRunId,
                     Error = failed ? new FlowRunError(StringProperty(executionEvent.Payload, "errorCode") ?? "flow_step_failed",
-                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.", StringProperty(executionEvent.Payload, "errorDetails")) { Origin = failureOrigin } : null
+                        StringProperty(executionEvent.Payload, "error") ?? "The Flow step failed.", StringProperty(executionEvent.Payload, "errorDetails"))
+                    { Origin = failureOrigin } : null
                 }, failed ? FlowRunEventType.StepRunFailed : FlowRunEventType.StepRunCompleted,
                     executionEvent.Payload, executionEvent.OccurredAt, cancellationToken);
                 break;
@@ -272,8 +273,16 @@ public sealed class AwpAssignmentProjection(
                 var owner = await flowRuns.GetRunExactAsync(stored.Value.ExecutionScopeRef, ownerId, cancellationToken);
                 if (owner?.Value.Scope != stored.Value.Scope) continue;
                 await AppendFlowEventAsync(owner.Value, FlowRunEventType.ProcessUnitChanged, ownerId == process.OwnerRunId ? process.OwnerStepName : null,
-                    JsonSerializer.SerializeToElement(new { processRunId = stored.Value.Id, process.OwnerRunId, process.OwnerStepName,
-                        process.UnitKey, process.Ordinal, stepName = step?.StepDefinitionId, sourceEventId = executionEvent.EventId }),
+                    JsonSerializer.SerializeToElement(new
+                    {
+                        processRunId = stored.Value.Id,
+                        process.OwnerRunId,
+                        process.OwnerStepName,
+                        process.UnitKey,
+                        process.Ordinal,
+                        stepName = step?.StepDefinitionId,
+                        sourceEventId = executionEvent.EventId
+                    }),
                     executionEvent.OccurredAt, cancellationToken);
             }
         }
@@ -340,7 +349,8 @@ public sealed class AwpAssignmentProjection(
             OutputOutcome = ParseOutcome(payload),
             Error = failed ? new FlowRunError(StringProperty(payload, "errorCode") ?? "child_flow_failed",
                 StringProperty(payload, "error") ?? "The child Flow failed.",
-                StringProperty(payload, "errorDetails")) { Origin = origin } : null,
+                StringProperty(payload, "errorDetails"))
+            { Origin = origin } : null,
             CompletedAt = occurredAt,
             ExecutionLeaseId = null,
             ExecutionLeaseExpiresAt = null,

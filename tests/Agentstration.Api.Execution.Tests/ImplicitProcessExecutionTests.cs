@@ -4,9 +4,9 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
-using Agentstration.Resources;
 using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -43,9 +43,13 @@ public sealed class ImplicitProcessExecutionTests
             using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(current);
             var flows = factory.Services.GetRequiredService<FlowService>();
             var ownerScope = ResourceScopeRef.Workspace(current.WorkspaceId);
-            var leaf = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
+            var leaf = new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                Steps = [new InputFlowStepDefinition { Name = "input" },
                 new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }],
-                Transitions = [new("done", "input", "completed", "completed")] };
+                Transitions = [new("done", "input", "completed", "completed")]
+            };
             await PublishAsync("named-leaf", leaf);
             var graph = new FlowGraphDefinition
             {

@@ -92,14 +92,17 @@ public sealed class FlowService(
     internal static ToolFlowStepDefinition FunctionStep(string name, Agentstration.Functions.Contracts.ResolvedTransformationFunction function,
         JsonElement input, string? displayName = null, FlowStepArtifactOutputDefinition? artifactOutput = null, JsonElement? parameters = null, JsonElement? outputSchema = null,
         IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaSnapshots = null) => new()
-    {
-        Name = name, DisplayName = displayName, ArtifactOutput = artifactOutput,
-        FunctionBinding = function, FunctionParameters = parameters,
-        FunctionSchemaSnapshots = schemaSnapshots,
-        FunctionOutputSchema = outputSchema ?? function.OutputSchema,
-        Tool = new("agentstration.transformation.invoke", ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance),
-        ArgumentsMapping = JsonSerializer.SerializeToElement(new { input }, JsonOptions)
-    };
+        {
+            Name = name,
+            DisplayName = displayName,
+            ArtifactOutput = artifactOutput,
+            FunctionBinding = function,
+            FunctionParameters = parameters,
+            FunctionSchemaSnapshots = schemaSnapshots,
+            FunctionOutputSchema = outputSchema ?? function.OutputSchema,
+            Tool = new("agentstration.transformation.invoke", ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance),
+            ArgumentsMapping = JsonSerializer.SerializeToElement(new { input }, JsonOptions)
+        };
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     internal Task<IReadOnlyDictionary<string, SchemaBindingSnapshot>?> ResolveFunctionSchemasAsync(JsonElement inputSchema,
@@ -311,8 +314,13 @@ public sealed class FlowService(
                 var snapshots = await ResolveFunctionSchemasAsync(contract.InputSchema,
                     JsonSerializer.SerializeToElement(transform.FunctionSchemas ?? new Dictionary<string, SchemaBinding>(), JsonOptions),
                     scopeRef, id.Namespace, $"$.steps[{transform.Name}].functionSchemas", cancellationToken);
-                pinnedSteps.Add(transform with { Function = contract.Reference, FunctionInputSchema = contract.InputSchema,
-                    FunctionSchemaSnapshots = snapshots, Schema = transform.Schema ?? contract.OutputSchema });
+                pinnedSteps.Add(transform with
+                {
+                    Function = contract.Reference,
+                    FunctionInputSchema = contract.InputSchema,
+                    FunctionSchemaSnapshots = snapshots,
+                    Schema = transform.Schema ?? contract.OutputSchema
+                });
             }
             graph = graph with { Steps = pinnedSteps };
             var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)

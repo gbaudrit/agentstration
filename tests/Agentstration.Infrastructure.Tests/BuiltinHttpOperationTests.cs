@@ -57,7 +57,9 @@ public sealed class BuiltinHttpOperationTests
         var values = JsonSerializer.SerializeToElement(new Dictionary<string, string>
         {
             ["q"] = "Rennes when:1d & category=local+news / été",
-            ["x y"] = "+", ["empty"] = "", ["nested%20name"] = "value"
+            ["x y"] = "+",
+            ["empty"] = "",
+            ["nested%20name"] = "value"
         });
         var url = BuiltinHttpOperation.RequestUri(operation.Definition, values);
         Assert.AreEqual("https://example.test/search?empty=&nested%2520name=value&q=Rennes%20when%3A1d%20%26%20category%3Dlocal%2Bnews%20%2F%20%C3%A9t%C3%A9&x%20y=%2B", url.AbsoluteUri);
@@ -108,32 +110,53 @@ public sealed class BuiltinHttpOperationTests
     {
         var service = new ConnectedServiceResource
         {
-            Metadata = new() { Name = "http-fixture" }, ScopeRef = ResourceScopeRef.Instance,
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
-            Definition = new() { DisplayName = "HTTP", Type = new()
+            Metadata = new() { Name = "http-fixture" },
+            ScopeRef = ResourceScopeRef.Instance,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Definition = new()
             {
-                Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(),
-                Version = "1.0.0", SchemaDigest = "digest"
-            }, Options = JsonSerializer.SerializeToElement(new { }) }
+                DisplayName = "HTTP",
+                Type = new()
+                {
+                    Type = new("http-endpoint", ResourceScopeRef.Instance),
+                    TypeUid = Guid.NewGuid(),
+                    Version = "1.0.0",
+                    SchemaDigest = "digest"
+                },
+                Options = JsonSerializer.SerializeToElement(new { })
+            }
         };
         var type = new ConnectedServiceOperationTypeReference
         {
-            Type = new("http-get", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "digest"
+            Type = new("http-get", ResourceScopeRef.Instance),
+            TypeUid = Guid.NewGuid(),
+            Version = "1.0.0",
+            SchemaDigest = "digest"
         };
         var candidate = BuiltinHttpOperation.Discover("https://example.test/search?q=sample", type);
         var operation = new ConnectedServiceOperationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
-            Metadata = new() { Name = "http-operation" }, ScopeRef = ResourceScopeRef.Instance,
-            Definition = new() { DisplayName = candidate.DisplayName, ExternalId = candidate.ExternalId,
-                Type = type, Definition = candidate.Definition, DefinitionDigest = "digest", Provenance = null!,
-                Service = new() { Service = new(service.Address, ResourceScopeRef.Instance), ServiceUid = service.Uid, Generation = 1 } },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
+            Metadata = new() { Name = "http-operation" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new()
+            {
+                DisplayName = candidate.DisplayName,
+                ExternalId = candidate.ExternalId,
+                Type = type,
+                Definition = candidate.Definition,
+                DefinitionDigest = "digest",
+                Provenance = null!,
+                Service = new() { Service = new(service.Address, ResourceScopeRef.Instance), ServiceUid = service.Uid, Generation = 1 }
+            },
             ObservedState = new() { Availability = ConnectedServiceOperationAvailability.Available, ObservedAt = DateTimeOffset.UnixEpoch }
         };
         var resolver = new ConnectionResolver(service, "https://example.test/search?q=changed-sample");
         var fetcher = new Fetcher();
         var executor = new BuiltinHttpOperationExecutor(resolver, fetcher, new()
-            { MaximumHttpResponseBytes = 4096, MaximumValueBytes = 512 });
+        { MaximumHttpResponseBytes = 4096, MaximumValueBytes = 512 });
         var context = new ConnectedServiceResolutionContext(ResourceScopeRef.Instance, operation.Address);
         var result = await executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { q = "configured" }), context, default);
         Assert.AreEqual("https://example.test/search?q=configured", fetcher.Request!.Url.AbsoluteUri);
@@ -163,7 +186,10 @@ public sealed class BuiltinHttpOperationTests
         public Task<ResolvedConnectedService?> ResolveAsync(ConnectedServiceReference reference,
             ConnectedServiceResolutionContext context, CancellationToken cancellationToken = default) => Task.FromResult<ResolvedConnectedService?>(new()
             {
-                Reference = reference, Type = service.Definition.Type, Options = service.Definition.Options, Exports = [],
+                Reference = reference,
+                Type = service.Definition.Type,
+                Options = service.Definition.Options,
+                Exports = [],
                 Inputs = [new() { Id = "baseUrl", Type = ConnectedServiceValueType.Text, Value = JsonSerializer.SerializeToElement(Sample) }]
             });
     }

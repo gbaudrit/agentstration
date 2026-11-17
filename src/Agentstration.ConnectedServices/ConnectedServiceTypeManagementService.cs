@@ -247,13 +247,13 @@ public sealed class ConnectedServiceTypeManagementService(
             throw new ConnectedServiceTypeValidationException(
                 "Produced operation types require an exact scope, UID, version and schema digest.");
         if (discovery.ProducedTypes.GroupBy(reference => new
-            {
-                reference.Type.ScopeRef,
-                Namespace = reference.Type.Namespace?.Value,
-                reference.Type.Name,
-                reference.TypeUid,
-                reference.Version
-            }).Any(group => group.Count() > 1))
+        {
+            reference.Type.ScopeRef,
+            Namespace = reference.Type.Namespace?.Value,
+            reference.Type.Name,
+            reference.TypeUid,
+            reference.Version
+        }).Any(group => group.Count() > 1))
             throw new ConnectedServiceTypeValidationException("Produced operation type references must be unique.");
     }
 

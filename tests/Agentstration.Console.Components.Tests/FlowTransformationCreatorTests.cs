@@ -18,9 +18,15 @@ public sealed partial class KnowledgeSourceEditorTests
     {
         var source = ProjectedSource();
         var original = source.Definition.DataSources[0];
-        source = source with { Definition = source.Definition with { DataSources = [original with { Transformations = [
+        source = source with
+        {
+            Definition = source.Definition with
+            {
+                DataSources = [original with { Transformations = [
             new() { Flow = new("redact", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) },
-            new() { Flow = new("verify", FlowCallVersionStrategy.Exact, "1.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) }] }] } };
+            new() { Flow = new("verify", FlowCallVersionStrategy.Exact, "1.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) }] }]
+            }
+        };
         using var context = CreateContext(new KnowledgeClientStub(source));
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         rendered.WaitForAssertion(() => Assert.Contains("default/redact:2.0.0 → default/verify:1.0.0", rendered.Find("tbody").TextContent));
@@ -31,8 +37,11 @@ public sealed partial class KnowledgeSourceEditorTests
     {
         using var context = CreateContext(new KnowledgeClientStub());
         var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = ManifestValueSchema, parameters = new { type = "object" } } });
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { TransformationVersions = ["1.0.0", "2.0.0"],
-            SequenceGraph = new() { EntryStep = "input", InputSchema = input, OutputSchema = ManifestValueSchema } });
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
+        {
+            TransformationVersions = ["1.0.0", "2.0.0"],
+            SequenceGraph = new() { EntryStep = "input", InputSchema = input, OutputSchema = ManifestValueSchema }
+        });
         var call = new FlowCompositionCall { Flow = new("artifact-transform-builtin", FlowCallVersionStrategy.Exact, "2.0.0", ResourceNamespace.Default, FlowClientStub.WorkspaceScope) };
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -76,11 +85,15 @@ public sealed partial class KnowledgeSourceEditorTests
     {
         using var context = CreateContext(new KnowledgeClientStub());
         var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = ManifestValueSchema, parameters = new { type = "object" } } });
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { SequenceGraph = new()
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
         {
-            EntryStep = "input", OutputSchema = ManifestValueSchema,
-            Steps = [new InputFlowStepDefinition { Name = "input", Schema = input }]
-        } });
+            SequenceGraph = new()
+            {
+                EntryStep = "input",
+                OutputSchema = ManifestValueSchema,
+                Steps = [new InputFlowStepDefinition { Name = "input", Schema = input }]
+            }
+        });
         IReadOnlyList<FlowCompositionCall> calls = [];
         var rendered = context.Render<FlowSequenceEditor>(parameters => parameters.Add(value => value.ValueChanged, values => calls = values));
         Assert.IsFalse(rendered.Find("[data-testid='flow-sequence-add']").HasAttribute("disabled"));
@@ -134,10 +147,15 @@ public sealed partial class KnowledgeSourceEditorTests
         using var context = CreateContext(new KnowledgeClientStub());
         var array = JsonSerializer.SerializeToElement(new { type = "array", items = new { type = "object" } });
         var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = new { type = "object" }, parameters = new { type = "object" } } });
-        var client = new FlowClientStub { SequenceGraph = new()
+        var client = new FlowClientStub
         {
-            EntryStep = "input", InputSchema = input, OutputSchema = array
-        } };
+            SequenceGraph = new()
+            {
+                EntryStep = "input",
+                InputSchema = input,
+                OutputSchema = array
+            }
+        };
         context.Services.AddSingleton<IFlowApiClient>(client);
         context.Services.AddSingleton(new ConsoleContextState(new TransformationContextProvider()));
         context.JSInterop.Mode = JSRuntimeMode.Loose;

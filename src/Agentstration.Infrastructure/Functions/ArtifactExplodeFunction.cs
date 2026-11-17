@@ -3,8 +3,8 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
-using Agentstration.Functions.Abstractions;
 using Agentstration.Functions;
+using Agentstration.Functions.Abstractions;
 using Agentstration.Functions.Builtins;
 using Agentstration.Identity.Contracts;
 using Agentstration.Schemas;
@@ -67,11 +67,23 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
                 var identity = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { invocation = execution.InvocationId, parentId, parentDigest, path, mode, key, version = Descriptor.Version })));
                 results.Add(JsonSerializer.SerializeToElement(new
                 {
-                    artifactId = "exploded-" + identity, kind = "inline", disposition = "publishable", name = "item-" + results.Count + ".json",
-                    mediaType = "application/json", digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(content)),
-                    contentBase64 = Convert.ToBase64String(content), dataContract = contract is null ? null : contract with { Validated = true },
-                    provenance = new Dictionary<string, string> { ["inputArtifactId"] = parentId, ["inputSha256"] = parentDigest,
-                        ["expansionPath"] = path, ["expansionMode"] = mode!, ["expansionKey"] = key, ["transformation"] = Descriptor.Id + "@" + Descriptor.Version }
+                    artifactId = "exploded-" + identity,
+                    kind = "inline",
+                    disposition = "publishable",
+                    name = "item-" + results.Count + ".json",
+                    mediaType = "application/json",
+                    digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(content)),
+                    contentBase64 = Convert.ToBase64String(content),
+                    dataContract = contract is null ? null : contract with { Validated = true },
+                    provenance = new Dictionary<string, string>
+                    {
+                        ["inputArtifactId"] = parentId,
+                        ["inputSha256"] = parentDigest,
+                        ["expansionPath"] = path,
+                        ["expansionMode"] = mode!,
+                        ["expansionKey"] = key,
+                        ["transformation"] = Descriptor.Id + "@" + Descriptor.Version
+                    }
                 }));
             }
         }
@@ -84,8 +96,12 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
     private static JsonElement InlineSource(JsonElement value)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value);
-        return JsonSerializer.SerializeToElement(new { artifactId = "inline-" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
-            kind = "inline", contentBase64 = Convert.ToBase64String(bytes) });
+        return JsonSerializer.SerializeToElement(new
+        {
+            artifactId = "inline-" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
+            kind = "inline",
+            contentBase64 = Convert.ToBase64String(bytes)
+        });
     }
 
     private ResolvedDataContract? ItemContract(JsonElement input)
@@ -96,8 +112,11 @@ public sealed class ArtifactExplodeFunction(ArtifactManagementService artifacts,
         var contract = DataContracts.Declared(JsonSchemaSelection.Select(snapshot!.Content), "function:artifact.explode/item", "application/json")!;
         if (snapshot.Source is { ScopeRef: { } scope, Namespace: { } ns } source
             && snapshot.SchemaUid is { } uid && snapshot.SchemaGeneration is { } generation)
-            contract = contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
-                snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+            contract = contract with
+            {
+                SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+                snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash)
+            };
         return contract;
     }
 

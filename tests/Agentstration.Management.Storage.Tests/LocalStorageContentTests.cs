@@ -2,8 +2,8 @@ using System.Text;
 using Agentstration.Asp.Abstractions;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
 using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Management.Tests;
 
@@ -57,7 +57,7 @@ public sealed class LocalStorageContentTests
     {
         var store = Store();
         var provider = new LocalStorageObjectProvider(Paths, clock, new()
-            { MaximumObjectBytes = 8, LocalMaximumStoreBytes = 10 });
+        { MaximumObjectBytes = 8, LocalMaximumStoreBytes = 10 });
         var first = await provider.WriteAsync(store, Access(store), Write("first", value: "12345678"), default);
         await provider.WriteAsync(store, Access(store), Write("second", "notes/second", "12"), default);
         var full = await Assert.ThrowsAsync<AspException>(() => provider.WriteAsync(store, Access(store), Write("third", "notes/third", "1"), default));

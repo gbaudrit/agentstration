@@ -164,8 +164,13 @@ public sealed class InferenceTimeoutTests
     private static IChatClient ChatClient(ServiceProvider services) => services.GetRequiredService<AepModelProvider>().CreateChatClient(
         new ModelProviderConfiguration
         {
-            Uid = Guid.NewGuid(), Namespace = ResourceNamespace.Default, Name = "ollama", AdapterType = "aep",
-            ContributionId = "ollama", Extension = new ResourceReference("ollama"), Endpoint = new Uri("http://localhost/")
+            Uid = Guid.NewGuid(),
+            Namespace = ResourceNamespace.Default,
+            Name = "ollama",
+            AdapterType = "aep",
+            ContributionId = "ollama",
+            Extension = new ResourceReference("ollama"),
+            Endpoint = new Uri("http://localhost/")
         },
         new ModelDeploymentConfiguration { Name = "test", ProviderName = "ollama", ModelName = "test-model" });
 

@@ -6,8 +6,8 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
 
@@ -71,7 +71,8 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner(
                 "The absolute base URL of the remote HTTP system.")],
             [new("baseUrl", ConnectedServiceValueType.Text,
                 ConnectedServiceValueProtection.Standard, "uri",
-                "The absolute base URL of the remote HTTP system.", "baseUrl")]) { OperationDiscovery = discovery };
+                "The absolute base URL of the remote HTTP system.", "baseUrl")])
+        { OperationDiscovery = discovery };
         // Maintainer-approved correction of the unreleased 1.0.0 baseline only.
         // Keep identity, policies, references and other observed preview versions intact.
         if (existingService is not null && BuiltinHttpOperation.IsCore(existingService.Value, HttpTypeName)

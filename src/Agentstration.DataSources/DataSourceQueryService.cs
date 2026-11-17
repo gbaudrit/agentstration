@@ -1,5 +1,5 @@
-using System.Security.Cryptography;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
@@ -133,11 +133,19 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
             if (previous.Count > 0 && now <= previous[0].PublishedAt) now = previous[0].PublishedAt.AddTicks(1);
             var published = new DataSourceQueryVersionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQueryVersion,
-                Metadata = new() { Name = VersionName(name, version), Namespace = ns }, ScopeRef = scope, Generation = 1,
-                QueryUid = draft.Value.Uid, QueryName = name, QueryGeneration = draft.Value.Generation,
-                Version = version, Definition = draft.Value.Definition, ContractDigest = Contract(draft.Value.Definition),
-                DefinitionDigest = Digest(draft.Value.Definition), PublishedAt = now
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSourceQueryVersion,
+                Metadata = new() { Name = VersionName(name, version), Namespace = ns },
+                ScopeRef = scope,
+                Generation = 1,
+                QueryUid = draft.Value.Uid,
+                QueryName = name,
+                QueryGeneration = draft.Value.Generation,
+                Version = version,
+                Definition = draft.Value.Definition,
+                ContractDigest = Contract(draft.Value.Definition),
+                DefinitionDigest = Digest(draft.Value.Definition),
+                PublishedAt = now
             };
             return (await resources.CreateImmutableAsync(published, token)).Value;
         }, ct);
@@ -201,8 +209,11 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
         }
         var result = await documents.QueryAsync(selection, new()
         {
-            Profile = selection.Contract.Profile, Query = innerCursor is null ? version.Definition.Query : null,
-            PageSize = innerCursor is null ? request.PageSize : null, AcquisitionId = request.AcquisitionId, Cursor = innerCursor
+            Profile = selection.Contract.Profile,
+            Query = innerCursor is null ? version.Definition.Query : null,
+            PageSize = innerCursor is null ? request.PageSize : null,
+            AcquisitionId = request.AcquisitionId,
+            Cursor = innerCursor
         }, ct);
         var exact = reference with { Version = version.Version };
         var next = result.NextCursor is null ? null : protector.Protect(JsonSerializer.Serialize(new Continuation("query/v1",
@@ -223,8 +234,12 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
         if (value is null || value.Selection?.Contract?.Profile is null || string.IsNullOrWhiteSpace(value.DisplayName) || value.DisplayName.Length > 200
             || value.Query.ValueKind != JsonValueKind.Object || JsonSerializer.SerializeToUtf8Bytes(value.Query).Length > 8192)
             throw Error("data_source_query_invalid");
-        return value with { Query = value.Query.Clone(), Selection = value.Selection with
-        { Mode = DataSourceDocumentSelectionModes.Latest, AcquisitionId = null, AcquisitionUid = null } };
+        return value with
+        {
+            Query = value.Query.Clone(),
+            Selection = value.Selection with
+            { Mode = DataSourceDocumentSelectionModes.Latest, AcquisitionId = null, AcquisitionUid = null }
+        };
     }
     internal static string Contract(DataSourceQueryProperties value)
     {

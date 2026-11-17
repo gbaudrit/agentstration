@@ -40,9 +40,14 @@ public sealed class FlowDetailsDesignerTests
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
         var run = new FlowRun
         {
-            Id = "invalid-json-run", WorkspaceId = workspace, FlowId = new("anonymization"), FlowVersion = "1.0.0",
-            Status = FlowRunStatus.Failed, Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
-            Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = FlowClientStub.Now,
+            Id = "invalid-json-run",
+            WorkspaceId = workspace,
+            FlowId = new("anonymization"),
+            FlowVersion = "1.0.0",
+            Status = FlowRunStatus.Failed,
+            Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = FlowClientStub.Now,
             Error = new(code, "Old generic error", "Tool storage.local.read requires explicit input and output schemas."),
             DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, new("anonymization"), "1.0.0", null, definition,
                 new Dictionary<string, string>(), FlowClientStub.Now)

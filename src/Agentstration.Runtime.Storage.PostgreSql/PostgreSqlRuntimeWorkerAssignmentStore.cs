@@ -480,7 +480,7 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
                 TerminalEventId = command.EventId,
                 ErrorCode = cancelled ? null : command.ErrorCode,
                 ErrorDetails = cancelled ? null : command.ErrorDetails,
-            ErrorMessage = cancelled ? null : command.Error
+                ErrorMessage = cancelled ? null : command.Error
             };
             assignment = assignment with
             {

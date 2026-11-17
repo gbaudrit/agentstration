@@ -94,10 +94,18 @@ public sealed class ConnectedServiceDiscoveryPanelTests
             Generation = 3,
             ScopeRef = ResourceScopeRef.Instance,
             Metadata = new() { Name = "fixture" },
-            Definition = new() { DisplayName = "Fixture", Type = new()
+            Definition = new()
             {
-                Type = new("http-endpoint", ResourceScopeRef.Instance), TypeUid = Guid.NewGuid(), Version = "1.0.0", SchemaDigest = "digest"
-            }, Options = JsonSerializer.SerializeToElement(new { }) }
+                DisplayName = "Fixture",
+                Type = new()
+                {
+                    Type = new("http-endpoint", ResourceScopeRef.Instance),
+                    TypeUid = Guid.NewGuid(),
+                    Version = "1.0.0",
+                    SchemaDigest = "digest"
+                },
+                Options = JsonSerializer.SerializeToElement(new { })
+            }
         };
         public ConnectedServiceOperationResource Operation { get; private set; }
         public DiscoveryHandler()

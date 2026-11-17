@@ -7,10 +7,10 @@ using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Bootstrap.Contracts;
-using Agentstration.Infrastructure;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
@@ -956,17 +956,17 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
         var current = (await toolSets.GetVersionExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
             ArtifactPlatformResourceProvisioner.DefaultToolSetName, ArtifactPlatformResourceProvisioner.DefaultToolSetVersion, default))!;
         using (services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("tools.internal-mcp")))
-        foreach (var name in ArtifactCapabilities.All.Concat([ArtifactStorageReadMcpTool.Name, ArtifactStorageWriteMcpTool.Name]))
-        {
-            var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
-                ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name));
-            var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
-            _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
+            foreach (var name in ArtifactCapabilities.All.Concat([ArtifactStorageReadMcpTool.Name, ArtifactStorageWriteMcpTool.Name]))
             {
-                Generation = checked(tool.Value.Generation + 1),
-                Definition = tool.Value.Definition with { Schema = tool.Value.Definition.Schema! with { Output = null } }
-            }, tool.ETag, false, default);
-        }
+                var address = ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default,
+                    ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(name));
+                var tool = (await store.GetExactAsync<ToolResource>(address, default))!;
+                _ = await store.PutExactAsync(ResourceScopeRef.Instance, tool.Value with
+                {
+                    Generation = checked(tool.Value.Generation + 1),
+                    Definition = tool.Value.Definition with { Schema = tool.Value.Definition.Schema! with { Output = null } }
+                }, tool.ETag, false, default);
+            }
         // Build the pre-upgrade persisted state: published v1.0.0 pins the old staging Tools.
         using (services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("artifacts.platform")))
         {
@@ -990,9 +990,12 @@ public sealed class ArtifactApiTests : ResourceManagementApiTestBase
             var suffix = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("1.0.0")))[..16];
             _ = await store.PutExactAsync(ResourceScopeRef.Instance, current.Value with
             {
-                Uid = Guid.Empty, Generation = 1,
+                Uid = Guid.Empty,
+                Generation = 1,
                 Metadata = current.Value.Metadata with { Name = $"{current.Value.ToolSetName}--{suffix}" },
-                Version = "1.0.0", ToolSetGeneration = legacySet.Value.Generation, Members = members,
+                Version = "1.0.0",
+                ToolSetGeneration = legacySet.Value.Generation,
+                Members = members,
                 DefinitionHash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(members)))
             }, null, true, default);
             var scope = ResourceScopeRef.Workspace(context.WorkspaceId);

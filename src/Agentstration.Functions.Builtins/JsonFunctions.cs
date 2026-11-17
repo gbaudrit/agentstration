@@ -67,6 +67,9 @@ public static class FunctionSchemas
     public static NativeFunctionDescriptor Descriptor(string id, string properties, string[] required, string output = "{}") =>
         new(id, "1.0.0", JsonSerializer.SerializeToElement(new
         {
-            type = "object", properties = JsonSerializer.Deserialize<JsonElement>(properties), required, additionalProperties = false
+            type = "object",
+            properties = JsonSerializer.Deserialize<JsonElement>(properties),
+            required,
+            additionalProperties = false
         }), JsonSerializer.Deserialize<JsonElement>(output));
 }

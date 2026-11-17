@@ -473,8 +473,15 @@ public sealed class DataSourceDatasetEditorTests
                 if (FailSave)
                 {
                     var failure = new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
-                    { Content = JsonContent.Create(new { title = "Invalid Data Source", type = "https://agentstration.dev/problems/" + SaveFailureCode, detail = "private-saved-value",
-                        compositionErrorCode = SaveFailureCode == "data_source_composition_invalid" ? "flow_composition_function_input_incompatible" : null }) };
+                    {
+                        Content = JsonContent.Create(new
+                        {
+                            title = "Invalid Data Source",
+                            type = "https://agentstration.dev/problems/" + SaveFailureCode,
+                            detail = "private-saved-value",
+                            compositionErrorCode = SaveFailureCode == "data_source_composition_invalid" ? "flow_composition_function_input_incompatible" : null
+                        })
+                    };
                     failure.Headers.Add("X-Correlation-ID", "fixture-error-reference");
                     return failure;
                 }

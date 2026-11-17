@@ -13,8 +13,11 @@ public sealed partial class AwpAssignmentExecutorTests
     public async Task ForeachPassesEachElementDirectlyAndPreservesOrder(bool empty)
     {
         var graph = ProcessGraph(new());
-        graph = graph with { Steps = graph.Steps.Select(step => step.Name == "partition"
-            ? new ForeachFlowStepDefinition { Name = step.Name, MaximumConcurrency = 3 } : step).ToArray() };
+        graph = graph with
+        {
+            Steps = graph.Steps.Select(step => step.Name == "partition"
+            ? new ForeachFlowStepDefinition { Name = step.Name, MaximumConcurrency = 3 } : step).ToArray()
+        };
         var values = empty ? Array.Empty<int>() : new[] { 3, 1, 2 };
         var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(values));
         Assert.AreEqual("success", result.Outcome);
@@ -59,8 +62,12 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task CompletedProcessUnitsAreReusedWithoutEventsOrSideEffects()
     {
-        var handler = new GraphHandler(TestNow) { ChildReplay = request => new(TestNow, "completed-unit", "Succeeded",
-            JsonSerializer.SerializeToElement("cached")) { Outcome = "success" } };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildReplay = request => new(TestNow, "completed-unit", "Succeeded",
+            JsonSerializer.SerializeToElement("cached"))
+            { Outcome = "success" }
+        };
         var (result, _) = await ExecuteGraphAsync(ProcessGraph(new()), JsonSerializer.SerializeToElement(new[] { 1 }), handler);
         Assert.AreEqual("cached", result.Output!.Value[0].GetString());
         Assert.IsFalse(handler.Events.Any(value => value.Location.RunId == "completed-unit"));
@@ -71,9 +78,16 @@ public sealed partial class AwpAssignmentExecutorTests
     public async Task FailedProcessReplayPreservesTheOriginalModelFailureCoordinates()
     {
         var original = new FlowFailureOrigin("failed-unit", "correction", "unit-0");
-        var handler = new GraphHandler(TestNow) { ChildReplay = request => new(TestNow, "failed-unit", "Failed", null)
-        { Outcome = "error", ErrorCode = "model_output_token_limit", ErrorMessage = "No final response.",
-            ErrorOrigin = JsonSerializer.SerializeToElement(original, JsonOptions) } };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildReplay = request => new(TestNow, "failed-unit", "Failed", null)
+            {
+                Outcome = "error",
+                ErrorCode = "model_output_token_limit",
+                ErrorMessage = "No final response.",
+                ErrorOrigin = JsonSerializer.SerializeToElement(original, JsonOptions)
+            }
+        };
         var (result, _) = await ExecuteGraphAsync(ProcessGraph(new()), JsonSerializer.SerializeToElement(new[] { 1 }), handler);
         Assert.AreEqual("model_output_token_limit", result.ErrorCode);
         Assert.AreEqual(original, result.ErrorOrigin);

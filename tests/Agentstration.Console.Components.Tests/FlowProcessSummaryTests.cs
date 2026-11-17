@@ -1,10 +1,10 @@
-using Agentstration.Flows;
 using System.Reflection;
 using System.Text.Json;
-using Agentstration.Web.Console;
-using Agentstration.Web.Components.Pages;
+using Agentstration.Flows;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Flows;
+using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,9 +25,17 @@ public sealed class FlowProcessSummaryTests
         var scope = ResourceScopeRef.Workspace(workspace.Value);
         var version = new FlowVersion(ResourceScopeRef.Instance, new("source"), "1.0.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")), new Dictionary<string, string>(), DateTimeOffset.UtcNow);
-        var root = new FlowRun { Id = "root", WorkspaceId = workspace, FlowId = new("source"), FlowVersion = "1.0.0",
-            Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()), Input = JsonSerializer.SerializeToElement(new { }), CreatedAt = DateTimeOffset.UtcNow,
-            DefinitionSnapshot = version };
+        var root = new FlowRun
+        {
+            Id = "root",
+            WorkspaceId = workspace,
+            FlowId = new("source"),
+            FlowVersion = "1.0.0",
+            Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { }),
+            CreatedAt = DateTimeOffset.UtcNow,
+            DefinitionSnapshot = version
+        };
         var definition = new FlowProcessDefinitionOrigin(root.FlowId, ResourceScopeRef.Instance, "1.0.0", "snapshot", "source-hash", "transform", "Fragments", "process", "body-hash");
         proxy.Runs = [root, root with { Id = "unit", ParentFlowRunId = root.Id, ProcessOrigin = new(definition, root.Id, "transform", 1, Guid.NewGuid(), "unit-0", 0, null) }];
         context.Services.AddSingleton(client);

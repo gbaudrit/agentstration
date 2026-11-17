@@ -89,17 +89,33 @@ public sealed class DataSourceAcquisitionDocumentTests
         public StorageQueryProfilePin Profile { get; } = new("odata/4.01", "1.0", "odata-options+json", "model");
         public DataSourceAcquisitionResource Acquisition { get; } = new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceAcquisition, Uid = Guid.NewGuid(),
-            Metadata = new() { Name = "acquisition-A" }, DataSourceScopeRef = ResourceScopeRef.Instance,
-            DataSourceUid = Guid.NewGuid(), DataSourceName = "alerts", DataSourceNamespace = ResourceNamespace.Default,
-            DataSourceGeneration = 1, FlowRunId = "flow-A", State = DataSourceAcquisitionState.Succeeded,
-            CorrelationId = "test", RequestHash = "hash", CreatedBy = Guid.NewGuid(), TenantId = Guid.NewGuid(),
-            WorkspaceId = Guid.NewGuid(), CreatedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture)
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSourceAcquisition,
+            Uid = Guid.NewGuid(),
+            Metadata = new() { Name = "acquisition-A" },
+            DataSourceScopeRef = ResourceScopeRef.Instance,
+            DataSourceUid = Guid.NewGuid(),
+            DataSourceName = "alerts",
+            DataSourceNamespace = ResourceNamespace.Default,
+            DataSourceGeneration = 1,
+            FlowRunId = "flow-A",
+            State = DataSourceAcquisitionState.Succeeded,
+            CorrelationId = "test",
+            RequestHash = "hash",
+            CreatedBy = Guid.NewGuid(),
+            TenantId = Guid.NewGuid(),
+            WorkspaceId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture)
         };
         public DataSourceDocumentDescription Description => new(new()
         {
-            Source = new("alerts", ResourceScopeRef.Instance, ResourceNamespace.Default), SourceUid = Acquisition.DataSourceUid,
-            AcquisitionScope = ResourceScopeRef.Instance, Contract = new(Profile), Mode = "exact", AcquisitionId = Acquisition.Name, AcquisitionUid = Acquisition.Uid
+            Source = new("alerts", ResourceScopeRef.Instance, ResourceNamespace.Default),
+            SourceUid = Acquisition.DataSourceUid,
+            AcquisitionScope = ResourceScopeRef.Instance,
+            Contract = new(Profile),
+            Mode = "exact",
+            AcquisitionId = Acquisition.Name,
+            AcquisitionUid = Acquisition.Uid
         }, Acquisition.Name, Acquisition.Uid, "publication-A", new(new(true, false, false, true, true,
             [new(Profile.Id, Profile.Version, Profile.Encoding)]), new(QueryProfiles: [Profile.Id]), [Profile], JsonSerializer.SerializeToElement(new { type = "object" }), "model"));
         public DataSourceQueryResource? SavedQuery { get; private set; }
@@ -119,8 +135,11 @@ public sealed class DataSourceAcquisitionDocumentTests
             if (path.EndsWith("/query", StringComparison.Ordinal))
             {
                 Queries.Add((await request.Content!.ReadFromJsonAsync<DataSourceDocumentQueryRequest>(cancellationToken))!);
-                return new(HttpStatusCode.OK) { Content = JsonContent.Create(new DataSourceDocumentQueryResult(Acquisition.Name, Acquisition.Uid,
-                    "publication-A", new(Profile), new([], [], null), Queries.Count == 1 ? "cursor-A" : null)) };
+                return new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new DataSourceDocumentQueryResult(Acquisition.Name, Acquisition.Uid,
+                    "publication-A", new(Profile), new([], [], null), Queries.Count == 1 ? "cursor-A" : null))
+                };
             }
             if (path.EndsWith("/tools", StringComparison.Ordinal))
             {

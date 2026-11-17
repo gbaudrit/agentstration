@@ -33,7 +33,8 @@ public sealed partial class ApiClientTests
         {
             path = request.RequestUri?.PathAndQuery;
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { type }) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var result = await new ConnectedServicesApiClient(httpClient).GetTypesAsync(default);
 
@@ -56,7 +57,8 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };
             response.Headers.ETag = new EntityTagHeaderValue("\"v2\"");
             return response;
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
 
         var snapshot = await new ConnectedServicesApiClient(httpClient)
             .ReconcileAsync(resource.Name, scope, "\"v1\"", default);

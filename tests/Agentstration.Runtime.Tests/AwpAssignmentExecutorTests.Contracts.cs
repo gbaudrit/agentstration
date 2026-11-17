@@ -12,8 +12,11 @@ public sealed partial class AwpAssignmentExecutorTests
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object", required = new[] { "safe" }, properties = new { safe = new { type = "boolean" } } });
         var graph = AgentAnswerGraph();
-        graph = graph with { Steps = graph.Steps.Select(step => step is AgentFlowStepDefinition agent
-            ? (FlowStepDefinition)(agent with { Agent = agent.Agent with { OutputSchema = schema } }) : step).ToArray() };
+        graph = graph with
+        {
+            Steps = graph.Steps.Select(step => step is AgentFlowStepDefinition agent
+            ? (FlowStepDefinition)(agent with { Agent = agent.Agent with { OutputSchema = schema } }) : step).ToArray()
+        };
         var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
             new GraphHandler(TestNow) { ModelOutput = "{\"safe\":true}" },
             agentMaterial: AgentMaterial() with { ParticipantId = "answer", AgentName = "assistant", OutputSchema = schema });
@@ -31,9 +34,12 @@ public sealed partial class AwpAssignmentExecutorTests
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
         var graph = AgentAnswerGraph();
-        graph = graph with { Steps = [.. graph.Steps, new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error,
+        graph = graph with
+        {
+            Steps = [.. graph.Steps, new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error,
                 Code = customFailure ? "ANONYMIZATION_FAILED" : null, DetailsExpression = customFailure ? "${transition.output}" : null }],
-            Transitions = [.. graph.Transitions, new("failed", "answer", "error", "failure")] };
+            Transitions = [.. graph.Transitions, new("failed", "answer", "error", "failure")]
+        };
         var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }),
             new GraphHandler(TestNow) { ModelOutput = "private fixture text" },
             agentMaterial: AgentMaterial() with { ParticipantId = "answer", AgentName = "assistant", OutputSchema = schema });
@@ -50,15 +56,23 @@ public sealed partial class AwpAssignmentExecutorTests
     public async Task InvalidNamedSuccessOutputCannotRouteAParentThroughItsSuccessTransition()
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object" });
-        var child = new FlowGraphDefinition { EntryStep = "completed", Steps = [new OutputFlowStepDefinition {
+        var child = new FlowGraphDefinition
+        {
+            EntryStep = "completed",
+            Steps = [new OutputFlowStepDefinition {
             Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = schema,
-            OutputMapping = JsonSerializer.SerializeToElement("${input.missing}") }] };
-        var graph = new FlowGraphDefinition { EntryStep = "child", Steps = [
+            OutputMapping = JsonSerializer.SerializeToElement("${input.missing}") }]
+        };
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "child",
+            Steps = [
             new FlowCallStepDefinition { Name = "child", Flow = new("child") },
             new TransformFlowStepDefinition { Name = "postAggregate", Schema = schema,
                 Mapping = JsonSerializer.SerializeToElement("${steps.child.output}") },
             new OutputFlowStepDefinition { Name = "done", Outcome = FlowOutputOutcome.Success }],
-            Transitions = [new("child-success", "child", "completed", "postAggregate"), new("done", "postAggregate", "completed", "done")] };
+            Transitions = [new("child-success", "child", "completed", "postAggregate"), new("done", "postAggregate", "completed", "done")]
+        };
         var handler = new GraphHandler(TestNow) { ChildGraph = child };
         var error = await Assert.ThrowsAsync<Agentstration.Runtime.Worker.MicrosoftAgentFramework.AwpExecutionNotSupportedException>(
             () => ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler));
@@ -72,9 +86,13 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task DanglingOutputMappingIdentifiesTheReferenceInsteadOfReportingANullSchemaViolation()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "completed", Steps = [new OutputFlowStepDefinition {
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "completed",
+            Steps = [new OutputFlowStepDefinition {
             Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = JsonSerializer.SerializeToElement(new { type = "object" }),
-            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") }] };
+            OutputMapping = JsonSerializer.SerializeToElement("${steps.transform.output}") }]
+        };
         var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }));
         Assert.AreEqual("data_contract_mapping_unavailable", result.ErrorCode);
         var failure = DataContracts.ParseFailure(result.ErrorDetails)!;
@@ -87,7 +105,10 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task UnselectedDeclaredBranchRemainsNullableInAnExplicitOutputMapping()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "branch", Steps = [
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "branch",
+            Steps = [
             new ConditionFlowStepDefinition { Name = "branch", Left = "${input.route}", Operator = "equals", Right = "left" },
             new TransformFlowStepDefinition { Name = "left", Mapping = JsonSerializer.SerializeToElement(new { route = "left" }) },
             new TransformFlowStepDefinition { Name = "right", Mapping = JsonSerializer.SerializeToElement(new { route = "right" }) },
@@ -96,7 +117,8 @@ public sealed partial class AwpAssignmentExecutorTests
                     left = new { type = new[] { "object", "null" } }, right = new { type = new[] { "object", "null" } } } }),
                 OutputMapping = JsonSerializer.SerializeToElement(new { left = "${steps.left.output}", right = "${steps.right.output}" }) }],
             Transitions = [new("branch-left", "branch", "true", "left"), new("branch-right", "branch", "false", "right"),
-                new("left-done", "left", "completed", "completed"), new("right-done", "right", "completed", "completed")] };
+                new("left-done", "left", "completed", "completed"), new("right-done", "right", "completed", "completed")]
+        };
         var (result, handler) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { route = "right" }));
         Assert.AreEqual("success", result.Outcome);
         Assert.AreEqual(JsonValueKind.Null, result.Output!.Value.GetProperty("left").ValueKind);
@@ -107,12 +129,16 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task AvailableStepWithAnExplicitNullOutputRemainsValidForANullableContract()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [
             new InputFlowStepDefinition { Name = "input" },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
                 Schema = JsonSerializer.SerializeToElement(new { type = new[] { "object", "null" } }),
                 OutputMapping = JsonSerializer.SerializeToElement("${steps.input.output}") }],
-            Transitions = [new("done", "input", "completed", "completed")] };
+            Transitions = [new("done", "input", "completed", "completed")]
+        };
         var (result, _) = await ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement<object?>(null));
         Assert.AreEqual("success", result.Outcome);
         Assert.AreEqual(JsonValueKind.Null, result.Output!.Value.ValueKind);

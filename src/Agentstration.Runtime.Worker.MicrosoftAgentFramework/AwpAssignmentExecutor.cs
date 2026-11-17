@@ -1,4 +1,3 @@
-using Agentstration.Schemas;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
@@ -8,6 +7,7 @@ using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.MicrosoftAgentFramework;
+using Agentstration.Schemas;
 
 namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 
@@ -294,221 +294,226 @@ internal sealed partial class AwpAssignmentExecutor(
                 var artifactContracts = new List<InvocationDataContracts>();
                 try
                 {
-                switch (stepDefinition)
-                {
-                    case InputFlowStepDefinition:
-                        output = material.Input.Clone();
-                        break;
-                    case AgentFlowStepDefinition agentStep:
-                        var agentResourceId = await ResolveStringAsync(agentStep.Agent.ResourceId,
-                            context, cancellationToken);
-                        executedAgent = material.Agents.SingleOrDefault(value => value.ParticipantId == agentStep.Name)
-                            ?? material.Agents.SingleOrDefault(value => value.AgentName == agentResourceId)
-                            ?? throw new AwpExecutionNotSupportedException("flow_agent_material_missing", $"Agent for step '{agentStep.Name}' is absent from the execution material.");
-                        var agentInput = agentStep.InputMapping is null
-                            ? transitionOutput?.Clone() ?? material.Input.Clone()
-                            : await ResolveJsonAsync(agentStep.InputMapping.Value, context, cancellationToken);
-                        try
-                        {
-                            var expected = ExpectedAgentOutput(graph, agentStep, material, executedAgent);
-                            executedAgentResult = await ExecuteFlowAgentAsync(session, material, executedAgent, step,
-                                agentInput, cancellationToken, expected);
-                            output = AgentResultValue(executedAgent, executedAgentResult.Output, expected, material.RunId, stepDefinition.Name);
-                            eventName = "success";
-                        }
-                        catch (Exception exception) when (exception is not OperationCanceledException)
-                        {
-                            output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                            eventName = "error";
-                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, _ => "agent_step_failed" };
-                            errorDetails = FailureDetails(exception);
-                            errorMessage = exception.Message;
-                        }
-                        break;
-                    case RouterFlowStepDefinition router:
-                        var routingInput = material.Input.GetRawText();
-                        var selection = router.Candidates.FirstOrDefault(candidate =>
-                            MatchesTarget(routingInput, candidate.Route)
-                            || candidate.Examples?.Any(example => routingInput.Contains(
-                                example, StringComparison.OrdinalIgnoreCase)) == true);
-                        if (selection is null && router.Fallback is null)
-                            throw new AwpExecutionNotSupportedException("router_no_route", $"Router step '{router.Name}' could not select a route.");
-                        output = JsonSerializer.SerializeToElement(new
-                        {
-                            selectedRoute = selection?.Route ?? "fallback",
-                            selectedAgent = selection?.Agent.ResourceId ?? router.Fallback!.ResourceId
-                        });
-                        eventName = selection is null ? "fallback" : "selected";
-                        break;
-                    case ConditionFlowStepDefinition condition:
-                        var conditionResult = await EvaluateConditionAsync(condition, context, cancellationToken);
-                        output = JsonSerializer.SerializeToElement(conditionResult);
-                        eventName = conditionResult ? "true" : "false";
-                        break;
-                    case ForeachArtifactsFlowStepDefinition processing:
-                        try
-                        {
-                            output = await ProcessArtifactsAsync(session, material, processing, context, step,
-                                childRunIds, childExecutions, artifactContracts, cancellationToken);
-                        }
-                        catch (Exception exception) when (exception is not OperationCanceledException)
-                        {
-                            output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                            eventName = "error";
-                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code,
-                                AwpClientException authority => authority.Code, _ => "artifact_processing_failed" };
-                            errorMessage = exception.Message;
-                            errorDetails = FailureDetails(exception);
-                        }
-                        break;
-                    case ForeachFlowStepDefinition iteration:
-                        try
-                        {
-                            var collection = iteration.ItemsMapping is { } itemsMapping
-                                ? await ResolveJsonAsync(itemsMapping, context, cancellationToken) : transitionOutput ?? material.Input;
-                            if (iteration.Partition is null && (collection.ValueKind != JsonValueKind.Array || collection.GetArrayLength() > iteration.MaximumItems))
-                                throw new AwpExecutionNotSupportedException("foreach_collection_invalid", "Foreach requires a bounded JSON array.");
-                            var items = iteration.Partition is { } partition
-                                ? FlowProcessRegions.Partition(collection, partition).ToArray()
-                                : collection.EnumerateArray().Select(item => item.Clone()).ToArray();
-                            foreach (var item in items)
-                                DataContracts.Validate(DataContracts.Declared(iteration.ItemSchema, "foreach-item"), item, "foreach-item", material.RunId, iteration.Name);
-                            output = await ProcessValuesAsync(session, step, items, iteration.Partition?.MaximumConcurrency ?? iteration.MaximumConcurrency, childRunIds, childExecutions, cancellationToken);
-                            if (iteration.ResultSchema is { } resultSchema)
-                                foreach (var result in output.Value.EnumerateArray())
-                                    DataContracts.Validate(DataContracts.Declared(resultSchema, "foreach-result"), result, "foreach-result", material.RunId, iteration.Name);
-                        }
-                        catch (Exception exception) when (exception is not OperationCanceledException)
-                        {
-                            output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "error";
-                            errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, AwpClientException authority => authority.Code, _ => "foreach_failed" };
-                            errorMessage = exception.Message; errorDetails = FailureDetails(exception);
-                            errorOrigin = (exception as AwpExecutionNotSupportedException)?.Origin;
-                        }
-                        break;
-                    case TransformFlowStepDefinition transform:
-                        output = transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)
-                            ? await EvaluateExpressionAsync(transform.Expression!, context, cancellationToken)
-                            : transform.Mapping is null
-                                ? JsonSerializer.SerializeToElement(new { })
-                                : await ResolveJsonAsync(transform.Mapping.Value, context, cancellationToken);
-                        DataContracts.Validate(DataContracts.Declared(transform.Schema, $"flow:{material.RunId}/step:{transform.Name}/output"),
-                            output ?? JsonSerializer.SerializeToElement<object?>(null), "transform-output", material.RunId, transform.Name);
-                        break;
-                    case ToolFlowStepDefinition:
-                    case ToolRouteFlowStepDefinition:
-                        var mapping = stepDefinition switch
-                        {
-                            ToolFlowStepDefinition directTool => directTool.ArgumentsMapping,
-                            ToolRouteFlowStepDefinition routedTool => routedTool.ArgumentsMapping,
-                            _ => null
-                        };
-                        var arguments = mapping is null
-                            ? DefaultToolArguments(stepDefinition, transitionOutput ?? material.Input)
-                            : await ResolveJsonAsync(mapping.Value, context, cancellationToken);
-                        try
-                        {
-                            executedTool = await session.Client.InvokeFlowToolAsync(new(session.Context,
-                                step.StepExecutionId, arguments), cancellationToken);
-                            output = executedTool.Result?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
-                            eventName = "success";
-                        }
-                        catch (Exception exception) when (exception is not OperationCanceledException)
-                        {
-                            output = JsonSerializer.SerializeToElement(new { error = exception.Message });
-                            eventName = "error";
-                            errorCode = exception is AwpClientException client ? client.Code
-                                : stepDefinition is ToolRouteFlowStepDefinition
-                                    ? "tool_route_step_failed" : "tool_step_failed";
-                            errorMessage = exception.Message;
-                            errorDetails = FailureDetails(exception);
-                        }
-                        break;
-                    case FlowCallStepDefinition flowCall:
-                        var childInput = flowCall.InputMapping is null
-                            ? transitionOutput?.Clone() ?? material.Input.Clone()
-                            : await ResolveJsonAsync(flowCall.InputMapping.Value, context, cancellationToken);
-                        if (flowCall.CompositionParameters is { } literalParameters)
-                            childInput = JsonSerializer.SerializeToElement(new { value = childInput, parameters = literalParameters });
-                        var child = await ExecuteChildFlowAsync(session, step, childInput,
-                            "flowCall", null, cancellationToken);
-                        childExecutions.Add(child);
-                        childRunIds.Add(child.RunId);
-                        output = child.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
-                        eventName = child.Result.OutputName
-                            ?? (child.Result.ErrorCode == "flow_run_timed_out" ? "timedOut"
-                                : child.Result.Outcome == "error" ? "failed" : "completed");
-                        if (child.Result.Outcome == "error")
-                        {
-                            errorDetails = child.Result.ErrorDetails;
-                            errorCode = child.Result.ErrorCode ?? "child_flow_failed";
-                            errorMessage = child.Result.ErrorMessage ?? "The child Flow failed.";
-                        }
-                        break;
-                    case RepeatFlowStepDefinition repeat:
-                        var repeatInput = repeat.InputMapping is null
-                            ? transitionOutput?.Clone() ?? material.Input.Clone()
-                            : await ResolveJsonAsync(repeat.InputMapping.Value, context, cancellationToken);
-                        output = null;
-                        for (var iteration = 1; iteration <= repeat.MaximumIterations; iteration++)
-                        {
-                            repeatIteration = iteration;
-                            var repeated = await ExecuteChildFlowAsync(session, step, repeatInput,
-                                "repeat", iteration, cancellationToken);
-                            childExecutions.Add(repeated);
-                            childRunIds.Add(repeated.RunId);
-                            output = repeated.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
-                            if (repeated.Result.Outcome == "error")
+                    switch (stepDefinition)
+                    {
+                        case InputFlowStepDefinition:
+                            output = material.Input.Clone();
+                            break;
+                        case AgentFlowStepDefinition agentStep:
+                            var agentResourceId = await ResolveStringAsync(agentStep.Agent.ResourceId,
+                                context, cancellationToken);
+                            executedAgent = material.Agents.SingleOrDefault(value => value.ParticipantId == agentStep.Name)
+                                ?? material.Agents.SingleOrDefault(value => value.AgentName == agentResourceId)
+                                ?? throw new AwpExecutionNotSupportedException("flow_agent_material_missing", $"Agent for step '{agentStep.Name}' is absent from the execution material.");
+                            var agentInput = agentStep.InputMapping is null
+                                ? transitionOutput?.Clone() ?? material.Input.Clone()
+                                : await ResolveJsonAsync(agentStep.InputMapping.Value, context, cancellationToken);
+                            try
                             {
-                                eventName = repeated.Result.OutputName ?? "failed";
-                                errorDetails = repeated.Result.ErrorDetails;
-                                errorCode = repeated.Result.ErrorCode ?? "child_flow_failed";
-                                errorMessage = repeated.Result.ErrorMessage ?? "The repeated child Flow failed.";
-                                break;
+                                var expected = ExpectedAgentOutput(graph, agentStep, material, executedAgent);
+                                executedAgentResult = await ExecuteFlowAgentAsync(session, material, executedAgent, step,
+                                    agentInput, cancellationToken, expected);
+                                output = AgentResultValue(executedAgent, executedAgentResult.Output, expected, material.RunId, stepDefinition.Name);
+                                eventName = "success";
                             }
-                            if (errorCode is not null)
-                    errorOrigin ??= childExecutions.LastOrDefault(child => child.Result.ErrorCode == errorCode)?.Result.ErrorOrigin
-                        ?? new FlowFailureOrigin(material.RunId, current, ProcessUnitKey(material));
-                if (final is not null && errorCode is not null) final = final with { ErrorOrigin = errorOrigin ?? transitionFailure?.Origin };
-                outputs[current] = output?.Clone();
-                            var repeatContext = ExecutionContext(material, stepDefinition, outputs,
-                                output, output);
-                            var until = await EvaluateExpressionAsync(repeat.Until, repeatContext, cancellationToken);
-                            if (until?.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
-                                throw new AwpExecutionNotSupportedException("flow_repeat_until_invalid",
-                                    $"Repeat step '{repeat.Name}' until expression must return a boolean.");
-                            if (until.Value.ValueKind == JsonValueKind.True) break;
-                            if (iteration == repeat.MaximumIterations)
-                                throw new AwpExecutionNotSupportedException("flow_repeat_limit_exceeded",
-                                    $"Repeat step '{repeat.Name}' reached its maximum of {repeat.MaximumIterations} iterations.");
-                            repeatInput = repeat.NextInputMapping is null
-                                ? output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
-                                : await ResolveJsonAsync(repeat.NextInputMapping.Value, repeatContext, cancellationToken);
-                        }
-                        break;
-                    case OutputFlowStepDefinition outputStep:
-                        output = outputStep.OutputMapping is null
-                            ? transitionOutput?.Clone() ?? material.Input.Clone()
-                            : await ResolveJsonAsync(outputStep.OutputMapping.Value, context, cancellationToken);
-                        var outcome = outputStep.Outcome ?? FlowOutputOutcome.Success;
-                        eventName = outputStep.Outcome.HasValue ? outputStep.Name : "completed";
-                        if (outcome == FlowOutputOutcome.Error)
-                        {
-                            errorOrigin = transitionFailure?.Origin;
-                            errorCode = outputStep.Code ?? transitionFailure?.Code ?? "FLOW_FAILED";
-                            errorMessage = outputStep.Message ?? transitionFailure?.Message ?? "Flow execution failed.";
-                        }
-                        DataContracts.Validate(DataContracts.Declared(graph.ResolveOutputSchema(outputStep, out _), $"flow:{material.RunId}/output:{outputStep.Name}"), output ?? JsonSerializer.SerializeToElement<object?>(null), "flow-output", material.RunId, outputStep.Name);
-                        final = new(output, outputStep.Outcome.HasValue ? outputStep.Name : null,
-                            outcome == FlowOutputOutcome.Error ? "error" : "success",
-                            errorCode, errorMessage,
-                            outputStep.DetailsExpression is null ? transitionFailure?.Details
-                                : PreserveContractFailure(transitionFailure?.Details, await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken)));
-                        break;
-                    default:
-                        throw new AwpExecutionNotSupportedException("flow_step_type_unsupported",
-                            $"Step '{stepDefinition.Name}' of type '{stepDefinition.Type()}' is not yet supported by the external Worker.");
-                }
+                            catch (Exception exception) when (exception is not OperationCanceledException)
+                            {
+                                output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                                eventName = "error";
+                                errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, _ => "agent_step_failed" };
+                                errorDetails = FailureDetails(exception);
+                                errorMessage = exception.Message;
+                            }
+                            break;
+                        case RouterFlowStepDefinition router:
+                            var routingInput = material.Input.GetRawText();
+                            var selection = router.Candidates.FirstOrDefault(candidate =>
+                                MatchesTarget(routingInput, candidate.Route)
+                                || candidate.Examples?.Any(example => routingInput.Contains(
+                                    example, StringComparison.OrdinalIgnoreCase)) == true);
+                            if (selection is null && router.Fallback is null)
+                                throw new AwpExecutionNotSupportedException("router_no_route", $"Router step '{router.Name}' could not select a route.");
+                            output = JsonSerializer.SerializeToElement(new
+                            {
+                                selectedRoute = selection?.Route ?? "fallback",
+                                selectedAgent = selection?.Agent.ResourceId ?? router.Fallback!.ResourceId
+                            });
+                            eventName = selection is null ? "fallback" : "selected";
+                            break;
+                        case ConditionFlowStepDefinition condition:
+                            var conditionResult = await EvaluateConditionAsync(condition, context, cancellationToken);
+                            output = JsonSerializer.SerializeToElement(conditionResult);
+                            eventName = conditionResult ? "true" : "false";
+                            break;
+                        case ForeachArtifactsFlowStepDefinition processing:
+                            try
+                            {
+                                output = await ProcessArtifactsAsync(session, material, processing, context, step,
+                                    childRunIds, childExecutions, artifactContracts, cancellationToken);
+                            }
+                            catch (Exception exception) when (exception is not OperationCanceledException)
+                            {
+                                output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                                eventName = "error";
+                                errorCode = exception switch
+                                {
+                                    DataContractException contract => contract.Code,
+                                    AwpExecutionNotSupportedException unsupported => unsupported.Code,
+                                    AwpClientException authority => authority.Code,
+                                    _ => "artifact_processing_failed"
+                                };
+                                errorMessage = exception.Message;
+                                errorDetails = FailureDetails(exception);
+                            }
+                            break;
+                        case ForeachFlowStepDefinition iteration:
+                            try
+                            {
+                                var collection = iteration.ItemsMapping is { } itemsMapping
+                                    ? await ResolveJsonAsync(itemsMapping, context, cancellationToken) : transitionOutput ?? material.Input;
+                                if (iteration.Partition is null && (collection.ValueKind != JsonValueKind.Array || collection.GetArrayLength() > iteration.MaximumItems))
+                                    throw new AwpExecutionNotSupportedException("foreach_collection_invalid", "Foreach requires a bounded JSON array.");
+                                var items = iteration.Partition is { } partition
+                                    ? FlowProcessRegions.Partition(collection, partition).ToArray()
+                                    : collection.EnumerateArray().Select(item => item.Clone()).ToArray();
+                                foreach (var item in items)
+                                    DataContracts.Validate(DataContracts.Declared(iteration.ItemSchema, "foreach-item"), item, "foreach-item", material.RunId, iteration.Name);
+                                output = await ProcessValuesAsync(session, step, items, iteration.Partition?.MaximumConcurrency ?? iteration.MaximumConcurrency, childRunIds, childExecutions, cancellationToken);
+                                if (iteration.ResultSchema is { } resultSchema)
+                                    foreach (var result in output.Value.EnumerateArray())
+                                        DataContracts.Validate(DataContracts.Declared(resultSchema, "foreach-result"), result, "foreach-result", material.RunId, iteration.Name);
+                            }
+                            catch (Exception exception) when (exception is not OperationCanceledException)
+                            {
+                                output = JsonSerializer.SerializeToElement(new { error = exception.Message }); eventName = "error";
+                                errorCode = exception switch { DataContractException contract => contract.Code, AwpExecutionNotSupportedException unsupported => unsupported.Code, AwpClientException authority => authority.Code, _ => "foreach_failed" };
+                                errorMessage = exception.Message; errorDetails = FailureDetails(exception);
+                                errorOrigin = (exception as AwpExecutionNotSupportedException)?.Origin;
+                            }
+                            break;
+                        case TransformFlowStepDefinition transform:
+                            output = transform.Mode.Equals("Expression", StringComparison.OrdinalIgnoreCase)
+                                ? await EvaluateExpressionAsync(transform.Expression!, context, cancellationToken)
+                                : transform.Mapping is null
+                                    ? JsonSerializer.SerializeToElement(new { })
+                                    : await ResolveJsonAsync(transform.Mapping.Value, context, cancellationToken);
+                            DataContracts.Validate(DataContracts.Declared(transform.Schema, $"flow:{material.RunId}/step:{transform.Name}/output"),
+                                output ?? JsonSerializer.SerializeToElement<object?>(null), "transform-output", material.RunId, transform.Name);
+                            break;
+                        case ToolFlowStepDefinition:
+                        case ToolRouteFlowStepDefinition:
+                            var mapping = stepDefinition switch
+                            {
+                                ToolFlowStepDefinition directTool => directTool.ArgumentsMapping,
+                                ToolRouteFlowStepDefinition routedTool => routedTool.ArgumentsMapping,
+                                _ => null
+                            };
+                            var arguments = mapping is null
+                                ? DefaultToolArguments(stepDefinition, transitionOutput ?? material.Input)
+                                : await ResolveJsonAsync(mapping.Value, context, cancellationToken);
+                            try
+                            {
+                                executedTool = await session.Client.InvokeFlowToolAsync(new(session.Context,
+                                    step.StepExecutionId, arguments), cancellationToken);
+                                output = executedTool.Result?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                                eventName = "success";
+                            }
+                            catch (Exception exception) when (exception is not OperationCanceledException)
+                            {
+                                output = JsonSerializer.SerializeToElement(new { error = exception.Message });
+                                eventName = "error";
+                                errorCode = exception is AwpClientException client ? client.Code
+                                    : stepDefinition is ToolRouteFlowStepDefinition
+                                        ? "tool_route_step_failed" : "tool_step_failed";
+                                errorMessage = exception.Message;
+                                errorDetails = FailureDetails(exception);
+                            }
+                            break;
+                        case FlowCallStepDefinition flowCall:
+                            var childInput = flowCall.InputMapping is null
+                                ? transitionOutput?.Clone() ?? material.Input.Clone()
+                                : await ResolveJsonAsync(flowCall.InputMapping.Value, context, cancellationToken);
+                            if (flowCall.CompositionParameters is { } literalParameters)
+                                childInput = JsonSerializer.SerializeToElement(new { value = childInput, parameters = literalParameters });
+                            var child = await ExecuteChildFlowAsync(session, step, childInput,
+                                "flowCall", null, cancellationToken);
+                            childExecutions.Add(child);
+                            childRunIds.Add(child.RunId);
+                            output = child.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                            eventName = child.Result.OutputName
+                                ?? (child.Result.ErrorCode == "flow_run_timed_out" ? "timedOut"
+                                    : child.Result.Outcome == "error" ? "failed" : "completed");
+                            if (child.Result.Outcome == "error")
+                            {
+                                errorDetails = child.Result.ErrorDetails;
+                                errorCode = child.Result.ErrorCode ?? "child_flow_failed";
+                                errorMessage = child.Result.ErrorMessage ?? "The child Flow failed.";
+                            }
+                            break;
+                        case RepeatFlowStepDefinition repeat:
+                            var repeatInput = repeat.InputMapping is null
+                                ? transitionOutput?.Clone() ?? material.Input.Clone()
+                                : await ResolveJsonAsync(repeat.InputMapping.Value, context, cancellationToken);
+                            output = null;
+                            for (var iteration = 1; iteration <= repeat.MaximumIterations; iteration++)
+                            {
+                                repeatIteration = iteration;
+                                var repeated = await ExecuteChildFlowAsync(session, step, repeatInput,
+                                    "repeat", iteration, cancellationToken);
+                                childExecutions.Add(repeated);
+                                childRunIds.Add(repeated.RunId);
+                                output = repeated.Result.Output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null);
+                                if (repeated.Result.Outcome == "error")
+                                {
+                                    eventName = repeated.Result.OutputName ?? "failed";
+                                    errorDetails = repeated.Result.ErrorDetails;
+                                    errorCode = repeated.Result.ErrorCode ?? "child_flow_failed";
+                                    errorMessage = repeated.Result.ErrorMessage ?? "The repeated child Flow failed.";
+                                    break;
+                                }
+                                if (errorCode is not null)
+                                    errorOrigin ??= childExecutions.LastOrDefault(child => child.Result.ErrorCode == errorCode)?.Result.ErrorOrigin
+                                        ?? new FlowFailureOrigin(material.RunId, current, ProcessUnitKey(material));
+                                if (final is not null && errorCode is not null) final = final with { ErrorOrigin = errorOrigin ?? transitionFailure?.Origin };
+                                outputs[current] = output?.Clone();
+                                var repeatContext = ExecutionContext(material, stepDefinition, outputs,
+                                    output, output);
+                                var until = await EvaluateExpressionAsync(repeat.Until, repeatContext, cancellationToken);
+                                if (until?.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                                    throw new AwpExecutionNotSupportedException("flow_repeat_until_invalid",
+                                        $"Repeat step '{repeat.Name}' until expression must return a boolean.");
+                                if (until.Value.ValueKind == JsonValueKind.True) break;
+                                if (iteration == repeat.MaximumIterations)
+                                    throw new AwpExecutionNotSupportedException("flow_repeat_limit_exceeded",
+                                        $"Repeat step '{repeat.Name}' reached its maximum of {repeat.MaximumIterations} iterations.");
+                                repeatInput = repeat.NextInputMapping is null
+                                    ? output?.Clone() ?? JsonSerializer.SerializeToElement<object?>(null)
+                                    : await ResolveJsonAsync(repeat.NextInputMapping.Value, repeatContext, cancellationToken);
+                            }
+                            break;
+                        case OutputFlowStepDefinition outputStep:
+                            output = outputStep.OutputMapping is null
+                                ? transitionOutput?.Clone() ?? material.Input.Clone()
+                                : await ResolveJsonAsync(outputStep.OutputMapping.Value, context, cancellationToken);
+                            var outcome = outputStep.Outcome ?? FlowOutputOutcome.Success;
+                            eventName = outputStep.Outcome.HasValue ? outputStep.Name : "completed";
+                            if (outcome == FlowOutputOutcome.Error)
+                            {
+                                errorOrigin = transitionFailure?.Origin;
+                                errorCode = outputStep.Code ?? transitionFailure?.Code ?? "FLOW_FAILED";
+                                errorMessage = outputStep.Message ?? transitionFailure?.Message ?? "Flow execution failed.";
+                            }
+                            DataContracts.Validate(DataContracts.Declared(graph.ResolveOutputSchema(outputStep, out _), $"flow:{material.RunId}/output:{outputStep.Name}"), output ?? JsonSerializer.SerializeToElement<object?>(null), "flow-output", material.RunId, outputStep.Name);
+                            final = new(output, outputStep.Outcome.HasValue ? outputStep.Name : null,
+                                outcome == FlowOutputOutcome.Error ? "error" : "success",
+                                errorCode, errorMessage,
+                                outputStep.DetailsExpression is null ? transitionFailure?.Details
+                                    : PreserveContractFailure(transitionFailure?.Details, await ResolveFailureDetailsAsync(outputStep.DetailsExpression, context, cancellationToken)));
+                            break;
+                        default:
+                            throw new AwpExecutionNotSupportedException("flow_step_type_unsupported",
+                                $"Step '{stepDefinition.Name}' of type '{stepDefinition.Type()}' is not yet supported by the external Worker.");
+                    }
                 }
                 catch (DataContractException exception)
                 {
@@ -677,7 +682,8 @@ internal sealed partial class AwpAssignmentExecutor(
         CancellationToken cancellationToken, AwpProcessUnit? processUnit = null)
     {
         var child = await session.Client.CreateChildFlowAsync(new(session.Context,
-            step.StepExecutionId, input, purpose, iteration) { ProcessUnit = processUnit }, cancellationToken);
+            step.StepExecutionId, input, purpose, iteration)
+        { ProcessUnit = processUnit }, cancellationToken);
         if (child.Status is "Succeeded" or "Failed" or "TimedOut" or "Cancelled")
             return new(child.RunId, child.FlowId ?? child.Material?.FlowId ?? string.Empty,
                 child.FlowNamespace ?? child.Material?.FlowNamespace ?? string.Empty,
@@ -785,7 +791,8 @@ internal sealed partial class AwpAssignmentExecutor(
         }
         var failed = children.OfType<AwpChildExecutionResult>().FirstOrDefault(child => child.Result.Outcome == "error");
         if (failed is not null) throw new AwpExecutionNotSupportedException(failed.Result.ErrorCode ?? "process_failed",
-            failed.Result.ErrorMessage ?? "Process execution failed.") { Details = failed.Result.ErrorDetails, Origin = failed.Result.ErrorOrigin };
+            failed.Result.ErrorMessage ?? "Process execution failed.")
+        { Details = failed.Result.ErrorDetails, Origin = failed.Result.ErrorOrigin };
         return JsonSerializer.SerializeToElement(children.Select(child => child!.Result.Output));
     }
 
@@ -815,51 +822,65 @@ internal sealed partial class AwpAssignmentExecutor(
         var outputCounts = new int[entries.Length];
         try
         {
-        await RunProcessUnitsAsync(session, step, entries.Length, definition.MaximumConcurrency ?? 1, async index =>
-        {
-            var item = entries[index];
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            await RunProcessUnitsAsync(session, step, entries.Length, definition.MaximumConcurrency ?? 1, async index =>
             {
-                var opened = (await session.Client.ProcessArtifactAsync(new(session.Context,
-                    step.StepExecutionId, index, "open", item), cancellationToken)).Result;
-                if (opened.TryGetProperty("contractContext", out var metadata) && metadata.ValueKind == JsonValueKind.Object
-                    && metadata.Deserialize<InvocationDataContracts>(JsonOptions) is { } contracts
-                    )
-                    contractsByUnit[index] = contracts;
-                var processingContext = context with { Input = JsonSerializer.SerializeToElement(new {
-                    artifact = opened.GetProperty("artifact"), content = opened.GetProperty("content"),
-                    inputAccess = opened.GetProperty("inputAccess"), outputAccess = opened.GetProperty("outputAccess"),
-                    parameters = material.Input.ValueKind == JsonValueKind.Object && material.Input.TryGetProperty("parameters", out var savedParameters) ? savedParameters : JsonSerializer.SerializeToElement(new { }) }), TransitionOutput = opened };
-                var processingInput = definition.ProcessingInputMapping is { } inputMapping
-                    ? await ResolveJsonAsync(inputMapping, processingContext, cancellationToken) : processingContext.Input;
-                var child = await ExecuteChildFlowAsync(session, step, processingInput, "artifactProcessing", index, cancellationToken, new($"unit-{index}", index, TotalUnits: entries.Length));
-                executions[index] = child;
-                if (child.Result.Outcome == "error")
+                var item = entries[index];
+                cancellationToken.ThrowIfCancellationRequested();
+                try
                 {
-                    await session.Client.ProcessArtifactAsync(new(session.Context, step.StepExecutionId,
-                        index, "abort", JsonSerializer.SerializeToElement(new { })), cancellationToken);
-                    return;
+                    var opened = (await session.Client.ProcessArtifactAsync(new(session.Context,
+                        step.StepExecutionId, index, "open", item), cancellationToken)).Result;
+                    if (opened.TryGetProperty("contractContext", out var metadata) && metadata.ValueKind == JsonValueKind.Object
+                        && metadata.Deserialize<InvocationDataContracts>(JsonOptions) is { } contracts
+                        )
+                        contractsByUnit[index] = contracts;
+                    var processingContext = context with
+                    {
+                        Input = JsonSerializer.SerializeToElement(new
+                        {
+                            artifact = opened.GetProperty("artifact"),
+                            content = opened.GetProperty("content"),
+                            inputAccess = opened.GetProperty("inputAccess"),
+                            outputAccess = opened.GetProperty("outputAccess"),
+                            parameters = material.Input.ValueKind == JsonValueKind.Object && material.Input.TryGetProperty("parameters", out var savedParameters) ? savedParameters : JsonSerializer.SerializeToElement(new { })
+                        }),
+                        TransitionOutput = opened
+                    };
+                    var processingInput = definition.ProcessingInputMapping is { } inputMapping
+                        ? await ResolveJsonAsync(inputMapping, processingContext, cancellationToken) : processingContext.Input;
+                    var child = await ExecuteChildFlowAsync(session, step, processingInput, "artifactProcessing", index, cancellationToken, new($"unit-{index}", index, TotalUnits: entries.Length));
+                    executions[index] = child;
+                    if (child.Result.Outcome == "error")
+                    {
+                        await session.Client.ProcessArtifactAsync(new(session.Context, step.StepExecutionId,
+                            index, "abort", JsonSerializer.SerializeToElement(new { })), cancellationToken);
+                        return;
+                    }
+                    var resultContext = context with
+                    {
+                        Input = child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null),
+                        TransitionOutput = child.Result.Output
+                    };
+                    var output = definition.ResultMapping is { } resultMapping
+                        ? await ResolveJsonAsync(resultMapping, resultContext, cancellationToken)
+                        : child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null);
+                    var prepared = (await session.Client.ProcessArtifactAsync(new(session.Context,
+                        step.StepExecutionId, index, "prepare", output), cancellationToken)).Result;
+                    outputCounts[index] = prepared.TryGetProperty("outputCount", out var count) ? count.GetInt32()
+                        : prepared.TryGetProperty("artifacts", out var replayOutputs) ? replayOutputs.GetArrayLength() : 1;
                 }
-                var resultContext = context with { Input = child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null),
-                    TransitionOutput = child.Result.Output };
-                var output = definition.ResultMapping is { } resultMapping
-                    ? await ResolveJsonAsync(resultMapping, resultContext, cancellationToken)
-                    : child.Result.Output ?? JsonSerializer.SerializeToElement<object?>(null);
-                var prepared = (await session.Client.ProcessArtifactAsync(new(session.Context,
-                    step.StepExecutionId, index, "prepare", output), cancellationToken)).Result;
-                outputCounts[index] = prepared.TryGetProperty("outputCount", out var count) ? count.GetInt32()
-                    : prepared.TryGetProperty("artifacts", out var replayOutputs) ? replayOutputs.GetArrayLength() : 1;
-            }
-            catch
-            {
-                try { await session.Client.ProcessArtifactAsync(new(session.Context, step.StepExecutionId,
-                    index, "abort", JsonSerializer.SerializeToElement(new { })), CancellationToken.None); }
-                catch (Exception cleanupError) when (cleanupError is not OutOfMemoryException)
-                { logger.LogWarning("Artifact processing draft cleanup was deferred: {ErrorType}", cleanupError.GetType().Name); }
-                throw;
-            }
-        }, cancellationToken);
+                catch
+                {
+                    try
+                    {
+                        await session.Client.ProcessArtifactAsync(new(session.Context, step.StepExecutionId,
+                        index, "abort", JsonSerializer.SerializeToElement(new { })), CancellationToken.None);
+                    }
+                    catch (Exception cleanupError) when (cleanupError is not OutOfMemoryException)
+                    { logger.LogWarning("Artifact processing draft cleanup was deferred: {ErrorType}", cleanupError.GetType().Name); }
+                    throw;
+                }
+            }, cancellationToken);
         }
         finally
         {
@@ -869,7 +890,8 @@ internal sealed partial class AwpAssignmentExecutor(
         }
         var failed = executions.OfType<AwpChildExecutionResult>().FirstOrDefault(child => child.Result.Outcome == "error");
         if (failed is not null) throw new AwpExecutionNotSupportedException(failed.Result.ErrorCode ?? "artifact_processing_failed",
-            failed.Result.ErrorMessage ?? "Artifact processing failed.") { Details = failed.Result.ErrorDetails, Origin = failed.Result.ErrorOrigin };
+            failed.Result.ErrorMessage ?? "Artifact processing failed.")
+        { Details = failed.Result.ErrorDetails, Origin = failed.Result.ErrorOrigin };
 
         // No retained output Artifact is registered until every processing region has succeeded.
         if (outputCounts.Sum() > definition.MaximumOutputArtifacts)

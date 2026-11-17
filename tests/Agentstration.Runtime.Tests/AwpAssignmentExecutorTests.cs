@@ -36,12 +36,16 @@ public sealed partial class AwpAssignmentExecutorTests
             "invalid-value" => JsonSerializer.SerializeToElement(new { value = "not-artifacts", parameters = new { } }),
             _ => JsonSerializer.SerializeToElement(new { value = manifest, parameters = new { } })
         };
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [
             new InputFlowStepDefinition { Name = "input" },
             new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
-            Transitions = [new("start", "input", "completed", "process"), new("done", "process", "completed", "completed"), new("failed", "process", "error", "failure")] };
+            Transitions = [new("start", "input", "completed", "process"), new("done", "process", "completed", "completed"), new("failed", "process", "error", "failure")]
+        };
         var (result, handler) = await ExecuteGraphAsync(graph, input);
         Assert.AreEqual(accepted ? "success" : "error", result.Outcome);
         if (accepted)
@@ -57,22 +61,32 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactTransformationAdaptsGenericToolInputAndPreparesAllResultsBeforePublishing()
     {
-        var processing = new ForeachArtifactsFlowStepDefinition { Name = "process",
+        var processing = new ForeachArtifactsFlowStepDefinition
+        {
+            Name = "process",
             ArtifactsMapping = JsonSerializer.SerializeToElement("${input}"),
             ProcessingInputMapping = JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }),
-            ResultMapping = JsonSerializer.SerializeToElement("${input.answer}") };
-        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [processing,
-            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }],
-            Transitions = [new("done", "process", "completed", "completed")] };
-        var handler = new GraphHandler(TestNow) { ChildGraph = new()
+            ResultMapping = JsonSerializer.SerializeToElement("${input.answer}")
+        };
+        var graph = new FlowGraphDefinition
         {
-            EntryStep = "generic",
-            Steps = [new ToolFlowStepDefinition { Name = "generic", Tool = new("existing-generic-tool"),
+            EntryStep = "process",
+            Steps = [processing,
+            new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success }],
+            Transitions = [new("done", "process", "completed", "completed")]
+        };
+        var handler = new GraphHandler(TestNow)
+        {
+            ChildGraph = new()
+            {
+                EntryStep = "generic",
+                Steps = [new ToolFlowStepDefinition { Name = "generic", Tool = new("existing-generic-tool"),
                 ArgumentsMapping = JsonSerializer.SerializeToElement("${input}") },
                 new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success,
                     OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
-            Transitions = [new("tool-done", "generic", "success", "completed")]
-        } };
+                Transitions = [new("tool-done", "generic", "success", "completed")]
+            }
+        };
         var (result, _) = await ExecuteGraphAsync(graph,
             JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "first" }, new { artifactId = "second" } } }), handler);
         CollectionAssert.AreEqual(new[] { "open", "prepare", "open", "prepare", "finish", "finish" }, handler.ArtifactProcessingRequests.Select(request => request.Action).ToArray());
@@ -88,9 +102,13 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactProcessingFailureCannotPublishAPartialResult()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "process",
+            Steps = [new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
-            Transitions = [new("failed", "process", "error", "failure")] };
+            Transitions = [new("failed", "process", "error", "failure")]
+        };
         var handler = new GraphHandler(TestNow) { ChildOutcome = "error" };
         var (result, _) = await ExecuteGraphAsync(graph,
             JsonSerializer.SerializeToElement(new { artifacts = new[] { new { artifactId = "first" } } }), handler);
@@ -1681,8 +1699,13 @@ public sealed partial class AwpAssignmentExecutorTests
             var request = Payload<AwpProcessArtifactRequest>(bytes);
             ArtifactProcessingRequests.Add(request);
             return new(now, request.Action == "open"
-                ? JsonSerializer.SerializeToElement(new { artifact = new { artifactId = request.Arguments.GetProperty("artifactId").GetString() },
-                    content = "source-" + request.Index, inputAccess = new { reference = "bound-input" }, outputAccess = new { reference = "bound-output" } })
+                ? JsonSerializer.SerializeToElement(new
+                {
+                    artifact = new { artifactId = request.Arguments.GetProperty("artifactId").GetString() },
+                    content = "source-" + request.Index,
+                    inputAccess = new { reference = "bound-input" },
+                    outputAccess = new { reference = "bound-output" }
+                })
                 : JsonSerializer.SerializeToElement(new { artifactId = "output-" + request.Index, kind = "durable", disposition = "publishable" }));
         }
 

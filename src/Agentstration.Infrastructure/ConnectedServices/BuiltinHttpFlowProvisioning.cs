@@ -2,9 +2,9 @@ using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Tools;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.ConnectedServices;
 
@@ -16,17 +16,34 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner
         var contract = discovery ? ConnectedServiceOperationDiscoveryContracts.V1 : "connected-service-operation-acquisition/v1";
         var toolName = discovery ? ConnectedServiceDiscoveryMcpTool.Name : ConnectedServiceAcquisitionMcpTool.Name;
         var input = discovery
-            ? JsonSerializer.SerializeToElement(new { type = "object", properties = new
+            ? JsonSerializer.SerializeToElement(new
             {
-                contract = new { type = "string" }, discoveryId = new { type = "string" },
-                service = new { type = "object" }, serviceType = new { type = "object" },
-                correlationId = new { type = "string" }, caller = new { type = "object" }
-            }, required = new[] { "contract", "discoveryId", "service", "serviceType", "correlationId", "caller" }, additionalProperties = false })
-            : JsonSerializer.SerializeToElement(new { type = "object", properties = new
+                type = "object",
+                properties = new
+                {
+                    contract = new { type = "string" },
+                    discoveryId = new { type = "string" },
+                    service = new { type = "object" },
+                    serviceType = new { type = "object" },
+                    correlationId = new { type = "string" },
+                    caller = new { type = "object" }
+                },
+                required = new[] { "contract", "discoveryId", "service", "serviceType", "correlationId", "caller" },
+                additionalProperties = false
+            })
+            : JsonSerializer.SerializeToElement(new
             {
-                acquisitionId = new { type = "string" }, operation = new { type = "object" },
-                parameters = new { type = "object" }, caller = new { type = "object" }
-            }, required = new[] { "acquisitionId", "operation", "parameters", "caller" }, additionalProperties = false });
+                type = "object",
+                properties = new
+                {
+                    acquisitionId = new { type = "string" },
+                    operation = new { type = "object" },
+                    parameters = new { type = "object" },
+                    caller = new { type = "object" }
+                },
+                required = new[] { "acquisitionId", "operation", "parameters", "caller" },
+                additionalProperties = false
+            });
         var id = new FlowId(name);
         var scope = ResourceScopeRef.Instance;
         var existing = await flows.GetExactAsync(scope, id, cancellationToken);
@@ -38,7 +55,9 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner
         {
             var graph = new FlowGraphDefinition
             {
-                EntryStep = "input", InputSchema = input, OutputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
+                EntryStep = "input",
+                InputSchema = input,
+                OutputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
                 Steps =
                 [
                     new InputFlowStepDefinition { Name = "input", Schema = input },
@@ -63,8 +82,12 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner
             {
                 existing = await flows.CreateExactAsync(scope, new CreateFlowCommand(name,
                     "Builtin HTTP operation adapter.", BuiltinHttpOperation.Version, true, definition,
-                    new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true",
-                        ["systemManaged"] = "true", [FlowMetadataKeys.Contract] = contract }, graph,
+                    new Dictionary<string, string>
+                    {
+                        [ResourceProvenanceAnnotations.BuiltIn] = "true",
+                        ["systemManaged"] = "true",
+                        [FlowMetadataKeys.Contract] = contract
+                    }, graph,
                     discovery ? "HTTP operation discovery" : "HTTP operation acquisition"), ResourceNamespace.Default, cancellationToken);
             }
             catch (FlowConcurrencyException)
@@ -79,8 +102,14 @@ public sealed partial class ConnectedServicePlatformResourceProvisioner
             catch (FlowConcurrencyException)
             { version = await flows.GetVersionExactAsync(scope, id, BuiltinHttpOperation.Version, cancellationToken) ?? throw new InvalidOperationException("The builtin HTTP Flow disappeared during provisioning."); }
         }
-        return new() { Flow = new(name, scope, ResourceNamespace.Default), FlowUid = existing.Value.Uid,
-            Version = version.Value.Version, DefinitionHash = version.Value.DefinitionHash!, Contract = contract };
+        return new()
+        {
+            Flow = new(name, scope, ResourceNamespace.Default),
+            FlowUid = existing.Value.Uid,
+            Version = version.Value.Version,
+            DefinitionHash = version.Value.DefinitionHash!,
+            Contract = contract
+        };
     }
 
 }

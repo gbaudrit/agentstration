@@ -28,8 +28,12 @@ internal static class BuiltinHttpOperation
         {
             method = new { type = "string", @enum = new[] { "GET" } },
             endpoint = new { type = "string", maxLength = MaximumUrlLength },
-            queryParameters = new { type = "array", maxItems = MaximumParameters,
-                items = new { type = "string", minLength = 1, maxLength = MaximumParameterNameLength } },
+            queryParameters = new
+            {
+                type = "array",
+                maxItems = MaximumParameters,
+                items = new { type = "string", minLength = 1, maxLength = MaximumParameterNameLength }
+            },
             readOnly = new { type = "boolean" },
             inputSchema = new { type = "object" },
             outputSchema = new { type = "object" }
@@ -100,7 +104,10 @@ internal static class BuiltinHttpOperation
             Type = type,
             Definition = JsonSerializer.SerializeToElement(new
             {
-                method = "GET", endpoint, queryParameters = names.ToArray(), readOnly = true,
+                method = "GET",
+                endpoint,
+                queryParameters = names.ToArray(),
+                readOnly = true,
                 inputSchema = new
                 {
                     type = "object",
@@ -143,7 +150,7 @@ internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver res
         using var connection = await ResolveAsync(service, context, cancellationToken);
         var candidate = BuiltinHttpOperation.Discover(Sample(connection), version.OperationDiscovery!.ProducedTypes.Single());
         return JsonSerializer.SerializeToElement(new ConnectedServiceOperationDiscoveryManifest
-            { Operations = [candidate] }, JsonSerializerOptions.Web);
+        { Operations = [candidate] }, JsonSerializerOptions.Web);
     }
 
     internal async Task<JsonElement> AcquireAsync(ConnectedServiceResource service,

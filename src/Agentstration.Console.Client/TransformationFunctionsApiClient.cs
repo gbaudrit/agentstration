@@ -68,7 +68,8 @@ public sealed class TransformationFunctionsApiClient(HttpClient http) : ITransfo
     private async Task SaveResourceAsync<T>(string path, T resource, string? etag, CancellationToken ct) where T : Resource
     {
         using var request = new HttpRequestMessage(etag is null ? HttpMethod.Post : HttpMethod.Put,
-            etag is null ? path : path + "/" + Uri.EscapeDataString(resource.Name) + Query(resource.ScopeRef)) { Content = JsonContent.Create(resource) };
+            etag is null ? path : path + "/" + Uri.EscapeDataString(resource.Name) + Query(resource.ScopeRef))
+        { Content = JsonContent.Create(resource) };
         if (etag is not null) request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await http.SendAsync(request, ct);
         await ApiResponse.EnsureSuccessAsync(response, ct);

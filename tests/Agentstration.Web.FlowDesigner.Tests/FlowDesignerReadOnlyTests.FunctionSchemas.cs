@@ -24,8 +24,13 @@ public sealed partial class FlowDesignerReadOnlyTests
         var parent = JsonSerializer.Deserialize<JsonElement>("""{"type":"array","items":{"type":"string"}}""");
         var schema = new FlowDesignerSchemaVersion("items", "Items", Agentstration.Resources.ResourceNamespace.Default,
             TestScope, "A", "json-schema", null, parent);
-        TransformFlowStepDefinition step = new() { Name = "explode", Function = new("explode", "2.0.0", TestScope),
-            FunctionInputSchema = input, Mapping = mapping };
+        TransformFlowStepDefinition step = new()
+        {
+            Name = "explode",
+            Function = new("explode", "2.0.0", TestScope),
+            FunctionInputSchema = input,
+            Mapping = mapping
+        };
         var component = context.Render<FlowTransformInspector>(parameters => parameters
             .Add(c => c.Step, step).Add(c => c.ActiveTab, FlowStepSettingsTab.Configuration)
             .Add(c => c.SchemaVersions, new[] { schema }).Add(c => c.Changed, value => step = (TransformFlowStepDefinition)value));

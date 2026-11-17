@@ -49,14 +49,20 @@ public sealed partial class KnowledgeSourceEditorTests
         public int SaveCount { get; private set; }
         private static FunctionKindResource Kind => new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind, ScopeRef = ResourceScopeRef.Instance,
-            Metadata = new() { Name = "native" }, Governance = ResourceGovernance.Core("functions.native"),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.FunctionKind,
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = "native" },
+            Governance = ResourceGovernance.Core("functions.native"),
             Definition = new("Native", [new("1.0.0", "native", NativeFunctionKindContract.DefinitionSchema)])
         };
         private static TransformationFunctionResource Function => new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction, ScopeRef = ResourceScopeRef.Instance,
-            Metadata = new() { Name = "json-select-builtin" }, Governance = ResourceGovernance.Core("functions.native"),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.TransformationFunction,
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = "json-select-builtin" },
+            Governance = ResourceGovernance.Core("functions.native"),
             Definition = new("json.select", [new("1.0.0", new("native", "1.0.0", ResourceScopeRef.Instance),
                 JsonSerializer.Deserialize<JsonElement>("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""))])
         };

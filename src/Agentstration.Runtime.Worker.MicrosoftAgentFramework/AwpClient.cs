@@ -307,7 +307,8 @@ internal sealed class AwpClient : IDisposable
         }
         catch (JsonException) { }
         return new AwpClientException(code ?? "http_error",
-            message ?? $"The AWP authority returned HTTP {(int)response.StatusCode}.", response.StatusCode) { Details = details };
+            message ?? $"The AWP authority returned HTTP {(int)response.StatusCode}.", response.StatusCode)
+        { Details = details };
     }
 
     public void Dispose() => http.Dispose();

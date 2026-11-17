@@ -69,8 +69,11 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
             foreach (var version in value.Definition.Versions)
             {
                 var resolved = await ResolveVersionAsync(value, version, scope, token);
-                versions.Add(version with { FunctionKind = resolved.FunctionKind,
-                    NativeContractDigest = FunctionDigests.Compute(registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).Descriptor) });
+                versions.Add(version with
+                {
+                    FunctionKind = resolved.FunctionKind,
+                    NativeContractDigest = FunctionDigests.Compute(registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).Descriptor)
+                });
             }
             value = value with { Definition = value.Definition with { Versions = versions } };
             var existing = await GetAsync(scope, value.Namespace, value.Name, token);
@@ -134,8 +137,15 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
         {
             var values = input.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
             foreach (var (name, snapshot) in schemaBindings)
-                values[name] = JsonSerializer.SerializeToElement(new { inline = new { format = snapshot.Format, dialect = snapshot.Dialect,
-                    content = JsonSchemaSelection.Select(snapshot.Content) } });
+                values[name] = JsonSerializer.SerializeToElement(new
+                {
+                    inline = new
+                    {
+                        format = snapshot.Format,
+                        dialect = snapshot.Dialect,
+                        content = JsonSchemaSelection.Select(snapshot.Content)
+                    }
+                });
             input = JsonSerializer.SerializeToElement(values);
             ValidateValue(resolved.InputSchema, input, "function-input", (options ?? new()).MaximumValueBytes);
         }

@@ -51,8 +51,12 @@ internal static class DataSourceQueryEndpoints
             DataSourceQueryService service, CancellationToken ct) => Run(async () =>
         {
             var owner = await service.GetAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace), name, ct);
-            return Results.Ok(await service.ExecuteAsync(new() { Query = new(name, owner.Value.ScopeRef, owner.Value.Namespace),
-                QueryUid = owner.Value.Uid, Version = version }, body, null, null, ct));
+            return Results.Ok(await service.ExecuteAsync(new()
+            {
+                Query = new(name, owner.Value.ScopeRef, owner.Value.Namespace),
+                QueryUid = owner.Value.Uid,
+                Version = version
+            }, body, null, null, ct));
         })).Produces<DataSourceQueryExecutionResult>().RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         group.MapPost("/{name}/tools", (string name, string scopeRef, string? @namespace, PublishDataSourceQueryToolRequest body,
             DataSourceQueryService service, DataSourceQueryToolService tools, CancellationToken ct) => Run(async () =>
@@ -65,8 +69,11 @@ internal static class DataSourceQueryEndpoints
     private static async Task<IResult> Run(Func<Task<IResult>> action)
     {
         try { return await action(); }
-        catch (DataSourceValidationException e) { return Problem(e.Code, e.Code.EndsWith("not_found", StringComparison.Ordinal) ? 404
-            : e.Code.EndsWith("access_denied", StringComparison.Ordinal) ? 403 : 422); }
+        catch (DataSourceValidationException e)
+        {
+            return Problem(e.Code, e.Code.EndsWith("not_found", StringComparison.Ordinal) ? 404
+            : e.Code.EndsWith("access_denied", StringComparison.Ordinal) ? 403 : 422);
+        }
         catch (DataSourceAcquisitionException e) { return Problem(e.Code, 422); }
         catch (StorageException e) { return Problem(e.Code, e.StatusCode); }
         catch (ResourceConcurrencyException) { return Problem("resource_version_conflict", 409); }

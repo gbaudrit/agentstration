@@ -22,23 +22,23 @@ public sealed class ConnectedServiceEditorModel
 
     public ConnectedServiceProperties Properties(ConnectedServiceTypeResource type,
         ConnectedServiceTypeVersionDescriptor version) => new()
-    {
-        DisplayName = DisplayName.Trim(),
-        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-        Enabled = Enabled,
-        Type = new()
         {
-            Type = new ResourceReference(type.Name,
+            DisplayName = DisplayName.Trim(),
+            Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+            Enabled = Enabled,
+            Type = new()
+            {
+                Type = new ResourceReference(type.Name,
                 type.ScopeRef ?? throw new InvalidOperationException("The Connected Service type has no exact scope."),
                 type.Namespace),
-            TypeUid = type.Uid,
-            Version = version.Version,
-            SchemaDigest = version.SchemaDigest
-        },
-        Options = Options.Clone(),
-        Bindings = Bindings.Where(value => value.IsConfigured).Select(value => value.ToBinding()).ToArray(),
-        UsePolicy = new() { Grants = UseGrants.ToArray() }
-    };
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest
+            },
+            Options = Options.Clone(),
+            Bindings = Bindings.Where(value => value.IsConfigured).Select(value => value.ToBinding()).ToArray(),
+            UsePolicy = new() { Grants = UseGrants.ToArray() }
+        };
 
     public static ConnectedServiceEditorModel From(ConnectedServiceResource resource) => new()
     {

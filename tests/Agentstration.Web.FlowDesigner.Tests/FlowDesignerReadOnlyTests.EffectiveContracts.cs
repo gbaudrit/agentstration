@@ -41,10 +41,14 @@ public sealed partial class FlowDesignerReadOnlyTests
         context.JSInterop.Setup<Blazor.Diagrams.Core.Geometry.Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new(0, 0, 1024, 768));
         var output = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"utc":{"type":"string"}},"required":["utc"],"additionalProperties":false}""");
         var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { field1 = new { type = "string" } }, required = required ? new[] { "field1" } : Array.Empty<string>(), additionalProperties = true });
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" },
             new ToolFlowStepDefinition { Name = "clock", Tool = new("datetime.get") { OutputSchema = output } },
             new AgentFlowStepDefinition { Name = "agent", Agent = new("redactor") { InputSchema = input }, InputMapping = JsonSerializer.SerializeToElement("${transition.output}") }],
-            Transitions = [new("clock-agent", "clock", "success", "agent")] };
+            Transitions = [new("clock-agent", "clock", "success", "agent")]
+        };
         context.Services.AddSingleton<IFlowDesignerBackend>(new BackendStub(false, graph));
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<FlowEditorStore>();

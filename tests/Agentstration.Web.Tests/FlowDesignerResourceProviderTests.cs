@@ -88,17 +88,29 @@ public sealed class FlowDesignerResourceProviderTests
         var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { safe = new { type = "boolean" } }, required = new[] { "safe" } });
         var providerResource = new ToolProviderResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
-            Metadata = new() { Name = "fixture" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "Fixture", ProviderType = type,
-                Mcp = type == ToolProviderType.Mcp ? new() { Internal = internalProvider } : null }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "fixture" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Fixture",
+                ProviderType = type,
+                Mcp = type == ToolProviderType.Mcp ? new() { Internal = internalProvider } : null
+            }
         };
         var tool = new ToolResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool,
-            Metadata = new() { Name = "fixture-tool" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "Fixture Tool", Provider = new("fixture", scope),
-                Schema = new() { Input = JsonSerializer.SerializeToElement(new { type = "object" }), Output = schema } }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new() { Name = "fixture-tool" },
+            ScopeRef = scope,
+            Definition = new()
+            {
+                DisplayName = "Fixture Tool",
+                Provider = new("fixture", scope),
+                Schema = new() { Input = JsonSerializer.SerializeToElement(new { type = "object" }), Output = schema }
+            }
         };
         var client = new MockApiClient(TimeProvider.System);
         var resources = new FlowDesignerResourceProvider(client, client,

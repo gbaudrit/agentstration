@@ -79,10 +79,13 @@ public sealed class StorageDocumentExecutionTests
                 Query = await request.Content!.ReadFromJsonAsync<StorageDocumentQuery>(cancellationToken);
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(new StorageDocumentPage([], [], null)) };
             }
-            return new(HttpStatusCode.OK) { Content = JsonContent.Create(new StorageDocumentDescription(
+            return new(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new StorageDocumentDescription(
                 new(true, false, false, true, false, [new("odata/4.01", "1.0", "odata-options+json")]),
                 new(QueryProfiles: ["odata/4.01"]), [new("odata/4.01", "1.0", "odata-options+json", "model")],
-                System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }), "model")) };
+                System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object" }), "model"))
+            };
         }
     }
 }

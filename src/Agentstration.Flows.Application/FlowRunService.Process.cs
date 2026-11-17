@@ -52,9 +52,12 @@ public sealed partial class FlowRunService
 
     private async Task AttachChildAsync(ResourceScopeRef scope, string parentId, string stepName, string childId, bool artifactStorage, CancellationToken token) =>
         await MutateProcessOwnerAsync(scope, parentId, stepName, step => step.ChildFlowRunIds.Contains(childId, StringComparer.Ordinal)
-            ? step : step with { ChildFlowRunId = artifactStorage ? step.ChildFlowRunId : childId,
+            ? step : step with
+            {
+                ChildFlowRunId = artifactStorage ? step.ChildFlowRunId : childId,
                 ArtifactStorageFlowRunId = artifactStorage ? childId : step.ArtifactStorageFlowRunId,
-                ChildFlowRunIds = [.. step.ChildFlowRunIds, childId] }, token);
+                ChildFlowRunIds = [.. step.ChildFlowRunIds, childId]
+            }, token);
 
     private async Task MutateProcessOwnerAsync(ResourceScopeRef scope, string parentId, string stepName,
         Func<FlowStepRun, FlowStepRun> mutate, CancellationToken token)

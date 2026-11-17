@@ -23,11 +23,12 @@ public sealed class StorageContentConfigurationTests
     public void InvalidOperatorLimitsFailDuringCompositionBeforeStorageIsOpened(string name, string value)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { [$"{StorageContentOptions.SectionName}:{name}"] = value }).Build();
+        { [$"{StorageContentOptions.SectionName}:{name}"] = value }).Build();
         var options = configuration.GetSection(StorageContentOptions.SectionName).Get<StorageContentOptions>()!;
         var failure = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAgentstration(new AgentstrationCompositionOptions
         {
-            DataDirectory = "unused-invalid-configuration", StorageContent = options
+            DataDirectory = "unused-invalid-configuration",
+            StorageContent = options
         }));
         Assert.Contains(StorageContentOptions.SectionName, failure.Message, StringComparison.Ordinal);
     }
@@ -47,14 +48,20 @@ public sealed class StorageContentConfigurationTests
     {
         var storage = new StorageContentOptions
         {
-            MaximumReadBytes = int.MaxValue, MaximumWriteBytes = int.MaxValue, MaximumObjectBytes = int.MaxValue,
-            TransferChunkBytes = int.MaxValue, MaximumPageSize = int.MaxValue,
-            LocalMaximumStoreBytes = long.MaxValue, LocalMaximumObjects = int.MaxValue,
-            LocalMaximumReceipts = int.MaxValue, LocalMaximumPublications = int.MaxValue
+            MaximumReadBytes = int.MaxValue,
+            MaximumWriteBytes = int.MaxValue,
+            MaximumObjectBytes = int.MaxValue,
+            TransferChunkBytes = int.MaxValue,
+            MaximumPageSize = int.MaxValue,
+            LocalMaximumStoreBytes = long.MaxValue,
+            LocalMaximumObjects = int.MaxValue,
+            LocalMaximumReceipts = int.MaxValue,
+            LocalMaximumPublications = int.MaxValue
         };
         new ServiceCollection().AddAgentstration(new AgentstrationCompositionOptions
         {
-            DataDirectory = "unused-valid-configuration", StorageContent = storage,
+            DataDirectory = "unused-valid-configuration",
+            StorageContent = storage,
             DataSourceContent = new() { MaximumValueBytes = int.MaxValue, MaximumHttpResponseBytes = int.MaxValue },
             FunctionContent = new() { MaximumValueBytes = int.MaxValue },
             FlowContent = new() { MaximumValueBytes = int.MaxValue }
@@ -71,7 +78,8 @@ public sealed class StorageContentConfigurationTests
     {
         Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAgentstration(new AgentstrationCompositionOptions
         {
-            DataDirectory = "unused-invalid-configuration", FunctionContent = new() { MaximumValueBytes = 0 }
+            DataDirectory = "unused-invalid-configuration",
+            FunctionContent = new() { MaximumValueBytes = 0 }
         }));
     }
 
@@ -80,7 +88,8 @@ public sealed class StorageContentConfigurationTests
     {
         Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAgentstration(new AgentstrationCompositionOptions
         {
-            DataDirectory = "unused-invalid-configuration", FlowContent = new() { MaximumValueBytes = 0 }
+            DataDirectory = "unused-invalid-configuration",
+            FlowContent = new() { MaximumValueBytes = 0 }
         }));
     }
 

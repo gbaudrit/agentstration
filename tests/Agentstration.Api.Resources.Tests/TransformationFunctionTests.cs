@@ -7,8 +7,8 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
@@ -30,11 +30,21 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
             new BootstrapApplicationTarget(context.TenantId, context.WorkspaceId));
         var planning = new BootstrapPlanningContext();
         var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        var kind = new BootstrapResourceDocument { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind,
-            Metadata = new() { Name = "native" }, Definition = JsonSerializer.SerializeToElement(new FunctionKindProperties("Native", [new("1.0.0", "native", NativeFunctionKindContract.DefinitionSchema)]), json) };
-        var function = new BootstrapResourceDocument { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-            Metadata = new() { Name = "select" }, Definition = JsonSerializer.SerializeToElement(new TransformationFunctionProperties("Select", [new("1.0.0", new("native", "1.0.0"),
-                Json("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""))]), json) };
+        var kind = new BootstrapResourceDocument
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.FunctionKind,
+            Metadata = new() { Name = "native" },
+            Definition = JsonSerializer.SerializeToElement(new FunctionKindProperties("Native", [new("1.0.0", "native", NativeFunctionKindContract.DefinitionSchema)]), json)
+        };
+        var function = new BootstrapResourceDocument
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.TransformationFunction,
+            Metadata = new() { Name = "select" },
+            Definition = JsonSerializer.SerializeToElement(new TransformationFunctionProperties("Select", [new("1.0.0", new("native", "1.0.0"),
+                Json("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""))]), json)
+        };
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await kindHandler.PlanAsync(kind, operation, planning, default)).Disposition);
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await functionHandler.PlanAsync(function, operation, planning, default)).Disposition);
         Assert.AreEqual(BootstrapResourceApplyResult.Created, await kindHandler.ApplyAsync(kind, operation, default));
@@ -86,7 +96,9 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
         Assert.AreEqual(2 * 1024 * 1024, factory.Services.GetRequiredService<FunctionContentOptions>().MaximumValueBytes);
         var kind = await service.PutKindAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.FunctionKind, ScopeRef = owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.FunctionKind,
+            ScopeRef = owner,
             Metadata = new() { Name = "native" },
             Definition = new("Native", [new("1.0.0", "native", TransformationFunctionService.NativeDefinitionSchema)])
         }, null, true, default);
@@ -94,8 +106,11 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
             Json("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""));
         var function = await service.PutAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction, ScopeRef = owner,
-            Metadata = new() { Name = "select" }, Definition = new("Select", [version])
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.TransformationFunction,
+            ScopeRef = owner,
+            Metadata = new() { Name = "select" },
+            Definition = new("Select", [version])
         }, null, true, default);
         var resolved = await service.ResolveAsync(new("select", "1.0.0", owner), owner, default);
         var result = await service.InvokeAsync(resolved, owner, Json("""{"value":{"results":[1,2]},"path":"/results"}"""), default);

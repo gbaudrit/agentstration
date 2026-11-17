@@ -109,7 +109,8 @@ public sealed partial class FlowRunService
             agents,
             ProjectToolCalls(events))
         {
-            ProcessOrigin = run.ProcessOrigin, ErrorOrigin = run.Error?.Origin,
+            ProcessOrigin = run.ProcessOrigin,
+            ErrorOrigin = run.Error?.Origin,
             ActiveStepName = run.Steps.FirstOrDefault(step => step.Status == FlowStepRunStatus.Running)?.StepName,
             Processes = run.Steps.Where(step => step.Process is not null).ToDictionary(step => step.StepName, step => step.Process!, StringComparer.Ordinal)
         };

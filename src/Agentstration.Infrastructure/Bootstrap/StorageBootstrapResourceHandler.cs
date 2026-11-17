@@ -1,6 +1,6 @@
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
-using Agentstration.ResourceManagement.Contracts;
 
 namespace Agentstration.Infrastructure.Bootstrap;
 

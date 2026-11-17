@@ -89,8 +89,12 @@ public sealed class DataSourceQueryViewsTests
     {
         public DataSourceResource Source { get; } = new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSource, Uid = Guid.NewGuid(),
-            Metadata = new() { Name = "alerts" }, ScopeRef = ResourceScopeRef.Instance, Definition = new() { DisplayName = "Alerts" }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = DataSourceResourceKinds.DataSource,
+            Uid = Guid.NewGuid(),
+            Metadata = new() { Name = "alerts" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new() { DisplayName = "Alerts" }
         };
         public DataSourceQueryResource Query { get; private set; }
         public string PublishedVersion { get; private set; } = "A";
@@ -99,11 +103,23 @@ public sealed class DataSourceQueryViewsTests
         {
             Query = new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQuery, Uid = Guid.NewGuid(),
-                Metadata = new() { Name = "only-alpha" }, ScopeRef = ResourceScopeRef.Instance,
-                Definition = new() { DisplayName = "Only alpha", Query = JsonSerializer.SerializeToElement(new { }), Selection = new()
-                { Source = new(Source.Name, Source.ScopeRef, Source.Namespace), SourceUid = Source.Uid, AcquisitionScope = ResourceScopeRef.Instance,
-                    Contract = new(new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model")) } }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = DataSourceResourceKinds.DataSourceQuery,
+                Uid = Guid.NewGuid(),
+                Metadata = new() { Name = "only-alpha" },
+                ScopeRef = ResourceScopeRef.Instance,
+                Definition = new()
+                {
+                    DisplayName = "Only alpha",
+                    Query = JsonSerializer.SerializeToElement(new { }),
+                    Selection = new()
+                    {
+                        Source = new(Source.Name, Source.ScopeRef, Source.Namespace),
+                        SourceUid = Source.Uid,
+                        AcquisitionScope = ResourceScopeRef.Instance,
+                        Contract = new(new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model"))
+                    }
+                }
             };
         }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
@@ -134,10 +150,19 @@ public sealed class DataSourceQueryViewsTests
                 if (request.Method == HttpMethod.Post) PublishedVersion = (await request.Content!.ReadFromJsonAsync<PublishDataSourceQueryRequest>(ct))!.Version;
                 var version = new DataSourceQueryVersionResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQueryVersion,
-                    Metadata = new() { Name = "query-version" }, ScopeRef = Query.ScopeRef, Uid = Guid.NewGuid(),
-                    QueryUid = Query.Uid, QueryName = Query.Name, QueryGeneration = 1, Version = PublishedVersion,
-                    Definition = Query.Definition, DefinitionDigest = "definition", ContractDigest = "contract", PublishedAt = DateTimeOffset.UnixEpoch
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = DataSourceResourceKinds.DataSourceQueryVersion,
+                    Metadata = new() { Name = "query-version" },
+                    ScopeRef = Query.ScopeRef,
+                    Uid = Guid.NewGuid(),
+                    QueryUid = Query.Uid,
+                    QueryName = Query.Name,
+                    QueryGeneration = 1,
+                    Version = PublishedVersion,
+                    Definition = Query.Definition,
+                    DefinitionDigest = "definition",
+                    ContractDigest = "contract",
+                    PublishedAt = DateTimeOffset.UnixEpoch
                 };
                 body = request.Method == HttpMethod.Post ? version : new[] { version with { Version = "A" }, version };
             }

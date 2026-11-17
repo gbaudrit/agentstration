@@ -1,24 +1,24 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Artifacts;
 using Agentstration.Agents;
-using Agentstration.Models;
-using Agentstration.ResourceManagement.Contracts;
-using Agentstration.Runtime.Abstractions;
+using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Contracts;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.ModelProviders;
+using Agentstration.Models;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
-using Agentstration.Tools;
-using Agentstration.Flows.Storage.Sqlite;
+using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Storage.Sqlite;
-using Microsoft.EntityFrameworkCore;
+using Agentstration.Tools;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -116,10 +116,18 @@ public sealed class ArtifactProcessingAgentExecutionTests
                     ? factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(current)
                     : factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(current);
                 var agents = factory.Services.GetRequiredService<AgentManagementService>();
-                var agent = await agents.PutAgentAsync(new AgentResource { ApiVersion = agentTemplate.ApiVersion, Kind = agentTemplate.Kind,
-                    Metadata = new() { Name = "scoped-anonymizer" }, ScopeRef = ownerScope, Definition = agentTemplate.Definition with
-                    { ModelProfile = agentTemplate.Definition.ModelProfile with { ScopeRef = ResourceScopeRef.Instance },
-                        RuntimeProfile = agentTemplate.Definition.RuntimeProfile with { ScopeRef = ResourceScopeRef.Instance } } }, null, true, default);
+                var agent = await agents.PutAgentAsync(new AgentResource
+                {
+                    ApiVersion = agentTemplate.ApiVersion,
+                    Kind = agentTemplate.Kind,
+                    Metadata = new() { Name = "scoped-anonymizer" },
+                    ScopeRef = ownerScope,
+                    Definition = agentTemplate.Definition with
+                    {
+                        ModelProfile = agentTemplate.Definition.ModelProfile with { ScopeRef = ResourceScopeRef.Instance },
+                        RuntimeProfile = agentTemplate.Definition.RuntimeProfile with { ScopeRef = ResourceScopeRef.Instance }
+                    }
+                }, null, true, default);
                 await agents.EnsureExecutionRevisionAsync(ResourceNamespace.Default, agent.Value.Name, ownerScope, agent.Value.Generation, default);
                 processingAgent = agent.Value.Name;
             }
@@ -128,8 +136,14 @@ public sealed class ArtifactProcessingAgentExecutionTests
             var inputId = "direct-input";
             JsonElement item;
             if (transient)
-                item = JsonSerializer.SerializeToElement(new { artifactId = inputId, kind = "inline", name = "input.txt", mediaType = "text/plain",
-                    contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)) });
+                item = JsonSerializer.SerializeToElement(new
+                {
+                    artifactId = inputId,
+                    kind = "inline",
+                    name = "input.txt",
+                    mediaType = "text/plain",
+                    contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content))
+                });
             else
             {
                 var staged = await artifacts.CreateStagedAsync(new("input.txt", "text/plain",
@@ -156,9 +170,13 @@ public sealed class ArtifactProcessingAgentExecutionTests
             };
             if (processor is "tool" or "template-tool" or "direct-template-tool")
             {
-                var generic = new ToolFlowStepDefinition { Name = "anonymize", Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
+                var generic = new ToolFlowStepDefinition
+                {
+                    Name = "anonymize",
+                    Tool = new(AgentstrationToolProvider.ToolResourceName("test.anonymizer"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                     ArgumentsMapping = JsonSerializer.SerializeToElement(mode == ArtifactProcessingMode.Content
-                        ? (object)"${input}" : new { text = "${steps.read.output.content}", language = "fr" }) };
+                        ? (object)"${input}" : new { text = "${steps.read.output.content}", language = "fr" })
+                };
                 var processing = (ForeachArtifactsFlowStepDefinition)graph.Steps.Single(step => step.Name == "process");
                 var body = mode == ArtifactProcessingMode.Content
                     ? new FlowStepDefinition[] { generic }
@@ -169,14 +187,20 @@ public sealed class ArtifactProcessingAgentExecutionTests
                         new ToolFlowStepDefinition { Name = "verify", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_read"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance) },
                         new ToolFlowStepDefinition { Name = "complete", Tool = new(AgentstrationToolProvider.ToolResourceName("artifact.processing.output_complete"), ScopeRef: kind == ResourceScopeKind.Workspace ? ownerScope : ResourceScopeRef.Instance),
                             ArgumentsMapping = JsonSerializer.SerializeToElement(new { expectedRevision = 1 }) }];
-                processing = processing with { ProcessingInputMapping = mode == ArtifactProcessingMode.Content
+                processing = processing with
+                {
+                    ProcessingInputMapping = mode == ArtifactProcessingMode.Content
                     ? JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }) : null,
-                    ResultMapping = mode == ArtifactProcessingMode.Content ? JsonSerializer.SerializeToElement("${input.redacted}") : null };
-                graph = graph with { Steps = [graph.Steps[0], processing, .. body, graph.Steps[^2], graph.Steps[^1]],
+                    ResultMapping = mode == ArtifactProcessingMode.Content ? JsonSerializer.SerializeToElement("${input.redacted}") : null
+                };
+                graph = graph with
+                {
+                    Steps = [graph.Steps[0], processing, .. body, graph.Steps[^2], graph.Steps[^1]],
                     Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", body[0].Name),
                         .. body.Select((step, index) => new FlowTransitionDefinition("next-" + step.Name, step.Name, "success", index + 1 == body.Length ? "process" : body[index + 1].Name)),
                         .. body.Select(step => new FlowTransitionDefinition("error-" + step.Name, step.Name, "error", "error")),
-                        new("done", "process", "completed", "completed"), new("failed", "process", "error", "error")] };
+                        new("done", "process", "completed", "completed"), new("failed", "process", "error", "error")]
+                };
             }
             if (processor is "template-tool" or "direct-template-tool")
             {
@@ -184,7 +208,8 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 var template = FlowDraftTemplates.CreateTransformation(new(schema, schema));
                 graph = graph with
                 {
-                    InputSchema = template.InputSchema, OutputSchema = template.OutputSchema,
+                    InputSchema = template.InputSchema,
+                    OutputSchema = template.OutputSchema,
                     Steps = [template.Steps[0], .. (processor == "template-tool" ? new[] { template.Steps[1] } : []), .. graph.Steps.Where(step => step.Name is not ("input" or "completed")), template.Steps[2]],
                     Transitions = [.. (processor == "template-tool"
                         ? new FlowTransitionDefinition[] { new("unwrap", "input", "completed", "transform"), new("process-input", "transform", "completed", "process") }
@@ -213,7 +238,7 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 var started = await runs.EnsureRootAsync(new("flowrun-direct-transform", flow.Value.Id, "1.0.0", "local",
                     FlowRunTrigger.Api, FlowInvocationOrigin.Api, current.PrincipalId.ToString(), null, null, "direct-transform-test",
                     input, "knowledge-projection:direct-transform-test", false, null, null, null, null, executionScope)
-                    { TransientPayloads = transient, DefinitionScopeRef = ownerScope }, default);
+                { TransientPayloads = transient, DefinitionScopeRef = ownerScope }, default);
                 runId = started.Value.Id;
             }
             else
@@ -340,7 +365,8 @@ public sealed class ArtifactProcessingAgentExecutionTests
                 _ => new Dictionary<string, object?>()
             };
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                [new FunctionCallContent("call-" + calls.Length, name, arguments)])) { FinishReason = ChatFinishReason.ToolCalls });
+                [new FunctionCallContent("call-" + calls.Length, name, arguments)]))
+            { FinishReason = ChatFinishReason.ToolCalls });
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;

@@ -11,11 +11,15 @@ public sealed class FlowDiagramMapperTests
     [TestMethod]
     public void ArtifactProcessingUsesTwoBottomPortsAndKeepsOuterContinuationsOnTheRight()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [
             new InputFlowStepDefinition { Name = "input" }, new ForeachArtifactsFlowStepDefinition { Name = "process" },
             new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
             Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
-                new("return", "body", "completed", "process"), new("done", "process", "completed", "completed")] };
+                new("return", "body", "completed", "process"), new("done", "process", "completed", "completed")]
+        };
         var projection = FlowDiagramMapper.Project(FlowDesignerDocument.From(graph));
         var owner = projection.NodesByName["process"];
         var start = owner.Outputs.Single(port => port.EventName == "process");

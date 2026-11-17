@@ -11,7 +11,9 @@ public sealed class KnowledgeFreshnessTests
     {
         var binding = new KnowledgeDataSourceBinding
         {
-            Name = "input", DataSource = new("source"), MaximumAge = TimeSpan.MaxValue
+            Name = "input",
+            DataSource = new("source"),
+            MaximumAge = TimeSpan.MaxValue
         };
         Assert.IsTrue(KnowledgeFreshness.IsFresh(binding, DateTimeOffset.MinValue, new Clock()));
     }

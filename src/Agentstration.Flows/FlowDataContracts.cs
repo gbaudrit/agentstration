@@ -84,9 +84,12 @@ public static class FlowDataContracts
         if (incoming.Length == 0) return graph.EntryStep == stepName ? graph.ResolveInputSchema() : null;
         var schemas = incoming.Select(step => step switch
         {
-            InputFlowStepDefinition => graph.ResolveInputSchema(), AgentFlowStepDefinition prior => prior.Agent.OutputSchema,
-            ToolFlowStepDefinition tool => tool.Tool.OutputSchema, FlowCallStepDefinition flow => flow.Flow.OutputSchema,
-            TransformFlowStepDefinition transform => transform.Schema, _ => null
+            InputFlowStepDefinition => graph.ResolveInputSchema(),
+            AgentFlowStepDefinition prior => prior.Agent.OutputSchema,
+            ToolFlowStepDefinition tool => tool.Tool.OutputSchema,
+            FlowCallStepDefinition flow => flow.Flow.OutputSchema,
+            TransformFlowStepDefinition transform => transform.Schema,
+            _ => null
         }).ToArray();
         return schemas.All(schema => schema is { } value && schemas[0] is { } first && JsonElement.DeepEquals(first, value)) ? schemas[0] : null;
     }

@@ -25,10 +25,14 @@ public sealed class SchemaCollectionBindingTests : ResourceManagementApiTestBase
         var schemas = product.Services.GetRequiredService<SchemaManagementService>();
         var schema = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema, ScopeRef = owner,
-            Metadata = new() { Name = "observations" }, Definition = new()
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = owner,
+            Metadata = new() { Name = "observations" },
+            Definition = new()
             {
-                DisplayName = "Observations", Format = SchemaFormatIds.JsonSchema,
+                DisplayName = "Observations",
+                Format = SchemaFormatIds.JsonSchema,
                 Content = StructuredStorageFixture.Json("""
                     {"type":"object","properties":{"results":{"type":"array","items":{"$ref":"#/$defs/observation"}}},
                     "$defs":{"observation":{"type":"object","properties":{"status":{"type":"string"},"value":{"type":"number"}},"required":["status","value"]}}}
@@ -38,10 +42,13 @@ public sealed class SchemaCollectionBindingTests : ResourceManagementApiTestBase
         var versionA = await schemas.PublishAsync(owner, schema.Value.Namespace, schema.Value.Name, "A", default);
         var storages = product.Services.GetRequiredService<StorageManagementService>();
         var current = (await storages.GetExactAsync(owner, fixture.Storage.Namespace, fixture.Storage.Name, default))!;
-        var definition = current.Value.Definition with { Collections = current.Value.Definition.Collections.Select(c => c.Uid != fixture.Collection ? c : c with
+        var definition = current.Value.Definition with
         {
-            SchemaBinding = new() { Reference = new() { Name = schema.Value.Name, Version = "A", ScopeRef = owner, SchemaPath = "/properties/results/items" } }
-        }).ToArray() };
+            Collections = current.Value.Definition.Collections.Select(c => c.Uid != fixture.Collection ? c : c with
+            {
+                SchemaBinding = new() { Reference = new() { Name = schema.Value.Name, Version = "A", ScopeRef = owner, SchemaPath = "/properties/results/items" } }
+            }).ToArray()
+        };
         var adopted = await storages.ReconcileAsync(owner, current.Value.Namespace, current.Value.Name, definition, current.ETag, default);
         var collection = adopted.Value.Definition.Collections.Single(c => c.Uid == fixture.Collection);
         Assert.AreEqual(versionA.Value.DefinitionHash, collection.SchemaSnapshot!.ParentDefinitionHash);
@@ -75,8 +82,11 @@ public sealed class SchemaCollectionBindingTests : ResourceManagementApiTestBase
         await using var fixture = await StructuredStorageFixture.StartAsync(product.Services, secretClient, owner, false);
         var storages = product.Services.GetRequiredService<StorageManagementService>();
         var current = (await storages.GetExactAsync(owner, fixture.Storage.Namespace, fixture.Storage.Name, default))!;
-        var definition = current.Value.Definition with { Collections = current.Value.Definition.Collections.Select(c => c with
-        { Schema = StructuredStorageFixture.Json("""{"type":"object","properties":{"status":{"type":"string","pattern":"^ok$"}}}""") }).ToArray() };
+        var definition = current.Value.Definition with
+        {
+            Collections = current.Value.Definition.Collections.Select(c => c with
+            { Schema = StructuredStorageFixture.Json("""{"type":"object","properties":{"status":{"type":"string","pattern":"^ok$"}}}""") }).ToArray()
+        };
         var failure = await Assert.ThrowsAsync<StorageException>(() => storages.ReconcileAsync(owner,
             current.Value.Namespace, current.Value.Name, definition, current.ETag, default));
         Assert.AreEqual("storage_collection_schema_invalid", failure.Code);

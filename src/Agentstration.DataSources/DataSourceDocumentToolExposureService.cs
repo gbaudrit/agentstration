@@ -49,10 +49,13 @@ public sealed class DataSourceDocumentToolExposureService(DataSourceDocumentAcce
         {
             _ = await definitions.PutAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, ScopeRef = scope,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
+                ScopeRef = scope,
                 Metadata = new()
                 {
-                    Name = name, Namespace = ns,
+                    Name = name,
+                    Namespace = ns,
                     Annotations = new Dictionary<string, string>
                     {
                         ["agentstration.io/data-source-uid"] = selection.SourceUid.ToString("D"),
@@ -62,11 +65,15 @@ public sealed class DataSourceDocumentToolExposureService(DataSourceDocumentAcce
                 },
                 Definition = new RelayToolDefinitionProperties
                 {
-                    Version = request.Version, Publish = true, DisplayName = selection.Source.Name + " query",
+                    Version = request.Version,
+                    Publish = true,
+                    DisplayName = selection.Source.Name + " query",
                     Description = request.Mode == DataSourceDocumentSelectionModes.Latest
                         ? "Query the latest successful retained acquisition of this Data Source, or provide acquisitionId for an exact retained acquisition. Source, stream, schema and query profile are fixed. Continue with cursor only; pagination stays on its first acquisition. No acquisition is started and no physical destination argument is accepted."
                         : "Query one exact immutable Data Source acquisition. Source, acquisition identity, schema and query profile are fixed. Continue with cursor only. No acquisition is started.",
-                    RequiresApproval = request.RequiresApproval, Target = await nativeTools.ResolveAsync(scope, ct), Bindings = bindings
+                    RequiresApproval = request.RequiresApproval,
+                    Target = await nativeTools.ResolveAsync(scope, ct),
+                    Bindings = bindings
                 }
             }, previous?.ETag, previous is null, ct);
         }

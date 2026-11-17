@@ -105,8 +105,8 @@ public sealed partial class FlowTests
         graph = graph with
         {
             Steps = graph.Steps.Select(step => step.Name == "partition" ? (FlowStepDefinition)new ForeachArtifactsFlowStepDefinition
-                { Name = "partition", Mode = ArtifactProcessingMode.Access } : step.Name == "body" ? new FlowCallStepDefinition
-                { Name = "body", Flow = new("named-child", FlowCallVersionStrategy.Exact, "1.0.0") } : step).ToArray(),
+            { Name = "partition", Mode = ArtifactProcessingMode.Access } : step.Name == "body" ? new FlowCallStepDefinition
+            { Name = "body", Flow = new("named-child", FlowCallVersionStrategy.Exact, "1.0.0") } : step).ToArray(),
             Transitions = graph.Transitions.Select(edge => edge.FromStep == "body" ? edge with { Event = "completed" } : edge).ToArray()
         };
         var published = await CreatePublishedGraphAsync(fixture, "artifact-parent", graph);

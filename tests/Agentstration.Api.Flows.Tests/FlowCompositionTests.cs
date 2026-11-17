@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using Agentstration.Resources;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -35,8 +35,11 @@ public sealed partial class FlowTests
         var parent = await CreatePublishedGraphAsync(fixture, "typed-boundary", CompositionTemplate());
         var template = (await fixture.Service.GetVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", default))!.Value;
         var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => new FlowCompositionService(fixture.Service).ResolveAsync(template,
-            new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["prepare"] = [new() { Flow = new("union-output"),
-                Parameters = JsonSerializer.SerializeToElement(new { label = "private-instance-value" }) }] }, TestScope.AccessScopeRef, default));
+            new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
+            {
+                ["prepare"] = [new() { Flow = new("union-output"),
+                Parameters = JsonSerializer.SerializeToElement(new { label = "private-instance-value" }) }]
+            }, TestScope.AccessScopeRef, default));
         Assert.AreEqual("flow_composition_contract_incompatible", error.Code);
         Assert.IsNotNull(error.CompositionDiagnostic);
         Assert.AreEqual("prepare", error.CompositionDiagnostic.Point);

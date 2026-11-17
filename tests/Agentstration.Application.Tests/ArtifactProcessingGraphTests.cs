@@ -67,8 +67,11 @@ public sealed class ArtifactProcessingGraphTests
     public async Task ArtifactByteBudgetsHaveNoAdditionalPublicationCeiling(int inputBytes, int outputBytes, bool valid)
     {
         var graph = Graph();
-        graph = graph with { Steps = graph.Steps.Select(step => step is ForeachArtifactsFlowStepDefinition processing
-            ? processing with { MaximumContentBytes = inputBytes, MaximumOutputBytes = outputBytes } : step).ToArray() };
+        graph = graph with
+        {
+            Steps = graph.Steps.Select(step => step is ForeachArtifactsFlowStepDefinition processing
+            ? processing with { MaximumContentBytes = inputBytes, MaximumOutputBytes = outputBytes } : step).ToArray()
+        };
         var result = await new FlowGraphValidator(new References()).ValidateAsync(graph, new(false), default);
         Assert.AreEqual(valid, result.IsValid, string.Join("; ", result.Issues.Select(issue => issue.Code)));
     }

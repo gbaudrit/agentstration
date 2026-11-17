@@ -1,6 +1,6 @@
 using Agentstration.Storage.Contracts;
-using Agentstration.Web.Console;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;

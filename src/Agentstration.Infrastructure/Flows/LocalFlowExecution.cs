@@ -563,12 +563,20 @@ public sealed class ManagedFlowToolExecutor(
         if (request.Arguments.ValueKind != JsonValueKind.Object)
             throw Agentstration.Schemas.DataContracts.Failure("tool_arguments_object_required", "tool-input", inputContract!.Origin, "$", "json_object", "object", request.Arguments.ValueKind.ToString(), request.RunId, request.StepName);
         var effectiveArguments = Agentstration.Schemas.DataContracts.BindOutputParameter(request.Arguments, schema, businessOutputContract, "tool-input", request.RunId, request.StepName);
-        try { Agentstration.Schemas.DataContracts.Validate(inputContract,
-            effectiveArguments, "tool-input", request.RunId, request.StepName, value => Agentstration.Secrets.Abstractions.SecretInputs.IsReference(value, request.SecretInputs)); }
+        try
+        {
+            Agentstration.Schemas.DataContracts.Validate(inputContract,
+            effectiveArguments, "tool-input", request.RunId, request.StepName, value => Agentstration.Secrets.Abstractions.SecretInputs.IsReference(value, request.SecretInputs));
+        }
         catch (Agentstration.Schemas.DataContractException exception)
         {
-            var code = exception.Failure.Rule switch { "json_schema_instance_type" => "tool_argument_type_invalid",
-                "json_schema_instance_required" => "tool_argument_required", "json_schema_instance_additional_property" => "tool_argument_unknown", _ => exception.Code };
+            var code = exception.Failure.Rule switch
+            {
+                "json_schema_instance_type" => "tool_argument_type_invalid",
+                "json_schema_instance_required" => "tool_argument_required",
+                "json_schema_instance_additional_property" => "tool_argument_unknown",
+                _ => exception.Code
+            };
             throw new FlowValidationException(code, exception.Message) { ContractFailure = exception.Failure };
         }
 

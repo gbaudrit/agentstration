@@ -1,5 +1,4 @@
 extern alias UtilitiesExtension;
-
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -13,14 +12,14 @@ using Agentstration.Schemas.Aep;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools.Mcp;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
-using ModelContextProtocol.Server;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModelContextProtocol.Server;
 
 namespace Agentstration.Web.Tests;
 
@@ -41,8 +40,14 @@ public sealed class McpToolCatalogTests
         var discovered = (await adapter.DiscoverAsync(provider, default)).Tools.Single(tool => tool.ExternalId == "contract_fixture");
         Assert.IsNotNull(discovered.OutputSchema);
         var baseline = Tool(provider.Name);
-        var tool = baseline with { Definition = baseline.Definition with { ExternalId = discovered.ExternalId,
-            Schema = new() { Input = discovered.InputSchema, Output = discovered.OutputSchema } } };
+        var tool = baseline with
+        {
+            Definition = baseline.Definition with
+            {
+                ExternalId = discovered.ExternalId,
+                Schema = new() { Input = discovered.InputSchema, Output = discovered.OutputSchema }
+            }
+        };
         var result = await adapter.InvokeAsync(provider, tool, JsonSerializer.SerializeToElement(new { }), default);
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Value.GetProperty("structuredContent").GetProperty("safe").GetBoolean());

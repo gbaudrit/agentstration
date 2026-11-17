@@ -35,12 +35,25 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
         {
             _ = await definitions.PutAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, ScopeRef = scope,
-                Metadata = new() { Name = GenericName, Namespace = ns, Annotations = new Dictionary<string, string>
-                    { ["agentstration.io/query-generic"] = "1" } },
-                Definition = new RelayToolDefinitionProperties { DisplayName = "Data Source Query", Version = GenericVersion,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
+                ScopeRef = scope,
+                Metadata = new()
+                {
+                    Name = GenericName,
+                    Namespace = ns,
+                    Annotations = new Dictionary<string, string>
+                    { ["agentstration.io/query-generic"] = "1" }
+                },
+                Definition = new RelayToolDefinitionProperties
+                {
+                    DisplayName = "Data Source Query",
+                    Version = GenericVersion,
                     Description = "Execute a named, published Data Source Query. Omit the Query version for the latest publication. Query and acquisition stay fixed during pagination.",
-                    Publish = true, Target = target, Bindings = [] }
+                    Publish = true,
+                    Target = target,
+                    Bindings = []
+                }
             }, null, true, ct);
         }
         return new(AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName(GenericName, GenericVersion)), scope, ns);
@@ -60,8 +73,12 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
         // Verify the selected acquisition and query contract without physically executing a query.
         var selection = selected.Definition.Selection;
         if (request.Acquisition is not null)
-            selection = selection with { Mode = DataSourceDocumentSelectionModes.Exact,
-                AcquisitionId = request.Acquisition.Id, AcquisitionUid = request.Acquisition.Uid };
+            selection = selection with
+            {
+                Mode = DataSourceDocumentSelectionModes.Exact,
+                AcquisitionId = request.Acquisition.Id,
+                AcquisitionUid = request.Acquisition.Uid
+            };
         _ = await documents.ResolveAsync(selection, ct);
         List<ToolArgumentBinding> bindings =
         [
@@ -80,13 +97,24 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
         {
             _ = await definitions.PutAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, ScopeRef = scope,
-                Metadata = new() { Name = request.Name, Namespace = ns, Annotations = new Dictionary<string, string>
-                { ["agentstration.io/query-uid"] = reference.QueryUid.ToString("D"),
-                  ["agentstration.io/data-source-uid"] = selected.Definition.Selection.SourceUid.ToString("D") } },
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
+                ScopeRef = scope,
+                Metadata = new()
+                {
+                    Name = request.Name,
+                    Namespace = ns,
+                    Annotations = new Dictionary<string, string>
+                    {
+                        ["agentstration.io/query-uid"] = reference.QueryUid.ToString("D"),
+                        ["agentstration.io/data-source-uid"] = selected.Definition.Selection.SourceUid.ToString("D")
+                    }
+                },
                 Definition = new RelayToolDefinitionProperties
                 {
-                    DisplayName = request.DisplayName, Version = request.Version, Publish = true,
+                    DisplayName = request.DisplayName,
+                    Version = request.Version,
+                    Publish = true,
                     Description = "Read documents already acquired from Data Source '" + selected.Definition.Selection.Source.Name
                         + "' using saved Query '" + selected.Definition.DisplayName + "' (" + reference.Query.Name + "). "
                         + "All caller inputs are optional. Call with {} on the first call. "
@@ -97,7 +125,9 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
                         + (reference.Version is null
                         ? "Resolve the latest published Query version at each initial call." : "Use exact Query version " + reference.Version + ".")
                         + " request.pageSize is optional. For a next page use request.cursor from the previous result. Query and acquisition stay fixed throughout pagination.",
-                    Target = new() { Name = genericTool.Name, Namespace = ns, ScopeRef = scope, Uid = genericTool.Uid, Generation = genericTool.Generation }, Bindings = bindings, RequiresApproval = request.RequiresApproval
+                    Target = new() { Name = genericTool.Name, Namespace = ns, ScopeRef = scope, Uid = genericTool.Uid, Generation = genericTool.Generation },
+                    Bindings = bindings,
+                    RequiresApproval = request.RequiresApproval
                 }
             }, existing?.ETag, existing is null, ct);
         }

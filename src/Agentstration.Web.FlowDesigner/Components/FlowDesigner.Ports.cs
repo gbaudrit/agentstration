@@ -51,16 +51,16 @@ public partial class FlowDesigner
             };
         if (port is "error" or "failed" || Editor.State.Diagram.Nodes.FirstOrDefault(node => node.Name == step?.Name)?.OutputOutcomes.GetValueOrDefault(port) == FlowOutputOutcome.Error) return null;
         return port == "input" ? step switch
-    {
-        InputFlowStepDefinition => EffectiveInputSchema,
-        TransformFlowStepDefinition transform => transform.FunctionInputSchema,
-        ForeachArtifactsFlowStepDefinition => ArtifactTransformContracts.Input,
-        AgentFlowStepDefinition agent => agent.Agent.InputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.InputSchema),
-        ToolFlowStepDefinition tool => tool.Tool.InputSchema ?? (ReadOnly ? null : ResolveTool(tool.Tool)?.InputSchema),
-        FlowCallStepDefinition call => call.Flow.InputSchema ?? FlowVersion(call)?.InputSchema,
-        OutputFlowStepDefinition output => output.Schema,
-        _ => null
-    } : ResolveStepOutputSchema(step);
+        {
+            InputFlowStepDefinition => EffectiveInputSchema,
+            TransformFlowStepDefinition transform => transform.FunctionInputSchema,
+            ForeachArtifactsFlowStepDefinition => ArtifactTransformContracts.Input,
+            AgentFlowStepDefinition agent => agent.Agent.InputSchema ?? (ReadOnly ? null : ResolveAgent(agent.Agent)?.InputSchema),
+            ToolFlowStepDefinition tool => tool.Tool.InputSchema ?? (ReadOnly ? null : ResolveTool(tool.Tool)?.InputSchema),
+            FlowCallStepDefinition call => call.Flow.InputSchema ?? FlowVersion(call)?.InputSchema,
+            OutputFlowStepDefinition output => output.Schema,
+            _ => null
+        } : ResolveStepOutputSchema(step);
     }
     private async Task InspectPortAsync(string name, string port)
     {
@@ -81,8 +81,13 @@ public partial class FlowDesigner
         portInspection = new(name, port, T($"DataContractMode.{mode}"), JsonSerializer.Serialize(new
         {
             source = ReadOnly ? "published-definition" : "draft-definition",
-            reference = step switch { AgentFlowStepDefinition agent => JsonSerializer.SerializeToElement(agent.Agent),
-                ToolFlowStepDefinition tool => JsonSerializer.SerializeToElement(tool.Tool), FlowCallStepDefinition flow => JsonSerializer.SerializeToElement(flow.Flow), _ => (JsonElement?)null },
+            reference = step switch
+            {
+                AgentFlowStepDefinition agent => JsonSerializer.SerializeToElement(agent.Agent),
+                ToolFlowStepDefinition tool => JsonSerializer.SerializeToElement(tool.Tool),
+                FlowCallStepDefinition flow => JsonSerializer.SerializeToElement(flow.Flow),
+                _ => (JsonElement?)null
+            },
             envelopeSchema = schema,
             artifactDataContract = artifact is not null && port != "input" ? artifact.OutputContract : null,
             artifactContent = artifact is null ? null : port is "input" or "process" ? T("ArtifactInputContentContract") : T("ArtifactOutputContentContract"),
@@ -90,12 +95,23 @@ public partial class FlowDesigner
             maximumArtifacts = artifact?.MaximumArtifacts,
             maximumContentBytes = artifact?.MaximumContentBytes,
             maximumOutputBytes = artifact?.MaximumOutputBytes,
-            mapping = step switch { AgentFlowStepDefinition agent => agent.InputMapping, ToolFlowStepDefinition tool => tool.ArgumentsMapping,
-                FlowCallStepDefinition flow => flow.InputMapping, TransformFlowStepDefinition transform => transform.Mapping,
+            mapping = step switch
+            {
+                AgentFlowStepDefinition agent => agent.InputMapping,
+                ToolFlowStepDefinition tool => tool.ArgumentsMapping,
+                FlowCallStepDefinition flow => flow.InputMapping,
+                TransformFlowStepDefinition transform => transform.Mapping,
                 ForeachArtifactsFlowStepDefinition transform => port == "input" ? transform.ArtifactsMapping : port == "process" ? transform.ProcessingInputMapping : transform.ResultMapping,
-                OutputFlowStepDefinition output => output.OutputMapping, _ => null },
-            origin = step switch { AgentFlowStepDefinition agent => agent.Agent.ResourceId, ToolFlowStepDefinition tool => tool.Tool.ResourceId,
-                FlowCallStepDefinition flow => flow.Flow.ResourceId, _ => step.Name }
+                OutputFlowStepDefinition output => output.OutputMapping,
+                _ => null
+            },
+            origin = step switch
+            {
+                AgentFlowStepDefinition agent => agent.Agent.ResourceId,
+                ToolFlowStepDefinition tool => tool.Tool.ResourceId,
+                FlowCallStepDefinition flow => flow.Flow.ResourceId,
+                _ => step.Name
+            }
         }, PortJson));
         await InvokeAsync(StateHasChanged);
     }

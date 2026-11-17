@@ -208,9 +208,14 @@ internal static class JsonSchemaInputModel
         if (variants.Count == 0) throw new NotSupportedException("InvalidSchema");
         return variants[0] with
         {
-            Kind = JsonSchemaInputKind.Union, Variants = variants, ExclusiveVariants = exclusive,
-            Title = Text(schema, "title"), Description = Text(schema, "description"),
-            Default = Clone(schema, "default"), Examples = Array(schema, "examples"), AllowedValues = []
+            Kind = JsonSchemaInputKind.Union,
+            Variants = variants,
+            ExclusiveVariants = exclusive,
+            Title = Text(schema, "title"),
+            Description = Text(schema, "description"),
+            Default = Clone(schema, "default"),
+            Examples = Array(schema, "examples"),
+            AllowedValues = []
         };
     }
 

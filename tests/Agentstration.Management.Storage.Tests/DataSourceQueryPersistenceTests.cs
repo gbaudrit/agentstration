@@ -29,21 +29,46 @@ public sealed class DataSourceQueryPersistenceTests
                 var store = provider.GetRequiredService<IResourceStore>(); await store.InitializeAsync(default);
                 saved = await store.PutExactAsync(scope, new DataSourceQueryResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQuery, ScopeRef = scope,
-                    Metadata = new() { Name = "alerts-active" }, Generation = 1,
-                    Definition = new() { DisplayName = "Active alerts", Query = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["$filter"] = "status eq 'active'" }),
-                        Selection = new() { Source = new("alerts", scope, ResourceNamespace.Default), SourceUid = Guid.NewGuid(), AcquisitionScope = scope,
-                            Contract = new(new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model")) } }
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = DataSourceResourceKinds.DataSourceQuery,
+                    ScopeRef = scope,
+                    Metadata = new() { Name = "alerts-active" },
+                    Generation = 1,
+                    Definition = new()
+                    {
+                        DisplayName = "Active alerts",
+                        Query = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["$filter"] = "status eq 'active'" }),
+                        Selection = new()
+                        {
+                            Source = new("alerts", scope, ResourceNamespace.Default),
+                            SourceUid = Guid.NewGuid(),
+                            AcquisitionScope = scope,
+                            Contract = new(new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model"))
+                        }
+                    }
                 }, null, true, default);
                 published = await store.CreateImmutableAsync(new DataSourceQueryVersionResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceQueryVersion, ScopeRef = scope,
-                    Metadata = new() { Name = "alerts-active-version-a" }, Generation = 1, QueryUid = saved.Value.Uid,
-                    QueryName = saved.Value.Name, QueryGeneration = saved.Value.Generation, Version = "A", Definition = saved.Value.Definition,
-                    ContractDigest = "contract", DefinitionDigest = "definition", PublishedAt = DateTimeOffset.UnixEpoch
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = DataSourceResourceKinds.DataSourceQueryVersion,
+                    ScopeRef = scope,
+                    Metadata = new() { Name = "alerts-active-version-a" },
+                    Generation = 1,
+                    QueryUid = saved.Value.Uid,
+                    QueryName = saved.Value.Name,
+                    QueryGeneration = saved.Value.Generation,
+                    Version = "A",
+                    Definition = saved.Value.Definition,
+                    ContractDigest = "contract",
+                    DefinitionDigest = "definition",
+                    PublishedAt = DateTimeOffset.UnixEpoch
                 }, default);
-                saved = await store.PutExactAsync(scope, saved.Value with { Generation = 2, Definition = saved.Value.Definition with
-                { Query = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["$filter"] = "status eq 'closed'" }) } }, saved.ETag, false, default);
+                saved = await store.PutExactAsync(scope, saved.Value with
+                {
+                    Generation = 2,
+                    Definition = saved.Value.Definition with
+                    { Query = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["$filter"] = "status eq 'closed'" }) }
+                }, saved.ETag, false, default);
             }
             await using (var restarted = Provider(connection))
             {

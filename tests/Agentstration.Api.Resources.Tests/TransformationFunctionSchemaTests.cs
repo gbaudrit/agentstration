@@ -23,7 +23,9 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
         var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
         var schema = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema, ScopeRef = owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = owner,
             Metadata = new() { Name = "function-items" },
             Definition = new() { DisplayName = "Items", Format = SchemaFormatIds.JsonSchema, Content = Json("""{"type":"string"}""") }
         }, default);
@@ -47,9 +49,12 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
         {
             var (binding, code) = invalid[index];
             var function = new Agentstration.Functions.Contracts.FunctionReference("artifact-explode-builtin", "1.0.0", owner);
-            var call = new FlowCompositionCall { Function = function,
+            var call = new FlowCompositionCall
+            {
+                Function = function,
                 Parameters = JsonSerializer.SerializeToElement(new { path = "", itemSchema = binding }, JsonSerializerOptions.Web),
-                FunctionSchemaSnapshots = new Dictionary<string, SchemaBindingSnapshot> { ["itemSchema"] = snapshot } };
+                FunctionSchemaSnapshots = new Dictionary<string, SchemaBindingSnapshot> { ["itemSchema"] = snapshot }
+            };
             var sequenceError = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => sequences.ResolveAsync(owner,
                 ResourceNamespace.Default, new("content-transformation-sequence-builtin", ScopeRef: owner),
                 new Dictionary<string, IReadOnlyList<FlowCompositionCall>> { ["transformations"] = [call] }, default));
@@ -58,7 +63,8 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
             await flows.CreateExactAsync(owner, new(name, null, "1.0.0", true,
                 new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
                 {
-                    EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
+                    EntryStep = "input",
+                    Steps = [new InputFlowStepDefinition { Name = "input" },
                         new TransformFlowStepDefinition { Name = "explode", Function = function,
                             Mapping = Json("""{"value":{"content":[]},"path":""}"""),
                             FunctionSchemas = new Dictionary<string, SchemaBinding> { ["itemSchema"] = binding },
@@ -74,7 +80,8 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
         await flows.CreateExactAsync(owner, new("forged-function-snapshot", null, "1.0.0", true,
             new WorkflowFlowDefinition("input", [new FlowNode("input", FlowNodeKind.Input)], []), Graph: new()
             {
-                EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
+                EntryStep = "input",
+                Steps = [new InputFlowStepDefinition { Name = "input" },
                     new ToolFlowStepDefinition { Name = "forged", Tool = new("agentstration.transformation.invoke"), FunctionBinding = functionContract,
                         FunctionSchemaSnapshots = new Dictionary<string, SchemaBindingSnapshot> { ["itemSchema"] = snapshot } },
                     new OutputFlowStepDefinition { Name = "output" }],
@@ -85,9 +92,16 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
 
         var largeSchema = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema, ScopeRef = owner,
-            Metadata = new() { Name = "large-function-schema" }, Definition = new() { DisplayName = "Large schema", Format = SchemaFormatIds.JsonSchema,
-                Content = JsonSerializer.SerializeToElement(new { type = "string", description = new string('x', 64_000) }) }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = owner,
+            Metadata = new() { Name = "large-function-schema" },
+            Definition = new()
+            {
+                DisplayName = "Large schema",
+                Format = SchemaFormatIds.JsonSchema,
+                Content = JsonSerializer.SerializeToElement(new { type = "string", description = new string('x', 64_000) })
+            }
         }, default);
         await schemas.PublishAsync(owner, ResourceNamespace.Default, largeSchema.Value.Name, "A", default);
         var largeBinding = new SchemaBinding { Reference = new() { Name = largeSchema.Value.Name, Version = "A", ScopeRef = owner } };

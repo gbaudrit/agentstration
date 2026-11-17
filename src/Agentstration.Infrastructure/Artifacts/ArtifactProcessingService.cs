@@ -1,4 +1,3 @@
-using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,11 +7,12 @@ using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
-using Agentstration.Storage;
-using Agentstration.Infrastructure.Storage;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas;
+using Agentstration.Storage;
 
 namespace Agentstration.Infrastructure.Artifacts;
 
@@ -133,10 +133,23 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     }
                     else content = text;
                 }
-                return Element(new { artifact = new { artifactId = session.Input.Id, name = session.Input.Name,
-                    mediaType = session.Input.MediaType, sizeBytes = session.Input.Length, sha256 = session.Input.Sha256, dataContract = session.Input.Contract },
-                    content, contractContext = new InvocationDataContracts(session.Input.Contract, session.Contract, step.Mode == ArtifactProcessingMode.Access, step.ResultMapping is not null), inputAccess = new { reference = key, access = "read" },
-                    outputAccess = new { reference = key, access = "readWrite" }, revision = session.Revision });
+                return Element(new
+                {
+                    artifact = new
+                    {
+                        artifactId = session.Input.Id,
+                        name = session.Input.Name,
+                        mediaType = session.Input.MediaType,
+                        sizeBytes = session.Input.Length,
+                        sha256 = session.Input.Sha256,
+                        dataContract = session.Input.Contract
+                    },
+                    content,
+                    contractContext = new InvocationDataContracts(session.Input.Contract, session.Contract, step.Mode == ArtifactProcessingMode.Access, step.ResultMapping is not null),
+                    inputAccess = new { reference = key, access = "read" },
+                    outputAccess = new { reference = key, access = "readWrite" },
+                    revision = session.Revision
+                });
             }
             if (session is null) throw Error("artifact_processing_context_missing");
             EnsureLive(session);
@@ -149,8 +162,13 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                     await SaveAsync(owner, childKey, child with { ExpiresAt = clock.GetUtcNow(), DirectOutput = null }, token);
                 }
                 if (session.Result is null && !owner.TransientPayloads) await artifacts.PurgeAsync(StagedArtifactId.Parse(session.OutputId), token);
-                await SaveAsync(owner, key, session with { ExpiresAt = clock.GetUtcNow(),
-                    DirectOutput = owner.TransientPayloads ? string.Empty : null, Input = session.Input with { DirectContent = null }, Result = null }, token);
+                await SaveAsync(owner, key, session with
+                {
+                    ExpiresAt = clock.GetUtcNow(),
+                    DirectOutput = owner.TransientPayloads ? string.Empty : null,
+                    Input = session.Input with { DirectContent = null },
+                    Result = null
+                }, token);
                 return Element(new { aborted = true });
             }
             if (action is not ("prepare" or "finish")) throw Error("artifact_processing_action_invalid");
@@ -181,8 +199,14 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 if (session.Contract is { } contentContract)
                     _ = DataContracts.ReadText(contentContract, outputText, "artifact-output", owner.Id, step.Name);
                 else ValidateContent(session.MediaType, outputText);
-                session = await WriteAsync(owner, step, key, session, Element(new { content = outputText,
-                    expectedRevision = 0, requestId = "capture-result", offset = 0, deleteLength = 0 }), token);
+                session = await WriteAsync(owner, step, key, session, Element(new
+                {
+                    content = outputText,
+                    expectedRevision = 0,
+                    requestId = "capture-result",
+                    offset = 0,
+                    deleteLength = 0
+                }), token);
                 session = session with { CompletedRevision = session.Revision };
                 await SaveAsync(owner, key, session, token);
             }
@@ -250,10 +274,21 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             var name = "item-" + keys.Count + ".json";
             var id = owner.TransientPayloads ? "expanded-" + childKey
                 : (await StageAsync(owner, step, childKey, name, "application/json", output.Bytes, session.Input, token)).ArtifactId.ToString();
-            var child = session with { Input = session.Input with { DirectContent = null }, OutputId = id, OutputName = name,
-                MediaType = "application/json", Revision = 0, CompletedRevision = 0, Writes = [], DurableReference = null, Result = null,
-                Contract = output.Contract is null ? null : output.Contract with { Validated = true }, OutputProvenance = output.Provenance,
-                DirectOutput = owner.TransientPayloads ? Utf8.GetString(output.Bytes) : null };
+            var child = session with
+            {
+                Input = session.Input with { DirectContent = null },
+                OutputId = id,
+                OutputName = name,
+                MediaType = "application/json",
+                Revision = 0,
+                CompletedRevision = 0,
+                Writes = [],
+                DurableReference = null,
+                Result = null,
+                Contract = output.Contract is null ? null : output.Contract with { Validated = true },
+                OutputProvenance = output.Provenance,
+                DirectOutput = owner.TransientPayloads ? Utf8.GetString(output.Bytes) : null
+            };
             await SaveAsync(owner, childKey, child, token);
             keys.Add(childKey);
         }
@@ -271,9 +306,18 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             var bytes = Utf8.GetBytes(session.DirectOutput!);
             // Inline publication uses the same operator ceiling as retained content.
             if (bytes.Length > (options ?? new()).MaximumObjectBytes) throw Error("artifact_processing_direct_output_too_large");
-            var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
-                name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, provenance = session.OutputProvenance, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                contentBase64 = Convert.ToBase64String(bytes) });
+            var manifest = Element(new
+            {
+                artifactId = session.OutputId,
+                kind = "inline",
+                disposition = "publishable",
+                name = session.OutputName,
+                mediaType = session.MediaType,
+                dataContract = session.Contract,
+                provenance = session.OutputProvenance,
+                digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                contentBase64 = Convert.ToBase64String(bytes)
+            });
             await SaveAsync(owner, key, session with { Result = manifest }, token);
             return manifest;
         }
@@ -308,13 +352,35 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         var stat = await durable.StatAsync(owner.WorkspaceId, reference, token);
         var materialization = await selectableStorage.DescribeReferenceAsync(owner.WorkspaceId, reference, token);
         var registered = await artifacts.CompleteFlowRunArtifactAsync(outputStage.ArtifactId, new(owner.Id, step.Name,
-            new() { StorageFlowRunId = string.Empty, OpaqueReference = reference,
-                Materialization = materialization, DataContract = session.Contract, MediaType = session.MediaType, Length = stat.Length, Sha256 = stat.Sha256,
-                Provenance = new Dictionary<string, string>(session.OutputProvenance ?? new Dictionary<string, string>()) { ["fileName"] = session.OutputName,
-                    ["inputArtifactId"] = session.Input.Id, ["inputArtifactKind"] = session.Input.Kind, ["inputSha256"] = session.Input.Sha256,
-                    ["processingRunId"] = ProcessingRunId(owner, step, attempt, index), ["provider"] = "artifact-processing" } }), token);
-        var manifestItem = Element(new { artifactId = registered.Value.ArtifactId.ToString(), kind = "durable",
-            disposition = "publishable", name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, digest = "sha256:" + stat.Sha256 });
+            new()
+            {
+                StorageFlowRunId = string.Empty,
+                OpaqueReference = reference,
+                Materialization = materialization,
+                DataContract = session.Contract,
+                MediaType = session.MediaType,
+                Length = stat.Length,
+                Sha256 = stat.Sha256,
+                Provenance = new Dictionary<string, string>(session.OutputProvenance ?? new Dictionary<string, string>())
+                {
+                    ["fileName"] = session.OutputName,
+                    ["inputArtifactId"] = session.Input.Id,
+                    ["inputArtifactKind"] = session.Input.Kind,
+                    ["inputSha256"] = session.Input.Sha256,
+                    ["processingRunId"] = ProcessingRunId(owner, step, attempt, index),
+                    ["provider"] = "artifact-processing"
+                }
+            }), token);
+        var manifestItem = Element(new
+        {
+            artifactId = registered.Value.ArtifactId.ToString(),
+            kind = "durable",
+            disposition = "publishable",
+            name = session.OutputName,
+            mediaType = session.MediaType,
+            dataContract = session.Contract,
+            digest = "sha256:" + stat.Sha256
+        });
         await SaveAsync(owner, key, session with { Result = manifestItem }, token);
         return manifestItem;
     }
@@ -349,11 +415,16 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
             if (session.Result is not null) throw Error("artifact_processing_closed");
             var side = action.StartsWith("input_", StringComparison.Ordinal) ? "input" : "output";
             if (action is "input_info" or "output_info")
-                return Element(new { name = side == "input" ? session.Input.Name : session.OutputName,
+                return Element(new
+                {
+                    name = side == "input" ? session.Input.Name : session.OutputName,
                     mediaType = side == "input" ? session.Input.MediaType : session.MediaType,
                     sizeBytes = side == "input" ? session.Input.Length : session.DirectOutput is { } directOutput ? Utf8.GetByteCount(directOutput) : (await OutputStageAsync(session, token)).Length,
-                    revision = side == "input" ? 0 : session.Revision, completed = side == "output" && session.CompletedRevision == session.Revision,
-                    dataContract = side == "input" ? session.Input.Contract : session.Contract, rangeUnit = "utf16Characters" });
+                    revision = side == "input" ? 0 : session.Revision,
+                    completed = side == "output" && session.CompletedRevision == session.Revision,
+                    dataContract = side == "input" ? session.Input.Contract : session.Contract,
+                    rangeUnit = "utf16Characters"
+                });
             if (action == "output_write")
             {
                 session = await WriteAsync(owner, step, key, session, arguments, token);
@@ -389,8 +460,16 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 var next = Math.Min(text.Length, offset + length);
                 if (SplitsScalar(text, next)) next--;
                 if (next == offset && next < text.Length) next = Math.Min(text.Length, offset + 2);
-                return Element(new { content = text[offset..next], offset, nextOffset = next, totalCharacters = text.Length,
-                    endOfContent = next == text.Length, revision, cursor = next == text.Length ? null : Encode(new(key, side, revision, next)) });
+                return Element(new
+                {
+                    content = text[offset..next],
+                    offset,
+                    nextOffset = next,
+                    totalCharacters = text.Length,
+                    endOfContent = next == text.Length,
+                    revision,
+                    cursor = next == text.Length ? null : Encode(new(key, side, revision, next))
+                });
             }
             var pattern = Text(arguments, "pattern");
             var limit = Integer(arguments, "maxMatches", 20);
@@ -455,9 +534,14 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
                 session.OutputName, session.MediaType, bytes, session.Input, token);
             outputId = stage.ArtifactId.ToString();
         }
-        var updated = session with { OutputId = outputId, DirectOutput = owner.TransientPayloads ? Utf8.GetString(bytes) : null,
-            Revision = session.Revision + 1, CompletedRevision = null,
-            Writes = [.. session.Writes, new(command, digest, session.Revision + 1)] };
+        var updated = session with
+        {
+            OutputId = outputId,
+            DirectOutput = owner.TransientPayloads ? Utf8.GetString(bytes) : null,
+            Revision = session.Revision + 1,
+            CompletedRevision = null,
+            Writes = [.. session.Writes, new(command, digest, session.Revision + 1)]
+        };
         await SaveAsync(owner, key, updated, token);
         return updated;
     }
@@ -542,8 +626,15 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         var producerId = "artifact-processing:" + Hash(identity);
         var stored = await artifacts.GetStagedByProducerIdForWriteAsync(producerId, token)
             ?? await artifacts.CreateStagedAsync(new(name, media,
-                new() { Kind = ArtifactProducerKind.FlowRun, Id = producerId, FlowRunId = owner.Id, FlowStepId = step.Name,
-                    CorrelationId = owner.CorrelationId, Provenance = new Dictionary<string, string> { ["inputArtifactId"] = input.Id, ["inputSha256"] = input.Sha256 } }), token);
+                new()
+                {
+                    Kind = ArtifactProducerKind.FlowRun,
+                    Id = producerId,
+                    FlowRunId = owner.Id,
+                    FlowStepId = step.Name,
+                    CorrelationId = owner.CorrelationId,
+                    Provenance = new Dictionary<string, string> { ["inputArtifactId"] = input.Id, ["inputSha256"] = input.Sha256 }
+                }), token);
         if (stored.Value.ArtifactStatus == StagedArtifactStatus.Open)
         {
             if (stored.Value.Length > bytes.Length) throw Error("artifact_processing_write_replay_conflict");

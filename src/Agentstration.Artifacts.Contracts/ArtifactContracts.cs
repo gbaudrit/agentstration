@@ -1,6 +1,6 @@
-using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 
 namespace Agentstration.Artifacts.Contracts;
 

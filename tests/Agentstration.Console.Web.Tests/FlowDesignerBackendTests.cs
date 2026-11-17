@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using Agentstration.Console.Web.Features.Flows;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
-using Agentstration.Console.Web.Features.Flows;
 
 namespace Agentstration.Console.Web.Tests;
 
@@ -17,7 +17,8 @@ public sealed class FlowDesignerBackendTests
     {
         var definition = new WorkflowFlowDefinition("input", [], [], []);
         var flow = new FlowResponse("transform", "Transform", null, "2.0.0", true, "2.0.0", definition,
-            new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch) { ScopeRef = ResourceScopeRef.Instance };
+            new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch)
+        { ScopeRef = ResourceScopeRef.Instance };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }] };
         var version = new FlowVersionResponse("transform", "1.0.0", null, definition, new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, graph);
         var requests = new List<string>();
@@ -25,7 +26,8 @@ public sealed class FlowDesignerBackendTests
         {
             requests.Add(request.Method + " " + request.RequestUri!.AbsolutePath);
             return new(HttpStatusCode.OK) { Content = request.RequestUri.AbsolutePath.EndsWith("/versions/1.0.0", StringComparison.Ordinal) ? JsonContent.Create(version) : JsonContent.Create(flow) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         IFlowDesignerBackend backend = new FlowDesignerBackend(new FlowApiClient(http));
         var target = new FlowDesignerTarget(ResourceNamespace.Default, "transform", ResourceScopeRef.Instance, "1.0.0");
         var loaded = await backend.LoadAsync(target, default);

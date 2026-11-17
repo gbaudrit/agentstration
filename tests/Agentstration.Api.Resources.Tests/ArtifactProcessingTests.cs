@@ -1,5 +1,4 @@
 using System.Text;
-using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
@@ -10,6 +9,7 @@ using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
@@ -350,8 +350,14 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var artifacts = services.GetRequiredService<ArtifactManagementService>();
         JsonElement item;
         if (transient)
-            item = Element(new { artifactId = "direct-input", kind = "inline", name = "source.txt", mediaType = media,
-                contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)) });
+            item = Element(new
+            {
+                artifactId = "direct-input",
+                kind = "inline",
+                name = "source.txt",
+                mediaType = media,
+                contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content))
+            });
         else
         {
             var staged = await artifacts.CreateStagedAsync(new("source.txt", media,
@@ -365,13 +371,28 @@ public sealed class ArtifactProcessingTests : ResourceManagementApiTestBase
         var flowId = new FlowId("artifact-processing-test");
         var version = new FlowVersion(logicalScope ?? ResourceScopeRef.Workspace(current.WorkspaceId), flowId, "1.0.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")), new Dictionary<string, string>(), DateTimeOffset.UtcNow, graph, FlowDefinitionHash.Compute(graph));
-        var owner = new FlowRun { TransientPayloads = transient, Id = "flowrun-" + Guid.NewGuid().ToString("N"), WorkspaceId = new(current.WorkspaceId),
-            FlowId = flowId, FlowVersion = version.Version, DefinitionSnapshot = version, DefinitionHash = version.DefinitionHash,
-            Scope = new(current.TenantId, new(current.WorkspaceId), current.PrincipalId) { LogicalScopeRef = logicalScope }, Input = Element(new { }),
-            CreatedAt = DateTimeOffset.UtcNow, Steps = [new FlowStepRun { StepName = step.Name, StepType = "foreachArtifacts", Attempt = 1 }] };
+        var owner = new FlowRun
+        {
+            TransientPayloads = transient,
+            Id = "flowrun-" + Guid.NewGuid().ToString("N"),
+            WorkspaceId = new(current.WorkspaceId),
+            FlowId = flowId,
+            FlowVersion = version.Version,
+            DefinitionSnapshot = version,
+            DefinitionHash = version.DefinitionHash,
+            Scope = new(current.TenantId, new(current.WorkspaceId), current.PrincipalId) { LogicalScopeRef = logicalScope },
+            Input = Element(new { }),
+            CreatedAt = DateTimeOffset.UtcNow,
+            Steps = [new FlowStepRun { StepName = step.Name, StepType = "foreachArtifacts", Attempt = 1 }]
+        };
         await services.GetRequiredService<IFlowRepository>().CreateRunAsync(owner, default);
-        var child = owner with { Id = "flowrun-processing-" + Guid.NewGuid().ToString("N"), ParentFlowRunId = owner.Id,
-            RootFlowRunId = owner.Id, ArtifactProcessing = new(owner.Id, step.Name, 1, 0) };
+        var child = owner with
+        {
+            Id = "flowrun-processing-" + Guid.NewGuid().ToString("N"),
+            ParentFlowRunId = owner.Id,
+            RootFlowRunId = owner.Id,
+            ArtifactProcessing = new(owner.Id, step.Name, 1, 0)
+        };
         return (owner, step, child, item);
     }
 }

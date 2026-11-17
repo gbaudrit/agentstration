@@ -219,7 +219,9 @@ public static class FlowDraftTemplates
         });
         return new()
         {
-            EntryStep = "input", InputSchema = input, OutputSchema = template.OutputSchema.Clone(),
+            EntryStep = "input",
+            InputSchema = input,
+            OutputSchema = template.OutputSchema.Clone(),
             Steps =
             [
                 new InputFlowStepDefinition { Name = "input", Schema = input },

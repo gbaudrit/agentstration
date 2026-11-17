@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
-using Agentstration.Artifacts.Contracts;
 using Agentstration.Agents;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -25,8 +25,10 @@ public sealed class StorageExecutionTests
     {
         var limits = new StorageContentOptions
         {
-            MaximumReadBytes = 128 * 1024, MaximumWriteBytes = 256 * 1024,
-            MaximumObjectBytes = 256 * 1024, TransferChunkBytes = 4096
+            MaximumReadBytes = 128 * 1024,
+            MaximumWriteBytes = 256 * 1024,
+            MaximumObjectBytes = 256 * 1024,
+            TransferChunkBytes = 4096
         };
         await using var factory = await FixtureAsync(limits);
         var services = factory.Services;
@@ -71,8 +73,11 @@ public sealed class StorageExecutionTests
 
         using var authority = services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0"));
         var changed = await management.ReconcileAsync(scope, resource.Value.Namespace, resource.Value.Name,
-            resource.Value.Definition with { Envelope = JsonSerializer.SerializeToElement(new
-                { write = true, maximumReadBytes = 8, maximumWriteBytes = 4 }) }, resource.ETag, default);
+            resource.Value.Definition with
+            {
+                Envelope = JsonSerializer.SerializeToElement(new
+                { write = true, maximumReadBytes = 8, maximumWriteBytes = 4 })
+            }, resource.ETag, default);
         var envelopeLimit = await Assert.ThrowsAsync<StorageException>(() => gateway.WriteAsync(Target(changed.Value, scope),
             write with { RequestId = "envelope-limit", Key = "notes/envelope", ContentBase64 = Convert.ToBase64String(new byte[5]) }));
         Assert.AreEqual("storage_content_limit_exceeded", envelopeLimit.Code);
@@ -86,7 +91,7 @@ public sealed class StorageExecutionTests
     public async Task ConfiguredRecordSetLimitCannotBeWidenedByTheConsumerPolicy()
     {
         await using var factory = await FixtureAsync(new()
-            { MaximumObjectBytes = 64, MaximumWriteBytes = 64, MaximumReadBytes = 64, TransferChunkBytes = 64 });
+        { MaximumObjectBytes = 64, MaximumWriteBytes = 64, MaximumReadBytes = 64, TransferChunkBytes = 64 });
         var services = factory.Services;
         var context = await InstanceContextAsync(services, factory.Context);
         using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
@@ -104,9 +109,12 @@ public sealed class StorageExecutionTests
     {
         var limits = new StorageContentOptions
         {
-            MaximumObjectBytes = 17 * 1024 * 1024, MaximumWriteBytes = 17 * 1024 * 1024,
-            MaximumReadBytes = 17 * 1024 * 1024, TransferChunkBytes = 128 * 1024,
-            MaximumPageSize = 1001, LocalMaximumStoreBytes = long.MaxValue
+            MaximumObjectBytes = 17 * 1024 * 1024,
+            MaximumWriteBytes = 17 * 1024 * 1024,
+            MaximumReadBytes = 17 * 1024 * 1024,
+            TransferChunkBytes = 128 * 1024,
+            MaximumPageSize = 1001,
+            LocalMaximumStoreBytes = long.MaxValue
         };
         await using var factory = await FixtureAsync(limits);
         var services = factory.Services;
@@ -139,7 +147,7 @@ public sealed class StorageExecutionTests
     public async Task PublicationMetadataDoesNotConsumeTheConfiguredContentBudget()
     {
         await using var factory = await FixtureAsync(new()
-            { MaximumObjectBytes = 8, MaximumWriteBytes = 8, MaximumReadBytes = 8, TransferChunkBytes = 8 });
+        { MaximumObjectBytes = 8, MaximumWriteBytes = 8, MaximumReadBytes = 8, TransferChunkBytes = 8 });
         var services = factory.Services;
         var context = await InstanceContextAsync(services, factory.Context);
         using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);

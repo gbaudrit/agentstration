@@ -1,9 +1,9 @@
-using Agentstration.Schemas;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
@@ -48,9 +48,12 @@ public sealed partial class FlowRunService
                 throw new FlowValidationException("process_unit_invalid", "A process unit requires a bounded key, ordinal and descriptor.");
             var body = FlowProcessGraph.Extract(parent.Value.DefinitionSnapshot.Graph!, step);
             var version = parent.Value.DefinitionSnapshot with { Graph = body, DefinitionHash = FlowDefinitionHash.Compute(body) };
-            var inlineCall = new FlowCallStepDefinition { Name = step.Name,
+            var inlineCall = new FlowCallStepDefinition
+            {
+                Name = step.Name,
                 Flow = new(parent.Value.FlowId.Value, FlowCallVersionStrategy.Exact, parent.Value.FlowVersion,
-                    parent.Value.FlowId.Namespace, version.ScopeRef) };
+                    parent.Value.FlowId.Namespace, version.ScopeRef)
+            };
             var processAttempt = Math.Max(1, parent.Value.Steps.Single(value => value.StepName == stepDefinitionId).Attempt);
             var definition = new FlowProcessDefinitionOrigin(parent.Value.FlowId, parent.Value.DefinitionSnapshot.ScopeRef,
                 parent.Value.FlowVersion, parent.Value.DefinitionSnapshotId ?? DefinitionSnapshotIdentity(parent.Value.DefinitionSnapshot),

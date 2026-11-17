@@ -195,8 +195,11 @@ public sealed partial class FlowDesignerReadOnlyTests
         var target = new FlowDesignerTarget(ResourceNamespace.Default, "sample", TestScope);
         var draft = await original.LoadAsync(target, CancellationToken.None);
         var published = new TaskCompletionSource<FlowDesignerLoadResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var backend = new BackendStub(readOnly: false) { LoadOverride = value => value.PublishedVersion is null
-            ? Task.FromResult(draft) : published.Task };
+        var backend = new BackendStub(readOnly: false)
+        {
+            LoadOverride = value => value.PublishedVersion is null
+            ? Task.FromResult(draft) : published.Task
+        };
         context.Services.AddSingleton<IFlowDesignerBackend>(backend);
         context.Services.AddSingleton<IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<FlowEditorStore>();

@@ -1,8 +1,8 @@
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
-using Agentstration.Resources;
-using Agentstration.ResourceManagement;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Storage;
 using Agentstration.Web.Security;
 

@@ -60,7 +60,8 @@ public sealed class TriggerDetailsTests
             ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111")),
             Definition = new()
             {
-                DisplayName = "Scheduled Flow", Enabled = false,
+                DisplayName = "Scheduled Flow",
+                Enabled = false,
                 Source = new() { Schedule = new() { Type = TriggerScheduleType.Interval, Every = "PT1H" } },
                 Target = new() { Flow = new() { Name = "source-flow", ScopeRef = ResourceScopeRef.Instance } }
             }

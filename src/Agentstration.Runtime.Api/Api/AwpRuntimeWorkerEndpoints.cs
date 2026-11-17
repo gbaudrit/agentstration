@@ -1,11 +1,11 @@
-using System.Text.Json;
-using Agentstration.Schemas;
 using System.Security.Claims;
+using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
+using Agentstration.Schemas;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Runtime.Api.Api;
@@ -565,9 +565,15 @@ public static class AwpRuntimeWorkerEndpoints
         return Envelope(envelope.MessageId, now, new AwpChildFlowResponse(now, child.RunId, child.Status, child.Output,
             child.Material is null ? null : (AwpRootFlowExecutionMaterial)ToContract(child.Material))
         {
-            FlowId = child.FlowId, FlowNamespace = child.FlowNamespace, FlowVersion = child.FlowVersion,
-            OutputName = child.OutputName, Outcome = child.Outcome, ErrorCode = child.ErrorCode,
-            ErrorMessage = child.ErrorMessage, ErrorDetails = child.ErrorDetails, ErrorOrigin = child.ErrorOrigin
+            FlowId = child.FlowId,
+            FlowNamespace = child.FlowNamespace,
+            FlowVersion = child.FlowVersion,
+            OutputName = child.OutputName,
+            Outcome = child.Outcome,
+            ErrorCode = child.ErrorCode,
+            ErrorMessage = child.ErrorMessage,
+            ErrorDetails = child.ErrorDetails,
+            ErrorOrigin = child.ErrorOrigin
         });
     }, principal);
 

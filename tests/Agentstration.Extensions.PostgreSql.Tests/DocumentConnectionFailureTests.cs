@@ -18,9 +18,14 @@ public sealed class DocumentConnectionFailureTests
         reserved.Bind(new IPEndPoint(IPAddress.Loopback, 0)); // Reserved but not listening: deterministic refusal, no database required.
         var connection = new NpgsqlConnectionStringBuilder
         {
-            Host = "127.0.0.1", Port = ((IPEndPoint)reserved.LocalEndPoint!).Port,
-            Database = "PRIVATE_DATABASE", Username = "PRIVATE_USER", Password = "PRIVATE_PASSWORD",
-            SslMode = SslMode.Disable, Timeout = 1, Pooling = false
+            Host = "127.0.0.1",
+            Port = ((IPEndPoint)reserved.LocalEndPoint!).Port,
+            Database = "PRIVATE_DATABASE",
+            Username = "PRIVATE_USER",
+            Password = "PRIVATE_PASSWORD",
+            SslMode = SslMode.Disable,
+            Timeout = 1,
+            Pooling = false
         };
         var provider = new PostgreSqlDocumentProvider(connection.ConnectionString, DocumentConformanceTests.Schema);
         var context = new AspDocumentContext(new("store", "binding", new string('a', 64)), new("collection"),

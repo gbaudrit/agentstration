@@ -29,13 +29,20 @@ public sealed class OperationSchemaCandidateTests
         context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         var operation = new ConnectedServiceOperationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
             Metadata = new() { Name = "items", Namespace = ResourceNamespace.Default },
-            ScopeRef = ResourceScopeRef.Instance, Uid = Guid.NewGuid(), Generation = 3,
+            ScopeRef = ResourceScopeRef.Instance,
+            Uid = Guid.NewGuid(),
+            Generation = 3,
             Definition = new()
             {
-                DisplayName = "Items · 200 application/json", ExternalId = "items-200", DefinitionDigest = "operation-digest",
-                Service = null!, Type = null!, Provenance = null!,
+                DisplayName = "Items · 200 application/json",
+                ExternalId = "items-200",
+                DefinitionDigest = "operation-digest",
+                Service = null!,
+                Type = null!,
+                Provenance = null!,
                 Definition = JsonSerializer.Deserialize<JsonElement>("""
                     {"outputSchema":{"type":"object","properties":{"results":{"type":"array","items":{"type":"object"}}}},
                      "responseShape":{"x-agentstration-response":{"status":"200","mediaType":"application/json","contractDigest":"source-digest","nativeDefinition":{"type":"object"}}}}
@@ -64,11 +71,17 @@ public sealed class OperationSchemaCandidateTests
             Assert.AreEqual(HttpMethod.Post, request.Method);
             Assert.AreEqual("/api/schemas", request.RequestUri!.AbsolutePath);
             Request = await request.Content!.ReadFromJsonAsync<CreateSchemaRequest>(cancellationToken);
-            var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(new SchemaResource
+            var response = new HttpResponseMessage(HttpStatusCode.Created)
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema,
-                ScopeRef = Request!.ScopeRef, Metadata = new() { Name = Request.Name }, Definition = Request.Properties
-            }) };
+                Content = JsonContent.Create(new SchemaResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = SchemaResourceKinds.Schema,
+                    ScopeRef = Request!.ScopeRef,
+                    Metadata = new() { Name = Request.Name },
+                    Definition = Request.Properties
+                })
+            };
             response.Headers.ETag = new("\"draft\"");
             return response;
         }

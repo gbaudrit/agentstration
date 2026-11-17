@@ -1,5 +1,5 @@
-using Agentstration.Knowledge;
 using Agentstration.Identity.Contracts;
+using Agentstration.Knowledge;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

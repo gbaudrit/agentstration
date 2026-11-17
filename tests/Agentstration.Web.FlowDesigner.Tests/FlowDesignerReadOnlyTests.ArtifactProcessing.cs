@@ -14,10 +14,14 @@ public sealed partial class FlowDesignerReadOnlyTests
     {
         var step = new ForeachFlowStepDefinition { Name = "partition", Partition = new() { Partition = FlowProcessPartition.TextChunks } };
         Assert.IsTrue(step.OutputEvents().Contains("process"));
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, step,
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" }, step,
             new TransformFlowStepDefinition { Name = "body" }, new OutputFlowStepDefinition { Name = "completed" }],
             Transitions = [new("start", "input", "completed", "partition"), new("body", "partition", "process", "body"),
-                new("return", "body", "completed", "partition"), new("done", "partition", "completed", "completed")] };
+                new("return", "body", "completed", "partition"), new("done", "partition", "completed", "completed")]
+        };
         var body = FlowProcessGraph.Extract(graph, step);
         Assert.AreEqual("process_input", body.EntryStep);
         Assert.AreEqual("process_result", body.Transitions.Single(edge => edge.FromStep == "body").ToStep);
@@ -32,8 +36,12 @@ public sealed partial class FlowDesignerReadOnlyTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.Setup<Blazor.Diagrams.Core.Geometry.Rectangle>("ZBlazorDiagrams.getBoundingClientRect", _ => true).SetResult(new(0, 0, 1024, 768));
-        var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" },
-            new ForeachArtifactsFlowStepDefinition { Name = "transform", OutputMediaType = "text/plain", OutputContract = new() { Schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"string"}""") } }] };
+        var graph = new FlowGraphDefinition
+        {
+            EntryStep = "input",
+            Steps = [new InputFlowStepDefinition { Name = "input" },
+            new ForeachArtifactsFlowStepDefinition { Name = "transform", OutputMediaType = "text/plain", OutputContract = new() { Schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"string"}""") } }]
+        };
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerBackend>(new BackendStub(true, graph));
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.Backend.IFlowDesignerResourceProvider>(new ResourceProviderStub());
         context.Services.AddSingleton<Agentstration.Web.FlowDesigner.State.FlowEditorStore>();
