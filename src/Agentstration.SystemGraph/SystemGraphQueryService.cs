@@ -173,6 +173,7 @@ public sealed partial class SystemGraphQueryService(
             }
             foreach (var edge in contribution.Relations)
                 if (nodes.ContainsKey(edge.Source) && nodes.ContainsKey(edge.Target)
+                    && (edge.ViaNodeId is null || nodes.ContainsKey(edge.ViaNodeId) && access[edge.ViaNodeId].InspectBindings)
                     && (edge.Kind == "system-membership" || access[edge.Source].InspectBindings && access[edge.Target].InspectBindings))
                 {
                     relations.Add(edge);
@@ -188,7 +189,7 @@ public sealed partial class SystemGraphQueryService(
             {
                 ids.Add(root);
                 foreach (var edge in visibleRelations.Where(edge => edge.Source == root || edge.Target == root))
-                { ids.Add(edge.Source); ids.Add(edge.Target); }
+                { ids.Add(edge.Source); ids.Add(edge.Target); if (edge.ViaNodeId is { } via) ids.Add(via); }
             }
             nodes = nodes.Where(pair => ids.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
             visibleRelations = [.. visibleRelations.Where(edge => ids.Contains(edge.Source) && ids.Contains(edge.Target))];
@@ -200,7 +201,7 @@ public sealed partial class SystemGraphQueryService(
             .ThenBy(edge => edge.Assessment, StringComparer.Ordinal).ThenBy(edge => edge.SelectedPublication, StringComparer.Ordinal)
             .ThenBy(edge => edge.TargetField, StringComparer.Ordinal).ThenBy(edge => edge.ExpectedHash, StringComparer.Ordinal)
             .ThenBy(edge => edge.ParentHash, StringComparer.Ordinal).ThenBy(edge => edge.BindingHash, StringComparer.Ordinal)
-            .ThenBy(edge => edge.CapabilityHash, StringComparer.Ordinal).ToArray();
+            .ThenBy(edge => edge.CapabilityHash, StringComparer.Ordinal).ThenBy(edge => edge.ViaNodeId, StringComparer.Ordinal).ToArray();
         return new(ordered, edges, Digest(JsonSerializer.Serialize(new { Nodes = ordered, Relations = edges }, JsonOptions)));
     }
 

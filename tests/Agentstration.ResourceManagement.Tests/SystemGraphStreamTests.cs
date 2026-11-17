@@ -17,6 +17,26 @@ public sealed class SystemGraphStreamTests
     }
 
     [TestMethod]
+    public async Task AccessProvenanceRequiresAnAuthorizedViaEndpointAndRevocationInvalidatesTheStream()
+    {
+        var agent = Node("agent"); var tool = Node("tool"); var via = Node("private-toolset");
+        var edge = new SystemGraphRelation(agent.Id, tool.Id, "toolset-access") { ViaNodeId = via.Id };
+        var access = new Access(); var source = new Source([new([agent, tool, via], [edge])]);
+        var service = new SystemGraphQueryService([source], access, TimeProvider.System);
+        Assert.IsTrue((await service.QueryAsync(new(Root: agent.Id), default)).Relations.Contains(edge));
+        var frames = await Collect(service, new(Root: agent.Id));
+        Assert.IsTrue(frames.SelectMany(frame => frame.Relations).Contains(edge));
+        access.Hidden.Add(via.Identity.ResourceUid);
+        Assert.IsEmpty((await service.QueryAsync(new(Root: agent.Id), default)).Relations);
+        Assert.IsFalse((await Collect(service, new(Root: agent.Id))).SelectMany(frame => frame.Relations).Contains(edge));
+        access.Hidden.Clear(); access.BindingDenied.Add(via.Identity.ResourceUid);
+        Assert.IsEmpty((await service.QueryAsync(new(Root: agent.Id), default)).Relations);
+        Assert.IsFalse((await Collect(service, new(Root: agent.Id))).SelectMany(frame => frame.Relations).Contains(edge));
+        access.BindingDenied.Clear(); source.OnRead = () => { if (source.Reads % 2 == 0) access.Hidden.Add(via.Identity.ResourceUid); };
+        frames = await Collect(service, new(Root: agent.Id)); Assert.AreEqual("error", frames[^1].Kind);
+    }
+
+    [TestMethod]
     public async Task FirstNodeAndHeartbeatArriveWhileTheTailIsBlockedAndCancellationDisposesIt()
     {
         var first = Node("first"); var second = Node("second");
@@ -217,9 +237,10 @@ public sealed class SystemGraphStreamTests
     {
         public SystemGraphAccess Allowed { get; set; } = new(true, true);
         public HashSet<Guid> Hidden { get; } = [];
+        public HashSet<Guid> BindingDenied { get; } = [];
         public Task<SystemGraphReadContext> GetContextAsync(CancellationToken ct) => Task.FromResult(new SystemGraphReadContext("actor", [Owner], [Owner], [new(Owner, null)]));
         public Task<SystemGraphAccess> EvaluateAsync(SystemGraphIdentity identity, SystemGraphReadContext context, CancellationToken ct) =>
-            Task.FromResult(Hidden.Contains(identity.ResourceUid) ? new(false, false) : Allowed);
+            Task.FromResult(Hidden.Contains(identity.ResourceUid) ? new(false, false) : BindingDenied.Contains(identity.ResourceUid) ? new(true, false) : Allowed);
     }
     private sealed class Source(List<SystemGraphContribution> items) : ISystemGraphContributor
     {

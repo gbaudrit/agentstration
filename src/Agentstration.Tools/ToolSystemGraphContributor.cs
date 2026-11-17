@@ -55,7 +55,7 @@ public sealed class ToolSystemGraphContributor(IResourceStore resources, IResour
             yield return builder.Build();
         }
         await foreach (var stored in ResourceSystemGraph.ReadAsync<ToolSetResource>(resources, scope, ToolResourceKinds.ToolSet, ct))
-            yield return new([ResourceSystemGraph.Node(stored.Value)], []);
+            yield return new([ResourceSystemGraph.Node(stored.Value) with { DisplayName = stored.Value.Definition.DisplayName }], []);
         await foreach (var stored in ResourceSystemGraph.ReadAsync<ToolSetVersionResource>(resources, scope, ToolResourceKinds.ToolSetVersion, ct))
         {
             var publication = stored.Value;

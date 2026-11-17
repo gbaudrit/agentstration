@@ -299,3 +299,24 @@ Instance/Tenant readers can navigate to their authorized Workspace contexts whil
 preserving the exact Agent selection. Recording remains subject to Workspace
 ownership, resource-write permission and Discover/Use of the referenced revision;
 navigation never creates or adopts an assignment automatically.
+
+### Tool access summary
+
+The default diagram groups a resource's current and recorded generations by UID.
+ToolSets appear as versioned access paths on Agent → Tool links; ToolDefinition
+publications move to link provenance. Several visible ToolSets can aggregate on a
+selectable link. The technical-details control restores the exact window; list
+and JSON export always retain the received semantic observation.
+
+The Agents contributor supplies selected-member evidence through `toolset-access`.
+Its `ViaNodeId` is an additional authorized endpoint: strict and progressive reads
+require Discover and binding inspection of it, and streams emit and recheck it
+before delivering the relation. Selection requires exact retained publication
+identity and matching recorded Tool pins, never all members inferred from topology.
+Native publication UIDs map to canonical ToolSet publication IDs without rewriting
+Agent revisions. Unknown legacy origins remain unknown.
+
+The summary contracts typed ToolDefinition paths with their original steps retained
+for inspection. It changes no executable closure or resource. A ToolSet is an access
+grouping; C4 container boundaries require actual execution units. See
+[ADR-0243](../../decisions/0243-tool-access-summaries-preserve-authorized-provenance.md).

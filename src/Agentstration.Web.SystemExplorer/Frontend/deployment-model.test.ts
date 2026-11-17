@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {layoutLikeC4Model,GraphvizWasmAdapter} from '@likec4/layouts';
 import {buildDeploymentModel} from './deployment-model';
-import {buildDefinitionModel,GraphPage} from './model';
+import {GraphPage} from './model';
 const d={deploymentUid:'dep-1',configurationId:'cfg-1',agentUid:'agent',revisionUid:'revision',revisionName:'Agent v2',agentVersion:2,definitionHash:'hash',environment:'prod"; injected attacker',targetId:'pool.α',targetName:'Target',targetKind:'worker-pool',runtime:'awp-worker',recordedAt:'2026-11-17T00:00:00Z'};
 const page:GraphPage={nodes:[{id:'deployment:dep-1:cfg-1',identity:{kind:'AgentDeployment',name:'deploy'},state:'recorded-deployment-configuration',deployment:d}],relations:[]};
 const labels={'runtime-awp-worker':'AWP Worker','deployment-environment':'Declared environment','deployment-desired':'Desired',worker:'Worker'};
@@ -26,15 +26,4 @@ test('observed topology has distinct attested Worker sessions and never turns th
  assert.equal(view.nodes.some(n=>n.title==='Target'),false);
  assert.throws(()=>buildDeploymentModel(page,labels,{mode:'observed',root:page.nodes[0]!.id,placements:[]}),/placement_unavailable/);
  assert.throws(()=>buildDeploymentModel(page,labels,{mode:'deployment',root:'hidden'}),/deployment_unavailable/);
-});
-test('definition grouping keeps generations and publications explicit without mutating or merging canonical identities',()=>{
- const input:GraphPage={nodes:[
-  {id:'root',identity:{kind:'AgentRevision',name:'Agent v1',resourceUid:'revision'},state:'publication'},
-  {id:'generation:tool:1',identity:{kind:'Tool',name:'Tool',resourceUid:'tool'},state:'recorded-generation',evidence:{generation:1}},
-  {id:'resource:tool',identity:{kind:'Tool',name:'Tool',resourceUid:'tool'},state:'definition',evidence:{generation:3}},
-  {id:'homonym',identity:{kind:'Tool',name:'Tool',resourceUid:'another-tool'},state:'definition'}],
-  relations:[{source:'root',target:'generation:tool:1',kind:'exact-dependency'},{source:'generation:tool:1',target:'resource:tool',kind:'generation-of'}]};
- const before=JSON.stringify(input);const result=buildDefinitionModel(input,{'recorded-generations':'Recorded','current-generation':'Current'});
- assert.equal([...result.model.elements()].length,3);assert.ok([...result.model.elements()].some(e=>e.title.includes('Recorded 1')&&e.title.includes('Current 3')));
- assert.equal(JSON.stringify(input),before);assert.ok([...result.ids.values()].includes('generation:tool:1'));assert.ok([...result.ids.values()].includes('homonym'));
 });

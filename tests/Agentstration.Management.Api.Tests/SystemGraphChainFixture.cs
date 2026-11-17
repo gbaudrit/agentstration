@@ -134,7 +134,7 @@ internal sealed record SystemGraphChainFixture(AgentResource Agent, AgentRevisio
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolSetVersion,
-            Metadata = new() { Name = "knowledge-access-set-v1", Namespace = ns },
+            Metadata = new() { Name = toolSet.Name + "--" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("1.0.0")))[..16], Namespace = ns },
             ToolSetUid = toolSet.Uid,
             ToolSetName = toolSet.Name,
             ToolSetGeneration = toolSet.Generation,
@@ -189,7 +189,7 @@ internal sealed record SystemGraphChainFixture(AgentResource Agent, AgentRevisio
                 DefinitionHash = "agent-digest",
                 ToolPins = [new(tool.Uid, owner, ns, tool.Kind, tool.Name, tool.Generation, "1.0.0")],
                 ToolSetAssignments = [new() { ToolSetUid = toolSet.Uid, ToolSetScopeRef = owner, ToolSetName = toolSet.Name, ToolSetNamespace = ns,
-                    ToolSetGeneration = toolSet.Generation, Version = "1.0.0", DefinitionHash = "set-digest", Members = ["read"] }]
+                    ToolSetGeneration = toolSet.Generation, Version = "1.0.0", DefinitionHash = "set-digest", Members = [ToolResourceIdentity.CatalogId(tool.Namespace, tool.Name)] }]
             }
         }, immutable: true);
         // Sharing a dependency must not pull a peer Agent into another Agent's view.

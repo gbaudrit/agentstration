@@ -227,4 +227,17 @@
   <data name="DeploymentOpenDefinition" xml:space="preserve"><value>Voir les révisions publiées</value></data>
   <data name="DeploymentWorkspaces" xml:space="preserve"><value>Ouvrir le Workspace de déploiement</value></data>
   <data name="DeploymentWriteRequired" xml:space="preserve"><value>Le droit d’écriture sur les ressources est nécessaire pour enregistrer ou modifier une affectation dans ce Workspace.</value></data>
+  <data name="SummaryTechnical" xml:space="preserve"><value>Afficher les détails techniques</value></data>
+  <data name="SummaryHelp" xml:space="preserve"><value>La synthèse regroupe les générations d’une ressource et place les accès par ToolSet sur les liaisons. La liste et l’export JSON conservent les identités exactes reçues.</value></data>
+  <data name="SummaryCount" xml:space="preserve"><value>{0} éléments dans le schéma.</value></data>
+  <data name="SummaryLinks" xml:space="preserve"><value>Consulter les liaisons du schéma</value></data>
+  <data name="SummaryLinkDetails" xml:space="preserve"><value>Détails de la liaison</value></data>
+  <data name="SummaryDirectAccess" xml:space="preserve"><value>Accès direct</value></data>
+  <data name="SummaryViaToolSet" xml:space="preserve"><value>via {0} · {1}</value></data>
+  <data name="SummaryViaToolSets" xml:space="preserve"><value>via {0} ToolSets visibles</value></data>
+  <data name="SummaryToolSetAccess" xml:space="preserve"><value>Membre de ToolSet sélectionné</value></data>
+  <data name="SummaryDefinitionPath" xml:space="preserve"><value>via la définition de l’outil</value></data>
+  <data name="SummaryPathHelp" xml:space="preserve"><value>Ces chemins décrivent les références reçues et les membres de ToolSet sélectionnés. Une origine historique non précisée reste inconnue ; les références seules n’attestent ni l’exécution ni le placement sur un Worker.</value></data>
+  <data name="SummaryExactEvidence" xml:space="preserve"><value>Preuves exactes reçues</value></data>
+  <data name="SummaryToolDefinitions" xml:space="preserve"><value>Provenance ToolDefinition</value></data>
 </root>

@@ -49,6 +49,8 @@ public sealed record SystemGraphRelation(
     string? SourceField = null,
     string? Resolution = null)
 {
+    // An additional semantic endpoint, authorized together with source and target.
+    public string? ViaNodeId { get; init; }
     public string? Assessment { get; init; }
     public string? SelectedPublication { get; init; }
     public string? TargetField { get; init; }

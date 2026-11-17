@@ -11,6 +11,7 @@
     [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> RelationshipLabels { get; set; } = new Dictionary<string, string>();
     [Parameter] public IReadOnlyDictionary<string, string>? OverlayNotes { get; set; }
     [Parameter] public SystemGraphDiagramOptions? Options { get; set; }
+    [Parameter] public EventCallback<string> LinkSelected { get; set; }
     [Parameter] public EventCallback<string> Selected { get; set; }
     [Parameter] public EventCallback Failed { get; set; }
     private ElementReference element;
@@ -40,6 +41,7 @@
         catch (JSException) { if (!disposed) await Failed.InvokeAsync(); }
     }
     [JSInvokable] public Task SelectNode(string id) => !disposed && Page.Nodes.Any(node => node.Id == id) ? Selected.InvokeAsync(id) : Task.CompletedTask;
+    [JSInvokable] public Task SelectLink(string id) => !disposed && Page.Relations.Any(edge => edge.Kind == id && id.StartsWith("summary:", StringComparison.Ordinal)) ? LinkSelected.InvokeAsync(id) : Task.CompletedTask;
     public async ValueTask DisposeAsync()
     {
         disposed = true;

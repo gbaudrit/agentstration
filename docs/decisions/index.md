@@ -286,3 +286,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 241. [ADR-0241 — System Explorer streams provisional authorized observations](0241-system-explorer-streams-provisional-authorized-observations.md)
 242. [ADR-0242 — Agent deployments record exact durable assignments](0242-agent-deployments-record-exact-durable-assignments.md)
+
+243. [ADR-0243 — Tool access summaries preserve authorized provenance](0243-tool-access-summaries-preserve-authorized-provenance.md)

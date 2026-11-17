@@ -125,13 +125,45 @@
         <span role="status">@Localizer["WindowCount", diagramPage?.Nodes.Count ?? 0, page.Nodes.Count]</span>
         <button class="button-secondary" type="button" @onclick="ExportAsync">@T("Export")</button>
         <label><input type="checkbox" @bind="showDiagram" /> @T("Diagram")</label>
+        @if (Perspective != "deployment") { <label><input type="checkbox" checked="@technicalDiagram" @onchange="ChangeTechnical" /> @T("SummaryTechnical")</label> }
     </div>
     @if (actionError is not null) { <ErrorState Message="@actionError" /> }
     @if (!loading && page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
     else if (page.Nodes.Count > 0)
     {
-        @if (showDiagram && !diagramFailed && (Perspective != "deployment" || configuration is not null && (diagramOptions?.Mode != "observed" || HasPlacement))) { <SystemGraphDiagram @key="(revision, windowOffset, Perspective)" Page="diagramPage!" Options="diagramOptions" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
+        @if (showDiagram && !diagramFailed && (Perspective != "deployment" || configuration is not null && (diagramOptions?.Mode != "observed" || HasPlacement))) { <SystemGraphDiagram @key="(revision, windowOffset, Perspective, technicalDiagram)" Page="visualPage!" Options="diagramOptions" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" LinkSelected="SelectLink" Failed="DiagramFailed" /> }
         @if (diagramFailed) { <p role="status">@T("DiagramUnavailable")</p> }
+        @if (summary is not null)
+        {
+            <p>@T("SummaryHelp") @Localizer["SummaryCount", summary.Graph.Nodes.Count]</p>
+            @if (summary.Links.Count > 0)
+            {
+                <details><summary>@T("SummaryLinks")</summary><ul>
+                    @foreach (var link in summary.Links)
+                    { <li><button type="button" class="text-button" @onclick="() => SelectLink(link.Id)">@(link.Source.DisplayName ?? link.Source.Identity.Name) → @(link.Target.DisplayName ?? link.Target.Identity.Name) · @LinkTitle(link)</button></li> }
+                </ul></details>
+            }
+        }
+        @if (selectedLink is not null)
+        {
+            <section class="panel" aria-label="@T("SummaryLinkDetails")">
+                <h2>@T("SummaryLinkDetails")</h2><p>@(selectedLink.Source.DisplayName ?? selectedLink.Source.Identity.Name) → @(selectedLink.Target.DisplayName ?? selectedLink.Target.Identity.Name)</p>
+                <p>@T("SummaryPathHelp")</p>
+                @foreach (var path in selectedLink.Paths)
+                {
+                    @if (path.Via is { } via)
+                    { <h3>@NodeDisplayName(via) · @via.Evidence?.Publication</h3><code>@via.Identity.OwnerScope.Value · @via.Identity.Namespace.Value · @via.Id</code> }
+                    <ol>@foreach (var step in path.Steps)
+                    { <li><code>@step.Source</code> — @RelationKind(step.Kind) → <code>@step.Target</code><br /><code>@step.SourceField</code> <code>@step.Resolution</code> <code>@step.SelectedPublication</code></li> }</ol>
+                }
+                @if (selectedLink.ToolDefinitions.Count > 0)
+                {
+                    <h3>@T("SummaryToolDefinitions")</h3><ul>@foreach (var definition in selectedLink.ToolDefinitions)
+                    { <li>@(definition.DisplayName ?? definition.Identity.Name) · @definition.Evidence?.Publication<br /><code>@definition.Id</code> · <code>@definition.Identity.OwnerScope.Value</code> · <code>@definition.Identity.Namespace.Value</code></li> }</ul>
+                }
+                <details><summary>@T("SummaryExactEvidence")</summary><pre class="explorer-json">@JsonSerializer.Serialize(selectedLink, JsonOptions)</pre></details>
+            </section>
+        }
         <section aria-label="@T("Resources")" aria-busy="@loading">
             <h2>@T("Resources")</h2>
             <div class="explorer-scroll"><table class="data-grid"><thead><tr><th>@T("Name")</th><th>@T("Kind")</th><th>@T("Owner")</th><th>@T("State")</th><th>@T("Evidence")</th><th></th></tr></thead><tbody>

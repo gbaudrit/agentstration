@@ -35,7 +35,7 @@ public partial class SystemExplorer
     private bool reloadRequested;
     protected override void OnParametersSet()
     {
-        showDiagram = RendererQuery != "list";
+        showDiagram = RendererQuery != "list"; technicalDiagram = TechnicalQuery; summary = null; visualPage = null; selectedLink = null;
         cancellation?.Cancel();
         ++revision;
         loading = true; contextReady = false; page = null; diagramPage = null; selected = null; overlayNotes = null;
@@ -83,6 +83,7 @@ public partial class SystemExplorer
         // Arrivals outside the current window and heartbeat timestamps do not restart layout.
         if (diagramPage is null || !diagramPage.Nodes.SequenceEqual(visible) || !diagramPage.Relations.SequenceEqual(edges))
             diagramPage = page with { Nodes = visible, Relations = edges };
+        RefreshSummary();
     }
     private string NodeDisplayName(SystemGraphNode node) =>
         !string.IsNullOrWhiteSpace(node.DisplayName) ? node.DisplayName
@@ -98,7 +99,7 @@ public partial class SystemExplorer
         selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
         Task groups = Task.CompletedTask;
         var buffer = new SystemGraphStreamBuffer();
-        ResetPerspectiveState();
+        ResetPerspectiveState(); summary = null; visualPage = null; selectedLink = null;
         try
         {
             var context = await ContextProvider.GetAsync(pending.Token);
@@ -272,16 +273,17 @@ public partial class SystemExplorer
     {
         get
         {
-            var labels = new[] { "system-membership", "exact-dependency", "dynamic-dependency", "generation-of", "publication", "relationship", "deployment-configuration", "deployed-revision" }.ToDictionary(kind => kind, RelationKind);
+            var labels = new[] { "system-membership", "exact-dependency", "dynamic-dependency", "generation-of", "publication", "relationship", "deployment-configuration", "deployed-revision", "toolset-access" }.ToDictionary(kind => kind, RelationKind);
             labels["runtime-awp-worker"] = T("DeploymentRuntime_awp-worker");
             labels["runtime-agentstration-server"] = T("DeploymentRuntime_agentstration-server");
             labels["runtime-remote-runtime"] = T("DeploymentRuntime_remote-runtime");
             labels["deployment-environment"] = T("C4Environment"); labels["deployment-desired"] = T("DeploymentDesired");
             labels["worker"] = T("C4Worker"); labels["recorded-generations"] = T("RecordedGenerations"); labels["current-generation"] = T("CurrentGeneration");
+            foreach (var pair in summaryLabels) labels[pair.Key] = pair.Value;
             return labels;
         }
     }
     private string NodeState(string value) => T(value switch { "draft" => "Draft", "definition" => "Definition", "publication" => "Published", "published" => "Published", "recorded-generation" => "RecordedGeneration", "reference-identity" => "ReferenceIdentity", "recorded-deployment-configuration" => "DeploymentConfigurationState", _ => "Metadata" });
-    private string RelationKind(string value) => T(value switch { "system-membership" => "Membership", "exact-dependency" => "Dependency", "dynamic-dependency" => "DynamicDependency", "generation-of" => "GenerationOf", "publication" => "Publication", "deployment-configuration" => "DeploymentConfigurationRelation", "deployed-revision" => "DeployedRevisionRelation", _ => "Relation" });
+    private string RelationKind(string value) => T(value switch { "system-membership" => "Membership", "exact-dependency" => "Dependency", "dynamic-dependency" => "DynamicDependency", "generation-of" => "GenerationOf", "publication" => "Publication", "deployment-configuration" => "DeploymentConfigurationRelation", "deployed-revision" => "DeployedRevisionRelation", "toolset-access" => "SummaryToolSetAccess", _ => "Relation" });
     public void Dispose() { ++revision; cancellation?.Cancel(); cancellation?.Dispose(); GC.SuppressFinalize(this); }
 }

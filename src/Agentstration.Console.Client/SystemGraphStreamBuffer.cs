@@ -38,7 +38,7 @@ public sealed class SystemGraphStreamBuffer
             }
             foreach (var relation in frame.Relations)
             {
-                if (!nodes.ContainsKey(relation.Source) || !nodes.ContainsKey(relation.Target)) return Fail();
+                if (!nodes.ContainsKey(relation.Source) || !nodes.ContainsKey(relation.Target) || relation.ViaNodeId is { } via && !nodes.ContainsKey(via)) return Fail();
                 relations.Add(relation);
             }
             foreach (var scope in frame.Scopes) scopes[scope.Scope] = scope;

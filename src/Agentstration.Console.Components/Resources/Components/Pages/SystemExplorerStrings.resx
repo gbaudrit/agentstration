@@ -227,4 +227,17 @@
   <data name="DeploymentOpenDefinition" xml:space="preserve"><value>View published revisions</value></data>
   <data name="DeploymentWorkspaces" xml:space="preserve"><value>Open deployment Workspace</value></data>
   <data name="DeploymentWriteRequired" xml:space="preserve"><value>Resource write access is required to record or reassign a deployment in this Workspace.</value></data>
+  <data name="SummaryTechnical" xml:space="preserve"><value>Show technical details</value></data>
+  <data name="SummaryHelp" xml:space="preserve"><value>The summary groups generations of the same resource and places ToolSet access on the links. The list and JSON export keep exact received identities.</value></data>
+  <data name="SummaryCount" xml:space="preserve"><value>{0} diagram elements.</value></data>
+  <data name="SummaryLinks" xml:space="preserve"><value>Inspect diagram links</value></data>
+  <data name="SummaryLinkDetails" xml:space="preserve"><value>Link details</value></data>
+  <data name="SummaryDirectAccess" xml:space="preserve"><value>Direct access</value></data>
+  <data name="SummaryViaToolSet" xml:space="preserve"><value>via {0} · {1}</value></data>
+  <data name="SummaryViaToolSets" xml:space="preserve"><value>via {0} visible ToolSets</value></data>
+  <data name="SummaryToolSetAccess" xml:space="preserve"><value>Selected ToolSet member</value></data>
+  <data name="SummaryDefinitionPath" xml:space="preserve"><value>via tool definition</value></data>
+  <data name="SummaryPathHelp" xml:space="preserve"><value>These paths describe received references and selected ToolSet members. An unspecified legacy origin remains unknown; references alone do not establish execution or Worker placement.</value></data>
+  <data name="SummaryExactEvidence" xml:space="preserve"><value>Exact received evidence</value></data>
+  <data name="SummaryToolDefinitions" xml:space="preserve"><value>ToolDefinition provenance</value></data>
 </root>

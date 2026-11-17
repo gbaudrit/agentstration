@@ -30,3 +30,12 @@ test('volatile localized overlay notes do not alter graph input or canonical map
  assert.equal([...decorated.model.elements()].length,1);
  assert.deepEqual([...plain.ids],[...decorated.ids]); assert.equal(JSON.stringify(input),before);
 });
+test('summary links retain a safe callback identity independent of hostile labels and native relationship IDs',async()=>{
+ const input:GraphPage={nodes:[node('agent'),node('tool')],relations:[{source:'agent',target:'tool',kind:'summary:abc'}]};
+ const {model,links}=buildModel(input,{'summary:abc':'via Nantes access · 2.0.0 <img src=x>'});
+ const relation=[...model.relationships()][0]!;
+ assert.equal(links.get(relation.id),'summary:abc');assert.equal(relation.title,'via Nantes access · 2.0.0 <img src=x>');
+ const graphviz=new GraphvizWasmAdapter();
+ try {const layout=await layoutLikeC4Model(model,{graphviz});const edge=layout.view('topology').$view.edges[0]!;assert.ok(edge.relations.some(id=>links.get(id)==='summary:abc'));} finally {graphviz.dispose();}
+ assert.equal(buildModel({nodes:input.nodes,relations:[{source:'agent',target:'tool',kind:'exact-dependency'}]}).links.size,0);
+});

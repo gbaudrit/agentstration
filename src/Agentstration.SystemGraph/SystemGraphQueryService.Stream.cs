@@ -138,6 +138,7 @@ public sealed partial class SystemGraphQueryService
                 if (!related.Contains(edge.Source) || !related.Contains(edge.Target)) return expanded;
             }
             QueueNode(edge.Source); QueueNode(edge.Target);
+            if (edge.ViaNodeId is { } via) QueueNode(via);
             if (!emittedEdges.Contains(edge)) pendingEdges.Add(edge);
             return expanded;
         }
@@ -145,7 +146,7 @@ public sealed partial class SystemGraphQueryService
         {
             await VerifyStreamContextAsync(context, ct);
             // Recheck everything this batch is about to disclose, even if collected earlier.
-            foreach (var id in pendingNodes.Keys.Concat(pendingEdges.SelectMany(edge => new[] { edge.Source, edge.Target })).Distinct())
+            foreach (var id in pendingNodes.Keys.Concat(pendingEdges.SelectMany(edge => edge.ViaNodeId is { } via ? new[] { edge.Source, edge.Target, via } : new[] { edge.Source, edge.Target })).Distinct())
                 await Verify(id);
             foreach (var edge in pendingEdges)
                 foreach (var owner in edges[edge])
@@ -211,6 +212,7 @@ public sealed partial class SystemGraphQueryService
                 foreach (var edge in contribution.Relations)
                 {
                     if (!nodes.ContainsKey(edge.Source) || !nodes.ContainsKey(edge.Target)
+                        || edge.ViaNodeId is { } via && (!nodes.ContainsKey(via) || !access[via].InspectBindings)
                         || edge.Kind != "system-membership" && (!access[edge.Source].InspectBindings || !access[edge.Target].InspectBindings)) continue;
                     if (!edges.TryGetValue(edge, out var guards))
                     {

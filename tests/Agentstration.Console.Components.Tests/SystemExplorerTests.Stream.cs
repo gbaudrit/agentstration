@@ -41,7 +41,7 @@ public sealed partial class SystemExplorerTests
         page.WaitForAssertion(() =>
         {
             var diagram = (SystemGraphPage)context.JSInterop.Invocations.Last(call => call.Identifier == "render").Arguments[1]!;
-            Assert.AreEqual("Friendly extension", diagram.Nodes.Single(node => node.Id == pin.Id).DisplayName);
+            Assert.StartsWith("Friendly extension", diagram.Nodes.Single(node => node.Id == pin.Id).DisplayName!);
             Assert.AreEqual("Other extension", diagram.Nodes.Single(node => node.Id == homonym.Id).DisplayName);
             Assert.AreEqual(3, diagram.Nodes.Single(node => node.Id == pin.Id).Evidence!.Generation);
         });

@@ -8,13 +8,14 @@ using Agentstration.SystemGraph.Contracts;
 
 namespace Agentstration.Agents;
 
-public sealed class AgentSystemGraphContributor(IResourceStore resources, IResourceReferenceResolver references) : ISystemGraphContributor
+public sealed partial class AgentSystemGraphContributor(IResourceStore resources, IResourceReferenceResolver references, Agentstration.Tools.ToolSetService toolSets) : ISystemGraphContributor
 {
     public string Family => "agents";
     public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "declared-tools-and-toolsets", "schema-publications", "agent-revisions", "recorded-deployment-configurations"], ["opaque-middleware-and-settings", "legacy-deployment-bindings-without-uids"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        var publications = new Dictionary<(Guid Uid, string Version), Agentstration.Tools.ToolSetVersionResource?>();
         await foreach (var stored in ResourceSystemGraph.ReadAsync<AgentResource>(resources, scope, AgentResourceKinds.Agent, cancellationToken))
         {
             var node = ResourceSystemGraph.Node(stored.Value);
@@ -29,6 +30,17 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
                 await AddDeclaredAsync<Agentstration.Tools.ToolSetResource>(selection.ToolSet, Agentstration.Tools.ToolResourceKinds.ToolSet, $"definition.toolSets[{index}]", selection.Version);
             }
             yield return new([node], declared);
+            foreach (var selection in stored.Value.Definition.ToolSets)
+            {
+                StoredResource<Agentstration.Tools.ToolSetResource>? resolved;
+                try { resolved = await references.ResolveAsync<Agentstration.Tools.ToolSetResource>(selection.ToolSet, stored.Value.Namespace,
+                    Agentstration.Tools.ToolResourceKinds.ToolSet, scope, cancellationToken); }
+                catch (Exception error) when (error is ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException) { continue; }
+                if (resolved is null) continue;
+                var publication = await PublicationAsync(resolved.Value.ScopeRef!.Value, resolved.Value.Namespace, resolved.Value.Name, selection.Version, resolved.Value.Uid);
+                if (publication is null) continue;
+                yield return ToolSetAccess(node, publication, selection.Members, null, "declared-toolset-member");
+            }
 
             async Task AddDeclaredAsync<T>(ResourceReference reference, string kind, string field, string? version = null) where T : Resource
             {
@@ -60,7 +72,14 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
                 relations.Add(new(source.Id, id, "exact-dependency", field, "recorded-pin") { SelectedPublication = pin.Version });
             }
             foreach (var assignment in revision.Definition.ToolSetAssignments)
-                relations.Add(new(source.Id, SystemGraphIds.Publication(assignment.ToolSetUid, assignment.Version), "exact-dependency", "definition.toolSets", "recorded-pin"));
+            {
+                var publication = await PublicationAsync(assignment.ToolSetScopeRef, assignment.ToolSetNamespace, assignment.ToolSetName, assignment.Version, assignment.ToolSetUid);
+                if (publication is not null && (publication.DefinitionHash != assignment.DefinitionHash
+                    || (publication.Uid == assignment.ToolSetUid ? publication.Generation : publication.ToolSetGeneration) != assignment.ToolSetGeneration)) publication = null;
+                if (publication is null) continue;
+                relations.Add(new(source.Id, SystemGraphIds.Publication(publication.ToolSetUid, publication.Version), "exact-dependency", "definition.toolSets", "recorded-pin"));
+                yield return ToolSetAccess(source, publication, assignment.Members, revision.Definition.ToolPins, "recorded-toolset-member");
+            }
             foreach (var schema in revision.Definition.SchemaBindings)
                 if (schema.Value.SchemaUid is { } uid && schema.Value.Source is { } reference)
                     relations.Add(new(source.Id, SystemGraphIds.Publication(uid, reference.Version), "exact-dependency", schema.Key, "recorded-schema")
@@ -87,6 +106,25 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
                 if (config.Id == stored.Value.Configurations.LastOrDefault()?.Id) edges.Add(new(deployment.Id, node.Id, "deployment-configuration"));
                 yield return new([node], edges) { BindingOwner = deployment.Identity, BindingOwnerNodeId = deployment.Id };
             }
+        }
+        async Task<Agentstration.Tools.ToolSetVersionResource?> PublicationAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, string version, Guid uid)
+        {
+            if (publications.TryGetValue((uid, version), out var found))
+                return found?.ScopeRef == owner && found.Namespace == ns && found.ToolSetName == name ? found : null;
+            var identity = await resources.GetIdentityByUidAsync(uid, cancellationToken);
+            StoredResource<Agentstration.Tools.ToolSetVersionResource>? stored = null;
+            if (identity is not null && identity.ScopeRef == owner && identity.Namespace == ns)
+            {
+                if (identity.Kind == Agentstration.Tools.ToolResourceKinds.ToolSetVersion)
+                    stored = await resources.GetExactAsync<Agentstration.Tools.ToolSetVersionResource>(new(owner, ns, identity.Kind, identity.Name), cancellationToken);
+                else if (identity.Kind == Agentstration.Tools.ToolResourceKinds.ToolSet && identity.Name == name)
+                    stored = await toolSets.GetVersionExactAsync(owner, ns, name, version, cancellationToken);
+            }
+            var value = stored?.Value;
+            found = value is not null && (value.Uid == uid || value.ToolSetUid == uid) && value.ScopeRef == owner && value.Namespace == ns
+                && value.ToolSetName == name && value.Version == version ? value : null;
+            publications[(uid, version)] = found;
+            return found;
         }
     }
 }
