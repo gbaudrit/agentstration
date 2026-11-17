@@ -36,6 +36,10 @@ public sealed class RegistrationContractTests
         var services = CreateServices("Deterministic", false);
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsService)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsAccess)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsEvidenceReader)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService)] = (1, ServiceLifetime.Singleton),
             [typeof(ISystemGraphContributor)] = (12, ServiceLifetime.Singleton),
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),

@@ -1,0 +1,11 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: playwright-bootstrap-provenance
+definition:
+  displayName: Playwright bootstrap provenance
+  description: Creates separate ordinary namespaced and default-namespace resources for the provenance regression.
+  targetScope: workspace
+  bindings:
+    - { name: assistant-model, targetKind: modelProfile, displayName: Local model, required: true }
+    - { name: assistant-runtime, targetKind: runtimeProfile, displayName: Local runtime, required: true }

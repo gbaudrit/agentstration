@@ -123,6 +123,52 @@ public sealed class RuntimeExecutionScopePersistenceTests
         Assert.AreEqual("api_version_not_supported", exception.Code);
     }
 
+    [TestMethod]
+    public async Task OperationalIdentityQueryFiltersNativeUidNamespaceScopeGenerationAndHashBeforeLimit()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"operations-runtime-{Guid.NewGuid():N}.db");
+        var services = new ServiceCollection();
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddSqliteRuntimeRuns($"Data Source={path};Pooling=False");
+        await using var provider = services.BuildServiceProvider();
+        try
+        {
+            var store = provider.GetRequiredService<IRuntimeRunStore>();
+            await store.InitializeAsync(default);
+            var scope = RuntimeRunScope.Workspace(Guid.NewGuid(), new(Guid.NewGuid()), Guid.NewGuid());
+            var uid = Guid.NewGuid(); var revision = Guid.NewGuid();
+            var root = Run(scope, "own") with
+            {
+                Properties = Run(scope, "own").Properties with
+                { Agent = new("same-name", 2) { ResourceUid = uid, RevisionUid = revision, ScopeRef = ResourceScopeRef.Instance, DefinitionHash = "attested" } }
+            };
+            await store.CreateAsync(root, default);
+            for (var index = 0; index < 8; index++)
+            {
+                var agent = root.Properties.Agent;
+                var foreign = root with { Id = $"newer-{index}", Name = $"newer-{index}", Status = root.Status with { CreatedAt = root.Status.CreatedAt.AddMinutes(index + 1) } };
+                foreign = index switch
+                {
+                    0 => foreign with { Properties = foreign.Properties with { Agent = agent with { ResourceUid = Guid.NewGuid() } } },
+                    1 => foreign with { Properties = foreign.Properties with { Agent = agent with { Namespace = ResourceNamespace.Parse("other") } } },
+                    2 => foreign with { Properties = foreign.Properties with { Agent = agent with { ScopeRef = scope.ScopeRef } } },
+                    3 => foreign with { Properties = foreign.Properties with { Agent = agent with { Version = 1 } } },
+                    4 => foreign with { Properties = foreign.Properties with { Agent = agent with { DefinitionHash = "different" } } },
+                    5 => foreign with { Scope = scope with { LogicalScopeRef = ResourceScopeRef.Instance } },
+                    6 => foreign with { Properties = foreign.Properties with { Agent = agent with { RevisionUid = Guid.NewGuid() } } },
+                    _ => foreign with { Properties = foreign.Properties with { Agent = new("same-name", 2) } }
+                };
+                await store.CreateAsync(foreign, default);
+            }
+            var result = await store.ListByIdentityAsync(new(scope.ScopeRef, ResourceScopeRef.Instance, ResourceNamespace.Default,
+                uid, revision, 2, DateTimeOffset.MinValue, 1, scope.ScopeRef, "attested"), default);
+            Assert.HasCount(1, result); Assert.AreEqual("own", result[0].Value.Id);
+            Assert.IsEmpty(await store.ListByIdentityAsync(new(ResourceScopeRef.Instance, ResourceScopeRef.Instance,
+                ResourceNamespace.Default, uid, revision, 2, DateTimeOffset.MinValue), default));
+        }
+        finally { File.Delete(path); }
+    }
+
     private static RuntimeRun Run(RuntimeRunScope scope, string id) => new()
     {
         WorkspaceId = scope.WorkspaceId,

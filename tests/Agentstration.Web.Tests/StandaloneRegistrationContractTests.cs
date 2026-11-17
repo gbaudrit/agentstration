@@ -118,6 +118,7 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
+            [typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService)] = 1,
             [typeof(ISystemGraphContributor)] = 12,
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,

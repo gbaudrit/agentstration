@@ -337,7 +337,8 @@ public sealed class FlowService(
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
             graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes, schemaBindings)
         {
-            Governance = stored.Value.Governance
+            Governance = stored.Value.Governance,
+            ResourceUid = stored.Value.Uid
         };
         FlowValidator.ValidateVersion(published);
         if (activate)
