@@ -155,7 +155,7 @@ public sealed partial class KnowledgeSourceToolExposureService
                 Operation = operation,
                 Contribution = selection,
                 DisplayName = name + " · " + KnowledgeAccessSchemas.Route(operation),
-                Description = string.IsNullOrWhiteSpace(businessDescription) ? name + ": " + help : name + ": " + businessDescription + "\n" + help,
+                Description = KnowledgeToolMetadataService.Format(name, businessDescription, help, profile),
                 BusinessDescription = businessDescription,
                 Usage = help,
                 InputSchema = schema,

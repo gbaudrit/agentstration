@@ -36,7 +36,7 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
             var usage = published.Metadata.Annotations.GetValueOrDefault(KnowledgeToolMetadataService.UsageAnnotation)
                 ?? published.Definition.Description ?? string.Empty;
             tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(selection?.BindingName ?? source.Definition.DisplayName,
-                business.Description, usage));
+                business.Description, usage, KnowledgeToolMetadataService.Profile(published)));
             if (published.Metadata.Annotations.GetValueOrDefault("agentstration.io/knowledge-operation") == "describe")
                 sources.Add(new
                 {
@@ -55,8 +55,10 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
             instructions += "\n\nKnowledge Sources assigned to this Agent:\n" + JsonSerializer.Serialize(sources) + "\n"
                 + "For a question requiring Knowledge data, choose a Knowledge Source from this catalogue and call its describe Tool with request: {} before the first data access. "
                 + "This lightweight discovery lists that source's inputs and their business descriptions. Call the same describe Tool with request.input set to the selected binding name for its schemas, fields, supported operations and limits before constructing a query that needs them. "
+                + "Only fields declared in the described record schema are queryable columns; text embedded in a field does not add columns. Use assigned search/read Tools for unstructured content when available. "
                 + "Reuse descriptions already obtained in this context for the same ToolSet version and exact Snapshot; refresh when that evidence changes. "
-                + "Use the exact assigned Tool names and declared fields. Reuse returned snapshotId values to keep related calls coherent.";
+                + "Use the exact assigned Tool names and declared fields. Reuse returned Snapshot identifiers as request.snapshotId to keep related calls coherent.";
+        if (sources.Count > 0) instructions += KnowledgeToolMetadataService.ArgumentGuidance;
         return new(instructions, tools);
     }
 

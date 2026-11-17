@@ -87,6 +87,7 @@ public sealed partial class KnowledgeAccessService
                 .Select(o => o with { Proposal = null }).ToArray(), contributions)
         {
             DetailLevel = detailed ? "input" : "overview",
+            InvocationInstructions = KnowledgeToolMetadataService.ArgumentGuidance.Trim(),
             ToolSummaries = available.Select(t => new KnowledgeToolSummary(t.Route, t.Operation, t.DisplayName, null, t.Contribution)).ToArray()
         };
         if (System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result, Json).Length > 196608)

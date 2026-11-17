@@ -65,6 +65,7 @@ public sealed record KnowledgeStructureDescription(string DisplayName, string? D
     IReadOnlyList<KnowledgeContributionDescription> Contributions)
 {
     public string DetailLevel { get; init; } = "overview";
+    public string? InvocationInstructions { get; init; }
     public IReadOnlyList<KnowledgeToolSummary> ToolSummaries { get; init; } = [];
     public string RelationshipEvidence { get; init; } = "not_declared";
 }

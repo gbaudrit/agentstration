@@ -126,6 +126,8 @@ public sealed partial class KnowledgeMetadataTests
         var result = await f.Access.DescribeAsync(f.Id, new("published-a"), default);
         Assert.AreEqual("proposal-a", result.ProposalDigest);
         Assert.AreEqual(f.Snapshot.Name, result.SnapshotId);
+        StringAssert.Contains(result.InvocationInstructions!, "request.snapshotId");
+        StringAssert.Contains(result.InvocationInstructions!, "Never send snapshotId beside request");
         Assert.AreEqual(selection, result.Contributions.Single().Selection);
         Assert.AreEqual("overview", result.DetailLevel);
         Assert.IsEmpty(result.Tools);

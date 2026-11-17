@@ -253,14 +253,26 @@ public sealed partial class DataSourceDatasetTests
             var tools = options!.Tools!.OfType<AIFunctionDeclaration>().ToArray();
             Diagnostic = JsonSerializer.Serialize(new { options.Instructions, Tools = tools.Select(t => new { t.Name, t.Description }), Results = results.Length });
             Assert.HasCount(2, tools);
+            foreach (var declaration in tools)
+            {
+                var properties = declaration.JsonSchema.GetProperty("properties");
+                Assert.IsFalse(properties.TryGetProperty("snapshotId", out _));
+                Assert.IsTrue(properties.GetProperty("request").GetProperty("properties").TryGetProperty("snapshotId", out _));
+                StringAssert.Contains(declaration.Description!, "request.snapshotId");
+            }
+            StringAssert.Contains(options.Instructions!, "Never send snapshotId beside request");
             StringAssert.Contains(options.Instructions!, "Knowledge Sources assigned to this Agent");
             StringAssert.Contains(options.Instructions!, "mixed-knowledge");
             Assert.IsFalse(options.Instructions!.Contains("unassigned-knowledge", StringComparison.Ordinal));
             StringAssert.Contains(options.Instructions!, "before the first data access");
-            StringAssert.Contains(tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal)).Description!, "Current invoice purpose");
+            var queryDescription = tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal)).Description!;
+            StringAssert.Contains(queryDescription, "Current invoice purpose");
+            StringAssert.Contains(queryDescription, "$filter");
+            StringAssert.Contains(queryDescription, "eq/ne/gt/ge/lt/le");
             if (results.Length > 0)
             {
                 var described = JsonSerializer.SerializeToElement(results[0].Result);
+                StringAssert.Contains(described.GetProperty("invocationInstructions").GetString()!, "request.snapshotId");
                 ObservedAccessCount = described.GetProperty("access").GetArrayLength();
                 Assert.AreEqual(2, ObservedAccessCount);
                 Assert.HasCount(1, described.GetProperty("contributions").EnumerateArray());

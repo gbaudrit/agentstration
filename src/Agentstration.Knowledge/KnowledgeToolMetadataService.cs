@@ -4,6 +4,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
 
 namespace Agentstration.Knowledge;
@@ -16,6 +17,9 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public const string UsageAnnotation = "agentstration.io/knowledge-operation-help";
+    public const string ArgumentGuidance = " Always place arguments inside request, for example {\"request\":{\"snapshotId\":\"<returned id>\"}}. Never send snapshotId beside request. Omit request.snapshotId initially; for related calls, only reuse a returned id and add this Tool's declared fields inside request.";
+
+    public const string ODataQueryGuidance = " Query encoding: odata-options+json. request.query is an object whose option names include the dollar prefix: $filter, $select, $orderby or $apply, with string values. Use OData operators eq/ne/gt/ge/lt/le and and/or, not == or SQL. Example shape: {\"request\":{\"pageSize\":10,\"query\":{\"$filter\":\"status eq 'open'\",\"$select\":\"status,value\"}}}. Replace example fields with exact fields from this input's described schema; do not invent field names. Use request.pageSize for pages; continue with request.cursor only. The supported aggregate/groupby subset uses $apply; $top/$skip, joins and expansion are unsupported.";
 
     public async Task<KnowledgeSourceResource?> ResolveSourceAsync(ToolDefinitionVersionResource publication, CancellationToken ct)
     {
@@ -57,12 +61,17 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
         {
             BusinessDescription = business.Description,
             DisplayName = name + " · " + KnowledgeAccessSchemas.Route(tool.Operation),
-            Description = Format(name, business.Description, tool.Usage ?? tool.Description)
+            Description = Format(name, business.Description, tool.Usage ?? tool.Description, tool.Profile)
         };
     }
 
-    public static string Format(string name, string? business, string usage) =>
-        string.IsNullOrWhiteSpace(business) ? name + ": " + usage : name + ": " + business + "\n" + usage;
+    public static string Format(string name, string? business, string usage, StorageQueryProfilePin? profile = null) =>
+        (string.IsNullOrWhiteSpace(business) ? name + ": " + usage : name + ": " + business + "\n" + usage)
+        + (profile?.Id == "odata/4.01" ? ODataQueryGuidance : string.Empty) + ArgumentGuidance;
+
+    public static StorageQueryProfilePin? Profile(ToolDefinitionVersionResource publication) =>
+        publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>()
+            .SingleOrDefault(b => b.Path == "/request/profile")?.Value.Deserialize<StorageQueryProfilePin>(Json);
 
     public static KnowledgeContributionSelection? Selection(ToolDefinitionVersionResource publication) =>
         publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>()

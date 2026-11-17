@@ -290,7 +290,15 @@ Every new exposure includes a source-owned describe relay. Its immutable
 `exposure` and `exposureScope` are fixed internally. The caller uses
 `{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
 then `{ "request": { "input": "invoices" } }` for one exposed input's contracts
-(`detailLevel: "input"`). Both accept `request.snapshotId`. The overview returns
+(`detailLevel: "input"`). Both accept `request.snapshotId`. Discovery also returns
+`invocationInstructions` with complete argument-envelope examples. Access relays
+use the same envelope, for example
+`{ "request": { "snapshotId": "<returned id>", "query": {} } }`.
+A returned top-level `snapshotId` belongs inside `request` on the next call.
+For `odata/4.01`, `request.query` uses dollar-prefixed option names and OData
+expressions, such as `"$filter": "status eq 'open'"`, using fields from discovery.
+`filter` and SQL-style `==` are not supported.
+The overview returns
 `toolSummaries` and input descriptions while omitting full `tools` contracts,
 contribution schemas and document-ID lists. Detailed selection refuses unknown
 or unassigned inputs with `knowledge_describe_input_not_exposed`. The native REST operation
