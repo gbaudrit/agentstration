@@ -288,12 +288,25 @@ current eligibility, but do not assert a previous review.
 
 Every new exposure includes a source-owned describe relay. Its immutable
 `exposure` and `exposureScope` are fixed internally. The caller uses
-`{ "request": {} }`, or provides `request.snapshotId`. The native REST operation
+`{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
+then `{ "request": { "input": "invoices" } }` for one exposed input's contracts
+(`detailLevel: "input"`). Both accept `request.snapshotId`. The overview returns
+`toolSummaries` and input descriptions while omitting full `tools` contracts,
+contribution schemas and document-ID lists. Detailed selection refuses unknown
+or unassigned inputs with `knowledge_describe_input_not_exposed`. The native REST operation
 is `POST /api/knowledgesources/{name}/content/describe`. Discovery returns recorded
 metadata and exact published access references, including their callable names.
 Agent calls are filtered by the trusted assigned Tool inventory, not an inventory
 supplied in business arguments. An unavailable or retired Snapshot is reported
 as metadata, without granting content access or initiating preparation.
+
+Business descriptions are live metadata: a nonempty input override wins over
+the bound Data Source description. Updating these descriptions/display names
+preserves executable generations and existing publications; ETags still change.
+Presentation is refreshed for runtime Tool descriptions and for describe calls.
+The runtime system prompt lists only Knowledge Sources with an actually assigned
+describe Tool and instructs the Agent to discover inputs before querying.
+Executable selections/contracts remain pinned to their published versions.
 
 Contribution access relays also fix `request.contribution` and, for structured
 queries, `request.profile`. Read/search/query APIs retain their source-wide mode

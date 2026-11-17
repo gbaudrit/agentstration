@@ -756,6 +756,44 @@ public sealed class AgentFrameworkRuntimeFactoryTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RuntimePresentationEnrichesInstructionsWithoutChangingPublishedDefinition(bool composed)
+    {
+        using var client = new RecordingChatClient();
+        var enricher = new PresentationProbe();
+        var factory = new AgentFrameworkRuntimeFactory(new RecordingResolver(client), NullLoggerFactory.Instance,
+            new GenAiObservabilityOptions { Enabled = false }, [enricher]);
+        var definition = Definition();
+        var original = definition.EffectiveInstructions;
+        var context = new AgentRuntimeContext(new EmptyToolCatalog());
+        if (composed)
+        {
+            var agent = await factory.CreateAgentAsync(definition, "revision-1", 1, context, null, default);
+            _ = await agent.RunAsync("Read the Knowledge");
+        }
+        else
+        {
+            var runtime = await factory.CreateAsync(definition, "revision-1", context, default);
+            _ = await runtime.ExecuteAsync(new AgentExecutionRequest("Read the Knowledge"), default);
+        }
+        StringAssert.Contains(client.Options!.Instructions!, "runtime-presentation-probe");
+        StringAssert.Contains(client.Options.Instructions!, original);
+        Assert.AreEqual(original, definition.EffectiveInstructions);
+        Assert.AreEqual(1, enricher.Calls);
+    }
+
+    private sealed class PresentationProbe : IRuntimeAgentPresentationEnricher
+    {
+        public int Calls { get; private set; }
+        public Task<RuntimeAgentPresentation> EnrichAsync(RuntimeAgentPresentation presentation, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(presentation with { Instructions = presentation.Instructions + "\nruntime-presentation-probe" });
+        }
+    }
+
+    [TestMethod]
     public async Task RuntimeResolvesCurrentProfileClientForEveryExecution()
     {
         using var first = new RecordingChatClient { Metadata = new ModelChatClientMetadata("profile", "deployment", "ollama", "local", "qwen3:1.7b") };

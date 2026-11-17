@@ -156,7 +156,7 @@
   <data name="StructuredOutputRequired" xml:space="preserve"><value>This document Storage requires an enabled collection allowing read, query and immutable publication. Configure one on the Storage, then select it here.</value></data>
   <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configure Storage collections</value></data>
   <data name="PublishedExposureVersion" xml:space="preserve"><value>Published version: {0}</value></data>
-  <data name="RepublishExposureHelp" xml:space="preserve"><value>Publish a new version to update these Tools. Earlier versions stay available. Select the new ToolSet version in your Agents after publication.</value></data>
+  <data name="RepublishExposureHelp" xml:space="preserve"><value>Description edits are live and do not require republication. Publish a new version for access or contract changes, then select it explicitly in your Agents. Earlier versions remain available.</value></data>
   <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publish a new Tool version</value></data>
   <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choose a different version. The published version cannot be overwritten.</value></data>
   <data name="ContentAvailability" xml:space="preserve"><value>Content availability</value></data>
@@ -195,4 +195,5 @@
   <data name="ToolIssue.DocumentsUnavailable" xml:space="preserve"><value>Structured document metadata is unavailable. Check the output Storage configuration and permissions.</value></data>
   <data name="ToolIssue.QueryUnsupported" xml:space="preserve"><value>Contribution queries require immutable publications, document selection and a supported query profile.</value></data>
   <data name="ToolIssue.Unavailable" xml:space="preserve"><value>This operation is unavailable. Review the saved source, output and access settings.</value></data>
+  <data name="ContributionDescriptionHelp" xml:space="preserve"><value>Leave empty to inherit the Data Source description. A custom description applies to this input only. Description edits do not require Tool republication.</value></data>
 </root>

@@ -127,7 +127,16 @@ public sealed partial class KnowledgeMetadataTests
         Assert.AreEqual("proposal-a", result.ProposalDigest);
         Assert.AreEqual(f.Snapshot.Name, result.SnapshotId);
         Assert.AreEqual(selection, result.Contributions.Single().Selection);
-        Assert.AreEqual("Contracts", result.Tools.Single().DisplayName);
+        Assert.AreEqual("overview", result.DetailLevel);
+        Assert.IsEmpty(result.Tools);
+        Assert.IsEmpty(result.Contributions.Single().DocumentIds);
+        Assert.IsEmpty(result.Contributions.Single().Schemas);
+        Assert.AreEqual("Contracts", result.ToolSummaries.Single().DisplayName);
+        var detailed = await f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts"), default);
+        Assert.AreEqual("input", detailed.DetailLevel);
+        Assert.AreEqual("Contracts", detailed.Tools.Single().DisplayName);
+        Assert.HasCount(1, detailed.Contributions.Single().DocumentIds);
+        await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a", Input: "unknown"), default));
         Assert.AreEqual(KnowledgeContentAvailability.Unknown, result.ContentAvailability);
         Assert.AreEqual(0, f.Store.Writes);
         Assert.AreEqual(0, f.Publications.Reads.Count);
@@ -137,6 +146,7 @@ public sealed partial class KnowledgeMetadataTests
         Assert.IsEmpty(restricted.Tools);
         Assert.IsEmpty(restricted.Access);
         Assert.IsEmpty(restricted.Contributions);
+        await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts"), default, [], agent: true));
         await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a"), default, agent: true));
 
     }

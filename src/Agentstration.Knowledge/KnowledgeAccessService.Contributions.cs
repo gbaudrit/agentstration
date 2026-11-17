@@ -39,30 +39,56 @@ public sealed partial class KnowledgeAccessService
         var exposure = (await resources.GetExactAsync<KnowledgeToolExposureVersion>(address, ct))?.Value;
         if (exposure is null || exposure.SourceUid != source.Uid) throw Error("knowledge_exposure_not_found");
         // Retained metadata only. No preparation, lease, provider inspection or content read.
-        var views = await snapshots.ListAsync(Id(source), ct);
         var view = request.SnapshotId is null
             ? await snapshots.GetActiveAsync(Id(source), ct)
-            : views.SingleOrDefault(v => v.Snapshot.Name == request.SnapshotId) ?? throw Error("knowledge_access_snapshot_not_found");
+            : (await snapshots.ListAsync(Id(source), ct)).SingleOrDefault(v => v.Snapshot.Name == request.SnapshotId) ?? throw Error("knowledge_access_snapshot_not_found");
         if (agent && exposedTools is null) throw Error("knowledge_assignment_evidence_unavailable");
         var operations = exposure.Operations.Where(o => exposedTools is null || exposedTools.Any(t => t.Name == o.Tool.Name
             && t.ScopeRef == o.Tool.ScopeRef && (t.Namespace ?? source.Namespace) == (o.Tool.Namespace ?? source.Namespace))).ToArray();
         var available = exposure.Proposal.Tools.Where(t => t.Issue is null && t.Change != "removed"
             && (exposedTools is null || operations.Any(o => o.Route == t.Route))).ToArray();
+        if (request.Input is { } requested && (string.IsNullOrWhiteSpace(requested) || requested.Length > 200))
+            throw Error("knowledge_describe_input_invalid");
+        if (request.Input is not null && !available.Any(t => t.Contribution?.BindingName == request.Input))
+            throw Error("knowledge_describe_input_not_exposed");
+        var detailed = request.Input is not null;
+        available = available.Where(t => request.Input is null || t.Contribution?.BindingName == request.Input).ToArray();
+        if (metadata is not null)
+        {
+            var presented = new List<KnowledgeToolProposal>();
+            foreach (var tool in available) presented.Add(await metadata.PresentAsync(source, tool, ct));
+            available = presented.ToArray();
+        }
         var contributions = new List<KnowledgeContributionDescription>();
         foreach (var selection in available.Where(t => t.Contribution is not null)
             .Select(t => t.Contribution!).Distinct())
         {
             var input = view?.Snapshot.ProjectionInputs.SingleOrDefault(i => i.BindingName == selection.BindingName && i.DataSourceUid == selection.DataSourceUid);
             var artifacts = view?.Snapshot.Artifacts.Where(a => KnowledgeContributions.FromSnapshot(view.Snapshot, a) == selection).ToArray() ?? [];
+            var candidate = available.First(t => t.Contribution == selection);
+            var business = metadata is null ? new KnowledgeBusinessDescription(candidate.BusinessDescription, "published")
+                : await metadata.DescriptionAsync(source, selection, candidate.BusinessDescription, ct);
             contributions.Add(new(selection, view is null ? "not_published" : artifacts.Length == 0 ? "no_matching_evidence" : "published",
-                artifacts.Select(a => a.ArtifactId).ToArray(), artifacts.Where(a => a.DataContract?.Schema is not null).Select(a => a.DataContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray(),
-                input?.AcquisitionId, input?.AcquiredAt)
-            { MediaTypes = artifacts.Select(a => a.MediaType).Distinct(StringComparer.Ordinal).ToArray() });
+                detailed ? artifacts.Select(a => a.ArtifactId).ToArray() : [],
+                detailed ? artifacts.Where(a => a.DataContract?.Schema is not null).Select(a => a.DataContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
+                detailed ? input?.AcquisitionId : null, detailed ? input?.AcquiredAt : null)
+            {
+                Description = business.Description,
+                DescriptionSource = business.Origin,
+                MediaTypes = artifacts.Select(a => a.MediaType).Distinct(StringComparer.Ordinal).ToArray()
+            });
         }
-        var result = new KnowledgeStructureDescription(exposure.DisplayName, exposure.Description, exposure.Version, exposure.Proposal.Digest, view?.Snapshot.Name,
+        var result = new KnowledgeStructureDescription(source.Definition.DisplayName, source.Definition.Description,
+            exposure.Version, exposure.Proposal.Digest, view?.Snapshot.Name,
             !source.Definition.Enabled ? "disabled" : view is null ? "not_published" : view.LifecycleState.ToString().ToLowerInvariant(),
             view?.ContentAvailability ?? KnowledgeContentAvailability.Unknown,
-            available, operations, contributions);
+            detailed ? available : [],
+            operations.Where(o => request.Input is null || o.Proposal?.Contribution?.BindingName == request.Input)
+                .Select(o => o with { Proposal = null }).ToArray(), contributions)
+        {
+            DetailLevel = detailed ? "input" : "overview",
+            ToolSummaries = available.Select(t => new KnowledgeToolSummary(t.Route, t.Operation, t.DisplayName, null, t.Contribution)).ToArray()
+        };
         if (System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result, Json).Length > 196608)
             throw Error("knowledge_structure_limit");
         return result;

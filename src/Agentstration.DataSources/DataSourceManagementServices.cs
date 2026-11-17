@@ -518,7 +518,20 @@ public sealed class DataSourceManagementService(
     {
         var existing = await GetAsync(ns, name, scopeRef, cancellationToken) ?? throw NotFound(name, ns);
         var scope = existing.Value.ScopeRef ?? throw Error("data_source_scope_required", "The Data Source has no ownership scope.");
-        var updated = existing.Value with { Generation = checked(existing.Value.Generation + 1), Definition = definition };
+        if (DataSourceDefinitionSemantics.ExecutionEquals(existing.Value.Definition, definition))
+        {
+            var editorial = existing.Value with { Definition = existing.Value.Definition with { DisplayName = definition.DisplayName, Description = definition.Description } };
+            Validate(editorial);
+            var saved = await scopeOperations.WriteAsync(editorial, scope, AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(scope, editorial, ifMatch, false, token), cancellationToken);
+            await AuditAsync(SecurityAuditActions.DataSourceUpdated, scope, saved.Value.Name, cancellationToken);
+            return saved;
+        }
+        var updated = existing.Value with
+        {
+            Generation = checked(existing.Value.Generation + 1),
+            Definition = definition
+        };
         if ((existing.Value.Definition.Dataset is null) != (definition.Dataset is null))
             throw Error("data_source_composition_mode_fixed", "Create a separate Data Source to change its composition mode.");
         if (datasets is not null) updated = await datasets.AdoptSchemasAsync(updated, cancellationToken, existing.Value);

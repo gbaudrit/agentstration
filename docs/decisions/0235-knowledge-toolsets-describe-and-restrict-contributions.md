@@ -32,8 +32,10 @@ and ToolSet writes. A failed final publication may leave unassigned versions,
 never an automatically adopted Agent/Flow assignment.
 
 Each configured binding produces source-owned read/regex and eligible structured
-query relays with fixed contribution selection. Business descriptions are binding
-metadata. The contribution identity combines the binding name and exact Data
+query relays with fixed contribution selection. Business descriptions are live editorial metadata. An input description overrides
+the bound Data Source description; an empty override inherits it. Resolving this
+metadata follows the exact bound Data Source UID and never retargets a recreated
+resource with the same name. The contribution identity combines the binding name and exact Data
 Source UID within its owning Knowledge Source. Two bindings of one Data Source
 remain distinct. A rename is a remove/add, not historical retargeting. Display
 names and the acquisition input type do not grant capabilities.
@@ -65,9 +67,13 @@ This adds no query language or physical destination argument.
 An immutable `KnowledgeToolExposureVersion`, owned at the publication's consumer
 scope, records the proposal and exact Tool references. Every newly published
 source ToolSet includes its describe Tool. A literal relay binding fixes that
-exposure identity. Describe returns bounded recorded purpose, contributions,
-contracts, acquisition dates, access references and optional exact Snapshot
-metadata. It neither prepares data nor issues content capabilities. Actual reads
+exposure identity. Describe without `input` returns a lightweight catalogue: effective business
+purpose, available input identities, formats and assigned Tool references. It
+omits full Tool contracts, schemas and document-ID lists. `describe(input=...)`
+returns only that exposed input's detailed contracts, schemas, provenance and
+optional exact Snapshot metadata. Unknown or unassigned inputs fail explicitly.
+Current editorial metadata overlays the immutable execution exposure; exact
+selections, schemas, profiles and publication references stay pinned. It neither prepares data nor issues content capabilities. Actual reads
 retain current permissions and integrity checks. Relationships are not inferred.
 
 Runtime passes its trusted exposed Tool references through the existing governed
@@ -75,6 +81,24 @@ pipeline and relay context. Agent-facing describe filters the exposure to that
 assignment; missing assignment evidence fails explicitly. Public business
 arguments cannot supply this context. Tool discovery does not add Tools to the
 Agent's context and actual invocation still uses existing authorization.
+
+Business description/display-name edits preserve the executable generations of
+Data Sources and Knowledge Sources and their accepted dependency pins. Their
+ETags and audit history still change. Input description overrides are editorial
+as well. Contract and proposal digests exclude this editorial text, while
+execution-affecting configuration, eligibility and capability changes remain
+reviewed publication inputs. Editorial updates neither rebind active dependencies
+nor require a new ToolSet version, Agent revision or Snapshot.
+
+A provider-neutral runtime presentation enricher prepares model-visible Tool
+descriptions and a system-prompt catalogue from the actual resolved assignment.
+The Knowledge implementation reads only the assigned immutable Tool publications
+and authorized source metadata. It lists only sources with an assigned describe
+Tool and instructs the Agent to discover inputs before first data access, obtain
+selected-input contracts when needed, and reuse evidence for the same exposure
+and Snapshot. Direct MAF creation and AWP materialization use this same boundary.
+This runtime presentation does not rewrite authored instructions, revision hashes,
+Tool references, schemas, approval flags or grants.
 
 Existing source-wide native APIs remain available. New exposure publication
 uses contribution-specific relays and explicit ToolSet adoption. Native input/

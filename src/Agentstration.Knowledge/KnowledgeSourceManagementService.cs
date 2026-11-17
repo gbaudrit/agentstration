@@ -192,6 +192,14 @@ public sealed class KnowledgeSourceManagementService(
     {
         var scopeRef = RequireScope(existing.Value);
         var changed = existing.Value with { Definition = definition };
+        if (!rebindDependencies && KnowledgeDefinitionSemantics.ExecutionEquals(existing.Value.Definition, definition))
+        {
+            ValidateStructure(changed);
+            var editorial = await scopeOperations.WriteAsync(changed, scopeRef, AuthorizationPermissions.ResourcesWrite,
+                token => store.PutExactAsync(scopeRef, changed, etag, false, token), cancellationToken);
+            await AuditAsync(auditAction, scopeRef, cancellationToken);
+            return editorial;
+        }
         var updated = await scopeOperations.WriteAsync(changed, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             KnowledgeSourceReadiness readiness;

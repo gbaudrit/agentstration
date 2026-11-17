@@ -156,7 +156,7 @@
   <data name="StructuredOutputRequired" xml:space="preserve"><value>Ce Storage documentaire nécessite une collection activée autorisant la lecture, les requêtes et la publication immuable. Configurez-en une dans le Storage, puis sélectionnez-la ici.</value></data>
   <data name="ConfigureOutputStorage" xml:space="preserve"><value>Configurer les collections du Storage</value></data>
   <data name="PublishedExposureVersion" xml:space="preserve"><value>Version publiée : {0}</value></data>
-  <data name="RepublishExposureHelp" xml:space="preserve"><value>Publiez une nouvelle version pour mettre à jour ces Tools. Les versions précédentes restent disponibles. Après publication, sélectionnez la nouvelle version du ToolSet dans vos agents.</value></data>
+  <data name="RepublishExposureHelp" xml:space="preserve"><value>Les descriptions sont actualisées sans republication. Pour modifier les accès ou les contrats, publiez une nouvelle version puis sélectionnez-la explicitement dans vos agents. Les versions précédentes restent disponibles.</value></data>
   <data name="PublishNewExposureVersion" xml:space="preserve"><value>Publier une nouvelle version des Tools</value></data>
   <data name="NewExposureVersionRequired" xml:space="preserve"><value>Choisissez une autre version. La version publiée ne peut pas être remplacée.</value></data>
   <data name="ContentAvailability" xml:space="preserve"><value>Disponibilité du contenu</value></data>
@@ -195,4 +195,5 @@
   <data name="ToolIssue.DocumentsUnavailable" xml:space="preserve"><value>Les métadonnées des documents structurés sont indisponibles. Vérifiez la configuration et les droits du Storage de sortie.</value></data>
   <data name="ToolIssue.QueryUnsupported" xml:space="preserve"><value>Les requêtes par contribution exigent des publications immuables, la sélection des documents et un profil de requête compatible.</value></data>
   <data name="ToolIssue.Unavailable" xml:space="preserve"><value>Cette opération est indisponible. Vérifiez la configuration enregistrée de la source, de la sortie et des droits.</value></data>
+  <data name="ContributionDescriptionHelp" xml:space="preserve"><value>Laissez vide pour reprendre la description de la Data Source. Une description personnalisée s’applique uniquement à cet input. Ces modifications ne nécessitent pas de republier les Tools.</value></data>
 </root>

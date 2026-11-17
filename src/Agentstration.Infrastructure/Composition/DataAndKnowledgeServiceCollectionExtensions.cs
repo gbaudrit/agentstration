@@ -43,6 +43,8 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, KnowledgeStorageUsageProvider>();
         services.AddSingleton<KnowledgeRetrievalService>();
         services.AddSingleton<KnowledgeAccessService>();
+        services.AddSingleton<KnowledgeToolMetadataService>();
+        services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeAgentPresentationEnricher, KnowledgeAgentPresentationEnricher>();
         services.AddSingleton<KnowledgeAccessTokenProtector>();
         services.AddSingleton<IKnowledgeAccessTokenProtector>(provider => provider.GetRequiredService<KnowledgeAccessTokenProtector>());
         services.AddSingleton<IKnowledgeAccessLifetime>(provider => provider.GetRequiredService<KnowledgeAccessTokenProtector>());

@@ -42,6 +42,13 @@ public static class KnowledgeAccessSchemas
         };
         if (operation == KnowledgeSourceOperation.Describe)
         {
+            properties["input"] = new JsonObject
+            {
+                ["type"] = new JsonArray("string", "null"),
+                ["minLength"] = 1,
+                ["maxLength"] = 200,
+                ["description"] = "Omit for a lightweight input catalogue. Set to an input binding name returned by discovery for its schemas and access contracts."
+            };
             properties["exposure"] = new JsonObject { ["type"] = "string", ["maxLength"] = 256 };
             properties["exposureScope"] = new JsonObject { ["type"] = "string", ["maxLength"] = 128 };
         }

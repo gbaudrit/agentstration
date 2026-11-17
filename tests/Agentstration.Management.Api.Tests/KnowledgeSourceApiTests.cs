@@ -207,7 +207,7 @@ public sealed class KnowledgeSourceApiTests : ModelManagementApiTestBase
 
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
             _ = await dataSources.PutAsync(source.Value.Namespace, source.Value.Name, instanceScope,
-                source.Value.Definition with { Description = "Changed dependency" }, source.ETag, default);
+                source.Value.Definition with { Enabled = false }, source.ETag, default);
         var stale = await knowledge.GetReadinessAsync(
             new(instance.Value.Name, instance.Value.Namespace, instanceScope), default);
         Assert.IsFalse(stale.Ready);

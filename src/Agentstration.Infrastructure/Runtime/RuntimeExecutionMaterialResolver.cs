@@ -19,7 +19,8 @@ public sealed class RuntimeExecutionMaterialResolver(
     AgentManagementService agentManagement,
     IToolCatalog tools,
     IOptions<FlowRunExecutionOptions> flowOptions,
-    Agentstration.DataSources.DataSourceDatasetAcquisitionService? datasetAcquisitions = null) : IRuntimeExecutionMaterialResolver
+    Agentstration.DataSources.DataSourceDatasetAcquisitionService? datasetAcquisitions = null,
+    IEnumerable<IRuntimeAgentPresentationEnricher>? presentationEnrichers = null) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -181,8 +182,11 @@ public sealed class RuntimeExecutionMaterialResolver(
                 material = material with { Tools = [.. material.Tools, .. scopedTools] };
             }
             ResolvedDataContract? responseContract = null;
-            try { responseContract = FlowDataContracts.AgentOutput(run.DefinitionSnapshot.Graph, reference.ParticipantId, run.Id,
-                $"agent:{material.AgentNamespace}/{material.AgentName}@{material.Generation}/output", material.OutputSchema, material.OutputContract, run.ContractContext, material.InputSchema); }
+            try
+            {
+                responseContract = FlowDataContracts.AgentOutput(run.DefinitionSnapshot.Graph, reference.ParticipantId, run.Id,
+                $"agent:{material.AgentNamespace}/{material.AgentName}@{material.Generation}/output", material.OutputSchema, material.OutputContract, run.ContractContext, material.InputSchema);
+            }
             catch (DataContractException exception) when (exception.Code == "data_contract_unresolved")
             { /* Resolve/fail at the selected Agent step, not while loading inactive branches. */ }
             material = material with { Instructions = FlowDataContracts.AgentInstructions(material.Instructions, material.InputSchema, responseContract, run.ContractContext) };
@@ -378,7 +382,8 @@ public sealed class RuntimeExecutionMaterialResolver(
         var resolvedTools = resolved.Definition.ToolReferences.Count > 0
             ? await tools.ResolveAsync(resolved.Definition.ToolReferences, cancellationToken)
             : await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
-        var toolMaterials = resolvedTools.Select(tool => new RuntimeExecutionToolMaterial(
+        var presented = await RuntimeAgentPresentation.CreateAsync(resolved.Definition.EffectiveInstructions, resolvedTools, presentationEnrichers, cancellationToken);
+        var toolMaterials = presented.Tools.Select(tool => new RuntimeExecutionToolMaterial(
             tool.Id,
             tool.Namespace ?? default,
             tool.Name,
@@ -408,7 +413,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             resolved.Definition.Handler,
             resolved.Definition.DisplayName,
             resolved.Definition.Description,
-            resolved.Definition.EffectiveInstructions,
+            presented.Instructions,
             resolved.ModelProfileName,
             resolved.ModelProfileNamespace,
             toolMaterials)

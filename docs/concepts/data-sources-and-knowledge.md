@@ -299,12 +299,24 @@ Publication checks the reviewed proposal digest; refresh and review again after
 a relevant configuration or capability change.
 
 Newly published ToolSets include **describe**, recorded status, and eligible
-access Tools for each configured Data Source contribution. Binding descriptions
-explain business coverage to the Agent. Text-readable output supports bounded
+access Tools for each configured Data Source contribution. Descriptions explain
+business coverage to the Agent. An input inherits its
+Data Source description unless an input-specific override is supplied. Editorial
+changes become visible on the next describe/context preparation without
+republishing Tools. Display-name/description edits keep executable generations
+and dependency pins unchanged; ETags and audit records still track the update.
+Text-readable output supports bounded
 read/regex access; compatible structured output additionally supports the fixed
 query profile/model when its provider implements governed document subsets.
-Discovery is part of the same ToolSet assigned to an Agent. It returns recorded
-structure/contracts and exact publication metadata; it does not make unassigned
+Discovery is part of the same ToolSet assigned to an Agent. Calling `describe`
+with an empty request lists inputs and their business
+purpose with compact assigned Tool references. Calling it again with
+`request.input` set to a binding name retrieves that input's schemas and detailed
+contracts. `request.snapshotId` selects exact retained Snapshot evidence. The
+system prompt lists the Knowledge Sources whose describe Tools are actually
+assigned and guides the Agent through discovery before first data access. It
+reuses metadata already obtained for the same version/Snapshot. Discovery does
+not make unassigned
 Tools callable or prove current provider health. Large descriptions fail at an
 explicit bound rather than silently reporting incomplete structure as complete.
 

@@ -38,8 +38,9 @@ public sealed partial class DataSourceDatasetTests
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         using var client = factory.CreateClient(); SelectConsoleContext(client, Owner);
         await using var storage = await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false);
+        var originDefinition = Source("mixed-origin", fixture, JsonSerializer.SerializeToElement(new { dataset = "mixed" }));
         var origin = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
-            Source("mixed-origin", fixture, JsonSerializer.SerializeToElement(new { dataset = "mixed" })), default);
+            originDefinition with { Definition = originDefinition.Definition with { Description = "Original supplier records" } }, default);
         async Task<KnowledgeDataSourceBinding> Binding(string name, params int[] values)
         {
             var transform = await PublishAsync(factory.Services, "mixed-" + name, KnowledgeFlowContracts.ArtifactTransformation,
@@ -57,7 +58,7 @@ public sealed partial class DataSourceDatasetTests
             return new()
             {
                 Name = name,
-                Description = "Business records for " + name,
+                Description = name == "contracts" ? null : "Business records for " + name,
                 RefreshIfNecessary = true,
                 MaximumAge = TimeSpan.FromHours(1),
                 DataSource = new(origin.Value.Name, Owner),
@@ -80,6 +81,12 @@ public sealed partial class DataSourceDatasetTests
                 DataSources = [await Binding("contracts", 1), await Binding("procedures", 100), await Binding("invoices", 10, 20)]
             }
         }, default);
+        _ = await sources.CreateAsync(source.Value with
+        {
+            Uid = Guid.Empty,
+            Metadata = new() { Name = "unassigned-knowledge" },
+            Definition = source.Value.Definition with { DisplayName = "Unassigned confidential source" }
+        }, default);
         var id = new KnowledgeSourceId(source.Value.Name, ScopeRef: Owner);
         var exposures = factory.Services.GetRequiredService<KnowledgeSourceToolExposureService>();
         var access = factory.Services.GetRequiredService<KnowledgeAccessService>();
@@ -92,7 +99,18 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsEmpty(await acquisitions.ListAsync(origin.Value.Namespace, origin.Value.Name, Owner, default));
         Assert.IsEmpty(await factory.Services.GetRequiredService<KnowledgeSnapshotService>().ListAsync(id, default));
         Assert.AreEqual(firstProposal.Digest, (await exposures.ProposeAsync(id, default)).Digest);
-        var changed = await sources.PutAsync(id, source.Value.Definition with { Description = "Updated business purpose" }, source.ETag, default);
+        var contractsProposal = firstProposal.Tools.First(t => t.Contribution?.BindingName == "contracts");
+        Assert.AreEqual("Original supplier records", contractsProposal.BusinessDescription);
+        var originUpdated = await factory.Services.GetRequiredService<DataSourceManagementService>().PutAsync(origin.Value.Namespace, origin.Value.Name, Owner,
+            origin.Value.Definition with { Description = "Updated supplier records" }, origin.ETag, default);
+        Assert.AreEqual(origin.Value.Generation, originUpdated.Value.Generation);
+        Assert.AreNotEqual(origin.ETag, originUpdated.ETag);
+        var editorial = await sources.PutAsync(id, source.Value.Definition with { Description = "Updated business purpose" }, source.ETag, default);
+        Assert.AreEqual(source.Value.Generation, editorial.Value.Generation);
+        var editorialProposal = await exposures.ProposeAsync(id, default);
+        Assert.AreEqual(firstProposal.Digest, editorialProposal.Digest);
+        Assert.AreEqual(contractsProposal.ContractDigest, editorialProposal.Tools.First(t => t.Route == contractsProposal.Route).ContractDigest);
+        var changed = await sources.PutAsync(id, editorial.Value.Definition with { Output = editorial.Value.Definition.Output! with { Rule = editorial.Value.Definition.Output.Rule with { MaximumReadBytes = 256 } } }, editorial.ETag, default);
         using var stale = await client.PostAsJsonAsync($"/api/knowledgesources/{id.Value}/tool-exposure?scopeRef=/instance",
             new PublishKnowledgeSourceToolExposureRequest { ProposalDigest = firstProposal.Digest });
         Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode, await stale.Content.ReadAsStringAsync());
@@ -111,7 +129,10 @@ public sealed partial class DataSourceDatasetTests
         }
         var before = await Run(describedTool, new { });
         Assert.AreEqual("not_published", before.GetProperty("state").GetString());
-        Assert.HasCount(11, before.GetProperty("tools").EnumerateArray());
+        Assert.HasCount(11, before.GetProperty("toolSummaries").EnumerateArray());
+        Assert.IsEmpty(before.GetProperty("tools").EnumerateArray());
+        Assert.IsFalse(before.GetRawText().Contains("inputSchema", StringComparison.Ordinal));
+        Assert.AreEqual("Updated supplier records", before.GetProperty("contributions")[0].GetProperty("description").GetString());
         Assert.IsEmpty(await acquisitions.ListAsync(origin.Value.Namespace, origin.Value.Name, Owner, default));
         var profile = (await access.DescribeDocumentsAsync(id, null, default)).QueryProfiles.Single();
         var query = new KnowledgeDocumentQueryRequest { Profile = profile, Query = StructuredStorageFixture.Json("{}"), PageSize = 10 };
@@ -135,11 +156,22 @@ public sealed partial class DataSourceDatasetTests
         var violation = await Assert.ThrowsAsync<KnowledgeAccessException>(() => access.QueryDocumentsAsync(id,
             new() { Cursor = page.NextCursor, Contribution = contracts.Proposal!.Contribution }, default));
         Assert.AreEqual("knowledge_access_cursor_contribution_mismatch", violation.Code);
-        _ = await sources.PutAsync(id, changed.Value.Definition with { DataSources = changed.Value.Definition.DataSources.Take(2).ToArray() }, changed.ETag, default);
-        var removed = await exposures.ProposeAsync(id, default);
-        Assert.HasCount(3, removed.Tools.Where(t => t.Change == "removed"));
-        var exact = await access.QueryDocumentsAsync(id, query with { SnapshotId = a, Contribution = queryPin }, default);
-        Assert.HasCount(2, exact.DocumentPage!.Documents);
+        var previewBeforeEditorial = await exposures.ProposeAsync(id, default);
+        originUpdated = await factory.Services.GetRequiredService<DataSourceManagementService>().PutAsync(origin.Value.Namespace, origin.Value.Name, Owner,
+            originUpdated.Value.Definition with { Description = "Live supplier records" }, originUpdated.ETag, default);
+        var overview = await Run(describedTool, new { snapshotId = a });
+        Assert.AreEqual("Live supplier records", overview.GetProperty("contributions")[0].GetProperty("description").GetString());
+        var details = await Run(describedTool, new { snapshotId = a, input = "contracts" });
+        Assert.AreEqual("input", details.GetProperty("detailLevel").GetString());
+        Assert.HasCount(1, details.GetProperty("contributions").EnumerateArray());
+        Assert.HasCount(3, details.GetProperty("tools").EnumerateArray());
+        Assert.IsTrue(details.GetProperty("tools")[0].TryGetProperty("inputSchema", out _));
+        var metadataOnly = await sources.PutAsync(id, changed.Value.Definition with { DataSources = changed.Value.Definition.DataSources.Select(b => b.Name == "invoices" ? b with { Description = "Current invoice purpose" } : b).ToArray() }, changed.ETag, default);
+        Assert.AreEqual(changed.Value.Generation, metadataOnly.Value.Generation);
+        var afterEditorial = await exposures.ProposeAsync(id, default);
+        Assert.AreEqual(previewBeforeEditorial.Digest, afterEditorial.Digest);
+        Assert.IsTrue(afterEditorial.Tools.All(t => t.Change == "unchanged"));
+        Assert.AreEqual("1.0.0", (await exposures.GetAsync(id, default))!.Value.ToolSetVersion);
         // Real AWP Agent execution with a partial ToolSet assignment: discovery cannot advertise siblings.
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var agent = await agents.PutAgentAsync(new()
@@ -159,6 +191,22 @@ public sealed partial class DataSourceDatasetTests
             }
         }, null, true, default);
         await agents.EnsureExecutionRevisionAsync(agent.Value.Namespace, agent.Value.Name, Owner, agent.Value.Generation, default);
+        var declared = new List<Agentstration.Runtime.Abstractions.RuntimeToolReference>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        foreach (var reference in new[] { describedTool, selected.Tool })
+        {
+            var stored = (await store.GetExactAsync<Agentstration.Tools.ToolResource>(new(reference.ScopeRef!.Value, reference.Namespace ?? default, "Tool", reference.Name), default))!.Value;
+            declared.Add(new(Agentstration.Tools.ToolResourceIdentity.CatalogId(stored.Namespace, stored.Name), stored.Namespace, stored.ScopeRef!.Value, stored.Uid, stored.Generation));
+        }
+        var runtimeTools = await factory.Services.GetRequiredService<Agentstration.Runtime.Abstractions.IToolCatalog>().ResolveAsync(declared);
+        var enrichers = factory.Services.GetServices<Agentstration.Runtime.Abstractions.IRuntimeAgentPresentationEnricher>().ToArray();
+        Assert.HasCount(1, enrichers);
+        var present = await Agentstration.Runtime.Abstractions.RuntimeAgentPresentation.CreateAsync("Original instructions", runtimeTools, enrichers, default);
+        StringAssert.Contains(present.Instructions, "Knowledge Sources assigned to this Agent", JsonSerializer.Serialize(runtimeTools.Select(t => new { t.Name, t.ProviderId, t.ExternalId, t.ScopeRef })));
+        var accessOnly = await Agentstration.Runtime.Abstractions.RuntimeAgentPresentation.CreateAsync("Original instructions",
+            runtimeTools.Where(t => t.Name.Contains("query-documents", StringComparison.Ordinal)).ToArray(), enrichers, default);
+        Assert.AreEqual("Original instructions", accessOnly.Instructions);
+        StringAssert.Contains(accessOnly.Tools.Single().Description!, "Current invoice purpose");
         model.Snapshot = a;
         var flows = factory.Services.GetRequiredService<FlowService>();
         var flow = await flows.CreateExactAsync(Owner, new CreateFlowCommand("mixed-knowledge-agent", null, "1.0.0", true,
@@ -178,23 +226,38 @@ public sealed partial class DataSourceDatasetTests
         var agentRun = (await submitted.Content.ReadFromJsonAsync<FlowRun>())!;
         for (var i = 0; i < 600 && agentRun.Status is FlowRunStatus.Pending or FlowRunStatus.Running; i++)
         { await Task.Delay(20); agentRun = (await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{agentRun.Id}"))!; }
-        Assert.AreEqual(FlowRunStatus.Succeeded, agentRun.Status, JsonSerializer.Serialize(agentRun));
+        Assert.AreEqual(FlowRunStatus.Succeeded, agentRun.Status, model.Diagnostic + "\n" + JsonSerializer.Serialize(agentRun.Error));
         Assert.AreEqual(2, model.ObservedAccessCount);
         Assert.AreEqual(30, model.ObservedTotal);
+        Assert.AreEqual(1, model.ObservedDetailedInputs);
+        _ = await sources.PutAsync(id, metadataOnly.Value.Definition with { DataSources = metadataOnly.Value.Definition.DataSources.Take(2).ToArray() }, metadataOnly.ETag, default);
+        var removed = await exposures.ProposeAsync(id, default);
+        Assert.HasCount(3, removed.Tools.Where(t => t.Change == "removed"));
+        var exact = await access.QueryDocumentsAsync(id, query with { SnapshotId = a, Contribution = queryPin }, default);
+        Assert.HasCount(2, exact.DocumentPage!.Documents);
+
     }
 
     private sealed class KnowledgeToolsetProbeModel : IChatClientResolver, IChatClient
     {
         public string? Snapshot { get; set; }
+        public string? Diagnostic { get; private set; }
         public int ObservedAccessCount { get; private set; }
         public int ObservedTotal { get; private set; }
+        public int ObservedDetailedInputs { get; private set; }
         public ValueTask<IChatClient> ResolveAsync(string name, CancellationToken ct = default) => ValueTask.FromResult<IChatClient>(this);
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default)
         {
             var history = messages.ToArray();
             var results = history.SelectMany(m => m.Contents).OfType<FunctionResultContent>().ToArray();
             var tools = options!.Tools!.OfType<AIFunctionDeclaration>().ToArray();
+            Diagnostic = JsonSerializer.Serialize(new { options.Instructions, Tools = tools.Select(t => new { t.Name, t.Description }), Results = results.Length });
             Assert.HasCount(2, tools);
+            StringAssert.Contains(options.Instructions!, "Knowledge Sources assigned to this Agent");
+            StringAssert.Contains(options.Instructions!, "mixed-knowledge");
+            Assert.IsFalse(options.Instructions!.Contains("unassigned-knowledge", StringComparison.Ordinal));
+            StringAssert.Contains(options.Instructions!, "before the first data access");
+            StringAssert.Contains(tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal)).Description!, "Current invoice purpose");
             if (results.Length > 0)
             {
                 var described = JsonSerializer.SerializeToElement(results[0].Result);
@@ -204,13 +267,20 @@ public sealed partial class DataSourceDatasetTests
             }
             if (results.Length > 1)
             {
-                var queryResult = JsonSerializer.SerializeToElement(results[1].Result);
+                var detail = JsonSerializer.SerializeToElement(results[1].Result);
+                Assert.AreEqual("input", detail.GetProperty("detailLevel").GetString());
+                ObservedDetailedInputs = detail.GetProperty("contributions").GetArrayLength();
+                Assert.HasCount(1, detail.GetProperty("tools").EnumerateArray());
+            }
+            if (results.Length > 2)
+            {
+                var queryResult = JsonSerializer.SerializeToElement(results[2].Result);
                 ObservedTotal = queryResult.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Total").GetInt32();
                 Assert.AreEqual(30, ObservedTotal);
                 return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "INVOICES_OK")) { FinishReason = ChatFinishReason.Stop });
             }
-            var tool = tools.Single(t => results.Length == 0 ? t.Name.Contains(".describe.", StringComparison.Ordinal) : t.Name.Contains("query-documents", StringComparison.Ordinal));
-            object request = results.Length == 0 ? new { snapshotId = Snapshot } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
+            var tool = tools.Single(t => results.Length < 2 ? t.Name.Contains(".describe.", StringComparison.Ordinal) : t.Name.Contains("query-documents", StringComparison.Ordinal));
+            object request = results.Length == 0 ? new { snapshotId = Snapshot } : results.Length == 1 ? new { snapshotId = Snapshot, input = "invoices" } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
                 [new FunctionCallContent("knowledge-call-" + results.Length, tool.Name, new Dictionary<string, object?> { ["request"] = request })]))
             { FinishReason = ChatFinishReason.ToolCalls });

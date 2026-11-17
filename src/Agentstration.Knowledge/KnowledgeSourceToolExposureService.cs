@@ -30,7 +30,8 @@ public sealed partial class KnowledgeSourceToolExposureService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ISecurityAuditWriter audit,
-    IKnowledgeAccessToolResolver? nativeTools = null, IStorageDocumentGateway? documents = null, KnowledgeSnapshotService? snapshots = null)
+    IKnowledgeAccessToolResolver? nativeTools = null, IStorageDocumentGateway? documents = null, KnowledgeSnapshotService? snapshots = null,
+    KnowledgeToolMetadataService? metadata = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private const string KnowledgeSourceUidAnnotation = "agentstration.io/knowledge-source-uid";
@@ -112,6 +113,7 @@ public sealed partial class KnowledgeSourceToolExposureService(
                     {
                         ["agentstration.io/knowledge-source"] = source.Value.Name,
                         [KnowledgeSourceUidAnnotation] = source.Value.Uid.ToString("D"),
+                        [KnowledgeToolMetadataService.UsageAnnotation] = candidate.Usage ?? candidate.Description,
                         ["agentstration.io/knowledge-source-scope"] = source.Value.ScopeRef!.Value.Value,
                         ["agentstration.io/knowledge-operation"] = route
                     }

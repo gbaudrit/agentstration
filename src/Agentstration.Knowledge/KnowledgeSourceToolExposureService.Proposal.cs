@@ -40,7 +40,8 @@ public sealed partial class KnowledgeSourceToolExposureService
         {
             var pin = source.Composition?.DataSources.SingleOrDefault(b => b.BindingName == binding.Name);
             var selection = new KnowledgeContributionSelection(binding.Name, pin?.DataSourceUid ?? Guid.Empty);
-            AddAccess(selection, binding.Name, binding.Description,
+            var business = metadata is null ? binding.Description : (await metadata.DescriptionAsync(source, selection, binding.Description, ct)).Description;
+            AddAccess(selection, binding.Name, business,
                 pin is null ? "knowledge_contribution_unresolved" : readiness.DataSources?.SingleOrDefault(b => b.Name == binding.Name)?.Issue);
         }
         // A post-aggregation transformation may create a new ensemble rather than preserving input identities.
@@ -85,11 +86,11 @@ public sealed partial class KnowledgeSourceToolExposureService
         {
             source.Uid,
             source.Generation,
-            source.Definition,
+            Definition = KnowledgeDefinitionSemantics.ExecutionDefinition(source.Definition),
             source.Composition,
             readiness.Ready,
             Issues = issues,
-            Tools = tools.Where(t => t.Change != "removed").Select(t => t with { Change = "added" }).ToArray()
+            Tools = tools.Where(t => t.Change != "removed").Select(t => new { t.ContractDigest, t.Issue, t.ContentEvidence }).ToArray()
         });
         return new()
         {
@@ -129,7 +130,7 @@ public sealed partial class KnowledgeSourceToolExposureService
             var profile = operation == KnowledgeSourceOperation.StructuredQuery ? description?.QueryProfiles.FirstOrDefault() : null;
             var help = operation switch
             {
-                KnowledgeSourceOperation.Describe => "Describe this published Knowledge ToolSet, its contributions, contracts and exact Snapshot metadata without reading content or preparing data. request accepts {} or an exact snapshotId.",
+                KnowledgeSourceOperation.Describe => "Discover the available inputs with request: {} before accessing Knowledge data. For one input's schemas and access contracts use request: {input: '<binding name>'}. Optionally reuse an exact snapshotId. Metadata only: no content reads or preparation.",
                 KnowledgeSourceOperation.GetStatus => "Inspect recorded Snapshot status and input freshness without reading content or starting preparation. request accepts {}.",
                 KnowledgeSourceOperation.Read => "Read bounded Unicode chunks of text-readable content in this contribution only. Binary documents require a configured text transformation. Reuse the snapshotId, documentId and readRange from its search. Without snapshotId, prepare current data if needed. Continue with cursor only.",
                 KnowledgeSourceOperation.SearchRegex => "Search text-readable content in this contribution only with a bounded .NET non-backtracking regular expression (no lookarounds/backreferences). Returns exact snapshotId, documentId and ranges for read. Continue with cursor only.",
@@ -155,6 +156,8 @@ public sealed partial class KnowledgeSourceToolExposureService
                 Contribution = selection,
                 DisplayName = name + " · " + KnowledgeAccessSchemas.Route(operation),
                 Description = string.IsNullOrWhiteSpace(businessDescription) ? name + ": " + help : name + ": " + businessDescription + "\n" + help,
+                BusinessDescription = businessDescription,
+                Usage = help,
                 InputSchema = schema,
                 OutputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),
                 DataSchema = description?.Schema,
@@ -163,7 +166,7 @@ public sealed partial class KnowledgeSourceToolExposureService
                 Issue = issue,
                 ContractDigest = ""
             };
-            proposal = proposal with { ContractDigest = Digest(proposal with { ContentEvidence = "not_checked", Issue = null }) };
+            proposal = proposal with { ContractDigest = Digest(proposal with { DisplayName = "", Description = "", BusinessDescription = null, ContentEvidence = "not_checked", Issue = null }) };
             tools.Add(proposal);
         }
     }
