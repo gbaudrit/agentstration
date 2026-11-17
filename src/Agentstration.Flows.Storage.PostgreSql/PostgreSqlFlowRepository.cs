@@ -286,6 +286,37 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         }).ToArray();
     }
 
+    public async Task<FlowRunPage> ListRunsByAgentBindingAsync(FlowRunAgentBindingQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.AgentUid == Guid.Empty || query.Take is < 1 or > 100)
+            throw new ArgumentException("A bounded attested Agent identity is required.", nameof(query));
+        var scope = query.Invocation;
+        var uid = query.AgentUid.ToString("D");
+        var revision = query.RevisionUid?.ToString("D") ?? "";
+        var generation = query.Generation?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        var hash = query.DefinitionHash ?? "";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM "flow"."FlowResources"
+            WHERE "ScopeRef" = {scope.ScopeRef.Value} AND "Kind" = 'run'
+              AND "TenantId" = {scope.TenantId} AND "PrincipalId" = {scope.PrincipalId}
+              AND COALESCE(jsonb_extract_path_text("Payload"::jsonb, 'scope', 'logicalScopeRef'), "ScopeRef") = {scope.AccessScopeRef.Value}
+              AND EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof("Payload"::jsonb -> 'runtimeBindings') = 'array' THEN "Payload"::jsonb -> 'runtimeBindings' ELSE '[]'::jsonb END) AS binding(value)
+                WHERE jsonb_extract_path_text(binding.value::jsonb, 'agentUid') = {uid}
+                  AND jsonb_extract_path_text(binding.value::jsonb, 'agentScopeRef') = {query.AgentOwner.Value}
+                  AND COALESCE(jsonb_extract_path_text(binding.value::jsonb, 'agentNamespace'), 'default') = {query.AgentNamespace.Value}
+                  AND LENGTH(jsonb_extract_path_text(binding.value::jsonb, 'participantId')) BETWEEN 1 AND 160
+                  AND jsonb_extract_path_text(binding.value::jsonb, 'revisionUid') IS NOT NULL AND jsonb_extract_path_text(binding.value::jsonb, 'revisionUid') <> '00000000-0000-0000-0000-000000000000'
+                  AND ({revision} = '' OR jsonb_extract_path_text(binding.value::jsonb, 'revisionUid') = {revision})
+                  AND ({generation} = '' OR jsonb_extract_path_text(binding.value::jsonb, 'agentGeneration') = {generation})
+                  AND ({hash} = '' OR jsonb_extract_path_text(binding.value::jsonb, 'definitionHash') = {hash}))
+              AND ("UpdatedAt" >= {query.WindowStart} OR "Status" NOT IN ({(int)FlowRunStatus.Succeeded},{(int)FlowRunStatus.Failed},{(int)FlowRunStatus.Cancelled},{(int)FlowRunStatus.TimedOut}))
+            ORDER BY "UpdatedAt" DESC, "Key" DESC LIMIT {query.Take + 1}
+            """).AsNoTracking().ToArrayAsync(cancellationToken);
+        return new(documents.Take(query.Take).Select(ToRun).ToArray(), documents.Length > query.Take);
+    }
+
     public async Task<FlowRunPage> ListRunsByIdentityAsync(FlowRunIdentityQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);

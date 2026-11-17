@@ -51,6 +51,37 @@
                     </li>
                 }
             </ul>
+            @if (facts.FlowBindings.Count > 0)
+            {
+                <h4>@T("OpsFlowBindingsTitle")</h4><p>@T("OpsFlowBindingsHelp")</p>
+                @if (facts.MoreFlowBindings) { <p>@T("OpsFlowBindingsPartial")</p> }
+                <ul data-testid="system-flow-bindings">
+                    @foreach (var binding in facts.FlowBindings)
+                    {
+                        <li @key="(binding.FlowRunId, binding.ParticipantId, binding.RevisionUid)">
+                            <a href="@BindingUrl(binding)">@binding.FlowRunId</a>
+                            · @T("OpsConsumerState"): @State(binding.FlowRunState)
+                            <p>@T("OpsParticipant"): <code>@binding.ParticipantId</code></p>
+                            <p>@T("OpsBoundRevision"): @binding.Generation · <code>@binding.RevisionUid</code></p>
+                            @if (binding.Invocations.Count == 0) { <p>@T("OpsInvocationUnknown")</p> }
+                            @if (binding.MoreInvocations) { <p>@T("OpsInvocationsPartial")</p> }
+                            @foreach (var invocation in binding.Invocations)
+                            {
+                                <p>
+                                    @if (invocation.StepExecutionId is not null)
+                                    { <a href="@BindingUrl(binding, invocation.StepDefinitionId)">@T("OpsStepExecution"): <code>@invocation.StepExecutionId</code></a> }
+                                    @T("OpsTurns"): @invocation.ObservedTurns
+                                    · @T("OpsAttempt"): <code>@invocation.AttemptId</code>
+                                    · @if (facts.CanInspectWorkerDetails) { <a href="@WorkerUrl(invocation.WorkerId)"><code>@invocation.WorkerId</code></a> }
+                                    else { <code>@invocation.WorkerId</code> } · @T("OpsSession"): <code>@invocation.SessionId</code>
+                                    · @T("OpsFencing"): @invocation.FencingGeneration · @State(invocation.AttemptState) · @State(invocation.Presence)
+                                </p>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
         }
     }
 </section>
@@ -128,6 +159,9 @@
     private string RunUrl(SystemRunEvidence run) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
         (run.Family == "flow" ? "/flow-runs/" : "/runs/") + Uri.EscapeDataString(run.RunId),
         new Dictionary<string, string?> { ["context"] = Context.Value, ["scopeRef"] = run.DataScope.Value });
+    private string BindingUrl(SystemFlowBindingEvidence binding, string? step = null) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+        "/flow-runs/" + Uri.EscapeDataString(binding.FlowRunId), new Dictionary<string, string?>
+        { ["context"] = Context.Value, ["scopeRef"] = binding.DataScope.Value, ["step"] = step });
     private string WorkerUrl(Guid worker) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/settings/runtime-workers/" + worker.ToString("D"), "context", Context.Value);
     public async ValueTask DisposeAsync() { disposed = true; await StopAsync(); }
 }

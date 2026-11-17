@@ -176,3 +176,11 @@ and subscription quotas. Both Console hosts register SystemOperationsClient usin
 their existing authenticated realtime configurator. The standalone host registers
 the optional bounded-dimension meter/activity source. No collector, operational
 database or new hosted worker is introduced. See ADR-0240.
+
+
+SystemFlowBindingReader is a singleton Infrastructure adapter composed with the
+existing FlowRunService and IRuntimeWorkerAssignmentStore. It reads exact attested
+Agent bindings after family-owned actor/scope filters and projects only native
+turn/step/attempt/session coordinates. It never calls the execution-material
+resolver or the general materializing Agent-instance observer. The neutral core
+keeps these associations separate from direct-run aggregation.

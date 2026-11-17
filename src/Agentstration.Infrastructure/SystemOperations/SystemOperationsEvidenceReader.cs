@@ -18,13 +18,14 @@ namespace Agentstration.Infrastructure.SystemOperations;
 public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, FlowRunService flows,
     IRuntimeObservabilityQueryService placement, IResourceIdentityCatalog identities, IResourceStore resources,
     ISystemGraphAuthorization graphAuthorization, ISystemGraphReadScope metadataScope,
-    WorkItemService work, IFlowRunExecutionScope flowScopes) : ISystemOperationsEvidenceReader
+    WorkItemService work, IFlowRunExecutionScope flowScopes, SystemFlowBindingReader flowBindings) : ISystemOperationsEvidenceReader
 {
     public async Task<SystemRunEvidencePage> ReadAsync(SystemGraphNode root, SystemOperationsReadContext context,
         DateTimeOffset windowStart, int take, CancellationToken ct)
     {
         if (!context.CanReadRuns) return new([], false, "run-read-required");
         var result = new List<SystemRunEvidence>(); bool more;
+        IReadOnlyList<SystemFlowBindingEvidence> consumers = []; var moreConsumers = false;
         var presence = context.CanInspectWorkers
             ? (await placement.ListWorkersAsync(ct)).ToDictionary(worker => worker.WorkerId, worker => worker.Presence.ToString().ToLowerInvariant())
             : new Dictionary<Guid, string>();
@@ -56,6 +57,7 @@ public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, Fl
                     return new([], false, "unavailable");
                 agentUid = revision.Value.AgentUid;
             }
+            (consumers, moreConsumers) = await flowBindings.ReadAsync(root, agentUid, context, windowStart, take, presence, ct);
             var query = new RuntimeRunIdentityQuery(context.DataScope, root.Identity.OwnerScope, root.Identity.Namespace,
                 agentUid, root.Identity.Kind == "AgentRevision" ? root.Identity.ResourceUid : null,
                 root.State == "recorded-generation" ? root.Evidence?.Generation : null, windowStart, take + 1, context.InvocationScope, root.Identity.Kind == "AgentRevision" ? root.Evidence?.Hash : null);
@@ -72,7 +74,7 @@ public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, Fl
                     await PlacementAsync(context, RuntimeAssignmentTargetKind.RuntimeRun, run.Id, presence, ct)));
             }
         }
-        return new(result, more, "attested-window");
+        return new(result, more, "attested-window") { FlowBindings = consumers, MoreFlowBindings = moreConsumers };
     }
     private async Task<IReadOnlyList<SystemPlacementEvidence>> PlacementAsync(SystemOperationsReadContext context, RuntimeAssignmentTargetKind kind, string runId, IReadOnlyDictionary<Guid, string> presence, CancellationToken ct)
     {

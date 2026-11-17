@@ -112,7 +112,7 @@
   <data name="OpsDuration" xml:space="preserve"><value>Durée moyenne par exécution terminée</value></data>
   <data name="OpsUnknown" xml:space="preserve"><value>Inconnu</value></data>
   <data name="OpsTokens" xml:space="preserve"><value>Tokens d’entrée / sortie rapportés</value></data>
-  <data name="OpsNoMetrics" xml:space="preserve"><value>Métriques indisponibles : aucune exécution autorisée avec identité attestée dans cet échantillon.</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Métriques indisponibles : aucun run direct autorisé avec identité attestée dans cet échantillon.</value></data>
   <data name="OpsPartial" xml:space="preserve"><value>Données partielles ; aucune conclusion sur la santé globale.</value></data>
   <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
   <data name="OpsPlacement" xml:space="preserve"><value>Affectation</value></data>
@@ -156,4 +156,15 @@
   <data name="OpsState_notprovisioned" xml:space="preserve"><value>Non provisionné</value></data>
 <data name="OpsConnecting" xml:space="preserve"><value>Connexion aux données autorisées…</value></data>
 <data name="OpsStale" xml:space="preserve"><value>Les données sont obsolètes et ont été effacées ; désactivez puis réactivez pour reconnecter.</value></data>
+  <data name="OpsFlowBindingsTitle" xml:space="preserve"><value>Bindings enregistrés par les Flow</value></data>
+  <data name="OpsFlowBindingsHelp" xml:space="preserve"><value>Ces Flow Runs ont enregistré ce binding exact d’Agent. Cette association ne prouve pas une exécution et reste exclue des métriques des runs directs. Les données de tour et de step apparaissent uniquement si le journal d’affectation les atteste.</value></data>
+  <data name="OpsFlowBindingsPartial" xml:space="preserve"><value>La limite de l’échantillon de bindings Flow est atteinte.</value></data>
+  <data name="OpsConsumerState" xml:space="preserve"><value>État du Flow consommateur</value></data>
+  <data name="OpsParticipant" xml:space="preserve"><value>Participant enregistré</value></data>
+  <data name="OpsBoundRevision" xml:space="preserve"><value>Version d’Agent / UID de révision enregistrés</value></data>
+  <data name="OpsInvocationUnknown" xml:space="preserve"><value>Aucune coordonnée d’invocation attestée dans cet échantillon.</value></data>
+  <data name="OpsInvocationsPartial" xml:space="preserve"><value>Au plus huit groupes d’invocation sont affichés pour ce binding.</value></data>
+  <data name="OpsStepExecution" xml:space="preserve"><value>Exécution de step</value></data>
+  <data name="OpsTurns" xml:space="preserve"><value>Tours distincts observés</value></data>
+  <data name="OpsSession" xml:space="preserve"><value>Session du worker</value></data>
 </root>

@@ -141,6 +141,28 @@ public sealed class SystemOperationsTests
             Assert.AreEqual(canonical, f.Root); Assert.AreEqual("definition", result.PublicationState);
         }
     }
+    [TestMethod]
+    public async Task FlowBindingsAreExactAuthorizedAssociationsAndNeverCountAsDirectRuns()
+    {
+        using var f = new Fixture();
+        var row = new SystemFlowBindingEvidence("consumer", f.Context.InvocationScope, f.Context.DataScope,
+            f.Root.Identity.OwnerScope, f.Root.Identity.Namespace, f.Root.Identity.ResourceUid, Guid.NewGuid(), 1, "agent-hash",
+            "participant", "running", Now, []);
+        f.Bindings = [row, row, row with { FlowRunId = "foreign", DataScope = ResourceScopeRef.Instance },
+            row with { FlowRunId = "homonym", AgentUid = Guid.NewGuid(), RevisionUid = Guid.NewGuid() },
+            row with { FlowRunId = "namespace", AgentNamespace = ResourceNamespace.Parse("other") }];
+        var result = (await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!;
+        Assert.HasCount(1, result.FlowBindings); Assert.IsNull(result.Metrics); Assert.IsEmpty(result.Runs);
+        f.Rows = [f.Run()];
+        result = (await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!;
+        Assert.AreEqual(1, result.Metrics!.ObservedSucceeded); Assert.AreEqual(0, result.Metrics.ObservedActive);
+        f.Root = f.Root with { Identity = f.Root.Identity with { Kind = "AgentRevision", ResourceUid = row.RevisionUid }, Evidence = new(Hash: "wrong") };
+        Assert.IsEmpty((await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!.FlowBindings);
+        f.Root = f.Root with { Evidence = new(Hash: "agent-hash") };
+        Assert.HasCount(1, (await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!.FlowBindings);
+        f.Context = f.Context with { CanReadRuns = false };
+        Assert.IsEmpty((await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!.FlowBindings);
+    }
     private sealed class Fixture : ISystemGraphQueryService, ISystemOperationsAccess, ISystemOperationsEvidenceReader, IDisposable
     {
         private readonly SystemOperationsTelemetry telemetry = new();
@@ -149,6 +171,7 @@ public sealed class SystemOperationsTests
         public SystemGraphNode Root = new("root", new(Guid.NewGuid(), ResourceScopeRef.Instance, ResourceNamespace.Default, "Agent", "homonym"), "definition");
         public SystemOperationsReadContext Context = new(Guid.NewGuid(), ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceScopeRef.Workspace(Guid.NewGuid()), Guid.NewGuid(), Guid.NewGuid(), true, false, false, "current");
         public IReadOnlyList<SystemRunEvidence> Rows = [];
+        public IReadOnlyList<SystemFlowBindingEvidence> Bindings = [];
         public bool Deliver = true, MutateGraph, Available = true;
         public int Reads, AccessReads;
         public Fixture() => Service = new(this, this, this, Time, telemetry);
@@ -159,7 +182,7 @@ public sealed class SystemOperationsTests
         public Task<SystemOperationsReadContext> GetAsync(CancellationToken ct) { ++AccessReads; return Task.FromResult(Context); }
         public Task<bool> CanDeliverAsync(SystemGraphIdentity identity, SystemOperationsReadContext expected, bool inspectBindings, CancellationToken ct) => Task.FromResult(Deliver);
         public Task<SystemRunEvidencePage> ReadAsync(SystemGraphNode root, SystemOperationsReadContext context, DateTimeOffset start, int take, CancellationToken ct)
-        { ++Reads; return Task.FromResult(new SystemRunEvidencePage(Rows, false, "attested-window")); }
+        { ++Reads; return Task.FromResult(new SystemRunEvidencePage(Rows, false, "attested-window") { FlowBindings = Bindings }); }
         public Task<long?> CurrentGenerationAsync(SystemGraphIdentity identity, CancellationToken ct) => Task.FromResult<long?>(2);
         public Task<string> ProvisioningAsync(SystemGraphNode root, CancellationToken ct) => Task.FromResult("unknown");
         public void Dispose() => telemetry.Dispose();
