@@ -34,12 +34,13 @@ export class GovernedKnowledgePage {
     await this.page.goto(url.toString());
     const exposurePanel = this.page.getByTestId(TestIds.governedKnowledge.exposure);
     await exposurePanel.getByRole('button', { name: text.publishExposure, exact: true }).click();
-    await expect(exposurePanel.getByTestId(TestIds.governedKnowledge.toolLink)).toHaveCount(4);
+    await expect(exposurePanel.getByTestId(TestIds.governedKnowledge.toolLink)).toHaveCount(6);
     const response = await this.page.request.get(`${consoleUrl}/api/knowledgesources/${knowledge}/tool-exposure?scopeRef=${encodeURIComponent(scope)}`);
     await status(response, 200);
     const exposure = await response.json() as Exposure;
     expect(exposure.toolSetVersion).toBe('1.0.0');
-    expect(exposure.operations).toHaveLength(4);
+    expect(exposure.operations).toHaveLength(6);
+    expect(exposure.operations.filter(item => item.route.endsWith('.describe'))).toHaveLength(2);
     expect(exposure.operations.some(item => item.route === 'describe')).toBe(true);
     await exposurePanel.getByRole('link', { name: text.openToolSet, exact: true }).click();
     await expect(this.publishedTools).toBeVisible();

@@ -214,14 +214,16 @@ selects complete response documents containing a matching alert; it does not
 flatten, trim or count individual array entries. JSON strings retain the profile's
 string comparison semantics even when their date-time format is validated.
 
-Publishing one document per array element requires an explicit normalization
-processor producing a multi-Artifact manifest. The current standard Flow catalog
-does not yet provide a turnkey deterministic operation for that split. Generic
-mapping, Artifact processing and array batches alone do not provide it. The
-structured acquisition/schema corrections do not add this separate operation or
-infer completeness of the OpenAPI acquisition's Artifact contract. The builtin
-HTTP acquisition has a different output envelope (`mediaType` and textual
-`content`); consumers must use the actual operation's output shape.
+Publishing one queryable record per array element uses `json.explode` with
+`path: /results` and the exact item schema. Configure it in Data Source or
+Knowledge binding transformations before materialization. One logical Artifact
+retains the collection identity, while Storage materializes independent records;
+`artifact.explode` separately creates multiple Artifacts. Schema selection alone
+does not extract data. The collection query model must describe the stored record,
+for example the sub-schema `/properties/results/items`, rather than the acquisition
+envelope. See [transformation functions](transformation-functions.md).
+The builtin HTTP acquisition has a different output envelope (`mediaType` and
+textual `content`); consumers must use the actual operation's output shape.
 
 ## Structured Knowledge
 
@@ -321,7 +323,12 @@ callers cannot supply a `request` wrapper or override fixed fields. No runtime
 argument repair or model-only schema flattening is involved.
 For `odata/4.01`, `query` uses dollar-prefixed option names and OData
 expressions, such as `"$filter": "status eq 'open'"`, using fields from discovery.
-`filter` and SQL-style `==` are not supported.
+`filter` and SQL-style `==` are not supported. Query guidance uses shape-only
+examples and requires actual field paths from the Tool's `dataSchema` and values
+from the request or observed data. Fields declared under an array's `items` are
+not root-level columns. For an envelope model, `any`/`all` select whole matching
+documents without trimming or sorting their nested arrays; use record extraction
+before publication when filtering, sorting and paging individual items is needed.
 The overview returns
 `toolSummaries` and input descriptions while omitting full `tools` contracts,
 contribution schemas and document-ID lists. Detailed selection refuses unknown

@@ -7,6 +7,23 @@ namespace Agentstration.Infrastructure.Tests;
 public sealed partial class KnowledgeToolInputPresentationTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void QueryGuidancePreservesTheModelNestingWithoutInventingBusinessPredicates(bool flatArguments)
+    {
+        var published = flatArguments ? Published.GetProperty("properties").GetProperty("request") : Published;
+        var schema = KnowledgeToolMetadataService.InputSchemaForModel(published, Profile);
+        var help = KnowledgeToolMetadataService.Format("records", null, "Query documents.", Profile, flatArguments);
+        StringAssert.Contains(help, "dataSchema");
+        StringAssert.Contains(help, "array item fields are not root columns");
+        StringAssert.Contains(help, "without filtering or sorting the returned array elements");
+        StringAssert.Contains(help, "values from the user request or observed data");
+        Assert.DoesNotContain("status eq", help);
+        Assert.DoesNotContain("status,value", help);
+        Assert.DoesNotContain("status eq", schema.GetRawText());
+    }
+
+    [TestMethod]
     public void FlatODataPresentationKeepsOptionalArgumentsAtToolLevel()
     {
         var published = Published.GetProperty("properties").GetProperty("request");
