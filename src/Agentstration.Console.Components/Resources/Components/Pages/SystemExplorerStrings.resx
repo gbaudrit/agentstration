@@ -222,4 +222,9 @@
   <data name="DeploymentConfigurationState" xml:space="preserve"><value>Deployment configuration</value></data>
   <data name="DeploymentConfigurationRelation" xml:space="preserve"><value>Selected configuration</value></data>
   <data name="DeployedRevisionRelation" xml:space="preserve"><value>Assigned revision</value></data>
+  <data name="DeploymentNoAssignment" xml:space="preserve"><value>No authorized deployment assignment is available for this Agent.</value></data>
+  <data name="DeploymentRevisionHelp" xml:space="preserve"><value>Published revisions are available under Definition. Assign a revision to an environment and target from an authorized Workspace.</value></data>
+  <data name="DeploymentOpenDefinition" xml:space="preserve"><value>View published revisions</value></data>
+  <data name="DeploymentWorkspaces" xml:space="preserve"><value>Open deployment Workspace</value></data>
+  <data name="DeploymentWriteRequired" xml:space="preserve"><value>Resource write access is required to record or reassign a deployment in this Workspace.</value></data>
 </root>

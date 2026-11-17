@@ -106,6 +106,7 @@ public partial class SystemExplorer
             var owner = ResourceScopeRef.Parse(OwnerQuery ?? actor.Value);
             if (current != revision) return;
             contextScope = actor; ownerScope = owner; contextReady = true;
+            deploymentWorkspaces = context.Contexts.Where(value => value.Kind == Agentstration.Web.Components.State.ConsoleContextKind.Workspace).ToArray();
             namespaceInput = NamespaceQuery ?? ResourceNamespace.DefaultValue;
             var ns = ResourceNamespace.Parse(namespaceInput);
             resourceNamespace = ns;
@@ -117,7 +118,8 @@ public partial class SystemExplorer
             foreach (var root in roots)
             {
                 buffer = new SystemGraphStreamBuffer();
-                await foreach (var frame in Client.StreamAsync(actor, ns, root, pending.Token))
+                var rootNamespace = Perspective == "deployment" && configuration is not null ? assignment!.Namespace : ns;
+                await foreach (var frame in Client.StreamAsync(actor, rootNamespace, root, pending.Token))
                 {
                     if (current != revision) return;
                     if (!buffer.Apply(frame)) throw new InvalidOperationException("The graph observation was invalidated.");

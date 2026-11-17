@@ -285,3 +285,17 @@ remain unattributed. Observation time, bounded sample coverage and unknown physi
 infrastructure/pool membership are visible. Saving an assignment does not route
 work, change adoption policy or establish placement. See
 [ADR-0242](../../decisions/0242-agent-deployments-record-exact-durable-assignments.md).
+
+An Agent's published `AgentRevision` records are listed in the **Definition**
+perspective. Publishing/preparing a revision does not create an environment/target
+assignment. The **C4 deployments** selector lists authorized assignments for the
+exact Agent UID across deployment namespaces; inventory without an Agent keeps its
+namespace filter. The selected configuration is queried and reassigned at the
+deployment's own namespace and owner, independently of the Agent namespace.
+
+An empty deployment perspective does not display the Agent dependency graph as a
+fallback. It explains the missing assignment and links to the published revisions.
+Instance/Tenant readers can navigate to their authorized Workspace contexts while
+preserving the exact Agent selection. Recording remains subject to Workspace
+ownership, resource-write permission and Discover/Use of the referenced revision;
+navigation never creates or adopts an assignment automatically.

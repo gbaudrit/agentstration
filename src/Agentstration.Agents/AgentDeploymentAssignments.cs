@@ -75,7 +75,9 @@ public sealed partial class AgentDeploymentAssignmentService(IResourceStore reso
         {
             await foreach (var stored in ReadAsync(owner, ct))
             {
-                if (stored.Value.Namespace != ns) continue;
+                // An Agent identity is independent of the namespace of its deployments.
+                // Namespace remains the inventory filter when no Agent is selected.
+                if (agentUid is null && stored.Value.Namespace != ns) continue;
                 var view = await ProjectAsync(stored, context, ct);
                 if (view is null || agentUid is { } uid && !view.Configurations.Any(config => config.AgentUid == uid)) continue;
                 if (result.Count == 1000) throw Error("agent_deployment_limit_exceeded", 422);

@@ -3,6 +3,7 @@ using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.SystemOperations.Contracts;
 using Agentstration.Web.SystemExplorer;
+using Agentstration.Web.Components.State;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -27,16 +28,19 @@ public partial class SystemExplorer
     private string[] definitionRoots = [];
     private string? perspectiveError;
     private bool observing;
+    private IReadOnlyList<ConsoleContextOption> deploymentWorkspaces = [];
     private string deploymentName = "", deploymentEnvironment = "production", deploymentTargetId = "", deploymentTargetName = "";
     private string deploymentTargetKind = "worker-pool", deploymentRuntime = "awp-worker", deploymentRevision = "";
     private string ActiveRoot => graphRoot ?? RootQuery ?? "";
     private bool HasPlacement => diagramOptions?.Placements?.Count > 0;
     private bool CanAssign => canWrite && contextScope.Kind == ResourceScopeKind.Workspace && catalog?.Revisions.Count > 0 && !loading && !busy;
+    private bool CanReassign => CanAssign && assignment?.ScopeRef == contextScope;
 
     private void ResetPerspectiveState()
     {
         catalog = null; assignments = []; assignment = null; configuration = null; diagramOptions = null;
         deploymentObservation = null; received = null; graphRoot = null; definitionRoots = []; perspectiveError = null; observing = false;
+        deploymentWorkspaces = [];
         deploymentName = ""; deploymentEnvironment = "production"; deploymentTargetId = ""; deploymentTargetName = "";
         deploymentTargetKind = "worker-pool"; deploymentRuntime = "awp-worker"; deploymentRevision = "";
     }
@@ -83,6 +87,8 @@ public partial class SystemExplorer
                 deploymentRuntime = configuration.Target.Runtime; deploymentRevision = configuration.RevisionUid.ToString("D");
                 return [graphRoot];
             }
+            // An empty deployment selection must not fall back to the Agent's definition graph.
+            return catalog is null ? [RootQuery] : [];
         }
         return [RootQuery];
     }
@@ -95,6 +101,11 @@ public partial class SystemExplorer
             ["revision"] = version, ["compare"] = compare, ["deployment"] = deployment?.ToString("D"),
             ["configuration"] = config?.ToString("D"), ["renderer"] = showDiagram ? null : "list"
         });
+    private string DeploymentWorkspaceUrl(ConsoleContextOption workspace) => QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
+    {
+        ["context"] = workspace.ScopeRef, ["namespace"] = resourceNamespace.Value,
+        ["root"] = catalog?.Agent.Id ?? RootQuery, ["view"] = "deployment", ["renderer"] = showDiagram ? null : "list"
+    });
     private void ChangeDefinition(ChangeEventArgs args) => Navigation.NavigateTo(PerspectiveUrl("definition", version: args.Value?.ToString(), compare: CompareQuery));
     private void ChangeComparison(ChangeEventArgs args) => Navigation.NavigateTo(PerspectiveUrl("definition", version: VersionQuery, compare: args.Value?.ToString()));
     private void ChangeDeployment(ChangeEventArgs args) => Navigation.NavigateTo(PerspectiveUrl("deployment", deployment: Guid.TryParse(args.Value?.ToString(), out var uid) ? uid : null));
@@ -102,12 +113,13 @@ public partial class SystemExplorer
     private void ChooseAgent(ChangeEventArgs args) => Navigation.NavigateTo(PerspectiveUrl(Perspective, root: args.Value?.ToString()));
     private async Task SaveAssignmentAsync(bool create)
     {
-        if (!CanAssign || !Guid.TryParse(deploymentRevision, out var revisionUid)) return;
+        if (!CanAssign || !create && !CanReassign || !Guid.TryParse(deploymentRevision, out var revisionUid)) return;
         var current = revision; busy = true; perspectiveError = null;
         try
         {
             var value = await Client.AssignAsync(contextScope, new(create ? deploymentName : assignment!.Name, revisionUid, deploymentEnvironment,
-                new(deploymentTargetId, deploymentTargetName, deploymentTargetKind, deploymentRuntime), contextScope, resourceNamespace), create ? null : assignment!.ETag, create, cancellation!.Token);
+                new(deploymentTargetId, deploymentTargetName, deploymentTargetKind, deploymentRuntime), contextScope,
+                create ? resourceNamespace : assignment!.Namespace), create ? null : assignment!.ETag, create, cancellation!.Token);
             if (current == revision) Navigation.NavigateTo(PerspectiveUrl("deployment", deployment: value.Uid, config: value.CurrentConfigurationId));
         }
         catch (OperationCanceledException) when (current != revision || cancellation!.IsCancellationRequested) { }

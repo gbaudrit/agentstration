@@ -222,4 +222,9 @@
   <data name="DeploymentConfigurationState" xml:space="preserve"><value>Configuration de déploiement</value></data>
   <data name="DeploymentConfigurationRelation" xml:space="preserve"><value>Configuration sélectionnée</value></data>
   <data name="DeployedRevisionRelation" xml:space="preserve"><value>Révision affectée</value></data>
+  <data name="DeploymentNoAssignment" xml:space="preserve"><value>Aucune affectation de déploiement autorisée n’est disponible pour cet agent.</value></data>
+  <data name="DeploymentRevisionHelp" xml:space="preserve"><value>Les révisions publiées sont disponibles dans Définition. Affectez une révision à un environnement et à une cible depuis un Workspace autorisé.</value></data>
+  <data name="DeploymentOpenDefinition" xml:space="preserve"><value>Voir les révisions publiées</value></data>
+  <data name="DeploymentWorkspaces" xml:space="preserve"><value>Ouvrir le Workspace de déploiement</value></data>
+  <data name="DeploymentWriteRequired" xml:space="preserve"><value>Le droit d’écriture sur les ressources est nécessaire pour enregistrer ou modifier une affectation dans ce Workspace.</value></data>
 </root>

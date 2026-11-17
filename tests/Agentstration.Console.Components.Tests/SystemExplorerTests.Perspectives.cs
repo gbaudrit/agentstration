@@ -4,6 +4,7 @@ using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.SystemOperations.Contracts;
 using Agentstration.Web.SystemExplorer;
+using Agentstration.Web.Components.State;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,6 +12,68 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class SystemExplorerTests
 {
+    [TestMethod]
+    [DataRow("en-US", "View published revisions", "Open deployment Workspace")]
+    [DataRow("fr-FR", "Voir les révisions publiées", "Ouvrir le Workspace de déploiement")]
+    public async Task InstanceAgentWithOnlyRevisionsShowsAnEmptyDeploymentAndExplicitDefinitionAndWorkspacePaths(string culture, string definitionLink, string workspaceLabel)
+    {
+        using var locale = new TestCultureScope(culture);
+        var client = new StreamClient { Owner = ResourceScopeRef.Instance }; var agent = StreamNode(client.Owner, "Agent 1");
+        var published = StreamNode(client.Owner, "agent-1--000002") with { State = "publication", Evidence = new(Publication: "2") };
+        client.Catalog = new(agent, [published]);
+        client.Photo = new([agent, published], [], "definitions", DateTimeOffset.UnixEpoch, "partial", false, false, null);
+        using var context = StreamContext(client); var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        context.Services.AddSingleton<IConsoleContextProvider>(new PerspectiveProvider(client.Owner, [new(workspace.Value, ConsoleContextKind.Workspace,
+            Guid.NewGuid(), "tenant", "Tenant", Guid.NewGuid(), "workspace", "Workspace")], write: true));
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo($"/system-explorer?context=%2Finstance&root={Uri.EscapeDataString(agent.Id)}&view=deployment");
+        var page = context.Render<Agentstration.Web.Components.Pages.SystemExplorer>();
+        page.WaitForAssertion(() => Assert.HasCount(1, page.FindAll("nav[aria-label='" + workspaceLabel + "'] a")));
+        Assert.IsEmpty(client.Roots, "An empty deployment must not request or show the Agent dependency graph.");
+        Assert.IsEmpty(page.FindAll("[data-testid=explorer-node]")); Assert.IsEmpty(page.FindComponents<SystemGraphDiagram>());
+        Assert.IsEmpty(page.FindAll("form input[required]"));
+        var target = page.Find("nav[aria-label='" + workspaceLabel + "'] a").GetAttribute("href")!;
+        Assert.Contains("context=" + Uri.EscapeDataString(workspace.Value), target);
+        Assert.Contains("root=" + Uri.EscapeDataString(agent.Id), target);
+        Assert.Contains("view=deployment", target);
+        Assert.IsTrue(page.FindAll("select").Take(2).All(select => select.HasAttribute("disabled")));
+        var definition = page.FindAll("a").Single(link => link.TextContent == definitionLink).GetAttribute("href")!;
+        await page.InvokeAsync(() => nav.NavigateTo(definition));
+        page.WaitForAssertion(() => Assert.Contains("agent-1--000002", page.Find("[data-testid=explorer-node]").TextContent));
+    }
+
+    [TestMethod]
+    public async Task CrossNamespaceDeploymentReadsAndReassignsAtItsExactOwningAddress()
+    {
+        var client = new StreamClient(); var agent = StreamNode(client.Owner, "agent");
+        var published = StreamNode(client.Owner, "revision") with { State = "publication", Evidence = new(Publication: "1") };
+        client.Catalog = new(agent, [published]);
+        var deploymentUid = Guid.NewGuid(); var ns = new ResourceNamespace("production-deployments");
+        var config = new AgentDeploymentConfiguration(Guid.NewGuid(), agent.Identity.ResourceUid, published.Identity.ResourceUid,
+            client.Owner, ResourceNamespace.Default, published.Identity.Name, 1, "hash", "production", new("pool", "Pool"), DateTimeOffset.UnixEpoch);
+        client.Deployments = [new(deploymentUid, client.Owner, ns, "production-agent", "expected-etag", config.Id, [config], "recorded", DateTimeOffset.UnixEpoch)];
+        var root = new SystemGraphNode($"deployment:{deploymentUid:D}:{config.Id:D}", new(deploymentUid, client.Owner, ns, "AgentDeployment", "production-agent"), "recorded-deployment-configuration");
+        client.Photo = new([root], [], "photo", DateTimeOffset.UnixEpoch, "partial", false, false, null);
+        using var context = StreamContext(client);
+        context.Services.AddSingleton<IConsoleContextProvider>(new PerspectiveProvider(client.Owner, [], write: true));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/system-explorer?root={Uri.EscapeDataString(agent.Id)}&view=deployment");
+        var page = context.Render<Agentstration.Web.Components.Pages.SystemExplorer>();
+        page.WaitForAssertion(() => Assert.AreEqual(ns, client.RootNamespaces.Last()));
+        page.WaitForAssertion(() => Assert.IsFalse(page.FindAll("button").Single(button => button.TextContent == "Record a new configuration").HasAttribute("disabled")));
+        Assert.AreEqual(ns, page.FindComponent<Agentstration.Web.Components.Pages.SystemOperationsPanel>().Instance.Namespace);
+        await page.FindAll("button").Single(button => button.TextContent == "Record a new configuration").ClickAsync();
+        Assert.AreEqual(ns, client.SavedAssignment!.Namespace); Assert.AreEqual(client.Owner, client.SavedAssignment.ScopeRef);
+        Assert.AreEqual("expected-etag", client.SavedETag);
+    }
+
+    private sealed class PerspectiveProvider(ResourceScopeRef owner, IReadOnlyList<ConsoleContextOption> contexts, bool write) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
+            Guid.NewGuid(), "Operator", owner.Value, owner == ResourceScopeRef.Instance ? ConsoleContextKind.Instance : ConsoleContextKind.Workspace,
+            Guid.NewGuid(), "tenant", "Tenant", Guid.NewGuid(), "workspace", "Workspace",
+            write ? new HashSet<string> { "resources/read", "resources/write" } : new HashSet<string> { "resources/read" }, [], contexts));
+    }
+
     [TestMethod]
     [DataRow("en-US", "Compare with", "Read observed placements")]
     [DataRow("fr-FR", "Comparer avec", "Lire les placements observés")]

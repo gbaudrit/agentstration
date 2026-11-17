@@ -36,8 +36,9 @@ public sealed class AgentDeploymentAssignmentApiTests : ModelManagementApiTestBa
         using var client = factory.CreateClient(); SelectConsoleContext(client, owner);
         var catalog = await client.GetFromJsonAsync<AgentDefinitionCatalog>("/api/agent-definition-catalog?uid=" + seed.Agent.Uid);
         Assert.AreEqual(second.Uid, catalog!.Revisions[0].Identity.ResourceUid); Assert.HasCount(2, catalog.Revisions);
+        var deploymentNamespace = new ResourceNamespace("deployment-assignments");
         var request = new AgentDeploymentAssignmentRequest("production-agent", seed.Revision.Uid, "production",
-            new("pool-a", "Pool A"), owner, ns);
+            new("pool-a", "Pool A"), owner, deploymentNamespace);
         using var created = await client.PostAsJsonAsync("/api/agent-deployment-assignments/production-agent", request);
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
         var first = (await created.Content.ReadFromJsonAsync<AgentDeploymentView>())!;
@@ -52,16 +53,21 @@ public sealed class AgentDeploymentAssignmentApiTests : ModelManagementApiTestBa
         using var stale = new HttpRequestMessage(HttpMethod.Put, "/api/agent-deployment-assignments/production-agent") { Content = JsonContent.Create(changed) };
         stale.Headers.IfMatch.ParseAdd(first.ETag);
         using var rejected = await client.SendAsync(stale); Assert.AreEqual(HttpStatusCode.PreconditionFailed, rejected.StatusCode);
-        var listed = await client.GetFromJsonAsync<AgentDeploymentView[]>("/api/agent-deployment-assignments?namespace=" + ns.Value);
+        var listed = await client.GetFromJsonAsync<AgentDeploymentView[]>("/api/agent-deployment-assignments?namespace=" + ns.Value + "&agentUid=" + seed.Agent.Uid);
         Assert.HasCount(2, listed!.Single().Configurations);
+        Assert.IsEmpty((await client.GetFromJsonAsync<AgentDeploymentView[]>("/api/agent-deployment-assignments?namespace=" + ns.Value))!);
+        SelectConsoleContext(client, ResourceScopeRef.Instance);
+        var instanceList = await client.GetFromJsonAsync<AgentDeploymentView[]>("/api/agent-deployment-assignments?namespace=" + ns.Value + "&agentUid=" + seed.Agent.Uid);
+        Assert.AreEqual(latest.Uid, instanceList!.Single().Uid);
+        SelectConsoleContext(client, owner);
         var root = $"deployment:{latest.Uid:D}:{first.Configurations[0].Id:D}";
-        var graph = await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?namespace=" + ns.Value + "&root=" + Uri.EscapeDataString(root));
+        var graph = await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?namespace=" + deploymentNamespace.Value + "&root=" + Uri.EscapeDataString(root));
         Assert.AreEqual(seed.Revision.Uid, graph!.Nodes.Single(node => node.Id == root).Deployment!.RevisionUid);
         Assert.IsFalse(graph.Nodes.Any(node => node.Identity.ResourceUid == second.Uid));
         var reference = new RuntimeAgentReference(seed.Agent.Name, 2)
         {
             Namespace = ns, ScopeRef = owner,
-            Deployment = new(latest.Uid, latest.Configurations[1].Id, owner, ns, latest.Name)
+            Deployment = new(latest.Uid, latest.Configurations[1].Id, owner, deploymentNamespace, latest.Name)
         };
         using (scopes.PushSystem())
         {
@@ -73,7 +79,7 @@ public sealed class AgentDeploymentAssignmentApiTests : ModelManagementApiTestBa
             await Assert.ThrowsExactlyAsync<RuntimeAgentResolutionException>(() => resolver.ResolveAsync(reference with
             { Deployment = reference.Deployment with { Uid = Guid.NewGuid() } }, default));
         }
-        var historical = await client.GetFromJsonAsync<SystemOperationalSnapshot>("/api/system-operations?namespace=" + ns.Value + "&root=" + Uri.EscapeDataString(root));
+        var historical = await client.GetFromJsonAsync<SystemOperationalSnapshot>("/api/system-operations?namespace=" + deploymentNamespace.Value + "&root=" + Uri.EscapeDataString(root));
         Assert.IsNotNull(historical!.Facts); Assert.IsNull(historical.Facts.Metrics); Assert.IsEmpty(historical.Facts.Runs);
         using var cross = await client.PostAsJsonAsync("/api/agent-deployment-assignments/foreign", request with { Name = "foreign", ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()) });
         Assert.AreEqual(HttpStatusCode.Forbidden, cross.StatusCode);

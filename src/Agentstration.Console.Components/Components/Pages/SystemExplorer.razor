@@ -46,10 +46,10 @@
         @if (Perspective == "deployment")
         {
             <div class="explorer-actions">
-                <label>@T("DeploymentAssignment") <select aria-label="@T("DeploymentAssignment")" value="@(assignment?.Uid.ToString("D") ?? "")" @onchange="ChangeDeployment"><option value="">@T("ChooseDeployment")</option>
-                    @foreach (var value in assignments) { <option value="@value.Uid">@value.Name</option> }
+                <label>@T("DeploymentAssignment") <select aria-label="@T("DeploymentAssignment")" disabled="@(loading || assignments.Count == 0)" value="@(assignment?.Uid.ToString("D") ?? "")" @onchange="ChangeDeployment"><option value="">@T("ChooseDeployment")</option>
+                    @foreach (var value in assignments) { <option value="@value.Uid">@value.Name · @value.Namespace.Value · @value.ScopeRef.Value</option> }
                 </select></label>
-                <label>@T("DeploymentConfiguration") <select aria-label="@T("DeploymentConfiguration")" value="@(configuration?.Id.ToString("D") ?? "")" @onchange="ChangeConfiguration"><option value="">@T("ChooseConfiguration")</option>
+                <label>@T("DeploymentConfiguration") <select aria-label="@T("DeploymentConfiguration")" disabled="@(loading || assignment?.Configurations.Count is not > 0)" value="@(configuration?.Id.ToString("D") ?? "")" @onchange="ChangeConfiguration"><option value="">@T("ChooseConfiguration")</option>
                     @foreach (var value in assignment?.Configurations.Reverse() ?? [])
                     { <option value="@value.Id">@value.Environment · @Localizer["DefinitionRevision", value.AgentVersion] · @value.RecordedAt.ToLocalTime().ToString("g")</option> }
                 </select></label>
@@ -68,7 +68,14 @@
                     else { <p>@T("DeploymentObservedPartial")</p> }
                 }
             }
-            else if (!loading) { <p role="status">@T("DeploymentNoConfiguration")</p> }
+            else if (!loading)
+            {
+                <p role="status">@T(assignments.Count == 0 ? "DeploymentNoAssignment" : "DeploymentNoConfiguration")</p>
+                @if (catalog?.Revisions.Count > 0)
+                {
+                    <p>@T("DeploymentRevisionHelp") <a class="text-button" href="@PerspectiveUrl("definition")">@T("DeploymentOpenDefinition")</a></p>
+                }
+            }
             @if (catalog?.Revisions.Count > 0 && contextScope.Kind == ResourceScopeKind.Workspace && canWrite)
             {
                 <form @onsubmit="() => SaveAssignmentAsync(true)" @onsubmit:preventDefault>
@@ -80,11 +87,21 @@
                     <label>@T("DeploymentTargetKind") <select aria-label="@T("DeploymentTargetKind")" @bind="deploymentTargetKind">@foreach (var kind in new[] { "worker-pool", "host", "cluster", "remote-endpoint" }) { <option value="@kind">@T("DeploymentTarget_" + kind)</option> }</select></label>
                     <label>@T("DeploymentRuntime") <select aria-label="@T("DeploymentRuntime")" @bind="deploymentRuntime">@foreach (var kind in new[] { "awp-worker", "agentstration-server", "remote-runtime" }) { <option value="@kind">@T("DeploymentRuntime_" + kind)</option> }</select></label>
                     <button type="submit" class="button-primary" disabled="@(!CanAssign)">@T("DeploymentNew")</button>
-                    @if (assignment is not null) { <button type="button" class="button-secondary" disabled="@(!CanAssign)" @onclick="() => SaveAssignmentAsync(false)">@T("DeploymentReassign")</button> }
+                    @if (assignment is not null) { <button type="button" class="button-secondary" disabled="@(!CanReassign)" @onclick="() => SaveAssignmentAsync(false)">@T("DeploymentReassign")</button> }
                 </form>
                 <p>@T("DeploymentAssignHint")</p>
             }
-            else if (catalog is not null) { <p>@T("DeploymentReadOnlyContext")</p> }
+            else if (catalog is not null)
+            {
+                <p>@T(contextScope.Kind == ResourceScopeKind.Workspace ? "DeploymentWriteRequired" : "DeploymentReadOnlyContext")</p>
+                @if (contextScope.Kind != ResourceScopeKind.Workspace && deploymentWorkspaces.Count > 0)
+                {
+                    <nav aria-label="@T("DeploymentWorkspaces")" class="explorer-actions">
+                        @foreach (var workspace in deploymentWorkspaces)
+                        { <a class="button-secondary" href="@DeploymentWorkspaceUrl(workspace)">@workspace.TenantDisplayName · @workspace.DisplayName</a> }
+                    </nav>
+                }
+            }
         }
         @if (perspectiveError is not null) { <ErrorState Message="@perspectiveError" /> }
     </section>
@@ -131,7 +148,7 @@
                 @if (DetailsUrl(selected) is { } url) { <a class="button-secondary" href="@url">@T("OpenDetails")</a> }
                 @if (selected.Identity.Kind == "Flow") { <a class="button-secondary" href="@DetailsUrl(selected, true)">@T("OpenDesigner")</a> }
                 <a class="button-secondary" href="@ReconciliationUrl(selected.Id)">@T("ReconTitle")</a>
-                <SystemOperationsPanel @key="selected.Id" Root="@selected.Id" Context="contextScope" Namespace="resourceNamespace" Changed="OperationalChanged" />
+                <SystemOperationsPanel @key="selected.Id" Root="@selected.Id" Context="contextScope" Namespace="selected.Identity.Namespace" Changed="OperationalChanged" />
                 <pre class="explorer-json">@JsonSerializer.Serialize(selected, JsonOptions)</pre>
                 <h3>@T("Relations")</h3>
                 <ul>@foreach (var edge in page.Relations.Where(edge => edge.Source == selected.Id || edge.Target == selected.Id))

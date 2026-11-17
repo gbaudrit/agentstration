@@ -166,7 +166,7 @@ public sealed partial class SystemExplorerTests
     }
     private sealed class StreamClient : ISystemExplorerClient
     {
-        public ResourceScopeRef Owner { get; } = ResourceScopeRef.Workspace(Guid.NewGuid());
+        public ResourceScopeRef Owner { get; init; } = ResourceScopeRef.Workspace(Guid.NewGuid());
         private readonly ConcurrentDictionary<ResourceScopeRef, Channel<SystemGraphStreamFrame>> streams = new();
         public ConcurrentQueue<ResourceScopeRef> Cancelled { get; } = new();
         public TaskCompletionSource<IReadOnlyList<SystemView>> Systems { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -176,6 +176,14 @@ public sealed partial class SystemExplorerTests
         public IReadOnlyList<AgentDeploymentView> Deployments { get; set; } = [];
         public SystemGraphPage? Photo { get; set; }
         public List<string?> Roots { get; } = [];
+        public List<ResourceNamespace> RootNamespaces { get; } = [];
+        public AgentDeploymentAssignmentRequest? SavedAssignment { get; private set; }
+        public string? SavedETag { get; private set; }
+        public Task<AgentDeploymentView> AssignAsync(ResourceScopeRef context, AgentDeploymentAssignmentRequest value, string? etag, bool create, CancellationToken ct)
+        {
+            SavedAssignment = value; SavedETag = etag;
+            return Task.FromResult(Deployments.Single(deployment => deployment.Name == value.Name));
+        }
         public SystemOperationalSnapshot Observation { get; set; } = new(null, DateTimeOffset.UnixEpoch, "unavailable");
         public Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) => HeldCatalog?.Task ?? Task.FromResult(Catalog);
         public Task<IReadOnlyList<AgentDeploymentView>> DeploymentsAsync(ResourceScopeRef context, ResourceNamespace ns, Guid? agentUid, CancellationToken ct) => Task.FromResult(Deployments);
@@ -185,7 +193,7 @@ public sealed partial class SystemExplorerTests
         public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
             [EnumeratorCancellation] CancellationToken ct)
         {
-            Roots.Add(root);
+            Roots.Add(root); RootNamespaces.Add(ns);
             if (Photo is not null)
             {
                 var epoch = Guid.NewGuid();

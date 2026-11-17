@@ -55,7 +55,11 @@ authorization requirement. Unknown evidence never becomes zero or healthy.
 The Console offers definition (draft, retained revision, two selected revisions)
 and deployment (selected configuration, desired, observed) perspectives. Definition
 comparison merges independently dated authorized observations, remains partial,
-and rejects conflicting metadata for the same graph identity. Rendering may group
+and rejects conflicting metadata for the same graph identity. Selecting an Agent
+lists its authorized assignments across deployment namespaces and uses the selected
+deployment’s owning address for graph reads and reassignment. An empty deployment
+selection explains the gap and links to Definition and authorized Workspaces,
+without falling back to the Agent dependency graph or creating an assignment. Rendering may group
 current and pinned generations of the same UID, while inspection/export retain
 all exact semantic identities and evidence.
 
