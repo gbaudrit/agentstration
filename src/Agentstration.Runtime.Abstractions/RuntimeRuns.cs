@@ -176,6 +176,9 @@ public sealed record RuntimeRunEvent
 
 public sealed record StoredRuntimeRun(RuntimeRun Value, string ETag, DateTimeOffset UpdatedAt);
 
+public sealed record RuntimeRunIdentityQuery(ResourceScopeRef ExecutionScope, ResourceScopeRef DefinitionOwner,
+    ResourceNamespace Namespace, Guid? AgentUid, Guid? RevisionUid, long? Generation, DateTimeOffset WindowStart, int Take = 100, ResourceScopeRef? InvocationScope = null, string? DefinitionHash = null);
+
 public interface IRuntimeRunStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
@@ -191,6 +194,8 @@ public interface IRuntimeRunStore
         GetAsync(RequiredWorkspace(scopeRef), runId, cancellationToken);
     Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         ListAsync(RequiredWorkspace(scopeRef), agentResourceId, skip, take, cancellationToken);
+    Task<IReadOnlyList<StoredRuntimeRun>> ListByIdentityAsync(RuntimeRunIdentityQuery query, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact Runtime execution identity projection is unavailable.");
     Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string expectedETag, CancellationToken cancellationToken) =>
         DeleteAsync(RequiredWorkspace(scopeRef), runId, expectedETag, cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> ListEventsExactAsync(ResourceScopeRef scopeRef, string runId, long afterSequence, CancellationToken cancellationToken) =>

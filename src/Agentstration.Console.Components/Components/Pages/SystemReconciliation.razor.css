@@ -1,0 +1,9 @@
+form { display:flex; flex-wrap:wrap; align-items:end; gap:1rem; margin:1rem 0; }
+label, input, select, section { min-width:0; max-width:100%; }
+label { display:block; }
+select { width:100%; }
+form > label { flex:1 1 18rem; }
+.recon-consumer { margin:1rem 0; overflow-wrap:anywhere; }
+pre { max-width:100%; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+code { overflow-wrap:anywhere; }
+li { margin-bottom:1rem; overflow-wrap:anywhere; }

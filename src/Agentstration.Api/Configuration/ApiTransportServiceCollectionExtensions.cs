@@ -1,3 +1,5 @@
+using Agentstration.SystemOperations.Api;
+using Agentstration.Systems.Api;
 using Agentstration.SystemGraph.Api;
 using Agentstration.Agents.Api;
 using Agentstration.Artifacts.Api;
@@ -58,6 +60,8 @@ public static class ApiTransportServiceCollectionExtensions
         services.AddRuntimeApi();
         services.AddResourcesApi();
         services.AddSystemGraphApi();
+        services.AddSystemOperationsApi();
+        services.AddSystemsApi();
         services.AddPacksApi();
         services.AddSourcesApi();
         services.AddToolsApi();

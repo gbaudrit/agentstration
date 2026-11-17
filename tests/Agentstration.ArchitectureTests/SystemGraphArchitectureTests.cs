@@ -10,7 +10,7 @@ public sealed class SystemGraphArchitectureTests
     [TestMethod]
     public void SemanticContractsAndQueryHaveNoPresentationOrExecutionDependencies()
     {
-        foreach (var assembly in new[] { typeof(SystemGraphPage).Assembly, typeof(SystemGraphQueryService).Assembly })
+        foreach (var assembly in new[] { typeof(Agentstration.SystemOperations.SystemOperationsService).Assembly, typeof(Agentstration.SystemOperations.Contracts.SystemOperationalFacts).Assembly, typeof(SystemGraphPage).Assembly, typeof(SystemGraphQueryService).Assembly, typeof(Agentstration.Systems.Contracts.SystemResource).Assembly, typeof(Agentstration.Systems.SystemModelService).Assembly, typeof(Agentstration.Reconciliation.ReconciliationPreviewService).Assembly, typeof(Agentstration.Reconciliation.Contracts.ReconciliationPreview).Assembly })
         {
             var forbiddenAssemblies = new[] { "EntityFramework", "AspNetCore", "LikeC4", "React", "Agentstration.Flows", "Agentstration.Runtime", "Agentstration.Tools", "Agentstration.Web" };
             foreach (var dependency in assembly.GetReferencedAssemblies())
@@ -32,6 +32,16 @@ public sealed class SystemGraphArchitectureTests
         Assert.IsFalse(typeof(SystemGraphPage).GetProperties().Any(property => property.PropertyType == typeof(SystemGraphContribution)));
         CollectionAssert.AreEquivalent(new[] { "AnalyzeAsync", "CompareAsync", "GetCoverageAsync" },
             typeof(ISystemGraphImpactService).GetMethods().Select(method => method.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void ReconciliationPreviewHasNoFamilyMutationOrPersistenceCapability()
+    {
+        CollectionAssert.AreEquivalent(new[] { "PreviewAsync", "RevalidateAsync" },
+            typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService).GetMethods().Select(method => method.Name).ToArray());
+        foreach (var dependency in typeof(Agentstration.Reconciliation.ReconciliationPreviewService).Assembly.GetReferencedAssemblies())
+            foreach (var name in new[] { "Storage", "Agentstration.Tools", "Agentstration.Agents", "Agentstration.Flows", "Agentstration.Runtime", "ResourceManagement" })
+                Assert.IsFalse(dependency.Name!.Contains(name, StringComparison.OrdinalIgnoreCase), dependency.Name);
     }
 
     [TestMethod]

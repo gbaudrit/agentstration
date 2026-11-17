@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.SystemOperations.Contracts/Agentstration.SystemOperations.Contracts.csproj" />
+  </ItemGroup>
+</Project>

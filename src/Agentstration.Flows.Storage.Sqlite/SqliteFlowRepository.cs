@@ -272,6 +272,63 @@ public sealed class SqliteFlowRepository(IDbContextFactory<FlowDbContext> contex
         }).ToArray();
     }
 
+    public async Task<FlowRunPage> ListRunsByAgentBindingAsync(FlowRunAgentBindingQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.AgentUid == Guid.Empty || query.Take is < 1 or > 100)
+            throw new ArgumentException("A bounded attested Agent identity is required.", nameof(query));
+        var scope = query.Invocation;
+        var uid = query.AgentUid.ToString("D");
+        var revision = query.RevisionUid?.ToString("D") ?? "";
+        var generation = query.Generation ?? -1;
+        var hash = query.DefinitionHash ?? "";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM "FlowResources"
+            WHERE "ScopeRef" = {scope.ScopeRef.Value} AND "Kind" = 'run'
+              AND "TenantId" = {scope.TenantId} AND "PrincipalId" = {scope.PrincipalId}
+              AND COALESCE(json_extract("Payload", '$.scope.logicalScopeRef'), "ScopeRef") = {scope.AccessScopeRef.Value}
+              AND EXISTS (SELECT 1 FROM json_each(COALESCE(json_extract("Payload", '$.runtimeBindings'), '[]')) AS binding
+                WHERE json_extract(binding.value, '$.agentUid') = {uid}
+                  AND json_extract(binding.value, '$.agentScopeRef') = {query.AgentOwner.Value}
+                  AND COALESCE(json_extract(binding.value, '$.agentNamespace'), 'default') = {query.AgentNamespace.Value}
+                  AND LENGTH(json_extract(binding.value, '$.participantId')) BETWEEN 1 AND 160
+                  AND json_extract(binding.value, '$.revisionUid') IS NOT NULL AND json_extract(binding.value, '$.revisionUid') <> '00000000-0000-0000-0000-000000000000'
+                  AND ({revision} = '' OR json_extract(binding.value, '$.revisionUid') = {revision})
+                  AND ({generation} = -1 OR json_extract(binding.value, '$.agentGeneration') = {generation})
+                  AND ({hash} = '' OR json_extract(binding.value, '$.definitionHash') = {hash}))
+              AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "Status" NOT IN ({(int)FlowRunStatus.Succeeded},{(int)FlowRunStatus.Failed},{(int)FlowRunStatus.Cancelled},{(int)FlowRunStatus.TimedOut}))
+            ORDER BY "UpdatedAt" DESC, "Key" DESC LIMIT {query.Take + 1}
+            """).AsNoTracking().ToArrayAsync(cancellationToken);
+        return new(documents.Take(query.Take).Select(ToRun).ToArray(), documents.Length > query.Take);
+    }
+
+    public async Task<FlowRunPage> ListRunsByIdentityAsync(FlowRunIdentityQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.ResourceUid == Guid.Empty || query.Take is < 1 or > 200)
+            throw new ArgumentException("A bounded exact Flow identity is required.", nameof(query));
+        var scope = query.Invocation;
+        var uid = query.ResourceUid.ToString("D");
+        var version = query.Version ?? "";
+        var hash = query.DefinitionHash ?? "";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Documents.FromSqlInterpolated($"""
+            SELECT * FROM "FlowResources"
+            WHERE "ScopeRef" = {scope.ScopeRef.Value} AND "Kind" = 'run'
+              AND "TenantId" = {scope.TenantId} AND "PrincipalId" = {scope.PrincipalId}
+              AND "Namespace" = {query.Namespace.Value}
+              AND json_extract("Payload", '$.definitionSnapshot.scopeRef') = {query.DefinitionOwner.Value}
+              AND json_extract("Payload", '$.definitionSnapshot.resourceUid') = {uid}
+              AND ({version} = '' OR "Version" = {version})
+              AND COALESCE(json_extract("Payload", '$.scope.logicalScopeRef'), "ScopeRef") = {scope.AccessScopeRef.Value}
+              AND ({hash} = '' OR json_extract("Payload", '$.definitionSnapshot.definitionHash') = {hash})
+              AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "Status" NOT IN ({(int)FlowRunStatus.Succeeded},{(int)FlowRunStatus.Failed},{(int)FlowRunStatus.Cancelled},{(int)FlowRunStatus.TimedOut}))
+            ORDER BY "UpdatedAt" DESC, "Key" DESC LIMIT {query.Take + 1}
+            """).AsNoTracking().ToArrayAsync(cancellationToken);
+        return new(documents.Take(query.Take).Select(ToRun).ToArray(), documents.Length > query.Take);
+    }
+
     public async Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);

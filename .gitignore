@@ -29,3 +29,6 @@ automation/playwright/node_modules/
 automation/playwright/test-results/
 automation/playwright/playwright-report/
 automation/playwright/.work/
+
+# Isolated System Explorer frontend build dependencies.
+src/Agentstration.Web.SystemExplorer/Frontend/node_modules/
