@@ -9,13 +9,14 @@ namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Reads an Artifact's exact materialization through its owning Storage boundary.</summary>
 public sealed class StorageMaterializedArtifactReader(IStorageContentGateway content, IStoragePublicationGateway publications,
-    IIdentityStore identities, ICurrentRequestContext current, IRequestContextScopeFactory scopes)
+    IIdentityStore identities, ICurrentRequestContext current, IRequestContextScopeFactory scopes, StorageContentOptions? options = null)
 {
     public async Task<ReadOnlyMemory<byte>> ReadAsync(WorkspaceId workspaceId, ArtifactStorageMaterialization value,
         long offset, int length, CancellationToken cancellationToken)
     {
         if (value.WorkspaceId != workspaceId || current.Current.WorkspaceId != workspaceId.Value
-            || value.Length is < 0 or > 65536 || offset < 0 || offset > value.Length || length < 1
+            || value.Length < 0 || value.Length > (options ?? new()).MaximumObjectBytes || offset < 0 || offset > value.Length
+            || length < 1 || length > (options ?? new()).MaximumReadBytes
             || value.Target is null || value.Target.Consumer is null || value.Target.Storage is null || value.Target.Policy is null
             || string.IsNullOrWhiteSpace(value.Key) || value.Key.Length > 2048
             || value.Sha256 is not { Length: 64 } || !value.Sha256.All(char.IsAsciiHexDigit))
@@ -49,7 +50,7 @@ public sealed class StorageMaterializedArtifactReader(IStorageContentGateway con
                 || item.Sha256 is not null && !string.Equals(item.Sha256, value.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw Error("artifact_storage_content_changed");
         }
-        var chunkSize = Math.Max(1, Math.Min(65536, value.Target.Policy.MaximumReadBytes));
+        var chunkSize = Math.Max(1, Math.Min((options ?? new()).TransferChunkBytes, value.Target.Policy.MaximumReadBytes));
         do
         {
             var count = (int)Math.Min(chunkSize, value.Length - bytes.Length);

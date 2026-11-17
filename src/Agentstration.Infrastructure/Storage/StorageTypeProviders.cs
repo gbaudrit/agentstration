@@ -59,14 +59,16 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
                         Version = LocalTypeVersion, SchemaDigest = StorageDigests.Schema(schema), ConfigurationSchema = schema,
                         EnvelopeSchemaDigest = StorageDigests.Schema(LocalEnvelopeSchema), EnvelopeSchema = LocalEnvelopeSchema,
                         Capabilities = new() { List = true, Stat = true, Read = true, Write = true },
-                        Limits = new(100, 65536, 65536)
+                        Limits = new(100, StorageContentOptions.SupportedMaximumBytes, StorageContentOptions.SupportedMaximumBytes)
                     }
                 ]
             }
         }, cancellationToken);
     }
 
-    public static JsonElement LocalEnvelopeSchema { get; } = JsonSerializer.SerializeToElement(new
+    public static JsonElement LocalEnvelopeSchema { get; } = EnvelopeSchema(StorageContentOptions.SupportedMaximumBytes);
+
+    private static JsonElement EnvelopeSchema(int maximumBytes) => JsonSerializer.SerializeToElement(new
     {
         type = "object",
         additionalProperties = false,
@@ -78,8 +80,8 @@ public sealed class StoragePlatformResourceProvisioner(StorageTypeManagementServ
             ["write"] = new { type = "boolean" },
             ["prefix"] = new { type = "string", maxLength = 256 },
             ["maximumPageSize"] = new { type = "integer", minimum = 1, maximum = 100 },
-            ["maximumReadBytes"] = new { type = "integer", minimum = 1, maximum = 65536 },
-            ["maximumWriteBytes"] = new { type = "integer", minimum = 1, maximum = 65536 },
+            ["maximumReadBytes"] = new { type = "integer", minimum = 1, maximum = maximumBytes },
+            ["maximumWriteBytes"] = new { type = "integer", minimum = 1, maximum = maximumBytes },
             ["keyFrom"] = new { type = "string", maxLength = 256 },
             ["keyBefore"] = new { type = "string", maxLength = 256 }
         }

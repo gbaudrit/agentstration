@@ -13,6 +13,10 @@ internal sealed class AgentstrationCompositionContext
         ArgumentNullException.ThrowIfNull(options.SourceRegistryTransport);
         ArgumentNullException.ThrowIfNull(options.RuntimeWorkerLease);
         ArgumentNullException.ThrowIfNull(options.RuntimeWorkerDispatch);
+        ArgumentNullException.ThrowIfNull(options.StorageContent);
+        ArgumentNullException.ThrowIfNull(options.DataSourceContent);
+        options.StorageContent.Validate();
+        options.DataSourceContent.Validate();
         StorageProvider = options.Storage.GetProvider();
         options.SourceRegistryTransport.Validate();
         options.RuntimeWorkerLease.Validate();

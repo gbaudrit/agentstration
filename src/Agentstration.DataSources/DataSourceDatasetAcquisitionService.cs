@@ -210,12 +210,12 @@ public sealed class DataSourceDatasetAcquisitionService(
                     output = recordProjection.Value;
                     recordContract = recordProjection.RecordContract;
                 }
-                if (output.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(output).Length > DataSourceDatasetCompositionService.MaximumValueBytes)
+                if (output.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(output).Length > compositions.MaximumValueBytes)
                     throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
                 if (acquisition.Dataset!.OutputSchemaSnapshot is not null)
                     DataContracts.Validate(DataSourceDatasetCompositionService.Contract(acquisition.Dataset, acquisition.Name), output,
                         "acquisition-output", acquisition.FlowRunId);
-                else DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset.OutputSchema, output);
+                else DataSourceDatasetCompositionService.ValidateOutput(acquisition.Dataset.OutputSchema, output, compositions.MaximumValueBytes);
                 if (recordProjection is null)
                 {
                     try
@@ -230,7 +230,7 @@ public sealed class DataSourceDatasetAcquisitionService(
                 var bytes = StorageRecordSets.Encode(output.EnumerateArray().ToArray());
                 if (acquisition.Dataset.Definition.Storage is null)
                 {
-                    if (bytes.Length > DataSourceDatasetCompositionService.MaximumValueBytes)
+                    if (bytes.Length > compositions.MaximumValueBytes)
                         throw Invalid("data_source_output_too_large", "The direct output exceeds the bounded handoff limit.");
                     directResult = new(bytes.Length, Digest(bytes), clock.GetUtcNow().AddMinutes(5), acquisition.IdempotencyKey ?? acquisition.Name);
                 }

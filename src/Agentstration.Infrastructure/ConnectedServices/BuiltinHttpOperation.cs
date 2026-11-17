@@ -128,7 +128,7 @@ internal static class BuiltinHttpOperation
         new(code, "The HTTP request URL or query parameter structure is invalid.");
 }
 
-internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver resolver, IHttpContentFetcher fetcher)
+internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver resolver, IHttpContentFetcher fetcher, DataSourceContentOptions? options = null)
 {
     private static readonly IReadOnlySet<string> AllowedMediaTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -158,13 +158,13 @@ internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver res
         var url = BuiltinHttpOperation.RequestUri(expected.Definition, parameters);
         // Redirects cannot change the selected service authority. Reuse the existing public-network,
         // timeout, media-type and bounded-body transport rather than introducing another HTTP client.
-        var response = await fetcher.FetchAsync(new(url, 48 * 1024, 0, TimeSpan.FromSeconds(20), AllowedMediaTypes), cancellationToken);
+        var response = await fetcher.FetchAsync(new(url, (options ?? new()).MaximumHttpResponseBytes, 0, TimeSpan.FromSeconds(20), AllowedMediaTypes), cancellationToken);
         string content;
         try { content = new UTF8Encoding(false, true).GetString(response.Content); }
         catch (DecoderFallbackException)
         { throw new DataSourceAcquisitionException("http_encoding_invalid", "The HTTP response must contain UTF-8 text."); }
         var result = JsonSerializer.SerializeToElement(new { mediaType = response.MediaType, content });
-        DataSourceDatasetCompositionService.ValidateValue(BuiltinHttpOperation.OutputSchema, result);
+        DataSourceDatasetCompositionService.ValidateValue(BuiltinHttpOperation.OutputSchema, result, (options ?? new()).MaximumValueBytes);
         return result;
     }
 

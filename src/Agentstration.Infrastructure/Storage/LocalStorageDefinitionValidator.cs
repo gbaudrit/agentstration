@@ -18,7 +18,7 @@ public sealed class LocalStorageDefinitionValidator : IStorageDefinitionValidato
         {
             var policy = definition.Envelope.Deserialize<StorageContentPolicy>(Json)
                 ?? throw new AspException("invalid_policy", "A local envelope is required.");
-            AspValidation.Policy(new(policy.List, policy.Stat, policy.Read, policy.Write, policy.Prefix,
+            StorageContentValidation.Policy(new(policy.List, policy.Stat, policy.Read, policy.Write, policy.Prefix,
                 policy.MaximumReadBytes, policy.MaximumWriteBytes, policy.MaximumPageSize, policy.KeyFrom, policy.KeyBefore));
         }
         catch (Exception exception) when (exception is AspException or JsonException)

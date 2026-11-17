@@ -20,7 +20,7 @@ namespace Agentstration.Infrastructure.Artifacts;
 public sealed class ArtifactProcessingService(ArtifactManagementService artifacts, IArtifactDurableStore durable,
     WorkspaceArtifactStorage selectableStorage, IRuntimeExecutionStateStore states, IFlowRepository runs,
     TimeProvider clock, DirectExecutionPayloadPersistence direct, IAuthorizationService authorization, ICurrentRequestContext current,
-    IRequestContextScopeFactory scopes) : IDisposable
+    IRequestContextScopeFactory scopes, Agentstration.Storage.StorageContentOptions? options = null) : IDisposable
 {
     private const string RuntimeType = "artifact-processing-v1";
     private const int MaximumInputBytes = 16 * 1024 * 1024;
@@ -267,8 +267,8 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         if (owner.TransientPayloads)
         {
             var bytes = Utf8.GetBytes(session.DirectOutput!);
-            // The existing Knowledge inline publication contract is bounded to 64 KiB.
-            if (bytes.Length > 65536) throw Error("artifact_processing_direct_output_too_large");
+            // Inline publication uses the same operator ceiling as retained content.
+            if (bytes.Length > (options ?? new()).MaximumObjectBytes) throw Error("artifact_processing_direct_output_too_large");
             var manifest = Element(new { artifactId = session.OutputId, kind = "inline", disposition = "publishable",
                 name = session.OutputName, mediaType = session.MediaType, dataContract = session.Contract, provenance = session.OutputProvenance, digest = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(bytes)),
                 contentBase64 = Convert.ToBase64String(bytes) });
@@ -465,7 +465,7 @@ public sealed class ArtifactProcessingService(ArtifactManagementService artifact
         if (kind == "inline")
         {
             var encoded = Text(value, "contentBase64");
-            if (encoded.Length > 87384) throw Error("artifact_processing_content_too_large");
+            if (encoded.Length > (((options ?? new()).MaximumObjectBytes + 2L) / 3) * 4) throw Error("artifact_processing_content_too_large");
             byte[] bytes;
             try { bytes = Convert.FromBase64String(encoded); }
             catch (FormatException) { throw Error("artifact_processing_content_invalid"); }

@@ -22,7 +22,7 @@ public sealed class KnowledgeProjectionInputResolver(
     DataSourceDatasetAcquisitionService datasets,
     ICurrentRequestContext current,
     IRequestContextScopeFactory requestScopes,
-    TimeProvider timeProvider) : IKnowledgeProjectionInputResolver
+    TimeProvider timeProvider, StorageContentOptions? options = null) : IKnowledgeProjectionInputResolver
 {
     public async Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
         ResourceScopeRef ownerScope,
@@ -345,9 +345,9 @@ public sealed class KnowledgeProjectionInputResolver(
         }
         await datasets.AcquireProjectionLeaseAsync(acquisition, requestId, cancellationToken);
         var item = acquisition.Content ?? throw Error("knowledge_projection_acquisition_empty", "The acquisition has no content.");
-        if (item.Length > 65536) throw Error("knowledge_projection_input_too_large", "The native input exceeds the inline Flow limit.");
+        if (item.Length > (options ?? new()).MaximumObjectBytes) throw Error("knowledge_projection_input_too_large", "The native input exceeds the inline Flow limit.");
         using var buffer = new MemoryStream();
-        var chunkSize = Math.Min(65536, acquisition.Dataset!.Definition.Rule.MaximumReadBytes);
+        var chunkSize = Math.Min((options ?? new()).TransferChunkBytes, acquisition.Dataset!.Definition.Rule.MaximumReadBytes);
         while (buffer.Length < item.Length)
         {
             Agentstration.Storage.Contracts.StorageObjectContent chunk;

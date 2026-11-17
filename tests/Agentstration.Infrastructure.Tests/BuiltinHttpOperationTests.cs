@@ -132,11 +132,13 @@ public sealed class BuiltinHttpOperationTests
         };
         var resolver = new ConnectionResolver(service, "https://example.test/search?q=changed-sample");
         var fetcher = new Fetcher();
-        var executor = new BuiltinHttpOperationExecutor(resolver, fetcher);
+        var executor = new BuiltinHttpOperationExecutor(resolver, fetcher, new()
+            { MaximumHttpResponseBytes = 4096, MaximumValueBytes = 512 });
         var context = new ConnectedServiceResolutionContext(ResourceScopeRef.Instance, operation.Address);
         var result = await executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { q = "configured" }), context, default);
         Assert.AreEqual("https://example.test/search?q=configured", fetcher.Request!.Url.AbsoluteUri);
         Assert.AreEqual(0, fetcher.Request.MaximumRedirects);
+        Assert.AreEqual(4096, fetcher.Request.MaximumBytes);
         Assert.AreEqual("application/rss+xml", result.GetProperty("mediaType").GetString());
         Assert.AreEqual("<rss/>", result.GetProperty("content").GetString());
         await executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { }), context, default);
@@ -149,6 +151,10 @@ public sealed class BuiltinHttpOperationTests
             Assert.AreEqual("http_operation_changed", failure.Code);
         }
         Assert.AreEqual(2, fetcher.Calls);
+        resolver.Sample = "https://example.test/search?q=sample";
+        var bounded = new BuiltinHttpOperationExecutor(resolver, fetcher, new() { MaximumValueBytes = 8 });
+        await Assert.ThrowsAsync<DataSourceValidationException>(() => bounded.AcquireAsync(service, operation,
+            JsonSerializer.SerializeToElement(new { }), context, default));
     }
 
     private sealed class ConnectionResolver(ConnectedServiceResource service, string sample) : IConnectedServiceResolver

@@ -278,3 +278,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 234. [ADR-0234 — Knowledge consultation reads only metadata](0234-knowledge-consultation-reads-only-metadata.md)
 
 235. [ADR-0235 — One Artifact owns a collection of JSON records](0235-json-record-projection.md)
+
+236. [ADR-0236 — Storage content has operator ceilings and resource envelopes](0236-storage-content-has-operator-ceilings-and-resource-envelopes.md)
