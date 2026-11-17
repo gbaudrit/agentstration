@@ -154,7 +154,7 @@ export class GovernedKnowledgePage {
     await status(updated, 200);
     const latest = await (await this.get(consoleUrl, `${path}/versions/2.0.0`, scope)).json() as { members: { toolName: string }[] };
     expect(latest.members.map(member => member.toolName)).toContain(additionalTool);
-    expect(latest.members).toHaveLength(5);
+    expect(latest.members).toHaveLength(toolSet.definition.members.length + 1);
     expect(await (await this.get(consoleUrl, `${path}/versions/1.0.0`, scope)).json()).toEqual(originalVersion);
 
     await this.openToolSet(consoleUrl, evidence.toolSetName, scope);
