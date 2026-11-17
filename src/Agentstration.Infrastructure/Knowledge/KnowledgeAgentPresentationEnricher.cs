@@ -35,8 +35,9 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
             var business = await metadata.DescriptionAsync(source, selection, null, cancellationToken);
             var usage = published.Metadata.Annotations.GetValueOrDefault(KnowledgeToolMetadataService.UsageAnnotation)
                 ?? published.Definition.Description ?? string.Empty;
+            var profile = KnowledgeToolMetadataService.Profile(published);
             tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(selection?.BindingName ?? source.Definition.DisplayName,
-                business.Description, usage, KnowledgeToolMetadataService.Profile(published)));
+                business.Description, usage, profile), KnowledgeToolMetadataService.InputSchemaForModel(tool.InputSchema, profile));
             if (published.Metadata.Annotations.GetValueOrDefault("agentstration.io/knowledge-operation") == "describe")
                 sources.Add(new
                 {
@@ -62,7 +63,7 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
         return new(instructions, tools);
     }
 
-    private sealed record PresentedTool(IAgentTool Inner, string Description) : IAgentTool
+    private sealed record PresentedTool(IAgentTool Inner, string Description, JsonElement InputSchema) : IAgentTool
     {
         public string Id => Inner.Id;
         public string Name => Inner.Name;
@@ -70,7 +71,6 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
         public ResourceNamespace? Namespace => Inner.Namespace;
         public ResourceNamespace? ProviderNamespace => Inner.ProviderNamespace;
         public string? ExternalId => Inner.ExternalId;
-        public JsonElement InputSchema => Inner.InputSchema;
         public JsonElement? OutputSchema => Inner.OutputSchema;
         public bool RequiresApproval => Inner.RequiresApproval;
         public ResourceScopeRef? ScopeRef => Inner.ScopeRef;

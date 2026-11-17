@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
@@ -59,6 +60,7 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
         var name = tool.Contribution?.BindingName ?? source.Definition.DisplayName;
         return tool with
         {
+            InputSchema = InputSchemaForModel(tool.InputSchema, tool.Profile),
             BusinessDescription = business.Description,
             DisplayName = name + " · " + KnowledgeAccessSchemas.Route(tool.Operation),
             Description = Format(name, business.Description, tool.Usage ?? tool.Description, tool.Profile)
@@ -68,6 +70,41 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
     public static string Format(string name, string? business, string usage, StorageQueryProfilePin? profile = null) =>
         (string.IsNullOrWhiteSpace(business) ? name + ": " + usage : name + ": " + business + "\n" + usage)
         + (profile?.Id == "odata/4.01" ? ODataQueryGuidance : string.Empty) + ArgumentGuidance;
+
+    // Presentation may narrow a pinned profile's accepted input language, never widen the published relay.
+    public static JsonElement InputSchemaForModel(JsonElement schema, StorageQueryProfilePin? profile)
+    {
+        if (profile is not { Id: "odata/4.01", Encoding: "odata-options+json" }
+            || !schema.TryGetProperty("properties", out var properties)
+            || !properties.TryGetProperty("request", out var request)
+            || !request.TryGetProperty("properties", out var requestProperties)
+            || !requestProperties.TryGetProperty("query", out _)) return schema;
+        var root = JsonNode.Parse(schema.GetRawText())!.AsObject();
+        var requestNode = root["properties"]!["request"]!.AsObject();
+        var fields = requestNode["properties"]!.AsObject();
+        requestNode["description"] = "Call arguments. Put all parameters here, including pageSize as a JSON number. No parameters belong beside request.";
+        fields["query"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["description"] = "OData options object, not a URL or query string. Use declared record fields and OData expressions, for example status eq 'open'.",
+            ["properties"] = new JsonObject
+            {
+                ["$filter"] = Option(4096),
+                ["$select"] = Option(1024),
+                ["$orderby"] = Option(1024),
+                ["$apply"] = Option(2048)
+            },
+            ["additionalProperties"] = false
+        };
+        if (fields["pageSize"] is JsonObject pageSize)
+            pageSize["description"] = "Optional JSON integer, for example 50. Put it inside request; never use a quoted string.";
+        var required = root["required"] as JsonArray ?? new JsonArray();
+        if (!required.Any(value => value?.GetValue<string>() == "request")) required.Add("request");
+        root["required"] = required.DeepClone();
+        return JsonSerializer.SerializeToElement(root);
+
+        static JsonObject Option(int maximum) => new() { ["type"] = "string", ["maxLength"] = maximum };
+    }
 
     public static StorageQueryProfilePin? Profile(ToolDefinitionVersionResource publication) =>
         publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>()

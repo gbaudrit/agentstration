@@ -5,16 +5,16 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Storage;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -92,12 +92,18 @@ public sealed partial class ConnectedServiceApiTests
                 // Explicit fixture grants: production provisioning must preserve access decisions.
                 var typeStored = (await store.GetExactAsync<ConnectedServiceTypeResource>(new(type.ScopeRef!.Value,
                     type.Namespace, type.Kind, type.Name), default))!;
-                type = (await store.PutExactAsync(type.ScopeRef.Value, type with { Definition = type.Definition with
-                    { UsePolicy = new() { Grants = [new(owner)] } } }, typeStored.ETag, false, default)).Value;
+                type = (await store.PutExactAsync(type.ScopeRef.Value, type with
+                {
+                    Definition = type.Definition with
+                    { UsePolicy = new() { Grants = [new(owner)] } }
+                }, typeStored.ETag, false, default)).Value;
                 var operationType = (await store.GetExactAsync<ConnectedServiceOperationTypeResource>(new(ResourceScopeRef.Instance,
                     ResourceNamespace.Default, ConnectedServiceResourceKinds.ConnectedServiceOperationType, "http-get"), default))!;
-                _ = await store.PutExactAsync(ResourceScopeRef.Instance, operationType.Value with { Definition = operationType.Value.Definition with
-                    { UsePolicy = new() { Grants = [new(owner)] } } }, operationType.ETag, false, default);
+                _ = await store.PutExactAsync(ResourceScopeRef.Instance, operationType.Value with
+                {
+                    Definition = operationType.Value.Definition with
+                    { UsePolicy = new() { Grants = [new(owner)] } }
+                }, operationType.ETag, false, default);
                 var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
                 var localType = (await store.ListExactAsync<StorageTypeResource>(ResourceScopeRef.Instance,
                     StorageResourceKinds.StorageType, 0, 100, default)).Single(item => item.Value.Name == "local").Value;
@@ -120,8 +126,13 @@ public sealed partial class ConnectedServiceApiTests
         var properties = new ConnectedServiceProperties
         {
             DisplayName = "News HTTP",
-            Type = new() { Type = new(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid,
-                Version = version.Version, SchemaDigest = version.SchemaDigest },
+            Type = new()
+            {
+                Type = new(type.Name, type.ScopeRef, type.Namespace),
+                TypeUid = type.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest
+            },
             Options = JsonSerializer.SerializeToElement(new { }),
             Bindings = [new() { InputId = "baseUrl", Kind = ConnectedServiceBindingKind.Literal,
                 Literal = JsonSerializer.SerializeToElement("https://news.example.test/rss/search?q=Nantes+when:1d&hl=fr&gl=FR&ceid=FR:fr") }]
@@ -197,7 +208,9 @@ public sealed partial class ConnectedServiceApiTests
             using var content = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content", timeout.Token);
             Assert.AreEqual(HttpStatusCode.OK, content.StatusCode, await content.Content.ReadAsStringAsync(timeout.Token));
             var storedContent = (await content.Content.ReadFromJsonAsync<StorageObjectContent>(timeout.Token))!;
-            var output = JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(storedContent.ContentBase64));
+            var records = JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(storedContent.ContentBase64));
+            Assert.AreEqual(1, records.GetArrayLength());
+            var output = records[0];
             Assert.AreEqual("application/rss+xml", output.GetProperty("mediaType").GetString());
             Assert.Contains("<rss>", output.GetProperty("content").GetString()!);
             results.Add(acquisition);
@@ -225,7 +238,7 @@ public sealed partial class ConnectedServiceApiTests
             Assert.AreEqual(HttpMethod.Get, request.Method);
             requests.Enqueue(request.RequestUri!);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                { Content = new StringContent("<rss><channel><title>Fixture</title></channel></rss>", Encoding.UTF8, "application/rss+xml") });
+            { Content = new StringContent("<rss><channel><title>Fixture</title></channel></rss>", Encoding.UTF8, "application/rss+xml") });
         }
     }
 }

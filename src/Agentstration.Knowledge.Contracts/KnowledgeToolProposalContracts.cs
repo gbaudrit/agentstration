@@ -56,6 +56,7 @@ public sealed record KnowledgeContributionDescription(KnowledgeContributionSelec
     public string? Description { get; init; }
     public string DescriptionSource { get; init; } = "published";
     public IReadOnlyList<string> MediaTypes { get; init; } = [];
+    public IReadOnlyList<JsonElement> RecordSchemas { get; init; } = [];
 }
 public sealed record KnowledgeToolSummary(string Route, KnowledgeSourceOperation Operation, string DisplayName,
     string? Description, KnowledgeContributionSelection? Contribution);

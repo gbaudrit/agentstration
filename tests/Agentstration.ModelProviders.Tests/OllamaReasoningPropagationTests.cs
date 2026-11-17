@@ -189,6 +189,45 @@ public sealed class OllamaReasoningPropagationTests
         resolver, null!, null!, null!, null!, null!, null!, null!, null!, TimeProvider.System,
         new CurrentRequestContext(), NullLogger<RuntimeWorkerOperationGateway>.Instance);
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task WorkerKnowledgeSchemasAndInstructionsReachTheNativeOllamaRequest(bool streaming)
+    {
+        using var capture = new NativeRequestHandler();
+        await using var extension = new OllamaExtensionFactory(capture);
+        using var http = extension.CreateClient();
+        var gateway = CreateGateway(CreateResolver(http, new ModelReasoningOptions { Mode = ReasoningMode.Disabled }));
+        var profile = new Agentstration.Storage.Contracts.StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model");
+        var published = JsonSerializer.Deserialize<JsonElement>("""
+            {"type":"object","properties":{"request":{"type":"object","properties":{"query":{},"pageSize":{"type":"integer"}},"additionalProperties":false}},"additionalProperties":false}
+            """);
+        var schema = Agentstration.Knowledge.KnowledgeToolMetadataService.InputSchemaForModel(published, profile);
+        var description = Agentstration.Knowledge.KnowledgeToolMetadataService.Format("records", null, "Query records.", profile);
+        var instructions = "Discover the selected input before querying." + Agentstration.Knowledge.KnowledgeToolMetadataService.ArgumentGuidance;
+        var request = WorkerRequest();
+        request = request with
+        {
+            Agent = request.Agent with
+            {
+                Instructions = instructions,
+                Tools = [new RuntimeExecutionToolMaterial("records-query", default, "records_query", description, schema, null, false, "agentstration", null, "records-query")]
+            }
+        };
+        if (streaming)
+        {
+            await foreach (var _ in gateway.StreamModelAsync(request, default)) { }
+        }
+        else await gateway.InvokeModelAsync(request, default);
+        var function = capture.LastRequest.GetProperty("tools").EnumerateArray().Single().GetProperty("function");
+        Assert.AreEqual("records_query", function.GetProperty("name").GetString());
+        StringAssert.Contains(function.GetProperty("description").GetString()!, "request.snapshotId");
+        var parameters = function.GetProperty("parameters");
+        Assert.IsTrue(JsonElement.DeepEquals(schema, parameters));
+        var system = capture.LastRequest.GetProperty("messages").EnumerateArray().Where(message => message.GetProperty("role").GetString() == "system");
+        Assert.IsTrue(system.Any(message => message.GetProperty("content").GetString()!.Contains("Never send snapshotId", StringComparison.Ordinal)));
+    }
+
     private static RuntimeGovernedModelRequest WorkerRequest() => new(
         new("material", "agent", Guid.NewGuid(), "agent", 1, "revision", "hash", "handler",
             "Agent", "Agent", "Instructions", "profile", ResourceNamespace.Default, []),

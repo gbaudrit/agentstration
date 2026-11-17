@@ -73,6 +73,8 @@ public sealed partial class KnowledgeAccessService
                 detailed ? artifacts.Where(a => a.DataContract?.Schema is not null).Select(a => a.DataContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
                 detailed ? input?.AcquisitionId : null, detailed ? input?.AcquiredAt : null)
             {
+                RecordSchemas = detailed ? artifacts.Where(a => a.RecordContract?.Schema is not null)
+                    .Select(a => a.RecordContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
                 Description = business.Description,
                 DescriptionSource = business.Origin,
                 MediaTypes = artifacts.Select(a => a.MediaType).Distinct(StringComparer.Ordinal).ToArray()

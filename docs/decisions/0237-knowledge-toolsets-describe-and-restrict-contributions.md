@@ -1,4 +1,4 @@
-# ADR-0235: Knowledge ToolSets describe and restrict published contributions
+# ADR-0237: Knowledge ToolSets describe and restrict published contributions
 
 ## Status
 
@@ -98,15 +98,27 @@ Tool and instructs the Agent to discover inputs before first data access, obtain
 selected-input contracts when needed, and reuse evidence for the same exposure
 and Snapshot. Direct MAF creation and AWP materialization use this same boundary.
 This runtime presentation does not rewrite authored instructions, revision hashes,
-Tool references, schemas, approval flags or grants.
+Tool references, published schemas, approval flags or grants. For an exact pinned
+OData profile, model presentation narrows the generic `request.query` value to
+its supported object/string-option schema and requires the `request` envelope.
+The same presentation applies to detailed discovery and AWP model material;
+publication and authoritative execution retain their immutable contracts.
 
 Existing source-wide native APIs remain available. New exposure publication
 uses contribution-specific relays and explicit ToolSet adoption. Native input/
 output contracts gain contribution/discovery support; old incompatible relay
 pins fail explicitly and require new publication/adoption. Initialization target
-9 reconciles the additional native Tool and its standard grants. No relational
+10 reconciles the additional native Tool and its standard grants. No relational
 migration or historical JSON rewrite is required; membership, descriptions,
 proposal and assignment fields are additive.
+
+The JSON record model from ADR-0235 remains independent of contribution identity.
+A selected logical Artifact contributes all its immutable member document IDs to
+the provider selection before filtering, aggregation and paging. Query results
+retain the logical Artifact and member ordinal, and continuations preserve the
+same contribution. Detailed discovery distinguishes whole-Artifact schemas from
+record schemas. Operator content ceilings from ADR-0236 continue to narrow the
+applicable Storage and acquisition budgets; Tool exposure does not widen them.
 
 ## Consequences
 

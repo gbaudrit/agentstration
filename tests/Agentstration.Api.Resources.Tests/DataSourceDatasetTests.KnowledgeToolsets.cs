@@ -46,14 +46,21 @@ public sealed partial class DataSourceDatasetTests
             var transform = await PublishAsync(factory.Services, "mixed-" + name, KnowledgeFlowContracts.ArtifactTransformation,
                 JsonSerializer.SerializeToElement(new
                 {
-                    artifacts = values.Select((value, i) => new
+                    artifacts = new[] { new
                     {
-                        artifactId = name + "-" + i,
+                        artifactId = name + "-records",
                         kind = "inline",
                         disposition = "publishable",
                         mediaType = "application/json",
-                        contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { status = name, value })))
-                    }).ToArray()
+                        recordContract = Agentstration.Schemas.DataContracts.Declared(JsonSerializer.SerializeToElement(new
+                        {
+                            type = "object",
+                            properties = new { status = new { type = "string" }, value = new { type = "integer" } },
+                            required = new[] { "status", "value" },
+                            additionalProperties = false
+                        }), "mixed-records", "application/json"),
+                        contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(values.Select(value => new { status = name, value })))
+                    } }
                 }));
             return new()
             {
@@ -143,6 +150,14 @@ public sealed partial class DataSourceDatasetTests
         var aggregate = await Run(selected.Tool, new { snapshotId = a, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } });
         Assert.AreEqual(2, aggregate.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Count").GetInt32());
         Assert.AreEqual(30, aggregate.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Total").GetInt32());
+        var records = await Run(selected.Tool, new { snapshotId = a, query = new { }, pageSize = 1 });
+        var member = records.GetProperty("records").EnumerateArray().Single();
+        Assert.AreEqual(0, member.GetProperty("memberOrdinal").GetInt32());
+        Assert.AreEqual(member.GetProperty("artifactId").GetString(), records.GetProperty("documentArtifacts").EnumerateObject().Single().Value.GetString());
+        var continuation = await Run(selected.Tool, new { cursor = records.GetProperty("nextCursor").GetString() });
+        var nextMember = continuation.GetProperty("records").EnumerateArray().Single();
+        Assert.AreEqual(member.GetProperty("artifactId").GetString(), nextMember.GetProperty("artifactId").GetString());
+        Assert.AreEqual(1, nextMember.GetProperty("memberOrdinal").GetInt32());
         var contracts = exposure.Value.Operations.Single(t => t.Operation == KnowledgeSourceOperation.SearchRegex && t.Proposal!.Contribution!.BindingName == "contracts");
         var matches = await Run(contracts.Tool, new { snapshotId = a, pattern = "contracts" });
         Assert.AreEqual(1, matches.GetProperty("matches").GetArrayLength());
@@ -265,7 +280,11 @@ public sealed partial class DataSourceDatasetTests
             StringAssert.Contains(options.Instructions!, "mixed-knowledge");
             Assert.IsFalse(options.Instructions!.Contains("unassigned-knowledge", StringComparison.Ordinal));
             StringAssert.Contains(options.Instructions!, "before the first data access");
-            var queryDescription = tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal)).Description!;
+            var queryDeclaration = tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal));
+            var querySchema = queryDeclaration.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query");
+            Assert.AreEqual("object", querySchema.GetProperty("type").GetString());
+            Assert.IsTrue(querySchema.GetProperty("properties").TryGetProperty("$filter", out _));
+            var queryDescription = queryDeclaration.Description!;
             StringAssert.Contains(queryDescription, "Current invoice purpose");
             StringAssert.Contains(queryDescription, "$filter");
             StringAssert.Contains(queryDescription, "eq/ne/gt/ge/lt/le");
@@ -282,6 +301,9 @@ public sealed partial class DataSourceDatasetTests
                 var detail = JsonSerializer.SerializeToElement(results[1].Result);
                 Assert.AreEqual("input", detail.GetProperty("detailLevel").GetString());
                 ObservedDetailedInputs = detail.GetProperty("contributions").GetArrayLength();
+                var recordSchema = detail.GetProperty("contributions")[0].GetProperty("recordSchemas").EnumerateArray().Single();
+                Assert.AreEqual("object", recordSchema.GetProperty("type").GetString());
+                Assert.IsTrue(recordSchema.GetProperty("properties").TryGetProperty("status", out _));
                 Assert.HasCount(1, detail.GetProperty("tools").EnumerateArray());
             }
             if (results.Length > 2)

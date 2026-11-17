@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
@@ -8,8 +10,6 @@ using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
-using System.Text.Json;
-using System.Security.Cryptography;
 using Agentstration.Storage;
 
 namespace Agentstration.Infrastructure.Flows;
@@ -22,7 +22,7 @@ public sealed class KnowledgeProjectionInputResolver(
     DataSourceDatasetAcquisitionService datasets,
     ICurrentRequestContext current,
     IRequestContextScopeFactory requestScopes,
-    TimeProvider timeProvider) : IKnowledgeProjectionInputResolver
+    TimeProvider timeProvider, StorageContentOptions? options = null) : IKnowledgeProjectionInputResolver
 {
     public async Task<ResolvedKnowledgeDataSourceBinding> ResolveDependencyAsync(
         ResourceScopeRef ownerScope,
@@ -340,13 +340,14 @@ public sealed class KnowledgeProjectionInputResolver(
             var value = await datasets.ReadDirectAsync(acquisition, requestId, cancellationToken);
             return [new() { ArtifactId = "direct-" + acquisition.Uid.ToString("N"), Kind = KnowledgeArtifactKind.Inline,
                 Disposition = KnowledgeArtifactDisposition.Publishable, MediaType = "application/json", Digest = direct.Sha256,
-                DataContract = DatasetContract(acquisition), ContentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(value)) }];
+                DataContract = DatasetContract(acquisition), RecordContract = acquisition.RecordContract,
+                ContentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(value)) }];
         }
         await datasets.AcquireProjectionLeaseAsync(acquisition, requestId, cancellationToken);
         var item = acquisition.Content ?? throw Error("knowledge_projection_acquisition_empty", "The acquisition has no content.");
-        if (item.Length > 65536) throw Error("knowledge_projection_input_too_large", "The native input exceeds the inline Flow limit.");
+        if (item.Length > (options ?? new()).MaximumObjectBytes) throw Error("knowledge_projection_input_too_large", "The native input exceeds the inline Flow limit.");
         using var buffer = new MemoryStream();
-        var chunkSize = Math.Min(65536, acquisition.Dataset!.Definition.Rule.MaximumReadBytes);
+        var chunkSize = Math.Min((options ?? new()).TransferChunkBytes, acquisition.Dataset!.Definition.Rule.MaximumReadBytes);
         while (buffer.Length < item.Length)
         {
             Agentstration.Storage.Contracts.StorageObjectContent chunk;
@@ -368,13 +369,12 @@ public sealed class KnowledgeProjectionInputResolver(
         }
         return [new() { ArtifactId = acquisition.Manifest?.Artifacts.SingleOrDefault()?.ArtifactId ?? acquisition.Name, Kind = KnowledgeArtifactKind.Inline,
             Disposition = KnowledgeArtifactDisposition.Publishable, MediaType = "application/json",
-            DataContract = DatasetContract(acquisition), Digest = item.Sha256, ContentBase64 = Convert.ToBase64String(buffer.ToArray()) }];
+            DataContract = DatasetContract(acquisition), RecordContract = acquisition.RecordContract,
+            Digest = item.Sha256, ContentBase64 = Convert.ToBase64String(buffer.ToArray()) }];
     }
 
     private static Agentstration.Schemas.ResolvedDataContract? DatasetContract(DataSourceAcquisitionResource acquisition) =>
-        Agentstration.Schemas.DataContracts.Declared(acquisition.Dataset?.OutputSchema,
-            $"datasource:{acquisition.DataSourceName}/acquisition:{acquisition.Name}/output", "application/json") is { } contract
-                ? contract with { Validated = true } : null;
+        acquisition.RecordContract is { } recordContract ? Agentstration.Schemas.JsonRecordProjection.Collection(recordContract) : null;
 
     private bool IsStale(KnowledgeDataSourceBinding binding, DateTimeOffset? completedAt) =>
         !KnowledgeFreshness.IsFresh(binding, completedAt, timeProvider);

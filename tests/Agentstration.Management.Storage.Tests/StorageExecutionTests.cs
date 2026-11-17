@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.Agents;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
@@ -18,6 +20,81 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class StorageExecutionTests
 {
+    [TestMethod]
+    public async Task ConfiguredLimitsAllowLargeObjectsAndRetainedArtifactsWhileEnforcingEveryNarrowerBound()
+    {
+        var limits = new StorageContentOptions
+        {
+            MaximumReadBytes = 128 * 1024, MaximumWriteBytes = 256 * 1024,
+            MaximumObjectBytes = 256 * 1024, TransferChunkBytes = 4096
+        };
+        await using var factory = await FixtureAsync(limits);
+        var services = factory.Services;
+        var context = await InstanceContextAsync(services, factory.Context);
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var scope = ResourceScopeRef.Instance;
+        var management = services.GetRequiredService<StorageManagementService>();
+        var resource = (await management.GetExactAsync(scope, ResourceNamespace.Default,
+            LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        var request = Target(resource.Value, scope);
+        var gateway = services.GetRequiredService<IStorageContentGateway>();
+        var bytes = Enumerable.Repeat((byte)42, limits.MaximumObjectBytes).ToArray();
+        var write = new StorageWrite("large-content", services.GetRequiredService<TimeProvider>().GetUtcNow().AddMinutes(1),
+            "notes/large", Convert.ToBase64String(bytes));
+        var item = await gateway.WriteAsync(request, write);
+        Assert.AreEqual((long)bytes.Length, item.Length);
+        Assert.AreEqual(item.Version, (await gateway.WriteAsync(request, write)).Version);
+        var materialized = new ArtifactStorageMaterialization(new(context.WorkspaceId), request,
+            item.Key, item.Version, item.Length, item.Sha256!);
+        var reader = services.GetRequiredService<StorageMaterializedArtifactReader>();
+        CollectionAssert.AreEqual(bytes[..100], (await reader.ReadAsync(new(context.WorkspaceId), materialized, 0, 100, default)).ToArray());
+        var excessive = await Assert.ThrowsAsync<StorageException>(() => gateway.WriteAsync(request,
+            write with { RequestId = "excessive", Key = "notes/excessive", ContentBase64 = Convert.ToBase64String(new byte[bytes.Length + 1]) }));
+        Assert.AreEqual("storage_content_limit_exceeded", excessive.Code);
+        var readLimit = await Assert.ThrowsAsync<StorageException>(() => gateway.ReadAsync(request,
+            item.Reference, 0, limits.MaximumReadBytes + 1));
+        Assert.AreEqual("storage_content_limit_exceeded", readLimit.Code);
+        var consumer = request with { Policy = request.Policy with { MaximumWriteBytes = 3 } };
+        var consumerLimit = await Assert.ThrowsAsync<StorageException>(() => gateway.WriteAsync(consumer,
+            write with { RequestId = "consumer-limit", Key = "notes/consumer", ContentBase64 = Convert.ToBase64String(new byte[4]) }));
+        Assert.AreEqual("storage_content_limit_exceeded", consumerLimit.Code);
+
+        var publications = services.GetRequiredService<IStoragePublicationGateway>();
+        var publication = await publications.PrepareAsync(request, "large-publication", bytes, default);
+        await publications.SealAsync(publication, default);
+        CollectionAssert.AreEqual(bytes[..100], (await reader.ReadAsync(new(context.WorkspaceId),
+            new(new(context.WorkspaceId), publication.Target, publication.Key, publication.Version,
+                publication.Length, publication.Sha256, publication), 0, 100, default)).ToArray());
+        var publicationLimit = await Assert.ThrowsAsync<StorageException>(() =>
+            publications.PrepareAsync(request, "too-large", new byte[bytes.Length + 1], default));
+        Assert.AreEqual("storage_publication_limit", publicationLimit.Code);
+
+        using var authority = services.GetRequiredService<IResourceGovernanceContext>().Push(ResourceGovernance.Core("storage.local-default", "1.0.0"));
+        var changed = await management.ReconcileAsync(scope, resource.Value.Namespace, resource.Value.Name,
+            resource.Value.Definition with { Envelope = JsonSerializer.SerializeToElement(new
+                { write = true, maximumReadBytes = 8, maximumWriteBytes = 4 }) }, resource.ETag, default);
+        var envelopeLimit = await Assert.ThrowsAsync<StorageException>(() => gateway.WriteAsync(Target(changed.Value, scope),
+            write with { RequestId = "envelope-limit", Key = "notes/envelope", ContentBase64 = Convert.ToBase64String(new byte[5]) }));
+        Assert.AreEqual("storage_content_limit_exceeded", envelopeLimit.Code);
+    }
+
+    [TestMethod]
+    public async Task ConfiguredRecordSetLimitCannotBeWidenedByTheConsumerPolicy()
+    {
+        await using var factory = await FixtureAsync(new()
+            { MaximumObjectBytes = 64, MaximumWriteBytes = 64, MaximumReadBytes = 64, TransferChunkBytes = 64 });
+        var services = factory.Services;
+        var context = await InstanceContextAsync(services, factory.Context);
+        using var caller = services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context);
+        var resource = (await services.GetRequiredService<StorageManagementService>().GetExactAsync(ResourceScopeRef.Instance,
+            ResourceNamespace.Default, LocalStorageDefaultsProvisioner.DefaultName, default))!;
+        var target = Target(resource.Value, ResourceScopeRef.Instance);
+        var failure = await Assert.ThrowsAsync<StorageException>(() => services.GetRequiredService<IStoragePublicationGateway>()
+            .PrepareRecordsAsync(target, "record-set-too-large",
+                [JsonSerializer.SerializeToElement(new { content = new string('x', 64) })], default));
+        Assert.AreEqual("storage_publication_limit", failure.Code);
+    }
+
     [TestMethod]
     public async Task InstanceDefaultIsFunctionalAndDifferentStoragesNeverShareContentAuthority()
     {
@@ -260,7 +337,7 @@ public sealed class StorageExecutionTests
         Assert.AreEqual(foreign.ETag, (await resources.GetExactAsync<StorageResource>(address with { ScopeRef = ResourceScopeRef.Workspace(colliding.Id) }, default))!.ETag);
     }
 
-    private static async Task<StorageFixture> FixtureAsync()
+    private static async Task<StorageFixture> FixtureAsync(StorageContentOptions? limits = null)
     {
         var directory = Path.Combine(Path.GetTempPath(), $"agentstration-storage-execution-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -275,6 +352,7 @@ public sealed class StorageExecutionTests
             flowConnectionString: Connection("flow"),
             runtimeConnectionString: Connection("runtime"),
             enableHostedServices: false);
+        if (limits is not null) services.AddSingleton(limits);
         var provider = services.BuildServiceProvider();
         try
         {

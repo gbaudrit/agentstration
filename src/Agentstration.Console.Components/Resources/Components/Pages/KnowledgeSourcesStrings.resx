@@ -196,4 +196,7 @@
   <data name="ToolIssue.QueryUnsupported" xml:space="preserve"><value>Contribution queries require immutable publications, document selection and a supported query profile.</value></data>
   <data name="ToolIssue.Unavailable" xml:space="preserve"><value>This operation is unavailable. Review the saved source, output and access settings.</value></data>
   <data name="ContributionDescriptionHelp" xml:space="preserve"><value>Leave empty to inherit the Data Source description. A custom description applies to this input only. Description edits do not require Tool republication.</value></data>
+  <data name="RecordArtifact" xml:space="preserve"><value>Artifact</value></data>
+  <data name="RecordOrdinal" xml:space="preserve"><value>Record {0}</value></data>
+  <data name="RecordCount" xml:space="preserve"><value>{0} JSON records</value></data>
 </root>

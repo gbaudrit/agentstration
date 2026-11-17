@@ -53,6 +53,16 @@ Every successful projection creates and activates a distinct immutable Snapshot.
 
 ## Native datasets and independent Snapshot output
 
+JSON storage accepts a collection of object records under one logical Artifact.
+By default the acquired root object is one record, with its root contract. Use
+`json.explode` and an exact item Schema to select `/results` into multiple records
+at Data Source transformations, on a Knowledge binding, or before publication.
+Document Storage writes one independently queryable row per record; built-in local
+Storage writes one physical JSON file per record. The whole Artifact remains a
+single array with a derived collection contract. Its detail page shows membership
+and the row contract without reading the files, and explicitly reads a selected
+record on demand. `artifact.explode` instead creates independent Artifacts.
+
 A native dataset binding uses its saved acquisition parameters and exact Storage
 revision. Select an **output Storage** on the Knowledge Source to enable native
 projection. Input and output Storages are independent. The output prefix narrows
@@ -340,4 +350,4 @@ Existing immutable Tools/ToolSets and Agent/Flow pins are not rewritten. Publish
 and explicitly adopt a new exposure to use contribution-specific access. Older
 native relay contracts which no longer match their platform source fail
 explicitly and require republication; historical Snapshot content remains intact.
-See [ADR-0235](../decisions/0235-knowledge-toolsets-describe-and-restrict-contributions.md).
+See [ADR-0237](../decisions/0237-knowledge-toolsets-describe-and-restrict-contributions.md).

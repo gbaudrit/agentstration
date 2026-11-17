@@ -8,3 +8,5 @@ code {
 article {
     margin-block: 1rem;
 }
+.knowledge-record-lineage { min-width: 0; overflow-wrap: anywhere; }
+.knowledge-record-lineage code { white-space: normal; overflow-wrap: anywhere; }

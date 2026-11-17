@@ -330,7 +330,7 @@ public sealed partial class ConnectedServiceApiTests
                 Compositions = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>
                 {
                     ["transformations"] = [new() { Function = new("json-select-builtin", "1.0.0", ResourceScopeRef.Instance),
-                        Parameters = JsonSerializer.SerializeToElement(new { path = "/dataset" }) }]
+                        Parameters = JsonSerializer.SerializeToElement(new { path = "" }) }]
                 }
             };
             using var save = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest(dataset,
@@ -356,7 +356,8 @@ public sealed partial class ConnectedServiceApiTests
             Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
             var content = (await read.Content.ReadFromJsonAsync<StorageObjectContent>())!;
             var storedJson = JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(content.ContentBase64));
-            Assert.AreEqual(dataset, transform ? storedJson.GetString() : storedJson.GetProperty("dataset").GetString());
+            Assert.AreEqual(1, storedJson.GetArrayLength());
+            Assert.AreEqual(dataset, storedJson[0].GetProperty("dataset").GetString());
             results.Add(acquisition);
         }
         Assert.AreNotEqual(results[0].Content!.Key, results[1].Content!.Key);

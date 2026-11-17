@@ -38,11 +38,87 @@ Configuration is `{}`. The local envelope uses `StorageContentPolicy` fields:
 defaults; write defaults to false. Both schema and pure local restriction
 validation run during management, without resolving a Secret or touching content.
 
-Limits are 100 items/page, 65,536 bytes/read or write, 1,024 current objects,
+The type supports up to 16 MiB per read/write, subject to operator and resource limits.
+Defaults are 10 MiB per read/write and content object, 100 items/page, 1,024 current objects,
 64 MiB total current content and 512 outstanding write receipts per Storage.
 Expired receipts are pruned at a subsequent write. Capacity refusal is explicit.
 Overwritten object versions become unavailable; no stable-version or durable
 Snapshot retention capability is advertised.
+
+### Operator ceilings and per-Storage limits
+
+Configure the authoritative server in `appsettings.json` or environment variables:
+
+```json
+{
+  "Agentstration": {
+    "StorageContent": {
+      "MaximumReadBytes": 10485760,
+      "MaximumWriteBytes": 10485760,
+      "MaximumObjectBytes": 10485760,
+      "TransferChunkBytes": 65536,
+      "MaximumPageSize": 100,
+      "LocalMaximumStoreBytes": 67108864,
+      "LocalMaximumObjects": 1024,
+      "LocalMaximumReceipts": 512,
+      "LocalMaximumPublications": 1024
+    },
+    "DataSourceContent": {
+      "MaximumValueBytes": 10485760,
+      "MaximumHttpResponseBytes": 10485760
+    }
+  }
+}
+```
+
+For example, `Agentstration__StorageContent__MaximumWriteBytes=10485760` sets the
+server write ceiling to 10 MiB. Restart the authority to apply configuration.
+Invalid values fail during composition. Supported payload/object budgets are
+1–16,777,216 bytes; transfer chunks are 1–65,536 bytes and pages are 1–100 objects.
+Local decoded object capacity must be at least the configured object budget and
+at most 1 GiB; count quotas accept 1–100,000. Publication count is per Storage and
+execution Workspace; object, decoded-byte and receipt quotas apply to the mutable
+local object backend, independently of retained publications and native Artifact files.
+
+In the Console Storage editor, use the existing envelope to restrict a particular
+Storage, for example:
+
+```json
+{
+  "list": true, "stat": true, "read": true, "write": true,
+  "maximumReadBytes": 2097152, "maximumWriteBytes": 2097152
+}
+```
+
+A consumer's rule can reduce this again. The effective read/write limit is the
+minimum of the operator ceiling, exact StorageType limits, Storage envelope and
+consumer rule. A write also obeys the server object-size ceiling. Raising the
+server limit does not alter an existing envelope or consumer rule. Newly provisioned
+local defaults use the configured server read/write limits. Lowering limits may
+refuse content or local state that no longer fits; it does not delete data.
+
+`MaximumWriteBytes` limits one product write; native dataset results are written
+whole. `MaximumObjectBytes` bounds native content and retained publication objects.
+Native Artifact copies transfer multiple chunks bounded by `TransferChunkBytes`.
+The integrated ASP remote adapters and standalone protocols are unchanged. Content
+wire/contribution ceilings remain 64 KiB and advertised remote type/provider limits
+still apply. Structured documents keep their separate `maximumDocumentBytes` and
+`maximumResultBytes` policies; these content settings do not widen document/query
+limits. JSON record collections retain their 64 KiB aggregate profile ceiling and
+also obey narrower local operator budgets. A server setting cannot widen that
+profile or a remote capability.
+
+`MaximumHttpResponseBytes` counts raw bytes from builtin HTTP GET acquisitions.
+`MaximumValueBytes` counts the complete serialized JSON operation input/output.
+Wrapping a response in JSON, escaping text and UTF-8 encoding add bytes: a body
+that fits its HTTP budget can still exceed its dataset budget. Storage and
+publication limits apply separately. Agent text-read windows, retrieval scan
+budgets, configuration schemas and ordinary file buffers retain their own bounds.
+
+The local `1.0.0` schema/contract is updated for a maintainer-authorized reseed.
+Instances using the previous immutable contract must be reseeded before testing
+this baseline; no automatic reset, migration or consumer rebinding is performed.
+See [ADR-0236](../decisions/0236-storage-content-has-operator-ceilings-and-resource-envelopes.md).
 
 Provisioning attempts a `local-default` using the existing Storage service and its
 current generic Use authorization and exact resource checks. It creates no grants, writes no UsePolicy

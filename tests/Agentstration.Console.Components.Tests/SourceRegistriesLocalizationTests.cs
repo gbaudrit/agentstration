@@ -28,7 +28,10 @@ public sealed class SourceRegistriesLocalizationTests
     [TestMethod]
     public void NeutralAndFrenchCatalogsHaveSymmetricKeys()
     {
-        var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Agentstration.Console.Components", "Resources", "Components", "Pages");
+        var repository = new DirectoryInfo(AppContext.BaseDirectory);
+        while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "Agentstration.slnx"))) repository = repository.Parent;
+        Assert.IsNotNull(repository);
+        var root = Path.Combine(repository.FullName, "src", "Agentstration.Console.Components", "Resources", "Components", "Pages");
         var neutral = Keys(Path.Combine(root, "SourceRegistriesStrings.resx"));
         var french = Keys(Path.Combine(root, "SourceRegistriesStrings.fr-FR.resx"));
         CollectionAssert.AreEquivalent(neutral, french);

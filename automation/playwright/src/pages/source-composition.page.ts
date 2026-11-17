@@ -242,7 +242,9 @@ export class SourceCompositionPage {
     }, { timeout: 90_000 }).toBe(true);
     expect(acquisition.errorCode, JSON.stringify(acquisition)).toBeFalsy();
     const content = (await api.api('GET', `/api/datasourceacquisitions/${acquisition.metadata.name}/content`)).value;
-    return { acquisition, content: JSON.parse(Buffer.from(content.contentBase64, 'base64').toString('utf8')) };
+    const records = JSON.parse(Buffer.from(content.contentBase64, 'base64').toString('utf8'));
+    expect(records).toHaveLength(1);
+    return { acquisition, content: records[0] };
   }
   private async authorPoint(base: string, name: string): Promise<void> {
     await this.page.goto(`${base}/flows/${name}/designer?scopeRef=%2Finstance&context=%2Finstance`);

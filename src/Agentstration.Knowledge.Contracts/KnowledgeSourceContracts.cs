@@ -231,6 +231,7 @@ public enum KnowledgeArtifactKind { Staged, Durable, Inline }
 
 public sealed record KnowledgeProjectionArtifact
 {
+    public ResolvedDataContract? RecordContract { get; init; }
     public IReadOnlyDictionary<string, string> Provenance { get; init; } = new Dictionary<string, string>();
     public ResolvedDataContract? DataContract { get; init; }
     public required string ArtifactId { get; init; }
@@ -380,6 +381,7 @@ public enum KnowledgeContentAvailability { Unknown, Retired }
 public sealed record KnowledgeSnapshotArtifact
 {
     public KnowledgeContributionSelection? Contribution { get; init; }
+    public ResolvedDataContract? RecordContract { get; init; }
     public ResolvedDataContract? DataContract { get; init; }
     public StoragePublicationReference? Content { get; init; }
     public required string ArtifactId { get; init; }

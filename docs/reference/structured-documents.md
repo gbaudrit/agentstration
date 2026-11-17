@@ -291,7 +291,11 @@ Every new exposure includes a source-owned describe relay. Its immutable
 `{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
 then `{ "request": { "input": "invoices" } }` for one exposed input's contracts
 (`detailLevel: "input"`). Both accept `request.snapshotId`. Discovery also returns
-`invocationInstructions` with complete argument-envelope examples. Access relays
+`invocationInstructions` with complete argument-envelope examples. Detailed input
+metadata separates whole-Artifact `schemas` from object-level `recordSchemas`.
+One Artifact may contain several records; contribution queries select its exact
+member IDs, and `documentArtifacts`/`records` retain the logical Artifact and
+member ordinal across pages. Access relays
 use the same envelope, for example
 `{ "request": { "snapshotId": "<returned id>", "query": {} } }`.
 A returned top-level `snapshotId` belongs inside `request` on the next call.

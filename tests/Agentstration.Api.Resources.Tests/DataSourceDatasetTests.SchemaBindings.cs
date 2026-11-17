@@ -1,9 +1,9 @@
-using System.Text.Json;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.DataSources.Contracts;
+using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -25,11 +25,14 @@ public sealed partial class DataSourceDatasetTests
         var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
         var parent = await schemas.CreateAsync(new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SchemaResourceKinds.Schema,
-            ScopeRef = Owner, Metadata = new() { Name = "dataset-response" },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SchemaResourceKinds.Schema,
+            ScopeRef = Owner,
+            Metadata = new() { Name = "dataset-response" },
             Definition = new()
             {
-                DisplayName = "Dataset response", Format = SchemaFormatIds.JsonSchema,
+                DisplayName = "Dataset response",
+                Format = SchemaFormatIds.JsonSchema,
                 Content = JsonSerializer.Deserialize<JsonElement>("""
                     {"type":"object","properties":{"document":{"type":"object","properties":{"dataset":{"type":"string"}},"required":["dataset"]}}}
                     """)
@@ -38,8 +41,14 @@ public sealed partial class DataSourceDatasetTests
         var versionA = await schemas.PublishAsync(Owner, ResourceNamespace.Default, parent.Value.Name, "A", default);
         var binding = new SchemaBinding { Reference = new() { Name = parent.Value.Name, Version = "A", ScopeRef = Owner, SchemaPath = "/properties/document" } };
         var desired = Source("bound-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "alpha" }));
-        desired = desired with { Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-        { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = binding } } } };
+        desired = desired with
+        {
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = binding } }
+            }
+        };
         var sources = factory.Services.GetRequiredService<DataSourceManagementService>();
         var source = await sources.CreateAsync(desired, default);
         var pin = source.Value.Definition.Dataset!.Acquisition.OutputSchemaSnapshot!;
@@ -61,17 +70,23 @@ public sealed partial class DataSourceDatasetTests
             new(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), ResourceNamespace.Default,
                 ArtifactResourceKinds.FlowRunArtifact, acquired.Manifest!.Artifacts.Single().ArtifactId), default))!.Value.Receipt;
         Assert.IsTrue(receipt.DataContract!.Validated);
-        Assert.AreEqual("A", receipt.DataContract.SchemaEvidence!.Version);
-        Assert.AreEqual("/properties/document", receipt.DataContract.SchemaEvidence.SchemaPath);
-        Assert.AreEqual(versionA.Value.DefinitionHash, receipt.DataContract.SchemaEvidence.ParentDefinitionHash);
-        Assert.AreEqual(pin.DefinitionHash, receipt.DataContract.SchemaEvidence.DefinitionHash);
-        Assert.AreEqual("string", receipt.DataContract.Schema!.Value.GetProperty("properties").GetProperty("dataset").GetProperty("type").GetString());
+        Assert.AreEqual("A", receipt.Materialization!.RecordContract!.SchemaEvidence!.Version);
+        Assert.AreEqual("/properties/document", receipt.Materialization!.RecordContract!.SchemaEvidence.SchemaPath);
+        Assert.AreEqual(versionA.Value.DefinitionHash, receipt.Materialization!.RecordContract!.SchemaEvidence.ParentDefinitionHash);
+        Assert.AreEqual(pin.DefinitionHash, receipt.Materialization!.RecordContract!.SchemaEvidence.DefinitionHash);
+        Assert.AreEqual("string", receipt.Materialization!.RecordContract!.Schema!.Value.GetProperty("properties").GetProperty("dataset").GetProperty("type").GetString());
         Assert.IsNotNull(changed);
         using var instance = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         var bindingB = binding with { Reference = binding.Reference! with { Version = "B" } };
-        var invalid = desired with { Metadata = new() { Name = "bound-incompatible-output" },
-            Definition = desired.Definition with { Dataset = desired.Definition.Dataset! with
-            { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = bindingB } } } };
+        var invalid = desired with
+        {
+            Metadata = new() { Name = "bound-incompatible-output" },
+            Definition = desired.Definition with
+            {
+                Dataset = desired.Definition.Dataset! with
+                { Acquisition = desired.Definition.Dataset.Acquisition with { OutputSchemaBinding = bindingB } }
+            }
+        };
         var sourceB = await sources.CreateAsync(invalid, default);
         using var started = await client.PostAsJsonAsync($"/api/datasources/{sourceB.Value.Name}/acquisitions?scopeRef=/instance", new StartDataSourceAcquisitionRequest());
         Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode);
@@ -85,7 +100,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual("data_contract_violation", pending.ErrorCode);
         Assert.AreEqual("$.dataset", pending.ContractFailure!.Path);
         Assert.IsNull(pending.Manifest);
-        Assert.AreEqual("A", receipt.DataContract.SchemaEvidence.Version);
+        Assert.AreEqual("A", receipt.Materialization!.RecordContract!.SchemaEvidence.Version);
         var resources = factory.Services.GetRequiredService<IResourceStore>();
         await resources.DeleteExactAsync(new(Owner, parent.Value.Namespace, SchemaResourceKinds.Schema, parent.Value.Name), changed.ETag, default);
         var renamed = await sources.PutAsync(source.Value.Namespace, source.Value.Name, Owner,

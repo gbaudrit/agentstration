@@ -1,24 +1,24 @@
 using System.Text.Json;
-using Agentstration.Flows;
 using Agentstration.ConnectedServices;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Flows;
 using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-using Agentstration.Tools;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Storage.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.DataSources;
 
 public sealed class DataSourceDatasetCompositionService(
     ConnectedServiceOperationService operations,
     IStorageResolver storage,
-    IStorageContentGateway content,
     IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
-    DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null)
+    DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null,
+    IStoragePublicationGateway? publications = null, DataSourceContentOptions? options = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
-    internal const int MaximumValueBytes = 64 * 1024;
+    public int MaximumValueBytes { get; } = (options ?? new()).MaximumValueBytes;
 
     public async Task<ResolvedDataSourceDataset> ResolveAsync(DataSourceResource source,
         ResourceScopeRef consumer, CancellationToken cancellationToken, ResolvedDataSourceDataset? accepted = null)
@@ -41,7 +41,7 @@ public sealed class DataSourceDatasetCompositionService(
         var finalSnapshot = definition.OutputSchemaSnapshot;
         var output = finalSnapshot is null ? rawOutput : JsonSchemaSelection.Select(finalSnapshot.Content);
         ValidateSchema(output);
-        ValidateValue(input, definition.Acquisition.Parameters);
+        ValidateValue(input, definition.Acquisition.Parameters, MaximumValueBytes);
         var partition = Partition(source);
         if (definition.Storage is { } inputStorage)
         {
@@ -58,7 +58,8 @@ public sealed class DataSourceDatasetCompositionService(
                     || !definition.Rule.List || !definition.Rule.Read || !definition.Rule.Write)
                     throw Invalid("data_source_storage_capability_required", "Acquisition requires list, read and write capabilities.");
                 var effective = definition.Rule with { Prefix = partition };
-                await content.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
+                if (publications is null) throw Invalid("data_source_record_storage_unavailable", "JSON record publication is unavailable.");
+                await publications.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
             }
         }
         var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
@@ -88,12 +89,18 @@ public sealed class DataSourceDatasetCompositionService(
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
             { ScopeRef = composed.Orchestration.ScopeRef };
             return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
-            { OperationFlow = flow, Composition = composed, OperationOutputSchema = rawOutput,
-                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null) };
+            {
+                OperationFlow = flow,
+                Composition = composed,
+                OperationOutputSchema = rawOutput,
+                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null)
+            };
         }
         catch (FlowValidationException exception)
-        { throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
-            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic }; }
+        {
+            throw new DataSourceValidationException("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible.")
+            { CompositionErrorCode = exception.Code, CompositionDiagnostic = exception.CompositionDiagnostic };
+        }
         catch (KeyNotFoundException)
         { throw Invalid("data_source_composition_invalid", "The ordered Flow composition is unavailable or incompatible."); }
     }
@@ -106,10 +113,17 @@ public sealed class DataSourceDatasetCompositionService(
             prior?.Acquisition.OutputSchemaBinding, prior?.Acquisition.OutputSchemaSnapshot, token);
         var final = await ResolveBindingAsync(dataset.OutputSchemaBinding, "$.dataset.outputSchema", resource,
             prior?.OutputSchemaBinding, prior?.OutputSchemaSnapshot, token);
-        return resource with { Definition = resource.Definition with { Dataset = dataset with
+        return resource with
         {
-            Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw }, OutputSchemaSnapshot = final
-        } } };
+            Definition = resource.Definition with
+            {
+                Dataset = dataset with
+                {
+                    Acquisition = dataset.Acquisition with { OutputSchemaSnapshot = raw },
+                    OutputSchemaSnapshot = final
+                }
+            }
+        };
     }
 
     private async Task<SchemaBindingSnapshot?> ResolveBindingAsync(SchemaBinding? binding, string path,
@@ -149,8 +163,11 @@ public sealed class DataSourceDatasetCompositionService(
         var snapshot = dataset.OutputSchemaSnapshot;
         if (snapshot?.Source is not { ScopeRef: { } scope, Namespace: { } ns } source
             || snapshot.SchemaUid is not { } uid || snapshot.SchemaGeneration is not { } generation) return contract;
-        return contract with { SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
-            snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash) };
+        return contract with
+        {
+            SchemaEvidence = new(source.Name, source.Version, scope, ns, uid, generation,
+            snapshot.ParentDefinitionHash ?? snapshot.DefinitionHash, source.SchemaPath, snapshot.DefinitionHash)
+        };
     }
 
     public static void ValidateLifecycle(DataSourceDatasetProperties definition)
@@ -189,19 +206,19 @@ public sealed class DataSourceDatasetCompositionService(
         { DocumentCollectionUid = dataset.Definition.DocumentCollectionUid };
     }
 
-    public static void ValidateValue(JsonElement schema, JsonElement value)
+    public static void ValidateValue(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes)
     {
         ValidateSchema(schema);
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumBytes)
             throw Invalid("data_source_parameters_invalid", "Operation values must be bounded JSON.");
         try { ToolInputSchemaValidator.Validate(schema, value); }
         catch (ToolInputValidationException)
         { throw Invalid("data_source_parameters_invalid", "The value does not satisfy the effective operation schema."); }
     }
 
-    public static void ValidateOutput(JsonElement schema, JsonElement value)
+    public static void ValidateOutput(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes)
     {
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumBytes)
             throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
         try { Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(schema, "dataset-output"), value, "dataset-output"); }
         catch (Agentstration.Schemas.DataContractException)

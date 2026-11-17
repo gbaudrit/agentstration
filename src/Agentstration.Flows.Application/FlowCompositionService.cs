@@ -156,7 +156,12 @@ public sealed class FlowCompositionService(FlowService flows)
                 mapping = JsonSerializer.SerializeToElement("${steps." + name + ".output}");
                 previousSchema = outputSchema;
             }
-            if (!FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema)) throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
+            // Dynamic native results are checked by the existing typed boundary Transform below.
+            // A function such as json.explode returns acquisition records or an Artifact manifest
+            // according to its actual input; an unconstrained descriptor cannot prove that shape statically.
+            var dynamicFunctionOutput = calls.LastOrDefault()?.Function is not null && IsUnconstrained(previousSchema);
+            if (!dynamicFunctionOutput && !FlowCompositionSchema.IsAssignable(previousSchema, point.OutputSchema))
+                throw Incompatible(template, point, "output", previousSchema, point.OutputSchema);
             producedSchemas[point.Name] = IsUnconstrained(point.OutputSchema) ? previousSchema.Clone() : point.OutputSchema.Clone();
             nodes.Add(new TransformFlowStepDefinition
             {
@@ -246,7 +251,7 @@ public sealed class FlowCompositionService(FlowService flows)
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static FlowValidationException Incompatible(FlowVersion template, FlowCompositionPointStepDefinition point,
         string boundary, JsonElement actual, JsonElement expected) => new("flow_composition_contract_incompatible", "The configured Flow composition contracts are incompatible.")
-    { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
+        { CompositionDiagnostic = new(point.Point, boundary, template.FlowId.ToString(), template.Version, TypeName(actual), TypeName(expected)) };
     private static string TypeName(JsonElement schema)
     {
         if (schema.ValueKind != JsonValueKind.Object) return "unknown";

@@ -53,7 +53,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsNotNull(projected.Value.SnapshotName);
         var outputArtifact = run.Output!.Value.GetProperty("artifacts")[0];
         using var content = JsonDocument.Parse(Convert.FromBase64String(outputArtifact.GetProperty("contentBase64").GetString()!));
-        Assert.AreEqual(payload, content.RootElement.GetProperty("dataset").GetString());
+        Assert.AreEqual(payload, content.RootElement[0].GetProperty("dataset").GetString());
         if (orchestrate)
         {
             Assert.HasCount(0, run.Composition!.Bindings["postAggregate"]);
@@ -100,8 +100,8 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsNotNull(acquisition.Content);
         var acquiredContent = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         using var acquiredJson = JsonDocument.Parse(Convert.FromBase64String(acquiredContent.ContentBase64));
-        Assert.AreEqual(2, acquiredJson.RootElement.GetProperty("stage").GetInt32());
-        Assert.AreEqual(1, acquiredJson.RootElement.GetProperty("previous").GetProperty("stage").GetInt32());
+        Assert.AreEqual(2, acquiredJson.RootElement[0].GetProperty("stage").GetInt32());
+        Assert.AreEqual(1, acquiredJson.RootElement[0].GetProperty("previous").GetProperty("stage").GetInt32());
         Assert.IsNotNull(acquisition.Dataset!.Composition?.Receipt);
         Assert.HasCount(2, acquisition.Dataset.Composition.Receipt.Bindings["transformations"]);
         var repository = factory.Services.GetRequiredService<IFlowRepository>();

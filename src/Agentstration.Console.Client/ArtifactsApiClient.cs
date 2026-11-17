@@ -5,6 +5,7 @@ namespace Agentstration.Web.Console;
 
 public interface IArtifactsClient
 {
+    Task<ArtifactRecordContent> ReadRecordAsync(FlowRunArtifactId id, string memberId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default);
     Task<StagedArtifactView?> GetStagedAsync(StagedArtifactId id, CancellationToken cancellationToken = default);
     Task<ArtifactContentChunk> ReadContentAsync(StagedArtifactId id, long offset, int length, CancellationToken cancellationToken = default);
@@ -20,6 +21,8 @@ public interface IArtifactsClient
 
 public sealed class ArtifactsApiClient(HttpClient httpClient) : IArtifactsClient
 {
+    public Task<ArtifactRecordContent> ReadRecordAsync(FlowRunArtifactId id, string memberId, CancellationToken cancellationToken = default) =>
+        ApiResponse.ReadAsync<ArtifactRecordContent>(httpClient, $"{DurablePath(id)}/records/{Uri.EscapeDataString(memberId)}/content", cancellationToken);
     public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
         ApiResponse.ReadAsync<IReadOnlyList<StagedArtifactView>>(httpClient, "api/artifacts/staged", cancellationToken);
 

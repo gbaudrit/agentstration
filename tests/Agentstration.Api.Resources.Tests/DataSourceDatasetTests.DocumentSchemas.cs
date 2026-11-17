@@ -1,14 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Agentstration.Identity.Contracts;
 using Agentstration.DataSources;
+using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
-using Agentstration.Storage.Contracts;
 using Agentstration.Storage;
-using Microsoft.Extensions.DependencyInjection;
+using Agentstration.Storage.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
@@ -71,9 +71,9 @@ public sealed partial class DataSourceDatasetTests
         };
         var saved = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(source, default);
         var acquisition = await AcquireAsync(client, saved.Value.Name);
-        Assert.IsNotNull(acquisition.Publication?.Document);
+        Assert.IsNotNull(acquisition.Publication?.Records?.DocumentPublication);
         var bytes = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
-        Assert.IsTrue(JsonElement.DeepEquals(response, JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(bytes.ContentBase64))));
+        Assert.IsTrue(JsonElement.DeepEquals(response, JsonSerializer.Deserialize<JsonElement>(Convert.FromBase64String(bytes.ContentBase64))[0]));
         var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
             ApiVersion = source.ApiVersion,

@@ -1,6 +1,10 @@
 using System.Text;
 using System.Text.Json;
 using Agentstration.Knowledge;
+using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Runtime.Abstractions;
+using Agentstration.Storage.Contracts;
+using Agentstration.Tools;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 
@@ -152,6 +156,91 @@ public sealed partial class KnowledgeMetadataTests
         await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a"), default, agent: true));
 
     }
+    [TestMethod]
+    [DataRow("workspace")]
+    [DataRow("tenant")]
+    [DataRow("instance")]
+    public async Task RuntimeDiscoveryAndODataSchemasRefreshOldPublicationsInEachOwnerScope(string owner)
+    {
+        var f = new Fixture(owner);
+        using var scope = f.Push();
+        var original = JsonSerializer.Deserialize<JsonElement>("""
+            {"type":"object","properties":{"request":{"type":"object","properties":{"query":{}},"additionalProperties":false}},"additionalProperties":false}
+            """);
+        var profile = new StorageQueryProfilePin("odata/4.01", "1.0", "odata-options+json", "model");
+        var tools = new List<IAgentTool>();
+        foreach (var operation in new[] { "describe", "input.query_documents" })
+        {
+            var name = "knowledge-" + operation.Replace('.', '-');
+            var bindings = new List<ToolArgumentBinding> { new LiteralToolArgumentBinding
+            {
+                Path = "/source", Value = JsonSerializer.SerializeToElement(new
+                {
+                    name = f.Source.Name, @namespace = f.Source.Namespace.Value,
+                    scopeRef = f.Source.ScopeRef!.Value.Value, uid = f.Source.Uid
+                })
+            } };
+            if (operation != "describe") bindings.Add(new LiteralToolArgumentBinding
+            {
+                Path = "/request/profile",
+                Value = JsonSerializer.SerializeToElement(profile, JsonSerializerOptions.Web)
+            });
+            f.Store.Add(new ToolDefinitionVersionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinitionVersion,
+                Metadata = new()
+                {
+                    Name = name,
+                    Annotations = new Dictionary<string, string>
+                    {
+                        ["agentstration.io/knowledge-source-uid"] = f.Source.Uid.ToString("D"),
+                        ["agentstration.io/knowledge-operation"] = operation
+                    }
+                },
+                ScopeRef = f.Source.ScopeRef,
+                DefinitionName = name,
+                DefinitionUid = Guid.NewGuid(),
+                PublishedAt = DateTimeOffset.UnixEpoch,
+                Definition = new RelayToolDefinitionProperties
+                {
+                    DisplayName = "Published",
+                    Description = "Old usage",
+                    InputSchema = original,
+                    Bindings = bindings,
+                    Target = new() { Name = "native", ScopeRef = f.Source.ScopeRef!.Value, Uid = Guid.NewGuid(), Generation = 1 }
+                }
+            });
+            tools.Add(new PresentationProbeTool(name, original, f.Source.ScopeRef));
+        }
+        var enricher = new KnowledgeAgentPresentationEnricher(f.Store, new KnowledgeToolMetadataService(f.Store, f.Sources, f.Context), f.Context);
+        var result = await enricher.EnrichAsync(new("Authored instructions", tools), default);
+        StringAssert.Contains(result.Instructions, "Knowledge Sources assigned");
+        StringAssert.Contains(result.Instructions, "Never send snapshotId beside request");
+        var query = result.Tools.Single(tool => tool.Name.Contains("query", StringComparison.Ordinal));
+        Assert.AreEqual("object", query.InputSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query").GetProperty("type").GetString());
+        StringAssert.Contains(query.Description!, "eq/ne/gt/ge/lt/le");
+        Assert.IsTrue(query.RequiresApproval);
+        Assert.AreEqual(tools[1].Id, query.Id);
+        Assert.AreEqual(tools[1].ExternalId, query.ExternalId);
+        Assert.AreEqual(tools[1].ScopeRef, query.ScopeRef);
+        Assert.IsTrue(JsonElement.DeepEquals(original, tools[1].InputSchema));
+        Assert.AreEqual(0, f.Store.Writes);
+        Assert.AreEqual(0, f.Publications.Reads.Count);
+        Assert.AreEqual(0, f.Resolver.Calls);
+    }
+
+    private sealed record PresentationProbeTool(string Name, JsonElement InputSchema, ResourceScopeRef? ScopeRef) : IAgentTool
+    {
+        public string Id => "agentstration." + Name;
+        public string? Description => "Old usage";
+        public string? ProviderId => AgentstrationToolProvider.Name;
+        public ResourceNamespace? Namespace => ResourceNamespace.Default;
+        public string? ExternalId => Name;
+        public JsonElement? OutputSchema => null;
+        public bool RequiresApproval => true;
+    }
+
     [TestMethod]
     public async Task HistoricalMembershipUsesExactPreparedEvidenceAndRejectsAmbiguousAttribution()
     {
