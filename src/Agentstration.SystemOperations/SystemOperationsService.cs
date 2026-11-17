@@ -46,8 +46,12 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
             : new SystemRunEvidencePage([], false, context.CanReadRuns ? "family-unsupported" : "run-read-required");
         var runs = rows.Runs.Where(run => Matches(root, run, context)).DistinctBy(run => (run.Family, run.DataScope, run.RunId))
             .OrderByDescending(run => run.CreatedAt).ThenBy(run => run.RunId, StringComparer.Ordinal).Take(query.MaximumRuns).ToArray();
+        var bindings = rows.FlowBindings.Where(binding => MatchesBinding(root, binding, context))
+            .DistinctBy(binding => (binding.FlowRunId, binding.DataScope, binding.ParticipantId, binding.AgentUid, binding.RevisionUid))
+            .OrderByDescending(binding => binding.RunCreatedAt).ThenBy(binding => binding.FlowRunId, StringComparer.Ordinal)
+            .ThenBy(binding => binding.ParticipantId, StringComparer.Ordinal).Take(query.MaximumRuns).ToArray();
         var metrics = runs.Length == 0 ? null : Metrics(runs);
-        var presences = runs.SelectMany(run => run.Placements).SelectMany(placement => placement.Attempts).Select(attempt => attempt.Presence).ToArray();
+        var presences = runs.SelectMany(run => run.Placements).SelectMany(placement => placement.Attempts).Select(attempt => attempt.Presence).Concat(bindings.SelectMany(binding => binding.Invocations).Select(invocation => invocation.Presence)).ToArray();
         var presence = !context.CanInspectWorkers || presences.Length == 0 ? "unknown" : presences.Contains("offline", StringComparer.Ordinal) ? "offline"
             : presences.Contains("stale", StringComparer.Ordinal) ? "stale" : presences.All(value => value == "online") ? "online" : "unknown";
         var provisioning = await evidence.ProvisioningAsync(root, ct);
@@ -58,7 +62,8 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
         var sampledAt = clock.GetUtcNow();
         var facts = new SystemOperationalFacts(root.Id, root.Identity, root.State, provisioning, dependency, presence, metrics,
             runs, context.InvocationScope, context.DataScope, start, sampledAt, rows.HasMore ? "bounded-sample" : rows.Coverage,
-            context.CanInspectWorkers, ["attested-identities-only", "legacy-identity-evidence-unavailable", "active-now-and-terminal-update-window", "duration-is-per-completed-run", "no-global-worker-totals"]);
+            context.CanInspectWorkers, ["attested-identities-only", "legacy-identity-evidence-unavailable", "active-now-and-terminal-update-window", "duration-is-per-completed-run", "no-global-worker-totals", "flow-bindings-are-not-direct-execution-metrics"])
+        { FlowBindings = bindings, MoreFlowBindings = rows.MoreFlowBindings };
         telemetry.Record(root.Identity.Kind, facts.Coverage);
         return new(facts, sampledAt, facts.Coverage);
     }
@@ -71,6 +76,15 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
         if (root.State == "recorded-generation" && run.Publication != root.Evidence?.Generation?.ToString(System.Globalization.CultureInfo.InvariantCulture)) return false;
         return root.State != "publication" || root.Evidence?.Publication == run.Publication
             && (root.Evidence?.Hash is null || root.Evidence.Hash == run.DefinitionHash);
+    }
+    private static bool MatchesBinding(SystemGraphNode root, SystemFlowBindingEvidence binding, SystemOperationsReadContext context)
+    {
+        if (root.Identity.Kind is not ("Agent" or "AgentRevision") || binding.AgentUid == Guid.Empty || binding.RevisionUid == Guid.Empty
+            || binding.Generation <= 0 || binding.ParticipantId.Length is < 1 or > 160 || binding.InvocationScope != context.InvocationScope
+            || binding.DataScope != context.DataScope || binding.AgentOwner != root.Identity.OwnerScope || binding.AgentNamespace != root.Identity.Namespace) return false;
+        return root.Identity.Kind == "AgentRevision" ? binding.RevisionUid == root.Identity.ResourceUid
+            && (root.Evidence?.Hash is null || binding.DefinitionHash == root.Evidence.Hash)
+            : binding.AgentUid == root.Identity.ResourceUid && (root.State != "recorded-generation" || binding.Generation == root.Evidence?.Generation);
     }
     private static SystemRunMetrics Metrics(SystemRunEvidence[] runs)
     {

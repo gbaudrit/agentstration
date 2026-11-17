@@ -112,7 +112,7 @@
   <data name="OpsDuration" xml:space="preserve"><value>Mean duration per completed run</value></data>
   <data name="OpsUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="OpsTokens" xml:space="preserve"><value>Reported input / output tokens</value></data>
-  <data name="OpsNoMetrics" xml:space="preserve"><value>Metrics unavailable: no authorized, attested run in this sample.</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Metrics unavailable: no authorized, attested direct run in this sample.</value></data>
   <data name="OpsPartial" xml:space="preserve"><value>Partial evidence; no global health conclusion.</value></data>
   <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
   <data name="OpsPlacement" xml:space="preserve"><value>Assignment</value></data>
@@ -156,4 +156,15 @@
   <data name="OpsState_notprovisioned" xml:space="preserve"><value>Not provisioned</value></data>
 <data name="OpsConnecting" xml:space="preserve"><value>Connecting to authorized evidence…</value></data>
 <data name="OpsStale" xml:space="preserve"><value>Evidence is stale. Facts were cleared; disable and enable to reconnect.</value></data>
+  <data name="OpsFlowBindingsTitle" xml:space="preserve"><value>Flow binding evidence</value></data>
+  <data name="OpsFlowBindingsHelp" xml:space="preserve"><value>These Flow Runs recorded this exact Agent binding. This association does not prove execution and is excluded from direct-run metrics. Turn and step evidence is shown only when attested by the assignment ledger.</value></data>
+  <data name="OpsFlowBindingsPartial" xml:space="preserve"><value>The Flow binding sample limit was reached.</value></data>
+  <data name="OpsConsumerState" xml:space="preserve"><value>Consumer Flow state</value></data>
+  <data name="OpsParticipant" xml:space="preserve"><value>Recorded participant</value></data>
+  <data name="OpsBoundRevision" xml:space="preserve"><value>Recorded Agent version / revision UID</value></data>
+  <data name="OpsInvocationUnknown" xml:space="preserve"><value>No attested invocation coordinates in this sample.</value></data>
+  <data name="OpsInvocationsPartial" xml:space="preserve"><value>At most eight invocation groups are shown for this binding.</value></data>
+  <data name="OpsStepExecution" xml:space="preserve"><value>Step execution</value></data>
+  <data name="OpsTurns" xml:space="preserve"><value>Observed distinct turns</value></data>
+  <data name="OpsSession" xml:space="preserve"><value>Worker session</value></data>
 </root>

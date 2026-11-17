@@ -59,6 +59,38 @@ public sealed class SystemOperationsPanelTests
             Assert.Contains("Evidence is stale", component.Markup);
         });
     }
+    [TestMethod]
+    [DataRow("en-US", "Flow binding evidence", "Observed distinct turns")]
+    [DataRow("fr-FR", "Bindings enregistrés par les Flow", "Tours distincts observés")]
+    public async Task FlowBindingProofLocalizesAndLinksScopedStepWithoutInventingMetrics(string culture, string title, string turns)
+    {
+        using var selectedCulture = new TestCultureScope(culture);
+        using var context = new BunitContext();
+        var client = new Client();
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISystemOperationsClient>(client);
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var component = context.Render<SystemOperationsPanel>(p => p.Add(v => v.Root, "root").Add(v => v.Context, scope).Add(v => v.Namespace, ResourceNamespace.Default));
+        await component.Find("input").ChangeAsync(true);
+        var invocation = new SystemFlowInvocationEvidence(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "respond",
+            Guid.NewGuid(), Guid.NewGuid(), 3, "active", 2, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+        var binding = new SystemFlowBindingEvidence("flow-id", scope, scope, ResourceScopeRef.Instance, ResourceNamespace.Default,
+            Guid.NewGuid(), Guid.NewGuid(), 2, "hash", "<img src=x>", "running", DateTimeOffset.UnixEpoch, [invocation]);
+        var facts = new SystemOperationalFacts("root", new(binding.AgentUid, ResourceScopeRef.Instance, ResourceNamespace.Default, "Agent", "safe"),
+            "definition", "unknown", "unknown", "unknown", null, [], scope, scope, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "attested-window", false, [])
+        { FlowBindings = [binding] };
+        await client.Frames.Writer.WriteAsync(new(Guid.NewGuid(), 1, 0, "snapshot", DateTimeOffset.UnixEpoch, facts));
+        component.WaitForElement("[data-testid=system-flow-bindings]");
+        Assert.Contains(title, component.Markup); Assert.Contains(turns, component.Markup);
+        Assert.IsEmpty(component.FindAll("img"));
+        var link = component.Find("[data-testid=system-flow-bindings] a[href*='step=']");
+        Assert.Contains("/flow-runs/flow-id?", link.GetAttribute("href")!);
+        Assert.Contains("step=respond", link.GetAttribute("href")!);
+        Assert.Contains("scopeRef=%2Fworkspaces%2F", link.GetAttribute("href")!);
+        Assert.Contains("context=%2Fworkspaces%2F", link.GetAttribute("href")!);
+        Assert.IsNull(facts.Metrics);
+    }
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset now = DateTimeOffset.UnixEpoch;

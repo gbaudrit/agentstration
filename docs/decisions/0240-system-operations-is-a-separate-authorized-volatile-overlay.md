@@ -32,9 +32,27 @@ Different graph slices have different observation digests.
 
 New canonical Flow publications capture their owning Flow resource UID. Existing
 publications stay immutable; missing evidence is not backfilled or inferred.
-Direct Agent/AgentRevision Runtime runs and attested Flow runs form the first
-cohort. Agent invocations inside Flow steps are not direct Runtime runs and remain
-unavailable here. Unsupported families and unattested history remain unknown.
+Direct Agent/AgentRevision Runtime runs and attested Flow runs provide direct
+metrics. Separately, recorded Flow RuntimeBindings can associate a run with exact
+Agent UID/revision/owner/namespace/generation/hash evidence. A binding alone does
+not prove invocation and never contributes to direct-run counts, duration or tokens.
+Native assignment ledger turns can additionally attest invocation coordinates:
+exact run/participant, unique recorded binding, attempt, Worker session/fencing and
+optional StepExecution. A step must match the stored run's exact version and
+non-null execution hash. Unknown legacy coordinates and conflicting participant
+bindings remain unattested; no name or reconstructed hash joins are used.
+Unsupported measurements, families and unattested history remain unknown.
+Flow binding queries preserve the same actor/tenant/logical/physical scope checks
+before their limit. Target Agent namespace is independent of the consumer Flow's
+namespace. Turn IDs are deduplicated before grouping by attempt/step; foreign
+participants or sibling runs do not affect evidence. At most 100 binding associations
+and eight invocation groups per association are delivered, with explicit truncation.
+Assignment metadata is read directly through its existing store port after the
+consumer run is authorized. The general Agent-instance observer resolves execution
+material and is deliberately not called: observation creates no material/content lease.
+Current Worker presence is reused only from the administrator-authorized inventory.
+Consumer Flow state remains distinct from Agent invocation or Worker state.
+
 A WorkItem identifier requires existing authorization, owner, exact scope and
 current-execution backlink checks. No task join or Console WorkItem route is
 invented; drill-down uses existing scoped Runtime and Flow run pages.
@@ -71,7 +89,7 @@ belongs only on the authorized snapshot trace, never metric labels.
 - Repeated reads are optimistic observation, not an atomic multi-store snapshot.
   Concurrent relevant change requires resynchronization.
 - The initial cohort excludes inferred historic identities, step-level Agent
-  aggregation, global fleet health and hierarchy-wide duration totals.
+  duration/token aggregation, global fleet health and hierarchy-wide duration totals.
 - Existing transports can retain physical Workspace coordinates for Instance/Tenant
   invocations alongside explicit logical scope. This differs from the eventual
   exact-scope direction of accepted ADR-0180. Both coordinates are exposed as

@@ -44,6 +44,7 @@ internal static class SystemGraphServiceCollectionExtensions
         services.AddSingleton<SystemGraphQueryService>();
         services.AddSingleton<SystemOperationsTelemetry>();
         services.AddSingleton<ISystemOperationsAccess, SystemOperationsAccess>();
+        services.AddSingleton<SystemFlowBindingReader>();
         services.AddSingleton<ISystemOperationsEvidenceReader, SystemOperationsEvidenceReader>();
         services.AddSingleton<ISystemOperationsService, SystemOperationsService>();
         services.AddSingleton<IReconciliationPreviewService, ReconciliationPreviewService>();
