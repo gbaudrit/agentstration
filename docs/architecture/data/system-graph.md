@@ -264,3 +264,24 @@ At most 100 binding associations and eight groups per binding are shown; flags
 report truncation. The panel offers scoped Flow/step drill-down in both locales.
 Neither these associations nor their live updates enter semantic graph JSON or
 publication/impact closure. See ADR-0240.
+
+### Definition photos and Agent deployment views
+
+System Explorer separates draft/retained-revision definition photos (including two
+explicitly selected revisions) from AgentDeployment configuration photos. The
+Agents-owned assignment endpoint records an exact revision, environment and logical
+target without provisioning or starting a Run. Reassignment uses ETags and retains
+up to 64 immutable configuration values atomically with the current assignment.
+Read access to each configuration requires access to its exact retained revision;
+purged or hidden revisions are unavailable. Legacy deployments gain no inferred
+configuration.
+
+Native LikeC4 deployment views contain environment/target nodes and runtime
+container instances; the Agent revision remains a logical component inside the
+runtime. Desired targets are declarations. Observed topology instead uses only
+explicitly associated Runs and attested Worker/session attempts, subject to the
+existing Worker-details permission. Runs without deployment/configuration UIDs
+remain unattributed. Observation time, bounded sample coverage and unknown physical
+infrastructure/pool membership are visible. Saving an assignment does not route
+work, change adoption policy or establish placement. See
+[ADR-0242](../../decisions/0242-agent-deployments-record-exact-durable-assignments.md).

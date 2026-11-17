@@ -18,6 +18,6 @@
   },
   "scripts": {
     "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx --test model.test.ts render-queue.test.ts"
+    "test": "node --import tsx --test model.test.ts render-queue.test.ts deployment-model.test.ts"
   }
 }

@@ -78,7 +78,13 @@ public sealed class RuntimeRunService(
             Name = name,
             Properties = new RuntimeRunProperties
             {
-                Agent = agentReference,
+                Agent = resolved.Deployment is null ? agentReference with { Deployment = null } : agentReference with
+                {
+                    ResourceId = resolved.AgentName, Version = resolved.Generation,
+                    ScopeRef = resolved.AgentScopeRef, Namespace = resolved.AgentNamespace,
+                    ResourceUid = resolved.AgentId, RevisionUid = resolved.RevisionUid,
+                    DefinitionHash = resolved.DefinitionHash, Deployment = resolved.Deployment
+                },
                 Input = input,
                 Execution = execution,
                 Origin = origin,

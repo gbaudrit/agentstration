@@ -107,7 +107,7 @@ public sealed partial class SystemGraphQueryService
         }
         async Task Verify(string id)
         {
-            if (await Evaluate(nodes[id].Identity) != access[id]) throw new SystemGraphException("system_graph_changed");
+            if (await Evaluate(nodes[id].Identity) != access[id] || !await DeploymentVisibleAsync(nodes[id], context, ct)) throw new SystemGraphException("system_graph_changed");
             if (owners.TryGetValue(id, out var guards))
                 foreach (var owner in guards)
                     if (await Evaluate(owner) is not { Discover: true, InspectBindings: true })
@@ -167,8 +167,9 @@ public sealed partial class SystemGraphQueryService
                 if ((!bindings && node.Id != contribution.BindingOwnerNodeId)
                     || query.Root is null && query.Namespace is { } ns && node.Identity.Namespace != ns) continue;
                 var allowed = await Evaluate(node.Identity);
-                if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings) continue;
-                var visible = allowed.InspectBindings ? node : node with { Evidence = null };
+                if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings
+                    || !await DeploymentVisibleAsync(node, context, ct)) continue;
+                var visible = allowed.InspectBindings ? node : node with { Evidence = null, Deployment = null };
                 if (nodes.TryGetValue(node.Id, out var existing))
                 {
                     if (existing != visible || access[node.Id] != allowed) throw new SystemGraphException("system_graph_changed");
@@ -203,8 +204,8 @@ public sealed partial class SystemGraphQueryService
                 {
                     if (!nodes.TryGetValue(node.Id, out var previous)) continue;
                     var allowed = await Evaluate(node.Identity);
-                    var visible = allowed.InspectBindings ? node : node with { Evidence = null };
-                    if (!allowed.Discover || previous != visible || allowed != access[node.Id]) throw new SystemGraphException("system_graph_changed");
+                    var visible = allowed.InspectBindings ? node : node with { Evidence = null, Deployment = null };
+                    if (!allowed.Discover || previous != visible || allowed != access[node.Id] || !await DeploymentVisibleAsync(node, context, ct)) throw new SystemGraphException("system_graph_changed");
                 }
                 if (!bindings) continue;
                 foreach (var edge in contribution.Relations)

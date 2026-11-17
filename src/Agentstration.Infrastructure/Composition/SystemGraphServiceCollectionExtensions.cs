@@ -27,6 +27,7 @@ internal static class SystemGraphServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationSystemGraph(this IServiceCollection services)
     {
         services.AddSingleton<ISystemGraphContributor, AgentSystemGraphContributor>();
+        services.AddSingleton<AgentDeploymentAssignmentService>();
         services.AddSingleton<ISystemGraphContributor, ModelSystemGraphContributor>();
         services.AddSingleton<ISystemGraphContributor, FlowSystemGraphContributor>();
         services.AddSingleton<ISystemGraphContributor, ToolSystemGraphContributor>();

@@ -4,11 +4,17 @@ using System.Net.Http.Json;
 using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Systems.Contracts;
+using Agentstration.Agents;
+using Agentstration.SystemOperations.Contracts;
 
 namespace Agentstration.Web.Console;
 
 public interface ISystemExplorerClient
 {
+    Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) => Task.FromResult<AgentDefinitionCatalog?>(null);
+    Task<IReadOnlyList<AgentDeploymentView>> DeploymentsAsync(ResourceScopeRef context, ResourceNamespace ns, Guid? agentUid, CancellationToken ct) => Task.FromResult<IReadOnlyList<AgentDeploymentView>>([]);
+    Task<AgentDeploymentView> AssignAsync(ResourceScopeRef context, AgentDeploymentAssignmentRequest value, string? etag, bool create, CancellationToken ct) => throw new NotSupportedException();
+    Task<SystemOperationalSnapshot> ObservedDeploymentAsync(ResourceScopeRef context, ResourceNamespace ns, string root, CancellationToken ct) => Task.FromResult(new SystemOperationalSnapshot(null, DateTimeOffset.UnixEpoch, "unavailable"));
     Task<SystemGraphPage> ReadAsync(ResourceScopeRef context, ResourceNamespace ns, string? root, string? cursor, CancellationToken ct);
     async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
         [EnumeratorCancellation] CancellationToken ct)
@@ -30,6 +36,19 @@ public interface ISystemExplorerClient
 
 public sealed class SystemExplorerApiClient(HttpClient http, TimeProvider? timeProvider = null) : ISystemExplorerClient
 {
+    public Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) =>
+        ApiResponse.ReadAsync<AgentDefinitionCatalog?>(http, "api/agent-definition-catalog?uid=" + uid.ToString("D"), context, ct);
+    public Task<IReadOnlyList<AgentDeploymentView>> DeploymentsAsync(ResourceScopeRef context, ResourceNamespace ns, Guid? agentUid, CancellationToken ct) =>
+        ApiResponse.ReadAsync<IReadOnlyList<AgentDeploymentView>>(http, "api/agent-deployment-assignments?namespace=" + Escape(ns.Value)
+            + (agentUid is null ? "" : "&agentUid=" + agentUid.Value.ToString("D")), context, ct);
+    public async Task<AgentDeploymentView> AssignAsync(ResourceScopeRef context, AgentDeploymentAssignmentRequest value, string? etag, bool create, CancellationToken ct)
+    {
+        using var request = Request(create ? HttpMethod.Post : HttpMethod.Put, "api/agent-deployment-assignments/" + Escape(value.Name), context, value, etag);
+        using var response = await http.SendAsync(request, ct); await ApiResponse.EnsureSuccessAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AgentDeploymentView>(ct))!;
+    }
+    public Task<SystemOperationalSnapshot> ObservedDeploymentAsync(ResourceScopeRef context, ResourceNamespace ns, string root, CancellationToken ct) =>
+        ApiResponse.ReadAsync<SystemOperationalSnapshot>(http, "api/system-operations?namespace=" + Escape(ns.Value) + "&root=" + Escape(root), context, ct);
     public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
         [EnumeratorCancellation] CancellationToken ct)
     {

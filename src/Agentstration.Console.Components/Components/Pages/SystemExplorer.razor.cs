@@ -40,6 +40,7 @@ public partial class SystemExplorer
         ++revision;
         loading = true; contextReady = false; page = null; diagramPage = null; selected = null; overlayNotes = null;
         system = null; systems = []; error = null; actionError = null;
+        ResetPerspectiveState();
         reloadRequested = true;
     }
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -51,7 +52,7 @@ public partial class SystemExplorer
         return LoadAsync();
     }
     private Task RefreshAsync() => LoadAsync();
-    private bool HasRoot => page?.Nodes.Any(node => node.Id == RootQuery) == true;
+    private bool HasRoot => page?.Nodes.Any(node => node.Id == ActiveRoot) == true;
     private int WindowCapacity => HasRoot ? 79 : 80;
     private bool HasNextWindow => page is not null && page.Nodes.Count - (HasRoot ? 1 : 0) > windowOffset + WindowCapacity;
     private bool MutationBlocked => busy || loading || systemsLoading;
@@ -60,7 +61,7 @@ public partial class SystemExplorer
     private Task ChangeWindow(int delta)
     {
         windowOffset = Math.Max(0, windowOffset + delta);
-        selected = page?.Nodes.FirstOrDefault(node => node.Id == RootQuery);
+        selected = page?.Nodes.FirstOrDefault(node => node.Id == ActiveRoot);
         overlayNotes = null; diagramFailed = false;
         RefreshWindow();
         return Task.CompletedTask;
@@ -68,7 +69,7 @@ public partial class SystemExplorer
     private void RefreshWindow()
     {
         if (page is null) { diagramPage = null; return; }
-        var root = page.Nodes.FirstOrDefault(node => node.Id == RootQuery);
+        var root = page.Nodes.FirstOrDefault(node => node.Id == ActiveRoot);
         var visible = page.Nodes.Where(node => node.Id != root?.Id).Skip(windowOffset).Take(root is null ? 80 : 79).ToArray();
         if (root is not null) visible = [root, .. visible];
         // Recorded pins keep their exact IDs/evidence. Their current authorized
@@ -97,6 +98,7 @@ public partial class SystemExplorer
         selected = null; system = null; systems = []; error = null; actionError = null; diagramFailed = false;
         Task groups = Task.CompletedTask;
         var buffer = new SystemGraphStreamBuffer();
+        ResetPerspectiveState();
         try
         {
             var context = await ContextProvider.GetAsync(pending.Token);
@@ -109,19 +111,29 @@ public partial class SystemExplorer
             resourceNamespace = ns;
             canWrite = context.Permissions.Contains("resources/write"); canDelete = context.Permissions.Contains("resources/delete");
             groups = LoadSystemsAsync(actor, owner, ns, selectedSystem, current, pending.Token);
-            await foreach (var frame in Client.StreamAsync(actor, ns, RootQuery, pending.Token))
+            var roots = await PreparePerspectiveAsync(actor, ns, current, pending.Token);
+            if (current != revision) return;
+            var photos = new List<SystemGraphPage>();
+            foreach (var root in roots)
             {
-                if (current != revision) return;
-                if (!buffer.Apply(frame)) throw new InvalidOperationException("The graph observation was invalidated.");
-                if (frame.Kind == "heartbeat") continue;
-                page = buffer.Page;
-                truncated = buffer.Truncated;
-                selected ??= page?.Nodes.FirstOrDefault(node => node.Id == RootQuery);
-                RefreshWindow();
-                if (buffer.Complete) loading = false;
-                await InvokeAsync(StateHasChanged);
+                buffer = new SystemGraphStreamBuffer();
+                await foreach (var frame in Client.StreamAsync(actor, ns, root, pending.Token))
+                {
+                    if (current != revision) return;
+                    if (!buffer.Apply(frame)) throw new InvalidOperationException("The graph observation was invalidated.");
+                    if (frame.Kind == "heartbeat") continue;
+                    received = SystemExplorerPresentation.Merge([.. photos, buffer.Page!]);
+                    page = Perspective == "definition" && definitionRoots.Length > 0
+                        ? SystemExplorerPresentation.Definition(received, definitionRoots) : received;
+                    truncated |= buffer.Truncated;
+                    selected ??= page.Nodes.FirstOrDefault(node => node.Id == ActiveRoot);
+                    RefreshWindow();
+                    await InvokeAsync(StateHasChanged);
+                }
+                if (!buffer.Complete) throw new InvalidOperationException("The graph observation ended before completion.");
+                photos.Add(buffer.Page!);
             }
-            if (!buffer.Complete) throw new InvalidOperationException("The graph observation ended before completion.");
+
         }
         catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
         catch (Exception)
@@ -129,7 +141,7 @@ public partial class SystemExplorer
             if (current == revision)
             {
                 buffer.Clear(); page = null; diagramPage = null; selected = null; overlayNotes = null;
-                system = null; systems = []; error = T("LoadFailed");
+                system = null; systems = []; ResetPerspectiveState(); error = T("LoadFailed");
             }
         }
         finally
@@ -221,8 +233,8 @@ public partial class SystemExplorer
         {
             var parentId = page?.Relations.FirstOrDefault(edge => edge.Kind == "publication" && edge.Target == node.Id)?.Source;
             var parent = page?.Nodes.FirstOrDefault(candidate => candidate.Id == parentId && candidate.Identity.Kind == "Agent");
-            if (parent is null) return null;
-            identity = parent.Identity;
+            if (parent is null && catalog?.Revisions.Any(value => value.Id == node.Id) != true) return null;
+            identity = parent?.Identity ?? catalog!.Agent.Identity;
         }
         var prefix = identity.Kind switch
         {
@@ -254,8 +266,20 @@ public partial class SystemExplorer
             ["uid"] = identity.ResourceUid.ToString()
         });
     }
-    private IReadOnlyDictionary<string, string> RelationshipLabels => new[] { "system-membership", "exact-dependency", "dynamic-dependency", "generation-of", "publication", "relationship" }.ToDictionary(kind => kind, RelationKind);
-    private string NodeState(string value) => T(value switch { "draft" => "Draft", "definition" => "Definition", "publication" => "Published", "published" => "Published", "recorded-generation" => "RecordedGeneration", "reference-identity" => "ReferenceIdentity", _ => "Metadata" });
-    private string RelationKind(string value) => T(value switch { "system-membership" => "Membership", "exact-dependency" => "Dependency", "dynamic-dependency" => "DynamicDependency", "generation-of" => "GenerationOf", "publication" => "Publication", _ => "Relation" });
+    private IReadOnlyDictionary<string, string> RelationshipLabels
+    {
+        get
+        {
+            var labels = new[] { "system-membership", "exact-dependency", "dynamic-dependency", "generation-of", "publication", "relationship", "deployment-configuration", "deployed-revision" }.ToDictionary(kind => kind, RelationKind);
+            labels["runtime-awp-worker"] = T("DeploymentRuntime_awp-worker");
+            labels["runtime-agentstration-server"] = T("DeploymentRuntime_agentstration-server");
+            labels["runtime-remote-runtime"] = T("DeploymentRuntime_remote-runtime");
+            labels["deployment-environment"] = T("C4Environment"); labels["deployment-desired"] = T("DeploymentDesired");
+            labels["worker"] = T("C4Worker"); labels["recorded-generations"] = T("RecordedGenerations"); labels["current-generation"] = T("CurrentGeneration");
+            return labels;
+        }
+    }
+    private string NodeState(string value) => T(value switch { "draft" => "Draft", "definition" => "Definition", "publication" => "Published", "published" => "Published", "recorded-generation" => "RecordedGeneration", "reference-identity" => "ReferenceIdentity", "recorded-deployment-configuration" => "DeploymentConfigurationState", _ => "Metadata" });
+    private string RelationKind(string value) => T(value switch { "system-membership" => "Membership", "exact-dependency" => "Dependency", "dynamic-dependency" => "DynamicDependency", "generation-of" => "GenerationOf", "publication" => "Publication", "deployment-configuration" => "DeploymentConfigurationRelation", "deployed-revision" => "DeployedRevisionRelation", _ => "Relation" });
     public void Dispose() { ++revision; cancellation?.Cancel(); cancellation?.Dispose(); GC.SuppressFinalize(this); }
 }

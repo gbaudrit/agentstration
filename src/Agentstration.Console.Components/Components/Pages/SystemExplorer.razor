@@ -14,6 +14,81 @@
 <PageHeader Title="@T("Title")" Description="@T("Description")" TestId="system-explorer">
     <Actions><button type="button" class="button-secondary" @onclick="RefreshAsync" disabled="@busy">@T("Refresh")</button></Actions>
 </PageHeader>
+<nav class="explorer-actions" aria-label="@T("Perspective")">
+    <a class="button-secondary" aria-current="@(Perspective == "resources" ? "page" : null)" href="@PerspectiveUrl("resources")">@T("PerspectiveResources")</a>
+    <a class="button-secondary" aria-current="@(Perspective == "definition" ? "page" : null)" href="@PerspectiveUrl("definition")">@T("PerspectiveDefinition")</a>
+    <a class="button-secondary" aria-current="@(Perspective == "deployment" ? "page" : null)" href="@PerspectiveUrl("deployment")">@T("PerspectiveDeployment")</a>
+</nav>
+@if (Perspective != "resources")
+{
+    <section class="panel" aria-label="@T("Perspective")">
+        @if (catalog is null)
+        {
+            <label>@T("ChooseAgent") <select aria-label="@T("ChooseAgent")" @onchange="ChooseAgent"><option value="">@T("ChooseAgent")</option>
+                @foreach (var agent in received?.Nodes.Where(node => node.Identity.Kind == "Agent" && node.State == "definition") ?? [])
+                { <option value="@agent.Id">@(agent.DisplayName ?? agent.Identity.Name) · @agent.Identity.OwnerScope.Value</option> }
+            </select></label>
+        }
+        else { <h2>@(catalog.Agent.DisplayName ?? catalog.Agent.Identity.Name)</h2> }
+        @if (Perspective == "definition" && catalog is not null)
+        {
+            <div class="explorer-actions">
+                <label>@T("DefinitionVersion") <select aria-label="@T("DefinitionVersion")" value="@(VersionQuery ?? catalog.Revisions.FirstOrDefault()?.Id ?? "draft")" @onchange="ChangeDefinition">
+                    <option value="draft">@T("DefinitionDraft")</option>
+                    @foreach (var value in catalog.Revisions) { <option value="@value.Id">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }
+                </select></label>
+                <label>@T("DefinitionCompare") <select aria-label="@T("DefinitionCompare")" value="@(CompareQuery ?? "")" @onchange="ChangeComparison"><option value="">@T("DefinitionSingle")</option>
+                    @foreach (var value in catalog.Revisions.Where(value => value.Id != graphRoot)) { <option value="@value.Id">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }
+                </select></label>
+            </div>
+            <p>@T("DefinitionDynamicNote")</p>
+        }
+        @if (Perspective == "deployment")
+        {
+            <div class="explorer-actions">
+                <label>@T("DeploymentAssignment") <select aria-label="@T("DeploymentAssignment")" value="@(assignment?.Uid.ToString("D") ?? "")" @onchange="ChangeDeployment"><option value="">@T("ChooseDeployment")</option>
+                    @foreach (var value in assignments) { <option value="@value.Uid">@value.Name</option> }
+                </select></label>
+                <label>@T("DeploymentConfiguration") <select aria-label="@T("DeploymentConfiguration")" value="@(configuration?.Id.ToString("D") ?? "")" @onchange="ChangeConfiguration"><option value="">@T("ChooseConfiguration")</option>
+                    @foreach (var value in assignment?.Configurations.Reverse() ?? [])
+                    { <option value="@value.Id">@value.Environment · @Localizer["DefinitionRevision", value.AgentVersion] · @value.RecordedAt.ToLocalTime().ToString("g")</option> }
+                </select></label>
+            </div>
+            <p>@T("DeploymentHistoryHelp")</p>
+            @if (configuration is not null)
+            {
+                <dl class="resource-details"><dt>@T("DeploymentEnvironment")</dt><dd>@configuration.Environment</dd><dt>@T("DeploymentTargetName")</dt><dd>@configuration.Target.Name <code>@configuration.Target.Id</code></dd>
+                    <dt>@T("DeploymentRevision")</dt><dd>@configuration.RevisionName · <code>@configuration.RevisionUid</code></dd><dt>@T("DeploymentSnapshotAt")</dt><dd>@configuration.RecordedAt.ToLocalTime().ToString("G")</dd></dl>
+                <div class="explorer-actions"><button type="button" class="button-secondary" @onclick="ShowDesiredDeployment">@T("DeploymentDesired")</button>
+                    <button type="button" class="button-secondary" disabled="@(loading || observing)" @onclick="ObserveDeploymentAsync">@T("DeploymentObservedRead")</button></div>
+                @if (diagramOptions?.Mode == "observed")
+                {
+                    <p role="status">@T("DeploymentObservedUnknown") @if (deploymentObservation is not null) { <time>@deploymentObservation.SampledAt.ToLocalTime().ToString("G")</time> }</p>
+                    @if (!HasPlacement) { <p role="status">@T("DeploymentObservedNone")</p> }
+                    else { <p>@T("DeploymentObservedPartial")</p> }
+                }
+            }
+            else if (!loading) { <p role="status">@T("DeploymentNoConfiguration")</p> }
+            @if (catalog?.Revisions.Count > 0 && contextScope.Kind == ResourceScopeKind.Workspace && canWrite)
+            {
+                <form @onsubmit="() => SaveAssignmentAsync(true)" @onsubmit:preventDefault>
+                    <label>@T("DeploymentName") <input @bind="deploymentName" maxlength="63" required /></label>
+                    <label>@T("DeploymentRevision") <select aria-label="@T("DeploymentRevision")" @bind="deploymentRevision">@foreach (var value in catalog.Revisions) { <option value="@value.Identity.ResourceUid.ToString("D")">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }</select></label>
+                    <label>@T("DeploymentEnvironment") <input @bind="deploymentEnvironment" maxlength="100" required /></label>
+                    <label>@T("DeploymentTargetId") <input @bind="deploymentTargetId" maxlength="200" required /></label>
+                    <label>@T("DeploymentTargetName") <input @bind="deploymentTargetName" maxlength="200" required /></label>
+                    <label>@T("DeploymentTargetKind") <select aria-label="@T("DeploymentTargetKind")" @bind="deploymentTargetKind">@foreach (var kind in new[] { "worker-pool", "host", "cluster", "remote-endpoint" }) { <option value="@kind">@T("DeploymentTarget_" + kind)</option> }</select></label>
+                    <label>@T("DeploymentRuntime") <select aria-label="@T("DeploymentRuntime")" @bind="deploymentRuntime">@foreach (var kind in new[] { "awp-worker", "agentstration-server", "remote-runtime" }) { <option value="@kind">@T("DeploymentRuntime_" + kind)</option> }</select></label>
+                    <button type="submit" class="button-primary" disabled="@(!CanAssign)">@T("DeploymentNew")</button>
+                    @if (assignment is not null) { <button type="button" class="button-secondary" disabled="@(!CanAssign)" @onclick="() => SaveAssignmentAsync(false)">@T("DeploymentReassign")</button> }
+                </form>
+                <p>@T("DeploymentAssignHint")</p>
+            }
+            else if (catalog is not null) { <p>@T("DeploymentReadOnlyContext")</p> }
+        }
+        @if (perspectiveError is not null) { <ErrorState Message="@perspectiveError" /> }
+    </section>
+}
 <form @onsubmit="ApplyNamespace" @onsubmit:preventDefault>
     <label>@T("Namespace") <input @bind="namespaceInput" maxlength="63" disabled="@(!contextReady)" /></label>
     <button class="button-secondary" type="submit" disabled="@(!contextReady)">@T("Apply")</button>
@@ -38,14 +113,14 @@
     @if (!loading && page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
     else if (page.Nodes.Count > 0)
     {
-        @if (showDiagram && !diagramFailed) { <SystemGraphDiagram @key="(revision, windowOffset)" Page="diagramPage!" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
+        @if (showDiagram && !diagramFailed && (Perspective != "deployment" || configuration is not null && (diagramOptions?.Mode != "observed" || HasPlacement))) { <SystemGraphDiagram @key="(revision, windowOffset, Perspective)" Page="diagramPage!" Options="diagramOptions" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" Failed="DiagramFailed" /> }
         @if (diagramFailed) { <p role="status">@T("DiagramUnavailable")</p> }
         <section aria-label="@T("Resources")" aria-busy="@loading">
             <h2>@T("Resources")</h2>
             <div class="explorer-scroll"><table class="data-grid"><thead><tr><th>@T("Name")</th><th>@T("Kind")</th><th>@T("Owner")</th><th>@T("State")</th><th>@T("Evidence")</th><th></th></tr></thead><tbody>
             @foreach (var node in diagramPage!.Nodes)
             {
-                <tr @key="node.Id" data-testid="explorer-node" aria-selected="@(selected?.Id == node.Id)"><td><button type="button" class="text-button" @onclick="() => Select(node.Id)">@(node.DisplayName ?? node.Identity.Name)</button><br /><code>@node.Identity.Namespace/@node.Identity.Name</code></td><td><code>@node.Identity.Kind</code></td><td><code>@node.Identity.OwnerScope.Value</code></td><td>@NodeState(node.State)</td><td><code>@(node.Evidence?.Publication ?? node.Evidence?.Generation?.ToString() ?? "—")</code></td><td><a href="@ExplorerUrl(node.Id)">@T("Neighbors")</a></td></tr>
+                <tr @key="node.Id" data-testid="explorer-node" aria-selected="@(selected?.Id == node.Id)"><td><button type="button" class="text-button" @onclick="() => Select(node.Id)">@(node.DisplayName ?? node.Identity.Name)</button><br /><code>@node.Identity.Namespace/@node.Identity.Name</code></td><td><code>@node.Identity.Kind</code></td><td><code>@node.Identity.OwnerScope.Value</code></td><td>@NodeState(node.State)</td><td><code>@(node.Evidence?.Publication ?? node.Evidence?.Generation?.ToString() ?? "—")</code></td><td><a href="@ExplorerUrl(node.Id)">@T("Neighbors")</a>@if (node.Identity.Kind is "Agent" or "AgentRevision") { <br /><a href="@PerspectiveUrl("definition", node.Id)">@T("PerspectiveDefinition")</a><br /><a href="@PerspectiveUrl("deployment", node.Id)">@T("PerspectiveDeployment")</a> }</td></tr>
             }
             </tbody></table></div>
         </section>

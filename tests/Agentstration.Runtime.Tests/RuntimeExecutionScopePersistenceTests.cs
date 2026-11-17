@@ -137,13 +137,14 @@ public sealed class RuntimeExecutionScopePersistenceTests
             await store.InitializeAsync(default);
             var scope = RuntimeRunScope.Workspace(Guid.NewGuid(), new(Guid.NewGuid()), Guid.NewGuid());
             var uid = Guid.NewGuid(); var revision = Guid.NewGuid();
+            var deployment = new RuntimeDeploymentReference(Guid.NewGuid(), Guid.NewGuid(), scope.ScopeRef, ResourceNamespace.Default, "production");
             var root = Run(scope, "own") with
             {
                 Properties = Run(scope, "own").Properties with
-                { Agent = new("same-name", 2) { ResourceUid = uid, RevisionUid = revision, ScopeRef = ResourceScopeRef.Instance, DefinitionHash = "attested" } }
+                { Agent = new("same-name", 2) { ResourceUid = uid, RevisionUid = revision, ScopeRef = ResourceScopeRef.Instance, DefinitionHash = "attested", Deployment = deployment } }
             };
             await store.CreateAsync(root, default);
-            for (var index = 0; index < 8; index++)
+            for (var index = 0; index < 10; index++)
             {
                 var agent = root.Properties.Agent;
                 var foreign = root with { Id = $"newer-{index}", Name = $"newer-{index}", Status = root.Status with { CreatedAt = root.Status.CreatedAt.AddMinutes(index + 1) } };
@@ -156,12 +157,15 @@ public sealed class RuntimeExecutionScopePersistenceTests
                     4 => foreign with { Properties = foreign.Properties with { Agent = agent with { DefinitionHash = "different" } } },
                     5 => foreign with { Scope = scope with { LogicalScopeRef = ResourceScopeRef.Instance } },
                     6 => foreign with { Properties = foreign.Properties with { Agent = agent with { RevisionUid = Guid.NewGuid() } } },
+                    7 => foreign with { Properties = foreign.Properties with { Agent = agent with { Deployment = deployment with { Uid = Guid.NewGuid() } } } },
+                    8 => foreign with { Properties = foreign.Properties with { Agent = agent with { Deployment = deployment with { ConfigurationId = Guid.NewGuid() } } } },
                     _ => foreign with { Properties = foreign.Properties with { Agent = new("same-name", 2) } }
                 };
                 await store.CreateAsync(foreign, default);
             }
             var result = await store.ListByIdentityAsync(new(scope.ScopeRef, ResourceScopeRef.Instance, ResourceNamespace.Default,
-                uid, revision, 2, DateTimeOffset.MinValue, 1, scope.ScopeRef, "attested"), default);
+                uid, revision, 2, DateTimeOffset.MinValue, 1, scope.ScopeRef, "attested")
+                { DeploymentUid = deployment.Uid, DeploymentConfigurationId = deployment.ConfigurationId }, default);
             Assert.HasCount(1, result); Assert.AreEqual("own", result[0].Value.Id);
             Assert.IsEmpty(await store.ListByIdentityAsync(new(ResourceScopeRef.Instance, ResourceScopeRef.Instance,
                 ResourceNamespace.Default, uid, revision, 2, DateTimeOffset.MinValue), default));

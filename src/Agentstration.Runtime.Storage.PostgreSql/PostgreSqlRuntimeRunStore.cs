@@ -141,6 +141,8 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
         var generation = query.Generation?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
         var invocation = (query.InvocationScope ?? query.ExecutionScope).Value;
         var hash = query.DefinitionHash ?? "";
+        var deployment = query.DeploymentUid?.ToString("D") ?? "";
+        var configuration = query.DeploymentConfigurationId?.ToString("D") ?? "";
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Runs.FromSqlInterpolated($"""
             SELECT * FROM "runtime"."RuntimeRuns"
@@ -152,6 +154,8 @@ public sealed class PostgreSqlRuntimeRunStore(IDbContextFactory<RuntimeRunDbCont
               AND ({generation} = '' OR jsonb_extract_path_text("Payload"::jsonb, 'properties', 'agent', 'version') = {generation})
               AND COALESCE(jsonb_extract_path_text("Payload"::jsonb, 'scope', 'logicalScopeRef'), "ScopeRef") = {invocation}
               AND ({hash} = '' OR jsonb_extract_path_text("Payload"::jsonb, 'properties', 'agent', 'definitionHash') = {hash})
+              AND ({deployment} = '' OR jsonb_extract_path_text("Payload"::jsonb, 'properties', 'agent', 'deployment', 'uid') = {deployment})
+              AND ({configuration} = '' OR jsonb_extract_path_text("Payload"::jsonb, 'properties', 'agent', 'deployment', 'configurationId') = {configuration})
               AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "State" NOT IN ('Succeeded','Failed','Cancelled','TimedOut'))
             ORDER BY "CreatedAt" DESC, "RunId" DESC LIMIT {query.Take}
             """).AsNoTracking().ToArrayAsync(cancellationToken);

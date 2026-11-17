@@ -172,6 +172,30 @@ public sealed class SystemGraphStreamTests
     }
 
     [TestMethod]
+    public async Task DeploymentConfigurationMetadataRequiresBindingAccessToItsExactRevisionInEveryObservation()
+    {
+        var revision = Node("private-revision"); revision = revision with { Identity = revision.Identity with { Kind = "AgentRevision" } };
+        var deployment = Node("deployment"); deployment = deployment with { Identity = deployment.Identity with { Kind = "AgentDeployment" } };
+        var config = deployment with
+        {
+            Id = "deployment-configuration", State = "recorded-deployment-configuration",
+            Deployment = new(deployment.Identity.ResourceUid, Guid.NewGuid(), Guid.NewGuid(), revision.Identity.ResourceUid,
+                Owner, ResourceNamespace.Default, revision.Identity.Name, 1, "hash", "private-environment", "private-target-id", "Private target", "worker-pool", "awp-worker", DateTimeOffset.UnixEpoch)
+        };
+        var access = new Access(); var source = new Source([new([deployment, revision, config], [new(config.Id, revision.Id, "deployed-revision")])]);
+        var service = new SystemGraphQueryService([source], access, TimeProvider.System);
+        Assert.IsTrue((await Collect(service, new(Root: config.Id))).SelectMany(frame => frame.Nodes).Any(node => node.Id == config.Id));
+        access.Hidden.Add(revision.Identity.ResourceUid);
+        var frames = await Collect(service, new(Root: config.Id));
+        Assert.IsEmpty(frames.SelectMany(frame => frame.Nodes).ToArray());
+        Assert.DoesNotContain("private-target-id", JsonSerializer.Serialize(await service.QueryAsync(new(), default)), StringComparison.Ordinal);
+        Assert.DoesNotContain("private-environment", JsonSerializer.Serialize(frames), StringComparison.Ordinal);
+        access.Hidden.Clear(); source.OnRead = () => { if (source.Reads % 2 == 0) access.Hidden.Add(revision.Identity.ResourceUid); };
+        frames = await Collect(service, new(Root: config.Id));
+        Assert.AreEqual("error", frames[^1].Kind);
+    }
+
+    [TestMethod]
     public async Task BoundsAreExplicitAndAnInvalidLimitNeverEnumeratesFamilies()
     {
         var source = new Source([new([Node("a")], []), new([Node("b")], [])]);

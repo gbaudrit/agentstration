@@ -41,7 +41,7 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
                 : known ? "observed-pins-current" : "unknown";
         }
         var start = now.AddMinutes(-query.WindowMinutes);
-        var rows = context.CanReadRuns && root.Identity.Kind is "Agent" or "AgentRevision" or "Flow"
+        var rows = context.CanReadRuns && (root.Identity.Kind is "Agent" or "AgentRevision" or "Flow" || root.Deployment is not null)
             ? await evidence.ReadAsync(root, context, start, query.MaximumRuns, ct)
             : new SystemRunEvidencePage([], false, context.CanReadRuns ? "family-unsupported" : "run-read-required");
         var runs = rows.Runs.Where(run => Matches(root, run, context)).DistinctBy(run => (run.Family, run.DataScope, run.RunId))
@@ -55,7 +55,7 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
         var presence = !context.CanInspectWorkers || presences.Length == 0 ? "unknown" : presences.Contains("offline", StringComparer.Ordinal) ? "offline"
             : presences.Contains("stale", StringComparer.Ordinal) ? "stale" : presences.All(value => value == "online") ? "online" : "unknown";
         var provisioning = await evidence.ProvisioningAsync(root, ct);
-        if (!await access.CanDeliverAsync(root.Identity, context, generationNodes.Length > 0, ct))
+        if (!await access.CanDeliverAsync(root.Identity, context, generationNodes.Length > 0 || root.Deployment is not null, ct))
             throw new SystemOperationsException("system_operations_access_changed");
         var currentPage = await graph.QueryAsync(new(query.Namespace, query.Root, 200), ct);
         if (currentPage.Snapshot != page.Snapshot) throw new SystemOperationsException("system_operations_access_changed");
@@ -69,7 +69,12 @@ public sealed class SystemOperationsService(ISystemGraphQueryService graph, ISys
     }
     private static bool Matches(SystemGraphNode root, SystemRunEvidence run, SystemOperationsReadContext context)
     {
-        if (run.InvocationScope != context.InvocationScope || run.DataScope != context.DataScope || run.DefinitionOwner != root.Identity.OwnerScope || run.DefinitionNamespace != root.Identity.Namespace) return false;
+        if (run.InvocationScope != context.InvocationScope || run.DataScope != context.DataScope
+            || run.DefinitionOwner != (root.Deployment?.RevisionOwner ?? root.Identity.OwnerScope)
+            || run.DefinitionNamespace != (root.Deployment?.RevisionNamespace ?? root.Identity.Namespace)) return false;
+        if (root.Deployment is { } deployment) return run.ResourceUid == deployment.AgentUid && run.RevisionUid == deployment.RevisionUid
+            && run.DefinitionHash == deployment.DefinitionHash && run.DeploymentUid == deployment.DeploymentUid
+            && run.DeploymentConfigurationId == deployment.ConfigurationId;
         if (root.Identity.Kind == "AgentRevision") return run.RevisionUid == root.Identity.ResourceUid
             && (root.Evidence?.Hash is null || root.Evidence.Hash == run.DefinitionHash);
         if (run.ResourceUid != root.Identity.ResourceUid) return false;

@@ -181,6 +181,8 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
         var generation = query.Generation ?? -1;
         var invocation = (query.InvocationScope ?? query.ExecutionScope).Value;
         var hash = query.DefinitionHash ?? "";
+        var deployment = query.DeploymentUid?.ToString("D") ?? "";
+        var configuration = query.DeploymentConfigurationId?.ToString("D") ?? "";
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var documents = await context.Runs.FromSqlInterpolated($"""
             SELECT * FROM "RuntimeRuns"
@@ -192,6 +194,8 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
               AND ({generation} = -1 OR json_extract("Payload", '$.properties.agent.version') = {generation})
               AND COALESCE(json_extract("Payload", '$.scope.logicalScopeRef'), "ScopeRef") = {invocation}
               AND ({hash} = '' OR json_extract("Payload", '$.properties.agent.definitionHash') = {hash})
+              AND ({deployment} = '' OR json_extract("Payload", '$.properties.agent.deployment.uid') = {deployment})
+              AND ({configuration} = '' OR json_extract("Payload", '$.properties.agent.deployment.configurationId') = {configuration})
               AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "State" NOT IN ('Succeeded','Failed','Cancelled','TimedOut'))
             ORDER BY "CreatedAt" DESC, "RunId" DESC LIMIT {query.Take}
             """).AsNoTracking().ToArrayAsync(cancellationToken);

@@ -12,6 +12,27 @@ public sealed class SystemOperationsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 17, 0, 0, 0, TimeSpan.Zero);
     [TestMethod]
+    public async Task DeploymentFactsRequireExplicitExactConfigurationAndNeverInferFromRevisionAlone()
+    {
+        using var f = new Fixture(); var run = f.Run();
+        var revision = Guid.NewGuid(); var deployment = Guid.NewGuid(); var configuration = Guid.NewGuid();
+        f.Root = f.Root with
+        {
+            Identity = f.Root.Identity with { Kind = "AgentDeployment", ResourceUid = deployment },
+            Deployment = new(deployment, configuration, run.ResourceUid, revision, run.DefinitionOwner,
+                run.DefinitionNamespace, "exact-revision", 1, "hash", "production", "pool", "Pool", "worker-pool", "awp-worker", Now)
+        };
+        var exact = run with { RevisionUid = revision, DefinitionHash = "hash", DeploymentUid = deployment, DeploymentConfigurationId = configuration };
+        f.Rows = [exact, exact with { RunId = "legacy", DeploymentUid = null, DeploymentConfigurationId = null },
+            exact with { RunId = "other-deployment", DeploymentUid = Guid.NewGuid() },
+            exact with { RunId = "other-config", DeploymentConfigurationId = Guid.NewGuid() },
+            exact with { RunId = "other-revision", RevisionUid = Guid.NewGuid() },
+            exact with { RunId = "other-hash", DefinitionHash = "changed" }];
+        var facts = (await f.Service.SnapshotAsync(new(f.Root.Id), default)).Facts!;
+        Assert.HasCount(1, facts.Runs); Assert.AreEqual(exact.RunId, facts.Runs[0].RunId);
+        Assert.AreEqual(1, facts.Metrics!.ObservedSucceeded);
+    }
+    [TestMethod]
     public async Task ExactUidOwnerNamespaceInvocationAndPublicationEvidenceExcludeHomonymsAndDuplicates()
     {
         using var f = new Fixture();

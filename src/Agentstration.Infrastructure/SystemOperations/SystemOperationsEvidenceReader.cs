@@ -57,10 +57,14 @@ public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, Fl
                     return new([], false, "unavailable");
                 agentUid = revision.Value.AgentUid;
             }
-            (consumers, moreConsumers) = await flowBindings.ReadAsync(root, agentUid, context, windowStart, take, presence, ct);
-            var query = new RuntimeRunIdentityQuery(context.DataScope, root.Identity.OwnerScope, root.Identity.Namespace,
-                agentUid, root.Identity.Kind == "AgentRevision" ? root.Identity.ResourceUid : null,
-                root.State == "recorded-generation" ? root.Evidence?.Generation : null, windowStart, take + 1, context.InvocationScope, root.Identity.Kind == "AgentRevision" ? root.Evidence?.Hash : null);
+            var deployment = root.Deployment;
+            if (deployment is null) (consumers, moreConsumers) = await flowBindings.ReadAsync(root, agentUid, context, windowStart, take, presence, ct);
+            var query = new RuntimeRunIdentityQuery(context.DataScope, deployment?.RevisionOwner ?? root.Identity.OwnerScope,
+                deployment?.RevisionNamespace ?? root.Identity.Namespace, deployment?.AgentUid ?? agentUid,
+                deployment?.RevisionUid ?? (root.Identity.Kind == "AgentRevision" ? root.Identity.ResourceUid : null),
+                root.State == "recorded-generation" ? root.Evidence?.Generation : null, windowStart, take + 1, context.InvocationScope,
+                deployment?.DefinitionHash ?? (root.Identity.Kind == "AgentRevision" ? root.Evidence?.Hash : null))
+            { DeploymentUid = deployment?.DeploymentUid, DeploymentConfigurationId = deployment?.ConfigurationId };
             var runs = await runtime.ListByIdentityAsync(SystemOperationsAccess.RuntimeScope(context), query, ct);
             more = runs.Count > take;
             foreach (var stored in runs.Take(take))
@@ -71,7 +75,11 @@ public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, Fl
                     agent.RevisionUid, agent.Version.ToString(CultureInfo.InvariantCulture), agent.DefinitionHash, State(run.Status.State), run.Status.CreatedAt,
                     run.Status.StartedAt, run.Status.CompletedAt, run.Status.InputTokens, run.Status.OutputTokens,
                     run.Status.InputTokens is not null && run.Status.OutputTokens is not null ? "complete" : "unavailable",
-                    await PlacementAsync(context, RuntimeAssignmentTargetKind.RuntimeRun, run.Id, presence, ct)));
+                    await PlacementAsync(context, RuntimeAssignmentTargetKind.RuntimeRun, run.Id, presence, ct))
+                {
+                    DeploymentUid = agent.Deployment?.Uid,
+                    DeploymentConfigurationId = agent.Deployment?.ConfigurationId
+                });
             }
         }
         return new(result, more, "attested-window") { FlowBindings = consumers, MoreFlowBindings = moreConsumers };
@@ -107,6 +115,7 @@ public sealed class SystemOperationsEvidenceReader(RuntimeRunService runtime, Fl
         var address = new ScopedResourceAddress(root.Identity.OwnerScope, root.Identity.Namespace, root.Identity.Kind, root.Identity.Name);
         if (root.Identity.Kind == "Agent") return (await resources.GetExactAsync<AgentResource>(address, ct))?.Value.Status?.ProvisioningState.ToString().ToLowerInvariant() ?? "unknown";
         if (root.Identity.Kind == "AgentRevision") return (await resources.GetExactAsync<AgentRevision>(address, ct))?.Value.ProvisioningState.ToString().ToLowerInvariant() ?? "unknown";
+        if (root.Identity.Kind == "AgentDeployment") return (await resources.GetExactAsync<AgentDeployment>(address, ct))?.Value.ProvisioningState.ToString().ToLowerInvariant() ?? "unknown";
         return "unknown";
     }
     private static string State(RuntimeRunState state) => state switch

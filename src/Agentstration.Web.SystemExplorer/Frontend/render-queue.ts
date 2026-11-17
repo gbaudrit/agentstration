@@ -1,9 +1,11 @@
 import type {GraphPage} from './model';
+import type {DeploymentOptions} from './deployment-model';
 export interface DiagramRenderInput {
  page:GraphPage;
  labels:Record<string,string>;
  notes:Record<string,string>;
  select:(id:string)=>void;
+ options?:DeploymentOptions;
 }
 // Keep the displayed graph while one layout runs; retain only the latest pending update.
 export class DiagramRenderQueue {

@@ -11,7 +11,7 @@ namespace Agentstration.Agents;
 public sealed class AgentSystemGraphContributor(IResourceStore resources, IResourceReferenceResolver references) : ISystemGraphContributor
 {
     public string Family => "agents";
-    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "declared-tools-and-toolsets", "schema-publications", "agent-revisions"], ["opaque-middleware-and-settings"]);
+    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "declared-tools-and-toolsets", "schema-publications", "agent-revisions", "recorded-deployment-configurations"], ["opaque-middleware-and-settings", "legacy-deployment-bindings-without-uids"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -66,6 +66,27 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
                     relations.Add(new(source.Id, SystemGraphIds.Publication(uid, reference.Version), "exact-dependency", schema.Key, "recorded-schema")
                     { SelectedPublication = reference.Version, TargetField = reference.SchemaPath, ExpectedHash = schema.Value.DefinitionHash, ParentHash = schema.Value.ParentDefinitionHash });
             yield return new(nodes, relations) { BindingOwner = source.Identity, BindingOwnerNodeId = source.Id };
+        }
+        await foreach (var stored in ResourceSystemGraph.ReadAsync<AgentDeployment>(resources, scope, AgentResourceKinds.AgentDeployment, cancellationToken))
+        {
+            var deployment = ResourceSystemGraph.Node(stored.Value);
+            yield return new([deployment], []);
+            foreach (var config in stored.Value.Configurations)
+            {
+                var id = $"deployment:{stored.Value.Uid:D}:{config.Id:D}";
+                var node = new SystemGraphNode(id, deployment.Identity, "recorded-deployment-configuration",
+                    new(Publication: config.Id.ToString("D"), Hash: config.DefinitionHash))
+                {
+                    DisplayName = stored.Value.Name,
+                    Deployment = new(stored.Value.Uid, config.Id, config.AgentUid, config.RevisionUid, config.RevisionOwner,
+                        config.RevisionNamespace, config.RevisionName, config.AgentVersion, config.DefinitionHash,
+                        config.Environment, config.Target.Id, config.Target.Name, config.Target.Kind, config.Target.Runtime, config.RecordedAt)
+                };
+                // Only the selected configuration is followed by default. History is selected explicitly.
+                var edges = new List<SystemGraphRelation> { new(node.Id, SystemGraphIds.Definition(config.RevisionUid), "deployed-revision", "configuration.revision", "recorded-uid") };
+                if (config.Id == stored.Value.Configurations.LastOrDefault()?.Id) edges.Add(new(deployment.Id, node.Id, "deployment-configuration"));
+                yield return new([node], edges) { BindingOwner = deployment.Identity, BindingOwnerNodeId = deployment.Id };
+            }
         }
     }
 }

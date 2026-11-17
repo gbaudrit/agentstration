@@ -35,7 +35,12 @@ public sealed record SystemGraphNode(
     SystemGraphEvidence? Evidence = null)
 {
     public string? DisplayName { get; init; }
+    public SystemGraphDeployment? Deployment { get; init; }
 }
+public sealed record SystemGraphDeployment(Guid DeploymentUid, Guid ConfigurationId, Guid AgentUid, Guid RevisionUid,
+    ResourceScopeRef RevisionOwner, ResourceNamespace RevisionNamespace, string RevisionName, long AgentVersion,
+    string DefinitionHash, string Environment, string TargetId, string TargetName, string TargetKind, string Runtime,
+    DateTimeOffset RecordedAt);
 
 public sealed record SystemGraphRelation(
     string Source,

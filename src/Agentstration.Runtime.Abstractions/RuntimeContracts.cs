@@ -163,6 +163,8 @@ public sealed record ResolvedRuntimeAgent(
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? AgentScopeRef { get; init; }
     public Guid RevisionUid { get; init; }
+    public RuntimeDeploymentReference? Deployment { get; init; }
+    public string? DefinitionHash { get; init; }
     public ResourceNamespace RuntimeProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceNamespace ModelProfileNamespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ModelProfileScopeRef { get; init; }

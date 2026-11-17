@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Agentstration.Resources;
+using Agentstration.Agents;
+using Agentstration.SystemOperations.Contracts;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Systems.Contracts;
 using Agentstration.Web.Components.Pages;
@@ -169,11 +171,29 @@ public sealed partial class SystemExplorerTests
         public ConcurrentQueue<ResourceScopeRef> Cancelled { get; } = new();
         public TaskCompletionSource<IReadOnlyList<SystemView>> Systems { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool HoldSystems { get; init; }
+        public AgentDefinitionCatalog? Catalog { get; set; }
+        public TaskCompletionSource<AgentDefinitionCatalog?>? HeldCatalog { get; set; }
+        public IReadOnlyList<AgentDeploymentView> Deployments { get; set; } = [];
+        public SystemGraphPage? Photo { get; set; }
+        public List<string?> Roots { get; } = [];
+        public SystemOperationalSnapshot Observation { get; set; } = new(null, DateTimeOffset.UnixEpoch, "unavailable");
+        public Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) => HeldCatalog?.Task ?? Task.FromResult(Catalog);
+        public Task<IReadOnlyList<AgentDeploymentView>> DeploymentsAsync(ResourceScopeRef context, ResourceNamespace ns, Guid? agentUid, CancellationToken ct) => Task.FromResult(Deployments);
+        public Task<SystemOperationalSnapshot> ObservedDeploymentAsync(ResourceScopeRef context, ResourceNamespace ns, string root, CancellationToken ct) => Task.FromResult(Observation);
         public Channel<SystemGraphStreamFrame> For(ResourceScopeRef scope) => streams.GetOrAdd(scope, _ => Channel.CreateUnbounded<SystemGraphStreamFrame>());
         public Task Push(ResourceScopeRef scope, SystemGraphStreamFrame frame) => For(scope).Writer.WriteAsync(frame).AsTask();
         public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
             [EnumeratorCancellation] CancellationToken ct)
         {
+            Roots.Add(root);
+            if (Photo is not null)
+            {
+                var epoch = Guid.NewGuid();
+                yield return new(epoch, 1, "start", Photo.ObservedAt, [], [], []);
+                yield return new(epoch, 2, "append", Photo.ObservedAt, Photo.Nodes, Photo.Relations, Photo.Scopes);
+                yield return new(epoch, 3, "complete", Photo.ObservedAt, [], [], []);
+                yield break;
+            }
             using var cancelled = ct.Register(() => Cancelled.Enqueue(context));
             await foreach (var frame in For(context).Reader.ReadAllAsync(ct)) yield return frame;
         }

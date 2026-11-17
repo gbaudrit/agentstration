@@ -12,7 +12,11 @@ public sealed record SystemRunEvidence(string Family, string RunId, ResourceScop
     ResourceScopeRef DefinitionOwner, ResourceNamespace DefinitionNamespace, Guid ResourceUid, Guid? RevisionUid, string? Publication, string? DefinitionHash,
     string State, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt,
     long? InputTokens, long? OutputTokens, string TokenCoverage, IReadOnlyList<SystemPlacementEvidence> Placements,
-    string? WorkItemId = null, string? WorkTaskId = null);
+    string? WorkItemId = null, string? WorkTaskId = null)
+{
+    public Guid? DeploymentUid { get; init; }
+    public Guid? DeploymentConfigurationId { get; init; }
+}
 // A recorded Flow binding is an association, not proof that an Agent executed.
 public sealed record SystemFlowInvocationEvidence(Guid AssignmentId, Guid AttemptId, Guid? StepExecutionId,
     string? StepDefinitionId, Guid WorkerId, Guid SessionId, long FencingGeneration, string AttemptState,

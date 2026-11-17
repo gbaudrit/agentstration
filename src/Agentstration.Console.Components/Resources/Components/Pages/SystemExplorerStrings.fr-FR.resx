@@ -172,4 +172,54 @@
   <data name="Previous" xml:space="preserve"><value>Ressources précédentes</value></data>
   <data name="SystemsLoadFailed" xml:space="preserve"><value>Les systèmes logiques n’ont pas pu être chargés. L’exploration des ressources reste disponible.</value></data>
   <data name="LimitReached" xml:space="preserve"><value>L’observation a atteint sa limite. Affinez le contexte ou l’espace de noms pour explorer les autres ressources.</value></data>
+  <data name="Perspective" xml:space="preserve"><value>Vues de l’explorateur</value></data>
+  <data name="PerspectiveResources" xml:space="preserve"><value>Ressources</value></data>
+  <data name="PerspectiveDefinition" xml:space="preserve"><value>Définition</value></data>
+  <data name="PerspectiveDeployment" xml:space="preserve"><value>Déploiements C4</value></data>
+  <data name="ChooseAgent" xml:space="preserve"><value>Choisir un agent</value></data>
+  <data name="DefinitionVersion" xml:space="preserve"><value>Version de la définition</value></data>
+  <data name="DefinitionDraft" xml:space="preserve"><value>Définition courante modifiable</value></data>
+  <data name="DefinitionRevision" xml:space="preserve"><value>Révision {0}</value></data>
+  <data name="DefinitionCompare" xml:space="preserve"><value>Comparer avec</value></data>
+  <data name="DefinitionSingle" xml:space="preserve"><value>Une seule révision</value></data>
+  <data name="DefinitionDynamicNote" xml:space="preserve"><value>Les références enregistrées conservent leurs identités exactes. Les dépendances dynamiques affichent les métadonnées actuelles autorisées ; une ancienne génération n’est pas une copie exécutable conservée. Le diagramme regroupe les ressources communes ; la liste et l’export conservent les nœuds exacts.</value></data>
+  <data name="DeploymentAssignment" xml:space="preserve"><value>Affectation de déploiement</value></data>
+  <data name="DeploymentConfiguration" xml:space="preserve"><value>Historique des configurations</value></data>
+  <data name="ChooseDeployment" xml:space="preserve"><value>Choisir un déploiement</value></data>
+  <data name="ChooseConfiguration" xml:space="preserve"><value>Choisir une configuration</value></data>
+  <data name="DeploymentHistoryHelp" xml:space="preserve"><value>Un déploiement reste une affectation même sans run actif. Chaque réaffectation explicite conserve la configuration précédente. L’historique est disponible tant que ses révisions référencées sont conservées et autorisées.</value></data>
+  <data name="DeploymentEnvironment" xml:space="preserve"><value>Environnement</value></data>
+  <data name="DeploymentTargetId" xml:space="preserve"><value>Identifiant stable de la cible</value></data>
+  <data name="DeploymentTargetName" xml:space="preserve"><value>Nom de la cible</value></data>
+  <data name="DeploymentTargetKind" xml:space="preserve"><value>Type de cible</value></data>
+  <data name="DeploymentRuntime" xml:space="preserve"><value>Conteneur d’exécution</value></data>
+  <data name="DeploymentName" xml:space="preserve"><value>Nom du nouveau déploiement</value></data>
+  <data name="DeploymentRevision" xml:space="preserve"><value>Révision affectée</value></data>
+  <data name="DeploymentSnapshotAt" xml:space="preserve"><value>Configuration enregistrée le</value></data>
+  <data name="DeploymentDesired" xml:space="preserve"><value>Déploiement souhaité</value></data>
+  <data name="DeploymentObservedRead" xml:space="preserve"><value>Lire les placements observés</value></data>
+  <data name="DeploymentObservedUnknown" xml:space="preserve"><value>Seuls les runs explicitement associés à cette configuration de déploiement sont affichés. L’infrastructure physique et l’appartenance à un pool restent inconnues sans preuve. Observation du :</value></data>
+  <data name="DeploymentObservedNone" xml:space="preserve"><value>Aucun placement n’est attesté pour cette configuration dans la fenêtre consultée. Cela ne prouve pas l’absence d’exécution.</value></data>
+  <data name="DeploymentObservedPartial" xml:space="preserve"><value>Observation limitée à 20 sessions de Workers. Les tentatives historiques ne prouvent pas la disponibilité actuelle.</value></data>
+  <data name="DeploymentNoConfiguration" xml:space="preserve"><value>Aucune configuration conservée et autorisée n’est disponible. Une ancienne référence par nom seul ne permet pas d’établir une photo de déploiement.</value></data>
+  <data name="DeploymentNew" xml:space="preserve"><value>Créer l’affectation durable</value></data>
+  <data name="DeploymentReassign" xml:space="preserve"><value>Enregistrer une nouvelle configuration</value></data>
+  <data name="DeploymentAssignHint" xml:space="preserve"><value>L’enregistrement définit l’affectation souhaitée. Il ne provisionne pas d’infrastructure, ne route pas de travail et ne démarre pas d’agent.</value></data>
+  <data name="DeploymentReadOnlyContext" xml:space="preserve"><value>Choisissez un contexte Workspace avec le droit d’écriture sur les ressources pour enregistrer une affectation.</value></data>
+  <data name="DeploymentSaveFailed" xml:space="preserve"><value>L’affectation n’a pas pu être enregistrée. Actualisez et vérifiez la révision, la cible et les permissions.</value></data>
+  <data name="DeploymentObservedFailed" xml:space="preserve"><value>Le placement observé est indisponible. Les observations précédemment affichées ont été effacées.</value></data>
+  <data name="DeploymentTarget_worker-pool" xml:space="preserve"><value>Pool de Workers</value></data>
+  <data name="DeploymentTarget_host" xml:space="preserve"><value>Hôte</value></data>
+  <data name="DeploymentTarget_cluster" xml:space="preserve"><value>Cluster</value></data>
+  <data name="DeploymentTarget_remote-endpoint" xml:space="preserve"><value>Point de terminaison distant</value></data>
+  <data name="DeploymentRuntime_awp-worker" xml:space="preserve"><value>Worker AWP</value></data>
+  <data name="DeploymentRuntime_agentstration-server" xml:space="preserve"><value>Serveur Agentstration</value></data>
+  <data name="DeploymentRuntime_remote-runtime" xml:space="preserve"><value>Runtime distant</value></data>
+  <data name="C4Environment" xml:space="preserve"><value>Environnement de déploiement déclaré</value></data>
+  <data name="C4Worker" xml:space="preserve"><value>Worker</value></data>
+  <data name="RecordedGenerations" xml:space="preserve"><value>Générations référencées</value></data>
+  <data name="CurrentGeneration" xml:space="preserve"><value>Génération actuelle</value></data>
+  <data name="DeploymentConfigurationState" xml:space="preserve"><value>Configuration de déploiement</value></data>
+  <data name="DeploymentConfigurationRelation" xml:space="preserve"><value>Configuration sélectionnée</value></data>
+  <data name="DeployedRevisionRelation" xml:space="preserve"><value>Révision affectée</value></data>
 </root>

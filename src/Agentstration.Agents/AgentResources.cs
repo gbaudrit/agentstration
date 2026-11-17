@@ -134,6 +134,9 @@ public sealed record ResolvedAgentDefinition
 
 public sealed record AgentDeployment : Resource
 {
+    public Guid? AgentUid { get; init; }
+    public Guid? RevisionUid { get; init; }
+    public IReadOnlyList<AgentDeploymentConfiguration> Configurations { get; init; } = [];
     public ResourceNamespace AgentNamespace { get; init; } = ResourceNamespace.Default;
     public required string RevisionName { get; init; }
     public string? AgentName { get; init; }
@@ -151,3 +154,12 @@ public sealed record AgentDeployment : Resource
     public string? LastError { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }
+
+/// <summary>An immutable assignment value retained atomically with its owning deployment.</summary>
+public sealed record AgentDeploymentConfiguration(Guid Id, Guid AgentUid, Guid RevisionUid,
+    ResourceScopeRef RevisionOwner, ResourceNamespace RevisionNamespace, string RevisionName,
+    long AgentVersion, string DefinitionHash, string Environment, AgentDeploymentTarget Target,
+    DateTimeOffset RecordedAt);
+
+/// <summary>A declared execution destination, not evidence of a running host or Worker.</summary>
+public sealed record AgentDeploymentTarget(string Id, string Name, string Kind = "worker-pool", string Runtime = "awp-worker");

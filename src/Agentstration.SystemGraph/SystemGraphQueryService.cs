@@ -5,11 +5,6 @@ using Agentstration.SystemGraph.Contracts;
 
 namespace Agentstration.SystemGraph;
 
-public sealed class SystemGraphException(string code) : Exception(code)
-{
-    public string Code { get; } = code;
-}
-
 /// <summary>Rebuilds and authorizes metadata; owns no family state or execution capability.</summary>
 public sealed partial class SystemGraphQueryService(
     IEnumerable<ISystemGraphContributor> contributors,
@@ -154,8 +149,9 @@ public sealed partial class SystemGraphQueryService(
                 SystemGraphAccess allowed;
                 using (metadataScope?.Enter())
                     allowed = await authorization.EvaluateAsync(node.Identity, context, ct);
-                if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings) continue;
-                var visible = allowed.InspectBindings ? node : node with { Evidence = null };
+                if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings
+                    || !await DeploymentVisibleAsync(node, context, ct)) continue;
+                var visible = allowed.InspectBindings ? node : node with { Evidence = null, Deployment = null };
                 if (nodes.TryGetValue(node.Id, out var existing) && existing != visible)
                     throw new SystemGraphException("system_graph_changed");
                 nodes[node.Id] = visible;
@@ -238,6 +234,15 @@ public sealed partial class SystemGraphQueryService(
     }
 
     private static string Digest(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private async Task<bool> DeploymentVisibleAsync(SystemGraphNode node, SystemGraphReadContext context, CancellationToken ct)
+    {
+        if (node.Deployment is not { } binding) return true;
+        using var trusted = metadataScope?.Enter();
+        return context.Scopes.Contains(binding.RevisionOwner) && await authorization.EvaluateAsync(new(binding.RevisionUid,
+            binding.RevisionOwner, binding.RevisionNamespace, "AgentRevision", binding.RevisionName), context, ct)
+            is { Discover: true, InspectBindings: true };
+    }
 
     private string CreateCursor(Cursor value)
     {

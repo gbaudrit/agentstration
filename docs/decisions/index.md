@@ -285,3 +285,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 240. [ADR-0240 — System operations is a separate authorized volatile overlay](0240-system-operations-is-a-separate-authorized-volatile-overlay.md)
 
 241. [ADR-0241 — System Explorer streams provisional authorized observations](0241-system-explorer-streams-provisional-authorized-observations.md)
+242. [ADR-0242 — Agent deployments record exact durable assignments](0242-agent-deployments-record-exact-durable-assignments.md)
