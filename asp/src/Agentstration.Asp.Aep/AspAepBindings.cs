@@ -168,7 +168,7 @@ public static class AspAepBindingEndpoints
             { return Results.Problem(statusCode: 503, title: "The protected Storage binding is unavailable."); }
         }).RequireAuthorization(AepAuthenticationDefaults.Policy);
 
-    private static async Task<AepStorageBindingRequest> ReadAsync(HttpRequest request, CancellationToken cancellationToken)
+    internal static async Task<AepStorageBindingRequest> ReadAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         const int maximumBytes = 100000;
         AspValidation.Require(request.ContentLength is null or <= maximumBytes, "limit_exceeded", "The binding payload exceeds its bound.");

@@ -10,7 +10,7 @@ public static class ToolRelayArguments
     public const int MaximumBindings = 64;
     public const int MaximumPayloadLength = 65_536;
 
-    public static JsonElement PublicSchema(JsonElement source, IReadOnlyList<ToolArgumentBinding> bindings)
+    public static JsonElement PublicSchema(JsonElement source, IReadOnlyList<ToolArgumentBinding> bindings, string? inputEnvelope = null)
     {
         ValidatePaths(bindings);
         if (source.GetRawText().Length > MaximumPayloadLength) throw Invalid("The source schema exceeds the relay size limit.");
@@ -20,6 +20,8 @@ public static class ToolRelayArguments
         foreach (var binding in bindings)
         {
             var schema = PropertySchema(source, binding.Path);
+            if (binding is OmittedToolArgumentBinding && RequiredProperty(source, binding.Path))
+                throw Invalid("Only optional source inputs can be omitted. Bind a value for required inputs instead.");
             if (binding is LiteralToolArgumentBinding literal)
             {
                 try { ToolInputSchemaValidator.Validate(schema, literal.Value); }
@@ -29,7 +31,16 @@ public static class ToolRelayArguments
                 && (!schema.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String || type.GetString() != "string"))
                 throw Invalid("A Secret binding requires an explicitly string-typed source property.");
         }
-        Prune(root, bindings.Select(value => Segments(value.Path)).ToArray());
+        Prune(root, bindings.Select(value => (Segments(value.Path), value is not OmittedToolArgumentBinding)).ToArray());
+        if (inputEnvelope is not null)
+        {
+            ValidateEnvelope(inputEnvelope);
+            if (root["properties"] is not JsonObject properties || properties.Count != 1
+                || properties[inputEnvelope] is not JsonObject envelope || envelope["type"]?.GetValueKind() != JsonValueKind.String
+                || envelope["type"]!.GetValue<string>() != "object")
+                throw Invalid("An input envelope must be the only remaining caller property and have an object schema.");
+            return JsonSerializer.SerializeToElement(envelope);
+        }
         return JsonSerializer.SerializeToElement(root);
     }
 
@@ -47,11 +58,12 @@ public static class ToolRelayArguments
         return current.Clone();
     }
 
-    public static void ValidateCaller(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings)
+    public static void ValidateCaller(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings, string? inputEnvelope = null)
     {
         if (caller.ValueKind != JsonValueKind.Object || caller.GetRawText().Length > MaximumPayloadLength)
             throw Invalid("Relay input must be a bounded JSON object.");
         RejectDuplicateProperties(caller, 0);
+        if (inputEnvelope is not null) caller = Wrap(caller, inputEnvelope);
         foreach (var binding in bindings)
         {
             var current = caller;
@@ -69,15 +81,16 @@ public static class ToolRelayArguments
 
     public static JsonElement Reconstruct(JsonElement caller, IReadOnlyList<ToolArgumentBinding> bindings,
         IReadOnlyDictionary<string, JsonElement> values, JsonElement sourceSchema,
-        IReadOnlyList<SecretInputReference>? secretInputs = null)
+        IReadOnlyList<SecretInputReference>? secretInputs = null, string? inputEnvelope = null)
     {
         ValidatePaths(bindings);
-        ValidateCaller(caller, bindings);
-        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings), caller, secretInputs); }
+        ValidateCaller(caller, bindings, inputEnvelope);
+        try { ToolInputSchemaValidator.Validate(PublicSchema(sourceSchema, bindings, inputEnvelope), caller, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Caller input does not satisfy the effective relay contract."); }
-        var root = JsonNode.Parse(caller.GetRawText())!.AsObject();
+        var root = JsonNode.Parse((inputEnvelope is null ? caller : Wrap(caller, inputEnvelope)).GetRawText())!.AsObject();
         foreach (var binding in bindings)
         {
+            if (binding is OmittedToolArgumentBinding) continue;
             var value = values.TryGetValue(binding.Path, out var resolved) ? resolved
                 : throw Invalid("A fixed binding has no resolved value.");
             var current = root;
@@ -98,6 +111,18 @@ public static class ToolRelayArguments
         try { ToolInputSchemaValidator.Validate(sourceSchema, result, secretInputs); }
         catch (ToolInputValidationException) { throw Invalid("Reconstructed Tool input does not satisfy its pinned source contract."); }
         return result;
+    }
+
+    private static JsonElement Wrap(JsonElement caller, string inputEnvelope)
+    {
+        ValidateEnvelope(inputEnvelope);
+        return JsonSerializer.SerializeToElement(new JsonObject { [inputEnvelope] = JsonNode.Parse(caller.GetRawText()) });
+    }
+
+    private static void ValidateEnvelope(string inputEnvelope)
+    {
+        if (string.IsNullOrWhiteSpace(inputEnvelope) || inputEnvelope.Length > 128)
+            throw Invalid("An input envelope must name one bounded source object property.");
     }
 
     public static string[] Segments(string path)
@@ -131,7 +156,16 @@ public static class ToolRelayArguments
                     throw Invalid("Fixed inputs cannot duplicate or overlap parent and child paths.");
     }
 
-    private static void Prune(JsonObject node, IReadOnlyList<string[]> paths)
+    private static bool RequiredProperty(JsonElement source, string path)
+    {
+        var segments = Segments(path);
+        var parent = source;
+        foreach (var segment in segments[..^1]) parent = parent.GetProperty("properties").GetProperty(segment);
+        return parent.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array
+            && required.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == segments[^1]);
+    }
+
+    private static void Prune(JsonObject node, IReadOnlyList<(string[] Segments, bool SuppliesValue)> paths)
     {
         if (paths.Count == 0) return;
         // These constraints cannot be projected by simply removing object properties.
@@ -139,10 +173,10 @@ public static class ToolRelayArguments
         if (unsupported.Any(node.ContainsKey)) throw Invalid("The source schema uses object constraints not supported by fixed-input projection.");
         if (node["properties"] is not JsonObject properties) throw Invalid("Fixed paths require declared object properties.");
         var required = node["required"] as JsonArray ?? new JsonArray();
-        foreach (var group in paths.GroupBy(path => path[0], StringComparer.Ordinal))
+        foreach (var group in paths.GroupBy(path => path.Segments[0], StringComparer.Ordinal))
         {
-            var descendants = group.Select(path => path[1..]).ToArray();
-            if (descendants.Any(path => path.Length == 0))
+            var descendants = group.Select(path => (Segments: path.Segments[1..], path.SuppliesValue)).ToArray();
+            if (descendants.Any(path => path.Segments.Length == 0))
             {
                 properties.Remove(group.Key);
                 RemoveRequired(required, group.Key);
@@ -151,9 +185,12 @@ public static class ToolRelayArguments
             {
                 var child = properties[group.Key] as JsonObject ?? throw Invalid("A fixed parent must be an object property.");
                 Prune(child, descendants);
-                RemoveRequired(required, group.Key);
-                // Reconstruction creates this object even when its original parent was optional.
-                if (child["required"] is JsonArray { Count: > 0 }) required.Add(group.Key);
+                if (descendants.Any(path => path.SuppliesValue))
+                {
+                    RemoveRequired(required, group.Key);
+                    // Only injected values create this object during reconstruction; omission preserves parent optionality.
+                    if (child["required"] is JsonArray { Count: > 0 }) required.Add(group.Key);
+                }
             }
         }
         node["required"] = required.DeepClone();

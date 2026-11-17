@@ -118,7 +118,19 @@ Saved parameters cannot override the connection or protected Authorization heade
 Effective input schemas preserve path/query/header groups and required values;
 empty-input operations use an empty object and show No configuration / Sans
 configuration. JSON response schemas and local references are projected into
-the bounded native schema profile. Unsupported schemas leave the operation
+the bounded native schema profile. Unconstrained additional fields declared as
+`additionalProperties: {}` or the legacy `additionalProperties: { "type": "any" }`
+are projected as `additionalProperties: true`. Declared fields and their constraints
+remain intact, as do the native response evidence and contract digest. Typed or
+otherwise constrained additional-property schemas remain unsupported rather than
+being weakened. The legacy string format `dateTime` maps to the enforced
+`date-time` format. OpenAPI integer formats `int32` and `int64` become their signed
+integer bounds, intersected with any declared minimum/maximum. Other unsupported
+formats leave the operation ineligible for acquisition; their constraints are not
+discarded. Rediscover existing operations after updating the extension to
+materialize these effective schemas, then verify enablement and explicitly select
+the new revision in the Data Source; saved consumer pins are not updated automatically.
+Unsupported schemas leave the operation
 visible for discovery with a diagnostic, but without acquisition schemas; the
 Console explains why it cannot feed an enabled Data Source. No required values
 are invented. Generic operation Tool relays remain owned by #1044.

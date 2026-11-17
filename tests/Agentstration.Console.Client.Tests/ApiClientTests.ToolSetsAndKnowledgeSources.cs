@@ -88,11 +88,12 @@ public sealed partial class ApiClientTests
         var snapshot = await new KnowledgeSourcesApiClient(http).PublishExposureAsync(
             sourceNamespace,
             "documentation",
-            new PublishKnowledgeSourceToolExposureRequest { Version = "2.0.0", RequiresApproval = true });
+            new PublishKnowledgeSourceToolExposureRequest { Version = "2.0.0", RequiresApproval = true, ProposalDigest = "reviewed" });
 
         Assert.AreEqual("/api/knowledgesources/documentation/tool-exposure?namespace=shared.knowledge", requested!.PathAndQuery);
         Assert.AreEqual("2.0.0", submitted!.Version);
         Assert.IsTrue(submitted.RequiresApproval);
+        Assert.AreEqual("reviewed", submitted.ProposalDigest);
         Assert.AreEqual("\"exposure-etag\"", snapshot.ETag);
     }
 
@@ -181,4 +182,25 @@ public sealed partial class ApiClientTests
         WorkspaceId = Guid.NewGuid(),
         CreatedAt = new DateTimeOffset(2026, 10, 8, 8, 0, 0, TimeSpan.Zero)
     };
+    [TestMethod]
+    public async Task KnowledgeSourceClientInspectsUnpublishedProposalWithoutPosting()
+    {
+        Uri? requested = null;
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            Assert.AreEqual(HttpMethod.Get, request.Method);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new KnowledgeSourceToolProposal
+                { SourceUid = Guid.NewGuid(), SourceGeneration = 2, Digest = "proposal", ToolSetName = "documentation.access", Ready = false })
+            };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        var proposal = await new KnowledgeSourcesApiClient(http).GetToolProposalAsync(new("shared.knowledge"), "documentation");
+        Assert.AreEqual("/api/knowledgesources/documentation/tool-proposal?namespace=shared.knowledge", requested!.PathAndQuery);
+        Assert.IsNull(proposal!.PublishedVersion);
+        Assert.IsFalse(proposal.Ready);
+    }
+
 }

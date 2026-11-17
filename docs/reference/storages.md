@@ -135,11 +135,18 @@ Typical codes include `storage_mapping_incomplete`, `storage_export_incompatible
 `storage_provider_unavailable`, `storage_access_denied` and `storage_in_use`.
 Diagnostics never echo configuration, export values or credentials.
 
-The Schemas family's builtin JSON Schema profile is used: maximum 256 KiB per
+Configuration and envelope validation use the Schemas family's builtin JSON Schema profile: maximum 256 KiB per
 document, depth 16, no external references, bounded regular expressions and no
 silently ignored unsupported keywords. Types contain at most 32 versions and 64
 requirements; a Storage contains at most 64 bindings. Opaque configuration is not
 a universal bucket/path/table contract.
+
+Collection document schemas are validated by the selected versioned document
+profile through its registered definition validator. The ASP profile supports
+bounded local definitions/references, nullable objects and asserted formats;
+see [structured documents](structured-documents.md). Errors identify the
+collection schema and include bounded field paths/codes. Shared Schema resource
+adoption is a separate evolution tracked by [#1172](https://github.com/gbaudrit/agentstration/issues/1172).
 
 ## Consumer and adapter ports
 

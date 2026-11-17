@@ -109,12 +109,16 @@ public sealed class AgentstrationDocumentationEndToEndTests
         var projection = await worker.AwaitAsync(projectionTask);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
         Assert.IsNotNull(projection.Value.SnapshotName);
-        _ = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
+        var exposure = await services.GetRequiredService<KnowledgeSourceToolExposureService>().PublishAsync(
             new("agentstration-documentation"), "1.0.0", false, default);
         var resourceStore = services.GetRequiredService<IResourceStore>();
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.search-regex", "pattern");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.get-status", "snapshotId");
-        await AssertKnowledgeToolRequestSchemaAsync(resourceStore, "agentstration-documentation.access.read", "maxCharacters");
+        KnowledgeSourceToolOperationExposure Operation(KnowledgeSourceOperation operation) =>
+            exposure.Value.Operations.Single(member => member.Operation == operation
+                && (operation != KnowledgeSourceOperation.Describe || member.Proposal?.Contribution is null));
+        await AssertKnowledgeToolInputSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.SearchRegex).Proposal!.DefinitionName, "pattern");
+        await AssertKnowledgeToolInputSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.GetStatus).Proposal!.DefinitionName, "snapshotId");
+        await AssertKnowledgeToolInputSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.Read).Proposal!.DefinitionName, "maxCharacters");
+        await AssertKnowledgeToolInputSchemaAsync(resourceStore, Operation(KnowledgeSourceOperation.Describe).Proposal!.DefinitionName, "snapshotId");
 
         var toolExecution = services.GetRequiredService<IToolDefinitionExecutor>().ExecuteAsync(
             new ToolDefinitionInvocation(
@@ -122,10 +126,10 @@ public sealed class AgentstrationDocumentationEndToEndTests
                 new WorkspaceId(workspace.Id),
                 principal.Id,
                 ResourceNamespace.Default,
-                ToolDefinitionService.VersionName("agentstration-documentation.access.search-regex", "1.0.0"),
+                Operation(KnowledgeSourceOperation.SearchRegex).CallableName!,
                 "documentation-search-call",
                 "documentation-search-correlation",
-                JsonSerializer.SerializeToElement(new { request = new { pattern = "Workspace", limit = 5 } }),
+                JsonSerializer.SerializeToElement(new { pattern = "Workspace", limit = 5 }),
                 ToolDefinitionCallerKind.Console,
                 "documentation-administrator"), default);
         var toolResult = await worker.AwaitAsync(toolExecution);
@@ -146,20 +150,22 @@ public sealed class AgentstrationDocumentationEndToEndTests
         StringAssert.Contains(legacy.Value.GetRawText(), "governed ownership");
     }
 
-    private static async Task AssertKnowledgeToolRequestSchemaAsync(
+    private static async Task AssertKnowledgeToolInputSchemaAsync(
         IResourceStore store,
         string toolName,
-        string requiredRequestProperty)
+        string expectedInputProperty)
     {
         var stored = await store.GetAsync<ToolDefinitionResource>(
             new(ToolResourceKinds.ToolDefinition, toolName), default);
         Assert.IsNotNull(stored);
         var schema = stored.Value.Definition.InputSchema;
-        var request = schema.GetProperty("properties").GetProperty("request");
-        Assert.IsTrue(request.GetProperty("properties").TryGetProperty(requiredRequestProperty, out _));
+        var properties = schema.GetProperty("properties");
+        Assert.IsTrue(properties.TryGetProperty(expectedInputProperty, out _));
         Assert.IsInstanceOfType<RelayToolDefinitionProperties>(stored.Value.Definition);
-        Assert.IsFalse(schema.GetProperty("properties").TryGetProperty("source", out _));
-        Assert.IsFalse(request.GetProperty("additionalProperties").GetBoolean());
+        Assert.AreEqual("request", ((RelayToolDefinitionProperties)stored.Value.Definition).InputEnvelope);
+        Assert.IsFalse(properties.TryGetProperty("source", out _));
+        Assert.IsFalse(properties.TryGetProperty("request", out _));
+        Assert.IsFalse(schema.GetProperty("additionalProperties").GetBoolean());
     }
 
     private sealed class AwpTestWorker : IDisposable

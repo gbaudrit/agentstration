@@ -602,6 +602,13 @@ See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content
 The [implementation validation report](knowledge-snapshots-validation-2026-11-09.md)
 records the executed chain, required suite results and remaining UX gates.
 
+Knowledge Source consultation, Snapshot history/details and native status now
+read persisted metadata without probing Artifact content or opening provider
+sessions. Lifecycle selection is separate from content availability, reported as
+unknown/not checked or metadata-known retirement. Reads validate the selected
+Artifact; structured queries validate their pinned publication without pre-reading
+unrelated documents. See [ADR-0234](../../decisions/0234-knowledge-consultation-reads-only-metadata.md).
+
 
 ## Produced Artifacts and their Storage materializations
 

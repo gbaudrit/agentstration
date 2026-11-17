@@ -12,13 +12,14 @@ public enum ArtifactProcessingMode
 }
 
 /// <summary>The process transition enters a private processing region; returning to this step completes that region.</summary>
-public sealed record ArtifactTransformFlowStepDefinition : FlowStepDefinition
+public sealed record ForeachArtifactsFlowStepDefinition : FlowStepDefinition
 {
     public ArtifactProcessingMode Mode { get; init; } = ArtifactProcessingMode.Content;
     public JsonElement? ArtifactsMapping { get; init; }
     public JsonElement? ProcessingInputMapping { get; init; }
     public JsonElement? ResultMapping { get; init; }
     public int MaximumArtifacts { get; init; } = 32;
+    public int MaximumOutputArtifacts { get; init; } = 100;
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MaximumConcurrency { get; init; }
     public int MaximumContentBytes { get; init; } = 65_536;
@@ -36,7 +37,7 @@ public static class FlowArtifactProcessingGraph
     public const string InputName = "artifact_processing_input";
     public const string ResultName = "artifact_processing_result";
 
-    public static FlowGraphDefinition Extract(FlowGraphDefinition graph, ArtifactTransformFlowStepDefinition owner) =>
+    public static FlowGraphDefinition Extract(FlowGraphDefinition graph, ForeachArtifactsFlowStepDefinition owner) =>
         FlowProcessGraph.Extract(graph, owner, InputName, ResultName);
 
     public static IReadOnlyList<FlowTransitionDefinition> ExecutionTransitions(FlowGraphDefinition graph) =>

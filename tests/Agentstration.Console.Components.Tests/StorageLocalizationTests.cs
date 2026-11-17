@@ -22,7 +22,7 @@ public sealed class StorageLocalizationTests
         Assert.AreEqual(title, strings["Storages"].Value);
         Assert.AreEqual(cancel, strings["Cancel"].Value);
         foreach (var status in Enum.GetValues<StorageAvailability>()) Assert.IsFalse(strings[$"Availability.{status}"].ResourceNotFound);
-        foreach (var key in new[] { "Type.Create", "Type.Publish", "Type.ImmutableHelp", "Type.ManagedHelp", "Type.AccessHelp", "Type.ReviewCurrent", "Type.DisableConfirm", "Type.ConfigurationSchema", "Type.Requirements", "Value.Yes", "Value.No" })
+        foreach (var key in new[] { "Documents.Collections", "Documents.Access", "Documents.QueryPayload", "Documents.PublishToolHelp", "Documents.InvalidJson", "Type.Create", "Type.Publish", "Type.ImmutableHelp", "Type.ManagedHelp", "Type.AccessHelp", "Type.ReviewCurrent", "Type.DisableConfirm", "Type.ConfigurationSchema", "Type.Requirements", "Value.Yes", "Value.No" })
             Assert.IsFalse(strings[key].ResourceNotFound, key);
         var accessStrings = services.GetRequiredService<IStringLocalizer<ResourceAccessPanelStrings>>();
         foreach (var key in new[] { "CurrentPolicy", "ReviewedPolicy", "ExactTargetOnly" })

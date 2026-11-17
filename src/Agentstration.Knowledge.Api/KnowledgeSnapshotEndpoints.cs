@@ -16,11 +16,11 @@ internal static class KnowledgeSnapshotEndpoints
         RouteGroupBuilder snapshots)
     {
         sources.MapGet("/{name}/snapshots", ListAsync)
-            .WithSummary("List Knowledge Snapshot history")
+            .WithSummary("List Knowledge Snapshot metadata without checking physical content")
             .Produces<IEnumerable<KnowledgeSnapshotView>>()
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         sources.MapGet("/{name}/snapshots/active", GetActiveAsync)
-            .WithSummary("Get the active Knowledge Snapshot")
+            .WithSummary("Get active Knowledge Snapshot metadata without checking physical content")
             .Produces<KnowledgeSnapshotView>()
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         sources.MapPut("/{name}/snapshots/active", SelectActiveAsync)
@@ -28,7 +28,7 @@ internal static class KnowledgeSnapshotEndpoints
             .Produces<KnowledgeSnapshotView>()
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         snapshots.MapGet("/{id}", GetAsync)
-            .WithSummary("Get a Knowledge Snapshot")
+            .WithSummary("Get Knowledge Snapshot metadata without checking physical content")
             .Produces<KnowledgeSnapshotView>()
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }

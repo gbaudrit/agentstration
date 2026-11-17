@@ -3,6 +3,7 @@ using Agentstration.Asp.Abstractions;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Storage;
 
 namespace Agentstration.Management.Tests;
 
@@ -24,6 +25,46 @@ public sealed class LocalStorageContentTests
 
     [TestCleanup]
     public void Cleanup() { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+
+    [TestMethod]
+    public async Task TenMebibyteContentRoundTripsWithoutChangingTheAspWireChunkCeiling()
+    {
+        var store = Store();
+        var bytes = new byte[10 * 1024 * 1024];
+        bytes[^1] = 42;
+        var access = Access(store) with { Policy = Policy with { MaxWriteBytes = bytes.Length, MaxReadBytes = bytes.Length } };
+        var item = await Provider.WriteAsync(store, access, new("ten-mib", clock.GetUtcNow().AddMinutes(1), "notes/large", bytes, null), default);
+        CollectionAssert.AreEqual(bytes, (await Provider.ReadAsync(store, access, item.Key, item.Version, 0, bytes.Length, default)).Content);
+        Assert.Throws<AspException>(() => AspValidation.Policy(access.Policy));
+    }
+
+    [TestMethod]
+    public async Task OperatorObjectCountAndReceiptCapacitiesAreIndependent()
+    {
+        var store = Store();
+        var provider = new LocalStorageObjectProvider(Paths, clock, new() { LocalMaximumObjects = 1 });
+        var item = await provider.WriteAsync(store, Access(store), Write("first"), default);
+        var full = await Assert.ThrowsAsync<AspException>(() => provider.WriteAsync(store, Access(store), Write("second", "notes/second"), default));
+        Assert.AreEqual("capacity_exceeded", full.Code);
+        _ = await provider.WriteAsync(store, Access(store), Write("replace", version: item.Version), default);
+        var receipts = new LocalStorageObjectProvider(Paths, clock, new() { LocalMaximumReceipts = 2 });
+        var receiptLimit = await Assert.ThrowsAsync<AspException>(() => receipts.WriteAsync(store, Access(store), Write("third"), default));
+        Assert.AreEqual("capacity_exceeded", receiptLimit.Code);
+    }
+
+    [TestMethod]
+    public async Task DecodedByteQuotaDoesNotCountJsonMetadataAndReplacementReclaimsOldBytes()
+    {
+        var store = Store();
+        var provider = new LocalStorageObjectProvider(Paths, clock, new()
+            { MaximumObjectBytes = 8, LocalMaximumStoreBytes = 10 });
+        var first = await provider.WriteAsync(store, Access(store), Write("first", value: "12345678"), default);
+        await provider.WriteAsync(store, Access(store), Write("second", "notes/second", "12"), default);
+        var full = await Assert.ThrowsAsync<AspException>(() => provider.WriteAsync(store, Access(store), Write("third", "notes/third", "1"), default));
+        Assert.AreEqual("capacity_exceeded", full.Code);
+        await provider.WriteAsync(store, Access(store), Write("replace", value: "12", version: first.Version), default);
+        await provider.WriteAsync(store, Access(store), Write("third", "notes/third", "123456"), default);
+    }
 
     [TestMethod]
     public async Task RetirementRejectsReplacedContentAndKeepsTheExactWriteReceipt()

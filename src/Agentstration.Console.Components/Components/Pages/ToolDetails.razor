@@ -296,7 +296,8 @@ else
         {
             runResult = null;
             runError = exception is AgentstrationApiException { ProblemType: "https://agentstration.dev/problems/data_source_acquisition_target_stale" }
-                ? T("AcquisitionTargetStale") : exception.Message;
+                ? T("AcquisitionTargetStale") : exception is AgentstrationApiException { ProblemTitle: { } code } api && code.StartsWith("data_source_", StringComparison.Ordinal)
+                    ? T("DataSourceQueryFailed") + " " + code + " · " + api.ErrorId : exception.Message;
         }
         finally
         {

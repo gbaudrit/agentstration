@@ -1,8 +1,8 @@
 using Agentstration.Artifacts.Contracts;
-using Agentstration.Schemas;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Security.Contracts;
 
 namespace Agentstration.Artifacts;
@@ -446,14 +446,26 @@ public sealed class ArtifactManagementService(
             || materialization.Sha256 is not { Length: 64 } || !materialization.Sha256.All(char.IsAsciiHexDigit))
             throw Error("artifact_materialization_invalid", "Exact producer, Workspace and content evidence are required.");
         ValidateMediaType(request.MediaType);
+        if (materialization.Publication?.Records is not null)
+        {
+            _ = Agentstration.Storage.Contracts.StorageRecordSets.Members(materialization.Publication);
+            if (materialization.RecordContract?.Schema is not { } recordSchema || request.DataContract?.Schema is not { } collectionSchema
+                || !collectionSchema.TryGetProperty("type", out var type) || type.GetString() != "array"
+                || !collectionSchema.TryGetProperty("items", out var items) || !System.Text.Json.JsonElement.DeepEquals(recordSchema, items)
+                || request.DataContract?.SchemaEvidence is not null)
+                throw Error("artifact_record_contract_invalid", "Record publications require separate record and whole-array contracts.");
+        }
         var reference = ArtifactStorageReferences.Encode(materialization);
         var stat = await (durable ?? throw Error("artifact_materialization_unavailable", "Artifact storage is unavailable."))
             .StatAsync(materialization.WorkspaceId, reference, cancellationToken);
         if (stat.Length != materialization.Length || !string.Equals(stat.Sha256, materialization.Sha256, StringComparison.OrdinalIgnoreCase))
             throw Error("artifact_storage_receipt_mismatch", "The stored content differs from the materialization evidence.");
         if (request.DataContract is { } declaredContract)
-            request = request with { DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
-                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken) };
+            request = request with
+            {
+                DataContract = await ValidateStoredContractAsync(declaredContract, request.MediaType, stat.Length,
+                async (offset, length) => (await durable!.ReadAsync(materialization.WorkspaceId, reference, offset, length, cancellationToken)).ToArray(), cancellationToken)
+            };
         var id = ArtifactStorageReferences.Identity(materialization.WorkspaceId, request.Identity);
         var resource = new FlowRunArtifactResource
         {
@@ -480,7 +492,7 @@ public sealed class ArtifactManagementService(
                 MediaType = request.MediaType,
                 Length = materialization.Length,
                 Sha256 = materialization.Sha256,
-                Provenance = new Dictionary<string, string> { ["provider"] = "storage", ["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin") }
+                Provenance = StoredProvenance(request)
             },
             CreatedAt = timeProvider.GetUtcNow()
         };
@@ -506,6 +518,20 @@ public sealed class ArtifactManagementService(
             || !SameReceipt(existing.Value.Receipt, resource.Receipt))
             throw Error("artifact_storage_receipt_conflict", "The Artifact identity already has different producer or materialization evidence.");
         return existing.Value;
+    }
+
+    private static IReadOnlyDictionary<string, string> StoredProvenance(RegisterStoredArtifactRequest request)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (request.Provenance is { } provenance)
+        {
+            if (provenance.Count > 32 || provenance.Any(pair => pair.Key.Length > 128 || pair.Value.Length > 2048))
+                throw new ArtifactValidationException("artifact_provenance_invalid", "Artifact provenance must be bounded metadata.");
+            foreach (var pair in provenance) result.Add(pair.Key, pair.Value);
+        }
+        result["provider"] = "storage";
+        result["fileName"] = request.ProducerExecutionId + (request.MediaType == "application/json" ? ".json" : ".bin");
+        return result;
     }
 
     public async Task<IReadOnlyList<StoredResource<FlowRunArtifactResource>>> ListFlowRunArtifactsAsync(CancellationToken cancellationToken)
@@ -705,7 +731,9 @@ public sealed class ArtifactManagementService(
         if (contract.MediaType is { } expected && !string.Equals(expected, mediaType, StringComparison.OrdinalIgnoreCase))
             throw DataContracts.Failure("data_contract_media_mismatch", "artifact-publication", contract.Origin, "$", "media_type", expected, mediaType);
         if (contract.Schema is null && !DataContracts.IsJsonMediaType(mediaType)) return contract with { Validated = true };
-        if (length > DataContracts.MaximumValueCharacters)
+        // Admission is bounded by the owning Storage or staging policy. Schema validation
+        // only requires that the admitted content fits its in-memory representation.
+        if (length > int.MaxValue)
             throw DataContracts.Failure("data_contract_value_too_large", "artifact-publication", contract.Origin, "$", "value_size", "bounded value", "oversized");
         using var content = new MemoryStream();
         while (content.Length < length)
@@ -717,7 +745,7 @@ public sealed class ArtifactManagementService(
             await content.WriteAsync(chunk, token);
         }
         _ = DataContracts.ReadUtf8(contract, content.GetBuffer().AsSpan(0, (int)content.Length), "artifact-publication");
-        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true };
+        return contract with { DeclaredMode = declaration.DeclaredMode, Validated = true, SchemaEvidence = declaration.SchemaEvidence };
     }
 
     private static bool SameReceipt(ArtifactStorageReceipt left, ArtifactStorageReceipt right) =>
@@ -727,6 +755,7 @@ public sealed class ArtifactManagementService(
         && left.DataContract?.Digest == right.DataContract?.Digest
         && left.DataContract?.Origin == right.DataContract?.Origin
         && left.DataContract?.Validated == right.DataContract?.Validated
+        && left.DataContract?.SchemaEvidence == right.DataContract?.SchemaEvidence
         && left.Length == right.Length
         && string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase)
         && left.Provenance.Count == right.Provenance.Count

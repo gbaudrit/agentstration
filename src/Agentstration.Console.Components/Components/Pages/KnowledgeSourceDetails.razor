@@ -92,7 +92,7 @@ else if (source is not null && readiness is not null)
     else if (activeTab == DetailsTab.Snapshots)
     {
         <section class="panel form-section" data-testid="knowledge-snapshots">
-        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("Snapshots")</h2><p>@T("SnapshotsHelp")</p></div></div>
+        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("Snapshots")</h2><p>@T("SnapshotsHelp")</p><p>@T("ContentAvailabilityHelp")</p></div></div>
         @if (snapshots.Count == 0) { <p class="muted">@T("NoSnapshots")</p> }
         else
         {
@@ -102,12 +102,13 @@ else if (source is not null && readiness is not null)
                 <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
                     <div><p class="eyebrow">@T("SnapshotDetails")</p><h3>@selectedSnapshotView.Snapshot.Name</h3><p>@T("SnapshotDetailsHelp")</p></div>
                     <dl class="resource-details knowledge-snapshot-provenance">
+                        <dt>@T("ContentAvailability")</dt><dd data-testid="knowledge-content-availability">@T($"ContentAvailability.{selectedSnapshotView.ContentAvailability}")</dd>
                         <dt>@T("Projection")</dt><dd><code>@selectedSnapshotView.Snapshot.ProjectionId</code></dd>
                         <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>
                     <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
                         <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("OutputStorage")</th></tr></Header>
-                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact, selectedSnapshotView.Snapshot)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td>@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</td></tr></Row>
+                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact, selectedSnapshotView.Snapshot)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)@if (artifact.Content?.Records is { } records) { <small>@T("RecordCount", records.Members.Count)</small> }</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td>@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</td></tr></Row>
                     </DataGrid>
                 </section>
             }
@@ -116,19 +117,56 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Retrieval)
     {
-        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" />
+        <KnowledgeContentAccess SourceName="@Name" SourceNamespace="SourceNamespace" Snapshots="snapshots" SupportsStructured="@(source?.Definition.Output?.DocumentCollectionUid is not null || snapshots.Any(s => s.Snapshot.Artifacts.Any(a => a.Content?.Records?.DocumentPublication is not null)))" />
     }
     else if (activeTab == DetailsTab.Tools)
     {
         <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
         <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
-        @if (exposure is null)
+        @if (exposure is not null)
         {
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
-            @if (CanManage) { <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!readiness.Ready || busy)">@(busy ? T("Publishing") : T("PublishExposure"))</button></div> }
-            @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
+            <p data-testid="knowledge-tool-exposure-current-version">@T("PublishedExposureVersion", exposure.ToolSetVersion)</p>
+            <p class="resource-hint">@T("RepublishExposureHelp")</p>
         }
-        else
+        <div class="form-actions"><button class="button-secondary" type="button" data-testid="knowledge-refresh-tools" disabled="@(!interactive || refreshingTools || busy)" @onclick="RefreshToolsAsync">@T("RefreshToolProposal")</button></div>
+        @if (proposalError is not null) { <p class="inline-warning" role="status">@proposalError</p> }
+        @if (toolProposal is { } proposal)
+        {
+            <h3>@T("ProposedTools")</h3>
+            <p class="resource-hint">@T("ToolProposalHelp")</p>
+            @foreach (var issue in proposal.Issues) { <p class="inline-warning">@ProposalIssueLabel(issue) <code>@issue</code></p> }
+            <DataGrid TItem="KnowledgeToolProposal" Items="proposal.Tools">
+                <Header><tr><th>@T("Tool")</th><th>@T("ProposalChange")</th><th>@T("ToolContract")</th></tr></Header>
+                <Row Context="candidate">
+                    <tr data-testid="knowledge-proposed-tool">
+                        <td><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></td>
+                        <td>@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p>@ProposalIssueLabel(issue) <code>@issue</code></p> }</td>
+                        <td><details><summary>@T("InspectToolContract")</summary>
+                            @if (candidate.Contribution is { } contribution)
+                            {
+                                <p><strong>@T("ToolFixedContribution")</strong> <code>@contribution.BindingName</code> · <code>@contribution.DataSourceUid</code></p>
+                            }
+                            @if (candidate.Profile is { } profile)
+                            {
+                                <p><strong>@T("ToolFixedQueryProfile")</strong> <code>@profile.Id @profile.Version · @profile.Encoding · @profile.ModelDigest</code></p>
+                            }
+                            <p>@T($"ToolContentEvidence.{candidate.ContentEvidence}")</p>
+                            <h4>@T("ToolInputContract")</h4><pre class="runner-json">@candidate.InputSchema.ToString()</pre>
+                            @if (candidate.OutputSchema is { } outputSchema) { <h4>@T("ToolOutputContract")</h4><pre class="runner-json">@outputSchema.ToString()</pre> }
+                            @if (candidate.DataSchema is { } dataSchema) { <h4>@T("ToolStorageDataSchema")</h4><pre class="runner-json">@dataSchema.ToString()</pre> }
+                        </details></td>
+                    </tr>
+                </Row>
+            </DataGrid>
+        }
+        @if (CanManage)
+        {
+            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" @bind:event="oninput" disabled="@(busy || !interactive)" data-testid="knowledge-tool-exposure-version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" disabled="@(busy || !interactive)" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
+            <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!CanPublishTools)">@(busy ? T("Publishing") : T(exposure is null ? "PublishExposure" : "PublishNewExposureVersion"))</button></div>
+            @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
+            @if (exposure is not null && string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal)) { <p class="inline-warning">@T("NewExposureVersionRequired")</p> }
+        }
+        @if (exposure is not null)
         {
             <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
                 <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
@@ -164,6 +202,9 @@ else if (source is not null && readiness is not null)
     private KnowledgeSourceResource? source;
     private KnowledgeSourceReadiness? readiness;
     private KnowledgeSourceToolExposureResource? exposure;
+    private KnowledgeSourceToolProposal? toolProposal;
+    private bool refreshingTools;
+    private string? proposalError;
     private IReadOnlyList<KnowledgeProjectionResource> projections = [];
     private KnowledgeProjectionResource? selectedProjection;
     private IReadOnlyList<KnowledgeSnapshotView> snapshots = [];
@@ -194,6 +235,8 @@ else if (source is not null && readiness is not null)
     private ResourceNamespace SourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
     private IReadOnlyList<DetailsTab> VisibleTabs => [DetailsTab.Overview, DetailsTab.Definition, DetailsTab.Projections, DetailsTab.Snapshots, DetailsTab.Retrieval, DetailsTab.Tools, .. (CanManage ? [DetailsTab.Access] : Array.Empty<DetailsTab>()), DetailsTab.Yaml];
     private bool CanManage => source is not null && ResourceOwnershipContext.CanManage(source.ScopeRef ?? ResourceScopeRef.Instance, Services);
+    private bool CanPublishTools => interactive && CanManage && readiness?.Ready == true && toolProposal?.Ready == true && !busy && !refreshingTools && !string.IsNullOrWhiteSpace(version)
+        && (exposure is null || !string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal));
     private string ToolSetUrl => exposure is null ? "/tools/sets" : ScopedToolUrl(
         exposure.ToolSet.Resolve(SourceNamespace, ToolResourceKinds.ToolSet).Namespace.IsDefault
             ? $"/tools/sets/{Uri.EscapeDataString(exposure.ToolSet.Name)}"
@@ -246,6 +289,8 @@ else if (source is not null && readiness is not null)
             etag = sourceSnapshot.ETag;
             readiness = await readinessTask;
             exposure = await exposureTask;
+            await RefreshToolsAsync();
+            version = exposure is null ? "1.0.0" : NextExposureVersion(exposure.ToolSetVersion);
             projections = (await projectionsTask).OrderByDescending(value => value.CreatedAt).ToArray();
             selectedProjection = projections.FirstOrDefault();
             snapshots = (await snapshotsTask).OrderByDescending(value => value.Snapshot.PublishedAt).ToArray();
@@ -347,21 +392,36 @@ else if (source is not null && readiness is not null)
         Metadata = source.Metadata,
         Definition = source.Definition
     };
+    private async Task RefreshToolsAsync()
+    {
+        if (refreshingTools) return;
+        refreshingTools = true;
+        proposalError = null;
+        try { toolProposal = await Client.GetToolProposalAsync(SourceNamespace, Name, cancellation.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { toolProposal = null; proposalError = T("ToolProposalRefreshFailed"); }
+        finally { refreshingTools = false; }
+    }
     private async Task PublishAsync()
     {
-        if (busy) return;
+        if (!CanPublishTools) return;
         busy = true;
         failed = false;
         message = null;
         try
         {
             exposure = (await Client.PublishExposureAsync(SourceNamespace, Name,
-                new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval }, cancellation.Token)).Value;
+                new PublishKnowledgeSourceToolExposureRequest { Version = version.Trim(), RequiresApproval = requiresApproval, ProposalDigest = toolProposal?.Digest }, cancellation.Token)).Value;
+            version = NextExposureVersion(exposure.ToolSetVersion);
             message = T("ExposurePublished");
+            await RefreshToolsAsync();
         }
         catch (Exception exception) { failed = true; message = exception.Message; }
         finally { busy = false; }
     }
+    private static string NextExposureVersion(string current) => System.Version.TryParse(current, out var parsed)
+        && parsed.Build >= 0 && parsed.Revision < 0 && parsed.Build < int.MaxValue
+            ? $"{parsed.Major}.{parsed.Minor}.{parsed.Build + 1}" : string.Empty;
     private async Task RunActionAsync(Func<Task> action, string success)
     {
         if (busy) return;
@@ -516,6 +576,18 @@ else if (source is not null && readiness is not null)
     private static string ShortIdentifier(string value) => value.Length > 28 ? $"{value[..28]}…" : value;
     private static string ShortMetricIdentifier(string value) => value.Length > 18 ? $"{value[..18]}…" : value;
     private string OperationLabel(KnowledgeSourceOperation operation) => T($"Operation.{operation}");
+    private string ProposalIssueLabel(string issue) => T(issue switch
+    {
+        "knowledge_source_tool_set_conflict" or "knowledge_source_tool_definition_conflict" => "ToolIssue.NameConflict",
+        "knowledge_contribution_unresolved" => "ToolIssue.UnresolvedContribution",
+        "knowledge_contribution_evidence_unavailable" => "ToolIssue.MissingEvidence",
+        "knowledge_contribution_no_published_members" => "ToolIssue.NoMembers",
+        "knowledge_contribution_text_unsupported" => "ToolIssue.TextUnsupported",
+        "knowledge_read_unsupported" => "ToolIssue.ReadDenied",
+        "knowledge_documents_unavailable" => "ToolIssue.DocumentsUnavailable",
+        "knowledge_contribution_query_unsupported" => "ToolIssue.QueryUnsupported",
+        _ => "ToolIssue.Unavailable"
+    });
     private static string FormatSize(long length) => length < 1024
         ? $"{length:N0} B"
         : length < 1024 * 1024
@@ -540,7 +612,7 @@ else if (source is not null && readiness is not null)
         var sequence = source?.Composition?.InputCompositions.GetValueOrDefault(binding.Name)?.Receipt?.Bindings.GetValueOrDefault("transformations")
             ?? source?.Definition.DataSources.FirstOrDefault(value => value.Name == binding.Name)?.Transformations ?? [];
         if (sequence.Count > 0)
-            return string.Join(" → ", sequence.Select(call => $"{call.Flow.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
+            return string.Join(" → ", sequence.Select(call => call.Function is { } function ? $"{function.Namespace ?? source!.Namespace}/{function.Name}:{function.Version}" : $"{call.Flow!.Namespace ?? source!.Namespace}/{call.Flow.ResourceId}:{call.Flow.Version ?? "—"}"));
         return binding.Transformation is { } flow ? $"{flow.Namespace}/{flow.Name}:{flow.Version}" : T("IdentityTransformation");
     }
     private static string FlowIdentity(ResolvedKnowledgeFlowBinding value) => $"{value.Namespace} · {value.Version}";

@@ -149,7 +149,10 @@ internal static class StorageEndpoints
     {
         try { return await action(); }
         catch (StorageException exception)
-        { return Problem(exception.StatusCode, exception.Code, exception.Message); }
+        {
+            return Results.Problem(statusCode: exception.StatusCode, title: exception.Code, detail: exception.Message,
+            extensions: new Dictionary<string, object?> { ["code"] = exception.Code, ["validationIssues"] = exception.ValidationIssues });
+        }
         catch (ResourceConcurrencyException)
         { return Problem(409, "storage_version_conflict", "The resource version has changed."); }
         catch (ResourceGovernanceViolationException exception)

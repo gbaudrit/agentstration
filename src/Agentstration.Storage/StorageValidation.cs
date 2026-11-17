@@ -6,6 +6,7 @@ namespace Agentstration.Storage;
 
 public sealed class StorageException(string code, string message, int statusCode = 422) : Exception(message)
 {
+    public IReadOnlyList<StorageValidationIssue> ValidationIssues { get; init; } = [];
     public string Code { get; } = code;
     public int StatusCode { get; } = statusCode;
 }

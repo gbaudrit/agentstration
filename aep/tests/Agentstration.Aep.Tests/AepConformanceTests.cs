@@ -35,7 +35,7 @@ public sealed class AepConformanceTests
                 "1.0",
                 document.RootElement,
                 [new("endpoint", true), new("credential", true, Protection: AepValueProtection.Secured)],
-                [new("connection", Protection: AepValueProtection.Secured)])]);
+                [new("connection", Protection: AepValueProtection.Secured) { SourceInputId = "credential" }])]);
         var manifest = new AepManifest(
             AepProtocol.Version,
             new("cloud", "Cloud", "1.0.0"),
@@ -53,6 +53,7 @@ public sealed class AepConformanceTests
         Assert.AreEqual(AepSchemaDigest.Compute(version.Schema), version.SchemaDigest);
         Assert.AreEqual(AepValueProtection.Secured, version.Inputs[1].Protection);
         Assert.AreEqual("connection", version.Exports.Single().Id);
+        Assert.AreEqual("credential", version.Exports.Single().SourceInputId);
     }
 
     [TestMethod]

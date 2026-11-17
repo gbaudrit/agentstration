@@ -3,13 +3,13 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Agentstration.DataSources;
-using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
-using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -185,7 +185,9 @@ public sealed partial class DataSourceDatasetTests
         using var exposed = await client.PostAsJsonAsync($"/api/knowledgesources/{id.Value}/tool-exposure?scopeRef=/instance", new PublishKnowledgeSourceToolExposureRequest());
         Assert.AreEqual(HttpStatusCode.Created, exposed.StatusCode, await exposed.Content.ReadAsStringAsync());
         var exposure = (await exposed.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
-        CollectionAssert.AreEquivalent(new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus }, exposure.Operations.Select(value => value.Operation).ToArray());
+        Assert.HasCount(5, exposure.Operations);
+        Assert.HasCount(2, exposure.Operations.Where(value => value.Operation == KnowledgeSourceOperation.Describe).ToArray());
+        CollectionAssert.AreEquivalent(new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus, KnowledgeSourceOperation.Describe }, exposure.Operations.Select(value => value.Operation).Distinct().ToArray());
         foreach (var operation in exposure.Operations)
         {
             var definitionName = $"{id.Value}.access.{operation.Route.Replace('_', '-')}";

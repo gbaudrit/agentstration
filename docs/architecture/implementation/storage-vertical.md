@@ -231,3 +231,24 @@ exercise contributed types, manual exports, protected configuration, revocation
 and disablement. Native Linux/Windows distribution and restart checks run in the
 dedicated packaging workflow. These backend checks do not approve the deferred
 Console/Workplace UX gates owned by #1033/#1065.
+
+## Structured document extension
+
+[#1150](https://github.com/gbaudrit/agentstration/issues/1150) adds bounded logical
+collections to Storage configuration and a provider-neutral document gateway.
+Storage-family projects retain their inward-only dependencies. Infrastructure
+composes ASP and AEP; the optional autonomous PostgreSQL extension references only
+the standalone protocol SDKs, optional OData grammar and Npgsql. Content operations
+and local defaults retain their existing contracts. Query relays fix exact
+Storage/collection/profile pins. Knowledge composes immutable document publications
+and canonical Artifact materializations with its existing Snapshot lifecycle.
+Data Sources can also pin a document collection for JSON-object acquisitions:
+each acquisition owns an immutable publication, exact Artifact evidence and
+producer-governed retention. Collection-schema validation follows the selected
+ASP profile through the existing Storage definition validator boundary; it does
+not alter generic Schema resources or the acquisition's declared output contract.
+
+[Structured documents](../../reference/structured-documents.md) specifies the
+capabilities, query subset, operator setup, Console/API behavior and deterministic
+verticals. ADR-0220 through ADR-0225 supplement the #1032 decisions. Memory #1156
+and the reusable UX scenario #1158 remain deferred under their recorded conditions.

@@ -40,7 +40,7 @@ public sealed class ToolRelayExecutor(
         var token = timeout.Token;
         try
         {
-            ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings);
+            ToolRelayArguments.ValidateCaller(invocation.Arguments, relay.Bindings, relay.InputEnvelope);
             var publication = await definitions.GetPublicationAsync(definition.Name, definition.Namespace,
                 definition.ScopeRef!.Value, token)
                 ?? throw Error("tool_definition_not_found", "The relay publication was not found.");
@@ -56,6 +56,8 @@ public sealed class ToolRelayExecutor(
             {
                 switch (binding)
                 {
+                    case OmittedToolArgumentBinding:
+                        break;
                     case LiteralToolArgumentBinding literal:
                         values[binding.Path] = literal.Value.Clone();
                         break;
@@ -85,7 +87,7 @@ public sealed class ToolRelayExecutor(
             if (SecretInputs.ContainsReference(invocation.Arguments, introduced)
                 || relay.Bindings.OfType<LiteralToolArgumentBinding>().Any(binding => SecretInputs.ContainsReference(binding.Value, references)))
                 throw Error("tool_definition_binding_invalid", "An untrusted value collides with a protected input reference.");
-            var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input, references);
+            var arguments = ToolRelayArguments.Reconstruct(invocation.Arguments, relay.Bindings, values, pinned.Tool.Definition.Schema!.Input, references, relay.InputEnvelope);
             using var resolvedInputs = await secretInputs.ResolveAsync(arguments, references, token);
             ToolInputSchemaValidator.Validate(pinned.Tool.Definition.Schema.Input, resolvedInputs.Value);
             var execution = invocation.ExecutionContext;
@@ -113,6 +115,7 @@ public sealed class ToolRelayExecutor(
                 PrincipalId = invocation.PrincipalId,
                 RunId = execution?.RuntimeRunId ?? execution?.FlowRunId,
                 FlowStepId = execution?.FlowStepId,
+                ExposedTools = execution?.ExposedTools,
                 AgentId = execution?.AgentId,
                 AgentRevisionId = execution?.AgentRevisionId,
                 AgentVersion = execution?.AgentVersion,

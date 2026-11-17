@@ -58,6 +58,7 @@ public sealed class FlowRunOutputTests
     [TestMethod]
     public void CatalogueFailureDoesNotHideTheReturnedFlowOutput()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output") { RejectDurableCatalog = true };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -79,8 +80,11 @@ public sealed class FlowRunOutputTests
         client.Durable = client.Durable with { ProducerFlowRunId = "original-acquisition" };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IArtifactsClient>(client);
-        var run = Run(client.Durable.WorkspaceId) with { Output = JsonSerializer.SerializeToElement(new
-            { artifacts = new[] { new { artifactId = client.Durable.ArtifactId.ToString(), kind = "durable" } } }) };
+        var run = Run(client.Durable.WorkspaceId) with
+        {
+            Output = JsonSerializer.SerializeToElement(new
+            { artifacts = new[] { new { artifactId = client.Durable.ArtifactId.ToString(), kind = "durable" } } })
+        };
         var rendered = context.Render<FlowRunOutput>(p => p.Add(c => c.Run, run));
         Assert.AreEqual(1, rendered.FindAll("[data-testid='flow-run-output-artifact']").Count);
         Assert.AreEqual("original-acquisition", client.Durable.ProducerFlowRunId);
@@ -89,10 +93,15 @@ public sealed class FlowRunOutputTests
 
     private static FlowRun Run(WorkspaceId workspace) => new()
     {
-        Id = "flow-run-1", WorkspaceId = workspace, FlowId = new("knowledge-orchestration-builtin"), FlowVersion = "1.0.0",
+        Id = "flow-run-1",
+        WorkspaceId = workspace,
+        FlowId = new("knowledge-orchestration-builtin"),
+        FlowVersion = "1.0.0",
         Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()) { LogicalScopeRef = ResourceScopeRef.Instance },
         DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, new("knowledge-orchestration-builtin"), "1.0.0", null,
             new DirectFlowDefinition(new(FlowTargetKind.Agent, "unused")), new Dictionary<string, string>(), DateTimeOffset.UtcNow),
-        Input = JsonSerializer.SerializeToElement(new { }), Status = FlowRunStatus.Succeeded, CreatedAt = DateTimeOffset.UtcNow
+        Input = JsonSerializer.SerializeToElement(new { }),
+        Status = FlowRunStatus.Succeeded,
+        CreatedAt = DateTimeOffset.UtcNow
     };
 }

@@ -71,6 +71,7 @@ export interface ExpectedText {
   };
   acquisitionFailure: { errorLegend: string; showErrorDetails: string };
   governedKnowledge: {
+    notReadyHelp: string;
     deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
     newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
   };
@@ -116,7 +117,7 @@ export const ExpectedTextByLocale = {
       profile: 'Profile',
       groups: [
         { heading: '', links: [{ label: 'Overview', url: '/' }] },
-        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schemas', url: '/schemas' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }, { label: 'Data Source Profiles', url: '/data-source-profiles' }] },
+        { heading: 'Design', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schemas', url: '/schemas' }, { label: 'Transformation functions', url: '/transformation-functions' }, { label: 'Entries', url: '/entries' }, { label: 'Resource plans', url: '/resource-plans' }, { label: 'Model profiles', url: '/modelprofiles' }, { label: 'Data Source Profiles', url: '/data-source-profiles' }] },
         { heading: 'Automate', links: [{ label: 'Triggers', url: '/triggers' }] },
         { heading: 'Operate', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tasks', url: '/tasks' }] },
         { heading: 'Observe', links: [{ label: 'Agent instances', url: '/agent-instances' }, { label: 'Agent runs', url: '/agent-runs' }, { label: 'Flow runs', url: '/flow-runs' }, { label: 'Run events', url: '/run-events' }] },
@@ -160,7 +161,7 @@ export const ExpectedTextByLocale = {
       input: 'Input',
     },
     acquisitionFailure: { errorLegend: 'Error', showErrorDetails: 'Show error details' },
-    governedKnowledge: { deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
+    governedKnowledge: { notReadyHelp: 'The source requires a compatible published projection Flow and valid input dependencies before its Tools can be exposed.', deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
     sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', requiredInput: 'Required input', addDataSource: 'Add a Data Source', notReady: 'Not ready', updateDependencies: 'Update dependencies', confirmDependencyUpdate: 'Save and update', dependencyUpdateHelp: 'Published Snapshots keep their original references.', cancel: 'Cancel' },
     schemaDrivenSources: {
       formMode: 'Form',
@@ -196,7 +197,7 @@ export const ExpectedTextByLocale = {
       profile: 'Profil',
       groups: [
         { heading: '', links: [{ label: 'Vue d’ensemble', url: '/' }] },
-        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schémas', url: '/schemas' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }, { label: 'Profils de source de données', url: '/data-source-profiles' }] },
+        { heading: 'Concevoir', links: [{ label: 'Agents', url: '/agents' }, { label: 'Flows', url: '/flows' }, { label: 'Schémas', url: '/schemas' }, { label: 'Fonctions de transformation', url: '/transformation-functions' }, { label: 'Entrées', url: '/entries' }, { label: 'Plans de ressources', url: '/resource-plans' }, { label: 'Profils de modèle', url: '/modelprofiles' }, { label: 'Profils de source de données', url: '/data-source-profiles' }] },
         { heading: 'Automatiser', links: [{ label: 'Déclencheurs', url: '/triggers' }] },
         { heading: 'Exploiter', links: [{ label: 'Conversations', url: '/conversations' }, { label: 'Tâches', url: '/tasks' }] },
         { heading: 'Observer', links: [{ label: 'Instances d’agent', url: '/agent-instances' }, { label: 'Exécutions d’agents', url: '/agent-runs' }, { label: 'Exécutions de Flows', url: '/flow-runs' }, { label: 'Événements d’exécution', url: '/run-events' }] },
@@ -240,7 +241,7 @@ export const ExpectedTextByLocale = {
       input: 'Entrées',
     },
     acquisitionFailure: { errorLegend: 'Erreur', showErrorDetails: 'Afficher les détails de l’erreur' },
-    governedKnowledge: { deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
+    governedKnowledge: { notReadyHelp: 'La source doit disposer d’un Flow de projection publié compatible et de dépendances d’entrée valides avant la publication de ses Tools.', deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
     sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', requiredInput: 'Entrée requise', addDataSource: 'Ajouter une source de données', notReady: 'Non prête', updateDependencies: 'Mettre à jour les dépendances', confirmDependencyUpdate: 'Enregistrer et mettre à jour', dependencyUpdateHelp: 'Les Snapshots déjà publiés conservent leurs références d’origine.', cancel: 'Annuler' },
     schemaDrivenSources: {
       formMode: 'Formulaire',

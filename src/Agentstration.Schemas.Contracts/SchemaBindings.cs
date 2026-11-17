@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 
 namespace Agentstration.Schemas.Contracts;
@@ -18,6 +19,9 @@ public sealed record SchemaVersionReference
     public required string Version { get; init; }
     public ResourceNamespace? Namespace { get; init; }
     public ResourceScopeRef? ScopeRef { get; init; }
+    /// <summary>RFC 6901 schemaPath to a schema within this exact published version; empty selects the root.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SchemaPath { get; init; }
 }
 
 /// <summary>
@@ -43,7 +47,11 @@ public sealed record SchemaBindingSnapshot(
     string DefinitionHash,
     SchemaVersionReference? Source = null,
     Guid? SchemaUid = null,
-    long? SchemaGeneration = null);
+    long? SchemaGeneration = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentDefinitionHash { get; init; }
+}
 
 public interface ISchemaBindingResolver
 {

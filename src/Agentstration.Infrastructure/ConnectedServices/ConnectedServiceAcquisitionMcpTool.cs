@@ -61,8 +61,12 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             && BuiltinHttpOperation.IsCore(operationType, BuiltinHttpOperation.TypeName)
             && operationVersion.Version == BuiltinHttpOperation.Version
             && operationVersion.Invocation.ProviderOperationId == BuiltinHttpOperation.ProviderOperationId)
-            return await httpOperations.AcquireAsync(service, operation, acquisition.Parameters,
+        {
+            var result = await httpOperations.AcquireAsync(service, operation, acquisition.Parameters,
                 new(consumer, operation.Address), cancellationToken);
+            DataSourceDatasetCompositionService.ValidateOperationOutput(acquisition.Dataset, result, invocation.RunId);
+            return result;
+        }
         var manager = type.Governance?.ManagedBy;
         if (manager?.Kind != ResourceManagementAuthorityKind.ExtensionInstallation
             || operationType.Governance?.ManagedBy != manager
@@ -102,7 +106,9 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             var result = await client.AcquireConnectedServiceOperationAsync(new(type.Name, version.Version,
                 service.Definition.Options, values, operationType.Name, operationVersion.Version,
                 operation.Definition.Definition, acquisition.Parameters, acquisition.CorrelationId), cancellationToken);
-            DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset.OutputSchema, result.Result);
+            if (operation.Definition.Definition.TryGetProperty(adapter.OutputSchemaProperty, out var declaredOutput))
+                DataSourceDatasetCompositionService.ValidateValue(declaredOutput, result.Result);
+            DataSourceDatasetCompositionService.ValidateOperationOutput(acquisition.Dataset, result.Result, invocation.RunId);
             return result.Result.Clone();
         }, cancellationToken);
     }

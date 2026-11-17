@@ -1,12 +1,11 @@
-using Agentstration.Infrastructure.Artifacts;
-using Agentstration.Artifacts;
-using Agentstration.Artifacts.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
+using Agentstration.Artifacts;
+using Agentstration.Artifacts.Contracts;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources;
@@ -15,18 +14,19 @@ using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
-using Agentstration.Infrastructure.Storage;
+using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Knowledge;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Agentstration.Knowledge.Contracts;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Knowledge;
-using Agentstration.Storage;
-using Agentstration.Tools.Contracts;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Agentstration.Tools.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -37,7 +37,9 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
     private static readonly JsonElement Empty = JsonSerializer.SerializeToElement(new { });
 
     [TestMethod]
-    public async Task InstanceKnowledgePublishesLogicalToolsAndExecutesAgainstItsOperationalSnapshot()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task InstanceKnowledgePublishesLogicalToolsAndExecutesAgainstItsOperationalSnapshot(bool explicitNullSelectors)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
@@ -71,7 +73,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var exposure = (await response.Content.ReadFromJsonAsync<KnowledgeSourceToolExposureResource>())!;
         Assert.AreEqual(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), exposure.ScopeRef);
         Assert.AreEqual(Owner, exposure.ToolSet.ScopeRef);
-        Assert.HasCount(3, exposure.Operations);
+        Assert.HasCount(5, exposure.Operations);
         Assert.IsTrue(exposure.Operations.All(value => value.Tool.ScopeRef == Owner));
         using var reloaded = await client.GetAsync($"/api/knowledgesources/{knowledge.Value.Name}/tool-exposure?scopeRef=/instance");
         Assert.AreEqual(HttpStatusCode.OK, reloaded.StatusCode);
@@ -79,15 +81,31 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         {
             var request = operation.Operation == KnowledgeSourceOperation.SearchRegex
                 ? JsonSerializer.SerializeToElement(new { pattern = "instance-tool-content" }) : Empty;
+            if (explicitNullSelectors)
+            {
+                request = operation.Operation switch
+                {
+                    KnowledgeSourceOperation.SearchRegex => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null,"cursor":null,"preparationId":null,"pattern":"instance-tool-content"}"""),
+                    KnowledgeSourceOperation.Read => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null,"cursor":null,"preparationId":null,"documentId":null,"range":null}"""),
+                    _ => JsonSerializer.Deserialize<JsonElement>("""{"snapshotId":null}""")
+                };
+            }
             using var executed = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request }), ToolRunMode.Execute));
+                new RunToolRequest(request, ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.OK, executed.StatusCode, await executed.Content.ReadAsStringAsync());
             var result = (await executed.Content.ReadFromJsonAsync<RunToolResponse>())!;
             Assert.AreEqual("completed", result.Status, JsonSerializer.Serialize(result));
-            Assert.Contains(operation.Operation == KnowledgeSourceOperation.GetStatus ? "activeSnapshotId" : "instance-tool-content",
+            Assert.Contains(operation.Operation switch
+            {
+                KnowledgeSourceOperation.GetStatus => "activeSnapshotId",
+                KnowledgeSourceOperation.Describe => "contributions",
+                _ => "instance-tool-content"
+            },
                 result.Output!.Value.GetRawText());
+            var substituted = request.Deserialize<Dictionary<string, object?>>()!;
+            substituted["source"] = new { name = "substituted" };
             using var overrideSource = await client.PostAsJsonAsync($"/api/tools/{operation.Tool.Name}/run?scopeRef=/instance",
-                new RunToolRequest(JsonSerializer.SerializeToElement(new { request, source = new { name = "substituted" } }), ToolRunMode.Execute));
+                new RunToolRequest(JsonSerializer.SerializeToElement(substituted), ToolRunMode.Execute));
             Assert.AreEqual(HttpStatusCode.UnprocessableEntity, overrideSource.StatusCode);
         }
 
@@ -245,7 +263,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Assert.AreNotEqual(fixture.Storage.StorageUid, published.Artifacts[0].Content!.Target.Storage.StorageUid);
         Assert.IsNotNull(published.Artifacts[0].Content!.Binding);
         Assert.AreEqual(original.Definition.Type.TypeUid, published.Artifacts[0].Content!.Binding!.Type.TypeUid);
-        Assert.AreEqual("storage.local.retained-publication/v1", published.Artifacts[0].Content!.Binding!.PublicationContract);
+        Assert.AreEqual("storage.local.retained-json-record/v1", published.Artifacts[0].Content!.Binding!.PublicationContract);
         var catalog = await client.GetFromJsonAsync<FlowRunArtifactResource[]>("/api/artifacts/flow-run-artifacts");
         Assert.IsNotNull(catalog);
         foreach (var entry in published.Artifacts)
@@ -255,7 +273,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             Assert.AreEqual(completed.Value.ProjectionFlowRunId, record.ProducerFlowRunId);
             Assert.AreEqual(completed.Value.Name, record.ProducerExecutionId);
             Assert.AreEqual(output.Value.Uid, record.Receipt.Materialization!.Target.Storage.StorageUid);
-            Assert.AreEqual(entry.Content, record.Receipt.Materialization.Publication);
+            Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(entry.Content),
+                JsonSerializer.SerializeToElement(record.Receipt.Materialization.Publication)));
         }
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
         {
@@ -265,7 +284,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
         var publications = factory.Services.GetRequiredService<IStoragePublicationGateway>();
         var bytes = await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default);
-        Assert.AreEqual(Encoding.UTF8.GetString(transformedBytes), Encoding.UTF8.GetString(bytes.Span));
+        var retainedJson = "[" + Encoding.UTF8.GetString(transformedBytes) + "]";
+        Assert.AreEqual(retainedJson, Encoding.UTF8.GetString(bytes.Span));
         var retry = await projections.StartAsync(new(created.Value.Name, ScopeRef: Owner), request, default);
         Assert.AreEqual(completed.Value.Uid, retry.Value.Uid);
         var retrieved = await factory.Services.GetRequiredService<KnowledgeRetrievalService>().SearchAsync(
@@ -274,13 +294,13 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Assert.IsNotEmpty(retrieved.Items);
         var next = await projections.StartAsync(new(created.Value.Name, ScopeRef: Owner), new() { IdempotencyKey = "next-publication" }, default);
         Assert.AreNotEqual(published.Name, next.Value.SnapshotName);
-        Assert.AreEqual(Encoding.UTF8.GetString(transformedBytes), Encoding.UTF8.GetString((await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default)).Span));
+        Assert.AreEqual(retainedJson, Encoding.UTF8.GetString((await publications.ReadAsync(published.Artifacts[0].Content!, 0, 65536, default)).Span));
         await Assert.ThrowsAsync<KnowledgeProjectionException>(() => projections.StartAsync(new(created.Value.Name, ScopeRef: Owner),
             request with { Parameters = JsonSerializer.SerializeToElement(new { changed = true }) }, default));
         var active = (await snapshots.GetActiveAsync(new(created.Value.Name, ScopeRef: Owner), default))!.Snapshot;
         Assert.AreEqual(next.Value.SnapshotName, active.Name);
-        await Assert.ThrowsAsync<StorageException>(() => publications.PrepareAsync(published.Artifacts[0].Content!.Target,
-            completed.Value.Name + ":normalized-alpha", Encoding.UTF8.GetBytes("changed"), default));
+        await Assert.ThrowsAsync<StorageException>(() => publications.PrepareRecordsAsync(published.Artifacts[0].Content!.Target,
+            completed.Value.Name + ":normalized-alpha", [JsonSerializer.SerializeToElement(new { changed = true })], default));
         var shared = await sources.CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -306,10 +326,12 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             .SearchAsync(new(created.Value.Name, ScopeRef: Owner), new() { Query = "alpha" }, default));
         var revisedInput = await management.PutAsync(first.Value.Namespace, first.Value.Name, Owner,
             first.Value.Definition with { DisplayName = "Revised input" }, first.ETag, default);
-        await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() => sources.PutExactAsync(Owner, new(shared.Value.Name),
-            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default));
-        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), shared.Value.Definition,
-            shared.ETag, default, rebindDependencies: true);
+        Assert.AreEqual(first.Value.Generation, revisedInput.Value.Generation);
+        var editedShared = await sources.PutExactAsync(Owner, new(shared.Value.Name),
+            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default);
+        Assert.AreEqual(shared.Value.Generation, editedShared.Value.Generation);
+        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), editedShared.Value.Definition,
+            editedShared.ETag, default, rebindDependencies: true);
         Assert.AreEqual(revisedInput.Value.Generation, explicitlyRebound.Value.Composition!.DataSources.Single().DataSourceGeneration);
         var renamed = await factory.Services.GetRequiredService<StorageManagementService>().PutExactAsync(Owner, output.Value.Namespace,
             output.Value.Name, output.Value.Definition with { DisplayName = "Edited Storage" }, output.ETag, default);
@@ -524,12 +546,9 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
     }
 
     [TestMethod]
-    public async Task ContentWithAnUnversionedWriteReceiptIsVerifiedBeforeReturningTheRequestedRange()
+    public async Task RetainedRecordIntegrityIsVerifiedBeyondTheRequestedRange()
     {
-        var gateway = new UnversionedWriteStorage();
-        await using var baseFactory = Factory();
-        await using var factory = baseFactory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<IStorageContentGateway>(gateway)));
+        await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var fixture = await PrepareAsync(factory.Services);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
@@ -538,62 +557,24 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
         var acquisition = await AcquireAsync(client, source.Value.Name);
-        Assert.IsNotNull(acquisition.Content);
-        Assert.IsNull(acquisition.Content.Version);
-        Assert.IsNotNull(acquisition.Content.Sha256);
-
+        Assert.IsNotNull(acquisition.Content!.Version);
+        var publication = acquisition.Publication!;
+        var member = publication.Records!.Members.Single();
+        var file = Path.Combine(factory.Services.GetRequiredService<LocalStoragePaths>().DirectoryFor(fixture.Storage),
+            "publications", fixture.Context.WorkspaceId.ToString("N"), member.Id + ".json");
+        var bytes = await File.ReadAllBytesAsync(file);
+        var whole = StorageRecordSets.Encode([JsonSerializer.Deserialize<JsonElement>(bytes)]);
         var path = $"/api/datasourceacquisitions/{acquisition.Name}/content?offset=2&maximumBytes=4";
-        var response = await client.GetFromJsonAsync<StorageObjectContent>(path);
-        Assert.IsNotNull(response);
+        var response = (await client.GetFromJsonAsync<StorageObjectContent>(path))!;
         Assert.AreEqual(2L, response.Offset);
         Assert.IsFalse(response.EndOfObject);
-        Assert.AreEqual(acquisition.Content.Sha256, response.Item.Sha256);
-        CollectionAssert.AreEqual(gateway.Bytes[2..6], Convert.FromBase64String(response.ContentBase64));
-
-        // Existing exact version receipts remain readable when the provider exposes no checksum.
-        var versionOnly = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(
-            acquisition with { Content = acquisition.Content with { Version = "current-version", Sha256 = null } }, 0, 4, default);
-        CollectionAssert.AreEqual(gateway.Bytes[..3], Convert.FromBase64String(versionOnly.ContentBase64));
-
-        gateway.Bytes[^2] ^= 1; // Alter a byte outside the requested range without changing the length or metadata.
+        CollectionAssert.AreEqual(whole[2..6], Convert.FromBase64String(response.ContentBase64));
+        bytes[^3] ^= 1;
+        await File.WriteAllBytesAsync(file, bytes);
         using var refused = await client.GetAsync(path);
-        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-        Assert.Contains("data_source_content_version_unavailable", await refused.Content.ReadAsStringAsync());
+        Assert.AreEqual(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Contains("storage_publication_integrity", await refused.Content.ReadAsStringAsync());
     }
-
-    private sealed class UnversionedWriteStorage : IStorageContentGateway
-    {
-        private StorageObject? written;
-        public byte[] Bytes { get; private set; } = [];
-
-        private StorageObject Listed => written! with { Version = "current-version", Sha256 = null, Reference = "fresh-reference" };
-
-        public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit, string? cursor = null,
-            CancellationToken cancellationToken = default) => Task.FromResult(new StorageObjectPage(written is null ? [] : [Listed], null));
-
-        public Task<StorageObject> StatAsync(StorageContentRequest target, string reference, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<StorageObjectContent> ReadAsync(StorageContentRequest target, string reference, long offset, int maximumBytes,
-            CancellationToken cancellationToken = default)
-        {
-            Assert.AreEqual(Listed.Reference, reference);
-            if (maximumBytes > 4) throw new Agentstration.Storage.StorageException("storage_content_limit_exceeded", "Fixture read bound.");
-            var length = Math.Min(3, Math.Min(maximumBytes, Bytes.Length - (int)offset));
-            return Task.FromResult(new StorageObjectContent(Listed, offset,
-                Convert.ToBase64String(Bytes.AsSpan((int)offset, length)), offset + length == Bytes.Length));
-        }
-
-        public Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request, CancellationToken cancellationToken = default)
-        {
-            Bytes = Convert.FromBase64String(request.ContentBase64);
-            written = new(request.Key, null, Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(Bytes)), "write-reference");
-            return Task.FromResult(written);
-        }
-    }
-
     [TestMethod]
     public async Task UnavailableHistoricalContentDoesNotBlockHistoryOrANewAcquisition()
     {
@@ -796,7 +777,9 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                     new(retainedKnowledge.Name, ScopeRef: Owner), new() { IdempotencyKey = "restart-publication" }, default)).Value;
                 retainedSnapshot = (await second.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(
                     new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;
-                Assert.AreEqual(second.Services.GetRequiredService<SealedOutputInterruption>().SealedContent![0].Content, retainedSnapshot.Artifacts[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(
+                    JsonSerializer.SerializeToElement(second.Services.GetRequiredService<SealedOutputInterruption>().SealedContent![0].Content),
+                    JsonSerializer.SerializeToElement(retainedSnapshot.Artifacts[0].Content)));
                 // Inject an interrupted final activation/completion, then replace the actual host.
                 using (scopes.Push(fixture.Context))
                 {
@@ -832,7 +815,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 Assert.AreEqual(retainedProjection.Uid, recovered.Value.Uid);
                 var active = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;
                 Assert.AreEqual(retainedSnapshot.Uid, active.Uid);
-                Assert.AreEqual(retainedSnapshot.Artifacts[0].Content, active.Artifacts[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(retainedSnapshot.Artifacts[0].Content),
+                    JsonSerializer.SerializeToElement(active.Artifacts[0].Content)));
                 var retrieved = await third.Services.GetRequiredService<KnowledgeRetrievalService>().SearchAsync(new(retainedKnowledge.Name, ScopeRef: Owner), new() { Query = "retained" }, default);
                 Assert.IsNotEmpty(retrieved.Items);
                 var acquisitions = third.Services.GetRequiredService<DataSourceAcquisitionService>();
@@ -841,7 +825,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 Assert.AreEqual(accepted.Uid, history[0].Uid);
                 var content = await third.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(history[0], 0, 65536, default);
                 Assert.Contains("retained", Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64)));
-                // Simulate pre-upgrade native history: bytes and Snapshot exist, Artifact metadata is absent.
+                // Recover missing catalog metadata from the exact current-format publication evidence.
                 var resourceStore = third.Services.GetRequiredService<IResourceStore>();
                 var snapshotBefore = JsonSerializer.Serialize(active);
                 var contentBefore = history[0].Content;
@@ -860,7 +844,8 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 await third.Services.GetRequiredService<StoredArtifactReconciliationService>().ReconcileAsync(default);
                 var reconciled = await acquisitions.ListAsync(source.Namespace, source.Name, Owner, default);
                 Assert.HasCount(1, reconciled);
-                Assert.AreEqual(contentBefore, reconciled[0].Content);
+                Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(contentBefore),
+                    JsonSerializer.SerializeToElement(reconciled[0].Content)));
                 Assert.AreEqual(acquisitionArtifactId, reconciled[0].Manifest!.Artifacts.Single().ArtifactId);
                 Assert.AreEqual(history[0].CompletedAt, reconciled[0].CompletedAt);
                 var after = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(
@@ -871,6 +856,12 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                     var catalog = await third.Services.GetRequiredService<ArtifactManagementService>().ListFlowRunArtifactsAsync(default);
                     Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == acquisitionArtifactId));
                     Assert.AreEqual(1, catalog.Count(item => item.Value.ArtifactId.ToString() == active.Artifacts[0].ArtifactId));
+                    var rebuilt = catalog.Single(item => item.Value.ArtifactId.ToString() == active.Artifacts[0].ArtifactId).Value;
+                    Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(active.Artifacts[0].RecordContract),
+                        JsonSerializer.SerializeToElement(rebuilt.Receipt.Materialization!.RecordContract)));
+                    Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(active.Artifacts[0].DataContract),
+                        JsonSerializer.SerializeToElement(rebuilt.Receipt.DataContract)));
+                    Assert.AreEqual(active.Artifacts[0].Provenance["publication"], rebuilt.Receipt.Provenance["publication"]);
                 }
 
             }
@@ -898,7 +889,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         }
     }
 
-    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false)
+    private static async Task<Fixture> PrepareAsync(IServiceProvider services, bool emptyInput = false, JsonElement? operationResult = null, bool declareAcquisitionOutput = true, JsonElement? operationOutputSchema = null)
     {
         var bootstrap = await services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         await services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
@@ -908,7 +899,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         var input = emptyInput ? JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false })
             : JsonSerializer.SerializeToElement(new { type = "object", properties = new { dataset = new { type = "string", minLength = 1 } }, required = new[] { "dataset" }, additionalProperties = false });
         var flow = await PublishAsync(services, "fixture-acquire", DataSourceDatasetCompositionService.FlowContract,
-            emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" }));
+            operationResult ?? (emptyInput ? Empty : JsonSerializer.SerializeToElement(new { dataset = "${input.parameters.dataset}" })), declareAcquisitionOutput);
         var definitionSchema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = true });
         var type = await services.GetRequiredService<ConnectedServiceOperationTypeManagementService>().CreateAsync(new()
         {
@@ -937,7 +928,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             {
                 Operations =
             [new() { ExternalId = "fixture.read", DisplayName = "Read fixture", Type = typeRef,
-                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = input }) }]
+                Definition = JsonSerializer.SerializeToElement(new { readOnly = true, inputSchema = input, outputSchema = operationOutputSchema ?? (operationResult is null ? input : JsonSerializer.SerializeToElement(new { type = "object" })) }) }]
             }));
         var serviceTypes = services.GetRequiredService<ConnectedServiceTypeManagementService>();
         var version = new ConnectedServiceTypeVersionDescriptor("1.0.0", AepSchemaDigest.Compute(definitionSchema), definitionSchema, [], [])
@@ -999,7 +990,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
         Definition = new() { DisplayName = name, Dataset = new(fixture.Storage, new(Write: true), new(fixture.OperationReference, parameters)) }
     };
 
-    private static async Task<ConnectedServiceDiscoveryFlowReference> PublishAsync(IServiceProvider services, string name, string contract, JsonElement output)
+    private static async Task<ConnectedServiceDiscoveryFlowReference> PublishAsync(IServiceProvider services, string name, string contract, JsonElement output, bool declareOutput = true)
     {
         var schema = contract == KnowledgeFlowContracts.ArtifactTransformation
             ? JsonSerializer.SerializeToElement(new { type = "object", properties = new { bindingName = new { type = "string" }, dataSource = new { type = "object" }, artifacts = new { type = "array" }, configuration = new { type = "object" }, caller = new { type = "object" }, correlationId = new { type = "string" }, transformationId = new { type = "string" } }, required = new[] { "bindingName", "dataSource", "artifacts", "configuration", "caller", "correlationId", "transformationId" } })
@@ -1015,7 +1006,7 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             {
                 EntryStep = "input",
                 InputSchema = schema,
-                OutputSchema = outputSchema,
+                OutputSchema = declareOutput ? outputSchema : null,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = schema },
                     new OutputFlowStepDefinition { Name = "output", OutputMapping = output }],
                 Transitions = [new("input-output", "input", "completed", "output")]
@@ -1054,6 +1045,6 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
     {
         var content = (await client.GetFromJsonAsync<StorageObjectContent>($"/api/datasourceacquisitions/{name}/content"))!;
         using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
-        return json.RootElement.GetProperty("dataset").GetString();
+        return json.RootElement[0].GetProperty("dataset").GetString();
     }
 }

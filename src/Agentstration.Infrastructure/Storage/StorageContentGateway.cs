@@ -18,8 +18,9 @@ public sealed class StorageContentGateway(
     IStorageResolver resolver, IResourceStore resources, ICurrentRequestContext current,
     IAuthorizationService authorization,
     LocalStorageObjectProvider local, StorageAspRemoteAdapter remote, IDataProtectionProvider protection,
-    TimeProvider clock) : IStorageContentGateway
+    TimeProvider clock, StorageContentOptions? options = null) : IStorageContentGateway
 {
+    private readonly StorageContentOptions limits = options ?? new();
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector protector = protection.CreateProtector("Agentstration.Storage.Content.v1");
     private sealed record Reference(string Kind, string Authority, string Key, string? Version, DateTimeOffset Expires, string? Query);
@@ -145,27 +146,27 @@ public sealed class StorageContentGateway(
     private static bool IsLocal(StorageTypeResource type) => type.Governance.ManagedBy?.Reference == "storage.local"
         && type.Governance.ManagedBy.Kind == ResourceManagementAuthorityKind.Core;
 
-    private static AspAccessPolicy Effective(ProtectedStorageContext context, StorageContentPolicy requested, bool local)
+    private AspAccessPolicy Effective(ProtectedStorageContext context, StorageContentPolicy requested, bool local)
     {
         ArgumentNullException.ThrowIfNull(requested);
         // Local envelopes have this schema. Remote envelopes remain provider-defined and opaque.
         var declared = local
             ? context.Envelope.Deserialize<StorageContentPolicy>(Json) ?? throw new AspException("invalid_policy", "A Storage envelope is required.")
-            : new StorageContentPolicy(Write: true);
+            : limits.DefaultPolicy(write: true);
         var requestedPolicy = Map(requested);
         var envelope = Map(declared);
-        AspValidation.Policy(requestedPolicy);
-        AspValidation.Policy(envelope);
+        StorageContentValidation.Policy(requestedPolicy);
+        StorageContentValidation.Policy(envelope);
         AspValidation.Require(requested.Prefix.StartsWith(declared.Prefix, StringComparison.Ordinal), "forbidden", "The dataset rule widens the Storage envelope.");
         var policy = new AspAccessPolicy(context.Capabilities.List && envelope.CanList && requested.List,
             context.Capabilities.Stat && envelope.CanStat && requested.Stat,
             context.Capabilities.Read && envelope.CanRead && requested.Read,
             context.Capabilities.Write && envelope.CanWrite && requested.Write,
-            requested.Prefix, Math.Min(context.Limits.MaximumReadBytes, Math.Min(envelope.MaxReadBytes, requested.MaximumReadBytes)),
-            Math.Min(context.Limits.MaximumWriteBytes, Math.Min(envelope.MaxWriteBytes, requested.MaximumWriteBytes)),
-            Math.Min(context.Limits.MaximumPageSize, Math.Min(envelope.MaxPageSize, requested.MaximumPageSize)),
+            requested.Prefix, Math.Min(limits.MaximumReadBytes, Math.Min(context.Limits.MaximumReadBytes, Math.Min(envelope.MaxReadBytes, requested.MaximumReadBytes))),
+            Math.Min(Math.Min(limits.MaximumWriteBytes, limits.MaximumObjectBytes), Math.Min(context.Limits.MaximumWriteBytes, Math.Min(envelope.MaxWriteBytes, requested.MaximumWriteBytes))),
+            Math.Min(limits.MaximumPageSize, Math.Min(context.Limits.MaximumPageSize, Math.Min(envelope.MaxPageSize, requested.MaximumPageSize))),
             Maximum(envelope.KeyFrom, requested.KeyFrom), Minimum(envelope.KeyBefore, requested.KeyBefore));
-        AspValidation.Policy(policy);
+        StorageContentValidation.Policy(policy);
         return policy;
     }
 

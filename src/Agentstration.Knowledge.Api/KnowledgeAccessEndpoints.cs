@@ -11,6 +11,18 @@ internal static class KnowledgeAccessEndpoints
 {
     public static void Map(RouteGroupBuilder sources)
     {
+        sources.MapPost("/{name}/content/describe", (string name, string? @namespace, string? scopeRef,
+            KnowledgeDescribeRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
+                Results.Ok(await service.DescribeAsync(Id(name, @namespace, scopeRef), body, ct))))
+            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        sources.MapGet("/{name}/content/document-capabilities", (string name, string? @namespace, string? scopeRef,
+            string? snapshotId, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
+                Results.Ok(await service.DescribeDocumentsAsync(Id(name, @namespace, scopeRef), snapshotId, ct))))
+            .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        sources.MapPost("/{name}/content/query-documents", (string name, string? @namespace, string? scopeRef,
+            KnowledgeDocumentQueryRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
+                Content(await service.QueryDocumentsAsync(Id(name, @namespace, scopeRef), body, ct))))
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         sources.MapPost("/{name}/content/read", (string name, string? @namespace, string? scopeRef,
             KnowledgeReadRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
                 Content(await service.ReadAsync(Id(name, @namespace, scopeRef), body, ct))))
@@ -22,6 +34,7 @@ internal static class KnowledgeAccessEndpoints
         sources.MapPost("/{name}/content/status", (string name, string? @namespace, string? scopeRef,
             KnowledgeStatusRequest body, KnowledgeAccessService service, CancellationToken ct) => ExecuteAsync(async () =>
                 Results.Ok(await service.GetStatusAsync(Id(name, @namespace, scopeRef), body, ct))))
+            .WithSummary("Inspect recorded Knowledge status without checking physical content or starting preparation")
             .RequireAuthorization(AgentstrationPolicies.CanReadRuns);
     }
     private static KnowledgeSourceId Id(string name, string? ns, string? scope) => new(name,

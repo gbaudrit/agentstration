@@ -1,4 +1,6 @@
 using Agentstration.Agents;
+using Agentstration.DataSources.Contracts;
+using Agentstration.Resources;
 using Agentstration.Agents.Contracts;
 using Agentstration.Api.Contracts;
 using Agentstration.Extensions.Contracts;
@@ -47,6 +49,7 @@ internal static class OpenApiSuccessResponseCatalog
             ?? WorkOperations(verb, path)
             ?? Workplace(verb, path)
             ?? Management(verb, path)
+            ?? DataSourceQueries(verb, path)
             ?? ModelManagement(verb, path)
             ?? Bootstrap(verb, path)
             ?? Identity(verb, path);
@@ -437,6 +440,22 @@ internal static class OpenApiSuccessResponseCatalog
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<SecretUsagesResponse>(200, "List Secret usages");
             return Json<SecretResponse>(200, "Get or update a Secret");
         }
+        return null;
+    }
+
+    private static OpenApiSuccessResponse? DataSourceQueries(string method, string path)
+    {
+        if (path.StartsWith("/api/datasourcequeries", StringComparison.Ordinal))
+        {
+            if (path.EndsWith("/execute", StringComparison.Ordinal)) return Json<DataSourceQueryExecutionResult>(200, "Execute a published Query");
+            if (path.EndsWith("/tools", StringComparison.Ordinal)) return method == "POST" ? Json<ResourceReference>(200, "Publish a Query relay") : Json<IReadOnlyList<DataSourceQueryToolPublication>>(200, "List Query Tools");
+            if (path.EndsWith("/versions", StringComparison.Ordinal)) return method == "POST" ? Json<DataSourceQueryVersionResource>(200, "Publish a Query version") : Json<IReadOnlyList<DataSourceQueryVersionResource>>(200, "List Query versions");
+            if (path.TrimEnd('/') == "/api/datasourcequeries" && method == "GET") return Json<IReadOnlyList<DataSourceQueryResource>>(200, "List Data Source queries");
+            return Json<DataSourceQueryResource>(method == "POST" ? 201 : 200, "Read or save a Query draft");
+        }
+        if (path == "/api/datasourceacquisitions/{id}/documents/capabilities") return Json<DataSourceDocumentDescription>(200, "Inspect an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/query") return Json<DataSourceDocumentQueryResult>(200, "Query an acquisition publication");
+        if (path == "/api/datasourceacquisitions/{id}/documents/tools") return Json<ResourceReference>(200, "Publish an acquisition query Tool");
         return null;
     }
 

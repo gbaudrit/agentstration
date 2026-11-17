@@ -1,0 +1,8 @@
+fieldset { min-inline-size: 0; min-width: 0; margin: 0; padding: 0; border: 0; align-items: end; }
+fieldset > *, label, input, select, textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+code, p { overflow-wrap: anywhere; }
+pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+    .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .form-span-2 { grid-column: auto; }
+}

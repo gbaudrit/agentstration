@@ -160,3 +160,19 @@ The local comparison for #981 used Debian 13 x64, SDK 10.0.300, test runtime .NE
 API host startup summed to 262.246 → 234.186 s; Security startup summed to 62.068 → 59.402 s. These are single-run observations, not a speed guarantee. The diagnostic wrapper's runtime field describes PowerShell; the host records identify the actual test runtime. Full disposal is included in module elapsed time but is not isolated by the host shutdown signal. Both modules remain above their warning thresholds and below unchanged failure limits. Pure-test relocation removes no host starts by itself.
 
 Negative controls deliberately changed an authorized Model Provider operation to return an unexpected 404, and disabled valid Artifact lease recognition. The matrix and pre-expiry read each failed, then passed after restoring the source and rebuilding. Neither mutation is part of the change.
+
+## Structured document provider lane
+
+The default deterministic suites run the memory-backed structured-document cases.
+Set `AGENTSTRATION_TEST_ASP_POSTGRES` to an explicitly disposable local database to
+run matching PostgreSQL cases; never target production content. The
+`structured-documents.yml` workflow runs contracts plus V2/V3 against PostgreSQL 17.
+See [Structured documents](../reference/structured-documents.md) for commands and
+known bounded semantics. The separate reusable browser journey #1158 must wait
+for explicit maintainer UX approval and implementation merge.
+
+The patched Aspire AppHost SDK uses the official Aspire CLI bundle 13.6.5. Install
+that version and put `aspire` on PATH before building the complete solution. Linux
+x64 CI uses `scripts/ci/install-aspire-cli-linux.sh` with a pinned archive SHA-512;
+Windows/macOS installations can use the same version's official release asset.
+The Web executable and isolated protocol tests do not require the AppHost to run.

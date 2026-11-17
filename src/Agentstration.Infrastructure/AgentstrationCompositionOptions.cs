@@ -11,6 +11,10 @@ public sealed record AgentstrationCompositionOptions
     public string? LocalStorageRootDirectory { get; init; }
     public AiProviderOptions Ai { get; init; } = new("Deterministic", new Uri("http://localhost/"), "deterministic", null);
     public AgentstrationStorageOptions Storage { get; init; } = new();
+    public Agentstration.Storage.StorageContentOptions StorageContent { get; init; } = new();
+    public Agentstration.DataSources.DataSourceContentOptions DataSourceContent { get; init; } = new();
+    public Agentstration.Functions.FunctionContentOptions FunctionContent { get; init; } = new();
+    public Agentstration.Flows.Application.FlowContentOptions FlowContent { get; init; } = new();
     public string? ControlPlaneConnectionString { get; init; }
     public string? WorkPlaneConnectionString { get; init; }
     public string? FlowConnectionString { get; init; }

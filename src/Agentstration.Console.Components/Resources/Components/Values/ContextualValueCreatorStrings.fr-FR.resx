@@ -21,6 +21,8 @@
   <data name="Binding.Source.Secret"><value>Secret</value></data>
   <data name="Binding.Source.Literal"><value>Valeur directe</value></data>
   <data name="Binding.Source.Caller"><value>Fourni par l’appelant</value></data>
+  <data name="Binding.Source.Omitted"><value>Masquer</value></data>
+  <data name="Binding.OmittedHelp"><value>Ce paramètre facultatif et ses sous-champs sont masqués pour l’appelant. Aucune valeur n’est envoyée au Tool source, qui conserve son comportement par défaut.</value></data>
   <data name="Binding.ExactResource"><value>Ressource de portée exacte</value></data>
   <data name="Binding.SelectResource"><value>Sélectionner une ressource</value></data>
   <data name="Binding.CreateParameter"><value>Créer un paramètre</value></data>

@@ -100,7 +100,7 @@ public sealed partial class ToolDefinitionService
             {
                 Publish = false,
                 Enabled = true,
-                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings),
+                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings, relay.InputEnvelope),
                 OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
                 RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
             };
@@ -139,7 +139,7 @@ public sealed partial class ToolDefinitionService
                     parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name),
                 SecretToolArgumentBinding secret when secret.Secret.ScopeRef is { } owner => ScopedResourceAddress.Create(owner,
                     secret.Secret.Address.Namespace, secret.Secret.Address.Kind, secret.Secret.Address.Name),
-                LiteralToolArgumentBinding => (ScopedResourceAddress?)null,
+                LiteralToolArgumentBinding or OmittedToolArgumentBinding => (ScopedResourceAddress?)null,
                 _ => throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Bindings require an exact scoped resource reference.")
             };
             if (address is null) continue;

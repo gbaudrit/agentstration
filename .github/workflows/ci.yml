@@ -135,6 +135,8 @@ jobs:
       - name: Verify formatting of changed .NET files
         shell: pwsh
         run: ./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: Install patched Aspire CLI bundle
+        run: bash scripts/ci/install-aspire-cli-linux.sh "$RUNNER_TEMP/aspire-cli"
       - name: Build Agentstration
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
       - name: Build complete AEP SDK

@@ -178,4 +178,66 @@
   <data name="Type.GenericUse" xml:space="preserve"><value>Generic Use in this context</value></data>
   <data name="Type.UseGranted" xml:space="preserve"><value>Generic Use granted</value></data>
   <data name="Type.UseNotGranted" xml:space="preserve"><value>Generic Use not granted</value></data>
+  <data name="Documents.Collections" xml:space="preserve"><value>Structured collections</value></data>
+  <data name="Documents.CollectionsHelp" xml:space="preserve"><value>Logical collections inherit the Storage envelope. Their server-assigned identity changes when recreated. Collection changes require explicit reconciliation.</value></data>
+  <data name="Documents.NewUid" xml:space="preserve"><value>Assigned when saved</value></data>
+  <data name="Documents.Get" xml:space="preserve"><value>Read document</value></data>
+  <data name="Documents.Put" xml:space="preserve"><value>Create or replace document</value></data>
+  <data name="Documents.Delete" xml:space="preserve"><value>Delete document</value></data>
+  <data name="Documents.Query" xml:space="preserve"><value>Query documents</value></data>
+  <data name="Documents.Publish" xml:space="preserve"><value>Publish immutable Snapshots</value></data>
+  <data name="Documents.PageSize" xml:space="preserve"><value>Maximum page size</value></data>
+  <data name="Documents.Profiles" xml:space="preserve"><value>Allowed profile identifiers (comma separated)</value></data>
+  <data name="Documents.Schema" xml:space="preserve"><value>Document JSON Schema</value></data>
+  <data name="Documents.InvalidJson" xml:space="preserve"><value>Enter a valid JSON object.</value></data>
+  <data name="Documents.Remove" xml:space="preserve"><value>Remove collection</value></data>
+  <data name="Documents.Add" xml:space="preserve"><value>Add collection</value></data>
+  <data name="Documents.Access" xml:space="preserve"><value>Structured data access</value></data>
+  <data name="Documents.AccessHelp" xml:space="preserve"><value>Inspect effective capabilities, verify access and explicitly publish a Tool for the selected operation. Documents entered here are persisted.</value></data>
+  <data name="Documents.Collection" xml:space="preserve"><value>Collection</value></data>
+  <data name="Documents.SelectCollection" xml:space="preserve"><value>Select a collection</value></data>
+  <data name="Documents.Discover" xml:space="preserve"><value>Inspect capabilities</value></data>
+  <data name="Documents.Operation" xml:space="preserve"><value>Operation</value></data>
+  <data name="Documents.Profile" xml:space="preserve"><value>Query profile</value></data>
+  <data name="Documents.Id" xml:space="preserve"><value>Document identifier</value></data>
+  <data name="Documents.Revision" xml:space="preserve"><value>Expected revision</value></data>
+  <data name="Documents.RevisionHelp" xml:space="preserve"><value>Leave empty to create; replacement and deletion require the current exact revision.</value></data>
+  <data name="Documents.QueryPayload" xml:space="preserve"><value>Query payload (JSON for the selected profile)</value></data>
+  <data name="Documents.Value" xml:space="preserve"><value>JSON document</value></data>
+  <data name="Documents.Run" xml:space="preserve"><value>Execute operation</value></data>
+  <data name="Documents.Next" xml:space="preserve"><value>Next page</value></data>
+  <data name="Documents.ToolVersion" xml:space="preserve"><value>Tool version</value></data>
+  <data name="Documents.ToolApproval" xml:space="preserve"><value>Require approval for this Tool</value></data>
+  <data name="Documents.PublishTool" xml:space="preserve"><value>Publish selected operation as a Tool</value></data>
+  <data name="Documents.PublishToolHelp" xml:space="preserve"><value>The relay fixes the Storage revision, collection, rights and query profile. Assign the published Tool explicitly to an agent or Flow. Republishing requires a new version.</value></data>
+  <data name="DisplayNameLabel" xml:space="preserve"><value>Display name</value></data>
+  <data name="Documents.Error.Query" xml:space="preserve"><value>The query is invalid or outside the selected profile. Check its declared fields and supported operators.</value></data>
+  <data name="Documents.Error.Profile" xml:space="preserve"><value>The exact query profile or model is unavailable. Inspect capabilities again and review the selected version.</value></data>
+  <data name="Documents.Error.Schema" xml:space="preserve"><value>The document does not satisfy the collection schema. Correct its required fields and JSON types.</value></data>
+  <data name="Documents.Error.Expired" xml:space="preserve"><value>The cursor or request expired or changed. Start a new read; verify an uncertain write before creating another mutation.</value></data>
+  <data name="Documents.Error.Exact" xml:space="preserve"><value>The exact Storage, collection or publication is unavailable. Review its identity and access; historical reads cannot switch versions.</value></data>
+  <data name="Documents.Error.Limit" xml:space="preserve"><value>A query, result or storage limit was reached. Narrow the selection or reduce the page size.</value></data>
+  <data name="Documents.Error.Conflict" xml:space="preserve"><value>The document revision or request identity conflicts. Read the current document and review the intended mutation.</value></data>
+  <data name="Documents.Capabilities" xml:space="preserve"><value>Document capabilities</value></data>
+  <data name="Documents.RequestPageSize" xml:space="preserve"><value>Page size</value></data>
+  <data name="Documents.NoOperations" xml:space="preserve"><value>No operation is available with your current rights</value></data>
+  <data name="Error.CollectionSchema" xml:space="preserve"><value>A collection schema is invalid or exceeds the supported document profile.</value></data>
+  <data name="Error.SchemaHelp" xml:space="preserve"><value>Correct the indicated collection schema fields, then save again.</value></data>
+  <data name="Error.Schema.ReferenceUnsupported" xml:space="preserve"><value>Only bounded, nonrecursive local references are supported:</value></data>
+  <data name="Error.Schema.ReferenceInvalid" xml:space="preserve"><value>The local schema reference is invalid or missing:</value></data>
+  <data name="Error.Schema.Union" xml:space="preserve"><value>Use a typed schema plus null for this nullable union:</value></data>
+  <data name="Error.Schema.Format" xml:space="preserve"><value>Supported asserted formats are date-time and uri:</value></data>
+  <data name="Error.Schema.Keyword" xml:space="preserve"><value>This keyword is outside the supported document schema profile:</value></data>
+  <data name="Error.Schema.Limit" xml:space="preserve"><value>The schema exceeds its depth or expansion limit.</value></data>
+  <data name="Error.Schema.Invalid" xml:space="preserve"><value>Check the type, structure and bounds at this schema location.</value></data>
+<data name="Documents.UseSharedSchema" xml:space="preserve"><value>Select a published Schema</value></data>
+<data name="Documents.UseInlineSchema" xml:space="preserve"><value>Use an inline schema</value></data>
+  <data name="Documents.IdentityRequired" xml:space="preserve"><value>Enter a display name (up to 200 characters) and a technical name (1–128 lowercase letters, digits, dots or hyphens, starting with a letter or digit).</value></data>
+  <data name="Error.Metadata" xml:space="preserve"><value>Enter a display name for the Storage and each collection (up to 200 characters). Descriptions must not exceed 2000 characters.</value></data>
+  <data name="Error.BackendConnectionRefused" xml:space="preserve"><value>The storage server refused the connection. Check that it is running and reachable from the extension.</value></data>
+  <data name="Error.BackendTimeout" xml:space="preserve"><value>The storage connection timed out. Check that the server is reachable from the extension.</value></data>
+  <data name="Error.BackendUnavailable" xml:space="preserve"><value>The storage backend is unavailable. Check the database service and the extension’s connection settings.</value></data>
+  <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>Executing a document operation requires runs/execute in the selected context. Select an authorized context or request this permission.</value></data>
+  <data name="Documents.RunQuery" xml:space="preserve"><value>Run query</value></data>
+  <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Enter a JSON object of at most 8 KiB and a page size within the displayed limit.</value></data>
 </root>

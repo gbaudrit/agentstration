@@ -1,18 +1,23 @@
-using Agentstration.Schemas;
 using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Artifacts.Contracts;
 
 /// <summary>Exact physical evidence for produced content, without an expiring access token.</summary>
 public sealed record ArtifactStorageMaterialization(WorkspaceId WorkspaceId, StorageContentRequest Target,
-    string Key, string? Version, long Length, string Sha256, StoragePublicationReference? Publication = null);
+    string Key, string? Version, long Length, string Sha256, StoragePublicationReference? Publication = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ResolvedDataContract? RecordContract { get; init; }
+}
 
 public sealed record RegisterStoredArtifactRequest(string Identity, string ProducerFlowRunId,
     ScopedResourceAddress ProducerResource, string ProducerExecutionId, string MediaType,
     ArtifactStorageMaterialization Materialization, string? ProducerFlowStepId = null,
-    Guid ProducerUid = default, long ProducerGeneration = 0, ResolvedDataContract? DataContract = null);
+    Guid ProducerUid = default, long ProducerGeneration = 0, ResolvedDataContract? DataContract = null,
+    IReadOnlyDictionary<string, string>? Provenance = null);
 
 public interface IStoredArtifactRegistrar
 {
@@ -21,23 +26,37 @@ public interface IStoredArtifactRegistrar
 
 public static class ArtifactStorageReferences
 {
-    private const string Prefix = "artifact-storage-v2.";
+    private const string Prefix = "artifact-storage-v3.";
+    private const int MaximumReferenceCharacters = 131072;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static string PublicationIdentity(StoragePublicationReference reference) =>
-        "publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + reference.Key;
+        reference.Records is not null
+            ? "record-publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + reference.Key
+                + ":" + reference.Records.DocumentPublication?.Target.CollectionUid.ToString("N")
+                + ":" + reference.Records.DocumentPublication?.Publication.Id + ":" + reference.Version
+        : reference.Document is { } document
+            ? "document-publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + document.Publication.Target.CollectionUid.ToString("N")
+                + ":" + document.Publication.Publication.Id + ":" + document.DocumentId
+            : "publication:" + reference.Target.Storage.StorageUid.ToString("N") + ":" + reference.Key;
     public static FlowRunArtifactId Identity(WorkspaceId workspaceId, string identity)
     {
         var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{workspaceId.Value:N}:{identity}"));
         return new(new Guid(digest.AsSpan(0, 16)));
     }
-    public static string Encode(ArtifactStorageMaterialization value) =>
-        Prefix + Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(value, Json));
+    public static string Encode(ArtifactStorageMaterialization value)
+    {
+        // Contract evidence belongs to catalogue metadata; physical reads need only exact membership.
+        var encoded = Prefix + Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(value with { RecordContract = null }, Json));
+        if (encoded.Length > MaximumReferenceCharacters)
+            throw new ArtifactValidationException("artifact_storage_reference_limit", "The Artifact materialization evidence exceeds its bounds.");
+        return encoded;
+    }
     public static ArtifactStorageMaterialization? Parse(string value)
     {
         if (!value.StartsWith(Prefix, StringComparison.Ordinal)) return null;
         try
         {
-            if (value.Length > 32768) throw new FormatException();
+            if (value.Length > MaximumReferenceCharacters) throw new FormatException();
             return JsonSerializer.Deserialize<ArtifactStorageMaterialization>(Convert.FromBase64String(value[Prefix.Length..]), Json)
                 ?? throw new FormatException();
         }

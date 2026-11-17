@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Agentstration.Resources;
 
 namespace Agentstration.Schemas;
 
@@ -19,8 +20,24 @@ public sealed record DataContractDefinition
     public string Source { get; init; } = "input";
 }
 
+public sealed record SchemaContractEvidence(string Name, string Version, ResourceScopeRef ScopeRef,
+    ResourceNamespace Namespace, Guid SchemaUid, long SchemaGeneration, string ParentDefinitionHash,
+    string? SchemaPath, string DefinitionHash);
+
 public sealed record ResolvedDataContract(JsonElement? Schema, string? MediaType, string Origin,
-    DataContractMode DeclaredMode, string Digest, bool Validated = false);
+    DataContractMode DeclaredMode, string Digest, bool Validated = false)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaContractEvidence? SchemaEvidence { get; init; }
+    [JsonIgnore]
+    public bool HasStructuralConstraints => Schema is { } schema && HasConstraints(schema);
+    private static bool HasConstraints(JsonElement schema) => schema.ValueKind == JsonValueKind.Object && schema.EnumerateObject().Any(p =>
+        p.Name is "required" or "enum" or "minimum" or "maximum" or "exclusiveMinimum" or "exclusiveMaximum"
+            or "minLength" or "maxLength" or "pattern" or "format" or "minItems" or "maxItems" or "anyOf" or "oneOf" or "allOf"
+        || p.Name == "additionalProperties" && p.Value.ValueKind == JsonValueKind.False
+        || p.Name == "properties" && p.Value.ValueKind == JsonValueKind.Object && p.Value.EnumerateObject().Any()
+        || p.Name == "items" && HasConstraints(p.Value));
+}
 
 public sealed record InvocationDataContracts(ResolvedDataContract? Input = null, ResolvedDataContract? ExpectedOutput = null, bool ArtifactDraft = false, bool FinalResultMapped = false);
 
@@ -39,7 +56,6 @@ public sealed class DataContractException(string code, DataContractFailure failu
 public static partial class DataContracts
 {
     public const int MaximumSchemaCharacters = 65_536;
-    public const int MaximumValueCharacters = 16 * 1024 * 1024;
     private static readonly BuiltinJsonSchemaFormatHandler Handler = new();
     private static readonly JsonSerializerOptions FailureJson = new(JsonSerializerDefaults.Web);
     public static DataContractFailure? ParseFailure(string? details)
@@ -105,8 +121,6 @@ public static partial class DataContracts
         if (contract?.Schema is not { } schema) return;
         if (value.ValueKind == JsonValueKind.Undefined)
             throw Failure("data_contract_violation", boundary, contract.Origin, "$", "required", "defined value", "absent", runId, stepName);
-        if (value.GetRawText().Length > MaximumValueCharacters)
-            throw Failure("data_contract_value_too_large", boundary, contract.Origin, "$", "value_size", "bounded value", "oversized", runId, stepName);
         var validation = isProtectedString is null ? Handler.ValidateInstanceAsync(schema, value, null, default)
             : Handler.ValidateSymbolicStringsAsync(schema, value, isProtectedString, default);
         var result = validation.AsTask().GetAwaiter().GetResult();

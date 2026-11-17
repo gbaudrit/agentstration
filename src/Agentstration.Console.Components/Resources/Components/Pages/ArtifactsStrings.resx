@@ -53,4 +53,13 @@
   <data name="DataContractValidated" xml:space="preserve"><value>Validated against the published content.</value></data>
   <data name="DataContractUnvalidated" xml:space="preserve"><value>Contract available; no content validation evidence.</value></data>
   <data name="DataContractOrigin" xml:space="preserve"><value>Contract origin</value></data>
+<data name="DataContractGenericValidated" xml:space="preserve"><value>Validation is limited to the declared generic contract. The business structure is not verified.</value></data>
+<data name="DataContractParentHash" xml:space="preserve"><value>Parent Schema hash:</value></data>
+<data name="DataContractSelectedHash" xml:space="preserve"><value>Selected schema hash:</value></data>
+  <data name="Records" xml:space="preserve"><value>JSON records</value></data>
+  <data name="RecordsHelp" xml:space="preserve"><value>This Artifact contains {0} independently stored records. Content is verified when you read it.</value></data>
+  <data name="RecordContract" xml:space="preserve"><value>Record contract</value></data>
+  <data name="RecordOrdinal" xml:space="preserve"><value>Record</value></data>
+  <data name="ReadRecord" xml:space="preserve"><value>Read record</value></data>
+  <data name="RecordReadFailed" xml:space="preserve"><value>The record could not be read or verified. Its metadata remains available.</value></data>
 </root>

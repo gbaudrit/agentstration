@@ -571,6 +571,7 @@ public sealed class IdentityFoundationTests
         var instanceContext = await instanceContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
         Assert.AreEqual(IdentityConsoleContextKind.Instance, instanceContext?.SelectedKind);
         Assert.AreEqual("/instance", instanceContext?.SelectedScopeRef);
+        Assert.Contains(AuthorizationPermissions.RunsExecute, instanceContext!.Permissions);
         var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
         var instanceOperations = await topology.GetInstanceOperationsWorkspaceAsync(default);
         Assert.AreEqual(instanceOperations.Id, instanceContext?.Context.WorkspaceId);
@@ -584,6 +585,7 @@ public sealed class IdentityFoundationTests
         var tenantContext = await tenantContextResponse.Content.ReadFromJsonAsync<IdentityConsoleContextResponse>();
         Assert.AreEqual(IdentityConsoleContextKind.Tenant, tenantContext?.SelectedKind);
         Assert.AreEqual(tenant.ScopeRef, tenantContext?.SelectedScopeRef);
+        Assert.Contains(AuthorizationPermissions.RunsExecute, tenantContext!.Permissions);
         var tenantOperations = await topology.GetTenantOperationsWorkspaceAsync(tenant.TenantId!.Value, default);
         Assert.AreEqual(tenantOperations.Id, tenantContext?.Context.WorkspaceId);
         Assert.IsFalse(initial.AvailableContexts.Any(value =>

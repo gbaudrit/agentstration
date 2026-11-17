@@ -1,24 +1,24 @@
+using System.Text;
 using System.Text.Json;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
-using System.Text;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Infrastructure.Knowledge;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Storage.Sqlite;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Agentstration.Infrastructure.Storage;
-using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Management.Tests;
 
@@ -29,12 +29,13 @@ public sealed partial class DataSourceDatasetTests
     public async Task SourceTtlRefreshesBeforeFallbackAndRejectsAnOverAgeFallback()
     {
         var clock = new NativeAccessClock(TimeProvider.System.GetUtcNow());
-        ControlledContent? controlled = null;
+        ControlledPublications? controlled = null;
         await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
-            services.AddSingleton<IStorageContentGateway>(p => controlled = new(ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock)));
-            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStoragePublicationGateway>(p => controlled = new(ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock)));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
@@ -127,7 +128,8 @@ public sealed partial class DataSourceDatasetTests
         {
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
             services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
-            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+            services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
@@ -171,6 +173,32 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(KnowledgeSnapshotLifecycleState.Retiring, protectedSnapshot.LifecycleState);
         var continuation = await access.ReadAsync(id, new() { Cursor = page.NextCursor }, default);
         Assert.AreEqual(first.Value.SnapshotName, continuation.SnapshotId);
+        // Retired metadata at the head of a bounded cleanup batch must not starve later publications (#1137).
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(fixture.Context))
+        {
+            var resources = factory.Services.GetRequiredService<IResourceStore>();
+            var retiredHead = new Dictionary<Guid, DateTimeOffset>();
+            for (var index = 0; index < 16; index++)
+            {
+                var old = await resources.CreateImmutableAsync(protectedSnapshot.Snapshot with
+                {
+                    Uid = Guid.NewGuid(),
+                    Generation = 1,
+                    Metadata = new() { Name = "retired-fixture-" + index },
+                    PublishedAt = protectedSnapshot.Snapshot.PublishedAt.AddDays(-1 - index),
+                    Artifacts = []
+                }, default);
+                retiredHead.Add(old.Value.Uid, clock.Now);
+            }
+            var address = new ScopedResourceAddress(ResourceScopeRef.Workspace(fixture.Context.WorkspaceId), knowledge.Value.Namespace,
+                KnowledgeResourceKinds.KnowledgeSnapshotObservedState, "snapshot-state-" + knowledge.Value.Uid.ToString("N"));
+            var state = (await resources.GetExactAsync<KnowledgeSnapshotObservedResource>(address, default))!;
+            await resources.PutExactAsync(address.ScopeRef, state.Value with
+            {
+                Generation = state.Value.Generation + 1,
+                RetiredSnapshots = state.Value.RetiredSnapshots.Concat(retiredHead).ToDictionary(pair => pair.Key, pair => pair.Value)
+            }, state.ETag, false, default);
+        }
         clock.Now += KnowledgeAccessService.SessionLifetime;
         await history.MaintainAsync(knowledge.Value, default);
         Assert.AreEqual(KnowledgeSnapshotLifecycleState.Retired, (await snapshots.GetAsync(new(first.Value.SnapshotName!), default)).LifecycleState);
@@ -207,16 +235,18 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(admitted[0].Value.Name, repeated.Value.Name);
     }
 
-    private sealed class ControlledContent(IStorageContentGateway inner) : IStorageContentGateway
+    private sealed class ControlledPublications(IStoragePublicationGateway inner) : IStoragePublicationGateway
     {
         public bool FailWrites { get; set; }
         public Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default) => inner.ValidateAsync(target, cancellationToken);
-        public Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit, string? cursor = null, CancellationToken cancellationToken = default) => inner.ListAsync(target, prefix, limit, cursor, cancellationToken);
-        public Task<StorageObject> StatAsync(StorageContentRequest target, string reference, CancellationToken cancellationToken = default) => inner.StatAsync(target, reference, cancellationToken);
-        public Task<StorageObjectContent> ReadAsync(StorageContentRequest target, string reference, long offset, int maximumBytes, CancellationToken cancellationToken = default) => inner.ReadAsync(target, reference, offset, maximumBytes, cancellationToken);
-        public Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => inner.RetireAsync(target, exact, cancellationToken);
-        public Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request, CancellationToken cancellationToken = default) => FailWrites
-            ? throw new StorageException("fixture_write_failed", "Synthetic refresh failure.") : inner.WriteAsync(target, request, cancellationToken);
+        public Task<StoragePublicationReference> PrepareRecordsAsync(StorageContentRequest target, string publicationId, IReadOnlyList<JsonElement> records,
+            CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => FailWrites && target.Consumer.Consumer.Kind == DataSourceResourceKinds.DataSource
+            ? throw new StorageException("fixture_write_failed", "Synthetic refresh failure.") : inner.PrepareRecordsAsync(target, publicationId, records, cancellationToken, notAfter);
+        public Task<StoragePublicationReference> PrepareAsync(StorageContentRequest target, string publicationId, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
+            inner.PrepareAsync(target, publicationId, bytes, cancellationToken);
+        public Task SealAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.SealAsync(reference, cancellationToken);
+        public Task<ReadOnlyMemory<byte>> ReadAsync(StoragePublicationReference reference, long offset, int length, CancellationToken cancellationToken) => inner.ReadAsync(reference, offset, length, cancellationToken);
+        public Task<bool> RetireAsync(StoragePublicationReference reference, CancellationToken cancellationToken) => inner.RetireAsync(reference, cancellationToken);
     }
 
     [TestMethod]
@@ -246,14 +276,20 @@ public sealed partial class DataSourceDatasetTests
             var flows = factory.Services.GetRequiredService<FlowService>();
             var contract = (await flows.GetVersionExactAsync(Owner, new("knowledge-projection-builtin"), "1.0.0", default))!.Value.Graph!.OutputSchema!.Value;
             var inputContract = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = contract, parameters = new { type = "object" } }, required = new[] { "value", "parameters" }, additionalProperties = false });
-            var graph = new FlowGraphDefinition { EntryStep = "input", InputSchema = inputContract, OutputSchema = contract,
+            var graph = new FlowGraphDefinition
+            {
+                EntryStep = "input",
+                InputSchema = inputContract,
+                OutputSchema = contract,
                 Steps = [new InputFlowStepDefinition { Name = "input", Schema = inputContract },
-                    new ArtifactTransformFlowStepDefinition { Name = "process" },
-                    new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { dataset = "${input.content.dataset}", transformed = true }) },
+                    new ForeachArtifactsFlowStepDefinition { Name = "process", OutputContract = new()
+                        { Schema = JsonSerializer.SerializeToElement(new { type = "object" }) } },
+                    new TransformFlowStepDefinition { Name = "body", Mapping = JsonSerializer.SerializeToElement(new { records = "${input.content}", transformed = true }) },
                     new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success, Schema = contract, OutputMapping = JsonSerializer.SerializeToElement("${transition.output}") },
                     new OutputFlowStepDefinition { Name = "error", Outcome = FlowOutputOutcome.Error }],
                 Transitions = [new("start", "input", "completed", "process"), new("body", "process", "process", "body"),
-                    new("return", "body", "completed", "process"), new("done", "process", "completed", "completed"), new("fail", "process", "error", "error")] };
+                    new("return", "body", "completed", "process"), new("done", "process", "completed", "completed"), new("fail", "process", "error", "error")]
+            };
             await flows.CreateExactAsync(Owner, new("direct-artifact-transform", null, "1.0.0", true,
                 new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input), new("completed", FlowNodeKind.Output)], [new("input", "completed")], ["completed"]), Graph: graph), ResourceNamespace.Default, default);
             await flows.PublishVersionExactAsync(Owner, new("direct-artifact-transform"), "1.0.0", true, default);
@@ -300,7 +336,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.IsNull(directAcquisition.Content);
         Assert.IsNull(directAcquisition.Manifest);
         var payload = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadDirectAsync(directAcquisition, directEvidence.DirectInput.RequestId, default);
-        Assert.AreEqual("direct-result", payload.GetProperty("dataset").GetString());
+        Assert.AreEqual("direct-result", payload[0].GetProperty("dataset").GetString());
         await Assert.ThrowsAsync<DataSourceAcquisitionException>(() => factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>()
             .ReadDirectAsync(directAcquisition, "another-projection", default));
         await using var flowDb = await factory.Services.GetRequiredService<IDbContextFactory<FlowDbContext>>().CreateDbContextAsync();

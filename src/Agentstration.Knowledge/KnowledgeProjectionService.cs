@@ -619,7 +619,9 @@ public sealed class KnowledgeProjectionService(
                     $"Artifact '{value.ArtifactId}' does not match its declared digest.");
             return new KnowledgeSnapshotArtifact
             {
+                Contribution = KnowledgeContributions.ForArtifact(source.Uid, projection.Inputs, value.ArtifactId),
                 ArtifactId = value.ArtifactId,
+                DataContract = value.DataContract,
                 ProducerFlowRunId = value.ProducerFlowRunId,
                 ProducerFlowStepId = value.ProducerFlowStepId,
                 StorageFlowRunId = value.StorageFlowRunId,
@@ -761,7 +763,10 @@ public sealed class KnowledgeProjectionService(
                 MediaType = Optional(entry, "mediaType"),
                 Digest = Optional(entry, "digest"),
                 ContentBase64 = Optional(entry, "contentBase64"),
-                DataContract = entry.TryGetProperty("dataContract", out var contract) && contract.ValueKind == JsonValueKind.Object ? contract.Deserialize<ResolvedDataContract>(FlowContractJsonOptions) : null
+                Provenance = entry.TryGetProperty("provenance", out var provenance) && provenance.ValueKind == JsonValueKind.Object
+                    ? provenance.Deserialize<Dictionary<string, string>>(FlowContractJsonOptions) ?? [] : new Dictionary<string, string>(),
+                DataContract = entry.TryGetProperty("dataContract", out var contract) && contract.ValueKind == JsonValueKind.Object ? contract.Deserialize<ResolvedDataContract>(FlowContractJsonOptions) : null,
+                RecordContract = entry.TryGetProperty("recordContract", out var record) && record.ValueKind == JsonValueKind.Object ? record.Deserialize<ResolvedDataContract>(FlowContractJsonOptions) : null
             });
         }
         if (result.Select(value => value.ArtifactId).Distinct(StringComparer.Ordinal).Count() != result.Count)

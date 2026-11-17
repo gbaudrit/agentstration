@@ -19,13 +19,13 @@ public partial class FlowDesigner
         var target = graph.Steps.FirstOrDefault(step => step.Name == to);
         if (source is null || target is null || PortSchema(source, eventName) is not { } output || PortSchema(target, inputPort) is not { } input) return null;
         if (target is ToolFlowStepDefinition { ArgumentsMapping: null }) return null;
-        if (target is ArtifactTransformFlowStepDefinition { Mode: ArtifactProcessingMode.Access } && inputPort == "result") return null;
+        if (target is ForeachArtifactsFlowStepDefinition { Mode: ArtifactProcessingMode.Access } && inputPort == "result") return null;
         var mapping = target switch
         {
             AgentFlowStepDefinition agent => agent.InputMapping,
             ToolFlowStepDefinition tool => tool.ArgumentsMapping,
             FlowCallStepDefinition call => call.InputMapping,
-            ArtifactTransformFlowStepDefinition artifact => inputPort == "result" ? artifact.ResultMapping : artifact.ArtifactsMapping,
+            ForeachArtifactsFlowStepDefinition artifact => inputPort == "result" ? artifact.ResultMapping : artifact.ArtifactsMapping,
             OutputFlowStepDefinition result => result.OutputMapping,
             _ => null
         };

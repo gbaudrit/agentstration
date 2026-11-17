@@ -36,14 +36,16 @@ public sealed class RegistrationContractTests
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
-            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (3, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (20, ServiceLifetime.Scoped),
+            [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
+            [typeof(IBootstrapResourceHandler)] = (22, ServiceLifetime.Scoped),
+            [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (6, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (3, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolDefinitionProvider)] = (47, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolHandler)] = (47, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolDefinitionProvider)] = (56, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolHandler)] = (56, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
             [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
             [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)

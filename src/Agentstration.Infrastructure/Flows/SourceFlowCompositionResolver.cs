@@ -4,12 +4,20 @@ using Agentstration.Resources;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class SourceFlowCompositionResolver(FlowService flows) : IFlowCompositionResolver
+public sealed class SourceFlowCompositionResolver(FlowService flows, FlowContentOptions? contentOptions = null) : IFlowCompositionResolver
 {
     public async Task<ResolvedFlowComposition> ResolveAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken cancellationToken)
+        => await ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, false, cancellationToken);
+
+    public Task<ResolvedFlowComposition> ResolveAcceptedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken cancellationToken)
+        => ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, true, cancellationToken);
+
+    private async Task<ResolvedFlowComposition> ResolveCoreAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, bool accepted, CancellationToken cancellationToken)
     {
-        var compiler = new FlowCompositionService(flows);
+        var compiler = new FlowCompositionService(flows, contentOptions);
         var template = await compiler.ResolveCallAsync(orchestration, consumer, ownerNamespace, cancellationToken);
         foreach (var binding in bindings.Where(pair => pair.Value.Any(call => call.PassInputDirectly)))
         {
@@ -17,7 +25,7 @@ public sealed class SourceFlowCompositionResolver(FlowService flows) : IFlowComp
             if (point is null || point.AllowEmpty || binding.Value.Count != 1 || !DominatesSuccess(template.Graph!, point.Name))
                 throw new FlowValidationException("flow_composition_boundary_invalid", "The governed source boundary must be required on every successful path.");
         }
-        var compiled = await compiler.ResolveAsync(template, bindings, consumer, cancellationToken);
+        var compiled = await compiler.ResolveAsync(template, bindings, consumer, cancellationToken, accepted, ownerNamespace);
         var resource = await flows.GetExactAsync(template.ScopeRef, template.FlowId, cancellationToken);
         return new(orchestration with
         {

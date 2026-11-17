@@ -77,7 +77,7 @@ internal static class JsonSchemaInputModel
             if (!allowAnyRoot && root.Kind != JsonSchemaInputKind.Map) return new(null, "ObjectSchemaRequired");
             if (root.Kind == JsonSchemaInputKind.Map && root.Properties.Count == 0 && root.AdditionalProperties)
                 return new(allowAnyRoot ? root : null, "FreeFormSchema");
-            if (allowAnyRoot && RequiresRaw(root)) return new(root, "FreeFormSchema");
+            if (RequiresRaw(root)) return new(root, "FreeFormSchema");
             return new(root, null);
         }
         catch (NotSupportedException exception) { return new(null, exception.Message); }

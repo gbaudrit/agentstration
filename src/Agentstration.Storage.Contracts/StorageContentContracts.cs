@@ -1,13 +1,17 @@
 namespace Agentstration.Storage.Contracts;
 
-/// <summary>A consumer can only narrow the Storage envelope; it cannot replace a connection or implementation.</summary>
+/// <summary>A consumer can only narrow the Storage envelope; omitted numeric bounds add no restriction to server configuration.</summary>
 public sealed record StorageContentPolicy(
     bool List = true, bool Stat = true, bool Read = true, bool Write = false,
-    string Prefix = "", int MaximumPageSize = 100, int MaximumReadBytes = 65536,
-    int MaximumWriteBytes = 65536, string? KeyFrom = null, string? KeyBefore = null);
+    string Prefix = "", int MaximumPageSize = int.MaxValue, int MaximumReadBytes = int.MaxValue,
+    int MaximumWriteBytes = int.MaxValue, string? KeyFrom = null, string? KeyBefore = null);
 
 public sealed record StorageContentRequest(
-    StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy);
+    StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+}
 
 public sealed record StorageObject(string Key, string? Version, long Length, string? Sha256, string Reference);
 public sealed record StorageObjectPage(IReadOnlyList<StorageObject> Objects, string? Cursor);
@@ -39,5 +43,8 @@ public sealed record StorageAspBindingDescriptor(string Profile, string McpServe
 /// <summary>Pure provider-owned validation in addition to the immutable JSON schemas. Never resolves values or performs I/O.</summary>
 public interface IStorageDefinitionValidator
 {
+    bool ValidatesDocumentSchemas(StorageTypeVersionDescriptor version) => false;
     void Validate(StorageTypeResource type, StorageTypeVersionDescriptor version, StorageProperties definition);
 }
+
+public sealed record StorageValidationIssue(string Path, string Code, string? Keyword = null);

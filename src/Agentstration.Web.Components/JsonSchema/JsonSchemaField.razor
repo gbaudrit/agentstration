@@ -120,8 +120,10 @@
     [Parameter] public EventCallback ValueRemoved { get; set; }
     [Parameter] public bool Compact { get; set; }
     private bool IsEditableScalar => Schema.Kind is JsonSchemaInputKind.Text or JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber or JsonSchemaInputKind.Toggle;
-    private bool CanSetEmptyString => Compact && PreservePresence && !IsPresent && Schema.Kind == JsonSchemaInputKind.Text
-        && Schema.AllowedValues.Count == 0 && JsonSchemaInputModel.Validate(JsonSerializer.SerializeToElement(string.Empty), Schema).Count == 0;
+    private bool AllowsEmptyString => Schema.Kind == JsonSchemaInputKind.Text
+        && JsonSchemaInputModel.Validate(JsonSerializer.SerializeToElement(string.Empty), Schema).Count == 0;
+    private bool CanSetEmptyString => (Schema.Required || Compact && PreservePresence) && !IsPresent
+        && Schema.AllowedValues.Count == 0 && AllowsEmptyString;
     private int chosenVariant = -1;
     private IReadOnlyList<JsonSchemaInputNode>? previousVariants;
     protected override void OnParametersSet()
@@ -147,7 +149,7 @@
     private string Label => Schema.Title ?? Schema.Name;
     private bool IsLocked => LockedPaths.Contains(Schema.Path);
     private bool FieldDisabled => Disabled || IsLocked;
-    private string RequiredMark => Schema.Required ? Localizer["RequiredMarker"] : string.Empty;
+    private string RequiredMark => Schema.Required ? Localizer[AllowsEmptyString ? "RequiredEmptyStringMarker" : "RequiredMarker"] : string.Empty;
     private string StringValue => Value is JsonValue value && value.TryGetValue<string>(out var text) ? text : string.Empty;
     private string NumberValue => Value?.ToJsonString() ?? string.Empty;
     private bool UsesMultilineText => Schema.MaximumLength is >= 1000;
@@ -169,7 +171,7 @@
         get
         {
             var rules = new List<string>();
-            if (Schema.Required) rules.Add(Localizer["Rule.Required"]);
+            if (Schema.Required) rules.Add(Localizer[AllowsEmptyString ? "Rule.RequiredEmptyString" : "Rule.Required"]);
             if (Schema.Kind == JsonSchemaInputKind.Text)
             {
                 if (Schema.MinimumLength is { } minimum && Schema.MaximumLength is { } maximum)

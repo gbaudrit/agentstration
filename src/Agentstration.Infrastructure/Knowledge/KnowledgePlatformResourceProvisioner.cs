@@ -26,6 +26,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
     IResourceGovernanceContext governance)
 {
     public const string DatasetOrchestrationFlowName = "data-source-orchestration-builtin";
+    public const string CompositionFlowVersion = "1.0.0";
     public const string KnowledgeOrchestrationFlowName = "knowledge-orchestration-builtin";
     public const string TransformationSequenceFlowName = "content-transformation-sequence-builtin";
     public const string RetrievalToolSetName = "knowledge-retrieval-builtin";
@@ -60,7 +61,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             instanceScope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, RetrievalToolSetName), cancellationToken)
             ?? throw new InvalidOperationException("The built-in Knowledge retrieval ToolSet was not reconciled.");
         await EnsureTenantAccessAsync(retrievalToolSet.Value, tenantScope, cancellationToken);
-        foreach (var operation in new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus })
+        foreach (var operation in new[] { KnowledgeSourceOperation.Read, KnowledgeSourceOperation.SearchRegex, KnowledgeSourceOperation.GetStatus, KnowledgeSourceOperation.Describe, KnowledgeSourceOperation.StructuredQuery })
         {
             var native = await store.GetExactAsync<ToolResource>(new(instanceScope, ResourceNamespace.Default,
                 ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(KnowledgeAccessSchemas.ToolName(operation))), cancellationToken);
@@ -501,7 +502,9 @@ public sealed class KnowledgePlatformResourceProvisioner(
             (TransformationSequenceFlowName, "artifact.sequence/v1", (string?)null)
         })
         {
-            var result = boundary == "acquisition" ? value : KnowledgeBuiltinSchemas.ArtifactManifestOutput;
+            // The acquisition request is an object envelope; its business response can be any JSON.
+            // The exact Operation schema is pinned and checked independently by the acquisition adapter.
+            var result = boundary == "acquisition" ? JsonSerializer.SerializeToElement(new { }) : KnowledgeBuiltinSchemas.ArtifactManifestOutput;
             var sequence = boundary is null ? "transformations" : boundary == "acquisition" ? "transformations" : "postAggregate";
             var nodes = new List<FlowStepDefinition> { new InputFlowStepDefinition { Name = "input", Schema = boundary is null ? result : value } };
             if (boundary is not null) nodes.Add(new FlowCompositionPointStepDefinition
@@ -529,7 +532,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 Schema = result,
                 OutputMapping = JsonSerializer.SerializeToElement("${steps." + sequence + ".output}")
             });
-            await CreateAndPublishFlowAsync(scope, name, name, contract, null, "1.0.0", new()
+            await CreateAndPublishFlowAsync(scope, name, name, contract, null, CompositionFlowVersion, new()
             {
                 EntryStep = "input",
                 InputSchema = boundary is null ? result : value,

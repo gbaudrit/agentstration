@@ -76,6 +76,11 @@ The extension contains types, schema paths and execution coordinates, never data
 values. Existing consumers can omit optional metadata; current workers enforce
 contracts supplied for an invocation.
 
+Problem Details includes the machine-readable `code` and its `errorCode` alias.
+HTTP diagnostics can retain `errorCode` while redacting generic `code` fields
+used by authentication protocols. Tool input validation failures return HTTP 422
+with their schema path in `contractFailure`, rather than an unhandled HTTP 500.
+
 ### Implicit process admission
 
 `/assignments/child-flows` additionally accepts purpose `process` for a step that

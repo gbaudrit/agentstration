@@ -60,9 +60,52 @@ public sealed class FlowService(
     ISecurityAuditWriter? audit = null,
     IFlowResourceReferenceResolver? resourceReferenceResolver = null,
     IFlowUsePolicy? usePolicy = null,
-    IFlowToolContractResolver? toolContracts = null)
+    IFlowToolContractResolver? toolContracts = null,
+    Agentstration.Functions.Contracts.ITransformationFunctionResolver? functions = null)
 {
+    public async Task<Agentstration.Functions.Contracts.ResolvedTransformationFunction> ResolveFunctionAsync(
+        Agentstration.Functions.Contracts.FunctionReference reference, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (functions is null) throw new FlowValidationException("flow_function_resolver_unavailable", "Function resolution is unavailable.");
+        try { return await functions.ResolveAsync(reference, consumer, ct); }
+        catch (Agentstration.Functions.Abstractions.TransformationFunctionException error)
+        { throw new FlowValidationException(error.Code, error.Message); }
+    }
+
+    internal async Task<FlowVersion> CompileFunctionsAsync(FlowVersion version, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (version.Graph is not { } graph) return version;
+        var steps = new List<FlowStepDefinition>();
+        foreach (var step in graph.Steps)
+        {
+            if (step is not TransformFlowStepDefinition { Function: { } reference } transform) { steps.Add(step); continue; }
+            var resolved = await ResolveFunctionAsync(reference with { Namespace = reference.Namespace ?? version.FlowId.Namespace }, consumer, ct);
+            steps.Add(FunctionStep(transform.Name, resolved, transform.Mapping ?? JsonSerializer.SerializeToElement("${transition.output}"), transform.DisplayName, transform.ArtifactOutput,
+                outputSchema: transform.Schema, schemaSnapshots: transform.FunctionSchemaSnapshots));
+        }
+        // Tool executors use their ordinary success event. Keep the author's completed connection.
+        var converted = graph.Steps.OfType<TransformFlowStepDefinition>().Where(s => s.Function is not null).Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+        var compiled = graph with { Steps = steps, Transitions = graph.Transitions.Select(t => converted.Contains(t.FromStep) && t.Event == "completed" ? t with { Event = "success" } : t).ToArray() };
+        return version with { Graph = compiled, DefinitionHash = FlowDefinitionHash.Compute(compiled) };
+    }
+
+    internal static ToolFlowStepDefinition FunctionStep(string name, Agentstration.Functions.Contracts.ResolvedTransformationFunction function,
+        JsonElement input, string? displayName = null, FlowStepArtifactOutputDefinition? artifactOutput = null, JsonElement? parameters = null, JsonElement? outputSchema = null,
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaSnapshots = null) => new()
+    {
+        Name = name, DisplayName = displayName, ArtifactOutput = artifactOutput,
+        FunctionBinding = function, FunctionParameters = parameters,
+        FunctionSchemaSnapshots = schemaSnapshots,
+        FunctionOutputSchema = outputSchema ?? function.OutputSchema,
+        Tool = new("agentstration.transformation.invoke", ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance),
+        ArgumentsMapping = JsonSerializer.SerializeToElement(new { input }, JsonOptions)
+    };
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    internal Task<IReadOnlyDictionary<string, SchemaBindingSnapshot>?> ResolveFunctionSchemasAsync(JsonElement inputSchema,
+        JsonElement parameters, ResourceScopeRef consumer, ResourceNamespace ns, string path, CancellationToken ct,
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? accepted = null, bool reuseAccepted = false) =>
+        new FunctionSchemaBindingSnapshotter(schemaBindingResolver).ResolveAsync(inputSchema, parameters, consumer, ns, path, ct, accepted, reuseAccepted);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
 
     public async Task ValidateUseAsync(ResourceScopeRef owner, FlowId id, string version, ResourceScopeRef consumer, Guid? expectedUid, CancellationToken ct)
@@ -253,11 +296,33 @@ public sealed class FlowService(
         IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
         if (graph is not null)
         {
+            if (graph.Steps.OfType<ToolFlowStepDefinition>().Any(step => step.FunctionBinding is not null
+                || step.FunctionParameters is not null || step.FunctionSchemaSnapshots is not null || step.FunctionOutputSchema is not null))
+                throw new FlowValidationException("function_binding_reserved", "Compiled function bindings are server-owned; author a Transform step instead.");
+            var pinnedSteps = new List<FlowStepDefinition>();
+            foreach (var step in graph.Steps)
+            {
+                if (step is not TransformFlowStepDefinition { Function: { } function } transform) { pinnedSteps.Add(step); continue; }
+                var contract = await ResolveFunctionAsync(function with { Namespace = function.Namespace ?? id.Namespace }, scopeRef, cancellationToken);
+                var names = Agentstration.Functions.Contracts.FunctionInvocationSchemas.SchemaParameters(contract.InputSchema);
+                if (transform.FunctionSchemas?.Keys.Any(name => !names.Contains(name, StringComparer.Ordinal)) == true
+                    || transform.Mapping is { ValueKind: JsonValueKind.Object } mapping && names.Any(name => mapping.TryGetProperty(name, out _)))
+                    throw new FlowValidationException("function_schema_configuration_invalid", "Schema arguments must be configured as static function schema bindings, outside the runtime mapping.");
+                var snapshots = await ResolveFunctionSchemasAsync(contract.InputSchema,
+                    JsonSerializer.SerializeToElement(transform.FunctionSchemas ?? new Dictionary<string, SchemaBinding>(), JsonOptions),
+                    scopeRef, id.Namespace, $"$.steps[{transform.Name}].functionSchemas", cancellationToken);
+                pinnedSteps.Add(transform with { Function = contract.Reference, FunctionInputSchema = contract.InputSchema,
+                    FunctionSchemaSnapshots = snapshots, Schema = transform.Schema ?? contract.OutputSchema });
+            }
+            graph = graph with { Steps = pinnedSteps };
             var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
                 .ResolveAsync(scopeRef, id, graph, cancellationToken);
             graph = await new FlowOutputContractSnapshotter(resourceReferenceResolver)
                 .ResolveAsync(scopeRef, id, resolved.Graph, cancellationToken);
-            schemaBindings = resolved.Snapshots;
+            schemaBindings = resolved.Snapshots.Concat(graph.Steps.OfType<TransformFlowStepDefinition>()
+                .SelectMany(step => step.FunctionSchemaSnapshots?.Values ?? [])
+                .Select(snapshot => new KeyValuePair<string, SchemaBindingSnapshot>(snapshot.Path, snapshot)))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         }
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
             graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes, schemaBindings)

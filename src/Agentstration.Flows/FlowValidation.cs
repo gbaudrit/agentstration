@@ -14,6 +14,7 @@ public sealed class FlowValidationException(string code, string message) : Argum
 {
     public string Code { get; } = code;
     public DataContractFailure? ContractFailure { get; init; }
+    public FlowCompositionDiagnostic? CompositionDiagnostic { get; init; }
 }
 
 public static class FlowValidator

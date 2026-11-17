@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge.Contracts;
 
@@ -6,6 +8,7 @@ public sealed record KnowledgeCharacterRange(long Start, long End);
 
 public sealed record KnowledgeReadRequest
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public string? SnapshotId { get; init; }
     public string? DocumentId { get; init; }
     public KnowledgeCharacterRange? Range { get; init; }
@@ -16,6 +19,7 @@ public sealed record KnowledgeReadRequest
 
 public sealed record KnowledgeRegexRequest
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
     public string? Pattern { get; init; }
     public bool IgnoreCase { get; init; } = true;
     public string? SnapshotId { get; init; }
@@ -25,10 +29,22 @@ public sealed record KnowledgeRegexRequest
     public int ContextCharacters { get; init; } = 160;
 }
 
+public sealed record KnowledgeDocumentQueryRequest
+{
+    public KnowledgeContributionSelection? Contribution { get; init; }
+    public string? SnapshotId { get; init; }
+    public string? Cursor { get; init; }
+    public string? PreparationId { get; init; }
+    public StorageQueryProfilePin? Profile { get; init; }
+    public JsonElement? Query { get; init; }
+    public int? PageSize { get; init; }
+}
+
 public sealed record KnowledgeStatusRequest(string? SnapshotId = null);
 public sealed record KnowledgeAccessDocument(string DocumentId, string MediaType, long Bytes, bool TextReadable);
 public sealed record KnowledgeReadChunk(string DocumentId, string MediaType, KnowledgeCharacterRange Range, string Content, bool EndOfDocument);
 public sealed record KnowledgeRegexMatch(string DocumentId, KnowledgeCharacterRange MatchRange, KnowledgeCharacterRange ReadRange, string Excerpt);
+public sealed record KnowledgeDocumentRecord(string DocumentId, string ArtifactId, int MemberOrdinal);
 public sealed record KnowledgeInputStatus(string BindingName, string? AcquisitionId, DateTimeOffset? AcquiredAt,
     bool Fresh, bool RefreshRequired, bool Required)
 {
@@ -39,6 +55,8 @@ public sealed record KnowledgeInputStatus(string BindingName, string? Acquisitio
 
 public sealed record KnowledgeAccessResult
 {
+    public KnowledgeContributionSelection? Contribution { get; init; }
+    public IReadOnlyDictionary<string, string> DocumentArtifacts { get; init; } = new Dictionary<string, string>();
     public required string State { get; init; }
     public required Guid SourceUid { get; init; }
     public string? SnapshotId { get; init; }
@@ -52,10 +70,14 @@ public sealed record KnowledgeAccessResult
     public string? NextCursor { get; init; }
     public DateTimeOffset? CursorExpiresAt { get; init; }
     public bool EndOfSelection { get; init; }
+    public StorageDocumentPage? DocumentPage { get; init; }
+    public StorageQueryProfilePin? QueryProfile { get; init; }
+    public IReadOnlyList<KnowledgeDocumentRecord> Records { get; init; } = [];
 }
 
 public sealed record KnowledgeAccessStatus
 {
+    public KnowledgeContentAvailability ContentAvailability { get; init; } = KnowledgeContentAvailability.Unknown;
     public required Guid SourceUid { get; init; }
     public required string State { get; init; }
     public required DateTimeOffset CheckedAt { get; init; }

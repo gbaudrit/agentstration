@@ -485,7 +485,11 @@ public sealed record AepConnectedServiceExportDescriptor(
     AepValueType Type = AepValueType.Text,
     AepValueProtection Protection = AepValueProtection.Standard,
     string? Format = null,
-    string? Description = null);
+    string? Description = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SourceInputId { get; init; }
+}
 
 public sealed record AepConnectedServiceTypeVersionDescriptor(
     string Version,
@@ -894,6 +898,13 @@ public static class AepDescriptorValidator
                     (version.Inputs ?? []).Select(value => value?.Id), errors);
                 ValidateConnectedServiceMembers(type.Id, version.Version, "export",
                     (version.Exports ?? []).Select(value => value?.Id), errors);
+                foreach (var export in version.Exports ?? [])
+                {
+                    if (export?.SourceInputId is not { } inputId) continue;
+                    var input = (version.Inputs ?? []).FirstOrDefault(i => i?.Id == inputId);
+                    if (input is null || input.Type != export.Type || input.Protection != export.Protection || input.Format != export.Format)
+                        errors.Add($"Connected Service type '{type.Id}' export '{export.Id}' must map an existing input with the same type, protection and format.");
+                }
                 if (version.OperationDiscovery is { } discovery)
                 {
                     if (string.IsNullOrWhiteSpace(discovery.FlowName)

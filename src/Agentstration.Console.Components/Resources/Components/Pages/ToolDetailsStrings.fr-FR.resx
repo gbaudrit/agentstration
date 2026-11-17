@@ -87,4 +87,5 @@
   <data name="OpenReturnedArtifact"><value>Ouvrir l’artefact</value></data>
   <data name="AcquisitionTargetStale" xml:space="preserve"><value>Une nouvelle découverte est disponible. Ouvre la source, réconcilie la cible dans Découverte, puis relance le Tool. Si l’opération a changé, lance une nouvelle acquisition et crée un Tool à partir de celle-ci.</value></data>
   <data name="NewDefinition" xml:space="preserve"><value>Nouvelle définition</value></data>
+  <data name="DataSourceQueryFailed" xml:space="preserve"><value>La requête de Data Source a échoué. Vérifiez sa version publiée, ses arguments, son contrat et les accès.</value></data>
 </root>

@@ -38,7 +38,7 @@ public sealed partial class AwpAssignmentExecutorTests
         };
         var graph = new FlowGraphDefinition { EntryStep = "input", Steps = [
             new InputFlowStepDefinition { Name = "input" },
-            new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
+            new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement(shape == "invalid-mapping" ? "${input.missing}" : "${transition.output}") },
             new OutputFlowStepDefinition { Name = "completed", Outcome = FlowOutputOutcome.Success },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("start", "input", "completed", "process"), new("done", "process", "completed", "completed"), new("failed", "process", "error", "failure")] };
@@ -57,7 +57,7 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactTransformationAdaptsGenericToolInputAndPreparesAllResultsBeforePublishing()
     {
-        var processing = new ArtifactTransformFlowStepDefinition { Name = "process",
+        var processing = new ForeachArtifactsFlowStepDefinition { Name = "process",
             ArtifactsMapping = JsonSerializer.SerializeToElement("${input}"),
             ProcessingInputMapping = JsonSerializer.SerializeToElement(new { text = "${input.content}", language = "fr" }),
             ResultMapping = JsonSerializer.SerializeToElement("${input.answer}") };
@@ -88,7 +88,7 @@ public sealed partial class AwpAssignmentExecutorTests
     [TestMethod]
     public async Task ArtifactProcessingFailureCannotPublishAPartialResult()
     {
-        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ArtifactTransformFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
+        var graph = new FlowGraphDefinition { EntryStep = "process", Steps = [new ForeachArtifactsFlowStepDefinition { Name = "process", ArtifactsMapping = JsonSerializer.SerializeToElement("${input}") },
             new OutputFlowStepDefinition { Name = "failure", Outcome = FlowOutputOutcome.Error }],
             Transitions = [new("failed", "process", "error", "failure")] };
         var handler = new GraphHandler(TestNow) { ChildOutcome = "error" };
@@ -1404,6 +1404,40 @@ public sealed partial class AwpAssignmentExecutorTests
         Assert.AreEqual("Here are the fixture alerts.", result.Output?.GetString());
         Assert.IsTrue(handler.Events.Any(value => value.Kind == AwpExecutionEventKind.ResponseDelta
             && value.Payload?.GetProperty("content").GetString() == "Here are the fixture alerts."));
+    }
+
+    [TestMethod]
+    public async Task AgentReceivesAnOptionalQueryToolContractAndCallsItWithEmptyArguments()
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"request":{"type":"object","properties":{"acquisitionId":{"type":"string"},"pageSize":{"type":"integer"},"cursor":{"type":"string"}},"additionalProperties":false}},"required":[],"additionalProperties":false}""");
+        const string description = "Read saved alerts. Call with {} to use the latest retained acquisition; all inputs are optional.";
+        var modelCalls = 0;
+        var toolCalls = 0;
+        var handler = new GraphHandler(TestNow)
+        {
+            ModelResponseFactory = request =>
+            {
+                var tool = request.Tools!.Single();
+                Assert.AreEqual("status-en-cours", tool.Name);
+                Assert.AreEqual(description, tool.Description);
+                Assert.IsTrue(JsonElement.DeepEquals(schema, tool.Parameters));
+                if (++modelCalls == 1)
+                    return [new AwpModelToolCallContent("query-call", tool.Name, JsonSerializer.SerializeToElement(new { }))];
+                return [new AwpModelTextContent("Fixture waste collection alerts.")];
+            },
+            AgentToolResultFactory = request =>
+            {
+                toolCalls++;
+                Assert.AreEqual("{}", request.Arguments!.Value.GetRawText());
+                return JsonSerializer.SerializeToElement(new { alerts = new[] { "Fixture collection alert" } });
+            }
+        };
+        var agent = AgentMaterial() with
+        { AgentName = "assistant", Tools = [ToolMaterial("status-en-cours") with { Description = description, InputSchema = schema }] };
+        var (result, _) = await ExecuteGraphAsync(AgentAnswerGraph(), JsonSerializer.SerializeToElement(new { }), handler, agentMaterial: agent);
+        Assert.AreEqual("Fixture waste collection alerts.", result.Output?.GetString());
+        Assert.AreEqual(1, toolCalls);
+        Assert.AreEqual(2, modelCalls);
     }
 
     [TestMethod]

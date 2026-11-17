@@ -33,3 +33,10 @@
 .artifact-header ::deep p {
     overflow-wrap: anywhere;
 }
+
+.schema-evidence code { white-space: normal; overflow-wrap: anywhere; }
+
+.artifact-records { min-width: 0; }
+.artifact-records code { white-space: normal; overflow-wrap: anywhere; }
+.artifact-records pre { max-width: 100%; overflow-x: auto; }
+.artifact-records .table-scroll { max-width: 100%; overflow-x: auto; }

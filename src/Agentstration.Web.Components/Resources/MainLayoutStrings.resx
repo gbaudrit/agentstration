@@ -42,4 +42,5 @@
   <data name="Command.CreateStorage" xml:space="preserve"><value>Create Storage</value></data>
   <data name="Nav.StorageTypes" xml:space="preserve"><value>Storage types</value></data>
   <data name="Command.CreateStorageType" xml:space="preserve"><value>Create Storage type</value></data>
+  <data name="Nav.TransformationFunctions" xml:space="preserve"><value>Transformation functions</value></data>
 </root>

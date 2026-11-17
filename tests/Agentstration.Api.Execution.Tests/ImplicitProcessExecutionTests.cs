@@ -51,7 +51,7 @@ public sealed class ImplicitProcessExecutionTests
             {
                 EntryStep = "input",
                 Steps = [new InputFlowStepDefinition { Name = "input" },
-                    new TransformFlowStepDefinition { Name = "partition", DisplayName = "Process fragments", Processing = new()
+                    new ForeachFlowStepDefinition { Name = "partition", DisplayName = "Process fragments", Partition = new()
                         { Partition = FlowProcessPartition.TextChunks, UnitSize = 2, MaximumConcurrency = 2, MaximumUnits = 3 } },
                     new ToolFlowStepDefinition { Name = "body", Tool = new(AgentstrationToolProvider.ToolResourceName("test.process.unit"), ScopeRef: ResourceScopeRef.Instance),
                         ArgumentsMapping = JsonSerializer.SerializeToElement(new { text = "${input}" }) },
@@ -73,7 +73,13 @@ public sealed class ImplicitProcessExecutionTests
             var id = value.GetProperty("id").GetString()!;
             var assignments = factory.Services.GetRequiredService<RuntimeWorkerAssignmentService>();
             var queued = await assignments.GetByTargetExactAsync(ownerScope, RuntimeAssignmentTargetKind.FlowRun, id, default);
-            Assert.AreEqual(RuntimeExecutionMaterialVersions.CoordinatedProcesses, queued!.Value.ExecutionMaterialVersion);
+            for (var attempt = 0; queued is null && attempt < 200; attempt++)
+            {
+                await Task.Delay(25);
+                queued = await assignments.GetByTargetExactAsync(ownerScope, RuntimeAssignmentTargetKind.FlowRun, id, default);
+            }
+            Assert.IsNotNull(queued, "The accepted Flow Run must publish its worker assignment before the material version is inspected.");
+            Assert.AreEqual(RuntimeExecutionMaterialVersions.CoordinatedProcesses, queued.Value.ExecutionMaterialVersion);
             var legacy = await assignments.ClaimNextAsync(new(Guid.NewGuid()), new(Guid.NewGuid()), "microsoft-agent-framework",
                 new HashSet<string> { "1.0" }, new HashSet<string> { "1.0" }, 1, default);
             Assert.IsNull(legacy, "A legacy Worker must not claim material that introduces processing semantics it cannot interpret.");

@@ -210,6 +210,8 @@ public static partial class AepServerExtensions
             capabilities[AepCapabilityNames.ConnectedServiceTypes] = new(AepProtocol.ConnectedServiceTypesCapabilityVersion);
         if (options.StorageTypes.Count > 0)
             capabilities[AepStorageProtocol.Capability] = new(AepStorageProtocol.Version, AepStorageProtocol.BindingPath);
+        if (options.StorageTypes.Any(t => t.Versions.Any(v => v.Documents is not null)))
+            capabilities[AepStorageProtocol.DocumentCapability] = new("1.0");
         if (options.ConnectedServiceOperationTypes.Count > 0)
             capabilities[AepCapabilityNames.ConnectedServiceOperationTypes] = new(
                 AepProtocol.ConnectedServiceOperationTypesCapabilityVersion);

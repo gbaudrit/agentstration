@@ -50,6 +50,8 @@ public sealed record AspReply<T>(string AspVersion, string RequestId, T? Data = 
 
 public sealed class AspException(string code, string message, string? sessionRef = null) : Exception(message)
 {
+    public string? SchemaPath { get; init; }
+    public string? SchemaKeyword { get; init; }
     public string Code { get; } = code;
     public string? SessionRef { get; } = sessionRef;
 }

@@ -1,9 +1,11 @@
 using Agentstration.Infrastructure.Artifacts;
+using Agentstration.Infrastructure.DataSources;
 using Agentstration.Infrastructure.Assistant;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.ResourcePlanning;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,7 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<DateTimeMcpTool>(services);
+        AddInternalTool<Agentstration.Infrastructure.Functions.TransformationInvokeTool>(services);
         AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
         services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
         services.AddSingleton<ConnectedServiceBoundValues>();
@@ -67,9 +70,19 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
+        AddInternalTool<StorageDocumentGetMcpTool>(services);
+        AddInternalTool<StorageDocumentPutMcpTool>(services);
+        AddInternalTool<StorageDocumentDeleteMcpTool>(services);
+        AddInternalTool<StorageDocumentQueryMcpTool>(services);
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceDocumentQueryDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceDocumentQueryMcpTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceQueryToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceQueryMcpTool>();
+        AddInternalTool<KnowledgeDocumentQueryMcpTool>(services);
         AddInternalTool<KnowledgeContentReadMcpTool>(services);
         AddInternalTool<KnowledgeContentRegexMcpTool>(services);
         AddInternalTool<KnowledgeContentStatusMcpTool>(services);
+        AddInternalTool<KnowledgeDescribeMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(

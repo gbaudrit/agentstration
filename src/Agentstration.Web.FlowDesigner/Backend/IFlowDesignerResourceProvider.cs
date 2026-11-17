@@ -6,6 +6,12 @@ using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Web.FlowDesigner.Backend;
 
+public sealed record FlowDesignerFunction(string DisplayName, Agentstration.Functions.Contracts.ResolvedTransformationFunction Function)
+{
+    public string? Description { get; init; }
+    public bool IsBuiltIn { get; init; }
+}
+
 public sealed record FlowDesignerAgent(string Name, string DisplayName, ResourceScopeRef ScopeRef)
 {
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
@@ -45,6 +51,8 @@ public sealed record FlowDesignerSchemaVersion(
 
 public interface IFlowDesignerResourceProvider
 {
+    Task<IReadOnlyList<FlowDesignerFunction>> GetFunctionsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<FlowDesignerFunction>>([]);
     Task<IReadOnlyList<FlowDesignerAgent>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowDesignerFlow>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<FlowDesignerFlow>>([]);

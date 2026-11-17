@@ -107,6 +107,14 @@ public sealed partial class OpenApiService(
             var responseMediaType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? "application/octet-stream";
             if (!options.AllowedResponseMediaTypes.Contains(responseMediaType, StringComparer.OrdinalIgnoreCase))
                 throw Error("openapi_response_content_type_denied", $"Response content type '{responseMediaType}' is not allowed.");
+            if (selector.ResponseStatus is { } selectedStatus)
+            {
+                var choices = ResponseSchemas(contract, operation);
+                var declared = DeclaredResponseStatus(contract, operation, (int)response.StatusCode);
+                if (selectedStatus != declared || !string.Equals(ResponseMediaTypeOf(selector.ResponseMediaType), responseMediaType, StringComparison.OrdinalIgnoreCase)
+                    || !choices.Any(c => c.Status == selectedStatus && string.Equals(c.MediaType, selector.ResponseMediaType, StringComparison.OrdinalIgnoreCase)))
+                    throw Error("openapi_response_selection_mismatch", "The response differs from the selected response contract.");
+            }
             var responseBytes = await ReadBoundedAsync(response.Content, options.MaximumResponseBytes, "openapi_response_too_large", cancellationToken);
             pages.Add(((int)response.StatusCode, responseMediaType, responseBytes));
             var next = NextLink(response);

@@ -26,10 +26,14 @@ public sealed class OpenApiConnectedServiceAcquisition(
                 throw new OpenApiExtensionException("openapi_credential_invalid", "The protected credential is invalid.");
             var definition = request.Definition;
             var selector = new OpenApiOperationSelector(Text("contractUri"), Text("contractDigest"), Text("server"),
-                Text("operationId"), Text("method"), Text("path"));
+                Text("operationId"), Text("method"), Text("path"))
+            {
+                ResponseStatus = ResponseChoice("status"),
+                ResponseMediaType = ResponseChoice("mediaType")
+            };
             var result = await service.InvokeAsync(selector, request.Parameters, null, null, 1, request.CorrelationId,
                 cancellationToken, token, baseUri, requireReadOnly: true);
-            if (result.MediaType != "application/json")
+            if (result.MediaType != "application/json" && !result.MediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase))
                 throw new OpenApiExtensionException("openapi_acquisition_json_required", "Acquisition requires a JSON response.");
             var bytes = Convert.FromBase64String(result.ContentBase64);
             if (bytes.Length > AepConnectedServiceAcquisitionProtocol.MaximumResponseBytes - 64)
@@ -39,6 +43,9 @@ public sealed class OpenApiConnectedServiceAcquisition(
                 throw new OpenApiExtensionException("openapi_sensitive_response", "The response contains protected connection material.");
             return new(output);
 
+            string? ResponseChoice(string name) => definition.TryGetProperty("responseShape", out var shape)
+                && shape.TryGetProperty("x-agentstration-response", out var choice) && choice.TryGetProperty(name, out var value)
+                    ? value.GetString() : null;
             string Text(string name) => definition.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
                 && value.GetString() is { Length: > 0 } text ? text
                 : throw new OpenApiExtensionException("openapi_selector_invalid", "The saved selector is invalid.");

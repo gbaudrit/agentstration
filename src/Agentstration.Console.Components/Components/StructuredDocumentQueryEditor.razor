@@ -1,0 +1,67 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.Components.Pages.StorageStrings> Localizer
+<div class="form-grid" data-testid="@TestId">
+    <label><span>@T("Documents.Profile")</span><select value="@profileIndex" @onchange="ChangeProfileAsync" disabled="@Busy" data-testid="@($"{TestId}-profile")">
+        @for (var i = 0; i < Description.QueryProfiles.Count; i++) { var p = Description.QueryProfiles[i]; <option value="@i">@p.Id / @p.Version · @p.Encoding</option> }
+    </select></label>
+    <label><span>@T("Documents.RequestPageSize")</span><input type="number" min="1" max="@Description.Policy.MaximumPageSize" @bind="pageSize" @bind:after="ResetAsync" disabled="@Busy" data-testid="@($"{TestId}-page-size")" /></label>
+    <label class="form-span-2"><span>@T("Documents.QueryPayload")</span><textarea class="form-code-editor" rows="8" maxlength="8192" @bind="Payload" @bind:event="oninput" @bind:after="ResetAsync" disabled="@Busy" data-testid="@($"{TestId}-payload")"></textarea></label>
+    @if (invalid) { <p class="form-alert form-alert-danger form-span-2" role="alert">@T("Documents.QueryInputInvalid")</p> }
+    @if (Description.QueryProfiles.Count == 0) { <p role="status">@T("Documents.Error.Profile")</p> }
+    @if (!CanExecute) { <p class="form-span-2" role="status">@T("Documents.ExecutePermissionRequired")</p> }
+    <div class="form-actions form-span-2">
+        <button type="button" class="button-primary" disabled="@(Busy || !CanExecute || !Description.Policy.Query || SelectedProfile is null)" @onclick="RunAsync" data-testid="@($"{TestId}-run")">@T("Documents.RunQuery")</button>
+        @if (HasNextPage) { <button type="button" class="button-secondary" disabled="@(Busy || !CanExecute)" @onclick="() => NextRequested.InvokeAsync()" data-testid="@($"{TestId}-next")">@T("Documents.Next")</button> }
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired] public StorageDocumentDescription Description { get; set; } = null!;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool CanExecute { get; set; } = true;
+    [Parameter] public bool HasNextPage { get; set; }
+    [Parameter] public string TestId { get; set; } = "document-query";
+    [Parameter] public EventCallback<StructuredDocumentQueryEditorRequest> RunRequested { get; set; }
+    [Parameter] public EventCallback NextRequested { get; set; }
+    [Parameter] public EventCallback ResetRequested { get; set; }
+    [Parameter] public EventCallback<StorageQueryProfilePin?> ProfileChanged { get; set; }
+    private StorageQueryProfilePin? notifiedProfile;
+    private StorageQueryProfilePin? SelectedProfile => profileIndex >= 0 && profileIndex < Description.QueryProfiles.Count ? Description.QueryProfiles[profileIndex] : null;
+    private int profileIndex, pageSize = 50;
+    [Parameter] public string Payload { get; set; } = "{}";
+    [Parameter] public EventCallback<string> PayloadChanged { get; set; }
+    private bool initialized, invalid;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!initialized) { initialized = true; pageSize = Math.Min(50, Description.Policy.MaximumPageSize); }
+        if (SelectedProfile is null) profileIndex = 0;
+        await NotifyProfileAsync();
+    }
+    private async Task NotifyProfileAsync()
+    {
+        if (notifiedProfile == SelectedProfile) return;
+        notifiedProfile = SelectedProfile;
+        await ProfileChanged.InvokeAsync(SelectedProfile);
+    }
+    private async Task ChangeProfileAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out profileIndex)) profileIndex = 0;
+        await NotifyProfileAsync();
+        await ResetAsync();
+    }
+    private async Task ResetAsync() { invalid = false; await PayloadChanged.InvokeAsync(Payload); await ResetRequested.InvokeAsync(); }
+    private async Task RunAsync()
+    {
+        if (Busy || !CanExecute || !Description.Policy.Query || SelectedProfile is not { } profile) return;
+        JsonElement query;
+        try
+        {
+            using var json = JsonDocument.Parse(Payload);
+            query = json.RootElement.Clone();
+            if (query.ValueKind != JsonValueKind.Object || JsonSerializer.SerializeToUtf8Bytes(query).Length > 8192
+                || pageSize < 1 || pageSize > Description.Policy.MaximumPageSize) throw new JsonException();
+        }
+        catch (JsonException) { invalid = true; return; }
+        invalid = false;
+        await RunRequested.InvokeAsync(new(profile, query, pageSize));
+    }
+    private string T(string key) => Localizer[key];
+}

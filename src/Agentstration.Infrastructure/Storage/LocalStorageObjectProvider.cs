@@ -1,16 +1,15 @@
 using System.Text.Json;
 using Agentstration.Asp.Abstractions;
 using Agentstration.Storage.Contracts;
+using Agentstration.Storage;
 
 namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Atomic bounded local content and idempotency state, partitioned by exact Storage UID.</summary>
-public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProvider clock)
+public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProvider clock, StorageContentOptions? options = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private const int MaximumObjects = 1024;
-    private const int MaximumReceipts = 512;
-    private const int MaximumStoreBytes = 64 * 1024 * 1024;
+    private readonly StorageContentOptions limits = options ?? new();
     private sealed record Entry(AspProviderObject Item, byte[] Content);
     private sealed record Receipt(string Fingerprint, AspProviderObject Item, DateTimeOffset Expires);
     private sealed record State(Dictionary<string, Entry> Objects, Dictionary<string, Receipt> Receipts);
@@ -20,7 +19,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
     {
         Validate(store: storage, context);
         AspValidation.Require(context.Policy.CanWrite, "forbidden", "Write is not authorized.");
-        AspValidation.Require(request.Content.Length <= context.Policy.MaxWriteBytes, "limit_exceeded", "Write limit exceeded.");
+        AspValidation.Require(request.Content.Length <= Math.Min(context.Policy.MaxWriteBytes, Math.Min(limits.MaximumWriteBytes, limits.MaximumObjectBytes)), "limit_exceeded", "Write limit exceeded.");
         request = request with { Content = request.Content.ToArray() };
         var directory = paths.EnsureDirectoryFor(storage);
         await using var lease = await LockAsync(directory, cancellationToken);
@@ -40,12 +39,12 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         }
         foreach (var expired in state.Receipts.Where(r => r.Value.Expires <= clock.GetUtcNow()).Select(r => r.Key).ToArray())
             state.Receipts.Remove(expired);
-        AspValidation.Require(state.Receipts.Count < MaximumReceipts, "capacity_exceeded", "The write receipt capacity has been reached.");
+        AspValidation.Require(state.Receipts.Count < limits.LocalMaximumReceipts, "capacity_exceeded", "The write receipt capacity has been reached.");
         state.Objects.TryGetValue(request.Key, out var current);
         AspValidation.Require(request.ExpectedVersion is null ? current is null : current?.Item.Version == request.ExpectedVersion,
             "conflict", "The object exists or the selected version is stale.");
-        AspValidation.Require((current is not null || state.Objects.Count < MaximumObjects)
-            && state.Objects.Values.Sum(v => v.Content.LongLength) - (current?.Content.Length ?? 0) + request.Content.Length <= MaximumStoreBytes,
+        AspValidation.Require((current is not null || state.Objects.Count < limits.LocalMaximumObjects)
+            && state.Objects.Values.Sum(v => v.Content.LongLength) - (current?.Content.Length ?? 0) + request.Content.Length <= limits.LocalMaximumStoreBytes,
             "capacity_exceeded", "The local store capacity has been reached.");
         var item = new AspProviderObject(request.Key, Guid.NewGuid().ToString("N"), request.Content.Length,
             AspValidation.Digest(request.Content));
@@ -82,7 +81,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         var page = state.Objects.Values.Select(e => e.Item)
             .Where(item => AspValidation.Allows(context.Policy, item.Key) && item.Key.StartsWith(prefix, StringComparison.Ordinal)
                 && (after is null || string.CompareOrdinal(item.Key, after) > 0))
-            .OrderBy(item => item.Key, StringComparer.Ordinal).Take(limit + 1).ToArray();
+            .OrderBy(item => item.Key, StringComparer.Ordinal).Take(limit == int.MaxValue ? limit : limit + 1).ToArray();
         return new(page.Take(limit).ToArray(), page.Length > limit ? page[limit - 1].Key : null);
     }
 
@@ -97,7 +96,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         string key, string? version, long offset, int maximumBytes, CancellationToken cancellationToken)
     {
         AspValidation.Require(context.Policy.CanRead, "forbidden", "Read is not authorized.");
-        AspValidation.Require(offset >= 0 && maximumBytes > 0 && maximumBytes <= context.Policy.MaxReadBytes,
+        AspValidation.Require(offset >= 0 && maximumBytes > 0 && maximumBytes <= Math.Min(context.Policy.MaxReadBytes, limits.MaximumReadBytes),
             "limit_exceeded", "Invalid read range.");
         var entry = await FindAsync(storage, context, key, version, cancellationToken);
         AspValidation.Require(offset <= entry.Content.Length, "invalid_request", "Offset exceeds the object length.");
@@ -105,17 +104,20 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
         return new(entry.Item, content, offset + content.Length == entry.Content.Length);
     }
 
-    private static async Task<State> ReadStateAsync(string directory, CancellationToken cancellationToken)
+    private async Task<State> ReadStateAsync(string directory, CancellationToken cancellationToken)
     {
         var path = LocalStoragePaths.Checked(Path.Combine(directory, "objects.json"));
         if (!File.Exists(path)) return new(new(StringComparer.Ordinal), new(StringComparer.Ordinal));
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
             65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        AspValidation.Require(stream.Length <= MaximumStoreBytes * 2L, "storage_state_invalid", "The local storage state exceeds its bound.");
+        // The byte quota counts decoded content; state also contains base64 and bounded metadata/receipts.
+        var maximumStateBytes = limits.LocalMaximumStoreBytes * 2m
+            + ((long)limits.LocalMaximumObjects + limits.LocalMaximumReceipts) * 4096 + 65536;
+        AspValidation.Require(stream.Length <= maximumStateBytes, "storage_state_invalid", "The local storage state exceeds its bound.");
         var state = await JsonSerializer.DeserializeAsync<State>(stream, Json, cancellationToken)
             ?? throw new AspException("storage_state_invalid", "The local storage state is invalid.");
         AspValidation.Require(state.Objects is not null && state.Receipts is not null
-            && state.Objects.Count <= MaximumObjects && state.Receipts.Count <= MaximumReceipts,
+            && state.Objects.Count <= limits.LocalMaximumObjects && state.Receipts.Count <= limits.LocalMaximumReceipts,
             "storage_state_invalid", "The local storage inventory is invalid.");
         foreach (var (key, entry) in state.Objects)
         {
@@ -172,7 +174,7 @@ public sealed class LocalStorageObjectProvider(LocalStoragePaths paths, TimeProv
 
     private static void Validate(StorageRevisionReference store, AspAccessContext context)
     {
-        AspValidation.Context(context);
+        StorageContentValidation.Context(context);
         AspValidation.Require(context.Store.StoreId == store.StorageUid.ToString("N") && context.Store.Revision == store.BindingDigest,
             "forbidden", "The provider context does not match the exact logical Storage.");
     }

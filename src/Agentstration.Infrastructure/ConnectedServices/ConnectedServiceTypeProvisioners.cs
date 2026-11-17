@@ -218,7 +218,7 @@ public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
                 input.Format, input.Description)).ToArray(),
             version.Exports.Select(export => new ConnectedServiceExportDescriptor(
                 export.Id, Map(export.Type), Map(export.Protection),
-                export.Format, export.Description)).ToArray(),
+                export.Format, export.Description, export.SourceInputId)).ToArray(),
             version.Deprecated)
         {
             OperationDiscovery = discovery

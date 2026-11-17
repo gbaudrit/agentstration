@@ -19,6 +19,7 @@ public sealed class StorageEditorModel
     public List<StorageExportBinding> Bindings { get; private set; } = [];
     public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
     public JsonElement Envelope { get; set; } = JsonSerializer.SerializeToElement(new { });
+    public List<StorageDocumentCollection> Collections { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
 
     public void SelectType(StorageTypeChoice? choice)
@@ -26,6 +27,7 @@ public sealed class StorageEditorModel
         Type = choice?.Reference;
         Configuration = JsonSerializer.SerializeToElement(new { });
         Envelope = JsonSerializer.SerializeToElement(new { });
+        Collections.Clear();
         SelectService(null);
     }
 
@@ -49,20 +51,33 @@ public sealed class StorageEditorModel
 
     public StorageProperties Properties() => new()
     {
-        DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-        Enabled = Enabled, Type = Type ?? throw new InvalidOperationException("Select a Storage type."),
-        ConnectedService = ConnectedService, ConnectedServiceType = ConnectedServiceType,
-        Bindings = Bindings.ToArray(), Configuration = Configuration.Clone(), Envelope = Envelope.Clone(),
+        DisplayName = DisplayName.Trim(),
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+        Enabled = Enabled,
+        Type = Type ?? throw new InvalidOperationException("Select a Storage type."),
+        ConnectedService = ConnectedService,
+        ConnectedServiceType = ConnectedServiceType,
+        Bindings = Bindings.ToArray(),
+        Configuration = Configuration.Clone(),
+        Envelope = Envelope.Clone(),
+        Collections = Collections.ToArray(),
         UsePolicy = new() { Grants = UseGrants.ToArray() }
     };
 
     public static StorageEditorModel From(StorageResource resource) => new()
     {
-        Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description,
-        Enabled = resource.Definition.Enabled, Type = resource.Definition.Type,
-        ConnectedService = resource.Definition.ConnectedService, ConnectedServiceType = resource.Definition.ConnectedServiceType,
-        Bindings = resource.Definition.Bindings.ToList(), Configuration = resource.Definition.Configuration.Clone(),
-        Envelope = resource.Definition.Envelope.Clone(), UseGrants = resource.Definition.UsePolicy.Grants.ToList()
+        Name = resource.Name,
+        DisplayName = resource.Definition.DisplayName,
+        Description = resource.Definition.Description,
+        Enabled = resource.Definition.Enabled,
+        Type = resource.Definition.Type,
+        ConnectedService = resource.Definition.ConnectedService,
+        ConnectedServiceType = resource.Definition.ConnectedServiceType,
+        Bindings = resource.Definition.Bindings.ToList(),
+        Configuration = resource.Definition.Configuration.Clone(),
+        Collections = resource.Definition.Collections.ToList(),
+        Envelope = resource.Definition.Envelope.Clone(),
+        UseGrants = resource.Definition.UsePolicy.Grants.ToList()
     };
 }
 
@@ -70,8 +85,11 @@ public sealed record StorageTypeChoice(StorageTypeResource Resource, StorageType
 {
     public StorageTypeReference Reference => new()
     {
-        Type = new(Resource.Name, Resource.ScopeRef!.Value, Resource.Namespace), TypeUid = Resource.Uid,
-        Version = Version.Version, SchemaDigest = Version.SchemaDigest, ContractDigest = Version.ContractDigest
+        Type = new(Resource.Name, Resource.ScopeRef!.Value, Resource.Namespace),
+        TypeUid = Resource.Uid,
+        Version = Version.Version,
+        SchemaDigest = Version.SchemaDigest,
+        ContractDigest = Version.ContractDigest
     };
     public string Key => JsonSerializer.Serialize(Reference);
     public bool Matches(StorageTypeReference? reference) => reference is not null && Key == JsonSerializer.Serialize(reference);

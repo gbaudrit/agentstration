@@ -148,4 +148,11 @@
   <data name="Discovery.State.TimedOut" xml:space="preserve"><value>Timed out</value></data>
   <data name="Http.DiscoveryHelp"><value>The HTTP URL is an example used to discover one GET operation and its query parameters. Discovery sends no request. Example values are discarded; configure acquisition values independently on each Data Source. Repeated query parameter names are not supported.</value></data>
   <data name="Http.SampleUrlHelp"><value>Enter the complete example HTTP(S) request URL, including its query parameters. Their values are used only as examples and are not copied to the operation or Data Source.</value></data>
+<data name="SchemaCandidate.Title" xml:space="preserve"><value>Declared response schema</value></data>
+<data name="SchemaCandidate.Help" xml:space="preserve"><value>Inspect the pinned OpenAPI evidence and effective acquisition contract. Creating a draft neither publishes it nor changes a consumer. Publish explicitly, then adopt its exact version in a Data Source or collection.</value></data>
+<data name="SchemaCandidate.Name" xml:space="preserve"><value>Schema technical name</value></data>
+<data name="SchemaCandidate.CreateDraft" xml:space="preserve"><value>Create Schema draft</value></data>
+<data name="SchemaCandidate.Unsupported" xml:space="preserve"><value>This candidate cannot be exported with the supported acquisition schema profile. Its original evidence remains available.</value></data>
+<data name="SchemaCandidate.Failed" xml:space="preserve"><value>The Schema draft could not be created. Check the name, permissions and supported schema constructs.</value></data>
+<data name="SchemaCandidate.Library" xml:space="preserve"><value>Inspect or reuse a published Schema</value></data>
 </root>

@@ -5,9 +5,10 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
-using Agentstration.Storage.Contracts;
-using Agentstration.Storage;
+using Agentstration.Schemas;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Knowledge;
 
@@ -25,7 +26,10 @@ public sealed record KnowledgeDurableArtifactEvidence(
     string MediaType,
     long Length,
     string Sha256,
-    IReadOnlyDictionary<string, string> Provenance);
+    IReadOnlyDictionary<string, string> Provenance)
+{
+    public ResolvedDataContract? DataContract { get; init; }
+}
 
 public interface IKnowledgeSnapshotArtifactResolver
 {
@@ -124,9 +128,9 @@ public sealed class KnowledgeSnapshotService(
                 && pinnedScope != source.Value.ScopeRef)
             throw Error("knowledge_snapshot_source_mismatch",
                 "The selected Knowledge Snapshot belongs to another KnowledgeSource.");
-        _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(context.WorkspaceId,
-            snapshot.Value.Artifacts.Where(value => value.Content is null).Select(value => value.ArtifactId).ToArray(), cancellationToken));
-        await ValidateContentAsync(snapshot.Value, cancellationToken);
+        var state = await LoadObservedAsync(scopeRef, source.Value, cancellationToken);
+        if (state?.Value.RetiredSnapshots.ContainsKey(snapshot.Value.Uid) == true)
+            throw Error("knowledge_snapshot_content_retired", "The Snapshot content has been retired.");
         return snapshot.Value;
     }
 
@@ -175,16 +179,9 @@ public sealed class KnowledgeSnapshotService(
             Uid = snapshot.KnowledgeSourceUid
         }, cancellationToken);
         if (observed?.Value.RetiredSnapshots.TryGetValue(snapshot.Uid, out var retiredAt) == true)
-            return new(snapshot with { ContentRetiredAt = retiredAt }, KnowledgeSnapshotLifecycleState.Retired);
-        try
         {
-            _ = await InWorkspaceAsync(() => artifacts.ResolveAsync(scopeRef.TargetId!.Value,
-                snapshot.Artifacts.Where(value => value.Content is null).Select(value => value.ArtifactId).ToArray(), cancellationToken));
-            await ValidateContentAsync(snapshot, cancellationToken);
-        }
-        catch (Exception exception) when (exception is KnowledgeSnapshotException or StorageException)
-        {
-            return new(snapshot, KnowledgeSnapshotLifecycleState.Unavailable);
+            return new(snapshot with { ContentRetiredAt = retiredAt }, KnowledgeSnapshotLifecycleState.Retired)
+            { ContentAvailability = KnowledgeContentAvailability.Retired };
         }
         if (observed?.Value.RetiringSnapshots.Contains(snapshot.Uid) == true)
             return new(snapshot, KnowledgeSnapshotLifecycleState.Retiring);

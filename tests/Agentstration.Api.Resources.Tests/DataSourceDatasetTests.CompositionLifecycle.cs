@@ -53,6 +53,9 @@ public sealed partial class DataSourceDatasetTests
         var history = factory.Services.GetRequiredService<SourceHistoryMaintenance>();
         var first = await projections.StartAsync(id, new(), default);
         var firstAcquisition = (await acquisitions.GetAsync(source.Value.Namespace, first.Value.Inputs.Single().AcquisitionId, default)).Value;
+        Assert.IsLessThan(firstAcquisition.Dataset!.Definition.Rule.MaximumWriteBytes,
+            firstAcquisition.Publication!.Target.Policy.MaximumWriteBytes,
+            "Retirement must preserve the publication's effective budget when the consumer rule is wider.");
         var firstSnapshot = await snapshots.GetAsync(new(first.Value.SnapshotName!), default);
         var originalSnapshot = JsonSerializer.Serialize(firstSnapshot.Snapshot);
         var retained = firstSnapshot.Snapshot.Artifacts.Single().Content!;
@@ -368,14 +371,15 @@ public sealed partial class DataSourceDatasetTests
     {
         var content = await services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
-        return json.RootElement.Clone();
+        return json.RootElement[0].Clone();
     }
 
     private static void ConfigureCompositionLifecycleClock(IServiceCollection services, NativeAccessClock clock)
     {
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStorageObjectProvider>(p, clock));
         services.AddSingleton<IStorageContentGateway>(p => ActivatorUtilities.CreateInstance<StorageContentGateway>(p, clock));
-        services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+        services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
+        services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock));
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
         services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
         services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));

@@ -1,9 +1,9 @@
 using Agentstration.Artifacts;
 using Agentstration.Artifacts.Contracts;
-using Agentstration.Flows;
-using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.DataSources;
 using Agentstration.DataSources.Contracts;
+using Agentstration.Flows;
+using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge;
 using Agentstration.Knowledge.Contracts;
@@ -68,7 +68,9 @@ public sealed class SourceHistoryMaintenance(IResourceStore resources, ICurrentR
                     continue;
                 }
                 var target = DataSourceDatasetCompositionService.Target(item, consumer);
-                var retired = await content.RetireAsync(target, item.Content!, ct);
+                var retired = item.Publication is { } publication
+                    ? await publications.RetireAsync(publication, ct)
+                    : await content.RetireAsync(target, item.Content!, ct);
                 _ = await InWorkspaceAsync(() => resources.PutExactAsync(item.ScopeRef!.Value, claimed.Value with
                 {
                     Generation = checked(claimed.Value.Generation + 1),
@@ -97,7 +99,10 @@ public sealed class SourceHistoryMaintenance(IResourceStore resources, ICurrentR
         await EnsureUseAsync(source, Consumer(), ct);
         if (await HasActiveFlowAsync(ct)) return;
         var all = await WorkspaceListAsync<KnowledgeSnapshotResource>(KnowledgeResourceKinds.KnowledgeSnapshot, ct);
-        foreach (var snapshot in all.Where(value => value.Value.KnowledgeSourceUid == source.Uid).OrderBy(value => value.Value.PublishedAt).Take(16))
+        var states = await WorkspaceListAsync<KnowledgeSnapshotObservedResource>(KnowledgeResourceKinds.KnowledgeSnapshotObservedState, ct);
+        var retired = states.SelectMany(state => state.Value.RetiredSnapshots.Keys).ToHashSet();
+        foreach (var snapshot in all.Where(value => value.Value.KnowledgeSourceUid == source.Uid && !retired.Contains(value.Value.Uid))
+            .OrderBy(value => value.Value.PublishedAt).Take(16))
         {
             if (policy.KeepHistory && snapshot.Value.PublishedAt + policy.HistoryRetention > clock.GetUtcNow()) continue;
             try { await RetireSnapshotAsync(source, snapshot.Value, all.Select(value => value.Value).ToArray(), ct); }
@@ -134,9 +139,15 @@ public sealed class SourceHistoryMaintenance(IResourceStore resources, ICurrentR
         {
             if (artifact.Content is not { } reference) { success = false; continue; }
             if (all.Any(other => other.Uid != snapshot.Uid && !retiredIds.Contains(other.Uid)
-                && other.Artifacts.Any(item => item.Content is { } retained && retained.Key == reference.Key
-                    && retained.Target.Storage.StorageUid == reference.Target.Storage.StorageUid))) continue;
-            await content.ValidateAsync(reference.Target with { Consumer = reference.Target.Consumer with { ConsumerScopeRef = Consumer() } }, ct);
+                && other.Artifacts.Any(item => item.Content is { } retained
+                    && retained.Target.Storage.StorageUid == reference.Target.Storage.StorageUid
+                    && (StorageRecordSets.DocumentPublication(reference) is { } batch
+                        ? StorageRecordSets.DocumentPublication(retained) is { } retainedBatch
+                            && retainedBatch.Target.CollectionUid == batch.Target.CollectionUid && retainedBatch.Publication == batch.Publication
+                        : retained.Key == reference.Key && retained.Version == reference.Version)))) continue;
+            var validationTarget = reference.Target with { Consumer = reference.Target.Consumer with { ConsumerScopeRef = Consumer() } };
+            if (StorageRecordSets.DocumentPublication(reference) is null) await content.ValidateAsync(validationTarget, ct);
+            else await publications.ValidateAsync(validationTarget, ct);
             success &= await publications.RetireAsync(reference, ct);
         }
         var latest = await InWorkspaceAsync(() => resources.GetExactAsync<KnowledgeSnapshotObservedResource>(key, ct));

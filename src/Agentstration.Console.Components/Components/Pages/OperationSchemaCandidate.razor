@@ -1,0 +1,58 @@
+@using Agentstration.Schemas
+@using Agentstration.Schemas.Contracts
+@inject ISchemasClient Schemas
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+@if (Operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out var candidate))
+{
+    <details class="schema-candidate" data-testid="operation-schema-candidate">
+        <summary>@Localizer["SchemaCandidate.Title"]</summary>
+        <p>@Localizer["SchemaCandidate.Help"]</p>
+        <pre>@JsonSerializer.Serialize(candidate, Pretty)</pre>
+        @if (Operation.Definition.Definition.TryGetProperty("outputSchema", out var effective))
+        {
+            <pre>@JsonSerializer.Serialize(effective, Pretty)</pre>
+            @if (CanManage)
+            {
+                <label><span>@Localizer["SchemaCandidate.Name"]</span><input @bind="name" maxlength="128" disabled="@busy" /></label>
+                <button type="button" class="button-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(name))"
+                    data-testid="operation-schema-create" @onclick="() => CreateAsync(effective, candidate)">@Localizer["SchemaCandidate.CreateDraft"]</button>
+            }
+        }
+        else { <p role="status">@Localizer["SchemaCandidate.Unsupported"]</p> }
+        @if (failed) { <p role="alert">@Localizer["SchemaCandidate.Failed"]</p> }
+        <a href="/schemas">@Localizer["SchemaCandidate.Library"]</a>
+    </details>
+}
+
+@code {
+    [Parameter, EditorRequired] public ConnectedServiceOperationResource Operation { get; set; } = null!;
+    [Parameter] public ResourceScopeRef? TargetScope { get; set; }
+    [Parameter] public bool CanManage { get; set; }
+    private string name = "";
+    private bool busy, failed;
+    private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
+    private async Task CreateAsync(JsonElement content, JsonElement evidence)
+    {
+        if (!CanManage || busy) return;
+        busy = true; failed = false;
+        try
+        {
+            var created = await Schemas.CreateAsync(new(name.Trim(), new()
+            {
+                DisplayName = name.Trim(), Format = SchemaFormatIds.JsonSchema,
+                Dialect = BuiltinJsonSchemaFormatHandler.Draft202012, Content = content.Clone(),
+                SourceEvidence = JsonSerializer.SerializeToElement(new
+                {
+                    OperationScopeRef = Operation.ScopeRef, OperationUid = Operation.Uid, OperationGeneration = Operation.Generation,
+                    OperationDigest = Operation.Definition.DefinitionDigest, Candidate = evidence.Clone()
+                })
+            }, Operation.Namespace, TargetScope ?? Operation.ScopeRef));
+            var schema = created.Value;
+            Navigation.NavigateTo($"/schemas/{Uri.EscapeDataString(schema.Name)}?scopeRef={Uri.EscapeDataString(schema.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(schema.Namespace.Value)}&view=definition");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { failed = true; }
+        finally { busy = false; }
+    }
+}

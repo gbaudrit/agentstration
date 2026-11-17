@@ -34,11 +34,23 @@ public sealed class RuntimeWorkerOperationGateway(
     private static readonly JsonSerializerOptions ProcessJson = new(JsonSerializerDefaults.Web);
     private const string ArtifactRuntimeType = "awp-artifact-v1";
 
+    private static bool MatchesFunctionLiterals(JsonElement mapping, JsonElement value)
+    {
+        if (mapping.ValueKind == JsonValueKind.String && mapping.GetString()!.Contains("${", StringComparison.Ordinal)) return true;
+        if (mapping.ValueKind != value.ValueKind) return false;
+        if (mapping.ValueKind == JsonValueKind.Object)
+            return mapping.EnumerateObject().All(property => value.TryGetProperty(property.Name, out var actual) && MatchesFunctionLiterals(property.Value, actual))
+                && mapping.EnumerateObject().Count() == value.EnumerateObject().Count();
+        if (mapping.ValueKind == JsonValueKind.Array)
+            return mapping.GetArrayLength() == value.GetArrayLength() && mapping.EnumerateArray().Zip(value.EnumerateArray(), MatchesFunctionLiterals).All(matches => matches);
+        return JsonElement.DeepEquals(mapping, value);
+    }
+
     public async Task<JsonElement> ProcessArtifactAsync(ResourceScopeRef executionScopeRef, Agentstration.Resources.WorkspaceId workspaceId,
         string flowRunId, string stepDefinitionId, int index, string action, JsonElement arguments, CancellationToken cancellationToken)
     {
         var (run, step) = await GetFlowStepAsync(executionScopeRef, flowRunId, stepDefinitionId, cancellationToken);
-        if (run.WorkspaceId != workspaceId || step is not ArtifactTransformFlowStepDefinition processing)
+        if (run.WorkspaceId != workspaceId || step is not ForeachArtifactsFlowStepDefinition processing)
             throw new RuntimeGovernedOperationException("artifact_processing_scope_invalid", "Artifact processing requires its owning Flow step.");
         using var requestScope = EnterScope(run.Scope);
         return await (artifactProcessing ?? throw new RuntimeGovernedOperationException("artifact_processing_unavailable", "Artifact processing is unavailable."))
@@ -132,6 +144,8 @@ public sealed class RuntimeWorkerOperationGateway(
                 PrincipalId = request.PrincipalId,
                 RunId = request.RunId,
                 FlowStepId = request.StepExecutionId?.ToString("D"),
+                ExposedTools = request.Agent.Tools.Select(t => new ResourceReference(t.Id[(t.Id.LastIndexOf('/') + 1)..],
+                    t.ScopeRef ?? request.ExecutionScopeRef, t.Namespace)).ToArray(),
                 AgentId = request.Agent.AgentId.ToString("D"),
                 AgentVersion = request.Agent.Generation,
                 AgentGeneration = request.Agent.Generation,
@@ -141,6 +155,15 @@ public sealed class RuntimeWorkerOperationGateway(
                 PersistArguments = request.TransientPayloads ? false : request.PersistArguments,
                 Arguments = request.Arguments?.Clone()
             }, cancellationToken);
+        }
+        catch (ToolInputValidationException exception)
+        {
+            throw new RuntimeGovernedOperationException(exception.Code,
+                request.TransientPayloads ? "Ephemeral execution failed." : exception.Message, exception)
+            {
+                ContractFailure = new("tool-input", "tool", exception.Path, exception.Code,
+                    "value matching the Tool input schema", "invalid", Code: exception.Code)
+            };
         }
         catch (ToolDefinitionInvocationException exception)
         {
@@ -194,6 +217,39 @@ public sealed class RuntimeWorkerOperationGateway(
         {
             case ToolFlowStepDefinition direct:
                 tool = direct.Tool;
+                if (direct.FunctionBinding is { } function)
+                {
+                    if (arguments.ValueKind != JsonValueKind.Object || arguments.EnumerateObject().Count() != 1
+                        || !arguments.TryGetProperty("input", out var functionInput))
+                        throw new RuntimeGovernedOperationException("function_binding_override", "The accepted function binding cannot be supplied or overridden by the Worker.");
+                    if (direct.FunctionParameters is { } fixedParameters)
+                    {
+                        if (functionInput.ValueKind != JsonValueKind.Object || functionInput.EnumerateObject().Any(property => property.Name != "value")
+                            || !functionInput.TryGetProperty("value", out var value))
+                            throw new RuntimeGovernedOperationException("function_parameter_override", "Saved transformation parameters cannot be supplied by the Worker.");
+                        var values = fixedParameters.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+                        values.Add("value", value.Clone());
+                        functionInput = JsonSerializer.SerializeToElement(values);
+                    }
+                    else if (direct.ArgumentsMapping is { } mapping && mapping.TryGetProperty("input", out var expectedInput) && !MatchesFunctionLiterals(expectedInput, functionInput))
+                        throw new RuntimeGovernedOperationException("function_parameter_override", "Authored literal function inputs cannot be overridden.");
+                    if (direct.FunctionParameters is null && functionInput.ValueKind == JsonValueKind.Object)
+                    {
+                        var names = Agentstration.Functions.Contracts.FunctionInvocationSchemas.SchemaParameters(function.InputSchema);
+                        if (names.Any(name => functionInput.TryGetProperty(name, out _)))
+                            throw new RuntimeGovernedOperationException("function_schema_override", "Schema arguments cannot be supplied by the Worker.");
+                        if (direct.FunctionSchemaSnapshots is { Count: > 0 } snapshots)
+                        {
+                            var values = functionInput.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+                            foreach (var (name, snapshot) in snapshots)
+                                values.Add(name, JsonSerializer.SerializeToElement(snapshot.Source is { } source
+                                    ? new Agentstration.Schemas.Contracts.SchemaBinding { Reference = source }
+                                    : new Agentstration.Schemas.Contracts.SchemaBinding { Inline = new() { Format = snapshot.Format, Dialect = snapshot.Dialect, Content = snapshot.Content } }, ProcessJson));
+                            functionInput = JsonSerializer.SerializeToElement(values);
+                        }
+                    }
+                    arguments = JsonSerializer.SerializeToElement(new { function, input = functionInput }, ProcessJson);
+                }
                 break;
             case ToolRouteFlowStepDefinition routed:
                 resolvedRoute = await flowToolSetResolver.ResolveAsync(workspaceId,
@@ -223,7 +279,11 @@ public sealed class RuntimeWorkerOperationGateway(
                 arguments,
                 resolvedRoute)
             { SecretInputs = run.SecretInputs, TransientPayloads = run.TransientPayloads }, cancellationToken);
+            if (step is ToolFlowStepDefinition { FunctionBinding: not null, FunctionOutputSchema: { } expectedOutput } && result.Output is { } functionOutput)
+                Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(expectedOutput, "function-output"), functionOutput, "function-output", run.Id, step.Name);
         }
+        catch (Agentstration.Schemas.DataContractException exception)
+        { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.Failure }; }
         catch (FlowValidationException exception)
         { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.ContractFailure }; }
         catch (ToolDefinitionInvocationException exception)
@@ -349,12 +409,12 @@ public sealed class RuntimeWorkerOperationGateway(
     {
         try
         {
+            var (owner, definition) = await GetFlowStepAsync(executionScopeRef, parentRunId, stepDefinitionId, cancellationToken);
+            using var context = EnterScope(owner.Scope);
             InvocationDataContracts? contracts = null;
             if (purpose is "artifactProcessing" or "process" && iteration is { } index)
             {
-                var (owner, definition) = await GetFlowStepAsync(executionScopeRef, parentRunId, stepDefinitionId, cancellationToken);
-                using var context = EnterScope(owner.Scope);
-                if (definition is ArtifactTransformFlowStepDefinition processing)
+                if (definition is ForeachArtifactsFlowStepDefinition processing)
                     contracts = await artifactProcessing!.ContractsAsync(owner, processing, index, cancellationToken);
             }
             var child = await flowRuns.CreateOrGetAssignedChildExactAsync(executionScopeRef, parentRunId,
@@ -362,10 +422,14 @@ public sealed class RuntimeWorkerOperationGateway(
                 unit is null ? null : new(unit.Key, unit.Ordinal, unit.Descriptor, unit.TotalUnits), stepExecutionId == Guid.Empty ? null : stepExecutionId);
             return new RuntimeGovernedChildFlow(child.Value.Id, child.Value.Status.ToString(), child.Value.Output?.Clone())
             {
-                FlowId = child.Value.FlowId.Value, FlowNamespace = child.Value.FlowId.Namespace.Value,
+                FlowId = child.Value.FlowId.Value,
+                FlowNamespace = child.Value.FlowId.Namespace.Value,
                 FlowVersion = child.Value.FlowVersion,
-                OutputName = child.Value.OutputName, Outcome = child.Value.Status == FlowRunStatus.Succeeded ? "success" : "error",
-                ErrorCode = child.Value.Error?.Code, ErrorMessage = child.Value.Error?.Message, ErrorDetails = child.Value.Error?.Details,
+                OutputName = child.Value.OutputName,
+                Outcome = child.Value.Status == FlowRunStatus.Succeeded ? "success" : "error",
+                ErrorCode = child.Value.Error?.Code,
+                ErrorMessage = child.Value.Error?.Message,
+                ErrorDetails = child.Value.Error?.Details,
                 ErrorOrigin = child.Value.Error?.Origin is { } origin ? JsonSerializer.SerializeToElement(origin, ProcessJson) : null
             };
         }
@@ -393,7 +457,7 @@ public sealed class RuntimeWorkerOperationGateway(
         .Select(value => new ChatMessage(ToRole(value.Role), value.Contents.Select(ToContent).ToList()))
         .ToArray();
 
-    private static ChatOptions ToOptions(RuntimeGovernedModelRequest request)
+    private ChatOptions ToOptions(RuntimeGovernedModelRequest request)
     {
         var tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
             tool.Name, tool.Description, tool.InputSchema)).ToList();
@@ -404,7 +468,9 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool.Name, tool.Description, tool.Parameters)));
         var options = new ChatOptions
         {
-            Instructions = request.Agent.Instructions,
+            Instructions = request.Agent.Instructions + "\n\nRuntime reference time (UTC): "
+                + timeProvider.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture)
+                + ". Use this reference for today and other relative dates. Use an explicitly supplied user or source time zone when available.",
             Tools = tools
         };
         if (request.Options.Parameters.TryGetValue("temperature", out var temperature)

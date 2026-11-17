@@ -37,6 +37,8 @@ public sealed record StorageContributionEvidence(
 
 public sealed record StorageTypeVersionDescriptor
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StorageDocumentCapabilities? Documents { get; init; }
     public required string Version { get; init; }
     public required string SchemaDigest { get; init; }
     public required JsonElement ConfigurationSchema { get; init; }
@@ -89,6 +91,7 @@ public sealed record StorageExportBinding(string RequirementId, ConnectedService
 
 public sealed record StorageProperties
 {
+    public IReadOnlyList<StorageDocumentCollection> Collections { get; init; } = [];
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
@@ -131,7 +134,8 @@ public sealed class ProtectedStorageContext(
     StorageRevisionReference reference, StorageTypeReference type,
     ConnectedServiceRevisionReference? connectedService, ConnectedServiceTypeReference? connectedServiceType,
     JsonElement configuration, JsonElement envelope, IReadOnlyList<StorageExportBinding> bindings,
-    StorageCapabilities capabilities, StorageLimits limits)
+    StorageCapabilities capabilities, StorageLimits limits,
+    StorageDocumentCapabilities? documents = null, IReadOnlyList<StorageDocumentCollection>? collections = null)
 {
     public StorageRevisionReference Reference { get; } = reference;
     public StorageTypeReference Type { get; } = type;
@@ -142,6 +146,8 @@ public sealed class ProtectedStorageContext(
     [JsonIgnore] public IReadOnlyList<StorageExportBinding> Bindings { get; } = bindings;
     [JsonIgnore] public StorageCapabilities Capabilities { get; } = capabilities;
     [JsonIgnore] public StorageLimits Limits { get; } = limits;
+    [JsonIgnore] public StorageDocumentCapabilities? Documents { get; } = documents;
+    [JsonIgnore] public IReadOnlyList<StorageDocumentCollection> Collections { get; } = collections ?? [];
     public override string ToString() => "[REDACTED]";
 }
 

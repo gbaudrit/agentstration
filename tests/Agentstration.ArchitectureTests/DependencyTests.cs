@@ -64,6 +64,19 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void PostgreSqlDocumentImplementationRemainsOutsideProductFamilies()
+    {
+        var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
+        var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
+        var references = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.PostgreSql.csproj", StringComparison.Ordinal)).ToArray();
+        CollectionAssert.AreEqual(new[] { appHostProject }, references);
+        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asp", "src", "Agentstration.Asp.Abstractions", "Agentstration.Asp.Abstractions.csproj"));
+        Assert.DoesNotContain("OData", generic, StringComparison.Ordinal);
+        Assert.DoesNotContain("Npgsql", generic, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void OnlyAppHostReferencesTheAutonomousOpenDalExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
