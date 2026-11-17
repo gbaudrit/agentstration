@@ -23,7 +23,7 @@
   <data name="Owner" xml:space="preserve"><value>Owner scope</value></data>
   <data name="State" xml:space="preserve"><value>State</value></data>
   <data name="Evidence" xml:space="preserve"><value>Generation / publication</value></data>
-  <data name="Neighbors" xml:space="preserve"><value>Explore neighbors</value></data>
+  <data name="Neighbors" xml:space="preserve"><value>Explore dependencies</value></data>
   <data name="Selection" xml:space="preserve"><value>Selected resource</value></data>
   <data name="OpenDetails" xml:space="preserve"><value>Open resource details</value></data>
   <data name="OpenDesigner" xml:space="preserve"><value>Open Flow Designer</value></data>

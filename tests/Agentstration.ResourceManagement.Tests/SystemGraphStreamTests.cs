@@ -128,6 +128,50 @@ public sealed class SystemGraphStreamTests
     }
 
     [TestMethod]
+    public async Task RootFollowsAnOutOfOrderCrossNamespaceDependencyChainWithoutPullingInOtherConsumers()
+    {
+        var chain = Enumerable.Range(0, 12).Select(index => Node("dependency-" + index)).ToArray();
+        chain[11] = chain[11] with { Identity = chain[11].Identity with { Namespace = new("shared") } };
+        var peer = Node("unrelated-agent"); var incoming = Node("root-consumer"); var other = Node("unrelated-model");
+        var items = chain.Select(node => new SystemGraphContribution([node], [])).ToList();
+        items.Add(new([peer, incoming, other], [new(peer.Id, chain[4].Id, "exact-dependency"),
+            new(incoming.Id, chain[0].Id, "exact-dependency"), new(incoming.Id, other.Id, "exact-dependency")]));
+        for (var index = 10; index >= 0; index--) items.Add(new([], [new(chain[index].Id, chain[index + 1].Id, "exact-dependency")]));
+        items.Add(new([], [new(chain[8].Id, chain[2].Id, "exact-dependency")])); // A cycle must terminate.
+        var access = new Access(); var service = new SystemGraphQueryService([new Source(items)], access, TimeProvider.System);
+        var frames = await Collect(service, new(ResourceNamespace.Default, chain[0].Id));
+        CollectionAssert.AreEquivalent(chain.Select(node => node.Id).Append(incoming.Id).ToArray(),
+            frames.SelectMany(frame => frame.Nodes).Select(node => node.Id).ToArray());
+        Assert.AreEqual("complete", frames[^1].Kind); Assert.IsFalse(frames[^1].Truncated);
+        Assert.AreEqual(13, frames.Sum(frame => frame.Relations.Count));
+        var strict = await service.QueryAsync(new(ResourceNamespace.Default, chain[0].Id), default);
+        CollectionAssert.AreEquivalent(new[] { chain[0].Id, chain[1].Id, incoming.Id }, strict.Nodes.Select(node => node.Id).ToArray());
+        var missing = await Collect(service, new(new ResourceNamespace("wrong"), chain[0].Id));
+        Assert.IsEmpty(missing.SelectMany(frame => frame.Nodes).ToArray());
+        access.Hidden.Add(chain[5].Identity.ResourceUid);
+        frames = await Collect(service, new(ResourceNamespace.Default, chain[0].Id));
+        Assert.IsFalse(frames.SelectMany(frame => frame.Nodes).Any(node => chain.Skip(5).Any(hidden => hidden.Id == node.Id)));
+        Assert.DoesNotContain("shared", JsonSerializer.Serialize(frames), StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task DepthLimitsAreExplicitAndCannotBeBypassedByAnEarlierLongerPath()
+    {
+        var nodes = Enumerable.Range(0, 5).Select(index => Node("node-" + index)).ToArray();
+        var items = nodes.Select(node => new SystemGraphContribution([node], [])).ToList();
+        items.Add(new([], [new(nodes[0].Id, nodes[1].Id, "exact-dependency"), new(nodes[1].Id, nodes[2].Id, "exact-dependency"),
+            new(nodes[2].Id, nodes[3].Id, "exact-dependency"), new(nodes[3].Id, nodes[4].Id, "exact-dependency")]));
+        var source = new Source(items); var service = new SystemGraphQueryService([source], new Access(), TimeProvider.System);
+        foreach (var depth in new[] { 0, 33 }) await Assert.ThrowsExactlyAsync<SystemGraphException>(() => Collect(service, new(MaximumDepth: depth)));
+        Assert.AreEqual(0, source.Reads);
+        var frames = await Collect(service, new(Root: nodes[0].Id, MaximumDepth: 2));
+        Assert.AreEqual(3, frames.Sum(frame => frame.Nodes.Count)); Assert.IsTrue(frames[^1].Truncated);
+        items.Add(new([], [new(nodes[0].Id, nodes[3].Id, "exact-dependency")]));
+        frames = await Collect(service, new(Root: nodes[0].Id, MaximumDepth: 2));
+        Assert.AreEqual(5, frames.Sum(frame => frame.Nodes.Count)); Assert.IsFalse(frames[^1].Truncated);
+    }
+
+    [TestMethod]
     public async Task BoundsAreExplicitAndAnInvalidLimitNeverEnumeratesFamilies()
     {
         var source = new Source([new([Node("a")], []), new([Node("b")], [])]);

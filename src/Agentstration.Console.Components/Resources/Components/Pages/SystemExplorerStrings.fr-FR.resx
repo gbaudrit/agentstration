@@ -23,7 +23,7 @@
   <data name="Owner" xml:space="preserve"><value>Portée propriétaire</value></data>
   <data name="State" xml:space="preserve"><value>État</value></data>
   <data name="Evidence" xml:space="preserve"><value>Génération / publication</value></data>
-  <data name="Neighbors" xml:space="preserve"><value>Explorer les voisins</value></data>
+  <data name="Neighbors" xml:space="preserve"><value>Explorer les dépendances</value></data>
   <data name="Selection" xml:space="preserve"><value>Ressource sélectionnée</value></data>
   <data name="OpenDetails" xml:space="preserve"><value>Ouvrir la fiche de la ressource</value></data>
   <data name="OpenDesigner" xml:space="preserve"><value>Ouvrir le concepteur de flux</value></data>

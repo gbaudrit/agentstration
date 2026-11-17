@@ -71,12 +71,22 @@ public partial class SystemExplorer
         var root = page.Nodes.FirstOrDefault(node => node.Id == RootQuery);
         var visible = page.Nodes.Where(node => node.Id != root?.Id).Skip(windowOffset).Take(root is null ? 80 : 79).ToArray();
         if (root is not null) visible = [root, .. visible];
+        // Recorded pins keep their exact IDs/evidence. Their current authorized
+        // catalogue label can be reused for presentation, including paired providers.
+        var labels = page.Nodes.Where(node => node.Id == SystemGraphIds.Definition(node.Identity.ResourceUid)
+            && !string.IsNullOrWhiteSpace(node.DisplayName)).ToDictionary(node => node.Identity.ResourceUid, node => node.DisplayName!);
+        visible = visible.Select(node => string.IsNullOrWhiteSpace(node.DisplayName) && labels.TryGetValue(node.Identity.ResourceUid, out var label)
+            ? node with { DisplayName = label } : node).ToArray();
         var ids = visible.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
         var edges = page.Relations.Where(edge => ids.Contains(edge.Source) && ids.Contains(edge.Target)).ToArray();
         // Arrivals outside the current window and heartbeat timestamps do not restart layout.
         if (diagramPage is null || !diagramPage.Nodes.SequenceEqual(visible) || !diagramPage.Relations.SequenceEqual(edges))
             diagramPage = page with { Nodes = visible, Relations = edges };
     }
+    private string NodeDisplayName(SystemGraphNode node) =>
+        !string.IsNullOrWhiteSpace(node.DisplayName) ? node.DisplayName
+        : page?.Nodes.FirstOrDefault(candidate => candidate.Id == SystemGraphIds.Definition(node.Identity.ResourceUid))?.DisplayName
+            is { Length: > 0 } label ? label : node.Identity.Name;
     private async Task LoadAsync()
     {
         cancellation?.Cancel(); cancellation?.Dispose();
@@ -162,9 +172,10 @@ public partial class SystemExplorer
     private void Navigate(string? root, string? ns, string? owner) => Navigation.NavigateTo(QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
     { ["context"] = ContextQuery ?? NavigationContext.ScopeRef ?? contextScope.Value, ["scopeRef"] = owner, ["namespace"] = ns, ["root"] = root, ["renderer"] = showDiagram ? null : "list" }));
     private string ReconciliationUrl(string root) => QueryHelpers.AddQueryString("/system-explorer/reconciliation", new Dictionary<string, string?>
-    { ["context"] = contextScope.Value, ["namespace"] = resourceNamespace.Value, ["root"] = root });
-    private string ExplorerUrl(string? root) => QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
-    { ["context"] = contextScope.Value, ["scopeRef"] = ownerScope.Value, ["namespace"] = resourceNamespace.Value, ["root"] = root, ["renderer"] = showDiagram ? null : "list" });
+    { ["context"] = contextScope.Value, ["namespace"] = RootNamespace(root), ["root"] = root });
+    private string RootNamespace(string? root) => page?.Nodes.FirstOrDefault(node => node.Id == root)?.Identity.Namespace.Value ?? resourceNamespace.Value;
+    private string ExplorerUrl(string? root, ResourceNamespace? ns = null) => QueryHelpers.AddQueryString("/system-explorer", new Dictionary<string, string?>
+    { ["context"] = contextScope.Value, ["scopeRef"] = ownerScope.Value, ["namespace"] = ns?.Value ?? RootNamespace(root), ["root"] = root, ["renderer"] = showDiagram ? null : "list" });
     private void ChangeSystem(ChangeEventArgs args)
     {
         system = systems.FirstOrDefault(value => value.Uid.ToString() == args.Value?.ToString());

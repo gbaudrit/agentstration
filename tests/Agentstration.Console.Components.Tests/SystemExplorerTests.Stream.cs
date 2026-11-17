@@ -16,6 +16,41 @@ namespace Agentstration.Web.Tests;
 public sealed partial class SystemExplorerTests
 {
     [TestMethod]
+    [DataRow("en-US", "Explore dependencies")]
+    [DataRow("fr-FR", "Explorer les dépendances")]
+    public async Task PairedProvidersAndTheirRecordedPinsUseTheAuthorizedNameWithoutConfusingHomonyms(string culture, string explore)
+    {
+        using var locale = new TestCultureScope(culture);
+        var client = new StreamClient(); using var context = StreamContext(client);
+        var page = context.Render<Agentstration.Web.Components.Pages.SystemExplorer>(); var epoch = Guid.NewGuid();
+        var provider = StreamNode(client.Owner, "paired-technical-id");
+        provider = provider with { Identity = provider.Identity with { Kind = "ToolProvider" }, DisplayName = "Friendly extension" };
+        var pin = provider with { Id = SystemGraphIds.Generation(provider.Identity.ResourceUid, 3), State = "recorded-generation", Evidence = new(3), DisplayName = null };
+        var homonym = StreamNode(client.Owner, "paired-technical-id");
+        homonym = homonym with { Identity = homonym.Identity with { Kind = "ToolProvider", Namespace = new("other") }, DisplayName = "Other extension" };
+        await client.Push(client.Owner, new(epoch, 1, "start", DateTimeOffset.UnixEpoch, [], [], []));
+        await client.Push(client.Owner, new(epoch, 2, "append", DateTimeOffset.UnixEpoch, [pin, homonym], [], []));
+        page.WaitForAssertion(() => Assert.HasCount(2, page.FindAll("[data-testid=explorer-node]")));
+        await client.Push(client.Owner, new(epoch, 3, "append", DateTimeOffset.UnixEpoch, [provider], [], []));
+        page.WaitForAssertion(() => Assert.AreEqual("Friendly extension", page.FindAll("[data-testid=explorer-node]")[0].QuerySelector("button")!.TextContent));
+        Assert.AreEqual("Other extension", page.FindAll("[data-testid=explorer-node]")[1].QuerySelector("button")!.TextContent);
+        Assert.AreEqual(explore, page.FindAll("[data-testid=explorer-node]")[0].QuerySelector("a")!.TextContent);
+        Assert.Contains("namespace=other", page.FindAll("[data-testid=explorer-node]")[1].QuerySelector("a")!.GetAttribute("href")!);
+        page.WaitForAssertion(() =>
+        {
+            var diagram = (SystemGraphPage)context.JSInterop.Invocations.Last(call => call.Identifier == "render").Arguments[1]!;
+            Assert.AreEqual("Friendly extension", diagram.Nodes.Single(node => node.Id == pin.Id).DisplayName);
+            Assert.AreEqual("Other extension", diagram.Nodes.Single(node => node.Id == homonym.Id).DisplayName);
+            Assert.AreEqual(3, diagram.Nodes.Single(node => node.Id == pin.Id).Evidence!.Generation);
+        });
+        await page.FindAll("[data-testid=explorer-node]")[0].QuerySelector("button")!.ClickAsync();
+        page.WaitForAssertion(() => Assert.AreEqual("Friendly extension", page.Find("[data-testid=explorer-selection] h2").TextContent));
+        Assert.Contains(pin.Id, page.Find("[data-testid=explorer-selection]").TextContent);
+        await client.Push(client.Owner, new(epoch, 4, "complete", DateTimeOffset.UnixEpoch, [], [], []));
+        client.For(client.Owner).Writer.TryComplete();
+    }
+
+    [TestMethod]
     [DataRow("en-US", "authorized resources received", "Next page")]
     [DataRow("fr-FR", "ressources autorisées reçues", "Page suivante")]
     public async Task BatchesRenderBeforeTailAndSystemsWithoutRelayoutOutsideTheBoundedWindow(string culture, string progress, string next)

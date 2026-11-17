@@ -14,11 +14,15 @@ public sealed class ToolSystemGraphContributor(IResourceStore resources, IResour
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var stored in ResourceSystemGraph.ReadAsync<ToolProviderResource>(resources, scope, ToolResourceKinds.ToolProvider, ct))
-            yield return new([ResourceSystemGraph.Node(stored.Value) with { Evidence = ResourceSystemGraph.Node(stored.Value).Evidence! with { Enabled = stored.Value.Definition.Enabled } }], []);
+            yield return new([ResourceSystemGraph.Node(stored.Value) with
+            {
+                DisplayName = stored.Value.Definition.DisplayName,
+                Evidence = ResourceSystemGraph.Node(stored.Value).Evidence! with { Enabled = stored.Value.Definition.Enabled }
+            }], []);
         await foreach (var stored in ResourceSystemGraph.ReadAsync<ToolResource>(resources, scope, ToolResourceKinds.Tool, ct))
         {
             var tool = stored.Value;
-            var builder = new SystemGraphContributionBuilder(ResourceSystemGraph.Node(tool), identities);
+            var builder = new SystemGraphContributionBuilder(ResourceSystemGraph.Node(tool) with { DisplayName = tool.Definition.DisplayName }, identities);
             if (tool.Definition.Provider is { } provider)
             {
                 var resolved = await references.ResolveAsync<ToolProviderResource>(provider, tool.Namespace, ToolResourceKinds.ToolProvider, scope, ct);

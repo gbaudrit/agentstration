@@ -1,15 +1,17 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.SystemGraph.Contracts;
+using Agentstration.Tools;
 
 namespace Agentstration.Knowledge;
 
 public sealed class KnowledgeSystemGraphContributor(IResourceStore resources, IResourceIdentityCatalog identities) : ISystemGraphContributor
 {
     public string Family => "knowledge";
-    public SystemGraphContributorCoverage Coverage => new(Family, ["source-composition-input-pins", "snapshot-input-output-storage-generations", "snapshot-storage-type-connected-service-pins"], ["historical-flow-bindings-without-uids", "proposal-refresh-unavailable"]);
+    public SystemGraphContributorCoverage Coverage => new(Family, ["source-composition-input-pins", "knowledge-access-relay-source-identities", "snapshot-input-output-storage-generations", "snapshot-storage-type-connected-service-pins"], ["historical-flow-bindings-without-uids", "proposal-refresh-unavailable"]);
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var stored in ResourceSystemGraph.ReadAsync<KnowledgeSourceResource>(resources, scope, KnowledgeResourceKinds.KnowledgeSource, ct))
@@ -69,6 +71,28 @@ public sealed class KnowledgeSystemGraphContributor(IResourceStore resources, IR
                     }
                 }
             }
+            yield return builder.Build();
+        }
+        // Knowledge owns this exact generated relay encoding. Do not search arbitrary
+        // Tool arguments or infer a source from names, mutable exposure state or history.
+        await foreach (var stored in ResourceSystemGraph.ReadAsync<ToolDefinitionVersionResource>(resources, scope, ToolResourceKinds.ToolDefinitionVersion, ct))
+        {
+            var publication = stored.Value;
+            var bindings = publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>().Where(binding => binding.Path == "/source").Take(2).ToArray();
+            if (publication.Definition is not RelayToolDefinitionProperties
+                || !publication.Metadata.Annotations.TryGetValue("agentstration.io/knowledge-source-uid", out var marker)
+                || !Guid.TryParse(marker, out var uid)
+                || bindings.Length != 1 || bindings[0].Value is not { ValueKind: JsonValueKind.Object } binding
+                || !binding.TryGetProperty("uid", out var boundUid) || boundUid.ValueKind != JsonValueKind.String || !boundUid.TryGetGuid(out var expectedUid) || uid != expectedUid
+                || !binding.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
+                || !binding.TryGetProperty("namespace", out var ns) || ns.ValueKind != JsonValueKind.String
+                || !binding.TryGetProperty("scopeRef", out var owner) || owner.ValueKind != JsonValueKind.String) continue;
+            var identity = await identities.GetIdentityByUidAsync(uid, ct);
+            if (identity is null || identity.Kind != KnowledgeResourceKinds.KnowledgeSource
+                || identity.Name != name.GetString() || identity.Namespace.Value != ns.GetString() || identity.ScopeRef.Value != owner.GetString()) continue;
+            var builder = new SystemGraphContributionBuilder(ResourceSystemGraph.Publication(publication, publication.DefinitionUid,
+                ToolResourceKinds.ToolDefinition, publication.DefinitionName, publication.Definition.Version, publishedAt: publication.PublishedAt), identities);
+            await builder.PinAsync(uid, "definition.bindings/source", ct, kind: "dynamic-dependency", resolution: "fixed-source-identity");
             yield return builder.Build();
         }
     }

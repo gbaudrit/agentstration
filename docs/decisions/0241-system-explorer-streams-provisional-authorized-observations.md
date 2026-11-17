@@ -28,8 +28,14 @@ precede the first byte. A `start` frame precedes family enumeration. The first
 authorized contribution is sent immediately, followed by batches of at most 20
 nodes. A second typed source pass checks observed metadata and emits relations
 only after both endpoints are known and authorized, in batches of at most 100.
-Root queries emit only the authorized root and its direct neighbourhood; missing
-and invisible roots remain indistinguishable.
+Root queries follow outgoing authorized dependencies up to `maximumDepth` (1–32,
+default 16), retaining direct consumers of the root without recursively traversing
+other consumers of shared dependencies. Namespace selects the root; its exact
+authorized dependencies may cross namespaces. Ordinary inventory still filters
+every node by namespace. Missing and invisible roots remain indistinguishable.
+Out-of-order edges are revisited within the bounded authorized working set; cycles
+terminate and reaching a depth bound is reported as truncation. The strict
+`/api/system-graph` root query retains its direct-neighbour contract.
 
 The application rechecks context before delivery and affected nodes, binding
 owners and relation endpoints before each data batch. Discover-only metadata is
@@ -63,6 +69,18 @@ nodes and preserve a selected neighbour root. Advancing a window does not query
 the backend again. Export contains only the authorized data actually received.
 Changing context/namespace, a sequence gap, stream error or incomplete EOF clears
 old data. Async results from an older request cannot replace the new observation.
+
+Agent draft Tool and exact ToolSet-publication declarations supplement recorded
+revision pins. Knowledge owns extraction of its generated access relay encoding:
+the UID annotation must match the exact `/source` identity binding and the current
+source UID, name, namespace and scope. Its edge is dynamic source-identity selection,
+not a fabricated immutable Snapshot pin. Recreated homonyms cannot replace the UID.
+No arbitrary binding/literal scan, source access or provider call is introduced.
+
+Tool and ToolProvider definition nodes include their stored display names. The
+Console can reuse a current authorized definition label for recorded pins of the
+same UID; labels never replace graph IDs, generations or publication evidence.
+Paired provider names remain exact technical identities in inspection/export.
 
 LikeC4 retains its current mount while one layout runs and keeps only the latest
 pending update. Completed incremental layouts can appear before the source stream

@@ -10,7 +10,7 @@ public sealed partial class SystemGraphQueryService
         [EnumeratorCancellation] CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (query.MaximumNodes is < 1 or > MaximumNodes || query.Root?.Length > 512)
+        if (query.MaximumNodes is < 1 or > MaximumNodes || query.MaximumDepth is < 1 or > 32 || query.Root?.Length > 512)
             throw new SystemGraphException("system_graph_query_invalid");
         if (families.Length == 0 || families.Select(family => family.Family).Distinct(StringComparer.Ordinal).Count() != families.Length)
             throw new SystemGraphException("system_graph_unavailable");
@@ -92,6 +92,7 @@ public sealed partial class SystemGraphQueryService
         var owners = new Dictionary<string, HashSet<SystemGraphIdentity>>(StringComparer.Ordinal);
         var emitted = new HashSet<string>(StringComparer.Ordinal);
         var related = new HashSet<string>(StringComparer.Ordinal);
+        var depths = new Dictionary<string, int>(StringComparer.Ordinal);
         var pendingNodes = new Dictionary<string, SystemGraphNode>(StringComparer.Ordinal);
         var edges = new Dictionary<SystemGraphRelation, HashSet<SystemGraphIdentity>>();
         var emittedEdges = new HashSet<SystemGraphRelation>();
@@ -116,17 +117,29 @@ public sealed partial class SystemGraphQueryService
         {
             if (!emitted.Contains(id)) pendingNodes.TryAdd(id, nodes[id]);
         }
-        void QueueEdge(SystemGraphRelation edge)
+        bool QueueEdge(SystemGraphRelation edge)
         {
+            var expanded = false;
             if (query.Root is { } root)
             {
-                if (!nodes.ContainsKey(root)) return;
+                if (!nodes.TryGetValue(root, out var rootNode) || query.Namespace is { } ns && rootNode.Identity.Namespace != ns) return false;
                 related.Add(root);
-                if (edge.Source == root || edge.Target == root) { related.Add(edge.Source); related.Add(edge.Target); }
-                if (!related.Contains(edge.Source) || !related.Contains(edge.Target)) return;
+                depths.TryAdd(root, 0);
+                // Retain direct consumers of the root, but do not expand through them into
+                // unrelated consumers of shared dependencies. Dependency traversal is outgoing.
+                if (edge.Target == root) related.Add(edge.Source);
+                if (depths.TryGetValue(edge.Source, out var depth) && depth < query.MaximumDepth
+                    && (!depths.TryGetValue(edge.Target, out var previous) || previous > depth + 1))
+                {
+                    depths[edge.Target] = depth + 1;
+                    related.Add(edge.Target);
+                    expanded = true;
+                }
+                if (!related.Contains(edge.Source) || !related.Contains(edge.Target)) return expanded;
             }
             QueueNode(edge.Source); QueueNode(edge.Target);
             if (!emittedEdges.Contains(edge)) pendingEdges.Add(edge);
+            return expanded;
         }
         async Task<StreamBatch> Flush()
         {
@@ -151,7 +164,8 @@ public sealed partial class SystemGraphQueryService
             var bindings = contribution.BindingOwner is not { } owner || await Evaluate(owner) is { Discover: true, InspectBindings: true };
             foreach (var node in contribution.Nodes)
             {
-                if ((!bindings && node.Id != contribution.BindingOwnerNodeId) || query.Namespace is { } ns && node.Identity.Namespace != ns) continue;
+                if ((!bindings && node.Id != contribution.BindingOwnerNodeId)
+                    || query.Root is null && query.Namespace is { } ns && node.Identity.Namespace != ns) continue;
                 var allowed = await Evaluate(node.Identity);
                 if (!allowed.Discover || (node.State.StartsWith("recorded-", StringComparison.Ordinal) || node.State == "reference-identity") && !allowed.InspectBindings) continue;
                 var visible = allowed.InspectBindings ? node : node with { Evidence = null };
@@ -169,7 +183,7 @@ public sealed partial class SystemGraphQueryService
                     if (!owners.TryGetValue(node.Id, out var guards)) owners[node.Id] = guards = [];
                     guards.Add(guard);
                 }
-                if (query.Root is null || node.Id == query.Root) QueueNode(node.Id);
+                if (query.Root is null || node.Id == query.Root && (query.Namespace is null || node.Identity.Namespace == query.Namespace)) QueueNode(node.Id);
                 if (pendingNodes.Count >= 20)
                     yield return await Flush();
             }
@@ -212,12 +226,21 @@ public sealed partial class SystemGraphQueryService
                 if (truncated) break;
             }
         }
-        // Neighbour-to-neighbour edges can precede discovery of their root membership.
-        foreach (var edge in edges.Keys)
+        // Sources can supply an entire dependency chain in reverse order. Revisit the
+        // authorized bounded edge set until no shorter path remains; cycles terminate.
+        for (var pass = 0; pass < query.MaximumDepth; pass++)
         {
-            QueueEdge(edge);
-            if (pendingNodes.Count >= 20 || pendingEdges.Count >= 100) yield return await Flush();
+            var expanded = false;
+            foreach (var edge in edges.Keys)
+            {
+                ct.ThrowIfCancellationRequested();
+                expanded |= QueueEdge(edge);
+                if (pendingNodes.Count >= 20 || pendingEdges.Count >= 100) yield return await Flush();
+            }
+            if (!expanded) break;
         }
+        if (query.Root is not null && edges.Keys.Any(edge => depths.TryGetValue(edge.Source, out var depth)
+            && depth >= query.MaximumDepth && !depths.ContainsKey(edge.Target))) truncated = true;
         if (pendingNodes.Count > 0 || pendingEdges.Count > 0) yield return await Flush();
         foreach (var id in emitted) { ct.ThrowIfCancellationRequested(); await Verify(id); }
         foreach (var edge in emittedEdges)

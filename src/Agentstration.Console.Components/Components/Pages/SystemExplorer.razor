@@ -52,7 +52,7 @@
         @if (selected is not null)
         {
             <section class="panel" aria-label="@T("Selection")" data-testid="explorer-selection">
-                <h2>@(selected.DisplayName ?? selected.Identity.Name)</h2><p><code>@selected.Id</code></p>
+                <h2>@NodeDisplayName(selected)</h2><p><code>@selected.Id</code></p>
                 @if (DetailsUrl(selected) is { } url) { <a class="button-secondary" href="@url">@T("OpenDetails")</a> }
                 @if (selected.Identity.Kind == "Flow") { <a class="button-secondary" href="@DetailsUrl(selected, true)">@T("OpenDesigner")</a> }
                 <a class="button-secondary" href="@ReconciliationUrl(selected.Id)">@T("ReconTitle")</a>
@@ -84,7 +84,7 @@
                 { <button class="button-secondary" type="button" disabled="@MutationBlocked" @onclick="AddMemberAsync">@T("AddSelected")</button> }
             }
             <ul>@foreach (var member in system.Members)
-            { <li @key="member.Uid"><a href="@ExplorerUrl(SystemGraphIds.Definition(member.Uid))">@member.Kind · @member.Namespace/@member.Name</a> <code>@member.ScopeRef.Value</code>
+            { <li @key="member.Uid"><a href="@ExplorerUrl(SystemGraphIds.Definition(member.Uid), member.Namespace)">@member.Kind · @member.Namespace/@member.Name</a> <code>@member.ScopeRef.Value</code>
                 @if (canWrite && ownerScope == contextScope) { <button type="button" class="text-button" disabled="@MutationBlocked" @onclick="() => RemoveMemberAsync(member.Uid)">@T("Remove")</button> }</li> }</ul>
             @if (canDelete && ownerScope == contextScope)
             {

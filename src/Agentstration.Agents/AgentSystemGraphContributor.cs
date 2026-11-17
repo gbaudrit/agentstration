@@ -11,7 +11,7 @@ namespace Agentstration.Agents;
 public sealed class AgentSystemGraphContributor(IResourceStore resources, IResourceReferenceResolver references) : ISystemGraphContributor
 {
     public string Family => "agents";
-    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "schema-publications", "agent-revisions"], ["opaque-middleware-and-settings"]);
+    public SystemGraphContributorCoverage Coverage => new(Family, ["model-runtime-generations", "tool-generations", "toolset-publications", "declared-tools-and-toolsets", "schema-publications", "agent-revisions"], ["opaque-middleware-and-settings"]);
 
     public async IAsyncEnumerable<SystemGraphContribution> ReadAsync(ResourceScopeRef scope, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -21,14 +21,24 @@ public sealed class AgentSystemGraphContributor(IResourceStore resources, IResou
             var declared = new List<SystemGraphRelation>();
             await AddDeclaredAsync<ModelProfileResource>(stored.Value.Definition.ModelProfile, ModelResourceKinds.ModelProfile, "definition.modelProfile");
             await AddDeclaredAsync<RuntimeProfileResource>(stored.Value.Definition.RuntimeProfile, RuntimeProfileResourceKinds.RuntimeProfile, "definition.runtimeProfile");
+            for (var index = 0; index < stored.Value.Definition.Tools.Count; index++)
+                await AddDeclaredAsync<Agentstration.Tools.ToolResource>(stored.Value.Definition.Tools[index], Agentstration.Tools.ToolResourceKinds.Tool, $"definition.tools[{index}]");
+            for (var index = 0; index < stored.Value.Definition.ToolSets.Count; index++)
+            {
+                var selection = stored.Value.Definition.ToolSets[index];
+                await AddDeclaredAsync<Agentstration.Tools.ToolSetResource>(selection.ToolSet, Agentstration.Tools.ToolResourceKinds.ToolSet, $"definition.toolSets[{index}]", selection.Version);
+            }
             yield return new([node], declared);
 
-            async Task AddDeclaredAsync<T>(ResourceReference reference, string kind, string field) where T : Resource
+            async Task AddDeclaredAsync<T>(ResourceReference reference, string kind, string field, string? version = null) where T : Resource
             {
                 try
                 {
                     var target = await references.ResolveAsync<T>(reference, stored.Value.Namespace, kind, scope, cancellationToken);
-                    if (target is not null) declared.Add(new(node.Id, SystemGraphIds.Definition(target.Value.Uid), "declared-reference", field, reference.ScopeRef is null ? "owner-relative" : "exact-owner"));
+                    if (target is not null) declared.Add(new(node.Id,
+                        version is null ? SystemGraphIds.Definition(target.Value.Uid) : SystemGraphIds.Publication(target.Value.Uid, version),
+                        "declared-reference", field, reference.ScopeRef is null ? "owner-relative" : "exact-owner")
+                    { SelectedPublication = version });
                 }
                 catch (Exception exception) when (exception is ResourceReferenceAmbiguousException or ResourceReferenceOutsideScopeException)
                 { /* Missing/ambiguous declarations never manufacture exact pins. */ }

@@ -114,7 +114,7 @@ public interface ISystemGraphReadScope
 }
 
 // Finite, provisional observations for exploration. Never a reconciliation read set.
-public sealed record SystemGraphStreamQuery(ResourceNamespace? Namespace = null, string? Root = null, int MaximumNodes = 10000);
+public sealed record SystemGraphStreamQuery(ResourceNamespace? Namespace = null, string? Root = null, int MaximumNodes = 10000, int MaximumDepth = 16);
 public sealed record SystemGraphStreamFrame(Guid Epoch, long Sequence, string Kind, DateTimeOffset ObservedAt,
     IReadOnlyList<SystemGraphNode> Nodes, IReadOnlyList<SystemGraphRelation> Relations,
     IReadOnlyList<SystemGraphScope> Scopes, string Coverage = "progressive-authorized-observation",

@@ -38,13 +38,13 @@ Cancellation uses the request token.
 | --- | --- |
 | Resources / Identity | Exact identities, source origin kind, persisted scope hierarchy and current authorization. |
 | Models / Runtime Profiles | Current exact ModelProfile and RuntimeProfile metadata. |
-| Agents | Definitions, owner-relative profile declarations, immutable revisions, recorded profile generations and revision hashes. |
+| Agents | Definitions, owner-relative profile/Tool declarations, exact declared ToolSet selections, immutable revisions, recorded profile generations and revision hashes. |
 | Flows | Definitions, immutable versions and recorded Agent revision UIDs in direct, routing, workflow and orchestration definitions and top-level Agent/router graph steps. |
 | Tools | Provider metadata, relay generations, ToolDefinition publications and ToolSet member pins. |
 | Schemas / Functions | Schema publications and family-owned function/type versions and digests. |
 | Data Sources | Profile Tool/provider pins, dataset operation/Storage pins, Query publications and contract digests. |
 | Connected Services / Storage | Type contracts, operation/service generations, value references, provider contributions and collection Schema pins. |
-| Knowledge | Source input pins, Snapshot history and recorded input/output Storage and binding identities. |
+| Knowledge | Generated access-relay source-identity bindings, source input pins, Snapshot history and recorded input/output Storage and binding identities. |
 | Triggers | Recorded Flow UID/version targets. |
 
 Inspection reads recorded publication pins; it never invokes the publication-time
@@ -142,6 +142,21 @@ heartbeats and a client 30-second idle deadline replace full-body buffering for
 this route. The strict inventory/cursor, impact and reconciliation APIs keep their
 existing consistency checks.
 
+With `root`, the stream follows outgoing authorized dependencies up to
+`maximumDepth` (1–32, default 16), alongside direct consumers of the selected root.
+It does not expand other consumers of shared dependencies. The namespace filter
+selects the root; exact dependency paths can cross namespaces when authorized.
+Without a root, namespace continues to filter every inventory node. Missing/hidden
+roots are indistinguishable; depth truncation is explicit. The strict inventory
+API retains its direct-neighbour contract. Out-of-order edges and cycles are handled
+within the bounded authorized working set.
+
+Knowledge access relays expose a dynamic link to their fixed KnowledgeSource UID
+only when their family-owned annotation and exact `/source` binding agree with the
+current source identity. Deletion/recreation never rebinds by name. Literal values
+are not exported. Agent drafts expose Tool and selected ToolSet declarations;
+revision pins keep their separate historical evidence.
+
 Stream observations are provisional, bounded to 10,000 authorized nodes / 20,000
 relations, and never globally complete. Data batches recheck current context,
 affected identities, binding owners and both endpoints; completion checks emitted
@@ -153,6 +168,9 @@ digest or reconciliation read set. There is no persistent index or resume cursor
 Received resources remain visible during loading. Table and diagram use local
 80-node windows, preserving the root for neighbour views; next/previous windows
 reuse received data. JSON exports only the authorized resources actually received.
+Tool/ToolProvider labels use stored display names. Recorded pins may reuse the
+current authorized definition label by UID for presentation, retaining exact graph
+identity and evidence; paired technical names remain in the inspector/export.
 Family detail/Flow Designer links retain current context and exact owner. Logical
 System listing loads independently. The neutral table, inspector and export work
 with `renderer=list` or the optional diagram disabled.
