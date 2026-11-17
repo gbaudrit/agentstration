@@ -457,7 +457,7 @@ public sealed class RuntimeWorkerOperationGateway(
         .Select(value => new ChatMessage(ToRole(value.Role), value.Contents.Select(ToContent).ToList()))
         .ToArray();
 
-    private static ChatOptions ToOptions(RuntimeGovernedModelRequest request)
+    private ChatOptions ToOptions(RuntimeGovernedModelRequest request)
     {
         var tools = request.Agent.Tools.Select(tool => (AITool)AIFunctionFactory.CreateDeclaration(
             tool.Name, tool.Description, tool.InputSchema)).ToList();
@@ -468,7 +468,9 @@ public sealed class RuntimeWorkerOperationGateway(
                 tool.Name, tool.Description, tool.Parameters)));
         var options = new ChatOptions
         {
-            Instructions = request.Agent.Instructions,
+            Instructions = request.Agent.Instructions + "\n\nRuntime reference time (UTC): "
+                + timeProvider.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture)
+                + ". Use this reference for today and other relative dates. Use an explicitly supplied user or source time zone when available.",
             Tools = tools
         };
         if (request.Options.Parameters.TryGetValue("temperature", out var temperature)

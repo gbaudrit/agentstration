@@ -328,6 +328,15 @@ The runtime system prompt lists only Knowledge Sources with an actually assigned
 describe Tool and instructs the Agent to discover all available sources/inputs,
 consult each exposed input with focused data operations before synthesis, and
 report unavailable or unconsulted inputs. Discovery alone is not data consultation.
+The Agent is instructed to invoke needed Tools rather than end with a plan or a
+promise of future calls, and to finish with the requested result or a specific
+blocker. Runtime continuation still depends on actual structured Tool calls;
+a text-only response with finish reason `stop` is a completed model response,
+not proof that an output-token ceiling was reached.
+The authoritative AWP model gateway adds its current UTC reference time to model
+instructions, using the server TimeProvider. Relative dates can use this reference
+and an explicitly supplied user/source time zone. This per-call context does not
+rewrite the authored Agent revision or immutable execution material.
 Invocation guidance from the assigned immutable Tool remains available when live
 Source metadata cannot be resolved; it grants no extra data or metadata access.
 Server logs and material-resolution trace tags report presentation coverage and

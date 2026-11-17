@@ -239,6 +239,8 @@ public sealed partial class KnowledgeMetadataTests
         StringAssert.Contains(result.Instructions, "Knowledge Sources assigned");
         StringAssert.Contains(result.Instructions, "Never send snapshotId beside request");
         StringAssert.Contains(result.Instructions, "Consult data from every exposed input");
+        StringAssert.Contains(result.Instructions, "issue its structured Tool call now");
+        StringAssert.Contains(result.Instructions, "Do not finish with only a plan");
         StringAssert.Contains(result.Instructions, "unavailable or unconsulted source/input");
         if (replaceSource || noRequestContext)
         {
