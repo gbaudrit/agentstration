@@ -322,10 +322,12 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
             .SearchAsync(new(created.Value.Name, ScopeRef: Owner), new() { Query = "alpha" }, default));
         var revisedInput = await management.PutAsync(first.Value.Namespace, first.Value.Name, Owner,
             first.Value.Definition with { DisplayName = "Revised input" }, first.ETag, default);
-        await Assert.ThrowsAsync<KnowledgeSourceValidationException>(() => sources.PutExactAsync(Owner, new(shared.Value.Name),
-            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default));
-        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), shared.Value.Definition,
-            shared.ETag, default, rebindDependencies: true);
+        Assert.AreEqual(first.Value.Generation, revisedInput.Value.Generation);
+        var editedShared = await sources.PutExactAsync(Owner, new(shared.Value.Name),
+            shared.Value.Definition with { DisplayName = "Cosmetic edit" }, shared.ETag, default);
+        Assert.AreEqual(shared.Value.Generation, editedShared.Value.Generation);
+        var explicitlyRebound = await sources.PutExactAsync(Owner, new(shared.Value.Name), editedShared.Value.Definition,
+            editedShared.ETag, default, rebindDependencies: true);
         Assert.AreEqual(revisedInput.Value.Generation, explicitlyRebound.Value.Composition!.DataSources.Single().DataSourceGeneration);
         var renamed = await factory.Services.GetRequiredService<StorageManagementService>().PutExactAsync(Owner, output.Value.Namespace,
             output.Value.Name, output.Value.Definition with { DisplayName = "Edited Storage" }, output.ETag, default);
