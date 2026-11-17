@@ -21,8 +21,8 @@ public sealed class StorageTypeVersionDraft
     public bool DurableRetention { get; set; }
     public bool Deprecated { get; set; }
     public int MaximumPageSize { get; set; } = 100;
-    public int MaximumReadBytes { get; set; } = 1048576;
-    public int MaximumWriteBytes { get; set; } = 1048576;
+    public int MaximumReadBytes { get; set; } = 10485760;
+    public int MaximumWriteBytes { get; set; } = 10485760;
 
     public StorageTypeVersionDescriptor Build()
     {

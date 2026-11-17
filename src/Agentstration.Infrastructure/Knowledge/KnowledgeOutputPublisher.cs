@@ -8,13 +8,15 @@ using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Schemas;
+using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Knowledge;
 
 public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publications, IResourceStore resources,
     IArtifactDurableStore durable, IAuthorizationService authorization, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
-    IStoredArtifactRegistrar artifacts, IStorageDocumentGateway? documents = null, IStorageResolver? storages = null, TimeProvider? clock = null) : IKnowledgeOutputPublisher
+    IStoredArtifactRegistrar artifacts, IStorageDocumentGateway? documents = null, IStorageResolver? storages = null,
+    TimeProvider? clock = null, StorageContentOptions? options = null) : IKnowledgeOutputPublisher
 {
     public async Task<IReadOnlyList<KnowledgeSnapshotArtifact>> PublishAsync(KnowledgeSourceResource source,
         KnowledgeProjectionResource projection, KnowledgeProjectionManifest manifest, CancellationToken cancellationToken)
@@ -39,7 +41,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
             var mediaType = item.MediaType ?? "application/octet-stream";
             if (item.Kind == KnowledgeArtifactKind.Inline)
             {
-                if (item.ContentBase64 is not { Length: <= 87384 } encoded)
+                if (item.ContentBase64 is not { } encoded || encoded.Length > (((options ?? new()).MaximumObjectBytes + 2L) / 3) * 4)
                     throw new KnowledgeProjectionException("knowledge_output_invalid", "Inline content is required and must be bounded.");
                 bytes = Convert.FromBase64String(encoded);
             }
@@ -52,7 +54,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                     ResourceScopeRef.Workspace(current.Current.WorkspaceId), ResourceNamespace.Default,
                     ArtifactResourceKinds.FlowRunArtifact, FlowRunArtifactId.Parse(item.ArtifactId).ToString()), cancellationToken))?.Value
                     ?? throw new KnowledgeProjectionException("knowledge_output_artifact_missing", "The output Artifact is unavailable.");
-                if (artifact.Receipt.Length > 65536) throw new KnowledgeProjectionException("knowledge_output_too_large", "The output exceeds the publication limit.");
+                if (artifact.Receipt.Length > (options ?? new()).MaximumObjectBytes) throw new KnowledgeProjectionException("knowledge_output_too_large", "The output exceeds the publication limit.");
                 bytes = await durable.ReadAsync(new(current.Current.WorkspaceId), artifact.Receipt.OpaqueReference, 0, (int)artifact.Receipt.Length, cancellationToken);
                 if (bytes.Length != artifact.Receipt.Length) throw new KnowledgeProjectionException("knowledge_output_incomplete", "The output Artifact is incomplete.");
                 if (!string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes.Span)), artifact.Receipt.Sha256,

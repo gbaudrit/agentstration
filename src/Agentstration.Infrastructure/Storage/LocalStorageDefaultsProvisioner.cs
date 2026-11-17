@@ -12,7 +12,7 @@ public sealed record LocalStorageDefaultProvisioning(StorageAvailability Availab
 
 public sealed partial class LocalStorageDefaultsProvisioner(IResourceStore resources, StorageManagementService storages,
     StorageTypeManagementService types, IResourceGovernanceContext governance,
-    ILogger<LocalStorageDefaultsProvisioner> logger) : IDisposable
+    ILogger<LocalStorageDefaultsProvisioner> logger, StorageContentOptions? options = null) : IDisposable
 {
     public const string DefaultName = "local-default";
     public const string WorkspaceAnnotation = "agentstration.io/local-storage-workspace";
@@ -77,7 +77,7 @@ public sealed partial class LocalStorageDefaultsProvisioner(IResourceStore resou
                             ContractDigest = version.ContractDigest
                         },
                         Configuration = JsonSerializer.SerializeToElement(new { }),
-                        Envelope = JsonSerializer.SerializeToElement(new StorageContentPolicy(Write: true), Json)
+                        Envelope = JsonSerializer.SerializeToElement((options ?? new()).DefaultPolicy(write: true), Json)
                     }
                 };
                 // Reuse the owning service's current generic Use and resource validation. Provisioning changes no grants.

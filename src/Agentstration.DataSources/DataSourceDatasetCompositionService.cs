@@ -15,10 +15,10 @@ public sealed class DataSourceDatasetCompositionService(
     IStorageResolver storage,
     IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
     DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null,
-    IStoragePublicationGateway? publications = null)
+    IStoragePublicationGateway? publications = null, DataSourceContentOptions? options = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
-    internal const int MaximumValueBytes = 64 * 1024;
+    public int MaximumValueBytes { get; } = (options ?? new()).MaximumValueBytes;
 
     public async Task<ResolvedDataSourceDataset> ResolveAsync(DataSourceResource source,
         ResourceScopeRef consumer, CancellationToken cancellationToken, ResolvedDataSourceDataset? accepted = null)
@@ -41,7 +41,7 @@ public sealed class DataSourceDatasetCompositionService(
         var finalSnapshot = definition.OutputSchemaSnapshot;
         var output = finalSnapshot is null ? rawOutput : JsonSchemaSelection.Select(finalSnapshot.Content);
         ValidateSchema(output);
-        ValidateValue(input, definition.Acquisition.Parameters);
+        ValidateValue(input, definition.Acquisition.Parameters, MaximumValueBytes);
         var partition = Partition(source);
         if (definition.Storage is { } inputStorage)
         {
@@ -206,19 +206,19 @@ public sealed class DataSourceDatasetCompositionService(
         { DocumentCollectionUid = dataset.Definition.DocumentCollectionUid };
     }
 
-    public static void ValidateValue(JsonElement schema, JsonElement value)
+    public static void ValidateValue(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes)
     {
         ValidateSchema(schema);
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumBytes)
             throw Invalid("data_source_parameters_invalid", "Operation values must be bounded JSON.");
         try { ToolInputSchemaValidator.Validate(schema, value); }
         catch (ToolInputValidationException)
         { throw Invalid("data_source_parameters_invalid", "The value does not satisfy the effective operation schema."); }
     }
 
-    public static void ValidateOutput(JsonElement schema, JsonElement value)
+    public static void ValidateOutput(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes)
     {
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > MaximumValueBytes)
+        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumBytes)
             throw Invalid("data_source_output_too_large", "The transformed output exceeds the bounded JSON payload limit.");
         try { Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(schema, "dataset-output"), value, "dataset-output"); }
         catch (Agentstration.Schemas.DataContractException)

@@ -262,7 +262,7 @@ public sealed class ArtifactTransformationFlowActivationGuard : IFlowVersionActi
             $"The {KnowledgeFlowContracts.ArtifactTransformation} {direction} schema {detail}.");
 }
 
-public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
+public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store, Agentstration.Storage.StorageContentOptions? options = null)
     : IKnowledgeArtifactReferenceValidator
 {
     public async Task ValidateAsync(
@@ -276,7 +276,7 @@ public sealed class KnowledgeArtifactReferenceValidator(IResourceStore store)
             {
                 var exists = reference.Kind switch
                 {
-                    KnowledgeArtifactKind.Inline => reference.ContentBase64 is { Length: <= 87384 },
+                    KnowledgeArtifactKind.Inline => reference.ContentBase64 is { } encoded && encoded.Length <= (((options ?? new()).MaximumObjectBytes + 2L) / 3) * 4,
                     KnowledgeArtifactKind.Staged => await store.GetExactAsync<StagedArtifactResource>(ScopedResourceAddress.Create(
                         ResourceScopeRef.Workspace(workspaceId), ResourceNamespace.Default, ArtifactResourceKinds.StagedArtifact,
                         StagedArtifactId.Parse(reference.ArtifactId).ToString()), cancellationToken) is not null,

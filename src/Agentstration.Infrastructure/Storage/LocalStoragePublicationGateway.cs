@@ -12,10 +12,10 @@ namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>Local retained publications use a separate namespace from mutable ASP objects.</summary>
 public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IStorageContentGateway content, IResourceStore resources,
-    LocalStoragePaths paths, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IStoragePublicationGateway
+    LocalStoragePaths paths, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, StorageContentOptions? options = null) : IStoragePublicationGateway
 {
-    private const int MaximumPublications = 1024;
-    private const int MaximumContentBytes = 65536;
+    private readonly StorageContentOptions limits = options ?? new();
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private sealed record Document(StoragePublicationReference Reference, byte[] Content);
 
@@ -28,7 +28,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         IReadOnlyList<JsonElement> records, CancellationToken cancellationToken, DateTimeOffset? notAfter = null) => GuardAsync<StoragePublicationReference>(async () =>
     {
         var aggregate = StorageRecordSets.Encode(records);
-        if (aggregate.Length > target.Policy.MaximumWriteBytes)
+        if (aggregate.Length > Math.Min(limits.MaximumObjectBytes, Math.Min(limits.MaximumWriteBytes, target.Policy.MaximumWriteBytes)))
             throw Error("storage_publication_limit", "The record set exceeds the publication limit.");
         var members = new List<StoragePublicationReference>();
         for (var index = 0; index < records.Count; index++)
@@ -87,7 +87,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         await authorization.EnsurePermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, cancellationToken);
         var resolved = await resolver.ResolveAsync(target.Storage, target.Consumer, cancellationToken);
         var envelope = resolved.Envelope.Deserialize<StorageContentPolicy>(Json)!;
-        if (bytes.Length > Math.Min(Math.Min(MaximumContentBytes, target.Policy.MaximumWriteBytes),
+        if (bytes.Length > Math.Min(Math.Min(Math.Min(limits.MaximumObjectBytes, limits.MaximumWriteBytes), target.Policy.MaximumWriteBytes),
                 Math.Min(resolved.Limits.MaximumWriteBytes, envelope.MaximumWriteBytes))
             || string.IsNullOrWhiteSpace(publicationId) || publicationId.Length > 256)
             throw Error("storage_publication_limit", "The publication exceeds its bounds.");
@@ -123,7 +123,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         var pendingPath = FileFor(reference, true);
         if (File.Exists(sealedPath)) { _ = await LoadAsync(reference, sealedPath, cancellationToken); return reference; }
         if (File.Exists(pendingPath)) { _ = await LoadAsync(reference, pendingPath, cancellationToken); return reference; }
-        if (Directory.EnumerateFiles(directory, "*.json").Take(MaximumPublications).Count() >= MaximumPublications)
+        if (Directory.EnumerateFiles(directory, "*.json").Take(limits.LocalMaximumPublications).Count() >= limits.LocalMaximumPublications)
             throw Error("storage_publication_capacity", "The retained publication capacity has been reached.");
         var temporary = LocalStoragePaths.Checked(Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp"));
         try
@@ -193,7 +193,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
         await content.ValidateAsync(reference.Target with { Policy = reference.Target.Policy with { Write = false } }, cancellationToken);
         await authorization.EnsurePermissionAsync(current.Current, AuthorizationPermissions.RunsRead, cancellationToken);
         if (offset < 0 || offset > reference.Length || length < 1
-            || length > Math.Min(Math.Min(MaximumContentBytes, reference.Target.Policy.MaximumReadBytes),
+            || length > Math.Min(Math.Min(limits.MaximumReadBytes, reference.Target.Policy.MaximumReadBytes),
                 Math.Min(resolved.Limits.MaximumReadBytes, envelope.MaximumReadBytes)))
             throw Error("storage_publication_range_invalid", "The publication read exceeds its bounds.");
         var document = await LoadAsync(reference, FileFor(reference, false), cancellationToken);
@@ -210,11 +210,11 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
             throw Error("storage_publication_reference_invalid", "The publication belongs to another scope.");
         return LocalStoragePaths.Checked(Path.Combine(DirectoryFor(reference), identity + (pending ? ".pending.json" : ".json")));
     }
-    private static async Task<Document> LoadAsync(StoragePublicationReference reference, string path, CancellationToken cancellationToken)
+    private async Task<Document> LoadAsync(StoragePublicationReference reference, string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path)) throw Error("storage_publication_unavailable", "The exact publication is unavailable.");
         await using var stream = File.OpenRead(LocalStoragePaths.Checked(path));
-        if (stream.Length > MaximumContentBytes * 3) throw Error("storage_publication_integrity", "Invalid publication size.");
+        if (stream.Length > limits.MaximumObjectBytes * 3L) throw Error("storage_publication_integrity", "Invalid publication size.");
         if (IsJsonRecord(reference))
         {
             var receiptPath = ReceiptPath(path);

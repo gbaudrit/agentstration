@@ -22,6 +22,7 @@ internal static class StorageServiceCollectionExtensions
         var storageOptions = context.Options.Storage;
         var storageProvider = context.StorageProvider;
         services.AddSingleton(storageOptions);
+        services.AddSingleton(context.Options.StorageContent);
         services.AddSingleton<InstanceInitializationOptions>();
         services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
         services.AddSingleton<WorkspacePlatformResourceProvisioner>();

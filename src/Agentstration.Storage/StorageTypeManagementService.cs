@@ -224,8 +224,8 @@ public sealed class StorageTypeManagementService(
             }
             if (version.Capabilities is null || version.Limits is null
                 || version.Limits.MaximumPageSize is < 1 or > 1000
-                || version.Limits.MaximumReadBytes is < 1 or > 16 * 1024 * 1024
-                || version.Limits.MaximumWriteBytes is < 1 or > 16 * 1024 * 1024
+                || version.Limits.MaximumReadBytes is < 1 or > StorageContentOptions.SupportedMaximumBytes
+                || version.Limits.MaximumWriteBytes is < 1 or > StorageContentOptions.SupportedMaximumBytes
                 || (version.Capabilities.DurableRetention && !version.Capabilities.StableVersions))
                 throw new StorageException("storage_capabilities_invalid", "Invalid capabilities or bounded limits.");
             var authority = governance.Current?.ManagedBy ?? resource.Governance.ManagedBy;

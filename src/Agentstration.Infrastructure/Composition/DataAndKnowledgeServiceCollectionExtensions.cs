@@ -15,6 +15,7 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationDataAndKnowledge(this IServiceCollection services, AgentstrationCompositionContext context)
     {
         var enableHostedServices = context.Options.EnableHostedServices;
+        services.AddSingleton(context.Options.DataSourceContent);
         services.AddSingleton<Agentstration.Flows.IFlowCompositionResolver, SourceFlowCompositionResolver>();
         services.AddSingleton<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>();
         services.AddSingleton<Agentstration.Artifacts.IArtifactMaterializationAdmission>(provider => provider.GetRequiredService<Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance>());

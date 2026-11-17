@@ -3,8 +3,8 @@ namespace Agentstration.Storage.Contracts;
 /// <summary>A consumer can only narrow the Storage envelope; it cannot replace a connection or implementation.</summary>
 public sealed record StorageContentPolicy(
     bool List = true, bool Stat = true, bool Read = true, bool Write = false,
-    string Prefix = "", int MaximumPageSize = 100, int MaximumReadBytes = 65536,
-    int MaximumWriteBytes = 65536, string? KeyFrom = null, string? KeyBefore = null);
+    string Prefix = "", int MaximumPageSize = 100, int MaximumReadBytes = 10485760,
+    int MaximumWriteBytes = 10485760, string? KeyFrom = null, string? KeyBefore = null);
 
 public sealed record StorageContentRequest(
     StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy)
