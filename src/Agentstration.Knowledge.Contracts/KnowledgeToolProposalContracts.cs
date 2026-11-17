@@ -53,6 +53,13 @@ public sealed record KnowledgeContributionDescription(KnowledgeContributionSelec
     string State, IReadOnlyList<string> DocumentIds, IReadOnlyList<JsonElement> Schemas,
     string? AcquisitionId, DateTimeOffset? AcquiredAt)
 {
+    public string Name => Selection.BindingName;
+    public string Input { get; init; } = Selection.BindingName;
+    public string? DescribeTool { get; init; }
+    public bool InputFixed { get; init; }
+    public JsonElement DescribeArguments => InputFixed
+        ? JsonSerializer.SerializeToElement(new { request = new { } })
+        : JsonSerializer.SerializeToElement(new { request = new { input = Input } });
     public string? Description { get; init; }
     public string DescriptionSource { get; init; } = "published";
     public IReadOnlyList<string> MediaTypes { get; init; } = [];

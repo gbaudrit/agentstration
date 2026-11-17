@@ -5,6 +5,13 @@ namespace Agentstration.Knowledge;
 /// <summary>Publication-owned attribution; business query arguments cannot create membership.</summary>
 public static class KnowledgeContributions
 {
+    public static string? InputId(KnowledgeToolProposal tool)
+    {
+        var suffix = "." + KnowledgeAccessSchemas.Route(tool.Operation);
+        return tool.Contribution is not null && tool.Route.Length > suffix.Length && tool.Route.EndsWith(suffix, StringComparison.Ordinal)
+            ? tool.Route[..^suffix.Length] : null;
+    }
+
     public static KnowledgeContributionSelection ForArtifact(Guid sourceUid,
         IReadOnlyList<KnowledgeProjectionInputEvidence> inputs, string artifactId)
     {

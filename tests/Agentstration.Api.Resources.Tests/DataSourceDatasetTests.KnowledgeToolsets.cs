@@ -24,7 +24,9 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    public async Task MixedContributionToolsetPreviewsWithoutPublicationDescribesAndEnforcesIndependentAccess()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task MixedContributionToolsetPreviewsWithoutPublicationDescribesAndEnforcesIndependentAccess(bool workspaceExecution)
     {
         var model = new KnowledgeToolsetProbeModel();
         await using var factory = Factory().WithWebHostBuilder(b =>
@@ -100,7 +102,7 @@ public sealed partial class DataSourceDatasetTests
         var acquisitions = factory.Services.GetRequiredService<DataSourceAcquisitionService>();
         var firstProposal = await exposures.ProposeAsync(id, default);
         Assert.IsTrue(firstProposal.Ready, string.Join("; ", firstProposal.Issues));
-        Assert.HasCount(11, firstProposal.Tools); // describe, status, 3 independently selected operations per binding
+        Assert.HasCount(14, firstProposal.Tools); // source describe/status and four independently selected operations per input
         Assert.HasCount(3, firstProposal.Tools.Where(t => t.Operation == KnowledgeSourceOperation.StructuredQuery));
         Assert.IsNull(await exposures.GetAsync(id, default));
         Assert.IsEmpty(await acquisitions.ListAsync(origin.Value.Namespace, origin.Value.Name, Owner, default));
@@ -123,8 +125,8 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode, await stale.Content.ReadAsStringAsync());
         var proposal = await exposures.ProposeAsync(id, default);
         var exposure = await exposures.PublishAsync(id, "1.0.0", false, default, proposal.Digest);
-        Assert.HasCount(11, exposure.Value.Operations);
-        var describedTool = exposure.Value.Operations.Single(t => t.Operation == KnowledgeSourceOperation.Describe).Tool;
+        Assert.HasCount(14, exposure.Value.Operations);
+        var describedTool = exposure.Value.Operations.Single(t => t.Operation == KnowledgeSourceOperation.Describe && t.Proposal!.Contribution is null).Tool;
         async Task<JsonElement> Run(ResourceReference tool, object request)
         {
             using var response = await client.PostAsJsonAsync($"/api/tools/{tool.Name}/run?scopeRef=/instance",
@@ -136,7 +138,7 @@ public sealed partial class DataSourceDatasetTests
         }
         var before = await Run(describedTool, new { });
         Assert.AreEqual("not_published", before.GetProperty("state").GetString());
-        Assert.HasCount(11, before.GetProperty("toolSummaries").EnumerateArray());
+        Assert.HasCount(14, before.GetProperty("toolSummaries").EnumerateArray());
         Assert.IsEmpty(before.GetProperty("tools").EnumerateArray());
         Assert.IsFalse(before.GetRawText().Contains("inputSchema", StringComparison.Ordinal));
         Assert.AreEqual("Updated supplier records", before.GetProperty("contributions")[0].GetProperty("description").GetString());
@@ -147,6 +149,7 @@ public sealed partial class DataSourceDatasetTests
             pending => access.QueryDocumentsAsync(id, query with { PreparationId = pending.PreparationId }, default));
         var a = published.SnapshotId!;
         var selected = exposure.Value.Operations.Single(t => t.Operation == KnowledgeSourceOperation.StructuredQuery && t.Proposal!.Contribution!.BindingName == "invoices");
+        var inputDescribe = exposure.Value.Operations.Single(t => t.Operation == KnowledgeSourceOperation.Describe && t.Proposal!.Contribution?.BindingName == "invoices").Tool;
         var aggregate = await Run(selected.Tool, new { snapshotId = a, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } });
         Assert.AreEqual(2, aggregate.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Count").GetInt32());
         Assert.AreEqual(30, aggregate.GetProperty("documentPage").GetProperty("groups")[0].GetProperty("Total").GetInt32());
@@ -179,7 +182,7 @@ public sealed partial class DataSourceDatasetTests
         var details = await Run(describedTool, new { snapshotId = a, input = "contracts" });
         Assert.AreEqual("input", details.GetProperty("detailLevel").GetString());
         Assert.HasCount(1, details.GetProperty("contributions").EnumerateArray());
-        Assert.HasCount(3, details.GetProperty("tools").EnumerateArray());
+        Assert.HasCount(4, details.GetProperty("tools").EnumerateArray());
         Assert.IsTrue(details.GetProperty("tools")[0].TryGetProperty("inputSchema", out _));
         var metadataOnly = await sources.PutAsync(id, changed.Value.Definition with { DataSources = changed.Value.Definition.DataSources.Select(b => b.Name == "invoices" ? b with { Description = "Current invoice purpose" } : b).ToArray() }, changed.ETag, default);
         Assert.AreEqual(changed.Value.Generation, metadataOnly.Value.Generation);
@@ -187,6 +190,13 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(previewBeforeEditorial.Digest, afterEditorial.Digest);
         Assert.IsTrue(afterEditorial.Tools.All(t => t.Change == "unchanged"));
         Assert.AreEqual("1.0.0", (await exposures.GetAsync(id, default))!.Value.ToolSetVersion);
+        var invoiceDetails = await Run(inputDescribe, new { snapshotId = a });
+        Assert.AreEqual("invoices", invoiceDetails.GetProperty("contributions")[0].GetProperty("selection").GetProperty("bindingName").GetString());
+        Assert.HasCount(4, invoiceDetails.GetProperty("tools").EnumerateArray());
+        var alias = overview.GetProperty("contributions").EnumerateArray().Single(c => c.GetProperty("selection").GetProperty("bindingName").GetString() == "invoices").GetProperty("input").GetString();
+        var aliased = await Run(describedTool, new { snapshotId = a, input = alias });
+        Assert.AreEqual("invoices", aliased.GetProperty("contributions")[0].GetProperty("selection").GetProperty("bindingName").GetString());
+
         // Real AWP Agent execution with a partial ToolSet assignment: discovery cannot advertise siblings.
         var agents = factory.Services.GetRequiredService<AgentManagementService>();
         var agent = await agents.PutAgentAsync(new()
@@ -202,13 +212,13 @@ public sealed partial class DataSourceDatasetTests
                 Tools = [],
                 ModelProfile = new("reasoning-default", Owner),
                 RuntimeProfile = new("maf-builtin", Owner),
-                ToolSets = [new() { ToolSet = exposure.Value.ToolSet, Version = "1.0.0", Members = [describedTool.Name, selected.Tool.Name] }]
+                ToolSets = [new() { ToolSet = exposure.Value.ToolSet, Version = "1.0.0", Members = [describedTool.Name, inputDescribe.Name, selected.Tool.Name] }]
             }
         }, null, true, default);
         await agents.EnsureExecutionRevisionAsync(agent.Value.Namespace, agent.Value.Name, Owner, agent.Value.Generation, default);
         var declared = new List<Agentstration.Runtime.Abstractions.RuntimeToolReference>();
         var store = factory.Services.GetRequiredService<IResourceStore>();
-        foreach (var reference in new[] { describedTool, selected.Tool })
+        foreach (var reference in new[] { describedTool, inputDescribe, selected.Tool })
         {
             var stored = (await store.GetExactAsync<Agentstration.Tools.ToolResource>(new(reference.ScopeRef!.Value, reference.Namespace ?? default, "Tool", reference.Name), default))!.Value;
             declared.Add(new(Agentstration.Tools.ToolResourceIdentity.CatalogId(stored.Namespace, stored.Name), stored.Namespace, stored.ScopeRef!.Value, stored.Uid, stored.Generation));
@@ -236,18 +246,18 @@ public sealed partial class DataSourceDatasetTests
             }), default, default);
         await flows.PublishVersionExactAsync(Owner, flow.Value.Id, "1.0.0", true, default);
         using var submitted = await client.PostAsJsonAsync("/api/flows/mixed-knowledge-agent/runs?scopeRef=/instance",
-            new CreateFlowRunRequest(Empty, "1.0.0") { DefinitionScopeRef = Owner, ExecutionScopeRef = Owner });
+            new CreateFlowRunRequest(Empty, "1.0.0") { DefinitionScopeRef = Owner, ExecutionScopeRef = workspaceExecution ? ResourceScopeRef.Workspace(fixture.Context.WorkspaceId) : Owner });
         Assert.AreEqual(HttpStatusCode.Accepted, submitted.StatusCode, await submitted.Content.ReadAsStringAsync());
         var agentRun = (await submitted.Content.ReadFromJsonAsync<FlowRun>())!;
         for (var i = 0; i < 600 && agentRun.Status is FlowRunStatus.Pending or FlowRunStatus.Running; i++)
         { await Task.Delay(20); agentRun = (await client.GetFromJsonAsync<FlowRun>($"/api/flowRuns/{agentRun.Id}"))!; }
         Assert.AreEqual(FlowRunStatus.Succeeded, agentRun.Status, model.Diagnostic + "\n" + JsonSerializer.Serialize(agentRun.Error));
-        Assert.AreEqual(2, model.ObservedAccessCount);
+        Assert.AreEqual(3, model.ObservedAccessCount);
         Assert.AreEqual(30, model.ObservedTotal);
         Assert.AreEqual(1, model.ObservedDetailedInputs);
         _ = await sources.PutAsync(id, metadataOnly.Value.Definition with { DataSources = metadataOnly.Value.Definition.DataSources.Take(2).ToArray() }, metadataOnly.ETag, default);
         var removed = await exposures.ProposeAsync(id, default);
-        Assert.HasCount(3, removed.Tools.Where(t => t.Change == "removed"));
+        Assert.HasCount(4, removed.Tools.Where(t => t.Change == "removed"));
         var exact = await access.QueryDocumentsAsync(id, query with { SnapshotId = a, Contribution = queryPin }, default);
         Assert.HasCount(2, exact.DocumentPage!.Documents);
 
@@ -267,7 +277,7 @@ public sealed partial class DataSourceDatasetTests
             var results = history.SelectMany(m => m.Contents).OfType<FunctionResultContent>().ToArray();
             var tools = options!.Tools!.OfType<AIFunctionDeclaration>().ToArray();
             Diagnostic = JsonSerializer.Serialize(new { options.Instructions, Tools = tools.Select(t => new { t.Name, t.Description }), Results = results.Length });
-            Assert.HasCount(2, tools);
+            Assert.HasCount(3, tools);
             foreach (var declaration in tools)
             {
                 var properties = declaration.JsonSchema.GetProperty("properties");
@@ -280,6 +290,8 @@ public sealed partial class DataSourceDatasetTests
             StringAssert.Contains(options.Instructions!, "mixed-knowledge");
             Assert.IsFalse(options.Instructions!.Contains("unassigned-knowledge", StringComparison.Ordinal));
             StringAssert.Contains(options.Instructions!, "before the first data access");
+            StringAssert.Contains(options.Instructions!, "Consult data from every exposed input");
+            StringAssert.Contains(options.Instructions!, "Discovery alone is not a data consultation");
             var queryDeclaration = tools.Single(t => t.Name.Contains("query-documents", StringComparison.Ordinal));
             var querySchema = queryDeclaration.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query");
             Assert.AreEqual("object", querySchema.GetProperty("type").GetString());
@@ -293,7 +305,7 @@ public sealed partial class DataSourceDatasetTests
                 var described = JsonSerializer.SerializeToElement(results[0].Result);
                 StringAssert.Contains(described.GetProperty("invocationInstructions").GetString()!, "request.snapshotId");
                 ObservedAccessCount = described.GetProperty("access").GetArrayLength();
-                Assert.AreEqual(2, ObservedAccessCount);
+                Assert.AreEqual(3, ObservedAccessCount);
                 Assert.HasCount(1, described.GetProperty("contributions").EnumerateArray());
             }
             if (results.Length > 1)
@@ -304,7 +316,7 @@ public sealed partial class DataSourceDatasetTests
                 var recordSchema = detail.GetProperty("contributions")[0].GetProperty("recordSchemas").EnumerateArray().Single();
                 Assert.AreEqual("object", recordSchema.GetProperty("type").GetString());
                 Assert.IsTrue(recordSchema.GetProperty("properties").TryGetProperty("status", out _));
-                Assert.HasCount(1, detail.GetProperty("tools").EnumerateArray());
+                Assert.HasCount(2, detail.GetProperty("tools").EnumerateArray());
             }
             if (results.Length > 2)
             {
@@ -313,8 +325,16 @@ public sealed partial class DataSourceDatasetTests
                 Assert.AreEqual(30, ObservedTotal);
                 return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "INVOICES_OK")) { FinishReason = ChatFinishReason.Stop });
             }
-            var tool = tools.Single(t => results.Length < 2 ? t.Name.Contains(".describe.", StringComparison.Ordinal) : t.Name.Contains("query-documents", StringComparison.Ordinal));
-            object request = results.Length == 0 ? new { snapshotId = Snapshot } : results.Length == 1 ? new { snapshotId = Snapshot, input = "invoices" } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
+            var input = results.Length == 0 ? default : JsonSerializer.SerializeToElement(results[0].Result).GetProperty("contributions")[0];
+            var tool = tools.Single(t => results.Length == 0 ? t.Name.Contains(".access.describe.", StringComparison.Ordinal)
+                : results.Length == 1 ? t.Name == input.GetProperty("describeTool").GetString()
+                : t.Name.Contains("query-documents", StringComparison.Ordinal));
+            if (results.Length == 1)
+            {
+                Assert.IsFalse(tool.JsonSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").TryGetProperty("input", out _));
+                Assert.IsEmpty(input.GetProperty("describeArguments").GetProperty("request").EnumerateObject());
+            }
+            object request = results.Length < 2 ? new { snapshotId = Snapshot } : new { snapshotId = Snapshot, query = new Dictionary<string, string> { ["$apply"] = "aggregate($count as Count,value with sum as Total)" } };
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
                 [new FunctionCallContent("knowledge-call-" + results.Length, tool.Name, new Dictionary<string, object?> { ["request"] = request })]))
             { FinishReason = ChatFinishReason.ToolCalls });

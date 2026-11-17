@@ -99,7 +99,7 @@ public sealed partial class KnowledgeMetadataTests
         });
         var candidate = new KnowledgeToolProposal
         {
-            Route = "contracts.read",
+            Route = "contracts-b70461ec.read",
             DefinitionName = "contracts-read",
             Operation = KnowledgeSourceOperation.Read,
             Contribution = selection,
@@ -138,6 +138,10 @@ public sealed partial class KnowledgeMetadataTests
         Assert.IsEmpty(result.Contributions.Single().DocumentIds);
         Assert.IsEmpty(result.Contributions.Single().Schemas);
         Assert.AreEqual("Contracts", result.ToolSummaries.Single().DisplayName);
+        Assert.AreEqual("contracts-b70461ec", result.Contributions.Single().Input);
+        Assert.AreEqual("contracts-b70461ec", result.Contributions.Single().DescribeArguments.GetProperty("request").GetProperty("input").GetString());
+        var aliased = await f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts-b70461ec"), default);
+        Assert.AreEqual(selection, aliased.Contributions.Single().Selection);
         var detailed = await f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts"), default);
         Assert.AreEqual("input", detailed.DetailLevel);
         Assert.AreEqual("Contracts", detailed.Tools.Single().DisplayName);
@@ -153,17 +157,33 @@ public sealed partial class KnowledgeMetadataTests
         Assert.IsEmpty(restricted.Access);
         Assert.IsEmpty(restricted.Contributions);
         await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts"), default, [], agent: true));
+        await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a", Input: "contracts-b70461ec"), default, [], agent: true));
         await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id, new("published-a"), default, agent: true));
+        var published = (await f.Store.GetExactAsync<KnowledgeToolExposureVersion>(new(f.Source.ScopeRef!.Value,
+            f.Source.Namespace, "KnowledgeToolExposureVersion", "published-a"), default))!.Value;
+        f.Store.Add(published with
+        {
+            Proposal = published.Proposal with
+            {
+                Tools = [candidate,
+                    candidate with { Route = "other.read", Contribution = new("contracts-b70461ec", Guid.NewGuid()) }]
+            }
+        });
+        var ambiguous = await Assert.ThrowsAsync<KnowledgeAccessException>(() => f.Access.DescribeAsync(f.Id,
+            new("published-a", Input: "contracts-b70461ec"), default));
+        Assert.AreEqual("knowledge_describe_input_not_exposed", ambiguous.Code);
 
     }
     [TestMethod]
-    [DataRow("workspace")]
-    [DataRow("tenant")]
-    [DataRow("instance")]
-    public async Task RuntimeDiscoveryAndODataSchemasRefreshOldPublicationsInEachOwnerScope(string owner)
+    [DataRow("workspace", false, false)]
+    [DataRow("tenant", false, false)]
+    [DataRow("instance", false, false)]
+    [DataRow("instance", true, false)]
+    [DataRow("instance", false, true)]
+    public async Task RuntimeDiscoveryAndODataSchemasRefreshOldPublicationsInEachOwnerScope(string owner, bool replaceSource, bool noRequestContext)
     {
         var f = new Fixture(owner);
-        using var scope = f.Push();
+        using var scope = noRequestContext ? null : f.Push();
         var original = JsonSerializer.Deserialize<JsonElement>("""
             {"type":"object","properties":{"request":{"type":"object","properties":{"query":{}},"additionalProperties":false}},"additionalProperties":false}
             """);
@@ -213,10 +233,19 @@ public sealed partial class KnowledgeMetadataTests
             });
             tools.Add(new PresentationProbeTool(name, original, f.Source.ScopeRef));
         }
+        if (replaceSource) f.Store.Add(f.Source with { Uid = Guid.NewGuid(), Definition = f.Source.Definition with { Description = "Private replacement Source purpose" } });
         var enricher = new KnowledgeAgentPresentationEnricher(f.Store, new KnowledgeToolMetadataService(f.Store, f.Sources, f.Context), f.Context);
         var result = await enricher.EnrichAsync(new("Authored instructions", tools), default);
         StringAssert.Contains(result.Instructions, "Knowledge Sources assigned");
         StringAssert.Contains(result.Instructions, "Never send snapshotId beside request");
+        StringAssert.Contains(result.Instructions, "Consult data from every exposed input");
+        StringAssert.Contains(result.Instructions, "unavailable or unconsulted source/input");
+        if (replaceSource || noRequestContext)
+        {
+            StringAssert.Contains(result.Instructions, "unavailable");
+            Assert.IsFalse(result.Instructions.Contains("Private replacement Source purpose", StringComparison.Ordinal));
+            Assert.IsFalse(result.Tools.Any(tool => tool.Description!.Contains("Private replacement Source purpose", StringComparison.Ordinal)));
+        }
         var query = result.Tools.Single(tool => tool.Name.Contains("query", StringComparison.Ordinal));
         Assert.AreEqual("object", query.InputSchema.GetProperty("properties").GetProperty("request").GetProperty("properties").GetProperty("query").GetProperty("type").GetString());
         StringAssert.Contains(query.Description!, "eq/ne/gt/ge/lt/le");

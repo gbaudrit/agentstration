@@ -114,6 +114,7 @@ public sealed partial class KnowledgeSourceToolExposureService(
                         ["agentstration.io/knowledge-source"] = source.Value.Name,
                         [KnowledgeSourceUidAnnotation] = source.Value.Uid.ToString("D"),
                         [KnowledgeToolMetadataService.UsageAnnotation] = candidate.Usage ?? candidate.Description,
+                        [KnowledgeToolMetadataService.SelectionAnnotation] = JsonSerializer.Serialize(candidate.Contribution, Json),
                         ["agentstration.io/knowledge-source-scope"] = source.Value.ScopeRef!.Value.Value,
                         ["agentstration.io/knowledge-operation"] = route
                     }
@@ -137,7 +138,9 @@ public sealed partial class KnowledgeSourceToolExposureService(
                     }, .. candidate.Profile is not null
                         ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/profile", Value = JsonSerializer.SerializeToElement(candidate.Profile, Json) } } : [],
                     .. candidate.Contribution is not null
-                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/contribution", Value = JsonSerializer.SerializeToElement(candidate.Contribution, Json) } } : [],
+                        ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = operation == KnowledgeSourceOperation.Describe ? "/request/input" : "/request/contribution",
+                            Value = operation == KnowledgeSourceOperation.Describe ? JsonSerializer.SerializeToElement(KnowledgeContributions.InputId(candidate))
+                                : JsonSerializer.SerializeToElement(candidate.Contribution, Json) } } : [],
                     .. operation == KnowledgeSourceOperation.Describe
                         ? new ToolArgumentBinding[] { new LiteralToolArgumentBinding { Path = "/request/exposure", Value = JsonSerializer.SerializeToElement(exposureName, Json) },
                             new LiteralToolArgumentBinding { Path = "/request/exposureScope", Value = JsonSerializer.SerializeToElement(scopeRef.Value, Json) } } : []]

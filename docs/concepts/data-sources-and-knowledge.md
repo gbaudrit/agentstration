@@ -320,12 +320,18 @@ read/regex access; compatible structured output additionally supports the fixed
 query profile/model when its provider implements governed document subsets.
 Discovery is part of the same ToolSet assigned to an Agent. Calling `describe`
 with an empty request lists inputs and their business
-purpose with compact assigned Tool references. Calling it again with
-`request.input` set to a binding name retrieves that input's schemas and detailed
-contracts. `request.snapshotId` selects exact retained Snapshot evidence. The
-system prompt lists the Knowledge Sources whose describe Tools are actually
-assigned and guides the Agent through discovery before first data access. It
-reuses metadata already obtained for the same version/Snapshot. Discovery does
+purpose with compact assigned Tool references. Each input exposes its `name`,
+`input` identifier and exact `describeTool`/`describeArguments`. Calling that
+input-level Tool with `{ "request": {} }` retrieves its schemas and detailed
+contracts; its input is fixed and cannot be overridden. Older exposures may use
+the source-wide describe with an exact exposed input identifier or unambiguous
+binding name. `request.snapshotId` selects exact retained Snapshot evidence. The
+system prompt lists assigned discovery Tools, guides the Agent through discovery
+before first data access, and requires consulting every available input before
+synthesis while reporting coverage gaps. Discovery alone is not data consultation.
+It reuses metadata already obtained for the same version/Snapshot. Invocation
+instructions from published contracts remain present if live editorial Source
+metadata is unavailable, without granting any extra access. Discovery does
 not make unassigned
 Tools callable or prove current provider health. Large descriptions fail at an
 explicit bound rather than silently reporting incomplete structure as complete.

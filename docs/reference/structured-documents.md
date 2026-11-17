@@ -289,8 +289,16 @@ current eligibility, but do not assert a previous review.
 Every new exposure includes a source-owned describe relay. Its immutable
 `exposure` and `exposureScope` are fixed internally. The caller uses
 `{ "request": {} }` for a compact input catalogue (`detailLevel: "overview"`),
-then `{ "request": { "input": "invoices" } }` for one exposed input's contracts
-(`detailLevel: "input"`). Both accept `request.snapshotId`. Discovery also returns
+then calls the selected input's returned `describeTool` with `describeArguments`
+(normally `{ "request": {} }`) for its contracts (`detailLevel: "input"`).
+The input-level Tool pins the exact published input internally; callers cannot
+supply or override `request.input`. Both describe tiers accept `request.snapshotId`.
+Each contribution exposes `name` (the binding name), `input` (its published route
+identifier), `describeTool`, `inputFixed` and the complete `describeArguments`.
+For an older exposure with no input-level describe member, discovery points to
+the assigned source-wide describe Tool and includes `request.input` in its example.
+The source-wide describe still accepts exact exposed route identifiers or
+unambiguous binding names; unknown, ambiguous and unassigned inputs are refused. Discovery also returns
 `invocationInstructions` with complete argument-envelope examples. Detailed input
 metadata separates whole-Artifact `schemas` from object-level `recordSchemas`.
 One Artifact may contain several records; contribution queries select its exact
@@ -317,7 +325,13 @@ the bound Data Source description. Updating these descriptions/display names
 preserves executable generations and existing publications; ETags still change.
 Presentation is refreshed for runtime Tool descriptions and for describe calls.
 The runtime system prompt lists only Knowledge Sources with an actually assigned
-describe Tool and instructs the Agent to discover inputs before querying.
+describe Tool and instructs the Agent to discover all available sources/inputs,
+consult each exposed input with focused data operations before synthesis, and
+report unavailable or unconsulted inputs. Discovery alone is not data consultation.
+Invocation guidance from the assigned immutable Tool remains available when live
+Source metadata cannot be resolved; it grants no extra data or metadata access.
+Server logs and material-resolution trace tags report presentation coverage and
+unavailable metadata counts without logging prompts or content.
 Executable selections/contracts remain pinned to their published versions.
 
 Contribution access relays also fix `request.contribution` and, for structured

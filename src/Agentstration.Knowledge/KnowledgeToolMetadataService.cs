@@ -17,8 +17,9 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
     KnowledgeSourceManagementService sources, ICurrentRequestContext current)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    public const string SelectionAnnotation = "agentstration.io/knowledge-contribution";
     public const string UsageAnnotation = "agentstration.io/knowledge-operation-help";
-    public const string ArgumentGuidance = " Always place arguments inside request, for example {\"request\":{\"snapshotId\":\"<returned id>\"}}. Never send snapshotId beside request. Omit request.snapshotId initially; for related calls, only reuse a returned id and add this Tool's declared fields inside request.";
+    public const string ArgumentGuidance = " Always place arguments inside request, for example {\"request\":{\"snapshotId\":\"<returned id>\"}}. Never send snapshotId beside request. Omit request.snapshotId initially; for related calls, only reuse a returned id and add this Tool's declared fields inside request. For input details, copy the describeTool and describeArguments returned by discovery. Per-input describe Tools already fix their input; do not supply request.input.";
 
     public const string ODataQueryGuidance = " Query encoding: odata-options+json. request.query is an object whose option names include the dollar prefix: $filter, $select, $orderby or $apply, with string values. Use OData operators eq/ne/gt/ge/lt/le and and/or, not == or SQL. Example shape: {\"request\":{\"pageSize\":10,\"query\":{\"$filter\":\"status eq 'open'\",\"$select\":\"status,value\"}}}. Replace example fields with exact fields from this input's described schema; do not invent field names. Use request.pageSize for pages; continue with request.cursor only. The supported aggregate/groupby subset uses $apply; $top/$skip, joins and expansion are unsupported.";
 
@@ -110,7 +111,11 @@ public sealed class KnowledgeToolMetadataService(IResourceStore resources,
         publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>()
             .SingleOrDefault(b => b.Path == "/request/profile")?.Value.Deserialize<StorageQueryProfilePin>(Json);
 
-    public static KnowledgeContributionSelection? Selection(ToolDefinitionVersionResource publication) =>
-        publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>()
-            .SingleOrDefault(b => b.Path == "/request/contribution")?.Value.Deserialize<KnowledgeContributionSelection>(Json);
+    public static KnowledgeContributionSelection? Selection(ToolDefinitionVersionResource publication)
+    {
+        var literal = publication.Definition.Bindings.OfType<LiteralToolArgumentBinding>().SingleOrDefault(b => b.Path == "/request/contribution");
+        return literal is not null ? literal.Value.Deserialize<KnowledgeContributionSelection>(Json)
+            : publication.Metadata.Annotations.TryGetValue(SelectionAnnotation, out var value)
+                ? JsonSerializer.Deserialize<KnowledgeContributionSelection>(value, Json) : null;
+    }
 }

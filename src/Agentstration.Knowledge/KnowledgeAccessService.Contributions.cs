@@ -49,10 +49,18 @@ public sealed partial class KnowledgeAccessService
             && (exposedTools is null || operations.Any(o => o.Route == t.Route))).ToArray();
         if (request.Input is { } requested && (string.IsNullOrWhiteSpace(requested) || requested.Length > 200))
             throw Error("knowledge_describe_input_invalid");
-        if (request.Input is not null && !available.Any(t => t.Contribution?.BindingName == request.Input))
-            throw Error("knowledge_describe_input_not_exposed");
-        var detailed = request.Input is not null;
-        available = available.Where(t => request.Input is null || t.Contribution?.BindingName == request.Input).ToArray();
+        KnowledgeContributionSelection? selectedInput = null;
+        if (request.Input is not null)
+        {
+            var matches = available.Where(t => t.Contribution is not null
+                && (t.Contribution.BindingName == request.Input || KnowledgeContributions.InputId(t) == request.Input))
+                .Select(t => t.Contribution!).Distinct().ToArray();
+            if (matches.Length != 1)
+                throw new KnowledgeAccessException("knowledge_describe_input_not_exposed", "Use an input returned by discovery. Call describe with request: {} and copy its describeTool and describeArguments. Unknown, ambiguous or unassigned inputs cannot be described.");
+            selectedInput = matches[0];
+        }
+        var detailed = selectedInput is not null;
+        available = available.Where(t => selectedInput is null || t.Contribution == selectedInput).ToArray();
         if (metadata is not null)
         {
             var presented = new List<KnowledgeToolProposal>();
@@ -68,11 +76,15 @@ public sealed partial class KnowledgeAccessService
             var candidate = available.First(t => t.Contribution == selection);
             var business = metadata is null ? new KnowledgeBusinessDescription(candidate.BusinessDescription, "published")
                 : await metadata.DescriptionAsync(source, selection, candidate.BusinessDescription, ct);
+            var inputDescribe = operations.FirstOrDefault(o => o.Operation == KnowledgeSourceOperation.Describe && o.Proposal?.Contribution == selection);
             contributions.Add(new(selection, view is null ? "not_published" : artifacts.Length == 0 ? "no_matching_evidence" : "published",
                 detailed ? artifacts.Select(a => a.ArtifactId).ToArray() : [],
                 detailed ? artifacts.Where(a => a.DataContract?.Schema is not null).Select(a => a.DataContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
                 detailed ? input?.AcquisitionId : null, detailed ? input?.AcquiredAt : null)
             {
+                Input = available.Where(t => t.Contribution == selection).Select(KnowledgeContributions.InputId).FirstOrDefault(value => value is not null) ?? selection.BindingName,
+                DescribeTool = inputDescribe?.CallableName ?? operations.FirstOrDefault(o => o.Operation == KnowledgeSourceOperation.Describe && o.Proposal?.Contribution is null)?.CallableName,
+                InputFixed = inputDescribe is not null,
                 RecordSchemas = detailed ? artifacts.Where(a => a.RecordContract?.Schema is not null)
                     .Select(a => a.RecordContract!.Schema!.Value).DistinctBy(schema => schema.GetRawText()).ToArray() : [],
                 Description = business.Description,
@@ -85,7 +97,7 @@ public sealed partial class KnowledgeAccessService
             !source.Definition.Enabled ? "disabled" : view is null ? "not_published" : view.LifecycleState.ToString().ToLowerInvariant(),
             view?.ContentAvailability ?? KnowledgeContentAvailability.Unknown,
             detailed ? available : [],
-            operations.Where(o => request.Input is null || o.Proposal?.Contribution?.BindingName == request.Input)
+            operations.Where(o => selectedInput is null || o.Proposal?.Contribution == selectedInput)
                 .Select(o => o with { Proposal = null }).ToArray(), contributions)
         {
             DetailLevel = detailed ? "input" : "overview",

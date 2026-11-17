@@ -6,18 +6,26 @@ using Agentstration.Resources;
 using Agentstration.ResourceManagement;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Tools;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Infrastructure.Knowledge;
 
 public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources, KnowledgeToolMetadataService metadata,
-    ICurrentRequestContext current) : IRuntimeAgentPresentationEnricher
+    ICurrentRequestContext current, ILogger<KnowledgeAgentPresentationEnricher>? logger = null) : IRuntimeAgentPresentationEnricher
 {
     public async Task<RuntimeAgentPresentation> EnrichAsync(RuntimeAgentPresentation presentation, CancellationToken cancellationToken)
     {
-        if (current.AccessMode is not (ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration))
-            return presentation;
+        var canReadLiveMetadata = current.AccessMode is ControlPlaneAccessMode.Workspace or ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration;
+        if (!canReadLiveMetadata)
+        {
+            System.Diagnostics.Activity.Current?.SetTag("agentstration.knowledge.presentation.live_metadata_skipped", "request_context");
+            if (logger is not null && logger.IsEnabled(LogLevel.Information))
+                logger.LogInformation("Knowledge presentation in {AccessMode} uses published contracts only: no live Source metadata ownership context is available.", current.AccessMode);
+        }
         var tools = new List<IAgentTool>();
         var sources = new List<object>();
+        var knownTools = 0;
+        var unavailableSources = 0;
         foreach (var tool in presentation.Tools)
         {
             tools.Add(tool);
@@ -25,20 +33,34 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
             var published = (await resources.GetExactAsync<ToolDefinitionVersionResource>(new(scope, tool.Namespace ?? default,
                 ToolResourceKinds.ToolDefinitionVersion, tool.ExternalId), cancellationToken))?.Value;
             if (published is null || !published.Metadata.Annotations.ContainsKey("agentstration.io/knowledge-source-uid")) continue;
-            KnowledgeSourceResource? source;
-            try { source = await metadata.ResolveSourceAsync(published, cancellationToken); }
-            catch (Exception exception) when (exception is AuthorizationDeniedException or KnowledgeSourceValidationException
-                or KnowledgeSourceNotFoundException or ResourceReferenceOutsideScopeException)
-            { continue; }
-            if (source is null) continue;
+            knownTools++;
             var selection = KnowledgeToolMetadataService.Selection(published);
-            var business = await metadata.DescriptionAsync(source, selection, null, cancellationToken);
             var usage = published.Metadata.Annotations.GetValueOrDefault(KnowledgeToolMetadataService.UsageAnnotation)
                 ?? published.Definition.Description ?? string.Empty;
             var profile = KnowledgeToolMetadataService.Profile(published);
+            var inputSchema = KnowledgeToolMetadataService.InputSchemaForModel(tool.InputSchema, profile);
+            // Invocation guidance comes from the assigned immutable Tool contract and does not require live Source metadata.
+            tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(published.Definition.DisplayName, null, usage, profile), inputSchema);
+            var operation = published.Metadata.Annotations.GetValueOrDefault("agentstration.io/knowledge-operation");
+            var describes = operation == "describe" || operation?.EndsWith(".describe", StringComparison.Ordinal) == true;
+            KnowledgeSourceResource? source = null;
+            if (canReadLiveMetadata)
+            {
+                try { source = await metadata.ResolveSourceAsync(published, cancellationToken); }
+                catch (Exception exception) when (exception is AuthorizationDeniedException or KnowledgeSourceValidationException
+                    or KnowledgeSourceNotFoundException or ResourceReferenceOutsideScopeException)
+                { /* Retain invocation guidance without disclosing live Source metadata. */ }
+            }
+            if (source is null)
+            {
+                unavailableSources++;
+                if (describes) sources.Add(new { DescribeTool = tool.Name, MetadataStatus = "unavailable" });
+                continue;
+            }
+            var business = await metadata.DescriptionAsync(source, selection, null, cancellationToken);
             tools[^1] = new PresentedTool(tool, KnowledgeToolMetadataService.Format(selection?.BindingName ?? source.Definition.DisplayName,
-                business.Description, usage, profile), KnowledgeToolMetadataService.InputSchemaForModel(tool.InputSchema, profile));
-            if (published.Metadata.Annotations.GetValueOrDefault("agentstration.io/knowledge-operation") == "describe")
+                business.Description, usage, profile), inputSchema);
+            if (describes)
                 sources.Add(new
                 {
                     source.Name,
@@ -48,14 +70,23 @@ public sealed class KnowledgeAgentPresentationEnricher(IResourceStore resources,
                     Description = source.Definition.Description is { Length: > 320 } description ? description[..320] : source.Definition.Description,
                     DescriptionTruncated = source.Definition.Description?.Length > 320,
                     Version = published.Definition.Version,
+                    Input = selection?.BindingName,
                     DescribeTool = tool.Name
                 });
         }
+        System.Diagnostics.Activity.Current?.SetTag("agentstration.knowledge.presentation.tool_count", knownTools);
+        System.Diagnostics.Activity.Current?.SetTag("agentstration.knowledge.presentation.describe_count", sources.Count);
+        System.Diagnostics.Activity.Current?.SetTag("agentstration.knowledge.presentation.unavailable_sources", unavailableSources);
+        if (presentation.Tools.Count > 0 && logger is not null && logger.IsEnabled(LogLevel.Information)) logger.LogInformation(
+            "Knowledge presentation in {AccessMode}: {AssignedTools} assigned Tools, {KnowledgeTools} Knowledge contracts, {DescribeTools} discovery Tools, {UnavailableSources} unavailable Source metadata lookups.",
+            current.AccessMode, presentation.Tools.Count, knownTools, sources.Count, unavailableSources);
         var instructions = presentation.Instructions;
         if (sources.Count > 0)
             instructions += "\n\nKnowledge Sources assigned to this Agent:\n" + JsonSerializer.Serialize(sources) + "\n"
-                + "For a question requiring Knowledge data, choose a Knowledge Source from this catalogue and call its describe Tool with request: {} before the first data access. "
-                + "This lightweight discovery lists that source's inputs and their business descriptions. Call the same describe Tool with request.input set to the selected binding name for its schemas, fields, supported operations and limits before constructing a query that needs them. "
+                + "For a question requiring Knowledge data, discover every Knowledge Source available through the assigned Tools and call its describe Tool with request: {} before the first data access. "
+                + "Source-level discovery lists inputs and their business descriptions. For detailed schemas, fields, supported operations and limits, call the selected input's returned describeTool with its describeArguments. Per-input describe Tools already fix the input and accept request: {}; do not supply request.input. When only source-level describe is assigned, copy contributions[].input into request.input instead of guessing an input from Tool names. "
+                + "Consult data from every exposed input before synthesizing the answer, using focused searches, reads or queries for the request. Do not stop after the first successful source. Discovery alone is not a data consultation. "
+                + "Identify any unavailable or unconsulted source/input and state the resulting coverage limits. Never claim to have consulted data when only its description was obtained. Respect the assigned access boundaries, pagination and operation limits. "
                 + "Only fields declared in the described record schema are queryable columns; text embedded in a field does not add columns. Use assigned search/read Tools for unstructured content when available. "
                 + "Reuse descriptions already obtained in this context for the same ToolSet version and exact Snapshot; refresh when that evidence changes. "
                 + "Use the exact assigned Tool names and declared fields. Reuse returned Snapshot identifiers as request.snapshotId to keep related calls coherent.";

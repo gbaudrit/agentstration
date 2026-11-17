@@ -69,8 +69,12 @@ scope, records the proposal and exact Tool references. Every newly published
 source ToolSet includes its describe Tool. A literal relay binding fixes that
 exposure identity. Describe without `input` returns a lightweight catalogue: effective business
 purpose, available input identities, formats and assigned Tool references. It
-omits full Tool contracts, schemas and document-ID lists. `describe(input=...)`
-returns only that exposed input's detailed contracts, schemas, provenance and
+omits full Tool contracts, schemas and document-ID lists. Each exposed input has
+its own describe relay with fixed input selection and a `{ "request": {} }` call.
+Discovery returns explicit input names/identifiers, assigned describe callable
+names and complete argument examples. The source-wide describe also accepts an
+exact exposed route identifier or unambiguous binding name for older exposures.
+Input-level discovery returns only that exposed input's detailed contracts, schemas, provenance and
 optional exact Snapshot metadata. Unknown or unassigned inputs fail explicitly.
 Current editorial metadata overlays the immutable execution exposure; exact
 selections, schemas, profiles and publication references stay pinned. It neither prepares data nor issues content capabilities. Actual reads
@@ -96,7 +100,13 @@ The Knowledge implementation reads only the assigned immutable Tool publications
 and authorized source metadata. It lists only sources with an assigned describe
 Tool and instructs the Agent to discover inputs before first data access, obtain
 selected-input contracts when needed, and reuse evidence for the same exposure
-and Snapshot. Direct MAF creation and AWP materialization use this same boundary.
+and Snapshot. It directs the Agent to consult every available input before
+synthesis and distinguish data consultation from metadata discovery. Instructions
+and schema guidance derived from the assigned immutable contract survive a failed
+live Source metadata lookup; only that Source's current editorial overlay is
+omitted. No new live metadata or content permissions are granted. Diagnostic logs
+and trace counters report presentation coverage without storing prompts/content.
+Direct MAF creation and AWP materialization use this same boundary.
 This runtime presentation does not rewrite authored instructions, revision hashes,
 Tool references, published schemas, approval flags or grants. For an exact pinned
 OData profile, model presentation narrows the generic `request.query` value to

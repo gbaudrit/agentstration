@@ -382,7 +382,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         var resolvedTools = resolved.Definition.ToolReferences.Count > 0
             ? await tools.ResolveAsync(resolved.Definition.ToolReferences, cancellationToken)
             : await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
-        var presented = await RuntimeAgentPresentation.CreateAsync(resolved.Definition.EffectiveInstructions, resolvedTools, presentationEnrichers, cancellationToken);
+        var enrichers = (presentationEnrichers ?? []).ToArray();
+        System.Diagnostics.Activity.Current?.SetTag("agentstration.runtime.presentation.enricher_count", enrichers.Length);
+        var presented = await RuntimeAgentPresentation.CreateAsync(resolved.Definition.EffectiveInstructions, resolvedTools, enrichers, cancellationToken);
         var toolMaterials = presented.Tools.Select(tool => new RuntimeExecutionToolMaterial(
             tool.Id,
             tool.Namespace ?? default,
