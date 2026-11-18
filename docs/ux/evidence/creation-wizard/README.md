@@ -1,11 +1,12 @@
 # Data Source creation Wizard — real application evidence
 
-These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `978b59d6e4d7308c060b423d802f615e241f0194`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
+These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `861f95347c1593372cd8323495dd4c0af381ea8d`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
 
 ## Capture matrix
 
 | Stage | English, dark, desktop | French, light, touch mobile |
 | --- | --- | --- |
+| Review with missing required inputs | [Capture](en-US-dark-review-incomplete.png) | [Viewport](fr-FR-light-review-incomplete.png) · [Full document](fr-FR-light-review-incomplete-full.png) |
 | Identity | [Capture](en-US-dark-identity.png) | [Viewport](fr-FR-light-identity.png) · [Full document](fr-FR-light-identity-full.png) |
 | Acquisition | [Capture](en-US-dark-acquisition.png) | [Viewport](fr-FR-light-acquisition.png) · [Full document](fr-FR-light-acquisition-full.png) |
 | Storage and lifecycle | [Capture](en-US-dark-storage.png) | [Viewport](fr-FR-light-storage.png) · [Full document](fr-FR-light-storage-full.png) |
@@ -21,11 +22,12 @@ Mobile viewport images show the actual first viewport. Additional full-document 
 
 The capture wrapper reuses the existing `SourcePoliciesPage.exerciseLifecycle` journey with the deterministic Source policy fixture. It does not introduce a permanent test scenario or a new production route. The fixture uses disposable local Development data; no live model or external Storage service is required.
 
-- All six creation steps render in both matrix cells; the product theme is asserted after language preference persistence.
+- All six creation steps and the incomplete review render in both matrix cells; the product theme is asserted after language preference persistence.
 - Only one content pane is active. Focus moves to its region after navigation. Horizontal overflow is checked at every forward transition.
-- Missing Storage and incompatible direct-input freshness/history settings keep the user on Storage, expose the localized error and leave the resource absent from the API.
+- Header navigation and Continue work with incomplete fields. Missing identity/operation/Storage are marked separately in the banner; optional empty sections remain complete.
+- Attempting creation with missing identity, missing Storage or incompatible direct-input freshness/history returns to the first incomplete section, exposes the localized error and leaves the resource absent from the API.
 - Back navigation and the review's Edit Acquisition action retain the exact operation pin and parameters.
-- The source is absent before final confirmation. Explicit creation retains its configured policy; the original downstream acquisition/projection lifecycle assertions also run.
+- The source is absent before final confirmation. The final confirmation stays available to explain incomplete inputs rather than silently disabling creation. Explicit creation retains its configured policy; the original downstream acquisition/projection lifecycle assertions also run.
 - Component tests additionally cover conditional steps, asynchronous navigation, disposal during validation, disabled/busy commands, retained child-component state, canonical namespaces and final EditContext validation.
 
 The archived capture wrapper/configuration are suffixed `.txt` intentionally. They document this one-off evidence campaign and are not discovered as reusable Playwright tests. To reproduce, copy them to their original paths under `automation/playwright`, install the locked npm packages, build the required product/fixture hosts first, and execute the command recorded in `observations.json`. Remove the temporary files afterwards.
