@@ -663,6 +663,7 @@ else
         selectedScope = savedResource.ScopeRef;
         rawInitialized = rawUsesSavedDefinition = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
         invalidInput = false; savedFingerprint = Fingerprint;
+        if (sourceMode) InitializeSource();
     }
     private void DiscardRawDraft() { rawInitialized = false; ShowSource(); }
 

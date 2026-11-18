@@ -70,6 +70,42 @@ public sealed class AgentResourceTemplateTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task DiscardFromYamlRestoresSavedManifestAndFormWithoutLeavingTheSection(bool includeFormDraft)
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var handler = new AgentHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = Context(http);
+        var cut = context.Render<AgentEditor>(p => p.Add(c => c.Name, "welcome"));
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("[data-testid=agent-resource-details]")));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("yaml"));
+        var savedYaml = cut.Find("[data-testid=agent-yaml-editor] textarea").GetAttribute("value");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(savedYaml));
+        if (includeFormDraft)
+        {
+            await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+            await cut.Find("[data-testid=agent-display-name]").InputAsync("Unsaved form name");
+            await cut.InvokeAsync(() => navigation.NavigateSection("yaml"));
+        }
+        await cut.Find("[data-testid=agent-yaml-editor] textarea").InputAsync(
+            includeFormDraft ? "invalid: [ YAML draft" : savedYaml + "\n# unsaved YAML comment");
+        Assert.IsNotNull(cut.Find("[data-testid=agent-discard]"));
+        await cut.Find("[data-testid=agent-discard]").ClickAsync();
+        Assert.AreEqual("yaml", navigation.CurrentPath);
+        Assert.AreEqual(savedYaml, cut.Find("[data-testid=agent-yaml-editor] textarea").GetAttribute("value"));
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsNull(handler.LastRequest, "Discard must not save the resource.");
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        Assert.AreEqual(handler.Current.Definition.DisplayName, cut.Find("[data-testid=agent-display-name]").GetAttribute("value"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("yaml"));
+        Assert.AreEqual(savedYaml, cut.Find("[data-testid=agent-yaml-editor] textarea").GetAttribute("value"));
+    }
+
+    [TestMethod]
     public void LoadingASavedResourceDoesNotCreateADraftOrBlockInitialNormalization()
     {
         using var handler = new AgentHandler { ModelLookupGate = new(TaskCreationOptions.RunContinuationsAsynchronously) };
@@ -161,8 +197,12 @@ public sealed class AgentResourceTemplateTests
         private int modelLookups;
         public AgentResource Current { get; private set; } = new()
         {
-            Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent,
-            ScopeRef = ResourceScopeRef.Instance, Metadata = new() { Name = "welcome" }, Generation = 1,
+            Uid = Guid.NewGuid(),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = "welcome" },
+            Generation = 1,
             Definition = new() { DisplayName = "Saved agent", Instructions = "Read the entire instruction. " + new string('x', 180), ModelProfile = new("reasoning-default", ResourceScopeRef.Instance) }
         };
         public string? LastEtag { get; private set; }

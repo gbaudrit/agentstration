@@ -3,6 +3,75 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
+      "id": "agent-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
+      "line": 62,
+      "host": "console",
+      "routes": [
+        "/agents/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/create-agent.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Agent configuration uses setting/value rows, preserving full structured values and exact profile links. Settings are not resource identities and gain no owner, lifecycle, publication version or row actions.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "connected-service-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Input",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceKind",
+        "ValueOrResource"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Bindings and literal options are source-reviewed. Existing family regression mapping is partial and does not claim populated detail-summary browser coverage; historical captures remain historical."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Configuration rows contain saved value bindings and literal options. Preserve reference coordinates and structured values; Secret references remain references without resolving contents. The former export-descriptor table is no longer rendered.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
       "id": "run-grid-flow-run",
       "source": "src/Agentstration.Console.Components/Components/RunGrid.razor",
       "line": 3,
@@ -404,7 +473,7 @@
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
-      "line": 73,
+      "line": 70,
       "host": "console",
       "routes": [
         "/agents/new",
@@ -5007,73 +5076,6 @@
       "informationKeys": [
         "ProposalChange",
         "ToolContract"
-      ],
-      "validation": "source-adopted-current-validation-pending",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "implementationPR": 1174,
-        "coveragePR": 1132,
-        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
-    },
-    {
-      "id": "connected-service-details-connected-service-value-binding",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "line": 37,
-      "host": "console",
-      "routes": [
-        "/connected-services/{Name}"
-      ],
-      "renderer": "CollectionView",
-      "itemType": "ConnectedServiceValueBinding",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": [
-        "SourceKind",
-        "ValueOrResource"
-      ],
-      "validation": "source-adopted-current-validation-pending",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "implementationPR": 1174,
-        "coveragePR": 1132,
-        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
-    },
-    {
-      "id": "connected-service-details-connected-service-export-descriptor",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "line": 40,
-      "host": "console",
-      "routes": [
-        "/connected-services/{Name}"
-      ],
-      "renderer": "CollectionView",
-      "itemType": "ConnectedServiceExportDescriptor",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": [
-        "ValueType",
-        "Protection",
-        "Format"
       ],
       "validation": "source-adopted-current-validation-pending",
       "verification": {
@@ -16430,7 +16432,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are enumerated in the surface entries, including the compact-rollout reconciliation. Fixed navigation, tabs, enum options and schema-generated form fields remain controls, not extra collections."
+      "reason": "Functional datasets include the current resource-detail configuration summary, explicitly enumerated in the shared frames. Navigation and fixed form choices remain controls."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
@@ -16850,7 +16852,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
       "classification": "inventoried",
-      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+      "reason": "Functional datasets include the current resource-detail configuration summary, explicitly enumerated in the shared frames. Navigation and fixed form choices remain controls."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
@@ -17091,6 +17093,32 @@
       "unmountedLegacy": 4,
       "auditedRepeatedItemSources": 114,
       "meaning": "Functional collections, including shared embedded selectors/history renderers; not routes, screens, raw foreach loops or route aliases. Fixed navigation, enum options and schema-generated form fields remain controls."
+    },
+    {
+      "date": "2026-11-18",
+      "reviewedSourceCommit": "5b00cd2bad6e6a352757aaf73e49ab30389a7ceb",
+      "reason": "Resource detail templates add the Agent configuration summary; the preceding Connected Service UX correction replaces its binding summary and removes its export-descriptor table. Reconcile current renderers without reusing historical screenshot claims.",
+      "retiredFrames": [
+        {
+          "id": "connected-service-details-connected-service-value-binding",
+          "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+          "itemType": "ConnectedServiceValueBinding"
+        },
+        {
+          "id": "connected-service-details-connected-service-export-descriptor",
+          "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+          "itemType": "ConnectedServiceExportDescriptor"
+        }
+      ],
+      "addedFrames": [
+        "agent-editor-configuration-summary",
+        "connected-service-details-configuration-summary"
+      ],
+      "sharedFrames": 88,
+      "specializedActive": 258,
+      "unmountedLegacy": 4,
+      "activeCollections": 346,
+      "auditedRepeatedItemSources": 147
     }
   ]
 }
