@@ -16976,6 +16976,11 @@
       "source": "src/Agentstration.Web.FlowDesigner/Components/FlowNodeWidget.razor",
       "classification": "non-collection-control",
       "reason": "Indexed output-port controls inside one topology node retain graph connection semantics; the existing topology surface owns the functional graph."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CreationWizard.razor",
+      "classification": "non-collection-control",
+      "reason": "Configured creation-step navigation and its content panes, not functional resource datasets. Screen-owned fields and collections keep their own adapters and existing inventory entries."
     }
   ],
   "reconciliation": {
@@ -16988,7 +16993,7 @@
     "unmountedLegacy": 4,
     "activeCollections": 346,
     "newFunctionalCollections": 75,
-    "auditedRepeatedItemSources": 145,
+    "auditedRepeatedItemSources": 146,
     "validation": "Source reconciliation complete; fresh run status belongs to final PR1174 validation and sync-main-1174.md. Historical screenshots retain their original source provenance.",
     "historicalActiveCollections": 271,
     "addedActiveCollections": 75,
@@ -17044,7 +17049,7 @@
     "unmountedLegacy": 4,
     "activeCollections": 346,
     "newFunctionalCollections": 75,
-    "auditedRepeatedItemSources": 145,
+    "auditedRepeatedItemSources": 146,
     "validation": "Source reconciliation complete; fresh run status belongs to final PR1174 validation and sync-main-1174.md. Historical screenshots retain their original source provenance.",
     "auditDelta": "27 newly repeated @foreach sources, two incoming indexed-loop sources, and two pre-existing indexed controls newly checked by the stronger guard.",
     "lastAuditFinding": "StorageDetails export-binding DataGrid was absent from the initial new-surface count. It is now a distinct shared frame included in the current total of346.",

@@ -1,0 +1,12 @@
+import { defineConfig } from '@playwright/test';
+import base from './playwright.config.js';
+export default defineConfig({ ...base,
+  testMatch: 'local-wizard-evidence.spec.ts', workers: 1,
+  outputDir: '/tmp/wizard-browser',
+  reporter: [['list'], ['json', { outputFile: '/tmp/wizard-browser-results.json' }]],
+  use: { ...base.use, launchOptions: { executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] } },
+  projects: [
+    { name: 'wizard-desktop', use: { viewport: { width: 1440, height: 1000 }, colorScheme: 'dark' } },
+    { name: 'wizard-touch', use: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, colorScheme: 'light' } },
+  ],
+});

@@ -10,14 +10,14 @@ export class SourcePoliciesPage {
   public get history(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
   public get definition(): Locator { return this.page.getByTestId(TestIds.sourcePolicies.knowledgeDefinitionFields); }
 
-  public async exerciseLifecycle(base: string, control: SourcePolicyTestControl, locale: SupportedTestLocale): Promise<void> {
+  public async exerciseLifecycle(base: string, control: SourcePolicyTestControl, locale: SupportedTestLocale, onCreationStep?: (step: string) => Promise<void>): Promise<void> {
     this.page.setDefaultTimeout(15_000);
     const fixtures = new SourcePolicyFixtures(this.page, base);
     const fixture = await fixtures.prepare();
     const direct = `direct-${fixture.suffix}`; const stored = `stored-${fixture.suffix}`; const knowledge = `knowledge-${fixture.suffix}`;
     const text = SourcePolicyTextByLocale[locale];
     await control.change({});
-    await this.createDirect(base, fixture, direct, text.ttl);
+    await this.createDirect(base, fixture, direct, text.ttl, locale, onCreationStep);
     await fixtures.source(fixture, stored, {});
     await this.openDataset(base, stored);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
@@ -98,32 +98,129 @@ export class SourcePoliciesPage {
     await control.change({});
   }
 
-  private async createDirect(base: string, fixture: SourcePolicyFixture, name: string, ttlLabel: string): Promise<void> {
+  private async createDirect(base: string, fixture: SourcePolicyFixture, name: string, ttlLabel: string, locale: SupportedTestLocale, onStep?: (step: string) => Promise<void>): Promise<void> {
     await this.page.goto(`${base}/data-sources/new?composition=dataset&context=%2Finstance`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const text = SourcePolicyTextByLocale[locale];
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+    await this.wizardSelect('review');
+    for (const step of ['identity', 'acquisition', 'storage']) {
+      await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
+      await expect(this.wizardButton(step)).toHaveAccessibleName(new RegExp(text.wizardIncomplete + '$'));
+    }
+    await onStep?.('review-incomplete');
+    await this.activate(this.page.getByTestId(TestIds.creationWizard.finishTop));
+    await this.assertWizardStep('identity');
+    await expect(this.page.getByRole('alert').filter({ hasText: text.wizardIdentityRequired })).toBeVisible();
+    await this.assertNotCreated(base, name);
+    await this.wizardNext('acquisition');
+    await this.wizardSelect('identity');
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).fill(name);
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceName)).toHaveValue(name);
+    await onStep?.('identity');
+    await this.wizardNext('acquisition');
     await this.page.getByTestId(TestIds.sourcePolicies.service).selectOption(fixture.service.uid);
     await this.page.getByTestId(TestIds.sourcePolicies.operation).selectOption(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
     await this.page.locator('[data-schema-path="$.dataset"] input').fill('synthetic-direct');
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.page.keyboard.press('Tab');
+    await onStep?.('acquisition');
+    await this.wizardNext('storage');
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.wizardStorageRequired);
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.direct).check();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.lifecycle)).toContainText(ttlLabel);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.datasetStorageRequired);
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
     await this.page.getByTestId(TestIds.sourcePolicies.history).check();
     await this.page.getByTestId(TestIds.sourcePolicies.retention).fill('24:00:00');
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.datasetStorageRequired);
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.history).uncheck();
-    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
+    await this.wizardNext('treatments');
+    await this.activate(this.page.getByTestId(TestIds.creationWizard.previousTop));
+    await this.assertWizardStep('storage');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
+    await onStep?.('storage');
+    await this.wizardNext('treatments');
+    await onStep?.('treatments');
+    await this.wizardNext('contracts');
+    await onStep?.('contracts');
+    await this.wizardNext('review');
+    await expect(this.page.getByTestId(TestIds.creationWizard.review)).toContainText(`default/${name}`);
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();
+    await this.assertNotCreated(base, name);
+    await expect(this.page.getByTestId(TestIds.creationWizard.source).locator('nav [data-step-complete="false"]')).toHaveCount(0);
+    await expect(this.wizardButton('storage')).toHaveAccessibleName(new RegExp(text.wizardComplete + '$'));
+    await onStep?.('review');
+    await this.activate(this.page.getByRole('button', { name: text.wizardEditAcquisition, exact: true }));
+    await this.assertWizardStep('acquisition');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.operation)).toHaveValue(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
+    await expect(this.page.locator('[data-schema-path="$.dataset"] input')).toHaveValue('synthetic-direct');
+    await this.wizardNext('storage');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
+    await this.wizardNext('treatments');
+    await this.wizardNext('contracts');
+    await this.wizardNext('review');
+    await this.activate(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave));
     await expect(this.page).toHaveURL(new RegExp(`/data-sources/${name}\\?`));
     await this.openDataset(base, name);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.storage)).toHaveValue('');
+  }
+
+  private wizardButton(step: string): Locator {
+    return this.page.getByTestId(TestIds.creationWizard.source).locator(`nav button[data-wizard-step="${step}"]`);
+  }
+  private async wizardSelect(step: string): Promise<void> {
+    await expect(this.wizardButton(step)).toBeEnabled();
+    await this.activate(this.wizardButton(step));
+    await this.assertWizardStep(step);
+    await expect.poll(() => this.page.evaluate(() => document.activeElement?.getAttribute('data-step-id'))).toBe(step);
+  }
+  private async rejectIncompleteCreation(step: string, message: string): Promise<void> {
+    await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
+    await this.wizardSelect('review');
+    await this.activate(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave));
+    await this.assertWizardStep(step);
+    await expect(this.page.getByRole('alert').filter({ hasText: message })).toBeVisible();
+  }
+
+  private async activate(button: Locator): Promise<void> {
+    if (await this.page.evaluate(() => navigator.maxTouchPoints > 0)) await button.tap();
+    else { await button.focus(); await button.press('Enter'); }
+  }
+  private async wizardNext(expected: string): Promise<void> {
+    const previous = await this.page.getByTestId(TestIds.creationWizard.source).locator('[data-step-id]:not([hidden])').getAttribute('data-step-id');
+    await this.activate(this.page.getByTestId(TestIds.creationWizard.nextTop));
+    await this.assertWizardStep(expected);
+    if (previous !== expected) await expect.poll(() => this.page.evaluate(() => document.activeElement?.getAttribute('data-step-id'))).toBe(expected);
+  }
+  private async assertWizardStep(expected: string): Promise<void> {
+    const active = this.page.getByTestId(TestIds.creationWizard.source).locator('[data-step-id]:not([hidden])');
+    await expect(active).toHaveAttribute('data-step-id', expected);
+    await expect(this.page.getByTestId(TestIds.creationWizard.source).locator('[aria-current="step"]')).toHaveCount(1);
+    await this.assertResponsive();
+    const alignment = await this.page.getByTestId(TestIds.creationWizard.source).locator('nav button').evaluateAll(buttons => buttons.map(button => {
+      const bounds = button.getBoundingClientRect();
+      const center = bounds.top + bounds.height / 2;
+      return Array.from(button.querySelectorAll('.creation-wizard-number, .creation-wizard-title, .creation-wizard-state')).filter(child => getComputedStyle(child).position !== 'absolute').map(child => {
+        const box = child.getBoundingClientRect();
+        return Math.abs(box.top + box.height / 2 - center);
+      });
+    }));
+    for (const offsets of alignment) for (const offset of offsets) expect(offset).toBeLessThanOrEqual(1);
+  }
+  private async assertNotCreated(base: string, name: string): Promise<void> {
+    const response = await this.page.request.get(`${base}/api/datasources/${name}?scopeRef=%2Finstance`);
+    expect(response.status()).toBe(404);
   }
 
   public async openDataset(base: string, name: string): Promise<void> {

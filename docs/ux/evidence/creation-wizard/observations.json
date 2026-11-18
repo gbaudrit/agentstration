@@ -1,0 +1,268 @@
+{
+  "implementationCommit": "0039eb6e884e83a90e28ee969b6d8e684cf8f883",
+  "baseCommit": "efbf247a31fafac3540b00d4ac1fc0180f7767b5",
+  "browser": "Chromium 154.0.8037.57 built on Debian GNU/Linux 13 (trixie)",
+  "playwright": "1.63.0",
+  "command": "PLAYWRIGHT_BROWSERS_PATH=/workspace/.playwright AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm run test:smoke -- --config local-wizard.config.ts",
+  "cwd": "automation/playwright",
+  "stats": {
+    "startTime": "2026-11-18T13:50:34.310Z",
+    "duration": 201699.841,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "maintained Source creation wizard and lifecycle @smoke",
+      "project": "wizard-desktop",
+      "status": "expected",
+      "attempts": [
+        {
+          "status": "passed",
+          "durationMs": 75685
+        }
+      ]
+    },
+    {
+      "title": "maintained Source creation wizard and lifecycle @smoke",
+      "project": "wizard-touch",
+      "status": "expected",
+      "attempts": [
+        {
+          "status": "passed",
+          "durationMs": 80617
+        }
+      ]
+    }
+  ],
+  "matrix": [
+    {
+      "project": "wizard-desktop",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "touch": false
+    },
+    {
+      "project": "wizard-touch",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "touch": true,
+      "isMobile": true
+    }
+  ],
+  "build": {
+    "configuration": "Release",
+    "warnings": 0,
+    "errors": 0
+  },
+  "fast": {
+    "passed": 1570,
+    "failed": 0,
+    "skipped": 0
+  },
+  "sourceDigestEncoding": "Git blob bytes, with repository LF normalization",
+  "sources": [
+    {
+      "path": "automation/playwright/src/contracts/test-ids.ts",
+      "gitBlobSha256": "82a930a31d9a98687781f4c51013b51b17182d6c6fdceac9e23e35c7d9eb4c06"
+    },
+    {
+      "path": "automation/playwright/src/locales/expected-text.ts",
+      "gitBlobSha256": "26676b0cd0577c93917e9c10259c4ac5f0aa4f6b40f3421a32a62731ccb40ecd"
+    },
+    {
+      "path": "automation/playwright/src/pages/source-policies.page.ts",
+      "gitBlobSha256": "6ac610a349a5207022bc78ebb4991f8ddd59c14528172674c7869cd6a41b6d4b"
+    },
+    {
+      "path": "automation/playwright/tests/source-policies.spec.ts",
+      "gitBlobSha256": "229a946b86a0f13545565c8e1d3ab701c9f798313f6b8958e4101205abd0450a"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "gitBlobSha256": "dee9d302e7fcc0d6be6a5e97aae5a065dc747978d646eee6e8ad70cb8d385258"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor.css",
+      "gitBlobSha256": "034320146037dfc38d6f59715c726f95eaecff93858092de4c73659f268548bf"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Resources/Components/Pages/DataSourcesStrings.fr-FR.resx",
+      "gitBlobSha256": "a1786bfd1ed0d1604f01e0af9434299abd9a3d8946d095cdae24abcac1042964"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Resources/Components/Pages/DataSourcesStrings.resx",
+      "gitBlobSha256": "0ab9b9db4a4b8f1c643c9cc2234a7c29b427926109340c34f0ba72885ba58fab"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CreationWizard.razor",
+      "gitBlobSha256": "74b1eaacf98992906d258215ed0b260118e42a81431c55a7030f33249a89560b"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CreationWizard.razor.css",
+      "gitBlobSha256": "89fb61bdfd8216d7cde66345a9e3907099b91b4e8e62da281c8d304000185fb6"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CreationWizardStep.cs",
+      "gitBlobSha256": "12cd50f0c9dfc5ed3116e2557812b4ac4a59fe22bb49fee4c70c4c26415c9d1b"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CreationWizardStrings.cs",
+      "gitBlobSha256": "4b106afa9a0b2d94b0b4b21fbc1130b4d63fef6869775ccebc74eb74acaf89d8"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/Resources/CreationWizardStrings.fr-FR.resx",
+      "gitBlobSha256": "d1d951da77010bf014685ca77b2dc3a32e43bc5f6181b88b3acc077c67f64ab9"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/Resources/CreationWizardStrings.resx",
+      "gitBlobSha256": "70df30464133d6077d3cad891e8a6d3b756af93b674311afce217867b6b77d77"
+    },
+    {
+      "path": "tests/Agentstration.Console.Components.Tests/DataSourceDatasetEditorTests.cs",
+      "gitBlobSha256": "26c3ce30ebc11ca1a39e8de288c3ae703280c94546867856926c65959f7a3078"
+    },
+    {
+      "path": "tests/Agentstration.Web.Components.Tests/CreationWizardTests.cs",
+      "gitBlobSha256": "50c3a27fff0eefb2d7868eb39a3017b4757d405506a2e9e006520bb371565d7a"
+    }
+  ],
+  "images": [
+    {
+      "file": "en-US-dark-acquisition.png",
+      "width": 1440,
+      "height": 1133,
+      "sha256": "2945b6d35bff1c8157bc83acf12a6da20712d41ee0255faa805493f908216ea9"
+    },
+    {
+      "file": "en-US-dark-contracts.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "f9e6e5d8fe19e8be3e11dae391ff7bfdd89e427ff9c893bb967fecebce118958"
+    },
+    {
+      "file": "en-US-dark-identity.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "0225257d4b974b711a1bb03cdcb46cf9492e94ddbb446212f7e3818ea630a52f"
+    },
+    {
+      "file": "en-US-dark-review-incomplete.png",
+      "width": 1440,
+      "height": 1257,
+      "sha256": "0163205239303a91d38be2ef743af5c5ebe5324d9d802adf284d9be96f69176d"
+    },
+    {
+      "file": "en-US-dark-review.png",
+      "width": 1440,
+      "height": 1362,
+      "sha256": "c733f8412cb4ae43fbc15a1442f93435468f4b9f1a0bd8fa90c78d646ca88976"
+    },
+    {
+      "file": "en-US-dark-storage.png",
+      "width": 1440,
+      "height": 1213,
+      "sha256": "32b8791397eee804c835e44a7e0943c4be2b578371a8efa21e338d9f2a45816e"
+    },
+    {
+      "file": "en-US-dark-treatments.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "501c84ecec64d8c9f809b55ef016504e42d48de57a39ad02169666db83882101"
+    },
+    {
+      "file": "fr-FR-light-acquisition-full.png",
+      "width": 390,
+      "height": 1318,
+      "sha256": "d516fd55d0077e44e999f2b5ab0d2683e8ad136763d418b4d827257d8d099435"
+    },
+    {
+      "file": "fr-FR-light-acquisition.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8bd361ad385edf47269396f0bad8315730748d84b3c044456e344d9c9c007a75"
+    },
+    {
+      "file": "fr-FR-light-contracts-full.png",
+      "width": 390,
+      "height": 1201,
+      "sha256": "aa558e5f525e5ed59cd9b1e609c9ef4e48393ba18539ad4e90bc875fde448268"
+    },
+    {
+      "file": "fr-FR-light-contracts.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "df66e856650eabdc84ca7da1b85705f17de27eebe729d221512359cc87fdb8de"
+    },
+    {
+      "file": "fr-FR-light-identity-full.png",
+      "width": 390,
+      "height": 1211,
+      "sha256": "7d6d548a4b1f72c6ce596d47cc419ecbe82ac9b79beb00572e7d1cd7bc1867c9"
+    },
+    {
+      "file": "fr-FR-light-identity.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "5c094d5f74f10687f36ac9f97bd8e760a7413c3aa08e921ed0fb2758a4645761"
+    },
+    {
+      "file": "fr-FR-light-review-full.png",
+      "width": 390,
+      "height": 1812,
+      "sha256": "11452ee6fb5bd2aa28d04d243deb99be0cd457279494e973be284d7523c6f749"
+    },
+    {
+      "file": "fr-FR-light-review-incomplete-full.png",
+      "width": 390,
+      "height": 1674,
+      "sha256": "c9603b3806c5484431906401e68af1cc648776e6efa9d6660592339bbe8f4573"
+    },
+    {
+      "file": "fr-FR-light-review-incomplete.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "d2849b0df86c7404827da11417f0c27711a91cc083eec0d584c3082389093d0b"
+    },
+    {
+      "file": "fr-FR-light-review.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "8535bb74b1cc0003a54e4400b7a1dd7b635d44ea7e9e31ad552dabce53f153ec"
+    },
+    {
+      "file": "fr-FR-light-storage-full.png",
+      "width": 390,
+      "height": 1723,
+      "sha256": "286a24791c74c64440d6d5fc8f4d0e7da79d018b7f6d76022af637f87c1cdf87"
+    },
+    {
+      "file": "fr-FR-light-storage.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "a5bac9732d7fd6acadd8418430e363a0071f1f1ccad200e3da0b15563a159526"
+    },
+    {
+      "file": "fr-FR-light-treatments-full.png",
+      "width": 390,
+      "height": 1360,
+      "sha256": "6869667b4b6a54bf406b374e05371c17e84d7639cb148feb6f797b087072cae0"
+    },
+    {
+      "file": "fr-FR-light-treatments.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "e7f7214f44b5b0fa611a2ced5fafbb260fd02af875b89d2722115988b8a5d47a"
+    }
+  ]
+}
