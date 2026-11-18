@@ -5516,6 +5516,38 @@
       "discoveredDuring": "2026-11-18 main synchronization #1174",
       "identityLabel": "Requirement",
       "rowTestId": "storage-mapping"
+    },
+    {
+      "id": "parameter-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/parameters/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Component checks cover saved typed values and draft isolation; new screenshot validation is recorded separately."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
     }
   ],
   "specialized": [

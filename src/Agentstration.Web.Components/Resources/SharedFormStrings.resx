@@ -201,4 +201,7 @@
   <data name="SecretMissingValue" xml:space="preserve"><value>The selected Secret has no configured value.</value></data>
   <data name="RequiredFields" xml:space="preserve"><value>Required fields</value></data>
   <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="Verification" xml:space="preserve"><value>Review</value></data>
 </root>
