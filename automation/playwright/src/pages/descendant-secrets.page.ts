@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -16,6 +17,7 @@ export class DescendantSecretsPage {
 
   public async openVault(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
     await this.open(`${consoleUrl}/vaults/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`, this.vaultEditor);
+    await selectResourceSection(this.page, 'definition/configuration');
   }
 
   public async openNewSecret(consoleUrl: string): Promise<void> {
@@ -47,8 +49,8 @@ export class DescendantSecretsPage {
   }
 
   public async initializeVault(): Promise<void> {
-    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
-    const initialize = this.page.locator('.resource-form .form-section .button-primary');
+    await selectResourceSection(this.page, 'master-key');
+    const initialize = this.page.getByTestId(TestIds.secretGrants.vaultInitialize);
     await initialize.waitFor({ state: 'visible' });
     await initialize.click();
     const confirmation = this.page.getByRole('alertdialog');
@@ -102,14 +104,14 @@ export class DescendantSecretsPage {
   }
 
   public async saveChanges(): Promise<void> {
-    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    const bar = this.page.locator('.unsaved-changes-bar');
     await bar.waitFor({ state: 'visible' });
     await bar.locator('button[type="submit"]').click();
     await bar.waitFor({ state: 'hidden' });
   }
 
   public async saveChangesIfPresent(): Promise<void> {
-    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    const bar = this.page.locator('.unsaved-changes-bar');
     await bar.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
     if (await bar.isVisible()) await this.saveChanges();
   }
@@ -134,13 +136,21 @@ export class DescendantSecretsPage {
 
   private async openAccessTab(): Promise<void> {
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
-    if (await target.count() > 0) return;
+    if (await target.isVisible()) return;
+    if (new URL(this.page.url()).pathname.startsWith('/vaults/')) {
+      await selectResourceSection(this.page, 'definition/grants');
+      await target.waitFor({ state: 'visible' });
+      return;
+    }
     await this.page.locator('[data-testid="vault-access-tab"], [data-testid="secret-access-tab"]').click();
     await target.waitFor({ state: 'visible' });
   }
 
   private async saveNew(kind: 'vaults' | 'secrets', name: string): Promise<void> {
-    await this.page.locator('.resource-form button[type="submit"]').click();
+    if (kind === 'vaults') {
+      await this.page.locator('[data-wizard-step=review]').click();
+      await this.page.getByTestId(TestIds.creationWizard.finish).click();
+    } else await this.page.locator('.resource-form button[type="submit"]').click();
     await this.page.waitForURL(url => url.pathname === `/${kind}/${name}`);
     await (kind === 'vaults' ? this.vaultEditor : this.secretEditor).waitFor({ state: 'visible' });
   }
@@ -158,6 +168,8 @@ export class DescendantSecretsPage {
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Secret management route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await marker.waitFor({ state: 'visible' });
-    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
+    if (target.pathname.startsWith('/vaults/') && !target.pathname.endsWith('/new'))
+      await expect(this.page.locator('.resource-details-navigation .resource-navigation')).toHaveAttribute('data-navigation-ready', 'true');
+    else await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 }

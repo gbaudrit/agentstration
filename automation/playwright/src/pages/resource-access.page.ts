@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 
 export interface ResourceAccessIdentity {
@@ -15,7 +16,7 @@ export class ResourceAccessPage {
   public get panel(): Locator { return this.page.getByTestId(TestIds.resourceAccess.panel); }
 
   public async openVaultAccess(): Promise<void> {
-    await this.page.getByTestId('vault-access-tab').click();
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
   }
 

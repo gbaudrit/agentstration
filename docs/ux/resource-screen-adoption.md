@@ -56,7 +56,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | TransformationFunctionEditor.razor | `/transformation-functions/{Name}` | Pending review and migration |
 | TriggerDetails.razor | `/triggers/{Name}` | Pending review and migration |
 | TriggerEditor.razor | `/triggers/new`, `/triggers/{Name}/edit` | Pending review and migration |
-| VaultEditor.razor | `/vaults/new`, `/vaults/{Name}` | Pending review and migration |
+| VaultEditor.razor | `/vaults/new`, `/vaults/{Name}` | Implemented; grant/draft regressions and 3 new wizard/EN/FR overview cases pass; TypeScript/catalog pass; browser checks pending |
 
 ## Embedded and delegated editors
 
@@ -66,4 +66,4 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Parameter saved configuration adds one shared frame: **89 shared frames + 258 active specialized collections = 347**, with 147 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Parameter and Vault saved configuration add shared frames: **90 shared frames + 258 active specialized collections = 348**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.

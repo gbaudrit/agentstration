@@ -398,6 +398,7 @@ export const TestIds = {
     invalidTarget: 'resource-access-invalid-target',
   },
   secretGrants: {
+    vaultInitialize: 'vault-initialize',
     scopePicker: 'resource-scope-picker',
     vaultName: 'vault-name',
     vaultDisplayName: 'vault-display-name',

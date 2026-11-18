@@ -5548,6 +5548,40 @@
         "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
         "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
       }
+    },
+    {
+      "id": "vault-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/vaults/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/foundry-secret-binding.spec.ts",
+          "tests/descendant-secrets.spec.ts",
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Vault provider and allowed descendant scopes; component checks cover draft isolation and grants. Browser evidence is recorded after host validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved configuration settings, not resource rows. No owner/state/version/action invented for a setting. No Secret or master key contents are resolved.",
+        "evidenceStatus": "New browser validation pending; historical captures remain historical."
+      }
     }
   ],
   "specialized": [
@@ -17020,6 +17054,11 @@
       "source": "src/Agentstration.Web.Components/ResourceNavigation.razor",
       "classification": "non-collection-control",
       "reason": "Configured resource-local primary/child navigation entries duplicated into a modal drawer, not functional resource datasets; resource content and collections remain screen-owned."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "classification": "inventoried",
+      "reason": "Saved Vault configuration summary is a functional collection recorded in shared frames; fixed wizard/navigation entries remain controls."
     }
   ],
   "reconciliation": {
