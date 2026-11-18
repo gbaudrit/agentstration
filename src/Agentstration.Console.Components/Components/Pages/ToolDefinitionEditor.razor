@@ -93,7 +93,7 @@ else
     private bool publish;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string savedFingerprint = string.Empty;
-    private string Fingerprint => JsonSerializer.Serialize(new { name, namespaceValue, displayName, description, enabled, requiresApproval, timeoutSeconds, selectedFlow, useActiveVersion, flowVersion });
+    private string Fingerprint => JsonSerializer.Serialize(new { name, namespaceValue, displayName, description, enabled, requiresApproval, timeoutSeconds, selectedFlow, useActiveVersion, flowVersion, publicationVersion, publish });
     private bool IsDirty => !loading && Fingerprint != savedFingerprint;
     private string T(string key, params object[] arguments)=>Localizer[key,arguments];
     protected override async Task OnParametersSetAsync()

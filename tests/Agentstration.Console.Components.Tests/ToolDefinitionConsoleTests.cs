@@ -14,6 +14,7 @@ using Agentstration.Web.Console;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -77,6 +78,44 @@ public sealed class ToolDefinitionConsoleTests
             Assert.IsTrue(rendered.Find("[data-testid='tool-definition-output-schema']") is not null));
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task PublicationChangesRequireNavigationConfirmationUntilReverted(bool changePublishFlag)
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IToolDefinitionsClient>(new DefinitionClient());
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClient());
+        context.Services.AddSingleton<ISchemasClient>(new SchemasClient());
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/tools/definitions/notification.send?namespace=default");
+        var rendered = context.Render<ToolDefinitionEditor>(parameters => parameters.Add(value => value.Name, "notification.send"));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty));
+        var version = rendered.FindComponents<FormField>().Single(field => field.Instance.Label == "ToolDefinition version").Find("input");
+        var publish = () => rendered.FindAll("label").Single(label => label.TextContent.Trim() == "Publish version").QuerySelector("input")!;
+        var originalVersion = version.GetAttribute("value");
+        if (changePublishFlag) publish().Change(true);
+        else version.Change("1.0.1");
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty));
+        var originalLocation = navigation.Uri;
+        await rendered.InvokeAsync(() => navigation.NavigateTo("/tools/definitions"));
+        rendered.WaitForElement("[role=alertdialog]");
+        Assert.AreEqual(originalLocation, navigation.Uri);
+        await rendered.Find("[role=alertdialog] .button-secondary").ClickAsync(new());
+        Assert.IsEmpty(rendered.FindAll("[role=alertdialog]"));
+        Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty);
+        if (changePublishFlag) publish().Change(false);
+        else version.Change(originalVersion);
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty));
+        await rendered.InvokeAsync(() => navigation.NavigateTo("/tools/definitions"));
+        Assert.IsTrue(navigation.Uri.EndsWith("/tools/definitions", StringComparison.Ordinal));
+        Assert.IsEmpty(rendered.FindAll("[role=alertdialog]"));
+    }
+
     private sealed class CreationContext : IConsoleNavigationContext, IConsoleContextProvider
     {
         public string ScopeRef => "/workspaces/11111111-1111-1111-1111-111111111111";
@@ -102,7 +141,15 @@ public sealed class ToolDefinitionConsoleTests
             }
         ]);
 
-        public Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public async Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken)
+        {
+            var resource = (await GetAsync(cancellationToken)).Single(value => value.Name == name);
+            return new(resource with
+            {
+                Definition = ((FlowToolDefinitionProperties)resource.Definition) with
+                { Flow = new ToolDefinitionFlowTarget { Name = "contract-flow" } }
+            }, "definition-etag");
+        }
         public Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(Agentstration.Tools.Contracts.CreateToolDefinitionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, Agentstration.Tools.Contracts.PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolDefinitionResource>> SetEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
