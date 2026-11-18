@@ -36,7 +36,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Pending review and migration |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
-| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Pending review and migration |
+| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Implemented; 3 new wizard/write-only/EN/FR overview cases and existing regressions pass (17 focused cases across the first 3 screens); TypeScript/catalog pass; browser checks pending |
 | SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Pending review and migration |
 | SourceRegistries.razor | `/settings/source-registries`, `/settings/source-registries/new`, `/settings/source-registries/{Name}` | Pending review and migration |
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
@@ -66,4 +66,4 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Parameter and Vault saved configuration add shared frames: **90 shared frames + 258 active specialized collections = 348**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Parameter, Vault and Secret saved configuration add shared frames: **91 shared frames + 258 active specialized collections = 349**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.

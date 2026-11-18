@@ -5582,6 +5582,40 @@
         "domainSemantics": "Saved configuration settings, not resource rows. No owner/state/version/action invented for a setting. No Secret or master key contents are resolved.",
         "evidenceStatus": "New browser validation pending; historical captures remain historical."
       }
+    },
+    {
+      "id": "secret-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "line": 43,
+      "host": "console",
+      "routes": [
+        "/secrets/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/foundry-secret-binding.spec.ts",
+          "tests/descendant-secrets.spec.ts",
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved metadata only: exact Vault reference, key, opaque type and allowed descendant scopes. Values remain write-only and are never loaded for the overview."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Configuration settings are not resource rows. Only the real declared Vault reference has a scoped link. No secret contents or replacement draft appear in saved summaries.",
+        "evidenceStatus": "Component and current source validation; browser evidence pending."
+      }
     }
   ],
   "specialized": [

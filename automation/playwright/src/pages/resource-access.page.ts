@@ -21,7 +21,7 @@ export class ResourceAccessPage {
   }
 
   public async openSecretAccess(): Promise<void> {
-    await this.page.getByTestId('secret-access-tab').click();
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
   }
 
