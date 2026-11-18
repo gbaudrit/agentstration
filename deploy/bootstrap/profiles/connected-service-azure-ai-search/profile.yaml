@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-azure-ai-search
+  tags:
+    category: search
+    vendor: microsoft
+    product: azure
+definition:
+  displayName: "Azure AI Search connection type"
+  description: "Installs the Azure AI Search connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

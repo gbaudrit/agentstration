@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-s3-compatible
+  tags:
+    category: storage
+    vendor: generic
+    product: s3
+definition:
+  displayName: "S3-compatible storage connection type"
+  description: "Installs the S3-compatible storage connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

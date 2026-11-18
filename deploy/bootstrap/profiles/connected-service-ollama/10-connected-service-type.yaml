@@ -1,0 +1,35 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: ollama
+  namespace: agentstration.connected-services
+  tags:
+    category: ai
+    vendor: ollama
+    product: ollama
+definition:
+  displayName: "Ollama"
+  description: "One Ollama server reached without application authentication. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: endpoint
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "Exact Ollama server endpoint. Private-network access remains controlled by the consumer/operator policy."
+      exports:
+        - id: endpoint
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: endpoint

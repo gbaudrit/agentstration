@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-sql-server
+  tags:
+    category: database
+    vendor: microsoft
+    product: sql-server
+definition:
+  displayName: "SQL Server / Azure SQL connection type"
+  description: "Installs the SQL Server / Azure SQL connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

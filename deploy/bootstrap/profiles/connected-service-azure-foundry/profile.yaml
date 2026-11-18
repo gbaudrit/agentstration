@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-azure-foundry
+  tags:
+    category: ai
+    vendor: microsoft
+    product: azure
+definition:
+  displayName: "Microsoft Foundry connection type"
+  description: "Installs the Microsoft Foundry connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

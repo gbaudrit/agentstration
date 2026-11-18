@@ -18,6 +18,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 - Ollama, llama.cpp and LocalAI integrations through autonomous, versioned AEP contributions;
 - governed Tool execution with enablement checks, ordered hooks, workspace guards, human approval and durable audit records;
 - local Secrets and Vault management;
+- optional Bootstrap profiles for [common Connected Service types](docs/reference/connected-services.md#optional-connection-type-bootstrap-profiles), with typed connection inputs and protected credential exports;
 - local accounts, external identity links, stable Principals, workspace memberships, scoped RBAC and security auditing.
 
 ### Flows and durable execution

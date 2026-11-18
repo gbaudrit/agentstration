@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-azure-storage
+  tags:
+    category: storage
+    vendor: microsoft
+    product: azure
+definition:
+  displayName: "Azure Storage connection type"
+  description: "Installs the Azure Storage connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

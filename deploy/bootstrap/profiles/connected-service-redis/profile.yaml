@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-redis
+  tags:
+    category: database
+    vendor: redis
+    product: redis
+definition:
+  displayName: "Redis connection type"
+  description: "Installs the Redis connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

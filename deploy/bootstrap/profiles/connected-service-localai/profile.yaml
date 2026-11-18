@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-localai
+  tags:
+    category: ai
+    vendor: localai
+    product: localai
+definition:
+  displayName: "LocalAI connection type"
+  description: "Installs the LocalAI connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

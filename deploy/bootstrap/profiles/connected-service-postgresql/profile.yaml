@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: connected-service-postgresql
+  tags:
+    category: database
+    vendor: postgresql
+    product: postgresql
+definition:
+  displayName: "PostgreSQL connection type"
+  description: "Installs the PostgreSQL connection contract only. Configure service instances and credentials separately."
+  targetScope: instance

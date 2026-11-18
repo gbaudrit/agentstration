@@ -1,0 +1,62 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceType
+metadata:
+  name: openai
+  namespace: agentstration.connected-services
+  tags:
+    category: ai
+    vendor: openai
+    product: openai
+definition:
+  displayName: "OpenAI"
+  description: "One OpenAI project and its configured API key. Connection metadata only; execution requires an authorized compatible consumer."
+  enabled: true
+  preferredVersion: 1.0.0
+  usePolicy:
+    grants: []
+  versions:
+    - version: 1.0.0
+      schemaDigest: sha256:51da7ceec6376f5f1caac4b422cfa832718adde8bb2de8fda7940d2aff2b043f
+      schema:
+        type: object
+        additionalProperties: false
+      inputs:
+        - id: baseUrl
+          required: true
+          type: string
+          protection: standard
+          format: uri
+          description: "OpenAI API base URL."
+        - id: projectId
+          required: false
+          type: string
+          protection: standard
+          description: "Optional OpenAI project identifier."
+        - id: organizationId
+          required: false
+          type: string
+          protection: standard
+          description: "Optional OpenAI organization identifier."
+        - id: apiKey
+          required: true
+          type: string
+          protection: secured
+          description: "OpenAI project API key."
+      exports:
+        - id: baseUrl
+          type: string
+          protection: standard
+          format: uri
+          sourceInputId: baseUrl
+        - id: projectId
+          type: string
+          protection: standard
+          sourceInputId: projectId
+        - id: organizationId
+          type: string
+          protection: standard
+          sourceInputId: organizationId
+        - id: apiKey
+          type: string
+          protection: secured
+          sourceInputId: apiKey
