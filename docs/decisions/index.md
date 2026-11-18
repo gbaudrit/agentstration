@@ -288,3 +288,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 239. [ADR-0239 — Bootstrap resolves public extension and contribution identities](0239-bootstrap-resolves-public-extension-contribution-identities.md)
 
 240. [ADR-0240 — Initial Bootstrap waits for required extension contributions](0240-initial-bootstrap-waits-for-required-extension-contributions.md)
+
+241. [ADR-0241 — Bootstrap declares local descendant resource access](0241-bootstrap-declares-local-descendant-access.md)

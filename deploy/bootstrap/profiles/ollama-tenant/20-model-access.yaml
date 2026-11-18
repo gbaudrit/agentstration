@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: ResourceAccessPolicy
+metadata: { name: ollama-chat-to-default }
+definition:
+  resource: { kind: ModelProfile, name: ollama-chat }
+  grants:
+    - targetLevel: /tenants/dev/workspaces/default
+      actions: [discover, use]

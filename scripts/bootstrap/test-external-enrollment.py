@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-test real Web/OpenAPI processes with delayed enrollment and persisted restart.
+"""Smoke-test real Web/extension processes with delayed enrollment and persisted restart.
 
 Build Agentstration.slnx in Release first. Requires Python 3.9+ and the .NET runtime;
 does not require Docker, a model provider or Internet access. Only fresh temporary
@@ -23,6 +23,7 @@ import urllib.request
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dotnet", default=shutil.which("dotnet"), help="Path to the dotnet executable")
+    parser.add_argument("--example", choices=("openapi", "ollama"), default="openapi")
     args = parser.parse_args()
     if not args.dotnet:
         parser.error("dotnet must be on PATH or supplied with --dotnet")
@@ -40,7 +41,7 @@ def main():
         listener.close()
     # Start from a controlled environment, not the operator's product settings.
     environment = {k: v for k, v in os.environ.items() if not k.lower().startswith(
-        ("agentstration__", "aep__", "openapi__", "data__", "ai__", "connectionstrings__", "aspnetcore_"))}
+        ("agentstration__", "aep__", "openapi__", "ollama__", "data__", "ai__", "connectionstrings__", "aspnetcore_"))}
     web = environment | {
         "ASPNETCORE_ENVIRONMENT": "Development", "ASPNETCORE_URLS": authority,
         "Data__Directory": str(root / "data"), "AI__Provider": "Deterministic",
@@ -68,6 +69,25 @@ def main():
         "Aep__SharedKeyFile__StateFile": str(root / "extension-instance"),
         "Aep__SharedKeyFile__AllowInsecureHttp": "true",
     }
+    extension_project = "Agentstration.Extensions.OpenApi"
+    if args.example == "ollama":
+        extension_project = "Agentstration.Extensions.Ollama"
+        for setting in list(web):
+            if setting.startswith("Agentstration__Extensions__Agentstration.Extensions.OpenApi__"):
+                del web[setting]
+        del web["Agentstration__Aep__Enrollment__AutoEnrollmentLevel"]
+        web.update({
+            "Agentstration__Bootstrap__InitialProfiles__1": "ollama-instance",
+            "Agentstration__Bootstrap__InitialApplications__0__Profiles__0": "ollama-tenant",
+            "Agentstration__Bootstrap__InitialApplications__0__TargetLevel": "/tenants/dev",
+            "Agentstration__Bootstrap__InitialApplications__1__Profiles__0": "ollama-workspace",
+            "Agentstration__Bootstrap__InitialApplications__1__TargetLevel": "/tenants/dev/workspaces/default",
+            "Agentstration__Extensions__Agentstration.Extensions.Ollama__EnrollmentMode": "SharedKeyFile",
+            "Agentstration__Extensions__Agentstration.Extensions.Ollama__SharedKeyFile__Path": str(key),
+        })
+        # Only configuration is bootstrapped. No live model or inference is needed.
+        extension["Ollama__Endpoint"] = "http://127.0.0.1:1"
+        del extension["OpenApi__AllowedDomains__0"]
     processes = []
 
     def start(project, settings, log_name):
@@ -120,6 +140,22 @@ def main():
                         ("instanceId", "targetScopeRef", "registrationName", "state")}
                 elif kind == "ExtensionRegistration" or (name.startswith("bootstrap-") and kind != "InstanceInitialization"):
                     result[kind + "/" + name] = (uid, etag)
+                elif args.example == "ollama" and name in ("ollama-chat", "ollama-assistant"):
+                    result[kind + "/" + name] = (uid, etag, json.loads(payload)["scopeRef"])
+            if args.example == "ollama":
+                expected_targets = {
+                    result["ModelProvider/bootstrap-ollama"][0].lower(): result["ModelProfile/ollama-chat"][2],
+                    result["ModelProfile/ollama-chat"][0].lower(): result["Agent/ollama-assistant"][2],
+                }
+                for uid, owner, grants_json, etag in db.execute(
+                        "SELECT ResourceUid, OwnerScopeRef, GrantsJson, ETag FROM ResourceAccessPolicies"):
+                    if uid.lower() in expected_targets:
+                        grants = json.loads(grants_json)
+                        assert len(grants) == 1
+                        assert grants[0]["targetScopeRef"] == expected_targets[uid.lower()]
+                        assert set(grants[0]["actions"]) == {"discover", "use"}
+                        result["AccessPolicy/" + uid] = (owner, grants_json, etag)
+                assert len([key for key in result if key.startswith("AccessPolicy/")]) == 2
         with sqlite3.connect(f"file:{root / 'data/flow-plane.db'}?mode=ro", uri=True) as db:
             for key, kind, etag in db.execute("SELECT Key, Kind, ETag FROM FlowResources WHERE FlowId='bootstrap-echo'"):
                 result["Flow/" + key] = (kind, etag)
@@ -134,19 +170,24 @@ def main():
         assert status("/health/ready") == 503
         assert status("/api/tools") == 503
         print("PASS delayed extension: live=200, ready=503, normal API=503", flush=True)
-        start("Agentstration.Extensions.OpenApi", extension, "extension-first")
+        start(extension_project, extension, "extension-first")
         until(lambda: status("/health/ready") == 200, 150, "complete contribution Bootstrap")
         before = snapshot()
-        assert "ToolSet/bootstrap-openapi-tools" in before
-        assert "DataSource/bootstrap-openapi-source" in before
-        assert any(k.startswith("Flow/") for k in before)
-        assert any(k.startswith("Entry/") for k in before)
+        if args.example == "ollama":
+            assert "ModelProvider/bootstrap-ollama" in before
+            assert before["ModelProfile/ollama-chat"][2].startswith("/tenants/")
+            assert before["Agent/ollama-assistant"][2].startswith("/workspaces/")
+        else:
+            assert "ToolSet/bootstrap-openapi-tools" in before
+            assert "DataSource/bootstrap-openapi-source" in before
+            assert any(k.startswith("Flow/") for k in before)
+            assert any(k.startswith("Entry/") for k in before)
         assert len([k for k in before if k.startswith("AepEnrollmentRequest/")]) == 1
         identity = (root / "extension-instance").read_text()
-        print("PASS enrollment, contributed Tool/DataSourceProfile, ToolSet, DataSource and Workspace Flow/Entry", flush=True)
+        print(f"PASS {args.example} enrollment and scoped Bootstrap resources", flush=True)
         stop()
         start("Agentstration.Web", web, "web-restart")
-        start("Agentstration.Extensions.OpenApi", extension, "extension-restart")
+        start(extension_project, extension, "extension-restart")
         until(lambda: status("/health/ready") == 200, 150, "restart readiness")
         assert before == snapshot(), "Restart changed an assignment or a Bootstrap consumer identity/version"
         assert identity == (root / "extension-instance").read_text()

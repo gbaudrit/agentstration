@@ -63,6 +63,14 @@ has its own writable volume. Keep these volumes across restarts. The extension
 process is owned by Compose. See the [Bootstrap reference](../../docs/reference/declarative-bootstrap.md#complete-local-bootstrap-with-an-external-extension)
 for scoped applications, readiness, Aspire configuration and recovery.
 
+## Ollama provider, model and Agent Bootstrap
+
+Use `bootstrap-ollama.yml` with `ollama.yml` after pulling `qwen3:1.7b` into the
+Ollama service. It creates the `dev/default` topology, an instance Model Provider,
+a Tenant Model Profile and a Workspace Agent, including their explicit access
+grants. See the [Ollama Bootstrap example](../../docs/reference/declarative-bootstrap.md#ollama-instance-tenant-and-workspace-example)
+for complete startup commands and the disposable Development credentials.
+
 ## PostgreSQL
 
 Create the ignored environment file once, then replace its disposable development password:

@@ -356,7 +356,7 @@ installation fails instead of replacing its connection.
 
 Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns its business identity and calls the existing resource boundary. This avoids assuming that all resources use `kind + metadata.name` as their existence key.
 
-Workspace profiles support direct editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.
+Instance profiles declare `ModelProvider` and `RuntimeProfile` resources. `ModelProfile` and `Agent` may be declared at Instance, Tenant or Workspace scope. Workspace profiles support direct editable `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests, with explicit access grants for ancestor dependencies. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.
 
 ## Flow authoring requirements
 
@@ -513,3 +513,105 @@ installation, assignment and resource preservation. It requires no live model,
 upstream API or Docker. Logs stay in the printed temporary directory. The
 functional integration suite separately covers missing contributions, timeouts,
 partial provisioning failure, unrelated absent extensions and catalog changes.
+
+## Ollama instance, Tenant and Workspace example
+
+The repository includes a complete local example using `qwen3:1.7b`:
+
+| Profile | Target | Result |
+| --- | --- | --- |
+| `development` | Instance | Disposable `admin / admin` account, Tenant `dev`, Workspace `default` and navigation default |
+| `ollama-instance` | Instance | SharedKeyFile enrollment override for `Agentstration.Extensions.Ollama`, `bootstrap-ollama` Model Provider and an explicit provider grant to `dev` |
+| `ollama-tenant` | `/tenants/dev` | `ollama-chat` Model Profile (`qwen3:1.7b`, temperature `0.2`) and a grant to `dev/default` |
+| `ollama-workspace` | `/tenants/dev/workspaces/default` | `ollama-assistant` Agent, with French instructions and no Tools |
+
+The Agent references the Tenant Model Profile by its ordinary name and the
+instance `maf-builtin` runtime. Platform provisioning already shares this runtime
+with business Workspaces. A Model Provider is instance-owned; visibility alone
+does not authorize its use by a Tenant. The example therefore declares each
+required `discover`/`use` grant explicitly, without granting another Tenant or
+Workspace access.
+
+### Start with Aspire
+
+Start Ollama locally and obtain the model first:
+
+```sh
+ollama serve
+# In another terminal, once Ollama is listening:
+ollama pull qwen3:1.7b
+dotnet run --project src/Agentstration.AppHost --launch-profile https-BootstrapOllama
+```
+
+If Ollama already runs as a service, keep that process and run only the pull and
+AppHost commands. AppHost uses `http://localhost:11434` by default; configure
+`Ollama:Endpoint` for another server. AppHost starts the existing Ollama AEP
+extension externally and provisions its shared key and durable installation ID.
+Only Ollama has an automatic enrollment override in these manifests. The other
+bundled extensions can remain pending without blocking this Bootstrap.
+
+Use the public disposable Development account `admin / admin` to inspect the
+instance provider, the `dev` Model Profile and the `dev/default` Agent. The
+bootstrap creates configuration and does not download model weights or execute
+inference. The model name can be changed in
+`deploy/bootstrap/profiles/ollama-tenant/10-model-profile.yaml` before the first
+application; pull that model on the configured Ollama server as well.
+
+### Start with Compose
+
+The overlay reuses the existing Ollama topology, including its worker, per-extension
+key volumes and installation state:
+
+```sh
+docker compose -f deploy/compose/ollama.yml -f deploy/compose/bootstrap-ollama.yml up -d --build ollama
+docker compose -f deploy/compose/ollama.yml -f deploy/compose/bootstrap-ollama.yml exec ollama ollama pull qwen3:1.7b
+docker compose -f deploy/compose/ollama.yml -f deploy/compose/bootstrap-ollama.yml up -d --build
+curl --fail http://localhost:5100/health/ready
+```
+
+The default HTTP port is `5100` and may be overridden by
+`AGENTSTRATION_HTTP_PORT`. Retain data, key and installation volumes on restart.
+Use these Development credentials only for this local fixture.
+
+### Bootstrap access-policy declarations
+
+An access declaration is local administrative Bootstrap input. It creates the
+existing UID-bound access overlay; it is not an exported overlay or a Pack
+resource. Managed bundle contexts are rejected in preview and apply. The resource belongs to the current profile target. Place its manifest
+before the policy, and apply the owner's profile before any descendant consumer:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: ResourceAccessPolicy
+metadata: { name: bootstrap-ollama-to-dev }
+definition:
+  resource: { kind: ModelProvider, name: bootstrap-ollama, namespace: default }
+  grants:
+    - targetLevel: /tenants/dev
+      actions: [discover, use]
+      includeDescendants: false
+```
+
+`targetLevel` uses the same active name/ID selectors as initial applications.
+Only descendants of the owning profile target are valid; self, sibling, ancestor,
+unknown and cross-Tenant targets fail. `includeDescendants` is optional and defaults
+to false. Bootstrap resolves the resource UID and current generation/version on
+the server and writes through the existing authorized, audited access-policy
+service. Preview performs no writes.
+
+An existing overlay is skipped, including a policy whose grants were revoked.
+Bootstrap never merges or replaces it. Change an existing resource or policy
+through its ordinary administration boundary; editing an already-applied manifest
+does not reconcile it. Installing or starting an extension or downloading a model
+remains the external orchestrator/operator's responsibility.
+
+The offline real-process check for this example is:
+
+```sh
+python3 scripts/bootstrap/test-external-enrollment.py --example ollama
+```
+
+It starts the actual Web and Ollama extension hosts, waits for SharedKeyFile
+enrollment, checks the instance provider, Tenant model and Workspace Agent, then
+restarts both processes with retained identities. It creates configuration only;
+it does not call a live Ollama backend or validate a generated model response.
