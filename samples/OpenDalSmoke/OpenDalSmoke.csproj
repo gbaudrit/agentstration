@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
+    <ProjectReference Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+  </ItemGroup>
+</Project>

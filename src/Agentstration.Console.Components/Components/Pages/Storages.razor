@@ -1,0 +1,71 @@
+@page "/storages"
+@implements IDisposable
+@inject IStoragesClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+
+<PageTitle>@T("Storages") · Agentstration</PageTitle>
+<PageHeader Title="@T("Storages")" Description="@T("List.Description")" TestId="storages-page">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button>@if (CanWrite) { <a class="button-primary" href="/storages/new" data-testid="storage-create">@T("Create")</a> }</Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (!Context.HasPermission("resources/read")) { <p role="alert">@T("Error.Forbidden")</p> }
+else if (error is not null) { <StorageError Error="error" /> }
+else
+{
+    <section class="panel">
+        <div class="toolbar">
+            <label><span>@T("Search")</span><input type="search" @bind="search" @bind:event="oninput" /></label>
+            <label><span>@T("Availability")</span><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach (var value in Enum.GetValues<StorageAvailability>()) { <option value="@value">@T($"Availability.{value}")</option> }</select></label>
+        </div>
+        @if (Filtered.Count == 0) { <EmptyState Title="@T("Empty.Title")" Message="@T("Empty.Description")" /> }
+        else
+        {
+            <DataGrid TItem="StorageResource" Items="Filtered"><Header><tr><th>@T("Storage")</th><th>@T("Type")</th><th>@T("Scope")</th><th>@T("Availability")</th></tr></Header>
+                <Row Context="item"><tr data-testid="storage-row"><td><a class="resource-name-link" href="@StorageLinks.Details(item)" data-testid="storage-name-link">@item.Definition.DisplayName</a><br /><code>@item.Namespace/@item.Name</code></td><td><code>@item.Definition.Type.Type.Name · @item.Definition.Type.Version</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@(Availability(item) == StorageAvailability.Ready ? UiStatus.Success : UiStatus.Warning)" /></td></tr></Row>
+            </DataGrid>
+        }
+    </section>
+    <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2><a href="/storage-types" data-testid="storage-types-manage">@T("Type.Manage")</a></div><p>@T("TypeCatalog.Help")</p>
+        @if (types.Count == 0) { <p>@T("NoTypes")</p> }
+        @foreach (var type in types)
+        {
+            @foreach (var version in type.Definition.Versions)
+            {
+                <details data-testid="storage-type-evidence"><summary>@type.Definition.DisplayName · @version.Version · @T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")</summary><StorageTypeEvidence Choice="new(type, version)" /></details>
+            }
+        }
+    </section>
+    <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="/connected-services">@T("ConnectedServices")</a><a href="/data-sources">@T("DataSources")</a><a href="/knowledge-sources">@T("KnowledgeSources")</a></nav>
+}
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<StorageResource> resources = [];
+    private IReadOnlyList<StorageTypeResource> types = [];
+    private bool loading = true;
+    private Exception? error;
+    private string search = string.Empty, status = string.Empty;
+    private bool CanWrite => Context.HasPermission("resources/write");
+    private IReadOnlyList<StorageResource> Filtered => resources.Where(value => (string.IsNullOrEmpty(search) || $"{value.Name} {value.Definition.DisplayName} {value.Definition.Type.Type.Name}".Contains(search, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrEmpty(status) || Availability(value).ToString() == status)).ToArray();
+    private string T(string key) => Localizer[key].Value;
+    private static StorageAvailability Availability(StorageResource value) => value.ObservedState?.Availability ?? (value.Definition.Enabled ? StorageAvailability.Unavailable : StorageAvailability.Disabled);
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            await Context.EnsureLoadedAsync(cancellation.Token);
+            if (!Context.HasPermission("resources/read")) return;
+            var scope = ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef);
+            var resourcesTask = Client.GetStoragesAsync(scope, cancellation.Token);
+            var typesTask = Client.GetTypesAsync(scope, cancellation.Token);
+            await Task.WhenAll(resourcesTask, typesTask);
+            resources = await resourcesTask; types = await typesTask;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

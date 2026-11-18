@@ -52,7 +52,9 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
                 ModelProfileNamespace = modelProfile.Namespace,
                 ModelProfileScopeRef = agent.Definition.ModelProfile.ScopeRef,
                 DeploymentId = deployment?.Metadata.Name,
+                OutputContract = agent.Definition.OutputContract,
                 InputSchema = agent.Definition.InputSchema?.Clone(),
+                OutputSchema = (agent.Definition.OutputSchema ?? (agent.Definition.OutputContract is { Mode: Agentstration.Schemas.DataContractMode.Fixed } ? agent.Definition.OutputContract.Schema : null))?.Clone(),
                 InputSchemaReference = agent.Definition.InputSchemaBinding?.Reference
             };
         }).ToArray();

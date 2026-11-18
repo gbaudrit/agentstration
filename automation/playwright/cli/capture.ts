@@ -28,7 +28,7 @@ if (plan.productRef) {
 
 let product: ProductHosts | undefined;
 const externalAddresses = resolveCaptureAddresses(options, plan);
-const addresses = externalAddresses ?? (product = await startProductHosts(plan.journey === 'exercise-organization-structure' ? 'Local' : 'Development', 'Deterministic', plan.journey === 'inspect-acquisition-failure', plan.journey === 'inspect-governed-extension-inventory', plan.journey === 'exercise-organization-structure'));
+const addresses = externalAddresses ?? (product = await startProductHosts(plan.journey === 'exercise-organization-structure' ? 'Local' : 'Development', 'Deterministic', plan.journey === 'inspect-acquisition-failure', plan.journey === 'inspect-governed-extension-inventory', plan.journey === 'exercise-organization-structure', plan.journey === 'exercise-source-policies'));
 
 const browser = await chromium.launch({
   headless: true,

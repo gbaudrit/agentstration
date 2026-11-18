@@ -1,0 +1,18 @@
+{
+  "journey": "exercise-source-composition",
+  "input": {
+    "locale": "en-US"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "theme": "dark",
+  "captures": [
+    {
+      "checkpoint": "source-composition-verified",
+      "file": "source-composition.png",
+      "scope": "target"
+    }
+  ]
+}

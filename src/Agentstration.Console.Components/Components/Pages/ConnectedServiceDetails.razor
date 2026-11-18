@@ -1,0 +1,131 @@
+@page "/connected-services/{Name}"
+@implements IDisposable
+@inject IConnectedServicesClient Client
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+<PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+<PageHeader Title="@(resource?.Definition.DisplayName ?? Name ?? T("ConnectedService"))" Description="@T("Details.Description")" TestId="connected-service-details">
+    <Actions>@if (resource is not null) { <button class="button-secondary" @onclick="RequestReconcile">@T("Reconcile")</button>@if (resource.Definition.Enabled) { <button class="button-danger" @onclick="() => confirmDeactivate = true">@T("Deactivate")</button> } }<a class="button-secondary" href="/connected-services">@T("Back")</a></Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
+else if (error is not null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
+else if (resource is not null)
+{
+    <InheritedResourceNotice OwnerScopeRef="@(resource.ScopeRef ?? ResourceScopeRef.Instance)" />
+    <ResourceTabs Label="@T("DetailsSections")">
+        @foreach (var tab in AvailableTabs)
+        {
+            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+        }
+    </ResourceTabs>
+
+    @if (activeTab == DetailsTab.Overview)
+    {
+        <section class="metric-grid">
+            <MetricCard Label="@T("Availability")" Value="@StatusLabel(Availability)" Status="@StatusColor(Availability)" />
+            <MetricCard Label="@T("Enabled")" Value="@(resource.Definition.Enabled ? T("Yes") : T("No"))" />
+            <MetricCard Label="@T("Generation")" Value="@resource.Generation.ToString()" />
+            <MetricCard Label="@T("Scope")" Value="@(resource.ScopeRef?.Value ?? "—")" />
+        </section>
+        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("PinnedContribution")</h2></div></div>
+            <dl class="details-list"><dt>@T("ResourceId")</dt><dd><code>@resource.Uid</code></dd><dt>@T("TechnicalName")</dt><dd><code>@resource.Name</code></dd><dt>@T("ExtensionRegistration")</dt><dd><code>@TypeReference(resource)</code></dd><dt>@T("TypeResourceId")</dt><dd><code>@resource.Definition.Type.TypeUid</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(TypeResource?.Governance.Origin.Reference ?? TypeResource?.Namespace.Value ?? "—")</code></dd><dt>@T("Type")</dt><dd><code>@resource.Definition.Type.Type.Name@@@resource.Definition.Type.Version</code></dd><dt>@T("SchemaDigest")</dt><dd><code>@resource.Definition.Type.SchemaDigest</code></dd></dl>
+        </section>
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Options")</h2></div><JsonSchemaInputEditor Schema="TypeVersion?.Schema" Value="resource.Definition.Options" ReadOnly /></section>
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Bindings")</h2></div>
+            @if (resource.Definition.Bindings.Count == 0) { <p>@T("NoBindings")</p> } else { <DataGrid TItem="ConnectedServiceValueBinding" Items="resource.Definition.Bindings"><Header><tr><th>@T("Input")</th><th>@T("SourceKind")</th><th>@T("ValueOrResource")</th></tr></Header><Row Context="binding"><tr><td><code>@binding.InputId</code></td><td>@BindingKindLabel(binding.Kind)</td><td><code>@BindingValue(binding)</code></td></tr></Row></DataGrid> }
+        </section>
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Exports")</h2></div>
+            @if (TypeVersion is null) { <div class="form-alert form-alert-warning">@T("ContributionUnavailable")</div> } else if (TypeVersion.Exports.Count == 0) { <p>@T("NoExports")</p> } else { <DataGrid TItem="ConnectedServiceExportDescriptor" Items="TypeVersion.Exports"><Header><tr><th>@T("Export")</th><th>@T("ValueType")</th><th>@T("Protection")</th><th>@T("Format")</th></tr></Header><Row Context="export"><tr><td><code>@export.Id</code><br /><small>@export.Description</small></td><td>@ValueTypeLabel(export.Type)</td><td>@ProtectionLabel(export.Protection)</td><td>@(export.Format ?? "—")</td></tr></Row></DataGrid> }
+        </section>
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Diagnostics")</h2></div>@if (resource.ObservedState is null) { <p>@T("NotObserved")</p> } else { <dl class="details-list"><dt>@T("ObservedAt")</dt><dd>@resource.ObservedState.ObservedAt.ToLocalTime().ToString("g")</dd><dt>@T("Code")</dt><dd><code>@(resource.ObservedState.Code ?? "—")</code></dd><dt>@T("Message")</dt><dd>@(resource.ObservedState.Message ?? "—")</dd></dl> }</section>
+        <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("DependentsExplanation")</p>@if (usages.Count == 0) { <p>@T("NoDependents")</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@(usage.ResourceType == StorageResourceKinds.Storage ? StorageLinks.FromApi(usage.Url) : usage.Url)"><strong>@usage.DisplayName</strong><code>@usage.ResourceType · @usage.Name</code></a></li> }</ul> }</section>
+    }
+    else if (activeTab == DetailsTab.Discovery)
+    {
+        <ConnectedServiceDiscoveryPanel Service="resource" Supported="@(TypeVersion?.OperationDiscovery is not null)" />
+    }
+    else if (activeTab == DetailsTab.Definition)
+    {
+        <ConnectedServiceEditor Name="@resource.Name" EmbeddedScopeRef="resource.ScopeRef" Embedded="true" Saved="DefinitionSavedAsync" />
+    }
+    else if (activeTab == DetailsTab.Access && CanManageAccess)
+    {
+        <ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace" Kind="@ConnectedServiceResourceKinds.ConnectedService" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+    }
+    else if (activeTab == DetailsTab.YAML)
+    {
+        <section class="panel form-section" data-testid="connected-service-yaml-viewer"><div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("YAML")</h2><p>@T("YamlReadOnlyHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div><textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("YamlDefinition")">@ResourceYaml</textarea></section>
+    }
+}
+<ConfirmationDialog IsOpen="@confirmReconcile" Title="@T("Reconcile")" Message="@T("ReconcileConfirm")" ConfirmLabel="@T("Reconcile")" OnConfirm="ReconcileAsync" OnCancel="() => confirmReconcile = false" />
+<ConfirmationDialog IsOpen="@confirmDeactivate" Title="@T("Deactivate")" Message="@T("DeactivateConfirm")" ConfirmLabel="@T("Deactivate")" OnConfirm="DeactivateAsync" OnCancel="() => confirmDeactivate = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private ConnectedServiceResource? resource;
+    private IReadOnlyList<ConnectedServiceTypeResource> catalog = [];
+    private IReadOnlyList<ConnectedServiceUsageResponse> usages = [];
+    private string? etag, loadedKey;
+    private bool loading = true, confirmReconcile, confirmDeactivate;
+    private AgentstrationApiException? error;
+    private DetailsTab activeTab = DetailsTab.Overview;
+    private ConnectedServiceAvailability Availability => resource?.ObservedState?.Availability ?? (resource?.Definition.Enabled == true ? ConnectedServiceAvailability.Stale : ConnectedServiceAvailability.Disabled);
+    private ConnectedServiceTypeResource? TypeResource => resource is null ? null : catalog.SingleOrDefault(type => MatchesType(type));
+    private ConnectedServiceTypeVersionDescriptor? TypeVersion => TypeResource?.Definition.Versions.SingleOrDefault(version => resource is not null && version.Version == resource.Definition.Type.Version && version.SchemaDigest == resource.Definition.Type.SchemaDigest);
+    private bool CanManageAccess => resource?.ScopeRef is { } scopeRef && ResourceOwnershipContext.CanManage(scopeRef, Services);
+    private IReadOnlyList<DetailsTab> AvailableTabs => CanManageAccess ? Enum.GetValues<DetailsTab>() : Enum.GetValues<DetailsTab>().Where(value => value != DetailsTab.Access).ToArray();
+    private string ResourceYaml => resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(new RawConnectedService
+    {
+        ApiVersion = resource.ApiVersion,
+        Kind = resource.Kind,
+        Metadata = resource.Metadata,
+        ScopeRef = resource.ScopeRef,
+        Definition = resource.Definition
+    });
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{ScopeRefValue}|{View}";
+        if (string.Equals(loadedKey, key, StringComparison.Ordinal)) return;
+        loadedKey = key;
+        activeTab = ParseTab(View);
+        await LoadAsync();
+    }
+    private async Task LoadAsync() { loading = true; error = null; try { var scope = ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException(T("ScopeRequired"))); var resourceTask = Client.GetConnectedServiceAsync(Name!, scope, cancellation.Token); var catalogTask = Client.GetTypesAsync(cancellation.Token); var usagesTask = Client.GetUsagesAsync(Name!, scope, cancellation.Token); await Task.WhenAll(resourceTask, catalogTask, usagesTask); var snapshot = await resourceTask; resource = snapshot.Value; etag = snapshot.ETag; catalog = await catalogTask; usages = (await usagesTask).Value; if (!CanManageAccess && activeTab == DetailsTab.Access) activeTab = DetailsTab.Overview; } catch (AgentstrationApiException exception) { error = exception; } catch (Exception exception) { error = new(exception.Message, Guid.NewGuid().ToString("N")); } finally { loading = false; } }
+    private async Task DefinitionSavedAsync() { await LoadAsync(); activeTab = DetailsTab.Definition; }
+    private bool MatchesType(ConnectedServiceTypeResource type) { if (resource is null) return false; var reference = resource.Definition.Type.Type; return reference.Name == type.Name && reference.ScopeRef == type.ScopeRef && (reference.Namespace ?? resource.Namespace) == type.Namespace && resource.Definition.Type.TypeUid == type.Uid; }
+    private void RequestReconcile() => confirmReconcile = true;
+    private async Task ReconcileAsync() { confirmReconcile = false; await ExecuteAsync(() => Client.ReconcileAsync(resource!.Name, resource.ScopeRef!.Value, etag!, cancellation.Token)); }
+    private async Task DeactivateAsync() { confirmDeactivate = false; await ExecuteAsync(() => Client.DeactivateAsync(resource!.Name, resource.ScopeRef!.Value, etag!, cancellation.Token)); }
+    private async Task ExecuteAsync(Func<Task<ResourceSnapshot<ConnectedServiceResource>>> action) { try { var snapshot = await action(); resource = snapshot.Value; etag = snapshot.ETag; } catch (AgentstrationApiException exception) { error = exception; } }
+    private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
+    private static UiStatus StatusColor(ConnectedServiceAvailability status) => status switch { ConnectedServiceAvailability.Ready => UiStatus.Success, ConnectedServiceAvailability.Stale => UiStatus.Warning, ConnectedServiceAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
+    private string BindingKindLabel(ConnectedServiceBindingKind kind) => T($"BindingKind.{kind}");
+    private string ValueTypeLabel(ConnectedServiceValueType type) => T($"ValueType.{type}");
+    private string ProtectionLabel(ConnectedServiceValueProtection protection) => T($"Protection.{protection}");
+    private static string BindingValue(ConnectedServiceValueBinding binding)
+    {
+        if (binding.Kind == ConnectedServiceBindingKind.Literal && binding.Literal is { } literal)
+            return literal.ValueKind == JsonValueKind.String ? literal.GetString() ?? string.Empty : literal.GetRawText();
+        var address = binding.Parameter?.Address ?? binding.Secret?.Address;
+        var scope = binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef;
+        return address is not { } exact ? "—" : $"{scope}/{exact.Namespace}/{exact.Name}";
+    }
+    private static string TypeReference(ConnectedServiceResource value) { var reference = value.Definition.Type.Type; return $"{reference.ScopeRef}/{reference.Namespace ?? value.Namespace}/{reference.Name}"; }
+    private static string TabId(DetailsTab tab) => $"connected-service-{tab.ToString().ToLowerInvariant()}-tab";
+    private static DetailsTab ParseTab(string? value) => Enum.TryParse<DetailsTab>(value, true, out var tab) ? tab : DetailsTab.Overview;
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed record RawConnectedService
+    {
+        public required string ApiVersion { get; init; }
+        public required string Kind { get; init; }
+        public required ResourceMetadata Metadata { get; init; }
+        public ResourceScopeRef? ScopeRef { get; init; }
+        public required ConnectedServiceProperties Definition { get; init; }
+    }
+    private enum DetailsTab { Overview, Definition, Discovery, Access, YAML }
+}

@@ -12,11 +12,17 @@ public sealed record UpdateFlowCommand(string? Description, string Version, bool
 public interface IFlowDeletionGuard
 {
     Task ValidateDeleteAsync(WorkspaceId workspaceId, FlowId flowId, CancellationToken cancellationToken);
+    Task ValidateDeleteAsync(ResourceScopeRef ownerScopeRef, FlowId flowId, CancellationToken cancellationToken) =>
+        ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ValidateDeleteAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), flowId, cancellationToken) : Task.CompletedTask;
 }
 
 public interface IFlowVersionActivationGuard
 {
     Task ValidateActivationAsync(WorkspaceId workspaceId, FlowVersion version, CancellationToken cancellationToken);
+    Task ValidateActivationAsync(ResourceScopeRef ownerScopeRef, FlowVersion version, CancellationToken cancellationToken) =>
+        ownerScopeRef.Kind == ResourceScopeKind.Workspace
+            ? ValidateActivationAsync(new WorkspaceId(ownerScopeRef.TargetId!.Value), version, cancellationToken) : Task.CompletedTask;
 }
 
 public interface IFlowAgentReferenceResolver
@@ -25,10 +31,20 @@ public interface IFlowAgentReferenceResolver
         FlowTargetReference reference, CancellationToken cancellationToken);
 }
 
+public interface IFlowToolContractResolver
+{
+    Task<FlowToolReference> ResolveAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace, FlowToolReference reference, CancellationToken cancellationToken);
+}
+
 public interface IFlowDiscoveryPolicy
 {
     Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
         CancellationToken cancellationToken);
+}
+
+public interface IFlowUsePolicy
+{
+    Task ValidateAsync(FlowResource flow, string version, ResourceScopeRef consumer, CancellationToken cancellationToken);
 }
 
 public sealed class FlowService(
@@ -42,10 +58,66 @@ public sealed class FlowService(
     IFlowDiscoveryPolicy? discoveryPolicy = null,
     IResourceGovernanceContext? governanceContext = null,
     ISecurityAuditWriter? audit = null,
-    IFlowResourceReferenceResolver? resourceReferenceResolver = null)
+    IFlowResourceReferenceResolver? resourceReferenceResolver = null,
+    IFlowUsePolicy? usePolicy = null,
+    IFlowToolContractResolver? toolContracts = null,
+    Agentstration.Functions.Contracts.ITransformationFunctionResolver? functions = null)
 {
+    public async Task<Agentstration.Functions.Contracts.ResolvedTransformationFunction> ResolveFunctionAsync(
+        Agentstration.Functions.Contracts.FunctionReference reference, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (functions is null) throw new FlowValidationException("flow_function_resolver_unavailable", "Function resolution is unavailable.");
+        try { return await functions.ResolveAsync(reference, consumer, ct); }
+        catch (Agentstration.Functions.Abstractions.TransformationFunctionException error)
+        { throw new FlowValidationException(error.Code, error.Message); }
+    }
+
+    internal async Task<FlowVersion> CompileFunctionsAsync(FlowVersion version, ResourceScopeRef consumer, CancellationToken ct)
+    {
+        if (version.Graph is not { } graph) return version;
+        var steps = new List<FlowStepDefinition>();
+        foreach (var step in graph.Steps)
+        {
+            if (step is not TransformFlowStepDefinition { Function: { } reference } transform) { steps.Add(step); continue; }
+            var resolved = await ResolveFunctionAsync(reference with { Namespace = reference.Namespace ?? version.FlowId.Namespace }, consumer, ct);
+            steps.Add(FunctionStep(transform.Name, resolved, transform.Mapping ?? JsonSerializer.SerializeToElement("${transition.output}"), transform.DisplayName, transform.ArtifactOutput,
+                outputSchema: transform.Schema, schemaSnapshots: transform.FunctionSchemaSnapshots));
+        }
+        // Tool executors use their ordinary success event. Keep the author's completed connection.
+        var converted = graph.Steps.OfType<TransformFlowStepDefinition>().Where(s => s.Function is not null).Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+        var compiled = graph with { Steps = steps, Transitions = graph.Transitions.Select(t => converted.Contains(t.FromStep) && t.Event == "completed" ? t with { Event = "success" } : t).ToArray() };
+        return version with { Graph = compiled, DefinitionHash = FlowDefinitionHash.Compute(compiled) };
+    }
+
+    internal static ToolFlowStepDefinition FunctionStep(string name, Agentstration.Functions.Contracts.ResolvedTransformationFunction function,
+        JsonElement input, string? displayName = null, FlowStepArtifactOutputDefinition? artifactOutput = null, JsonElement? parameters = null, JsonElement? outputSchema = null,
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaSnapshots = null) => new()
+        {
+            Name = name,
+            DisplayName = displayName,
+            ArtifactOutput = artifactOutput,
+            FunctionBinding = function,
+            FunctionParameters = parameters,
+            FunctionSchemaSnapshots = schemaSnapshots,
+            FunctionOutputSchema = outputSchema ?? function.OutputSchema,
+            Tool = new("agentstration.transformation.invoke", ResourceNamespace.Default, ScopeRef: ResourceScopeRef.Instance),
+            ArgumentsMapping = JsonSerializer.SerializeToElement(new { input }, JsonOptions)
+        };
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    internal Task<IReadOnlyDictionary<string, SchemaBindingSnapshot>?> ResolveFunctionSchemasAsync(JsonElement inputSchema,
+        JsonElement parameters, ResourceScopeRef consumer, ResourceNamespace ns, string path, CancellationToken ct,
+        IReadOnlyDictionary<string, SchemaBindingSnapshot>? accepted = null, bool reuseAccepted = false) =>
+        new FunctionSchemaBindingSnapshotter(schemaBindingResolver).ResolveAsync(inputSchema, parameters, consumer, ns, path, ct, accepted, reuseAccepted);
     private readonly IResourceGovernanceContext effectiveGovernanceContext = governanceContext ?? new ResourceGovernanceContext();
+
+    public async Task ValidateUseAsync(ResourceScopeRef owner, FlowId id, string version, ResourceScopeRef consumer, Guid? expectedUid, CancellationToken ct)
+    {
+        var flow = await repository.GetExactAsync(owner, id, ct);
+        if (flow?.Value.Enabled != true || expectedUid is { } uid && flow.Value.Uid != uid)
+            throw new FlowValidationException("flow_composition_child_unavailable", "The exact published Flow is unavailable.");
+        if (usePolicy is not null) await usePolicy.ValidateAsync(flow.Value, version, consumer, ct);
+    }
 
     public Task InitializeAsync(CancellationToken cancellationToken) => repository.InitializeAsync(cancellationToken);
 
@@ -206,11 +278,7 @@ public sealed class FlowService(
         if (IsSystemManaged(stored.Value.Metadata)
             && (!allowSystemManaged || !IsDirectAgentFlow(stored.Value.Metadata)))
             throw new FlowValidationException("system_flow_managed", $"Flow '{id}' is managed by Agentstration and cannot be deleted independently.");
-        if (scopeRef.Kind == ResourceScopeKind.Workspace)
-        {
-            var workspaceId = new WorkspaceId(scopeRef.TargetId!.Value);
-            foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(workspaceId, id, cancellationToken);
-        }
+        foreach (var guard in deletionGuards) await guard.ValidateDeleteAsync(scopeRef, id, cancellationToken);
         await repository.DeleteExactAsync(scopeRef, id, expectedETag, cancellationToken);
         await AuditReconciliationAsync(stored.Value.Governance, cancellationToken);
     }
@@ -231,11 +299,38 @@ public sealed class FlowService(
         IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
         if (graph is not null)
         {
+            if (graph.Steps.OfType<ToolFlowStepDefinition>().Any(step => step.FunctionBinding is not null
+                || step.FunctionParameters is not null || step.FunctionSchemaSnapshots is not null || step.FunctionOutputSchema is not null))
+                throw new FlowValidationException("function_binding_reserved", "Compiled function bindings are server-owned; author a Transform step instead.");
+            var pinnedSteps = new List<FlowStepDefinition>();
+            foreach (var step in graph.Steps)
+            {
+                if (step is not TransformFlowStepDefinition { Function: { } function } transform) { pinnedSteps.Add(step); continue; }
+                var contract = await ResolveFunctionAsync(function with { Namespace = function.Namespace ?? id.Namespace }, scopeRef, cancellationToken);
+                var names = Agentstration.Functions.Contracts.FunctionInvocationSchemas.SchemaParameters(contract.InputSchema);
+                if (transform.FunctionSchemas?.Keys.Any(name => !names.Contains(name, StringComparer.Ordinal)) == true
+                    || transform.Mapping is { ValueKind: JsonValueKind.Object } mapping && names.Any(name => mapping.TryGetProperty(name, out _)))
+                    throw new FlowValidationException("function_schema_configuration_invalid", "Schema arguments must be configured as static function schema bindings, outside the runtime mapping.");
+                var snapshots = await ResolveFunctionSchemasAsync(contract.InputSchema,
+                    JsonSerializer.SerializeToElement(transform.FunctionSchemas ?? new Dictionary<string, SchemaBinding>(), JsonOptions),
+                    scopeRef, id.Namespace, $"$.steps[{transform.Name}].functionSchemas", cancellationToken);
+                pinnedSteps.Add(transform with
+                {
+                    Function = contract.Reference,
+                    FunctionInputSchema = contract.InputSchema,
+                    FunctionSchemaSnapshots = snapshots,
+                    Schema = transform.Schema ?? contract.OutputSchema
+                });
+            }
+            graph = graph with { Steps = pinnedSteps };
             var resolved = await new FlowSchemaBindingSnapshotter(schemaBindingResolver)
                 .ResolveAsync(scopeRef, id, graph, cancellationToken);
             graph = await new FlowOutputContractSnapshotter(resourceReferenceResolver)
                 .ResolveAsync(scopeRef, id, resolved.Graph, cancellationToken);
-            schemaBindings = resolved.Snapshots;
+            schemaBindings = resolved.Snapshots.Concat(graph.Steps.OfType<TransformFlowStepDefinition>()
+                .SelectMany(step => step.FunctionSchemaSnapshots?.Values ?? [])
+                .Select(snapshot => new KeyValuePair<string, SchemaBindingSnapshot>(snapshot.Path, snapshot)))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         }
         var published = new FlowVersion(stored.Value.ScopeRef, id, version, stored.Value.Description, definition, stored.Value.Metadata, timeProvider.GetUtcNow(), graph,
             graph is null ? FlowDefinitionHash.Compute(definition) : FlowDefinitionHash.Compute(graph), releaseNotes, schemaBindings)
@@ -244,8 +339,7 @@ public sealed class FlowService(
         };
         FlowValidator.ValidateVersion(published);
         if (activate)
-            if (scopeRef.Kind == ResourceScopeKind.Workspace)
-                foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(new(scopeRef.TargetId!.Value), published, cancellationToken);
+            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(scopeRef, published, cancellationToken);
         StoredFlowVersion created;
         try { created = await repository.CreateVersionAsync(published, cancellationToken); }
         catch (FlowConcurrencyException)
@@ -298,10 +392,10 @@ public sealed class FlowService(
     private async Task<FlowGraphDefinition> PinAgentsAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
         FlowGraphDefinition graph, CancellationToken cancellationToken)
     {
-        if (agentReferences is null) return graph;
+        if (agentReferences is null && toolContracts is null && resourceReferenceResolver is null) return graph;
         async Task<FlowResourceReference> Resolve(FlowResourceReference reference)
         {
-            var resolved = await agentReferences.ResolveAsync(ownerScopeRef, ownerNamespace,
+            var resolved = await agentReferences!.ResolveAsync(ownerScopeRef, ownerNamespace,
                 new(FlowTargetKind.Agent, reference.ResourceId,
                     reference.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture), reference.Namespace,
                     reference.ScopeRef), cancellationToken);
@@ -312,14 +406,24 @@ public sealed class FlowService(
                 Version = long.Parse(resolved.Version!, System.Globalization.CultureInfo.InvariantCulture),
                 ResourceUid = resolved.ResourceUid,
                 RevisionUid = resolved.RevisionUid,
-                DefinitionHash = resolved.DefinitionHash
+                DefinitionHash = resolved.DefinitionHash,
+                InputSchema = resolved.InputSchema,
+                OutputSchema = resolved.OutputSchema,
+                OutputContract = resolved.OutputContract
             };
+        }
+        async Task<FlowCallReference> ResolveCall(FlowCallReference reference)
+        {
+            var resolved = await resourceReferenceResolver!.ResolveFlowAsync(ownerScopeRef, ownerNamespace, reference, cancellationToken);
+            return resolved is null ? reference : reference with { ScopeRef = resolved.ScopeRef, InputSchema = resolved.InputSchema, OutputSchema = resolved.OutputSchema, OutputMediaType = resolved.OutputMediaType };
         }
         var steps = await Task.WhenAll(graph.Steps.Select(async step => step switch
         {
-            AgentFlowStepDefinition agent when !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal) =>
+            FlowCallStepDefinition call when resourceReferenceResolver is not null => call with { Flow = await ResolveCall(call.Flow) },
+            ToolFlowStepDefinition tool when toolContracts is not null => tool with { Tool = await toolContracts.ResolveAsync(ownerScopeRef, ownerNamespace, tool.Tool, cancellationToken) },
+            AgentFlowStepDefinition agent when agentReferences is not null && !agent.Agent.ResourceId.StartsWith("${", StringComparison.Ordinal) =>
                 agent with { Agent = await Resolve(agent.Agent) },
-            RouterFlowStepDefinition router => router with
+            RouterFlowStepDefinition router when agentReferences is not null => router with
             {
                 Candidates = await Task.WhenAll(router.Candidates.Select(async candidate =>
                     candidate with { Agent = await Resolve(candidate.Agent) })),
@@ -342,8 +446,7 @@ public sealed class FlowService(
         var published = await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken)
             ?? throw new FlowValidationException("flow_version_not_published", "The Flow version must be published before activation.");
         if (stored.Value.ActiveVersion == version) return stored;
-        if (scopeRef.Kind == ResourceScopeKind.Workspace)
-            foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(new(scopeRef.TargetId!.Value), published.Value, cancellationToken);
+        foreach (var guard in activationGuards ?? []) await guard.ValidateActivationAsync(scopeRef, published.Value, cancellationToken);
         var activated = await repository.UpdateAsync(stored.Value with { ActiveVersion = version, Enabled = true, UpdatedAt = timeProvider.GetUtcNow() }, stored.ETag, cancellationToken);
         await AuditReconciliationAsync(stored.Value.Governance, cancellationToken);
         return activated;

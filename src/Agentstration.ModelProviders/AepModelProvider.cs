@@ -17,7 +17,8 @@ public sealed class AepModelProvider(
     ISecretResolver? secrets = null,
     ISecretCapabilityService? capabilities = null,
     IParameterResolver? parameters = null,
-    IConfiguration? configuration = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+    IConfiguration? configuration = null,
+    AepInferenceOptions? inferenceOptions = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -31,13 +32,14 @@ public sealed class AepModelProvider(
         if (string.IsNullOrWhiteSpace(deployment.ModelName))
             throw new ModelProviderConfigurationException($"AEP deployment '{deployment.Name}' must specify a model name.");
         deployment.ProviderOptions.TryGetValue(provider.ContributionId, out var nativeOptions);
-        var client = CreateClient(provider);
-        return new AepChatClient(
+        var client = CreateClient(provider, AepInferenceOptions.HttpClientName);
+        return new AepInferenceChatClient(new AepChatClient(
             client.CreateModelProvider(provider.ContributionId),
             deployment.ModelName,
             nativeOptions is null ? null : Map(nativeOptions),
             token => IssueBoundValuesAsync(provider, deployment, client, null, token),
-            deployment.EffectiveSpecification is null ? null : Map(deployment.EffectiveSpecification));
+            deployment.EffectiveSpecification is null ? null : Map(deployment.EffectiveSpecification)),
+            (inferenceOptions ?? new()).Timeout);
     }
 
     private async Task<AepBoundValuesLease> IssueBoundValuesAsync(
@@ -305,6 +307,8 @@ public sealed class AepModelProvider(
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.DataSourceProfileBundle, value.Id)))
                     .Concat((manifest.Contributions.SchemaFormats ?? [])
                         .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.SchemaFormat, value.Id)))
+                    .Concat((manifest.Contributions.ConnectedServiceTypes ?? [])
+                        .Select(value => new ExtensionContribution(Agentstration.Aep.Abstractions.AepContributionKinds.ConnectedServiceType, value.Id)))
                     .ToArray(),
                 catalog.OptionSets.Select(Map).ToArray(),
                 ValueRequirements: manifest.ValueRequirements);
@@ -359,9 +363,9 @@ public sealed class AepModelProvider(
         }
     }
 
-    private AepClient CreateClient(ModelProviderConfiguration provider)
+    private AepClient CreateClient(ModelProviderConfiguration provider, string httpClientName = "agentstration-aep")
     {
-        var client = httpClients.CreateClient("agentstration-aep");
+        var client = httpClients.CreateClient(httpClientName);
         if (client.BaseAddress != provider.Endpoint) client.BaseAddress = provider.Endpoint;
         return new AepClient(
             client,

@@ -8,6 +8,12 @@
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 
+@if (DatasetMode)
+{
+    <DataSourceDatasetEditor Name="@Name" Namespace="@Namespace" ScopeRef="@ScopeRef" View="@View" />
+}
+else
+{
 <PageTitle>@(source?.Definition.DisplayName ?? T(IsNew ? "CreateSource" : "DataSources")) · Agentstration</PageTitle>
 <PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DataSourcesHelp")" TestId="data-source-editor">
     <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
@@ -21,7 +27,7 @@ else
     @if (!IsNew) { <ResourceTabs Label="@T("DataSources")">@foreach (var value in Enum.GetValues<Tab>().Where(value => CanManage || value is not Tab.Access)) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => SelectTab(value)">@T(value.ToString())</button> }</ResourceTabs> }
     @if (tab == Tab.Overview && !IsNew)
     {
-        <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Detail="@T(source!.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /><MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source!.Definition.Profile.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Status="@UiStatus.Info" Url="@ProfileUrl" /><MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@($"{source.Namespace}/{source.Name}")" Status="@UiStatus.Info" /><MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? T("None") : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition is null ? T("AcquisitionCount", acquisitions.Count) : $"{T("AcquisitionCount", acquisitions.Count)} · {LatestAcquisition.CreatedAt.ToLocalTime():g}")" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@AcquisitionsUrl" /></section>
+        <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Detail="@T(source!.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /><MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source!.Definition.Profile?.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Status="@UiStatus.Info" Url="@ProfileUrl" /><MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@($"{source.Namespace}/{source.Name}")" Status="@UiStatus.Info" /><MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? T("None") : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition is null ? T("AcquisitionCount", acquisitions.Count) : $"{T("AcquisitionCount", acquisitions.Count)} · {LatestAcquisition.CreatedAt.ToLocalTime():g}")" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@AcquisitionsUrl" /></section>
         @if (readiness?.Issues.Count > 0) { <section class="panel form-section">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</section> }
         @if (AcquisitionFlow is { } acquisitionFlow)
         {
@@ -61,7 +67,7 @@ else
                         <td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td>
                         <td data-label="@T("State")"><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" /></td>
                         <td data-label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></td>
-                        <td data-label="@T("Version")"><code>@item.Composition.Profile.Version</code></td>
+                        <td data-label="@T("Version")"><code>@(item.Composition?.Profile.Version ?? item.Dataset?.OperationType.Version)</code></td>
                         <td data-label="@T("AcquiredArtifacts")">
                             @if (item.Manifest is { Artifacts.Count: > 0 })
                             {
@@ -75,7 +81,7 @@ else
                                             @T("CreateAcquisitionTool")
                                         </button>
                                     }
-                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition.Acquisition is { } binding
+                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition is AcquisitionToolDefinitionProperties { Acquisition: var binding }
                                         && binding.TemplateId == item.Name && binding.TemplateNamespace == item.Namespace))
                                     {
                                         <a class="button-secondary" href="@AcquisitionToolUrl(linkedTool)" data-testid="data-source-linked-tool">@linkedTool.Definition.DisplayName</a>
@@ -165,8 +171,12 @@ else
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
+}
+
 @code {
     [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "composition")] public string? Composition { get; set; }
+    private bool DatasetMode => Composition == "dataset" || source?.Definition.Dataset is not null;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
@@ -306,6 +316,7 @@ else
         acquisitionTools = [];
         try
         {
+            if (DatasetMode) return;
             await LoadProfilesAsync();
             if (!IsNew)
             {
@@ -313,6 +324,7 @@ else
                 var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope.Value, cancellation.Token);
                 source = snapshot.Value;
                 etag = snapshot.ETag;
+                if (source.Definition.Dataset is not null) return;
                 LoadForm();
                 tab = View?.ToLowerInvariant() switch
                 {
@@ -327,7 +339,7 @@ else
                         .OrderByDescending(value => value.CreatedAt).ToArray();
                     if (acquisitions.Count > 0 && Services.GetService<IToolDefinitionsClient>() is { } definitions)
                         acquisitionTools = (await definitions.GetAsync(cancellation.Token))
-                            .Where(value => value.Definition.Acquisition is not null).ToArray();
+                            .Where(value => value.Definition is AcquisitionToolDefinitionProperties).ToArray();
                     if (readiness.Discovery is not null)
                     {
                         discoveries = (await Client.GetDiscoveriesAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))
@@ -345,7 +357,7 @@ else
         finally { loading = false; }
     }
     private async Task LoadProfilesAsync() { profiles = (await Profiles.GetAsync(cancellation.Token)).Where(value => value.ActiveVersion is not null && value.Definition.Enabled).ToArray(); var active = await Task.WhenAll(profiles.Select(async item => { var revisions = await Profiles.GetRevisionsAsync(item.Namespace, item.Name, item.ScopeRef!.Value, cancellation.Token); var revision = revisions.Single(value => string.Equals(value.Version, item.ActiveVersion, StringComparison.Ordinal)); return new KeyValuePair<string, JsonElement>(ProfileKey(item), revision.Definition.ConfigurationSchema.Clone()); })); profileSchemas = active.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal); }
-    private void LoadForm() { technicalName = source!.Name; displayName = source.Definition.DisplayName; sourceNamespace = source.Namespace.Value; description = source.Definition.Description ?? string.Empty; enabled = source.Definition.Enabled; configuration = source.Definition.Configuration.Clone(); var profile = profiles.FirstOrDefault(value => value.Name == source.Definition.Profile.Name && (source.Definition.Profile.Namespace ?? source.Namespace) == value.Namespace && (source.Definition.Profile.ScopeRef is null || source.Definition.Profile.ScopeRef == value.ScopeRef)); profileKey = profile is not null ? ProfileKey(profile) : source.Definition.Profile.ScopeRef is { } profileScope ? $"{profileScope.Value}|{(source.Definition.Profile.Namespace ?? source.Namespace).Value}|{source.Definition.Profile.Name}" : string.Empty; rawYaml = ResourceManifestSerializer.ToYaml(new RawSource { ApiVersion = source.ApiVersion, Kind = source.Kind, Metadata = source.Metadata, ScopeRef = source.ScopeRef, Definition = source.Definition }); }
+    private void LoadForm() { technicalName = source!.Name; displayName = source.Definition.DisplayName; sourceNamespace = source.Namespace.Value; description = source.Definition.Description ?? string.Empty; enabled = source.Definition.Enabled; configuration = source.Definition.Configuration.Clone(); var profile = profiles.FirstOrDefault(value => value.Name == source.Definition.Profile!.Name && (source.Definition.Profile!.Namespace ?? source.Namespace) == value.Namespace && (source.Definition.Profile!.ScopeRef is null || source.Definition.Profile!.ScopeRef == value.ScopeRef)); profileKey = profile is not null ? ProfileKey(profile) : source.Definition.Profile!.ScopeRef is { } profileScope ? $"{profileScope.Value}|{(source.Definition.Profile!.Namespace ?? source.Namespace).Value}|{source.Definition.Profile!.Name}" : string.Empty; rawYaml = ResourceManifestSerializer.ToYaml(new RawSource { ApiVersion = source.ApiVersion, Kind = source.Kind, Metadata = source.Metadata, ScopeRef = source.ScopeRef, Definition = source.Definition }); }
     private DataSourceProperties Definition() { var profile = ParseProfile(profileKey); return new() { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Profile = new(profile.Name, profile.Scope, profile.Namespace), Configuration = configuration.Clone() }; }
     private async Task SaveAsync() { busy = true; error = null; try { if (IsNew) { if (selectedScope is null) throw new InvalidOperationException(T("Scope")); var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), sourceNamespace.Trim(), selectedScope), cancellation.Token); Navigation.NavigateTo(Url(saved.Value)); } else { var saved = await Client.UpdateAsync(source!.Namespace, source.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
     private async Task StartAsync()

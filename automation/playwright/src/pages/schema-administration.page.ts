@@ -115,14 +115,14 @@ export class SchemaAdministrationPage {
     await this.page.getByTestId(TestIds.schemaAdministration.designerTab).click();
     await this.page.getByTestId(TestIds.schemaAdministration.sourceMode).click();
     await this.replaceMonaco(JSON.stringify({
-      type: 'object', properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
-    }, null, 2), 'oneOf');
+      type: 'object', properties: { value: { not: { type: 'string' } } },
+    }, null, 2), 'not');
     await this.page.getByTestId(TestIds.schemaAdministration.applySource).click();
     await expect(this.page.getByTestId(TestIds.schemaAdministration.sourceOnly)).toBeVisible();
     await expect(this.page.getByTestId(TestIds.schemaAdministration.designer)
-      .locator('.form-alert-danger[role="alert"]')).toContainText('$.properties.value.oneOf');
+      .locator('.form-alert-danger[role="alert"]')).toContainText('$.properties.value.not');
     await this.page.getByTestId(TestIds.schemaAdministration.sourceMode).click();
-    await this.expectMonacoContains('oneOf');
+    await this.expectMonacoContains('not');
 
     const supported = {
       $schema: dialect, type: 'object',

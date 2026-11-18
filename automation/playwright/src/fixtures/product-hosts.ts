@@ -14,9 +14,14 @@ export interface ProductAddresses {
 }
 
 export interface ProductHosts extends ProductAddresses {
+  sourcePolicy?: SourcePolicyTestControl;
   platformHealth?: PlatformHealthTestControl;
   runtimeWorker?: RuntimeWorkerTestControl;
   stop(): Promise<void>;
+}
+
+export interface SourcePolicyTestControl {
+  change(command: { advanceSeconds?: number; failWrites?: boolean; reconcile?: boolean }): Promise<void>;
 }
 
 export interface PlatformHealthTestControl {
@@ -70,8 +75,9 @@ export async function startProductHosts(
   acquisitionFailureFixture = false,
   governedInventoryFixture = false,
   organizationStructureFixture = false,
+  sourcePolicyFixture = false,
 ): Promise<ProductHosts> {
-  if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
+  if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   const runId = `${Date.now()}-${process.pid}`;
   const workDirectory = path.join(automationRoot, '.work', runId);
   const dataDirectory = path.join(workDirectory, 'data');
@@ -143,7 +149,10 @@ export async function startProductHosts(
     throw error;
   }
 
-  const consoleProject = organizationStructureFixture
+  const sourcePolicyKey = randomBytes(32).toString('hex');
+  const consoleProject = sourcePolicyFixture
+    ? 'automation/playwright/fixtures/SourcePolicyHost/SourcePolicyHost.csproj'
+    : organizationStructureFixture
     ? 'automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj'
     : governedInventoryFixture
     ? 'automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj'
@@ -153,6 +162,7 @@ export async function startProductHosts(
   const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
     ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
+    ...(sourcePolicyFixture ? { SOURCE_POLICY_FIXTURE_KEY: sourcePolicyKey } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: consoleUrl,
     Logging__EventLog__LogLevel__Default: 'None',
@@ -245,6 +255,12 @@ export async function startProductHosts(
   }
 
   return {
+    ...(sourcePolicyFixture ? { sourcePolicy: { change: async (command: { advanceSeconds?: number; failWrites?: boolean; reconcile?: boolean }) => {
+      const response = await fetch(`${consoleUrl}/__fixture/source-policy`, { method: 'POST', signal: AbortSignal.timeout(30_000), headers: {
+        'Content-Type': 'application/json', 'X-Fixture-Control': sourcePolicyKey,
+      }, body: JSON.stringify(command) });
+      if (!response.ok) throw new Error(`Source policy control failed: ${response.status} ${await response.text()}`);
+    } } } : {}),
     consoleUrl,
     workplaceUrl,
     platformHealth: runtimeProxy,

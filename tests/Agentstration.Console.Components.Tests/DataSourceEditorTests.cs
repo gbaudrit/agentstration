@@ -351,7 +351,7 @@ public sealed class DataSourceEditorTests
             Assert.DoesNotContain(cultureName == "fr-FR" ? "Obsolète" : "Stale", rendered.Markup);
         });
         rendered.Find("[data-testid=data-source-discovery-results-tab]").Click();
-        Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]"));
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=data-source-discovery-choice]")));
         var reads = client.DiscoveryReads;
         await rendered.InvokeAsync(clock.Tick);
         Assert.AreEqual(reads, client.DiscoveryReads, "Terminal operations must stop network polling.");
@@ -699,12 +699,11 @@ public sealed class DataSourceEditorTests
                             Kind = ToolResourceKinds.ToolDefinition,
                             Metadata = new ResourceMetadata { Name = "saved-acquisition" },
                             ScopeRef = Scope,
-                            Definition = new ToolDefinitionProperties
+                            Definition = new AcquisitionToolDefinitionProperties
                             {
                                 DisplayName = "Saved acquisition",
                                 Acquisition = new(Acquisition.Name, Acquisition.Namespace, "catalog.json", "staged"),
-                                InputSchema = ToolDefinitionAcquisitionTarget.InputSchema,
-                                Flow = new ToolDefinitionFlowTarget { Name = "acquisition" }
+                                InputSchema = ToolDefinitionAcquisitionTarget.InputSchema
                             }
                         }
                     }
@@ -722,7 +721,7 @@ public sealed class DataSourceEditorTests
                     Kind = ToolResourceKinds.ToolDefinition,
                     Metadata = new ResourceMetadata { Name = Request.Name },
                     ScopeRef = Scope,
-                    Definition = new ToolDefinitionProperties
+                    Definition = new FlowToolDefinitionProperties
                     {
                         DisplayName = Request.DisplayName,
                         InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),

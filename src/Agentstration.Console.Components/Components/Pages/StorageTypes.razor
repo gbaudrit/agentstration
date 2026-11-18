@@ -1,0 +1,50 @@
+@page "/storage-types"
+@implements IDisposable
+@inject IStorageTypesClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
+
+<PageTitle>@T("TypeCatalog") · Agentstration</PageTitle>
+<PageHeader Title="@T("TypeCatalog")" Description="@T("Type.ListHelp")" TestId="storage-types-page">
+    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button>@if (Context.HasPermission("resources/write")) { <a class="button-primary" href="/storage-types/new" data-testid="storage-type-create">@T("Type.Create")</a> }<a class="button-secondary" href="/storages">@T("Back")</a></Actions>
+</PageHeader>
+@if (loading) { <LoadingState Message="@T("Type.Loading")" /> }
+else if (!Context.HasPermission("resources/read")) { <p role="alert">@T("Error.Forbidden")</p> }
+else if (error is not null) { <StorageError Error="error" /> }
+else
+{
+    <section class="panel">
+        <div class="toolbar"><label><span>@T("Type.Search")</span><input type="search" @bind="search" @bind:event="oninput" /></label></div>
+        @if (Filtered.Count == 0) { <EmptyState Title="@T("NoTypes")" Message="@T("Type.ListHelp")" /> }
+        else
+        {
+            <DataGrid TItem="StorageTypeResource" Items="Filtered"><Header><tr><th>@T("Type")</th><th>@T("Scope")</th><th>@T("Origin")</th><th>@T("Type.PreferredVersion")</th><th>@T("Availability")</th></tr></Header>
+                <Row Context="item"><tr data-testid="storage-type-row"><td><a href="@StorageTypeLinks.Details(item)" data-testid="storage-type-name-link">@item.Definition.DisplayName</a><br /><code>@item.Namespace/@item.Name</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td>@T($"Origin.{item.Governance.Origin.Kind}")</td><td>@item.Definition.PreferredVersion</td><td>@T($"Availability.{item.ObservedVersions.FirstOrDefault(value => value.Version == item.Definition.PreferredVersion)?.Availability ?? StorageAvailability.Unavailable}")</td></tr></Row>
+            </DataGrid>
+        }
+    </section>
+}
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<StorageTypeResource> resources = [];
+    private bool loading = true;
+    private Exception? error;
+    private string search = string.Empty;
+    private IReadOnlyList<StorageTypeResource> Filtered => resources.Where(value => $"{value.Namespace}/{value.Name} {value.Definition.DisplayName}".Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private string T(string key) => Localizer[key].Value;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            await Context.EnsureLoadedAsync(cancellation.Token);
+            if (Context.HasPermission("resources/read"))
+                resources = await Client.GetTypesAsync(ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef), cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { error = exception; }
+        finally { loading = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -65,5 +65,12 @@ internal static class FlowInspectorPresentation
             ? Localize(localizer, "ToolUnavailable")
             : tool.RequiresApproval ? Localize(localizer, "ToolApprovalRequired") : string.Empty;
 
+    internal static string StepDisplayLabel(IStringLocalizer<FlowDesignerStrings> localizer, string label)
+    {
+        if (label is "postAggregate" or "Transform before publication") return localizer["BeforePublication"].Value;
+        if (label.StartsWith("postAggregate ", StringComparison.Ordinal) && int.TryParse(label[14..], out var index))
+            return localizer["BeforePublication"].Value + " " + index;
+        return label;
+    }
     private static string Localize(IStringLocalizer<FlowDesignerStrings> localizer, string key, params object[] arguments) => localizer[key, arguments].Value;
 }

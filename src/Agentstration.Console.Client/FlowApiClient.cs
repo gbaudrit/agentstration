@@ -105,6 +105,12 @@ public sealed class FlowApiClient(HttpClient httpClient) : IFlowApiClient
     public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions{ScopeQuery(scopeRef)}", cancellationToken);
 
+    public async Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, ResourceScopeRef? scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<FlowVersionResponse[]>(httpClient, $"{FlowPath(@namespace, flowId)}/versions{ScopeQuery(scopeRef)}", contextScope, cancellationToken);
+
+    public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, ResourceScopeRef? scopeRef, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<FlowVersionResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}{ScopeQuery(scopeRef)}", contextScope, cancellationToken);
+
     public Task<FlowVersionResponse> GetFlowVersionAsync(ResourceNamespace @namespace, string flowId, string version, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<FlowVersionResponse>(httpClient, $"{FlowPath(@namespace, flowId)}/versions/{Uri.EscapeDataString(version)}", cancellationToken);
 

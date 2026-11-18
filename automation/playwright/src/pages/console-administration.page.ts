@@ -6,7 +6,7 @@ import type { ExpectedText } from '../locales/expected-text.js';
 type AdministrationMarker = keyof Pick<typeof TestIds.consoleAdministration,
   'settings' | 'profileSettings' | 'organization' | 'organizationAccess' |
   'organizationMembers' | 'organizationMemberDetails' | 'organizationSecurityAudit' |
-  'accountPat' | 'accountSecurity' | 'logout'>;
+  'accountPat' | 'accountSecurity' | 'logout' | 'storages' | 'storageEditor'>;
 
 export class ConsoleAdministrationPage {
   public constructor(private readonly page: Page) {}

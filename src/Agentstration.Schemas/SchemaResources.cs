@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -22,6 +23,8 @@ public sealed record SchemaProperties
     public required string Format { get; init; }
     public string? Dialect { get; init; }
     public required JsonElement Content { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? SourceEvidence { get; init; }
     public DescendantUsePolicy UsePolicy { get; init; } = new();
 }
 
@@ -41,6 +44,8 @@ public sealed record SchemaVersionResource : Resource, IImmutableResource
     public string? Dialect { get; init; }
     public required JsonElement Content { get; init; }
     public required string DefinitionHash { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? SourceEvidence { get; init; }
     public required DateTimeOffset PublishedAt { get; init; }
 }
 

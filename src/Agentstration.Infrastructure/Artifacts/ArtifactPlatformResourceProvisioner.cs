@@ -19,7 +19,9 @@ public sealed class ArtifactPlatformResourceProvisioner(
 {
     public const string DefaultBindingName = "artifact-staging-filesystem-builtin";
     public const string DefaultToolSetName = "artifact-staging-filesystem-builtin";
-    public const string DefaultToolSetVersion = "1.0.0";
+    public const string DefaultToolSetVersion = "1.0.1";
+    public const string StorageFlowVersion = "1.0.0";
+    private const string LegacyToolSetVersion = "1.0.0";
     public const string BrokerToolSetName = "staged-artifacts-builtin";
     public const string StorageWriteFlowName = "artifact-storage-filesystem-write-builtin";
     public const string StorageReadFlowName = "artifact-storage-filesystem-read-builtin";
@@ -49,7 +51,7 @@ public sealed class ArtifactPlatformResourceProvisioner(
     {
         var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, DefaultToolSetName);
         if (await store.GetExactAsync<ToolSetResource>(address, cancellationToken) is { } existing)
-            return existing.Value;
+            return await ReconcileToolSetVersionAsync(scope, existing, cancellationToken);
 
         var members = ArtifactCapabilities.All.Select(capability => new ToolSetMember
         {
@@ -81,65 +83,18 @@ public sealed class ArtifactPlatformResourceProvisioner(
         return (await CreateOrReadAsync(resource, scope, cancellationToken)).Value;
     }
 
-    private async Task EnsureVersionAsync(ResourceScopeRef scope, ToolSetResource toolSet, CancellationToken cancellationToken)
-    {
-        var versionName = VersionResourceName(DefaultToolSetName, DefaultToolSetVersion);
-        var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.ToolSetVersion, versionName);
-        if (await store.GetExactAsync<ToolSetVersionResource>(address, cancellationToken) is not null) return;
+    private Task EnsureVersionAsync(ResourceScopeRef scope, ToolSetResource toolSet, CancellationToken cancellationToken) =>
+        EnsurePublishedVersionAsync(scope, toolSet, DefaultToolSetName, ArtifactCapabilities.All, DefaultToolSetVersion, cancellationToken);
 
-        var members = new List<PublishedToolSetMember>();
-        foreach (var capability in ArtifactCapabilities.All)
+    private async Task<ToolSetResource> ReconcileToolSetVersionAsync(ResourceScopeRef scope,
+        StoredResource<ToolSetResource> existing, CancellationToken cancellationToken)
+    {
+        if (existing.Value.Definition.Version == DefaultToolSetVersion) return existing.Value;
+        return (await store.PutExactAsync(scope, existing.Value with
         {
-            var toolName = AgentstrationToolProvider.ToolResourceName(capability);
-            var tool = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
-                scope, ResourceNamespace.Default, ToolResourceKinds.Tool, toolName), cancellationToken)
-                ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' was not projected.");
-            var provider = tool.Value.Definition.Provider?.Resolve(ResourceNamespace.Default, ToolResourceKinds.ToolProvider)
-                ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' has no provider.");
-            var storedProvider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
-                scope, provider.Namespace, ToolResourceKinds.ToolProvider, provider.Name), cancellationToken)
-                ?? throw new InvalidOperationException($"Built-in Artifact staging Tool '{toolName}' references missing provider '{provider}'.");
-            members.Add(new PublishedToolSetMember
-            {
-                Capability = capability,
-                Route = "default",
-                ToolName = tool.Value.Name,
-                ToolNamespace = tool.Value.Namespace,
-                ToolScopeRef = scope,
-                ToolUid = tool.Value.Uid,
-                ToolGeneration = tool.Value.Generation,
-                ProviderName = provider.Name,
-                ProviderNamespace = provider.Namespace,
-                ProviderScopeRef = scope,
-                ProviderUid = storedProvider.Value.Uid,
-                ProviderGeneration = storedProvider.Value.Generation,
-                ExternalToolId = tool.Value.Definition.ExternalId!,
-                InputSchema = tool.Value.Definition.Schema!.Input.Clone(),
-                OutputSchema = tool.Value.Definition.Schema.Output?.Clone(),
-                RequiresApproval = tool.Value.Definition.RequiresApproval
-            });
-        }
-        var version = new ToolSetVersionResource
-        {
-            ApiVersion = ResourceApiVersions.CoreV1,
-            Kind = ToolResourceKinds.ToolSetVersion,
-            Metadata = new ResourceMetadata
-            {
-                Name = versionName,
-                Annotations = new Dictionary<string, string> { [ResourceProvenanceAnnotations.BuiltIn] = "true" }
-            },
-            ScopeRef = scope,
-            Generation = 1,
-            Status = Succeeded(),
-            ToolSetUid = toolSet.Uid,
-            ToolSetName = DefaultToolSetName,
-            ToolSetGeneration = toolSet.Generation,
-            Version = DefaultToolSetVersion,
-            DefinitionHash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(members))),
-            PublishedAt = timeProvider.GetUtcNow(),
-            Members = members
-        };
-        _ = await CreateOrReadAsync(version, scope, cancellationToken);
+            Generation = checked(existing.Value.Generation + 1),
+            Definition = existing.Value.Definition with { Version = DefaultToolSetVersion }
+        }, existing.ETag, false, cancellationToken)).Value;
     }
 
     private async Task EnsureBindingAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
@@ -210,7 +165,8 @@ public sealed class ArtifactPlatformResourceProvisioner(
     private async Task<ToolSetResource> EnsureBrokerToolSetAsync(ResourceScopeRef scope, CancellationToken cancellationToken)
     {
         var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.ToolSet, BrokerToolSetName);
-        if (await store.GetExactAsync<ToolSetResource>(address, cancellationToken) is { } existing) return existing.Value;
+        if (await store.GetExactAsync<ToolSetResource>(address, cancellationToken) is { } existing)
+            return await ReconcileToolSetVersionAsync(scope, existing, cancellationToken);
         var members = BrokerTools.Select(name => new ToolSetMember
         {
             Tool = new ResourceReference(AgentstrationToolProvider.ToolResourceName(name), scope, ResourceNamespace.Default),
@@ -240,15 +196,20 @@ public sealed class ArtifactPlatformResourceProvisioner(
         }, scope, cancellationToken)).Value;
     }
 
-    private Task EnsureBrokerVersionAsync(ResourceScopeRef scope, ToolSetResource toolSet, CancellationToken cancellationToken) =>
-        EnsurePublishedVersionAsync(scope, toolSet, BrokerToolSetName, BrokerTools, cancellationToken);
+    private async Task EnsureBrokerVersionAsync(ResourceScopeRef scope, ToolSetResource toolSet, CancellationToken cancellationToken)
+    {
+        // Existing exact callers keep their historical pins. Fresh installations also serve the original built-in bundles.
+        await EnsurePublishedVersionAsync(scope, toolSet, BrokerToolSetName, BrokerTools, LegacyToolSetVersion, cancellationToken);
+        await EnsurePublishedVersionAsync(scope, toolSet, BrokerToolSetName, BrokerTools, DefaultToolSetVersion, cancellationToken);
+    }
 
     private async Task EnsurePublishedVersionAsync(ResourceScopeRef scope, ToolSetResource toolSet, string toolSetName,
-        IReadOnlyList<string> capabilities, CancellationToken cancellationToken)
+        IReadOnlyList<string> capabilities, string publishedVersion, CancellationToken cancellationToken)
     {
-        var versionName = VersionResourceName(toolSetName, DefaultToolSetVersion);
+        var versionName = VersionResourceName(toolSetName, publishedVersion);
         var address = ScopedResourceAddress.Create(scope, ResourceNamespace.Default, ToolResourceKinds.ToolSetVersion, versionName);
-        if (await store.GetExactAsync<ToolSetVersionResource>(address, cancellationToken) is not null) return;
+        var existing = await store.GetExactAsync<ToolSetVersionResource>(address, cancellationToken);
+        if (existing is not null && publishedVersion == LegacyToolSetVersion) return;
         var members = new List<PublishedToolSetMember>();
         foreach (var capability in capabilities)
         {
@@ -281,6 +242,12 @@ public sealed class ArtifactPlatformResourceProvisioner(
                 RequiresApproval = tool.Value.Definition.RequiresApproval
             });
         }
+        if (existing is not null)
+        {
+            if (!JsonElement.DeepEquals(JsonSerializer.SerializeToElement(existing.Value.Members), JsonSerializer.SerializeToElement(members)))
+                throw new InvalidOperationException($"Built-in ToolSet '{toolSetName}:{publishedVersion}' pins outdated Tool or provider revisions. A new built-in ToolSet version is required for this release.");
+            return;
+        }
         _ = await CreateOrReadAsync(new ToolSetVersionResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -296,7 +263,7 @@ public sealed class ArtifactPlatformResourceProvisioner(
             ToolSetUid = toolSet.Uid,
             ToolSetName = toolSetName,
             ToolSetGeneration = toolSet.Generation,
-            Version = DefaultToolSetVersion,
+            Version = publishedVersion,
             DefinitionHash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(members))),
             PublishedAt = timeProvider.GetUtcNow(),
             Members = members
@@ -379,7 +346,7 @@ public sealed class ArtifactPlatformResourceProvisioner(
         try
         {
             _ = await flows.CreateExactAsync(scope, new CreateFlowCommand(name,
-                $"Built-in implementation of {contract}.", DefaultToolSetVersion, true, legacy,
+                $"Built-in implementation of {contract}.", StorageFlowVersion, true, legacy,
                 new Dictionary<string, string>
                 {
                     ["systemManaged"] = "true",
@@ -387,7 +354,7 @@ public sealed class ArtifactPlatformResourceProvisioner(
                     [ResourceProvenanceAnnotations.BuiltIn] = "true",
                     [FlowMetadataKeys.Contract] = contract
                 }, graph, displayName), ResourceNamespace.Default, cancellationToken);
-            _ = await flows.PublishVersionExactAsync(scope, id, DefaultToolSetVersion, true, cancellationToken,
+            _ = await flows.PublishVersionExactAsync(scope, id, StorageFlowVersion, true, cancellationToken,
                 "Built-in local-first Artifact storage contract implementation.");
         }
         catch (FlowConcurrencyException)

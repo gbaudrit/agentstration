@@ -14,9 +14,16 @@ export class ResourceScopesPage {
 
   public async open(consoleUrl: string, scopeRef?: string): Promise<void> {
     const shell = this.page.getByTestId(TestIds.console.shell);
-    if (!scopeRef) await expect(shell).toHaveAttribute('data-context-scope', /^\/(instance|tenants\/|workspaces\/)/);
-    const scope = scopeRef ?? (await shell.getAttribute('data-context-scope'))!;
-    await this.page.goto(`${consoleUrl}/settings/resource-scopes?context=${encodeURIComponent(scope)}`);
+    let scope = scopeRef ?? '';
+    if (!scopeRef) {
+      await expect.poll(async () => {
+        const current = await shell.getAttribute('data-context-scope');
+        scope = current ?? '';
+        return scope;
+      }).toMatch(/^\/(instance|tenants\/|workspaces\/)/);
+    }
+    const response = await this.page.goto(`${consoleUrl}/settings/resource-scopes?context=${encodeURIComponent(scope)}`);
+    expect(response?.ok()).toBeTruthy();
     await expect(shell).toHaveAttribute('data-context-scope', scope);
     await expect(shell).toHaveAttribute('data-preferences-ready', 'true');
     await expect(this.count).toBeVisible();

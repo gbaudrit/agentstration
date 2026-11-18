@@ -96,8 +96,8 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
 
         Assert.IsInstanceOfType<ToolFlowStepDefinition>(delivery.Definition.Graph!.Steps.Single(value => value.Name == "create-notification"));
         Assert.IsInstanceOfType<FlowCallStepDefinition>(parent.Definition.Graph!.Steps.Single(value => value.Name == "deliver"));
-        Assert.AreEqual("notification-delivery", definition.Definition.Flow.Name);
-        Assert.IsTrue(definition.Definition.Flow.UseActiveVersion);
+        Assert.AreEqual("notification-delivery", ((FlowToolDefinitionProperties)definition.Definition).Flow.Name);
+        Assert.IsTrue(((FlowToolDefinitionProperties)definition.Definition).Flow.UseActiveVersion);
         Assert.IsTrue(ToolDefinitionService.SameSchema(definition.Definition.InputSchema, delivery.Definition.Graph.InputSchema));
         StringAssert.Contains(definition.Definition.Description!, "distinct notification identity");
         Assert.IsTrue(definition.Definition.InputSchema.GetProperty("properties").GetProperty("actionUrl").TryGetProperty("pattern", out _));
@@ -229,7 +229,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             workspaceId,
             context.PrincipalId,
             ResourceNamespace.Default,
-            "news.alert",
+            "news.alert.v1.0.0",
             "news-alert-call-1",
             "news-correlation-1",
             arguments,
@@ -242,7 +242,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
         Assert.IsTrue(replay.Receipt.Recovered);
         Assert.AreEqual(first.Receipt.FlowRunId, replay.Receipt.FlowRunId);
         var root = await factory.Services.GetRequiredService<FlowRunService>().GetAsync(
-            first.Receipt.FlowRunId,
+            first.Receipt.FlowRunId ?? throw new AssertFailedException("Expected a Flow-backed receipt."),
             new FlowRunScope(context.TenantId, workspaceId, context.PrincipalId),
             default);
         Assert.IsNotNull(root);
@@ -304,9 +304,10 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = name },
             ScopeRef = scope,
-            Definition = new ToolDefinitionProperties
+            Definition = new FlowToolDefinitionProperties
             {
                 DisplayName = name,
+                Publish = true,
                 InputSchema = schemas.Input.Clone(),
                 OutputSchema = schemas.Output.Clone(),
                 Flow = new ToolDefinitionFlowTarget { Name = flow, UseActiveVersion = true }
@@ -409,7 +410,7 @@ public sealed class NotificationDeliveryApiTests : ModelManagementApiTestBase
             Definition = new ToolResourceProperties
             {
                 DisplayName = "Send external message",
-                Provider = new ResourceReference("third-party", ResourceScopeRef.Instance),
+                Provider = new ResourceReference("third-party", scope),
                 ExternalId = "messages.send",
                 Enabled = true,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = now, LastSeenAt = now },

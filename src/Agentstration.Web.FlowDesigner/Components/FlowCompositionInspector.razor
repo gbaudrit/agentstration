@@ -1,0 +1,33 @@
+@using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
+@inject IStringLocalizer<FlowDesignerStrings> Localizer
+
+@if (ActiveTab == FlowStepSettingsTab.Configuration)
+{
+    <p>@T("CompositionHelp")</p>
+    <label>@T("CompositionPoint")<input value="@Step.Point" disabled="@ReadOnly" @onchange="args => Changed.InvokeAsync(Step with { Point = args.Value?.ToString() ?? string.Empty })" data-testid="composition-point-name" /></label>
+    <label><input type="checkbox" checked="@Step.AllowEmpty" disabled="@ReadOnly" @onchange="args => Changed.InvokeAsync(Step with { AllowEmpty = args.Value is true })" />@T("CompositionAllowEmpty")</label>
+    <label>@T("TransformMapping")<textarea value="@(Step.InputMapping?.GetRawText() ?? "null")" disabled="@ReadOnly" @onchange="UpdateMappingAsync"></textarea></label>
+}
+@if (ActiveTab == FlowStepSettingsTab.Input)
+{
+    <SchemaDocumentEditor Value="Step.InputSchema" ValueChanged="value => Changed.InvokeAsync(Step with { InputSchema = value })" ReadOnly="ReadOnly" />
+}
+@if (ActiveTab == FlowStepSettingsTab.Output)
+{
+    <SchemaDocumentEditor Value="Step.OutputSchema" ValueChanged="value => Changed.InvokeAsync(Step with { OutputSchema = value })" ReadOnly="ReadOnly" />
+}
+@if (invalidJson) { <p role="alert">@T("InvalidJson")</p> }
+
+@code {
+    [Parameter, EditorRequired] public FlowCompositionPointStepDefinition Step { get; set; } = default!;
+    [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<FlowStepDefinition> Changed { get; set; }
+    private bool invalidJson;
+    private async Task UpdateMappingAsync(ChangeEventArgs args)
+    {
+        try { var value = JsonSerializer.Deserialize<JsonElement>(args.Value?.ToString() ?? "null"); invalidJson = false; await Changed.InvokeAsync(Step with { InputMapping = value.ValueKind == JsonValueKind.Null ? null : value }); }
+        catch (JsonException) { invalidJson = true; }
+    }
+    private string T(string key) => Localizer[key];
+}

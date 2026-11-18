@@ -25,18 +25,30 @@ else if (run is null)
 }
 else
 {
-    <PageHeader Title="@T("FlowRun")" Description="@run.Id">
-        <Actions>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a></Actions>
+    <PageHeader Title="@(run.ProcessOrigin is { } processTitle ? ProcessLabel(processTitle) : T("FlowRun"))" Description="@run.Id">
+        <Actions><a class="button-secondary" href="@($"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}")">@T("BackToRuns")</a>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a></Actions>
     </PageHeader>
+    @if (run.ProcessOrigin is { } process)
+    {
+        <div class="panel process-origin" data-testid="flow-process-origin">
+            <span class="eyebrow">@T("ProcessDefinition")</span>
+            <p><a href="@CausalRunUrl(process.OwnerRunId, process.OwnerStepName)">@T("ProcessOwner"): @(process.Definition.OwnerStepDisplayName ?? process.OwnerStepName)</a> · @T("ProcessAttempt", process.OwnerAttempt)</p>
+            <p class="muted">@T("SourceFlow"): @process.Definition.SourceFlowId.Value · @process.Definition.SourceVersion · @T("ProcessRegion"): <code>@process.Definition.Region</code></p>
+        </div>
+    }
     <nav class="section-tabs flow-run-page-tabs" role="tablist" aria-label="@T("RunViewsAriaLabel")">
         @foreach (var tab in AvailableTabs)
         {
             <button id="@TabId(tab)" data-testid="@(tab == RunTab.Worker ? "flow-run-worker-tab" : null)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="flow-run-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => SelectTabAsync(tab)">@TabLabel(tab)</button>
         }
     </nav>
-    @if (run.Error is not null)
+    @if (run.Error is not null && activeTab == RunTab.Summary)
     {
-        <article class="panel run-error" data-testid="flow-run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
+        <article class="panel run-error" data-testid="flow-run-error">
+            @if (run.Error.Origin is { } failureOrigin && failureOrigin.RunId != run.Id)
+            { <p><span class="muted">@T("FailurePropagated")</span> · <a data-testid="flow-failure-origin" href="@CausalRunUrl(failureOrigin.RunId, failureOrigin.StepName)">@T("FailureOrigin"): @failureOrigin.StepName</a></p> }
+            <ContractFailurePanel Details="@(IsContractFailure(run.Error) ? run.Error.Details : RunErrorDetail(run.Error))" ErrorCode="@run.Error.Code" Message="@RunErrorMessage(run.Error)" Run="run" RelatedRuns="contractOrigins" Collapsible="true" />
+        </article>
     }
     @if (pendingInput is not null)
     {
@@ -121,7 +133,7 @@ else
                 <FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
                                  View="@FlowRunTimeline.TimelineView.Summary" ShowHeader="false" ShowNavigation="false" Embedded="true" ParticipantUrls="@ParticipantUrls" />
                 <section class="designer-layout run-layout flow-run-overview-topology @(inspectorVisible ? null : "inspector-collapsed")">
-                    <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
+                    <FlowTopologyViewer ContractDescription="StepContractDescription" Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
                                         ShowInspectorControl="true" InspectorVisible="inspectorVisible" InspectorVisibleChanged="SetInspectorVisible"
                                         ReplayInProgress="replayInProgress" ReplayElapsed="replayElapsed" ReplayRequested="ReplaySequenceAsync"
                                         InitiallyFit="true" />
@@ -136,8 +148,20 @@ else
                         else
                         {
                             <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
-                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
-                            @if (selected.Error is not null) { <div class="error-panel"><strong>@selected.Error.Code</strong><p>@selected.Error.Message</p></div> }
+                            @if (IsContractFailure(selected.Error))
+                            { <ContractFailurePanel Details="@selected.Error!.Details" ErrorCode="@selected.Error.Code" Run="run" RelatedRuns="contractOrigins" /> }
+                            <details><summary>@T("EffectiveContracts")</summary><p>@T("EffectiveContractsHelp")</p><pre>@Pretty(selected.Contracts is null ? null : JsonSerializer.SerializeToElement(selected.Contracts))</pre>
+                                @foreach (var contracts in selected.ArtifactContracts) { <pre>@Pretty(JsonSerializer.SerializeToElement(contracts))</pre> }
+                                @if (selected.MoreArtifactContracts) { <p>@T("AdditionalArtifactContracts")</p> }
+                            </details>
+                            @if (selected.Process is { } admission)
+                            { <FlowProcessSummary Admission="admission" OwnerRunId="@run.Id" StepName="@selected.StepName" Scope="run.ExecutionScopeRef" LogicalScope="run.Scope.LogicalScopeRef" Nodes="@(causality?.Value ?? [])" /> }
+                            @if (IsContractFailure(selected.Error))
+                            { <details><summary>@T("ContractPayloadDetails")</summary>                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre></details> }
+                            else
+                            {                            <span class="field-label">@T("DeclaredInput")</span><pre>@Pretty(selected.DeclaredInput)</pre><span class="field-label">@T("ResolvedInput")</span><pre>@Pretty(selected.ResolvedInput)</pre><span class="field-label">@T("Output")</span><pre>@Pretty(selected.Output)</pre><span class="field-label">@T("Logs")</span><pre>@string.Join(Environment.NewLine, selected.Logs)</pre>
+                                @if (selected.Error is not null) { <ContractFailurePanel ErrorCode="@selected.Error.Code" Message="@RunErrorMessage(selected.Error)" Details="@RunErrorDetail(selected.Error)" Collapsible="true" /> }
+                            }
                         }
                     </article>
                     }
@@ -160,14 +184,21 @@ else
                     <ol class="causality-tree">
                         @foreach (var node in causality.Value)
                         {
-                            <li style="--causality-depth:@node.NestingDepth">
+                            <li @key="node.FlowRunId" style="--causality-depth:@node.NestingDepth">
                                 <article class="panel causality-node">
-                                    <div class="panel-header"><h2><a href="@ConsoleResourceUrls.Flow(node.FlowId)">@node.FlowId.Value · @node.FlowVersion</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
-                                    <div class="causality-meta"><code>@node.FlowRunId</code><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <span>@T("CalledByStep", parentStep)</span> }</div>
+                                    <div class="panel-header"><h2><a href="@CausalRunUrl(node.FlowRunId)">@(node.ProcessOrigin is { } processNode ? ProcessLabel(processNode) : $"{node.FlowId.Value} · {node.FlowVersion}")</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
+                                    <div class="causality-meta"><a href="@CausalRunUrl(node.FlowRunId)"><code>@node.FlowRunId</code></a><a href="@CausalRunUrl(node.FlowRunId)">@T("OpenExecution") ↗</a><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <a href="@CausalRunUrl(node.ParentFlowRunId ?? run.Id, parentStep)">@T("CalledByStep", parentStep)</a> }</div>
+                                    @if (node.ProcessOrigin is { } processOrigin)
+                                    { <p class="muted">@T("SourceFlow"): @processOrigin.Definition.SourceFlowId.Value · @processOrigin.Definition.SourceVersion · @T("ProcessAttempt", processOrigin.OwnerAttempt)</p> }
+                                    @if (node.ErrorOrigin is { } originFailure && originFailure.RunId != node.FlowRunId)
+                                    { <p><a href="@CausalRunUrl(originFailure.RunId, originFailure.StepName)">@T("FailureOrigin"): @originFailure.StepName</a></p> }
+                                    @foreach (var owned in node.Processes)
+                                    { <FlowProcessSummary Admission="owned.Value" OwnerRunId="@node.FlowRunId" StepName="@owned.Key" Scope="run.ExecutionScopeRef" LogicalScope="run.Scope.LogicalScopeRef" Nodes="causality.Value" /> }
+                                    <FlowRunCausalityOutput RunId="@node.FlowRunId" Scope="run.ExecutionScopeRef" LogicalScope="run.Scope.LogicalScopeRef" Status="node.Status" Root="run" />
                                     @if (node.AgentExecutions.Count > 0)
                                     {
                                         <h3>@T("AgentExecutions")</h3>
-                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@version</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
+                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@(version)</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
                                     }
                                     @if (node.ToolCalls.Count > 0)
                                     {
@@ -192,12 +223,12 @@ else
         {
             <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
                 <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Input")</h2></div><pre>@Pretty(run.Input)</pre></article>
-                <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Output")</h2></div><pre>@Pretty(run.Output)</pre></article>
+                <FlowRunOutput Run="run" />
             </section>
         }
         else if (activeTab == RunTab.Worker)
         {
-            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@run.Id" ScopeRef="@run.ExecutionScopeRef" />
+            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@(run.RootFlowRunId ?? run.Id)" ScopeRef="@run.ExecutionScopeRef" />
         }
         else
         {
@@ -210,6 +241,7 @@ else
 </div>
 @code {
     [Parameter] public string RunId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "step")] public string? FocusStep { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
@@ -225,6 +257,8 @@ else
     private readonly FlowRunEventBuffer eventBuffer = new();
     private FlowRun? run;
     private FlowRunCausalityPageResponse? causality;
+    private string ProcessLabel(FlowProcessRunOrigin process) => T("ProcessRun", process.Definition.OwnerStepDisplayName ?? process.OwnerStepName, process.Ordinal + 1);
+    private string CausalRunUrl(string id, string? step = null) => FlowRunInspection.RunUrl(id, run!.ExecutionScopeRef, run.Scope.LogicalScopeRef, step);
     private string? causalityError;
     private InputRequest? pendingInput;
     private FlowStepRun? selected;
@@ -294,6 +328,8 @@ else
             : $"/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(participant.Id)}";
     }
 
+    private IReadOnlyList<FlowRun> contractOrigins = [];
+    private static bool IsContractFailure(FlowRunError? error) => error is not null && (ContractFailurePanel.IsContractCode(error.Code) || Agentstration.Schemas.DataContracts.ParseFailure(error.Details) is not null);
     protected override async Task OnParametersSetAsync()
     {
         replayCancellation?.Cancel();
@@ -320,8 +356,10 @@ else
         }
         await RefreshInputAsync();
         await RefreshCausalityAsync();
+        contractOrigins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token);
         if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
-        selected = run.Steps.FirstOrDefault();
+        selected = run.Steps.FirstOrDefault(step => step.StepName == FocusStep) ?? run.Steps.FirstOrDefault();
+        if (!string.IsNullOrEmpty(FocusStep)) { activeTab = RunTab.Summary; inspectorVisible = true; }
         eventBuffer.Clear();
         await ReplayAsync();
         if (!run.Status.IsTerminal()) await ConnectAsync();
@@ -361,6 +399,8 @@ else
     {
         await hub!.InvokeAsync("SubscribeAsync", RunId, run!.ExecutionScopeRef.Value, cancellation.Token);
         await ReplayAsync();
+        // Persisted state is authoritative even when a reconnect has no new notification to replay.
+        await RefreshRunAsync();
     }
 
     private async Task ReplayAsync()
@@ -394,6 +434,7 @@ else
         await RefreshInputAsync();
         if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
         await RefreshCausalityAsync();
+        contractOrigins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token);
     }
 
     private async Task RefreshCausalityAsync()
@@ -586,15 +627,32 @@ else
     }
 
     private async Task CancelAsync() => run = await Client.CancelFlowRunAsync(RunId, run!.ExecutionScopeRef, cancellation.Token);
+    private string? StepContractDescription(string name) => run?.Steps.FirstOrDefault(step => step.StepName == name)?.Contracts is { } contracts
+        ? T("EffectiveContracts") + ": " + JsonSerializer.Serialize(contracts) : null;
     private string RunErrorMessage(FlowRunError error) => error.Code switch
     {
+        "data_contract_encoding_invalid" => T("Error.ContractEncodingInvalid"),
+        "data_contract_json_invalid" => T("Error.ContractJsonInvalid"),
+        "data_contract_unresolved" => T("Error.ContractUnresolved"),
+        "data_contract_violation" or "flow_composition_value_invalid" => T("Error.ContractViolation"),
+        "data_contract_media_mismatch" => T("Error.ContractMediaMismatch"),
+        "data_contract_conflict" => T("Error.ContractConflict"),
+        "tool_contract_required" => T("Error.ToolContractRequired"),
+        "tool_contract_stale" => T("Error.ToolContractStale"),
+        "artifact_processing_json_invalid" => T("Error.ArtifactOutputJsonInvalid"),
+        "artifact_processing_input_json_invalid" => T("Error.ArtifactInputJsonInvalid"),
         "agent_model_profile_unavailable" => T("Error.AgentModelProfileUnavailable"),
         "model_output_token_limit" => T("Error.ModelOutputTokenLimit"),
         "model_empty_response" => T("Error.ModelEmptyResponse"),
         _ => error.Message
     };
     private static string? RunErrorDetail(FlowRunError error) => error.Code == "agent_model_profile_unavailable"
-        ? error.Message : error.Details;
+        ? error.Message : DataContracts.ParseFailure(error.Details) is not null ? SelectedFailureDetails(error.Details!) : error.Details;
+    private static string? SelectedFailureDetails(string details)
+    {
+        using var document = JsonDocument.Parse(details);
+        return document.RootElement.TryGetProperty("details", out var selected) && selected.ValueKind == JsonValueKind.String ? selected.GetString() : null;
+    }
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
     private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }

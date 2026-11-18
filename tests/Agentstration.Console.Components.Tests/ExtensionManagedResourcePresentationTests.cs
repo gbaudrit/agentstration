@@ -181,6 +181,8 @@ public sealed class ExtensionManagedResourcePresentationTests
 
     private sealed class ProfilePolicies : IResourceAccessPolicyClient
     {
+        public Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(false, ResourceAccessDecisionReasons.GrantMissing));
         public ResourceAccessPolicy? Saved { get; private set; }
         public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult<ResourceAccessPolicySnapshot?>(null);
         public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken cancellationToken)

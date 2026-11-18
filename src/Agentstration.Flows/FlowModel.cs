@@ -59,7 +59,8 @@ public enum FlowRunEventType
     ParticipantHandoff,
     ChildFlowRunCreated,
     FlowRunWaitingForChild,
-    FlowRunResumedFromChild
+    FlowRunResumedFromChild,
+    ProcessUnitChanged
 }
 
 public enum InputRequestType { Text, Choice, Confirmation }

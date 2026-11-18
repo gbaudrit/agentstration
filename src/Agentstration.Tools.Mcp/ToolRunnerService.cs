@@ -173,9 +173,9 @@ public sealed class ToolRunnerService(
         EnsureOwnerScope(tool, ownerScope);
         if (ownerScope != workspaceScope)
         {
-            var definition = await store.GetExactAsync<ToolDefinitionResource>(ScopedResourceAddress.Create(
-                ownerScope, toolNamespace, ToolResourceKinds.ToolDefinition, tool.Definition.ExternalId ?? toolName), cancellationToken);
-            if (definition?.Value.Definition.Acquisition is null
+            var definition = await store.GetExactAsync<ToolDefinitionVersionResource>(ScopedResourceAddress.Create(
+                ownerScope, toolNamespace, ToolResourceKinds.ToolDefinitionVersion, tool.Definition.ExternalId ?? toolName), cancellationToken);
+            if (definition is null
                 || AgentstrationToolProvider.ToolResourceName(definition.Value.Name) != tool.Name)
                 throw new ToolRunException("tool_scope_mismatch", 403, "The Tool does not support administrative execution.");
         }
@@ -202,9 +202,22 @@ public sealed class ToolRunnerService(
         values.TryGetValue("workItemId", out var workItemId);
         values.TryGetValue("flowRunId", out var flowRunId);
         values.TryGetValue("correlationId", out var correlationId);
+        ToolDefinitionRelayReceipt? relay = null;
+        if (values.TryGetValue("relay.publicationUid", out var publicationUid)
+            && values.TryGetValue("relay.version", out var version)
+            && values.TryGetValue("relay.sourceTool", out var sourceTool)
+            && values.TryGetValue("relay.sourceScope", out var sourceScope)
+            && values.TryGetValue("relay.sourceUid", out var sourceUid)
+            && values.TryGetValue("relay.sourceGeneration", out var sourceGeneration))
+        {
+            values.TryGetValue("relay.sourceVersion", out var sourceVersion);
+            relay = new(Guid.Parse(publicationUid), version, sourceTool, ResourceScopeRef.Parse(sourceScope),
+                Guid.Parse(sourceUid), long.Parse(sourceGeneration, System.Globalization.CultureInfo.InvariantCulture), sourceVersion);
+        }
         return workItemId is null && flowRunId is null && correlationId is null
+            && relay is null
             ? null
-            : new ToolRunReceipt(workItemId, flowRunId, correlationId);
+            : new ToolRunReceipt(workItemId, flowRunId, correlationId, relay);
     }
 
     private static void EnsureOwnerScope(Resource resource, ResourceScopeRef ownerScope)

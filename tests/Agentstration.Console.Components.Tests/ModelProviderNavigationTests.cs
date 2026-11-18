@@ -573,6 +573,8 @@ public sealed partial class ModelProviderNavigationTests
 
     private sealed class StubResourceAccessPolicyClient : IResourceAccessPolicyClient
     {
+        public Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceAccessDecision(false, ResourceAccessDecisionReasons.GrantMissing));
         public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) =>
             Task.FromResult<ResourceAccessPolicySnapshot?>(null);
 

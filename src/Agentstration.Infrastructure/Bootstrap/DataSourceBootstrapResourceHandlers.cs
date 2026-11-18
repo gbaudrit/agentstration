@@ -74,8 +74,10 @@ public sealed class DataSourceBootstrapResourceHandler(
         if (await service.GetAsync(value.Namespace, value.Name, scope, cancellationToken) is not null)
             return new(BootstrapResourceDisposition.Skip);
         DataSourceManagementService.Validate(value);
+        if (value.Definition.Dataset is not null)
+            return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
         var reference = value.Definition.Profile;
-        var profileNamespace = reference.Namespace ?? value.Namespace;
+        var profileNamespace = reference!.Namespace ?? value.Namespace;
         var planned = WorkspaceBootstrapResource.IsAvailable(planning,
             DataSourceResourceKinds.DataSourceProfile, reference.Name, profileNamespace);
         if (!planned && await profiles.GetAsync(profileNamespace, reference.Name, reference.ScopeRef, cancellationToken) is null)

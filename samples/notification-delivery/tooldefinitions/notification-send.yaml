@@ -3,6 +3,9 @@ kind: ToolDefinition
 metadata:
   name: notification.send
 definition:
+  toolKind: flow
+  version: 1.0.0
+  publish: true
   displayName: Send notification
   description: Notifies the current Workspace user about a relevant event or result through the active delivery Flow. Agentstration creates a distinct notification identity for every execution; actions can target only local Agentstration paths.
   enabled: true

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Tools;
 
@@ -15,7 +16,7 @@ public static partial class ToolInputSchemaValidator
     private const int MaximumDepth = 12;
     private const int MaximumPayloadLength = 2 * 1024 * 1024;
 
-    public static void Validate(JsonElement? schema, JsonElement arguments)
+    public static void Validate(JsonElement? schema, JsonElement arguments, IReadOnlyList<SecretInputReference>? secretInputs = null)
     {
         if (arguments.GetRawText().Length > MaximumPayloadLength)
             throw Error("tool_arguments_too_large", "$", $"Tool arguments cannot exceed {MaximumPayloadLength} JSON characters.");
@@ -25,10 +26,10 @@ public static partial class ToolInputSchemaValidator
                 throw Error("tool_arguments_object_required", "$", "Tool arguments must be a JSON object.");
             return;
         }
-        ValidateNode(schema.Value, arguments, "$", 0);
+        ValidateNode(schema.Value, arguments, "$", 0, secretInputs ?? []);
     }
 
-    private static void ValidateNode(JsonElement schema, JsonElement value, string path, int depth)
+    private static void ValidateNode(JsonElement schema, JsonElement value, string path, int depth, IReadOnlyList<SecretInputReference> secretInputs)
     {
         if (depth > MaximumDepth)
             throw Error("tool_schema_too_deep", path, "The Tool input schema exceeds the supported nesting depth.");
@@ -36,6 +37,12 @@ public static partial class ToolInputSchemaValidator
             throw Error("tool_input_schema_invalid", path, "The Tool input schema must contain JSON objects.");
 
         var types = ReadTypes(schema, path);
+        if (SecretInputs.IsReference(value, secretInputs))
+        {
+            if (types is not null && !types.Contains("string"))
+                throw Error("tool_argument_type_invalid", path, "A Secret reference requires a string input.");
+            return; // The live value is validated again at the server execution boundary.
+        }
         if (schema.TryGetProperty("enum", out var allowed) && allowed.ValueKind == JsonValueKind.Array
             && !allowed.EnumerateArray().Any(item => JsonElement.DeepEquals(item, value)))
             throw Error("tool_argument_enum_invalid", path, $"Value at '{path}' is not one of the allowed values.");
@@ -47,10 +54,10 @@ public static partial class ToolInputSchemaValidator
         switch (type)
         {
             case "object":
-                ValidateObject(schema, value, path, depth);
+                ValidateObject(schema, value, path, depth, secretInputs);
                 break;
             case "array":
-                ValidateArray(schema, value, path, depth);
+                ValidateArray(schema, value, path, depth, secretInputs);
                 break;
             case "string":
                 ValidateString(schema, value.GetString()!, path);
@@ -62,7 +69,7 @@ public static partial class ToolInputSchemaValidator
         }
     }
 
-    private static void ValidateObject(JsonElement schema, JsonElement value, string path, int depth)
+    private static void ValidateObject(JsonElement schema, JsonElement value, string path, int depth, IReadOnlyList<SecretInputReference> secretInputs)
     {
         if (value.ValueKind != JsonValueKind.Object) return;
         if (schema.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array)
@@ -88,11 +95,11 @@ public static partial class ToolInputSchemaValidator
                     throw Error("tool_argument_unknown", PropertyPath(path, property.Name), $"Tool argument '{property.Name}' is not declared by the Tool schema.");
                 continue;
             }
-            ValidateNode(propertySchema, property.Value, PropertyPath(path, property.Name), depth + 1);
+            ValidateNode(propertySchema, property.Value, PropertyPath(path, property.Name), depth + 1, secretInputs);
         }
     }
 
-    private static void ValidateArray(JsonElement schema, JsonElement value, string path, int depth)
+    private static void ValidateArray(JsonElement schema, JsonElement value, string path, int depth, IReadOnlyList<SecretInputReference> secretInputs)
     {
         if (value.ValueKind != JsonValueKind.Array) return;
         CheckCount(value.GetArrayLength(), Integer(schema, "minItems"), Integer(schema, "maxItems"), path, "items");
@@ -100,7 +107,7 @@ public static partial class ToolInputSchemaValidator
         var index = 0;
         foreach (var item in value.EnumerateArray())
         {
-            ValidateNode(items, item, $"{path}[{index}]", depth + 1);
+            ValidateNode(items, item, $"{path}[{index}]", depth + 1, secretInputs);
             index++;
         }
     }

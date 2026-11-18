@@ -16,7 +16,7 @@ public static partial class FlowEndpoints
     {
         var workspaceId = CurrentWorkspace(requestContext);
         var ownerScope = RequestedOwnerScope(body.ScopeRef, requestContext);
-        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.CreateExactAsync(workspaceId, ownerScope, new CreateFlowDraftCommand(body.Name, body.DisplayName, body.Description, body.Tags, body.Template), operationToken), token);
+        var stored = await WriteFlowAsync(scopes, ownerScope, operationToken => service.CreateExactAsync(workspaceId, ownerScope, new CreateFlowDraftCommand(body.Name, body.DisplayName, body.Description, body.Tags, body.Template) { Transformation = body.Transformation }, operationToken), token);
         response.Headers.ETag = stored.ETag;
         response.Headers.Location = $"/api/flows/{stored.Value.FlowId.Value}/draft";
         return Results.Json(new FlowDraftResponse(stored.Value, stored.ETag), statusCode: StatusCodes.Status201Created);

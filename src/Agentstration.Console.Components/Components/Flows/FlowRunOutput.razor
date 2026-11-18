@@ -1,0 +1,85 @@
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject IArtifactsClient Artifacts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
+
+<article class="panel io-panel flow-run-tab-card" data-testid="flow-run-output">
+    <div class="panel-header"><h2>@T("Output")</h2><button class="button-secondary" type="button" disabled="@loading" @onclick="LoadAsync" data-testid="flow-run-output-refresh">@T("OutputRefresh")</button></div>
+    @if (Run.TransientPayloads && !Run.TransientPayloadsAvailable)
+    { <p class="inline-warning" role="status" data-testid="flow-run-output-expired">@T("TransientOutputUnavailable")</p> }
+    else if (Run.Output is { ValueKind: JsonValueKind.Null } || Run.Output is null && Run.Status == FlowRunStatus.Succeeded && Run.Steps.Any(step => step.StepType == "output" && step.Status == FlowStepRunStatus.Succeeded))
+    { <p class="muted">@T("OutputNullValue")</p><pre>null</pre> }
+    else if (Run.Output is { ValueKind: JsonValueKind.String } text && text.GetString() == string.Empty)
+    { <p class="muted">@T("OutputEmptyText")</p><pre>""</pre> }
+    else if (Run.Output is not { ValueKind: not JsonValueKind.Undefined })
+    { <p class="muted" data-testid="flow-run-output-empty">@T("NoReturnedOutput")</p><small>@T("NoReturnedOutputHelp")</small> }
+    else
+    { <pre>@OutputPreview</pre>@if (PreviewTruncated) { <small>@T("OutputPreviewTruncated", MaximumPreviewCharacters!.Value)</small> } }
+    <h3>@T("ProducedArtifacts")</h3>
+    @if (loading) { <p role="status">@T("ProducedArtifactsLoading")</p> }
+    @if (error is not null) { <p class="inline-warning" role="status">@error</p> }
+    @if (!loading && error is null && outputs.Count == 0) { <p class="muted">@T("NoProducedArtifacts")</p> }
+    @foreach (var artifact in outputs)
+    {
+        <div class="form-section" data-testid="flow-run-output-artifact">
+            <a href="@ArtifactUrl(artifact)" class="text-button"><strong>@(artifact.Receipt.Provenance.GetValueOrDefault("fileName") ?? artifact.Name)</strong></a>
+            <code>@artifact.ArtifactId</code>
+            <span>@artifact.Receipt.MediaType · @T("OutputBytes", artifact.Receipt.Length.ToString("N0", System.Globalization.CultureInfo.CurrentCulture))</span>
+            @if (artifact.Receipt.Materialization is { } location) { <a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a> }
+        </div>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public FlowRun Run { get; set; } = default!;
+    [Parameter] public int? MaximumPreviewCharacters { get; set; }
+    private string FullOutput => JsonSerializer.Serialize(Run.Output, new JsonSerializerOptions { WriteIndented = true });
+    private bool PreviewTruncated => MaximumPreviewCharacters is > 0 && FullOutput.Length > MaximumPreviewCharacters;
+    private string OutputPreview => PreviewTruncated ? FullOutput[..MaximumPreviewCharacters!.Value] + "…" : FullOutput;
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<FlowRunArtifactResource> outputs = [];
+    private string? loadedId, error;
+    private FlowRunStatus? loadedStatus;
+    private WorkspaceId? loadedWorkspace;
+    private bool loading;
+    private int loadRevision;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    protected override Task OnParametersSetAsync() => loadedId == Run.Id && loadedWorkspace == Run.WorkspaceId && loadedStatus == Run.Status ? Task.CompletedTask : LoadAsync();
+    private async Task LoadAsync()
+    {
+        var revision = ++loadRevision;
+        var id = Run.Id;
+        var workspaceId = Run.WorkspaceId;
+        loadedId = id; loadedWorkspace = workspaceId; loadedStatus = Run.Status;
+        loading = true; error = null; outputs = [];
+        try
+        {
+            var values = await Artifacts.GetDurableAsync(cancellation.Token);
+            if (revision != loadRevision || Run.Id != id || Run.WorkspaceId != workspaceId || cancellation.IsCancellationRequested) return;
+            var referenced = ManifestArtifactIds(Run.Output);
+            outputs = values.Where(value => value.WorkspaceId == workspaceId
+                && (value.ProducerFlowRunId == id || value.Receipt.Provenance.GetValueOrDefault("processingRunId") == id || referenced.Contains(value.ArtifactId.ToString())))
+                .OrderBy(value => value.CreatedAt).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception) { if (revision == loadRevision && !cancellation.IsCancellationRequested) { error = T("ProducedArtifactsUnavailable"); outputs = []; } }
+        finally { if (revision == loadRevision) loading = false; }
+    }
+    private static HashSet<string> ManifestArtifactIds(JsonElement? output)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        if (output is not { } manifest) return result;
+        if (manifest.ValueKind == JsonValueKind.Object && !manifest.TryGetProperty("artifacts", out manifest)) return result;
+        if (manifest.ValueKind != JsonValueKind.Array) return result;
+        foreach (var item in manifest.EnumerateArray())
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("artifactId", out var id) && id.ValueKind == JsonValueKind.String)
+                result.Add(id.GetString()!);
+        return result;
+    }
+    private string ArtifactUrl(FlowRunArtifactResource artifact)
+    {
+        var context = Run.Scope.LogicalScopeRef ?? Run.ExecutionScopeRef;
+        return $"/artifacts/durable/{artifact.ArtifactId}?context={Uri.EscapeDataString(context.Value)}";
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

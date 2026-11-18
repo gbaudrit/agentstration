@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
 
@@ -16,7 +17,11 @@ public sealed record FlowToolExecutionRequest(
     string CorrelationId,
     FlowToolReference Tool,
     JsonElement Arguments,
-    ResolvedFlowToolRoute? Route = null);
+    ResolvedFlowToolRoute? Route = null)
+{
+    public bool TransientPayloads { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+}
 
 public sealed record FlowToolExecutionResult(
     JsonElement? Output,
@@ -191,7 +196,8 @@ public sealed partial class FlowRunService(
     IEnumerable<IFlowRunDeletionGuard>? configuredRunDeletionGuards = null,
     IFlowStepArtifactCapture? configuredArtifactCapture = null,
     FlowService? flowDefinitions = null,
-    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null)
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null,
+    FlowContentOptions? contentOptions = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly FlowRunExecutionOptions executionOptions = executionOptions is null

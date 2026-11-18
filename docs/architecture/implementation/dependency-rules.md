@@ -18,4 +18,9 @@ Additional modules follow the same principle: abstractions and domain models do 
 - Concrete Microsoft Agent Framework types live only in `Runtime.MicrosoftAgentFramework`.
 - Endpoints, UI components, MCP tools, workers, and `Program.cs` delegate business behavior to application services.
 
+`Storage.Contracts`, `Storage` and `Storage.Api` own selectable Storage resources.
+Storage consumes Connected Service export metadata through contracts only; ASP/AEP,
+Artifact and physical provider adapters remain outside the family. See the
+[Storage vertical](storage-vertical.md) for its authority layers and composition.
+
 Architecture tests enforce important project-reference boundaries.

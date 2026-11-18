@@ -52,6 +52,7 @@ public sealed record SubmitInputResponseRequest(JsonElement Value);
 public sealed record CreateFlowDraftRequest(string Name, string DisplayName, string? Description = null, IReadOnlyDictionary<string, string>? Tags = null, string Template = "AgentRouting")
 {
     public ResourceScopeRef? ScopeRef { get; init; }
+    public FlowTransformationTemplate? Transformation { get; init; }
 }
 public sealed record UpdateFlowDraftRequest(string DisplayName, string? Description, IReadOnlyDictionary<string, string>? Tags, FlowGraphDefinition Definition, string UpdatedBy = "local-user");
 public sealed record PublishFlowDraftRequest(string Version, string? ReleaseNotes = null, bool Activate = true);

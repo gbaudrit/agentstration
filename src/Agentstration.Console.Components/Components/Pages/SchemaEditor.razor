@@ -63,6 +63,10 @@ else
                     <dt>@T("Format")</dt><dd><code>@schema.Definition.Format</code></dd>
                     <dt>@T("Dialect")</dt><dd><code>@(schema.Definition.Dialect ?? "—")</code></dd>
                 </dl>
+                @if (schema.Definition.SourceEvidence is { } evidence)
+                {
+                    <details><summary>@T("SourceEvidence")</summary><pre>@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details>
+                }
             </section>
         </main>
     }
@@ -272,6 +276,7 @@ else
         {
             var properties = new SchemaProperties
             {
+                SourceEvidence = schema?.Definition.SourceEvidence,
                 DisplayName = displayName.Trim(),
                 Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Format = format.Trim(),

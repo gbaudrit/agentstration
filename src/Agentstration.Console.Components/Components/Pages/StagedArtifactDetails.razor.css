@@ -93,3 +93,17 @@
     white-space: normal;
     word-break: break-word;
 }
+
+.artifact-header {
+    min-width: 0;
+}
+
+.artifact-header ::deep .page-header > div {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.artifact-header ::deep h1,
+.artifact-header ::deep p {
+    overflow-wrap: anywhere;
+}

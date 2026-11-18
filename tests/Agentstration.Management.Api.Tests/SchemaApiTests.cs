@@ -222,7 +222,7 @@ public sealed class SchemaApiTests : ModelManagementApiTestBase
             BuiltinJsonSchemaFormatHandler.Draft202012, default);
 
         Assert.IsFalse(definitionResult.IsValid);
-        Assert.IsTrue(definitionResult.Issues.Any(issue => issue.Code == "json_schema_keyword_unsupported"
+        Assert.IsTrue(definitionResult.Issues.Any(issue => issue.Code == "json_schema_union_invalid"
             && issue.Path == "$.properties.age.oneOf"));
 
         var definition = JsonDocument.Parse(

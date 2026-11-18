@@ -19,7 +19,7 @@ public sealed partial class ApiClientTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolDefinition,
             Metadata = new ResourceMetadata { Name = "notification.send", Namespace = new ResourceNamespace("communications") },
-            Definition = new ToolDefinitionProperties
+            Definition = new FlowToolDefinitionProperties
             {
                 DisplayName = "Send notification",
                 InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }),

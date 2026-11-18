@@ -33,12 +33,12 @@ public sealed class ToolDefinitionAcquisitionExecutor(
             return null;
 
         using var workspace = requestScopes.Push(context);
-        var stored = await definitions.GetAsync(invocation.ToolName, invocation.Namespace, cancellationToken);
-        return stored?.Value.Definition.Acquisition is not null ? stored : null;
+        var stored = await definitions.GetInvocationAsync(invocation.ToolName, invocation.Namespace, cancellationToken);
+        return stored?.Value.Definition is AcquisitionToolDefinitionProperties ? stored : null;
     }
 
     internal bool OwnsAdministrativeInvocation(ToolDefinitionResource definition, ToolDefinitionInvocation invocation) =>
-        definition.Definition.Acquisition is not null && MatchingContext(invocation) is { } context
+        definition.Definition is AcquisitionToolDefinitionProperties && MatchingContext(invocation) is { } context
         && definition.ScopeRef == (requestContext.AccessMode switch
         {
             ControlPlaneAccessMode.Instance => ResourceScopeRef.Instance,
@@ -60,7 +60,7 @@ public sealed class ToolDefinitionAcquisitionExecutor(
         timeout.CancelAfter(TimeSpan.FromSeconds(definition.Definition.InvocationTimeoutSeconds));
         var token = timeout.Token;
         var callHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(invocation.CallId)));
-        var idempotencyKey = $"acquisition-tool:{definition.Uid:N}:{context.PrincipalId:N}:{callHash}";
+        var idempotencyKey = $"acquisition-tool:{definition.Uid:N}:{definition.Definition.Version}:{context.PrincipalId:N}:{callHash}";
         try
         {
             var started = await acquisitions.StartFromSuccessfulAcquisitionAsync(target.TemplateNamespace,
@@ -94,7 +94,7 @@ public sealed class ToolDefinitionAcquisitionExecutor(
                 artifact = new { artifact.ArtifactId, kind = target.ArtifactKind, artifact.Name, artifact.MediaType },
                 acquisitionId = completed.Name
             }, OutputJson);
-            var flow = completed.Composition.Flow;
+            var flow = completed.Composition!.Flow;
             return new(output, new ToolDefinitionOperationReceipt(
                 null, completed.FlowRunId, flow.Name, flow.Namespace,
                 flow.Version, completed.CorrelationId, false));

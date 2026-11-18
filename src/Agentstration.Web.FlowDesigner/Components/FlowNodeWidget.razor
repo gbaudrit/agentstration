@@ -1,24 +1,44 @@
-<div class="flow-node @Node.Source.Type" aria-label="@Node.Source.DisplayName">
+<div class="flow-node @Node.Source.Type" aria-label="@DisplayName">
     <button type="button" class="flow-node-settings" title="@Localizer["ConfigureStep"]" aria-label="@Localizer["ConfigureStepNamed", Node.Source.DisplayName]"
             @onclick="OpenSettingsAsync" @onclick:stopPropagation="true" @onpointerdown:stopPropagation="true">
         <UiIcon Name="settings" />
     </button>
-    <span class="flow-port-handle input @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@Localizer["InputConnectionHandle"]" aria-label="@Localizer["InputConnectionHandle"]">
+    <span class="flow-port-handle input @(Node.Input.ContractProblem is null ? null : "contract-incompatible") @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@PortTitle("input")" aria-label="@Localizer["InputConnectionHandle"]">
         <PortRenderer Port="Node.Input" />
+            <button type="button" class="flow-port-inspect input" title="@PortTitle("input")" aria-label="@Localizer["InspectPortNamed", "input"]"
+                @onpointerdown:stopPropagation="true" @onmousedown:stopPropagation="true" @onclick:stopPropagation="true" @onclick='() => InspectPortAsync("input")' aria-disabled="false"><span aria-hidden="true">i</span></button>
     </span>
-    <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
-    <span class="flow-node-copy"><strong title="@Node.Source.DisplayName">@Node.Source.DisplayName</strong><small>@Node.Source.Type</small></span>
-    @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@Short(Node.Source.Resource)</code> }
-    @for (var index = 0; index < Node.Outputs.Count; index++)
+    @if (Node.Outputs.FirstOrDefault(port => port.EventName == "process") is { } processingStart)
     {
-        var output = Node.Outputs[index];
-        var top = 100d * (index + 1) / (Node.Outputs.Count + 1);
-        <span class="flow-port-handle output @OutcomeClass(output) @(Node.Locked ? "locked" : null)" style="top: @top.ToString(System.Globalization.CultureInfo.InvariantCulture)%" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@OutputLabel(output)" aria-label="@OutputLabel(output)">
-            @if (Node.Outputs.Count > 1)
+        <span class="flow-port-handle processing-start @(processingStart.ContractProblem is null ? null : "contract-incompatible") @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" data-testid="artifact-processing-start-port" title="@PortTitle("process")" aria-label="@Localizer["ArtifactProcessingStartPort"]">
+            <PortRenderer Port="processingStart" />
+            <button type="button" class="flow-port-inspect processing-start" title="@PortTitle("process")" aria-label="@Localizer["InspectPortNamed", "process"]"
+                @onpointerdown:stopPropagation="true" @onmousedown:stopPropagation="true" @onclick:stopPropagation="true" @onclick='() => InspectPortAsync("process")' aria-disabled="false"><span aria-hidden="true">i</span></button>
+        </span>
+    }
+    @if (Node.ProcessingResult is { } processingResult)
+    {
+        <span class="flow-port-handle processing-result @(processingResult.ContractProblem is null ? null : "contract-incompatible") @(Node.Locked ? "locked" : null)" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" data-testid="artifact-processing-result-port" title="@PortTitle("result")" aria-label="@Localizer["ArtifactProcessingResultPort"]">
+            <PortRenderer Port="processingResult" />
+            <button type="button" class="flow-port-inspect processing-result" title="@PortTitle("result")" aria-label="@Localizer["InspectPortNamed", "result"]"
+                @onpointerdown:stopPropagation="true" @onmousedown:stopPropagation="true" @onclick:stopPropagation="true" @onclick='() => InspectPortAsync("result")' aria-disabled="false"><span aria-hidden="true">i</span></button>
+        </span>
+    }
+    <span class="flow-node-icon" aria-hidden="true"><UiIcon Name="@FlowStepIcons.Name(Node.Source.Type)" /></span>
+    <span class="flow-node-copy"><strong title="@DisplayName">@DisplayName</strong><small>@Node.Source.Type</small></span>
+    @if (Node.Source.Resource is not null) { <code title="@Node.Source.Resource">@(Node.Source.Type == "agent" ? Localizer["CalledAgentNode", Interactions?.DescribeResource?.Invoke(Node.Source.Name) ?? Short(Node.Source.Resource)].Value : Short(Node.Source.Resource))</code> }
+    @for (var index = 0; index < SideOutputs.Count; index++)
+    {
+        var output = SideOutputs[index];
+        var top = 100d * (index + 1) / (SideOutputs.Count + 1);
+        <span class="flow-port-handle output @(output.ContractProblem is null ? null : "contract-incompatible") @OutcomeClass(output) @(Node.Locked ? "locked" : null)" style="top: @top.ToString(System.Globalization.CultureInfo.InvariantCulture)%" tabindex="@(Node.Locked ? -1 : 0)" aria-disabled="@Node.Locked.ToString().ToLowerInvariant()" title="@PortTitle(output.EventName ?? "output")" aria-label="@OutputLabel(output)">
+            @if (SideOutputs.Count > 1)
             {
                 <span class="flow-port-label">@OutcomeSymbol(output)@output.EventName</span>
             }
             <PortRenderer Port="output" />
+            <button type="button" class="flow-port-inspect output" title="@PortTitle(output.EventName ?? "output")" aria-label="@Localizer["InspectPortNamed", output.EventName ?? "output"]"
+                @onpointerdown:stopPropagation="true" @onmousedown:stopPropagation="true" @onclick:stopPropagation="true" @onclick='() => InspectPortAsync(output.EventName ?? "output")' aria-disabled="false"><span aria-hidden="true">i</span></button>
         </span>
     }
 </div>
@@ -27,6 +47,11 @@
     [Inject] private IStringLocalizer<FlowDesignerStrings> Localizer { get; set; } = default!;
     [CascadingParameter] private FlowNodeInteractionContext? Interactions { get; set; }
     [Parameter, EditorRequired] public FlowDiagramNode Node { get; set; } = default!;
+    private IReadOnlyList<FlowDiagramPort> SideOutputs => Node.Outputs.Where(port => port.Alignment != Blazor.Diagrams.Core.Models.PortAlignment.Bottom).ToArray();
+    private string DisplayName => FlowInspectorPresentation.StepDisplayLabel(Localizer, Node.Source.DisplayName);
+    private string PortTitle(string port) => (port == "input" ? Node.Input : port == "result" ? Node.ProcessingResult : Node.Outputs.FirstOrDefault(output => output.EventName == port))?.ContractProblem
+        ?? Interactions?.DescribePort?.Invoke(Node.Source.Name, port) ?? Localizer["InspectPortNamed", port];
+    private Task InspectPortAsync(string port) => Interactions?.InspectPortAsync?.Invoke(Node.Source.Name, port) ?? Task.CompletedTask;
     private Task OpenSettingsAsync() => Interactions?.OpenSettingsAsync(Node.Source.Name) ?? Task.CompletedTask;
     private static string Short(string value) => value[(value.LastIndexOf('/') + 1)..];
     private string OutputLabel(FlowDiagramPort output) => output.Outcome is { } outcome

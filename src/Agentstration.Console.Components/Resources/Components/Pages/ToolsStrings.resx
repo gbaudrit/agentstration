@@ -23,13 +23,13 @@
   <data name="Details"><value>Details</value></data>
   <data name="Definitions"><value>Definitions</value></data>
   <data name="DefinitionsTitle"><value>Tool definitions</value></data>
-  <data name="DefinitionsDescription"><value>Publish stable MCP tools implemented by governed Flows.</value></data>
+  <data name="DefinitionsDescription"><value>Define and publish Flow-backed, relay and acquisition Tools.</value></data>
   <data name="NewDefinition"><value>New definition</value></data>
   <data name="EditDefinition"><value>Edit definition</value></data>
-  <data name="DefinitionEditorDescription"><value>Choose a published Flow and expose its contract as an Agentstration MCP tool.</value></data>
+  <data name="DefinitionEditorDescription"><value>Configure the Tool contract, governance and published versions.</value></data>
   <data name="LoadingDefinitions"><value>Loading tool definitions…</value></data>
   <data name="DefinitionsEmptyTitle"><value>No tool definitions</value></data>
-  <data name="DefinitionsEmptyMessage"><value>Create a definition to expose one published Flow as a bounded MCP tool.</value></data>
+  <data name="DefinitionsEmptyMessage"><value>Create a definition from a published Flow or an existing Tool.</value></data>
   <data name="Definition"><value>Definition</value></data>
   <data name="Name"><value>Name</value></data>
   <data name="Namespace"><value>Namespace</value></data>
@@ -64,4 +64,101 @@
   <data name="AcquisitionImplementationHelp"><value>This Tool reuses the target and parameters from its acquisition template.</value></data>
   <data name="AcquisitionTemplate"><value>Acquisition template</value></data>
   <data name="AcquisitionOutput"><value>Output artifact</value></data>
+  <data name="ToolKind" xml:space="preserve"><value>Tool kind</value></data>
+  <data name="RelayViews" xml:space="preserve"><value>Relay views</value></data>
+  <data name="RelayConfiguration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="RelayVersions" xml:space="preserve"><value>Versions</value></data>
+  <data name="RelayUsages" xml:space="preserve"><value>Usages</value></data>
+  <data name="RelayVersion" xml:space="preserve"><value>ToolDefinition version</value></data>
+  <data name="SourceToolVersion" xml:space="preserve"><value>Target source Tool version / revision</value></data>
+  <data name="PublishedAt" xml:space="preserve"><value>Published at</value></data>
+  <data name="NewVersion" xml:space="preserve"><value>New version</value></data>
+  <data name="PublishVersion" xml:space="preserve"><value>Publish version</value></data>
+  <data name="SelectSourceTool" xml:space="preserve"><value>Select a source Tool and exact version</value></data>
+  <data name="PinnedSourceUnavailable" xml:space="preserve"><value>{0} · {1} · unavailable pinned source</value></data>
+  <data name="SourceSelectionHelp" xml:space="preserve"><value>Select an exact source. Existing publications never follow source updates automatically.</value></data>
+  <data name="FixedInputBindings" xml:space="preserve"><value>Fixed input bindings</value></data>
+  <data name="LiveBindingHelp" xml:space="preserve"><value>Parameter and Secret values are resolved for every call. Updating their value does not publish a new relay; changing the binding requires a new version.</value></data>
+  <data name="ValueSource.Caller" xml:space="preserve"><value>Provided by caller</value></data>
+  <data name="ValueSource.Literal" xml:space="preserve"><value>Literal value</value></data>
+  <data name="ValueSource.Parameter" xml:space="preserve"><value>Parameter</value></data>
+  <data name="ValueSource.Secret" xml:space="preserve"><value>Secret</value></data>
+  <data name="BoundResource" xml:space="preserve"><value>Exact bound resource</value></data>
+  <data name="SelectBoundResource" xml:space="preserve"><value>Select an authorized resource</value></data>
+  <data name="CreateParameter" xml:space="preserve"><value>Create a Parameter</value></data>
+  <data name="CreateSecret" xml:space="preserve"><value>Create a Secret</value></data>
+  <data name="SecretReferenceOnly" xml:space="preserve"><value>Only the Secret reference is shown. Its value is never included in previews.</value></data>
+  <data name="RelayBindingInvalid" xml:space="preserve"><value>Resolve missing, incompatible or overlapping fixed input bindings before publishing.</value></data>
+  <data name="PublicationChanges" xml:space="preserve"><value>Changes since the selected publication</value></data>
+  <data name="ReviewFixedBindings" xml:space="preserve"><value>Review the fixed paths and value sources above</value></data>
+  <data name="ConsumerAdoptionHelp" xml:space="preserve"><value>Existing consumers keep their pinned versions. Adopt this publication through a new Agent revision, ToolSet version or Flow version.</value></data>
+  <data name="SaveDraft" xml:space="preserve"><value>Save draft</value></data>
+  <data name="ReviewPublication" xml:space="preserve"><value>Review publication</value></data>
+  <data name="ReviewVersionPair" xml:space="preserve"><value>Publish ToolDefinition {0} targeting source {1}.</value></data>
+  <data name="ConfirmPublication" xml:space="preserve"><value>Confirm publication</value></data>
+  <data name="SourceUnavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="CatalogRevision" xml:space="preserve"><value>Catalog revision {0}</value></data>
+  <data name="UsageKind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="UsageKind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="UsageKind.ToolSet" xml:space="preserve"><value>ToolSet</value></data>
+  <data name="UpdateSource" xml:space="preserve"><value>Update source</value></data>
+  <data name="ChooseNewSource" xml:space="preserve"><value>Choose another exact source version or revision in the source selector, then review the contract and bindings.</value></data>
+  <data name="ContractUnchanged" xml:space="preserve"><value>Unchanged</value></data>
+  <data name="ContractChanged" xml:space="preserve"><value>Changed — review before publication</value></data>
+  <data name="FixedInputChanges" xml:space="preserve"><value>Compare fixed input bindings</value></data>
+  <data name="PublishedBindings" xml:space="preserve"><value>Published bindings</value></data>
+  <data name="DraftBindings" xml:space="preserve"><value>Draft bindings</value></data>
+  <data name="SourceContractChanges" xml:space="preserve"><value>Compare source input contracts</value></data>
+  <data name="PublishedSourceInput" xml:space="preserve"><value>Published source input</value></data>
+  <data name="DraftSourceInput" xml:space="preserve"><value>Selected source input</value></data>
+  <data name="BoundResourceUnavailable" xml:space="preserve"><value>Unavailable or incompatible reference: {0}</value></data>
+  <data name="Kind.Relay" xml:space="preserve"><value>Relay</value></data>
+  <data name="Kind.Acquisition" xml:space="preserve"><value>Acquisition</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="CreationTitle" xml:space="preserve"><value>New Tool definition</value></data>
+  <data name="CreationDescription" xml:space="preserve"><value>Define your Tool, then choose how it will execute.</value></data>
+  <data name="CreationProgress" xml:space="preserve"><value>Tool creation steps</value></data>
+  <data name="CreationDefine" xml:space="preserve"><value>Define</value></data>
+  <data name="CreationConfigure" xml:space="preserve"><value>Configure</value></data>
+  <data name="CreationIdentityEyebrow" xml:space="preserve"><value>IDENTITY</value></data>
+  <data name="CreationIdentityTitle" xml:space="preserve"><value>Name your Tool</value></data>
+  <data name="CreationIdentityHelp" xml:space="preserve"><value>A stable identity, whatever its execution mode.</value></data>
+  <data name="CreationDisplayNameHelp" xml:space="preserve"><value>Readable name displayed in the Console.</value></data>
+  <data name="CreationTechnicalNameHelp" xml:space="preserve"><value>Identifier used by APIs and resource references.</value></data>
+  <data name="CreationInitialVersion" xml:space="preserve"><value>Initial version</value></data>
+  <data name="CreationInitialVersionHelp" xml:space="preserve"><value>The independent version of this Tool definition.</value></data>
+  <data name="CreationScopeHelp" xml:space="preserve"><value>Choose the ownership scope of this definition. Administrative execution uses the corresponding operational Workspace.</value></data>
+  <data name="CreationDescriptionHelp" xml:space="preserve"><value>Describe the expected result when calling this Tool.</value></data>
+  <data name="CreationKindEyebrow" xml:space="preserve"><value>EXECUTION MODE</value></data>
+  <data name="CreationKindTitle" xml:space="preserve"><value>Tool type</value></data>
+  <data name="CreationKindHelp" xml:space="preserve"><value>Choose what this definition should expose.</value></data>
+  <data name="CreationKindFlow" xml:space="preserve"><value>From a Flow</value></data>
+  <data name="CreationKindFlowHelp" xml:space="preserve"><value>Expose a published Flow as a Tool, with its inputs and outputs.</value></data>
+  <data name="CreationKindRelay" xml:space="preserve"><value>Tool relay</value></data>
+  <data name="CreationKindRelayHelp" xml:space="preserve"><value>Reuse an existing Tool by fixing selected inputs and exposing the others.</value></data>
+  <data name="CreationNextRelay" xml:space="preserve"><value>Configure the relay</value></data>
+  <data name="CreationNextFlow" xml:space="preserve"><value>Configure the Tool</value></data>
+  <data name="CreationNextRelayHelp" xml:space="preserve"><value>Choose its source and the inputs to fix.</value></data>
+  <data name="CreationNextFlowHelp" xml:space="preserve"><value>Choose the published Flow to expose.</value></data>
+  <data name="CreationReady" xml:space="preserve"><value>Ready to create the draft</value></data>
+  <data name="CreationDraftHelp" xml:space="preserve"><value>The definition remains editable before its separate publication.</value></data>
+  <data name="CreationContinue" xml:space="preserve"><value>Continue</value></data>
+  <data name="CreationBack" xml:space="preserve"><value>Back</value></data>
+  <data name="CreationCreateDraft" xml:space="preserve"><value>Create draft</value></data>
+  <data name="CreationCreating" xml:space="preserve"><value>Creating…</value></data>
+  <data name="CreationScopeRequired" xml:space="preserve"><value>Select a writable ownership scope to create a Tool definition.</value></data>
+  <data name="CreationIdentityInvalid" xml:space="preserve"><value>Enter a display name, technical name, namespace and an initial version in major.minor.patch format.</value></data>
+  <data name="CreationFlowEyebrow" xml:space="preserve"><value>FLOW CONFIGURATION</value></data>
+  <data name="CreationFlowTitle" xml:space="preserve"><value>Choose the Flow to expose</value></data>
+  <data name="CreationFlowHelp" xml:space="preserve"><value>Select a published version and inspect its contract.</value></data>
+  <data name="CreationFlowVersion" xml:space="preserve"><value>Flow version</value></data>
+  <data name="CreationSelectVersion" xml:space="preserve"><value>Select an exact version or revision</value></data>
+  <data name="CreationNoPublishedVersions" xml:space="preserve"><value>This Flow has no published version. Publish it before creating a Tool.</value></data>
+  <data name="CreationRelayEyebrow" xml:space="preserve"><value>RELAY CONFIGURATION</value></data>
+  <data name="CreationRelayTitle" xml:space="preserve"><value>Choose the source Tool</value></data>
+  <data name="CreationRelayHelp" xml:space="preserve"><value>Select the exact version or revision that the relay will call.</value></data>
+  <data name="CreationSourceTool" xml:space="preserve"><value>Source Tool</value></data>
+  <data name="CreationSelectSource" xml:space="preserve"><value>Select a source Tool</value></data>
+  <data name="CreationIndependentVersions" xml:space="preserve"><value>The relay version is independent of the source Tool version.</value></data>
+  <data name="CreationLoadingContext" xml:space="preserve"><value>Loading the selected Console context…</value></data>
 </root>

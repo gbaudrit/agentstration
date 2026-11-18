@@ -21,6 +21,29 @@ public sealed class HttpDiagnosticsTests
     private const string ResponseJson = "{\"output\":\"diagnostic-response\",\"access_token\":\"response-secret\"}";
 
     [TestMethod]
+    public async Task SafeAwpErrorAliasRemainsDiagnosableWhileGenericCodesStayRedacted()
+    {
+        var logs = new Logs();
+        var builder = Builder(logs);
+        await using var app = builder.Build();
+        app.UseAgentstrationHttpDiagnostics();
+        app.MapGet("/api/awp/v1/probe", () => Results.Problem(statusCode: 422, extensions: new Dictionary<string, object?>
+        {
+            ["code"] = "generic-sensitive-code",
+            ["errorCode"] = "tool_argument_minimum_length",
+            ["contractFailure"] = new { path = "$.request.snapshotId" }
+        }));
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var response = await client.GetAsync("/api/awp/v1/probe");
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Contains("generic-sensitive-code", await response.Content.ReadAsStringAsync());
+        Assert.DoesNotContain("generic-sensitive-code", logs.Text);
+        Assert.Contains("tool_argument_minimum_length", logs.Text);
+        Assert.Contains("$.request.snapshotId", logs.Text);
+    }
+
+    [TestMethod]
     [DataRow("Agentstration.Web")]
     [DataRow("Agentstration.Console.Web")]
     [DataRow("Agentstration.Workplace.Web")]

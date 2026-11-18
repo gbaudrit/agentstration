@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
+    <ProjectReference Include="../../asp/src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
+    <ProjectReference Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+</Project>

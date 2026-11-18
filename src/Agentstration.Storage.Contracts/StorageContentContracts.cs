@@ -1,0 +1,50 @@
+namespace Agentstration.Storage.Contracts;
+
+/// <summary>A consumer can only narrow the Storage envelope; omitted numeric bounds add no restriction to server configuration.</summary>
+public sealed record StorageContentPolicy(
+    bool List = true, bool Stat = true, bool Read = true, bool Write = false,
+    string Prefix = "", int MaximumPageSize = int.MaxValue, int MaximumReadBytes = int.MaxValue,
+    int MaximumWriteBytes = int.MaxValue, string? KeyFrom = null, string? KeyBefore = null);
+
+public sealed record StorageContentRequest(
+    StorageRevisionReference Storage, StorageResolutionContext Consumer, StorageContentPolicy Policy)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+}
+
+public sealed record StorageObject(string Key, string? Version, long Length, string? Sha256, string Reference);
+public sealed record StorageObjectPage(IReadOnlyList<StorageObject> Objects, string? Cursor);
+public sealed record StorageObjectContent(StorageObject Item, long Offset, string ContentBase64, bool EndOfObject);
+public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, string Key,
+    string ContentBase64, string? ExpectedVersion = null);
+
+/// <summary>Each operation reauthorizes an exact Storage. No session is an authorization cache.</summary>
+public interface IStorageContentGateway
+{
+    // Provider-qualified retirement of a producer-owned exact result; never inferred from generic ASP delete.
+    Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+    Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default);
+    Task<StorageObjectPage> ListAsync(StorageContentRequest target, string prefix, int limit,
+        string? cursor = null, CancellationToken cancellationToken = default);
+    Task<StorageObject> StatAsync(StorageContentRequest target, string reference,
+        CancellationToken cancellationToken = default);
+    Task<StorageObjectContent> ReadAsync(StorageContentRequest target, string reference, long offset, int maximumBytes,
+        CancellationToken cancellationToken = default);
+    Task<StorageObject> WriteAsync(StorageContentRequest target, StorageWrite request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Versioned protocol mapping; contains no credentials or physical target configuration.</summary>
+public sealed record StorageAspBindingDescriptor(string Profile, string McpServer, string ToolPrefix,
+    string ProviderId, string ProviderVersion, string BindingPath);
+
+/// <summary>Pure provider-owned validation in addition to the immutable JSON schemas. Never resolves values or performs I/O.</summary>
+public interface IStorageDefinitionValidator
+{
+    bool ValidatesDocumentSchemas(StorageTypeVersionDescriptor version) => false;
+    void Validate(StorageTypeResource type, StorageTypeVersionDescriptor version, StorageProperties definition);
+}
+
+public sealed record StorageValidationIssue(string Path, string Code, string? Keyword = null);

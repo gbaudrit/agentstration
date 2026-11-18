@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Schemas;
 using Microsoft.Extensions.Options;
 
 namespace Agentstration.Infrastructure.Runtime;
@@ -17,9 +18,22 @@ public sealed class RuntimeExecutionMaterialResolver(
     IRuntimeAgentResolver agents,
     AgentManagementService agentManagement,
     IToolCatalog tools,
-    IOptions<FlowRunExecutionOptions> flowOptions) : IRuntimeExecutionMaterialResolver
+    IOptions<FlowRunExecutionOptions> flowOptions,
+    Agentstration.DataSources.DataSourceDatasetAcquisitionService? datasetAcquisitions = null,
+    IEnumerable<IRuntimeAgentPresentationEnricher>? presentationEnrichers = null) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private async Task ValidateDatasetAsync(FlowRun run, CancellationToken cancellationToken)
+    {
+        if (run.DefinitionSnapshot.Metadata.GetValueOrDefault(FlowMetadataKeys.Contract)
+            != Agentstration.DataSources.DataSourceDatasetCompositionService.FlowContract) return;
+        if (datasetAcquisitions is null)
+            throw new RuntimeExecutionMaterialException("operation_adapter_unavailable", "Dataset execution is unavailable.");
+        try { await datasetAcquisitions.ValidateInvocationAsync(run.Id, run.Input, cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { throw new RuntimeExecutionMaterialException("operation_acquisition_refused", "The accepted operation acquisition is no longer authorized or available."); }
+    }
 
     public async Task<RuntimeExecutionMaterial> ResolveAsync(
         RuntimeWorkerAssignment assignment,
@@ -43,10 +57,20 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is ForeachFlowStepDefinition
+                || step is ForeachArtifactsFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
+                "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         if (!BelongsToAssignment(assignment, run))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
+        await ValidateDatasetAsync(run, cancellationToken);
         if (!string.Equals(run.FlowVersion, flowVersion, StringComparison.Ordinal)
             || !string.Equals(DefinitionHash(run), flowDefinitionHash, StringComparison.Ordinal))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The step does not reference the pinned Flow version and hash.");
@@ -76,6 +100,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         await runtimeScopes.ValidateAsync(stored.Value.Scope, cancellationToken);
         using var scope = runtimeScopes.Enter(stored.Value.Scope);
         var agent = await ResolveAgentAsync("agent", stored.Value.Properties.Agent, cancellationToken);
+        var directOutput = FlowDataContracts.AgentOutput(null, agent.ParticipantId, assignment.TargetRunId,
+            $"agent:{agent.AgentNamespace}/{agent.AgentName}@{agent.Generation}/output", agent.OutputSchema, agent.OutputContract, null, agent.InputSchema);
+        agent = agent with { Instructions = FlowDataContracts.AgentInstructions(agent.Instructions, agent.InputSchema, directOutput, null) };
         return new RuntimeDirectAgentExecutionMaterial(
             assignment.ExecutionMaterialId,
             assignment.ExecutionMaterialVersion,
@@ -103,10 +130,20 @@ public sealed class RuntimeExecutionMaterialResolver(
         var stored = await flowRuns.GetRunExactAsync(assignment.ExecutionScopeRef, flowRunId, cancellationToken)
             ?? throw new RuntimeExecutionMaterialException("execution_run_not_found", "The assigned Flow Run was not found.");
         var run = stored.Value;
+        if (assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.V1
+            && run.DefinitionSnapshot.Graph?.Steps.Any(step => step is ForeachFlowStepDefinition
+                || step is ForeachArtifactsFlowStepDefinition { MaximumConcurrency: > 1 }) == true)
+            throw new RuntimeExecutionMaterialException("execution_material_version_unsupported",
+                "This process requires execution material 1.1. Start a new run with an updated Runtime Worker.");
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new RuntimeExecutionMaterialException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads && run.DefinitionSnapshot.Graph?.Steps.Any(step => step.ArtifactOutput is not null) == true)
+            throw new RuntimeExecutionMaterialException("direct_intermediate_storage_refused", "Direct content cannot be captured into an intermediate Artifact.");
         if (!BelongsToAssignment(assignment, run))
             throw new RuntimeExecutionMaterialException("execution_coordinate_invalid", "The Flow Run does not belong to this root assignment.");
         await flowScopes.ValidateAsync(run.Scope, cancellationToken);
         using var scope = flowScopes.Enter(run.Scope);
+        await ValidateDatasetAsync(run, cancellationToken);
         if (!string.Equals(run.FlowVersion, run.DefinitionSnapshot.Version, StringComparison.Ordinal)
             || run.DefinitionHash is not null
             && !string.Equals(run.DefinitionHash, run.DefinitionSnapshot.DefinitionHash, StringComparison.Ordinal)
@@ -137,6 +174,22 @@ public sealed class RuntimeExecutionMaterialResolver(
                 || binding.RevisionUid != Guid.Empty && material.RevisionUid != binding.RevisionUid
                 || binding.DefinitionHash is not null && !string.Equals(material.DefinitionHash, binding.DefinitionHash, StringComparison.Ordinal)))
                 throw new RuntimeExecutionMaterialException("execution_material_drift", $"Participant '{binding.ParticipantId}' no longer resolves to its pinned revision.");
+            if (run.ArtifactProcessing is { ContentAccess: true })
+            {
+                var scopedTools = RuntimeArtifactProcessingTools.Create();
+                if (material.Tools.Any(tool => scopedTools.Any(scoped => scoped.Id == tool.Id || scoped.Name == tool.Name)))
+                    throw new RuntimeExecutionMaterialException("artifact_processing_tool_collision", "An Agent Tool conflicts with an execution-bound content Tool.");
+                material = material with { Tools = [.. material.Tools, .. scopedTools] };
+            }
+            ResolvedDataContract? responseContract = null;
+            try
+            {
+                responseContract = FlowDataContracts.AgentOutput(run.DefinitionSnapshot.Graph, reference.ParticipantId, run.Id,
+                $"agent:{material.AgentNamespace}/{material.AgentName}@{material.Generation}/output", material.OutputSchema, material.OutputContract, run.ContractContext, material.InputSchema);
+            }
+            catch (DataContractException exception) when (exception.Code == "data_contract_unresolved")
+            { /* Resolve/fail at the selected Agent step, not while loading inactive branches. */ }
+            material = material with { Instructions = FlowDataContracts.AgentInstructions(material.Instructions, material.InputSchema, responseContract, run.ContractContext) };
             resolvedAgents.Add(material);
         }
 
@@ -176,7 +229,9 @@ public sealed class RuntimeExecutionMaterialResolver(
         {
             ScopeRef = run.ExecutionScopeRef,
             LogicalScopeRef = run.Scope.LogicalScopeRef,
-            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value
+            FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value,
+            ProcessOrigin = run.ProcessOrigin is null ? null : JsonSerializer.SerializeToElement(run.ProcessOrigin, JsonOptions),
+            ContractContext = run.ContractContext
         };
     }
 
@@ -327,7 +382,10 @@ public sealed class RuntimeExecutionMaterialResolver(
         var resolvedTools = resolved.Definition.ToolReferences.Count > 0
             ? await tools.ResolveAsync(resolved.Definition.ToolReferences, cancellationToken)
             : await tools.ResolveAsync(resolved.Definition.EffectiveToolNames, cancellationToken);
-        var toolMaterials = resolvedTools.Select(tool => new RuntimeExecutionToolMaterial(
+        var enrichers = (presentationEnrichers ?? []).ToArray();
+        System.Diagnostics.Activity.Current?.SetTag("agentstration.runtime.presentation.enricher_count", enrichers.Length);
+        var presented = await RuntimeAgentPresentation.CreateAsync(resolved.Definition.EffectiveInstructions, resolvedTools, enrichers, cancellationToken);
+        var toolMaterials = presented.Tools.Select(tool => new RuntimeExecutionToolMaterial(
             tool.Id,
             tool.Namespace ?? default,
             tool.Name,
@@ -357,7 +415,7 @@ public sealed class RuntimeExecutionMaterialResolver(
             resolved.Definition.Handler,
             resolved.Definition.DisplayName,
             resolved.Definition.Description,
-            resolved.Definition.EffectiveInstructions,
+            presented.Instructions,
             resolved.ModelProfileName,
             resolved.ModelProfileNamespace,
             toolMaterials)
@@ -366,6 +424,9 @@ public sealed class RuntimeExecutionMaterialResolver(
             AgentScopeRef = resolved.AgentScopeRef,
             ModelProfileScopeRef = resolved.ModelProfileScopeRef,
             RevisionUid = resolved.RevisionUid,
+            InputSchema = resolved.Definition.InputSchema,
+            OutputSchema = resolved.Definition.OutputSchema,
+            OutputContract = resolved.Definition.OutputContract,
             RuntimeProfileName = resolved.RuntimeProfileName,
             RuntimeProfileNamespace = resolved.RuntimeProfileNamespace
         };

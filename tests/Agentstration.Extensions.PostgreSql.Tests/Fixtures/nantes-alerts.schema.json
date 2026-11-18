@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alertes Nantes Métropole",
+  "type": "object",
+  "properties": {
+    "total_count": {
+      "type": "integer"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/alerte"
+      }
+    }
+  },
+  "required": [
+    "total_count",
+    "results"
+  ],
+  "$defs": {
+    "alerte": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "debut": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "fin": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "titre": {
+          "type": "string"
+        },
+        "importance": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string",
+          "description": "Contenu HTML de l'alerte"
+        },
+        "lieu_nom_complet": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_adresse": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_ville": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_codepostal": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lieu_quartier": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_theme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_categorie": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lieu_site_web": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "geolocalisation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/geolocalisation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "debut",
+        "fin",
+        "titre",
+        "importance",
+        "status",
+        "detail",
+        "lieu_nom_complet",
+        "lieu_adresse",
+        "lieu_ville",
+        "lieu_codepostal",
+        "lieu_quartier",
+        "lieu_theme",
+        "lieu_categorie",
+        "lieu_type",
+        "lieu_site_web",
+        "geolocalisation"
+      ]
+    },
+    "geolocalisation": {
+      "type": "object",
+      "properties": {
+        "lon": {
+          "type": "number"
+        },
+        "lat": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lon",
+        "lat"
+      ]
+    }
+  }
+}

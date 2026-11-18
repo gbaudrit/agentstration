@@ -18,7 +18,7 @@ public sealed class FlowToolExecutorTests
     public async Task ExecutorBuildsStableFlowRunIdentitiesAndPassesTheResolvedArguments(ToolProviderType providerType)
     {
         var store = await StoreAsync(providerType);
-        var pipeline = new RecordingPipeline();
+        var pipeline = new RecordingPipeline { ExternalEnvelope = providerType == ToolProviderType.Aep };
         var executor = new ManagedFlowToolExecutor(store, pipeline);
         var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1);
 
@@ -26,7 +26,7 @@ public sealed class FlowToolExecutorTests
         await executor.ExecuteAsync(request, default);
         await executor.ExecuteAsync(request with { Attempt = 2 }, default);
 
-        Assert.AreEqual("sent", output.Output?.GetString());
+        Assert.AreEqual("sent", providerType == ToolProviderType.Aep ? output.Output?.GetProperty("structuredContent").GetString() : output.Output?.GetString());
         Assert.AreEqual("notification.send", output.ToolName);
         Assert.AreEqual(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), output.ToolUid);
         Assert.AreEqual(4L, output.ToolGeneration);
@@ -45,6 +45,18 @@ public sealed class FlowToolExecutorTests
         Assert.AreEqual(Scope.PrincipalId, first.PrincipalId);
         Assert.AreEqual("notify", first.FlowStepId);
         Assert.AreEqual("hello", first.Arguments?.GetProperty("message").GetString());
+    }
+
+    [TestMethod]
+    public async Task ExternalStructuredContentIsValidatedWithoutUnwrappingTheFlowResult()
+    {
+        var store = await StoreAsync(ToolProviderType.Aep);
+        var invalid = new RecordingPipeline { Response = JsonSerializer.SerializeToElement(new { structuredContent = 42, content = Array.Empty<object>() }) };
+        var failure = await Assert.ThrowsExactlyAsync<Agentstration.Schemas.DataContractException>(() =>
+            new ManagedFlowToolExecutor(store, invalid).ExecuteAsync(Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1), default));
+        Assert.AreEqual("tool-output", failure.Failure.Boundary);
+        Assert.AreEqual("$.structuredContent", failure.Failure.Path);
+        Assert.AreEqual("string", failure.Failure.Expected);
     }
 
     [TestMethod]
@@ -198,6 +210,7 @@ public sealed class FlowToolExecutorTests
                 },
                 Schema = new ToolSchema
                 {
+                    Output = JsonSerializer.SerializeToElement(new { type = "string" }),
                     Input = JsonSerializer.SerializeToElement(new
                     {
                         type = "object",
@@ -211,12 +224,14 @@ public sealed class FlowToolExecutorTests
 
     private sealed class RecordingPipeline : IToolExecutionPipeline
     {
+        public bool ExternalEnvelope { get; init; }
+        public JsonElement? Response { get; init; }
         public List<ToolExecutionContext> Contexts { get; } = [];
 
         public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
         {
             Contexts.Add(context);
-            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement("sent"));
+            return ValueTask.FromResult<JsonElement?>(Response ?? (ExternalEnvelope ? JsonSerializer.SerializeToElement(new { structuredContent = "sent", content = Array.Empty<object>() }) : JsonSerializer.SerializeToElement("sent")));
         }
     }
 

@@ -53,7 +53,16 @@ export class ScopedFlowDesignerPage {
     const exactTenant = `${fixture.scopes.tenant}|default|${duplicateAgentName}`;
     await selector.selectOption(exactTenant);
     await expect(selector).toHaveValue(exactTenant);
+    await this.page.getByTestId(TestIds.flowObservability.stepSettingsInputTab).click();
+    const mapping = this.page.getByTestId(TestIds.flowMapping.value);
+    await mapping.fill('${input}');
+    await mapping.press('Tab');
+    await expect(mapping).toHaveValue('${input}');
+    await this.page.locator('.mapping-picker-toggle').click();
+    await this.page.getByRole('option').filter({ hasText: '${transition.output}' }).click();
+    await expect(mapping).toHaveValue('${transition.output}');
     await this.closeAgentSettings();
+    await expect(this.page.locator('.flow-node.agent .flow-node-copy strong')).toHaveText('Scoped Agent');
     await expect(this.page.locator('.save-state.saved')).toBeVisible({ timeout: 30_000 });
     await this.page.reload({ waitUntil: 'domcontentloaded' });
     await this.openAgentSettings();

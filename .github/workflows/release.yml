@@ -52,6 +52,8 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Restore
         run: dotnet restore Agentstration.slnx -p:NuGetAudit=true -p:NuGetAuditMode=all
+      - name: Install patched Aspire CLI bundle
+        run: bash scripts/ci/install-aspire-cli-linux.sh "$RUNNER_TEMP/aspire-cli"
       - name: Build
         run: dotnet build Agentstration.slnx --configuration Release --no-restore
       - name: Test fast lane

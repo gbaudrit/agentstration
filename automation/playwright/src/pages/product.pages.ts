@@ -1,3 +1,5 @@
+import { SourceCompositionPage } from './source-composition.page.js';
+import { SourcePoliciesPage } from './source-policies.page.js';
 import { GovernedKnowledgePage } from './governed-knowledge.page.js';
 import { SourceLifecyclePage } from './source-lifecycle.page.js';
 import type { Locator, Page } from '@playwright/test';
@@ -43,6 +45,8 @@ import { ResourceScopesPage } from './resource-scopes.page.js';
 import { GovernedExtensionInventoryPage } from './governed-extension-inventory.page.js';
 
 export class ProductPages {
+  public readonly sourceComposition: SourceCompositionPage;
+  public readonly sourcePolicies: SourcePoliciesPage;
   public readonly governedExtensionInventory: GovernedExtensionInventoryPage;
   public readonly governedKnowledge: GovernedKnowledgePage;
   public readonly resourceScopes: ResourceScopesPage;
@@ -86,6 +90,8 @@ export class ProductPages {
   public readonly scopedFlowDesigner: ScopedFlowDesignerPage;
 
   public constructor(public readonly page: Page) {
+    this.sourceComposition = new SourceCompositionPage(page);
+    this.sourcePolicies = new SourcePoliciesPage(page);
     this.governedExtensionInventory = new GovernedExtensionInventoryPage(page);
     this.governedKnowledge = new GovernedKnowledgePage(page);
     this.resourceScopes = new ResourceScopesPage(page);

@@ -1,0 +1,7 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../samples/LocalStorage/LocalStorage.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+</Project>

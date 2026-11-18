@@ -1,0 +1,71 @@
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject ConsoleContextState Context
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<fieldset @ref="element" class="form-section flow-transformation-creator" disabled="@(creating || ReadOnly)" data-testid="flow-transformation-creator">
+    <legend>@T("SequenceCreate")</legend>
+    @if (createdUrl is null)
+    {
+        <p>@T("SequenceCreateHelp")</p>
+        <div class="form-grid">
+            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameTestId="flow-transformation-display-name" TechnicalNameTestId="flow-transformation-name" />
+        </div>
+        @if (error is not null) { <p role="alert">@error</p> }
+        <div class="form-actions">
+            <button type="button" class="button-secondary" @onclick="() => Close.InvokeAsync()">@T("SequenceCancel")</button>
+            <button type="button" class="button-primary" disabled="@(scope is null || string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(technicalName))" @onclick="CreateAsync" data-action="create-transformation" data-testid="flow-transformation-create">@T("SequenceCreateDraft")</button>
+        </div>
+    }
+    else
+    {
+        <p role="status">@T("SequenceCreated")</p>
+        <a class="button-secondary" href="@createdUrl" target="_blank" rel="noopener noreferrer" data-enhance-nav="false" data-testid="flow-transformation-designer">@T("SequenceOpenDesigner")</a>
+        <button type="button" class="text-button" @onclick="() => Close.InvokeAsync()">@T("SequenceClose")</button>
+    }
+</fieldset>
+
+@code {
+    [Parameter, EditorRequired] public JsonElement InputSchema { get; set; }
+    [Parameter, EditorRequired] public JsonElement OutputSchema { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback Created { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private string displayName = string.Empty, technicalName = string.Empty;
+    private string? error, createdUrl;
+    private ResourceScopeRef? scope;
+    private bool creating;
+    private ElementReference element;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await JS.InvokeVoidAsync("agentstrationDataSources.bindTransformationCreator", element);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await Context.EnsureLoadedAsync(cancellation.Token);
+        if (Context.Current is { } current) scope = ResourceScopeRef.Parse(current.SelectedScopeRef);
+        else error = T("SequenceCreateFailed");
+    }
+    private async Task CreateAsync()
+    {
+        if (creating || ReadOnly || scope is null || createdUrl is not null) return;
+        creating = true; error = null;
+        try
+        {
+            var draft = await Client.CreateDraftAsync(new CreateFlowDraftRequest(technicalName, displayName, Template: "EmptyFlow")
+            { ScopeRef = scope, Transformation = new(InputSchema.Clone(), OutputSchema.Clone()) }, cancellation.Token);
+            createdUrl = $"/flows/{Uri.EscapeDataString(draft.Value.FlowId.Value)}/designer?scopeRef={Uri.EscapeDataString(scope.Value.Value)}&context={Uri.EscapeDataString(scope.Value.Value)}";
+            await Created.InvokeAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = T("SequenceCreateFailed"); }
+        finally { creating = false; }
+        if (createdUrl is not null)
+            try { await JS.InvokeVoidAsync("agentstrationDataSources.openDesigner", Navigation.ToAbsoluteUri(createdUrl).ToString()); }
+            catch (JSException) { /* The visible link also works when a popup is blocked. */ }
+    }
+    private string T(string key) => Localizer[key];
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

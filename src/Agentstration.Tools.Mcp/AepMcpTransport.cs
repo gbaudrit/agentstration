@@ -10,6 +10,10 @@ public sealed class AepMcpTransport(
     IHttpMessageHandlerFactory httpMessageHandlerFactory,
     ILoggerFactory loggerFactory)
 {
+    public HttpClient CreateConfigurationClient(ResolvedAepExtension extension) => CreateHttpClient(
+        McpToolServiceCollectionExtensions.AepClientName, extension.Registration.Definition.Endpoint,
+        extension.AccessTokenProvider, TimeSpan.FromSeconds(30));
+
     public async Task<AepManifest> DiscoverAsync(
         ResolvedAepExtension extension,
         string? expectedExtensionId,
@@ -39,11 +43,17 @@ public sealed class AepMcpTransport(
             extension.AccessTokenProvider,
             cancellationToken);
 
+    public Task<McpClient> ConnectAsync(ResolvedAepExtension extension, AepMcpServerDescriptor server,
+        IReadOnlyDictionary<string, string> protectedHeaders, CancellationToken cancellationToken) => ConnectAsync(
+            AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server), server.Id,
+            extension.AccessTokenProvider, cancellationToken, protectedHeaders);
+
     public Task<McpClient> ConnectAsync(
         Uri endpoint,
         string name,
         IAepAccessTokenProvider? accessTokenProvider,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? protectedHeaders = null)
     {
         var http = CreateHttpClient(
             accessTokenProvider is null
@@ -52,6 +62,8 @@ public sealed class AepMcpTransport(
             endpoint,
             accessTokenProvider,
             TimeSpan.FromSeconds(90));
+        foreach (var header in protectedHeaders ?? new Dictionary<string, string>())
+            http.DefaultRequestHeaders.Add(header.Key, header.Value);
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions { Endpoint = endpoint, Name = name },
             http,

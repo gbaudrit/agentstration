@@ -17,7 +17,7 @@ public sealed class ArtifactContentMaterializationGateway(
     FlowService flows,
     FlowRunService runs,
     ICurrentRequestContext requestContext,
-    TimeProvider timeProvider) : IArtifactContentMaterializationGateway
+    TimeProvider timeProvider, IArtifactMaterializationAdmission? admission = null) : IArtifactContentMaterializationGateway
 {
     private const int PageSize = 200;
     private const int MaximumScannedRuns = 2000;
@@ -30,6 +30,7 @@ public sealed class ArtifactContentMaterializationGateway(
     {
         _ = await artifacts.GetFlowRunArtifactForContentReadAsync(artifactId, true, cancellationToken)
             ?? throw Error("flow_run_artifact_not_found", $"FlowRunArtifact '{artifactId}' was not found.");
+        if (admission is not null) await admission.EnsureAsync(artifactId, cancellationToken);
         var current = Current();
         var flowName = string.IsNullOrWhiteSpace(request.FlowName)
             ? ArtifactPlatformResourceProvisioner.StorageReadFlowName
@@ -65,6 +66,15 @@ public sealed class ArtifactContentMaterializationGateway(
                 Type: "artifact-storage-read",
                 Instruction: $"Materialize durable Artifact '{artifactId}'.",
                 Title: $"Read durable Artifact {artifactId}"), cancellationToken);
+            if (admission is not null)
+            {
+                try { await admission.EnsureAsync(artifactId, cancellationToken); }
+                catch (ArtifactValidationException)
+                {
+                    _ = await runs.CancelAsync(submission.FlowRun.Run.Id, submission.FlowRun.Run.Scope, CancellationToken.None);
+                    throw;
+                }
+            }
             return Snapshot(submission.FlowRun.Run, artifactId);
         }
         catch (ArtifactValidationException) { throw; }

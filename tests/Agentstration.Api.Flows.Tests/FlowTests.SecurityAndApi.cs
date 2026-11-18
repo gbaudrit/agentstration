@@ -699,7 +699,9 @@ public sealed partial class FlowTests
 
         using var missingInput = JsonDocument.Parse("{}");
         using var rejectedRun = await client.PostAsJsonAsync("/api/flows/designer-api-flow/draft/runs", new CreateFlowRunRequest(missingInput.RootElement.Clone()), JsonOptions);
-        Assert.AreEqual(HttpStatusCode.BadRequest, rejectedRun.StatusCode);
+        Assert.AreEqual(HttpStatusCode.UnprocessableEntity, rejectedRun.StatusCode);
+        using var contractFailure = JsonDocument.Parse(await rejectedRun.Content.ReadAsStringAsync());
+        Assert.AreEqual("flow-input", contractFailure.RootElement.GetProperty("contractFailure").GetProperty("boundary").GetString());
 
         using var input = JsonDocument.Parse("""{"prompt":"Review this SQL query"}""");
         using var acceptedRun = await client.PostAsJsonAsync("/api/flows/designer-api-flow/draft/runs", new CreateFlowRunRequest(input.RootElement.Clone()), JsonOptions);

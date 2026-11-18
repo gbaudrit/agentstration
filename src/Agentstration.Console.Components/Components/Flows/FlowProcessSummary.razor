@@ -1,0 +1,30 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
+<details class="process-summary" data-testid="flow-process-summary">
+    <summary><span><strong>@Localizer["ProcessUnits"]</strong> · <a href="@OwnerUrl">@StepName</a></span><span>@(Admission.TotalUnits is { } planned ? Localizer["ProcessProgressKnown", Completed, planned, Active] : Localizer["ProcessProgress", Completed, Admission.Units.Count])</span></summary>
+    <div class="process-summary-body">
+        <div class="process-summary-status"><span>@Localizer[Admission.Closed ? "ProcessClosed" : "ProcessDiscovering"]</span><span>@Localizer["ProcessAttempt", Admission.Attempt]</span></div>
+        @if (Admission.Closed && Admission.Units.Count == 0) { <p class="muted">@Localizer["ProcessEmpty"]</p> }
+        else
+        {
+            @if (Admission.TotalUnits is { } total) { <progress max="@Math.Max(1, total)" value="@Completed" aria-label="@Localizer["ProcessUnits"]"></progress> }
+            else { <progress aria-label="@Localizer["ProcessDiscovering"]"></progress> }
+            <ul>@foreach (var unit in Admission.Units.OrderBy(unit => unit.Ordinal))
+            {
+                var node = Nodes.FirstOrDefault(node => node.FlowRunId == unit.RunId);
+                <li><a href="@FlowRunInspection.RunUrl(unit.RunId, Scope, LogicalScope)">@Localizer["ProcessUnit", unit.Ordinal + 1]</a>@if (unit.Descriptor is not null) { <span>@unit.Descriptor</span> }@if (node?.ActiveStepName is { } activeStep) { <small>@Localizer["ProcessActiveStep"]: @activeStep</small> }<span class="process-unit-status">@(node is null ? Localizer["ProcessAdmitted"].Value : Localizer[$"Status.{node.Status}"].Value)</span></li>
+            }</ul>
+        }
+    </div>
+</details>
+@code {
+    [Parameter, EditorRequired] public FlowProcessAdmission Admission { get; set; } = default!;
+    [Parameter, EditorRequired] public string StepName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string OwnerRunId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public ResourceScopeRef Scope { get; set; }
+    [Parameter] public ResourceScopeRef? LogicalScope { get; set; }
+    [Parameter] public IReadOnlyList<FlowRunCausalityNode> Nodes { get; set; } = [];
+    private string OwnerUrl => FlowRunInspection.RunUrl(OwnerRunId, Scope, LogicalScope, StepName);
+    private int Active => Admission.Units.Count(unit => Nodes.Any(node => node.FlowRunId == unit.RunId && node.Status == FlowRunStatus.Running));
+    private int Completed => Admission.Units.Count(unit => Nodes.Any(node => node.FlowRunId == unit.RunId && node.Status.IsTerminal()));
+}

@@ -267,10 +267,12 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(workspace, savedSecret.Resource.Definition.UsePolicy.Grants.Single().ScopeRef);
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
         {
-            _ = await factory.Services.GetRequiredService<IResourceAccessPolicyService>().PutAsync(
+            var accessPolicies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+            _ = await accessPolicies.PutAsync(
                 new(new(savedSecret.Resource.Uid, tenant, savedSecret.Resource.Namespace,
                         savedSecret.Resource.Kind, savedSecret.Resource.Generation),
-                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                    [new(workspace, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]),
+                (await accessPolicies.GetAsync(savedSecret.Resource.Uid, default))?.ETag, default);
         }
         SelectConsoleContext(client, workspace);
         var visibleAfterGrant = await client.GetFromJsonAsync<SecretResponse[]>("/api/secrets");
@@ -595,8 +597,9 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ResourceScopeRef.Instance, revision.Value.Definition.RuntimeProfilePin?.ScopeRef);
         Assert.AreEqual("maf-builtin", revision.Value.Definition.RuntimeProfilePin?.Name);
 
+        StoredResource<ModelProfileResource> updatedProfile;
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
-            _ = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
+            updatedProfile = await profiles.PutAsync(profile.Value.Namespace, profile.Value.Name, tenantScope,
                 profile.Value.Definition with { Description = "Generation two" }, profile.ETag, default);
         var staleAgent = agent with
         {
@@ -604,6 +607,17 @@ public sealed class ResourceScopeApiTests : ModelManagementApiTestBase
         };
         await Assert.ThrowsExactlyAsync<ModelProfileValidationException>(async () =>
             await agents.PutAgentAsync(staleAgent, null, true, default));
+
+        // Renew the explicit generation pin before testing the independent provider Use denial.
+        using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushTenantAdministration(context))
+        {
+            var currentProfilePolicy = await policies.GetAsync(profile.Value.Uid, default);
+            Assert.IsNotNull(currentProfilePolicy);
+            _ = await policies.PutAsync(currentProfilePolicy.Policy with
+            {
+                Resource = currentProfilePolicy.Policy.Resource with { Generation = updatedProfile.Value.Generation }
+            }, currentProfilePolicy.ETag, default);
+        }
 
         using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(context))
         {

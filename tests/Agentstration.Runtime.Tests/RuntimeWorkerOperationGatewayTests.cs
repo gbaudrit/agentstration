@@ -4,6 +4,7 @@ using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.ModelProviders;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -162,6 +163,42 @@ public sealed class RuntimeWorkerOperationGatewayTests
         Assert.IsFalse(logger.Message.Contains("private-tool-argument", StringComparison.Ordinal));
         Assert.IsFalse(logger.Message.Contains("private-inner-detail", StringComparison.Ordinal));
         Assert.IsNull(logger.Exception);
+    }
+
+    [TestMethod]
+    [DataRow("\"\"", "tool_argument_minimum_length")]
+    [DataRow("42", "tool_argument_type_invalid")]
+    public async Task InvalidKnowledgeSelectorsProduceGovernedContractFailures(string selectorJson, string code)
+    {
+        var scopes = new RecordingRequestContextScopes();
+        var gateway = new RuntimeWorkerOperationGateway(null!, new ValidatingKnowledgePipeline(), null!, null!, null!,
+            null!, null!, null!, null!, TimeProvider.System, scopes, NullLogger<RuntimeWorkerOperationGateway>.Instance);
+        var tool = new RuntimeExecutionToolMaterial("status-tool", ResourceNamespace.Default, "Knowledge status", null,
+            KnowledgeAccessSchemas.Envelope(KnowledgeSourceOperation.GetStatus), null, false, "provider", ResourceNamespace.Default, "external");
+        var arguments = JsonSerializer.SerializeToElement(new
+        {
+            source = new { name = "private-source-name", @namespace = "default", scopeRef = "/instance", uid = Guid.NewGuid() },
+            request = new { snapshotId = JsonSerializer.Deserialize<JsonElement>(selectorJson) }
+        });
+        var request = new RuntimeGovernedToolRequest(Agent(), tool, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            null, Guid.NewGuid(), new WorkspaceId(Guid.NewGuid()), Guid.NewGuid(), "runtime-run", arguments, null);
+
+        var failure = await Assert.ThrowsExactlyAsync<RuntimeGovernedOperationException>(() => gateway.InvokeToolAsync(request, default));
+
+        Assert.AreEqual(code, failure.Code);
+        Assert.AreEqual("$.request.snapshotId", failure.ContractFailure?.Path);
+        Assert.AreEqual("tool-input", failure.ContractFailure?.Boundary);
+        Assert.DoesNotContain("private-source-name", JsonSerializer.Serialize(failure.ContractFailure));
+        Assert.AreEqual(ControlPlaneAccessMode.Unavailable, scopes.AccessMode);
+    }
+
+    private sealed class ValidatingKnowledgePipeline : IToolExecutionPipeline
+    {
+        public ValueTask<JsonElement?> ExecuteAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            ToolInputSchemaValidator.Validate(KnowledgeAccessSchemas.Envelope(KnowledgeSourceOperation.GetStatus), context.Arguments!.Value);
+            return ValueTask.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { state = "ready" }));
+        }
     }
 
     private sealed class FailingToolPipeline : IToolExecutionPipeline

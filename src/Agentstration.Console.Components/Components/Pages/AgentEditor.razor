@@ -103,6 +103,16 @@ else
                             Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
                     </InputContent>
                     <OutputContent>
+                        <p class="muted">@T("OutputInstructionHelp")</p>
+                        <label>@T("OutputResolution")
+                            <select disabled="@(model.OutputSchema is not null || model.OutputSchemaBinding is not null)" value="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic ? model.OutputContract.Source : model.OutputSchema is not null || model.OutputSchemaBinding is not null || model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Fixed ? "fixed" : "absent")" @onchange="UpdateOutputResolution">
+                                <option value="fixed" disabled>@T("OutputResolution.Fixed")</option>
+                                <option value="absent">@T("OutputResolution.Absent")</option>
+                                <option value="input">@T("OutputResolution.Input")</option>
+                                <option value="parent">@T("OutputResolution.Parent")</option>
+                            </select>
+                        </label>
+                        <label>@T("OutputMediaType")<input disabled="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic)" value="@model.OutputContract?.MediaType" @onchange="UpdateOutputMediaType" /></label>
                         <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
                             Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
                     </OutputContent>
@@ -434,12 +444,25 @@ else
         }
         return Task.CompletedTask;
     }
+    private void UpdateOutputMediaType(ChangeEventArgs args)
+    {
+        if (model is null) return;
+        var media = args.Value?.ToString();
+        model.OutputContract = string.IsNullOrWhiteSpace(media) ? null : new() { Mode = Agentstration.Schemas.DataContractMode.Fixed, MediaType = media.Trim() };
+    }
+    private void UpdateOutputResolution(ChangeEventArgs args)
+    {
+        if (model is null) return;
+        model.OutputContract = args.Value?.ToString() is "input" or "parent"
+            ? new() { Mode = Agentstration.Schemas.DataContractMode.Dynamic, Source = args.Value.ToString()! } : null;
+    }
     private Task UpdateAgentOutputSchemaAsync(SchemaBindingEditorValue value)
     {
         if (model is not null)
         {
             model.OutputSchemaBinding = value.Binding;
             model.OutputSchema = value.EffectiveContent?.Clone();
+            if (model.OutputSchema is not null) model.OutputContract = null;
             isDirty = true;
         }
         return Task.CompletedTask;

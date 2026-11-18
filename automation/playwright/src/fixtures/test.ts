@@ -5,6 +5,7 @@ import { isActionableAssetResponse, isActionableConsoleError, isActionableFirstP
 
 interface AgentstrationWorkerFixtures {
   product: ProductHosts;
+  sourcePolicyFixture: boolean;
   acquisitionFailureFixture: boolean;
   governedInventoryFixture: boolean;
   organizationStructureFixture: boolean;
@@ -19,17 +20,18 @@ interface AgentstrationTestFixtures {
 export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFixtures>({
   authenticationMode: ['Development', { option: true, scope: 'worker' }],
   aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
+  sourcePolicyFixture: [false, { option: true, scope: 'worker' }],
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
   governedInventoryFixture: [false, { option: true, scope: 'worker' }],
   organizationStructureFixture: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture }, use) => {
+  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture);
     try {
       await use(product);
     } finally {

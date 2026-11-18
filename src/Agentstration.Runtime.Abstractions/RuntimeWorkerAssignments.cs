@@ -26,10 +26,14 @@ public sealed record RuntimeAssignmentAttempt
     public Guid? TerminalEventId { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? ErrorDetails { get; init; }
 }
 
 public sealed record RuntimeWorkerAssignment
 {
+    public bool TransientPayloads { get; init; }
+    public string? TransientPayloadTicket { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public bool TransientPayloadsAvailable { get; init; } = true;
     public required WorkspaceId WorkspaceId { get; init; }
     public ResourceScopeRef? ScopeRef { get; init; }
     public ResourceScopeRef ExecutionScopeRef => ScopeRef ?? ResourceScopeRef.Workspace(WorkspaceId.Value);
@@ -168,7 +172,8 @@ public sealed record RuntimeAssignmentTerminalCommand(
     Guid EventId,
     string? Response = null,
     string? Error = null,
-    string? ErrorCode = null);
+    string? ErrorCode = null,
+    string? ErrorDetails = null);
 
 public static class RuntimeAssignmentErrorCodes
 {

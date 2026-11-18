@@ -1,12 +1,18 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agentstration.ConnectedServices.Contracts;
+using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.DataSources.Contracts;
 
 public static class DataSourceResourceKinds
 {
     public const string DataSource = "DataSource";
+    public const string DataSourceQuery = "DataSourceQuery";
+    public const string DataSourceQueryVersion = "DataSourceQueryVersion";
     public const string DataSourceProfile = "DataSourceProfile";
     public const string DataSourceProfileRevision = "DataSourceProfileRevision";
     public const string DataSourceAcquisition = "DataSourceAcquisition";
@@ -84,8 +90,51 @@ public sealed record DataSourceProperties
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public bool Enabled { get; init; } = true;
-    public required ResourceReference Profile { get; init; }
+    public ResourceReference? Profile { get; init; }
     public JsonElement Configuration { get; init; } = JsonSerializer.SerializeToElement(new { });
+    public DataSourceDatasetProperties? Dataset { get; init; }
+}
+
+public sealed record DataSourceOperationAcquisitionBinding(
+    ConnectedServiceOperationRevisionReference Operation, JsonElement Parameters)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? OutputSchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
+}
+
+/// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
+public sealed record DataSourceDatasetProperties(
+    StorageRevisionReference? Storage, StorageContentPolicy Rule,
+    DataSourceOperationAcquisitionBinding Acquisition)
+{
+    /// <summary>Explicit structured acquisition target; null retains the content profile.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? DocumentCollectionUid { get; init; }
+    public DataSourceAcquisitionPolicy? Lifecycle { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBinding? OutputSchemaBinding { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
+    public FlowCallReference? Orchestration { get; init; }
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; }
+        = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
+}
+
+public sealed record ResolvedDataSourceDataset(
+    DataSourceDatasetProperties Definition, ConnectedServiceOperationResource Operation,
+    ConnectedServiceOperationTypeVersionDescriptor OperationType,
+    JsonElement InputSchema, JsonElement OutputSchema, string Partition,
+    ResolvedDataSourceFlowBinding Flow)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? OperationOutputSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
+    public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
+    public ResolvedFlowComposition? Composition { get; init; }
 }
 
 public sealed record DataSourceResource : Resource
@@ -171,7 +220,11 @@ public sealed record DataSourceReadiness(
     ResolvedDataSourceProfile? Profile,
     IReadOnlyList<string> Issues,
     ResolvedDataSourceFlowBinding? Acquisition = null,
-    ResolvedDataSourceFlowBinding? Discovery = null);
+    ResolvedDataSourceFlowBinding? Discovery = null)
+{
+    public ResolvedDataSourceDataset? Dataset { get; init; }
+    public bool CanAcquire { get; init; }
+}
 
 public sealed record CreateDataSourceProfileRequest(
     string Name,
@@ -354,13 +407,24 @@ public sealed record DataSourceAcquisitionInput
 
 public sealed record DataSourceAcquisitionResource : Resource
 {
+    public Agentstration.Schemas.ResolvedDataContract? RecordContract { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }
     public required string DataSourceName { get; init; }
     public required ResourceNamespace DataSourceNamespace { get; init; }
     public required long DataSourceGeneration { get; init; }
     public DataSourceAcquisitionTargetResource? Target { get; init; }
-    public required ResolvedDataSourceAcquisitionComposition Composition { get; init; }
+    public ResolvedDataSourceAcquisitionComposition? Composition { get; init; }
+    public ResolvedDataSourceDataset? Dataset { get; init; }
+    public StorageObject? Content { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public StoragePublicationReference? Publication { get; init; }
+    public DirectDataSourceResult? DirectResult { get; init; }
+    public DateTimeOffset? ContentRetiredAt { get; init; }
+    public DateTimeOffset? ContentRetiringAt { get; init; }
+    public bool ContentRetirementPending { get; init; }
+    public IReadOnlyDictionary<string, DateTimeOffset> ProjectionLeases { get; init; } = new Dictionary<string, DateTimeOffset>();
+    public DateTimeOffset? WriteNotAfter { get; init; }
     public required string FlowRunId { get; init; }
     public required DataSourceAcquisitionState State { get; init; }
     public required string CorrelationId { get; init; }
@@ -377,6 +441,7 @@ public sealed record DataSourceAcquisitionResource : Resource
     public int Attempt { get; init; } = 1;
     public string? RetriedFrom { get; init; }
     public DataSourceAcquisitionManifest? Manifest { get; init; }
+    public Agentstration.Schemas.DataContractFailure? ContractFailure { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Schemas;
 
 namespace Agentstration.Flows;
 
@@ -12,6 +13,8 @@ public static class FlowRunStatusExtensions
 public sealed class FlowValidationException(string code, string message) : ArgumentException(message)
 {
     public string Code { get; } = code;
+    public DataContractFailure? ContractFailure { get; init; }
+    public FlowCompositionDiagnostic? CompositionDiagnostic { get; init; }
 }
 
 public static class FlowValidator

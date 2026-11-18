@@ -53,7 +53,7 @@ internal static class RuntimeWorkerAssignmentModel
 }
 
 public sealed class SqliteRuntimeWorkerAssignmentStore(
-    IDbContextFactory<RuntimeRunDbContext> contextFactory) : IRuntimeWorkerAssignmentStore
+    IDbContextFactory<RuntimeRunDbContext> contextFactory, IRuntimeAssignmentPayloadPersistence? payloads = null) : IRuntimeWorkerAssignmentStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -490,6 +490,7 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
             CompletedAt = completedAt,
             TerminalEventId = command.EventId,
             ErrorCode = cancelled ? null : command.ErrorCode,
+            ErrorDetails = cancelled ? null : command.ErrorDetails,
             ErrorMessage = cancelled ? null : command.Error
         };
         assignment = assignment with
@@ -609,13 +610,15 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         return results;
     }
 
-    private static RuntimeWorkerAssignment ValidateOwnership(
+    private RuntimeWorkerAssignment ValidateOwnership(
         RuntimeWorkerAssignmentDocument document,
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest,
         DateTimeOffset observedAt)
     {
         var assignment = Deserialize(document).Value;
+        if (assignment.TransientPayloads && !assignment.TransientPayloadsAvailable)
+            throw new RuntimeAssignmentException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
         var attempt = assignment.CurrentAttempt;
         if (assignment.State != RuntimeAssignmentState.Assigned || attempt is null || attempt.State != RuntimeAssignmentAttemptState.Active
             || attempt.Id != proof.AttemptId || attempt.WorkerId != proof.WorkerId || attempt.WorkerSessionId != proof.WorkerSessionId)
@@ -681,7 +684,7 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
     private static bool NullableJsonEquals(JsonElement? left, JsonElement? right) =>
         left.HasValue == right.HasValue && (!left.HasValue || JsonElement.DeepEquals(left.Value, right!.Value));
 
-    private static void ValidateTerminalReplay(
+    private void ValidateTerminalReplay(
         RuntimeWorkerAssignmentDocument document,
         RuntimeAssignmentOwnershipProof proof,
         byte[] ownershipTokenDigest)
@@ -775,7 +778,7 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         });
     }
 
-    private static void Apply(RuntimeWorkerAssignmentDocument document, RuntimeWorkerAssignment assignment, string? digest, DateTimeOffset? leaseExpiresAt)
+    private void Apply(RuntimeWorkerAssignmentDocument document, RuntimeWorkerAssignment assignment, string? digest, DateTimeOffset? leaseExpiresAt)
     {
         var etag = NewETag();
         document.State = assignment.State.ToString();
@@ -785,12 +788,12 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         document.ActiveWorkerId = activeAttempt?.WorkerId.Value;
         document.ActiveWorkerSessionId = activeAttempt?.WorkerSessionId.Value;
         document.OwnershipTokenDigest = digest;
-        document.Payload = JsonSerializer.Serialize(assignment, JsonOptions);
+        document.Payload = JsonSerializer.Serialize(payloads?.Store(assignment) ?? assignment, JsonOptions);
         document.ETag = etag;
         document.UpdatedAt = assignment.UpdatedAt.UtcTicks;
     }
 
-    private static RuntimeWorkerAssignmentDocument ToDocument(RuntimeWorkerAssignment assignment, string etag, string? digest) => new()
+    private RuntimeWorkerAssignmentDocument ToDocument(RuntimeWorkerAssignment assignment, string etag, string? digest) => new()
     {
         ScopeRef = assignment.ExecutionScopeRef.Value,
         WorkspaceId = assignment.WorkspaceId.Value,
@@ -806,17 +809,17 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         ActiveWorkerId = assignment.State == RuntimeAssignmentState.Assigned ? assignment.CurrentAttempt?.WorkerId.Value : null,
         ActiveWorkerSessionId = assignment.State == RuntimeAssignmentState.Assigned ? assignment.CurrentAttempt?.WorkerSessionId.Value : null,
         OwnershipTokenDigest = digest,
-        Payload = JsonSerializer.Serialize(assignment, JsonOptions),
+        Payload = JsonSerializer.Serialize(payloads?.Store(assignment) ?? assignment, JsonOptions),
         ETag = etag,
         CreatedAt = assignment.CreatedAt.UtcTicks,
         UpdatedAt = assignment.UpdatedAt.UtcTicks
     };
 
-    private static StoredRuntimeWorkerAssignment Deserialize(RuntimeWorkerAssignmentDocument document)
+    private StoredRuntimeWorkerAssignment Deserialize(RuntimeWorkerAssignmentDocument document)
     {
         var assignment = JsonSerializer.Deserialize<RuntimeWorkerAssignment>(document.Payload, JsonOptions)
             ?? throw new InvalidOperationException($"Stored Runtime Worker assignment '{document.AssignmentId}' is invalid.");
-        return new StoredRuntimeWorkerAssignment(assignment, document.ETag);
+        return new StoredRuntimeWorkerAssignment(payloads?.Restore(assignment) ?? assignment, document.ETag);
     }
 
     private static RuntimeRunState ToRunState(RuntimeAssignmentState state) => state switch

@@ -37,4 +37,11 @@
   <data name="Trigger.Flow"><value>Flow</value></data>
   <data name="Trigger.Schedule"><value>Planification</value></data>
   <data name="Trigger.Event"><value>Événement</value></data>
+  <data name="ProcessRun" xml:space="preserve"><value>Process de {0} — Unité {1}</value></data>
+  <data name="SourceFlow" xml:space="preserve"><value>Flow source</value></data>
+  <data name="ExecutionKind" xml:space="preserve"><value>Type d’exécution</value></data>
+  <data name="NamedRuns" xml:space="preserve"><value>Appels de Flow et historique</value></data>
+  <data name="ProcessRuns" xml:space="preserve"><value>Unités de process</value></data>
+  <data name="AllRunKinds" xml:space="preserve"><value>Toutes les exécutions</value></data>
+  <data name="InvalidExecutionScope" xml:space="preserve"><value>Le périmètre d’exécution est invalide.</value></data>
 </root>
