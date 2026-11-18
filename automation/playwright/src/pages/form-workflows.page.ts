@@ -16,11 +16,11 @@ export class FormWorkflowsPage {
       expect(response.ok()).toBe(true);
       return (await response.json()).value.definition.transitions as { id: string; priority?: number | null }[];
     };
-    await expect.poll(async () => (await read()).find(value => value.id === 'input-completed-completed')?.priority).toBe(7);
+    await expect.poll(async () => (await read()).find(value => value.id === 'input-completed-decision')?.priority).toBe(7);
     const before = await read();
     await priority.fill('42');
     await this.fields.clearField(priority, locale);
-    await expect.poll(async () => (await read()).find(value => value.id === 'input-completed-completed')?.priority ?? null).toBeNull();
+    await expect.poll(async () => (await read()).find(value => value.id === 'input-completed-decision')?.priority ?? null).toBeNull();
     const after = await read();
     expect(after.map(value => value.id)).toEqual(before.map(value => value.id));
     await this.fields.assertWithinViewport();

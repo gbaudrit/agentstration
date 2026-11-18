@@ -23,7 +23,7 @@ export const exerciseFormWorkflow: Journey<ExerciseFormWorkflowInput> = async (c
       break;
     case 'flow-inspector': {
       const name = await context.pages.flowDesigner.createResponsiveDraftAndOpen(context.consoleUrl);
-      await context.pages.flowDesigner.selectTransition('input —completed→ completed');
+      await context.pages.flowDesigner.selectTransition('input —completed→ decision');
       await forms.exerciseTransitionPriority(context.consoleUrl, name, input.locale);
       break;
     }
