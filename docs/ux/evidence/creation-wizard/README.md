@@ -1,6 +1,6 @@
 # Data Source creation Wizard — real application evidence
 
-These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `861f95347c1593372cd8323495dd4c0af381ea8d`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
+These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `0a4f46e030445167c187fd3011781d51971b920e`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
 
 ## Capture matrix
 
@@ -23,6 +23,7 @@ Mobile viewport images show the actual first viewport. Additional full-document 
 The capture wrapper reuses the existing `SourcePoliciesPage.exerciseLifecycle` journey with the deterministic Source policy fixture. It does not introduce a permanent test scenario or a new production route. The fixture uses disposable local Development data; no live model or external Storage service is required.
 
 - All six creation steps and the incomplete review render in both matrix cells; the product theme is asserted after language preference persistence.
+- Step numbers and titles stay on one line, with a fixed trailing status slot. Browser assertions check the vertical centers of the number, title and status through mixed completion states.
 - Only one content pane is active. Focus moves to its region after navigation. Horizontal overflow is checked at every forward transition.
 - Header navigation and Continue work with incomplete fields. Missing identity/operation/Storage are marked separately in the banner; optional empty sections remain complete.
 - Attempting creation with missing identity, missing Storage or incompatible direct-input freshness/history returns to the first incomplete section, exposes the localized error and leaves the resource absent from the API.
