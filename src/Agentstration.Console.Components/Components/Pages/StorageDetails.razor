@@ -54,7 +54,7 @@ else
             </section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("Dependents.Help")</p>
                 @if (usages.Count == 0) { <p>@T("NoDependents")</p> }
-                else { <ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="layers"><Badges><span>@usage.Kind</span></Badges></CollectionIdentity></li> }</ul> }
+                else { <ul class="resource-links">@foreach (var usage in usages) { var usageIdentity = StorageLinks.UsageIdentity(usage); <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usageIdentity.Namespace" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="layers"><IconBadges>@if (usageIdentity.ScopeRef is { } usageScope) { <ResourceScopeBadge ScopeRef="usageScope" IconOnly /> }</IconBadges><Badges><span>@usage.Kind</span></Badges></CollectionIdentity></li> }</ul> }
                 <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="/data-sources">@T("DataSources")</a><a href="/knowledge-sources">@T("KnowledgeSources")</a></nav>
             </section>
         }

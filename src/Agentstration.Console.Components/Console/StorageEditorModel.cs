@@ -3,6 +3,7 @@ using Agentstration.ConnectedServices.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Agentstration.Web.Console;
 
@@ -98,6 +99,29 @@ public sealed record StorageTypeChoice(StorageTypeResource Resource, StorageType
 public static class StorageLinks
 {
     public static string FromApi(string url) => url.StartsWith("/api/storages/", StringComparison.Ordinal) ? url[4..] : url;
+
+    // Usage URLs are already authorized by their family provider. Only expose metadata
+    // explicitly present in that local destination; absent values remain unknown.
+    public static (string? Namespace, ResourceScopeRef? ScopeRef) UsageIdentity(StorageUsage usage)
+    {
+        var url = usage.Url;
+        if (!url.StartsWith('/') || url.StartsWith("//", StringComparison.Ordinal)
+            || url.Contains('\\') || url.Any(char.IsControl)) return (null, null);
+        var question = url.IndexOf('?');
+        if (question < 0) return (null, null);
+        var fragment = url.IndexOf('#');
+        if (fragment >= 0 && fragment < question) return (null, null);
+        var query = QueryHelpers.ParseQuery(fragment < 0 ? url[question..] : url[question..fragment]);
+        string? resourceNamespace = null;
+        if (query.TryGetValue("namespace", out var values) && values.Count == 1 && !string.IsNullOrWhiteSpace(values[0]))
+        {
+            try { resourceNamespace = ResourceNamespace.Parse(values[0]).Value; }
+            catch (ArgumentException) { }
+        }
+        ResourceScopeRef? scope = query.TryGetValue("scopeRef", out var scopes) && scopes.Count == 1
+            && ResourceScopeRef.TryParse(scopes[0], out var parsed) ? parsed : null;
+        return (resourceNamespace, scope);
+    }
 
     public static ScopedResourceAddress Address(StorageResource resource) =>
         ScopedResourceAddress.Create(resource.ScopeRef!.Value, resource.Namespace, StorageResourceKinds.Storage, resource.Name);

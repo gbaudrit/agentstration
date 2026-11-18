@@ -43,7 +43,7 @@ else
             </dl></section>
             <section class="panel form-section"><h2>@T("Usages")</h2><p>@T("Type.UsagesHelp")</p>
                 @if (usages.Count == 0) { <p>@T("NoUsages")</p> }
-                <ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="database" data-testid="storage-type-usage" /></li> }</ul>
+                <ul class="resource-links">@foreach (var usage in usages) { var usageIdentity = StorageLinks.UsageIdentity(usage); <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usageIdentity.Namespace" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="database" data-testid="storage-type-usage"><IconBadges>@if (usageIdentity.ScopeRef is { } usageScope) { <ResourceScopeBadge ScopeRef="usageScope" IconOnly /> }</IconBadges></CollectionIdentity></li> }</ul>
             </section>
         }
         else if (activeTab == DetailsTab.Definition)

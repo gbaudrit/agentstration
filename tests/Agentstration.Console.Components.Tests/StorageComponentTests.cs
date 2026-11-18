@@ -416,6 +416,35 @@ public sealed class StorageComponentTests
         Assert.AreEqual("evidence/documents", page.Find("li[data-testid=storage-row] .copyable-value code").TextContent);
     }
 
+    [TestMethod]
+    public void UsageHomonymsExposeOnlyExplicitAuthorizedNamespaceAndOwnerMetadata()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        StorageUsage[] usages = [
+            new("Storage", "documents", "Documents", $"/storages/documents?namespace=first&scopeRef={Uri.EscapeDataString(tenant.Value)}"),
+            new("Storage", "documents", "Documents", $"/storages/documents?namespace=second&scopeRef={Uri.EscapeDataString(workspace.Value)}")
+        ];
+        var client = new StorageClient { Usages = usages };
+        using var context = Setup(client);
+        Navigate(context, Resource());
+        var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
+        page.WaitForAssertion(() => Assert.HasCount(2, page.FindAll(".resource-links li")));
+        var rows = page.FindAll(".resource-links li");
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            Assert.AreEqual(usages[index].Url, row.QuerySelector("a.resource-name-link")!.GetAttribute("href"));
+            Assert.AreEqual(index == 0 ? "first/documents" : "second/documents", row.QuerySelector(".copyable-value code")!.GetAttribute("title"));
+            Assert.AreEqual(index == 0 ? "T" : "W", row.QuerySelector(".scope-letter")!.TextContent);
+            StringAssert.StartsWith(row.QuerySelector(".resource-owner-icon button")!.GetAttribute("aria-label")!, index == 0 ? "Tenant" : "Workspace");
+            Assert.IsNull(row.QuerySelector(".managed-resource-badge"));
+            Assert.IsNull(row.QuerySelector(".status-icon-only"));
+        }
+        Assert.AreEqual(1, client.UsageCalls);
+    }
+
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
@@ -442,6 +471,9 @@ public sealed class StorageComponentTests
     }
     private sealed class StorageClient : IStoragesClient
     {
+        public IReadOnlyList<StorageUsage> Usages { get; init; } = [];
+        public int UsageCalls { get; private set; }
+
         public bool TypeUseDenied { get; init; }
         public bool TypeEnabled { get; init; } = true;
         public StorageAvailability TypeAvailability { get; init; } = StorageAvailability.Ready;
@@ -466,7 +498,7 @@ public sealed class StorageComponentTests
         public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult<IReadOnlyList<StorageResource>>([Resource()]); }
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Workspace", true)]);
         public Task<ResourceSnapshot<StorageResource>> GetAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult(new ResourceSnapshot<StorageResource>(Resource(), "\"revision-4\""));
-        public Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult<IReadOnlyList<StorageUsage>>([]);
+        public Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
         public Task<ResourceSnapshot<StorageResource>> CreateAsync(CreateStorageRequest body, CancellationToken token) { Created = body; return Result(); }
         public Task<ResourceSnapshot<StorageResource>> UpdateAsync(ScopedResourceAddress address, PutStorageRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; LastAddress = address; return Result(); }
         public Task<ResourceSnapshot<StorageResource>> ReconcileAsync(ScopedResourceAddress address, ReconcileStorageRequest body, string etag, CancellationToken token) { Reconciles++; Reconciled = body; LastEtag = etag; LastAddress = address; return Result(); }
