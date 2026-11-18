@@ -267,6 +267,7 @@
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Web/">
+    <Project Path="tests/Agentstration.AppHost.Tests/Agentstration.AppHost.Tests.csproj" />
     <Project Path="tests/Agentstration.Http.Diagnostics.Tests/Agentstration.Http.Diagnostics.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />

@@ -4,6 +4,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs.Contracts;
@@ -121,6 +122,7 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = 2,
+            [typeof(IBootstrapContributionResourceResolver)] = 4,
             [typeof(IBootstrapResourceHandler)] = 24,
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = 6,
             [typeof(IPackResourceHandler)] = 11,

@@ -35,8 +35,13 @@ services:
       LocalAI__ApiKey: ${LOCALAI_API_KEY:-}
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://localai-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
     volumes:
       - aep-localai-key:/run/aep-key:ro
+      - aep-localai-state:/var/lib/aep
 
   utilities-extension:
     build:
@@ -48,8 +53,13 @@ services:
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://utilities-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
     volumes:
       - aep-utilities-key:/run/aep-key:ro
+      - aep-utilities-state:/var/lib/aep
     depends_on:
       aep-key-provisioner:
         condition: service_completed_successfully
@@ -68,6 +78,7 @@ services:
       - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      AllowedHosts: localhost;127.0.0.1;[::1];agentstration
       AI__Provider: ${AI_PROVIDER:-Managed}
       Data__Directory: /data
       Data__ControlPlanePath: /data/control-plane.db
@@ -100,3 +111,5 @@ volumes:
   localai-data:
   aep-localai-key:
   aep-utilities-key:
+  aep-localai-state:
+  aep-utilities-state:

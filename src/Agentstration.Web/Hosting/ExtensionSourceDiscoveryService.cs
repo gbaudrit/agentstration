@@ -6,8 +6,8 @@ using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
@@ -45,6 +45,7 @@ public sealed class ExtensionSourceDiscoveryService(
     public async Task<string> ProvisionAsync(
         AepEnrollmentAnnouncement announcement,
         ResourceScopeRef targetScopeRef,
+        bool automatic,
         CancellationToken cancellationToken)
     {
         var section = configuration.GetSection($"Agentstration:Extensions:{announcement.Extension.Id}");
@@ -76,9 +77,12 @@ public sealed class ExtensionSourceDiscoveryService(
                 || candidate.Value.Definition.ExpectedExtensionId != announcement.Extension.Id))
                 throw new AepEnrollmentException("registration_conflict", "The installation registration identity conflicts with an existing connection.", 409);
         }
+        var registration = await registrations.GetExactAsync(targetScopeRef, ResourceNamespace.Default, name, cancellationToken);
+        if (automatic && registration is not null && !registration.Value.Definition.Enabled)
+            throw new AepEnrollmentException("registration_disabled", "The existing registration is disabled; enrollment cannot enable it automatically.", 409);
         var source = new ExtensionSource(
             name,
-            section["DisplayName"] ?? announcement.Extension.Name,
+            InstallationValue(section, announcement.InstanceId, "DisplayName") ?? announcement.Extension.Name,
             announcement.Endpoint,
             announcement.Extension.Id,
             ExtensionRegistrationSource.Configuration,

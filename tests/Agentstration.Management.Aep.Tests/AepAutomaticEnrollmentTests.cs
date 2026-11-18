@@ -1,4 +1,5 @@
 using Agentstration.Aep.Abstractions;
+using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
@@ -50,6 +51,49 @@ public sealed partial class AepEnrollmentTests
             await automatic.ProcessPendingAsync(default);
             Assert.AreEqual(AepEnrollmentState.Unpaired, (await service.ListAsync(context, default))
                 .Single(value => value.Definition.InstanceId == announcement.InstanceId).Definition.State);
+        }
+        finally { File.Delete(keyPath); }
+    }
+
+    [TestMethod]
+    public async Task AutomaticEnrollmentDoesNotReenableADisabledLegacyRegistration()
+    {
+        var keyPath = Path.GetTempFileName();
+        const string key = "legacy-disabled-registration-disposable-test-key";
+        await File.WriteAllTextAsync(keyPath, key);
+        try
+        {
+            await using var factory = EnrollmentFactory().WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Agentstration:Aep:Enrollment:AutoEnrollmentLevel", "/instance");
+                builder.UseSetting("Agentstration:Extensions:extension.automatic:EnrollmentMode", "SharedKeyFile");
+                builder.UseSetting("Agentstration:Extensions:extension.automatic:SharedKeyFile:Path", keyPath);
+                builder.UseSetting("Agentstration:Extensions:extension.automatic:RegistrationName", "legacy-registration");
+                builder.ConfigureServices(services => services.RemoveAll<IAepEnrollmentResourceProvisioner>());
+            });
+            var context = await GetBootstrapContextAsync(factory);
+            var announcement = AutomaticAnnouncement();
+            using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+            var registrations = factory.Services.GetRequiredService<ExtensionRegistrationManagementService>();
+            var existing = await registrations.SynchronizeAsync("legacy-registration", new()
+            {
+                DisplayName = "Disabled legacy connection",
+                Endpoint = announcement.Endpoint,
+                ExpectedExtensionId = announcement.Extension.Id,
+                Enabled = false,
+                Source = ExtensionRegistrationSource.Configuration
+            }, default);
+            var enrollment = factory.Services.GetRequiredService<AepEnrollmentService>();
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            _ = await enrollment.AnnounceAsync(announcement, new(timestamp,
+                AepEnrollmentProofs.Sign(announcement, timestamp, key)), default);
+            await factory.Services.GetRequiredService<AepAutomaticEnrollmentService>().ProcessPendingAsync(default);
+            var request = (await enrollment.ListAsync(context, default)).Single(value => value.Definition.InstanceId == announcement.InstanceId);
+            Assert.AreEqual(AepEnrollmentState.VerificationFailed, request.Definition.State);
+            StringAssert.Contains(request.Definition.Outcome, "disabled");
+            var unchanged = await registrations.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "legacy-registration", default);
+            Assert.AreEqual(existing.ETag, unchanged!.ETag);
+            Assert.IsFalse(unchanged.Value.Definition.Enabled);
         }
         finally { File.Delete(keyPath); }
     }

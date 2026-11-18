@@ -17,6 +17,7 @@ using Agentstration.Sources;
 using Agentstration.Web.Components.Localization;
 using Agentstration.Web.Configuration;
 using Agentstration.Work;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -56,7 +57,7 @@ internal static class StandaloneHostServiceCollectionExtensions
             .GetSection(AepEnrollmentPolicyOptions.SectionName)
             .Get<AepEnrollmentPolicyOptions>() ?? new();
         ExtensionEnrollmentPolicyService.ValidateLevel(policyOptions.AutoEnrollmentLevel);
-        services.AddSingleton(policyOptions);
+        services.Replace(ServiceDescriptor.Singleton(policyOptions));
         services.AddSingleton<ExtensionSourceDiscoveryService>();
         services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
         return services;

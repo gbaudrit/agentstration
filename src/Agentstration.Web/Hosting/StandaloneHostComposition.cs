@@ -1,6 +1,6 @@
 using Agentstration.Agents;
-using Agentstration.Extensions.Aep;
 using Agentstration.Application.Work;
+using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
@@ -220,6 +220,9 @@ internal static class StandaloneHostCompositionExtensions
                 .RequireAuthorization(AgentstrationPolicies.Authenticated);
         }
     }
+
+    internal static Task RunAgentstrationStandaloneHostAsync(this WebApplication app) =>
+        app.Lifetime.ApplicationStarted.IsCancellationRequested ? app.WaitForShutdownAsync() : app.RunAsync();
 
     internal static async Task InitializeAgentstrationStandaloneHostAsync(
         this WebApplication app,

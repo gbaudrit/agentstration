@@ -293,7 +293,11 @@ public sealed partial class DeclarativeBootstrapService(
                     }
                     catch (BootstrapDependencyException exception)
                     {
-                        throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' [{exception.Code}]: {exception.Message}", exception);
+                        var consumers = profile.Resources.Where(source => BootstrapExtensionReferencePreparation
+                            .UsedBindings(profile with { Resources = [source] }).Contains(binding.Name))
+                            .Select(source => $"{source.Location}: {source.Resource.Kind}/{source.Resource.Metadata.Name}");
+                        throw new DeclarativeBootstrapException(
+                            $"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' used by {string.Join(", ", consumers)} requires extension '{extensionTarget.ExtensionId}' installation '{extensionTarget.InstanceId}', {extensionTarget.Kind}/{extensionTarget.ContributionId} version '{extensionTarget.Version}' [{exception.Code}]: {exception.Message}", exception);
                     }
                 }
                 if (target is null)

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Contracts;
@@ -6,7 +7,6 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
-using System.Text.Json;
 
 namespace Agentstration.Infrastructure.Bootstrap;
 
@@ -55,10 +55,16 @@ public sealed class BootstrapConnectedServiceTypeContributionResolver(IResourceS
         var version = selected.Value.Definition.Versions.Single(value =>
             value.Version == (selector.Version ?? selected.Value.Definition.PreferredVersion));
         var resolved = BootstrapExtensionReferenceResolver.Resolved(selected.Value, selected.ETag);
-        return resolved with { TargetValue = JsonSerializer.SerializeToElement(new ConnectedServiceTypeReference
+        return resolved with
         {
-            Type = resolved.Reference, TypeUid = selected.Value.Uid, Version = version.Version, SchemaDigest = version.SchemaDigest
-        }, JsonOptions) };
+            TargetValue = JsonSerializer.SerializeToElement(new ConnectedServiceTypeReference
+            {
+                Type = resolved.Reference,
+                TypeUid = selected.Value.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest
+            }, JsonOptions)
+        };
     }
 }
 
@@ -86,11 +92,17 @@ public sealed class BootstrapStorageTypeContributionResolver(IResourceStore stor
         var version = selected.Value.Definition.Versions.Single(value =>
             value.Version == (selector.Version ?? selected.Value.Definition.PreferredVersion));
         var resolved = BootstrapExtensionReferenceResolver.Resolved(selected.Value, selected.ETag);
-        return resolved with { TargetValue = JsonSerializer.SerializeToElement(new StorageTypeReference
+        return resolved with
         {
-            Type = resolved.Reference, TypeUid = selected.Value.Uid, Version = version.Version,
-            SchemaDigest = version.SchemaDigest, ContractDigest = version.ContractDigest
-        }, JsonOptions) };
+            TargetValue = JsonSerializer.SerializeToElement(new StorageTypeReference
+            {
+                Type = resolved.Reference,
+                TypeUid = selected.Value.Uid,
+                Version = version.Version,
+                SchemaDigest = version.SchemaDigest,
+                ContractDigest = version.ContractDigest
+            }, JsonOptions)
+        };
     }
 }
 

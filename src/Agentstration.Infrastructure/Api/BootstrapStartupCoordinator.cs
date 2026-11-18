@@ -151,7 +151,8 @@ public sealed class BootstrapStartupCoordinator(
                         if (requirement.Selector.Kind == ExtensionKinds.ExtensionRegistration)
                             _ = await references.ResolveExtensionAsync(new()
                             {
-                                Id = requirement.Selector.ExtensionId, InstanceId = requirement.Selector.InstanceId
+                                Id = requirement.Selector.ExtensionId,
+                                InstanceId = requirement.Selector.InstanceId
                             }, requirement.ConsumerScope, wait.Token);
                         else
                             _ = await references.ResolveContributionAsync(requirement.Selector, requirement.ConsumerScope, wait.Token);

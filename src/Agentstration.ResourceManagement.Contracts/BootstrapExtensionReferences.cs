@@ -1,5 +1,5 @@
-using Agentstration.Resources;
 using System.Text.Json;
+using Agentstration.Resources;
 
 namespace Agentstration.ResourceManagement.Contracts;
 

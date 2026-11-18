@@ -43,11 +43,11 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("tool")] Tool,
+    [JsonStringEnumMemberName("parameter")] Parameter,
+    [JsonStringEnumMemberName("secret")] Secret,
     [JsonStringEnumMemberName("connectedServiceType")] ConnectedServiceType,
     [JsonStringEnumMemberName("storageType")] StorageType,
-    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile,
-    [JsonStringEnumMemberName("parameter")] Parameter,
-    [JsonStringEnumMemberName("secret")] Secret
+    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile
 }
 
 public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null);

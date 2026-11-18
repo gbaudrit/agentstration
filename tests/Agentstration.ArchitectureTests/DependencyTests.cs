@@ -1689,7 +1689,7 @@ public sealed class DependencyTests
             var enabled = variables.TryGetProperty("Agentstration__Lan__Enabled", out var lan)
                 && bool.Parse(lan.GetString()!);
             Assert.AreEqual(profile.Name is "https-LAN" or "https-LAN-NoBootstrap", enabled);
-            Assert.AreEqual(profile.Name is "https" or "https-LAN",
+            Assert.AreEqual(profile.Name is "https" or "https-LAN" or "https-BootstrapExtensions",
                 bool.Parse(variables.GetProperty("Agentstration__Bootstrap__InitialBootstrapEnabled").GetString()!));
 
             foreach (var key in new[] { "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL", "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL" })

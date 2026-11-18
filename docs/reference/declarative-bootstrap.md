@@ -375,3 +375,141 @@ transitions:
 ```
 
 The empty Flow template already supplies both terminal outputs. In the visual Designer, adding an Agent, Tool, or Flow call automatically connects its conventional `error` event to the first error terminal when one exists. Bootstrap preview and Flow validation reject missing required error paths.
+
+## Complete local Bootstrap with an external extension
+
+The versioned `bootstrap-openapi` example enrolls an externally started OpenAPI
+extension, waits for its bundle and enabled discovery Tool, then creates a
+published ToolSet and a DataSource using the contributed DataSourceProfile. The
+`bootstrap-workspace-example` profile creates a published, active echo Flow and
+Entry in the explicit `dev/default` Workspace. Creating these resources does not
+contact `example.invalid` or execute upstream discovery.
+
+### Compose
+
+From the repository root, use the opt-in overlay on the deterministic topology:
+
+```sh
+docker compose -f deploy/compose/base.yml -f deploy/compose/bootstrap.yml config --quiet
+docker compose -f deploy/compose/base.yml -f deploy/compose/bootstrap.yml up -d --build
+curl --fail http://localhost:5080/health/ready
+```
+
+The overlay selects `development` and `bootstrap-openapi` at instance scope,
+then `bootstrap-workspace-example` at `/tenants/dev/workspaces/default`. It uses
+the public disposable Development account `admin / admin`. Use a separate
+Compose project and configure a real administrator password before adapting this
+example to another environment. The overlay adds an independent key volume for
+the OpenAPI extension, read-only key mounts on both sides, and persistent writable
+installation state. All Compose extension services now announce themselves using
+SharedKeyFile; assignment remains manual unless an automatic policy is enabled.
+
+Health becomes live while required contributions are still pending. Readiness
+and normal APIs remain unavailable until the full Bootstrap completes. An
+extension may start after the server; no dependency on server readiness is needed
+for its announcement. Compose, Aspire, or the operator owns the extension
+process. Bootstrap does not install, launch, restart, or supervise it.
+
+Stop and restart the topology without deleting volumes to retain installation
+IDs, keys, enrollment records and resources. Reapplication is create-only and
+keeps user changes. Do not run `down --volumes` when testing recovery. Rotating a
+key or replacing installation state is an explicit operator enrollment action;
+an existing identity is never inferred from a new key or process endpoint.
+
+### Aspire
+
+For the complete repository-owned example, use the explicit opt-in launch profile:
+
+```sh
+dotnet run --project src/Agentstration.AppHost --launch-profile https-BootstrapExtensions
+```
+
+Aspire starts OpenAPI externally, provisions its key and durable installation
+state, and forwards the same catalog and scoped applications as Compose. The
+existing `https` and `https-NoBootstrap` profiles retain their PairingCode/manual
+settings. For a separately managed external extension, configure trust explicitly
+and select SharedKeyFile mode rather than relying on those default profiles.
+
+AppHost forwards phased-startup settings, ordered scoped `InitialApplications`,
+effective enrollment mode gates, `AutoEnrollmentLevel`, and external extension
+trust metadata. Its launch profile still owns catalog path resolution and initial
+activation, and its generated key files remain authoritative for bundled
+extensions. Configure the following keys in AppHost configuration (environment
+variables use double underscores in place of colons):
+
+```json
+{
+  "Agentstration": {
+    "Bootstrap": {
+      "PhasedStartupEnabled": true,
+      "ExtensionDependencyTimeout": "00:10:00",
+      "InitialProfiles": ["development", "bootstrap-openapi"],
+      "InitialApplications": [{
+        "Profiles": ["bootstrap-workspace-example"],
+        "TargetLevel": "/tenants/dev/workspaces/default"
+      }]
+    },
+    "Aep": {
+      "EnrollmentMode": "SharedKeyFile",
+      "Enrollment": { "AutoEnrollmentLevel": "/instance" },
+      "Transport": {
+        "AllowedHttpHosts": ["localhost"],
+        "AllowedPrivateNetworkHosts": ["localhost"]
+      }
+    },
+    "Extensions": {
+      "Agentstration.Extensions.OpenApi": {
+        "EnrollmentMode": "SharedKeyFile",
+        "SharedKeyFile": { "Path": "/absolute/path/to/openapi.key" }
+      }
+    }
+  }
+}
+```
+
+Start the OpenAPI extension separately with `OpenApi:AllowedDomains:0=example.invalid`,
+`Aep:EnrollmentMode=SharedKeyFile`,
+`Aep:SharedKeyFile:Path` pointing to that same key file,
+`Aep:SharedKeyFile:AuthorityUrl` pointing to the orchestrated server's HTTP
+endpoint, `Aep:SharedKeyFile:PublicEndpoint` pointing to its own reachable
+endpoint, and a durable `Aep:SharedKeyFile:StateFile`. For local HTTP, explicitly
+set `Aep:SharedKeyFile:AllowInsecureHttp=true`. Use stable externally advertised
+ports when retaining an installation across orchestration restarts. Start AppHost
+with a Bootstrap-enabled profile and override the ordinary profile's PairingCode
+mode with `-- --Agentstration:Aep:EnrollmentMode SharedKeyFile`. `https-NoBootstrap` continues to
+skip initial application, even when phased settings are configured.
+
+Existing manually assigned PairingCode and SharedKeyFile installations remain
+valid. Keep automatic enrollment unset to preserve manual assignment; enable the
+phased startup flag only for initial catalogs that must wait for external
+contributions. Existing installations are not moved when a default or manifest
+policy changes.
+
+### Migrating legacy endpoint discovery
+
+Disable `Agentstration:Extensions:DiscoverOnStartup` before switching an existing
+connection to extension-initiated announcements. Retain its `RegistrationName`,
+public extension ID, exact scope, endpoint and SharedKeyFile trust mapping; use an
+explicit policy for that same scope. A matching enabled registration is reused.
+A disabled registration fails with `registration_disabled` and is never enabled
+by automatic assignment. Existing closed enrollment records remain closed.
+Inspect differing endpoints or scopes before enabling the policy; choose an
+explicit registration name to reject collisions rather than creating a distinct
+installation registration. Do not run legacy discovery alongside this migration,
+because its configuration synchronization remains a separate operator action.
+
+### Reproducible executable check
+
+After a Release build, run the repository-owned process smoke check:
+
+```sh
+python3 scripts/bootstrap/test-external-enrollment.py
+```
+
+It uses fresh temporary SQLite stores and a generated key, starts Web before the
+external OpenAPI host, checks the readiness/API barrier, verifies contributed and
+ordinary resources, then restarts both processes using the same state and checks
+installation, assignment and resource preservation. It requires no live model,
+upstream API or Docker. Logs stay in the printed temporary directory. The
+functional integration suite separately covers missing contributions, timeouts,
+partial provisioning failure, unrelated absent extensions and catalog changes.

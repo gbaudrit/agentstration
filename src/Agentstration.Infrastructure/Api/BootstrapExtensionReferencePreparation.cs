@@ -152,8 +152,10 @@ internal sealed class BootstrapExtensionReferencePreparation(IBootstrapExtension
         var selector = value.Deserialize<BootstrapExtensionSelector>(JsonOptions)!;
         var result = new BootstrapContributionSelector
         {
-            ExtensionId = selector.Id, InstanceId = selector.InstanceId,
-            Kind = "ExtensionRegistration", ContributionId = string.Empty
+            ExtensionId = selector.Id,
+            InstanceId = selector.InstanceId,
+            Kind = "ExtensionRegistration",
+            ContributionId = string.Empty
         };
         Validate(result);
         return result;

@@ -25,7 +25,7 @@ public interface IAepEnrollmentAnnouncementProvisioner
 {
     AepEnrollmentMethod Method { get; }
     Task ValidateAsync(AepEnrollmentAnnouncement announcement, AepEnrollmentProof? proof, CancellationToken cancellationToken);
-    Task<string> ProvisionAsync(AepEnrollmentAnnouncement announcement, ResourceScopeRef targetScopeRef, CancellationToken cancellationToken);
+    Task<string> ProvisionAsync(AepEnrollmentAnnouncement announcement, ResourceScopeRef targetScopeRef, bool automatic, CancellationToken cancellationToken);
 }
 
 public interface IAepEnrollmentResourceProvisioner
@@ -150,7 +150,7 @@ public sealed class AepEnrollmentService(
             if (stored.Value.Definition.State != AepEnrollmentState.Unpaired) return;
         }
         await AssignCoreAsync(stored, targetScopeRef,
-            targetScopeRef.Kind == ResourceScopeKind.Instance ? null : context.TenantId, cancellationToken);
+            targetScopeRef.Kind == ResourceScopeKind.Instance ? null : context.TenantId, false, cancellationToken);
     }
 
     public async Task AssignAutomaticallyAsync(
@@ -183,22 +183,24 @@ public sealed class AepEnrollmentService(
         }, cancellationToken);
         try
         {
-            await AssignCoreAsync(stored, target.ScopeRef, target.TenantId, cancellationToken);
+            await AssignCoreAsync(stored, target.ScopeRef, target.TenantId, true, cancellationToken);
             await AuditAsync(SecurityAuditActions.AepEnrollmentAvailable, stored.Value, "automatic_assignment", cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // AssignCoreAsync records contribution failures itself. Other failures may
             // happen before registration creation and must remain safely retryable too.
+            var failureCode = exception is AepEnrollmentException enrollmentException
+                ? enrollmentException.Code : "automatic_assignment_failed";
             var current = await GetAsync(requestId, cancellationToken);
             if (current.Value.Definition.State == AepEnrollmentState.Verifying && current.ETag == stored.ETag)
                 _ = await UpdateAsync(current, current.Value.Definition with
                 {
                     State = AepEnrollmentState.VerificationFailed,
                     AutomaticEnrollmentLeaseExpiresAt = null,
-                    Outcome = "automatic_assignment_failed"
+                    Outcome = failureCode
                 }, cancellationToken);
-            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, "automatic_assignment_failed",
+            await AuditAsync(SecurityAuditActions.AepEnrollmentFailed, stored.Value, failureCode,
                 cancellationToken, SecurityAuditOutcome.Failed);
             if (exception is AepEnrollmentException) throw;
             throw new AepEnrollmentException("automatic_assignment_failed", "Automatic AEP enrollment could not complete.", 502);
@@ -209,12 +211,13 @@ public sealed class AepEnrollmentService(
         StoredResource<AepEnrollmentRequestResource> stored,
         ResourceScopeRef targetScopeRef,
         Guid? targetTenantId,
+        bool automatic,
         CancellationToken cancellationToken)
     {
         var registrationName = await scopeOperations.WriteAsync(ExtensionKinds.ExtensionRegistration, targetScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             if (stored.Value.Definition.EnrollmentMode != AepEnrollmentMode.SharedKeyFile) return null;
-            return await ProvisionAnnouncementAsync(Announcement(stored.Value.Definition), targetScopeRef, token);
+            return await ProvisionAnnouncementAsync(Announcement(stored.Value.Definition), targetScopeRef, automatic, token);
         }, cancellationToken);
         if (registrationName is not null)
         {
@@ -869,11 +872,12 @@ public sealed class AepEnrollmentService(
     private async Task<string> ProvisionAnnouncementAsync(
         AepEnrollmentAnnouncement announcement,
         ResourceScopeRef targetScopeRef,
+        bool automatic,
         CancellationToken cancellationToken)
     {
         var provisioner = announcementProvisioners.SingleOrDefault(value => value.Method == announcement.Method)
             ?? throw new AepEnrollmentException("enrollment_mode_unavailable", $"The '{announcement.Method}' enrollment mode is not configured.", 409);
-        return await provisioner.ProvisionAsync(announcement, targetScopeRef, cancellationToken);
+        return await provisioner.ProvisionAsync(announcement, targetScopeRef, automatic, cancellationToken);
     }
 
     private async Task EnsureEnrollmentModeEnabledAsync(AepEnrollmentMethod method, CancellationToken cancellationToken)

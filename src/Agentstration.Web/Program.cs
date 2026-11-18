@@ -9,9 +9,6 @@ app.UseAgentstrationHttpDiagnostics();
 
 app.ConfigureAgentstrationStandaloneHost(composition);
 await app.InitializeAgentstrationStandaloneHostAsync(composition);
-if (app.Lifetime.ApplicationStarted.IsCancellationRequested)
-    await app.WaitForShutdownAsync();
-else
-    await app.RunAsync();
+await app.RunAgentstrationStandaloneHostAsync();
 
 public partial class Program;
