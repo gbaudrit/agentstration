@@ -126,7 +126,7 @@ else
                             {
                                 <section class="panel form-section" data-testid="schema-exposure">
                                     <h4>@T("ExposeAsFunction")</h4><p>@T("ExposureHelp")</p>
-                                    <fieldset disabled="@(!CanExpose || busy)">
+                                    <fieldset class="schema-exposure-fields" disabled="@(!CanExpose || busy)">
                                         <label><span>@T("TechnicalName")</span><input @bind="functionName" data-testid="exposure-name" /></label>
                                         <label><span>@T("DisplayName")</span><input @bind="functionDisplayName" data-testid="exposure-display-name" /></label>
                                         <label><span>@T("Version")</span><input @bind="functionVersion" data-testid="exposure-version" /></label>
@@ -222,9 +222,13 @@ else
     private IReadOnlyList<SchemaFormatDescriptor> formats = [];
     private IReadOnlyList<SchemaVersionResource> versions = [];
     private SchemaVersionResource? selectedVersion;
-    private bool loading = true, busy;
+    private bool loading = true, busy, interactive;
     private string functionName = string.Empty, functionDisplayName = string.Empty, functionVersion = "1.0.0";
-    private bool CanExpose => (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
+    private bool CanExpose => interactive && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+    }
     private SchemaTab activeTab = SchemaTab.Overview;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private IReadOnlyList<SchemaFormatDescriptor> AvailableFormats => formats.Where(value => value.IsAvailable)

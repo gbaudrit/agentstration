@@ -22,18 +22,19 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    [DataRow("data-source", false, false)]
-    [DataRow("data-source", false, true)]
-    [DataRow("data-source", true, true)]
-    [DataRow("binding", false, true)]
-    [DataRow("postAggregate", false, true)]
-    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(string point, bool documentStorage, bool explode)
+    [DataRow("data-source", false, false, 2)]
+    [DataRow("data-source", false, false, 0)]
+    [DataRow("data-source", false, true, 2)]
+    [DataRow("data-source", true, true, 2)]
+    [DataRow("binding", false, true, 2)]
+    [DataRow("postAggregate", false, true, 2)]
+    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(string point, bool documentStorage, bool explode, int itemCount)
     {
         await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var fixture = await PrepareAsync(factory.Services, declareAcquisitionOutput: false,
-            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = RssTransformationTestData.Feed(2) }));
+            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = RssTransformationTestData.Feed(itemCount) }));
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         await RssTransformationTestData.CreateAsync(factory.Services, Owner);
         using var client = factory.CreateClient();

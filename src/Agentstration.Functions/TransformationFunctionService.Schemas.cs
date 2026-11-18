@@ -49,12 +49,25 @@ public sealed partial class TransformationFunctionService
         catch (SchemaBindingResolutionException error) { throw Error(error.Code, error.Message); }
     }
 
-    public Task<TransformationSchemaSnapshot> ValidateExposureAsync(ExposeTransformationSchemaRequest request, CancellationToken ct, ISchemaBindingResolver? resolver = null) =>
-        ResolveTransformationAsync(request.Schema, request.ScopeRef, request.Namespace, request.ScopeRef, ct, resolver);
+    public Task<TransformationSchemaSnapshot> ValidateExposureAsync(ExposeTransformationSchemaRequest request, CancellationToken ct, ISchemaBindingResolver? resolver = null)
+    {
+        if (request.Schema is null) throw Error("transformation_reference_invalid", "An exact transformation Schema reference is required.");
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 128 || !char.IsLetterOrDigit(request.Name[0])
+            || request.Name.Any(c => !char.IsLower(c) && !char.IsDigit(c) && c is not ('-' or '.')))
+            throw Error("function_definition_invalid", "A bounded lowercase function name is required.");
+        Versions([request.Version]);
+        ValidateResource(new TransformationFunctionResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
+            ScopeRef = request.ScopeRef, Metadata = new() { Name = request.Name, Namespace = request.Namespace },
+            Definition = new(request.DisplayName, [])
+        }, FunctionResourceKinds.TransformationFunction, request.DisplayName);
+        return ResolveTransformationAsync(request.Schema, request.ScopeRef, request.Namespace, request.ScopeRef, ct, resolver);
+    }
 
     public async Task<StoredResource<TransformationFunctionResource>> ExposeAsync(ExposeTransformationSchemaRequest request, CancellationToken ct)
     {
-        var mapping = await ResolveTransformationAsync(request.Schema, request.ScopeRef, request.Namespace, request.ScopeRef, ct);
+        var mapping = await ValidateExposureAsync(request, ct);
         var engine = await ResolveAsync(mapping.Engine, request.ScopeRef, ct);
         var version = new TransformationFunctionVersion(request.Version, engine.FunctionKind,
             JsonSerializer.SerializeToElement(new { implementation = new { id = engine.ImplementationId, version = engine.ImplementationVersion } }))

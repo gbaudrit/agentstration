@@ -1,0 +1,13 @@
+.function-transformation-evidence details {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.function-transformation-evidence pre {
+    font-size: .8rem;
+    max-height: 24rem;
+    max-width: 100%;
+    overflow: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}

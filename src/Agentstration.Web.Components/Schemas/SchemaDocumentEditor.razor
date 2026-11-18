@@ -88,7 +88,7 @@
     @if (sourceActivated)
     {
         <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
-            <label><span>@Localizer["DefinitionSource"]</span></label>
+            <label><span>@Localizer[IsJsonSchema ? "DefinitionSource" : "NativeDefinitionSource"]</span></label>
             <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" Language="@(IsXml ? "xml" : "json")" />
             @if (!ReadOnly)
             {

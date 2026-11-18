@@ -38,7 +38,7 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         if (rules.ValueKind != JsonValueKind.Object || rules.EnumerateObject().Any(p => p.Name is not ("namespaces" or "root"))) throw Error("xml_rules_invalid");
         var namespaces = Namespaces(rules);
         if (!rules.TryGetProperty("root", out var root) || root.ValueKind != JsonValueKind.Object
-            || !root.TryGetProperty("type", out var type) || type.GetString() != "object") throw Error("xml_rules_invalid");
+            || !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String || type.GetString() != "object") throw Error("xml_rules_invalid");
         var count = 0;
         ValidateNode(root, namespaces, 0, ref count);
     }
@@ -71,7 +71,7 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         if (value.ValueKind != JsonValueKind.Object) throw Error("xml_namespace_invalid");
         foreach (var property in value.EnumerateObject())
         {
-            if (result.Count >= 16 || property.Value.ValueKind != JsonValueKind.String || property.Value.GetString()!.Length is < 1 or > 512
+            if (result.Count >= 16 || property.Name.Length is < 1 or > 128 || property.Value.ValueKind != JsonValueKind.String || property.Value.GetString()!.Length is < 1 or > 512
                 || property.Name is "xml" or "xmlns" || !result.TryAdd(property.Name, property.Value.GetString()!)) throw Error("xml_namespace_invalid");
             try { XmlConvert.VerifyNCName(property.Name); } catch (XmlException) { throw Error("xml_namespace_invalid"); }
         }
@@ -104,7 +104,11 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         var parts = value.Split(':');
         try
         {
-            foreach (var part in parts) XmlConvert.VerifyNCName(part);
+            foreach (var part in parts)
+            {
+                if (string.IsNullOrEmpty(part)) throw Error("xml_path_invalid");
+                XmlConvert.VerifyNCName(part);
+            }
             return parts.Length == 1 ? XName.Get(value) : parts.Length == 2 && ns.TryGetValue(parts[0], out var uri)
                 ? XName.Get(parts[1], uri) : throw Error("xml_namespace_invalid");
         }
@@ -118,8 +122,13 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         if (type == "array")
         {
             if (selected.Count > 100) throw Error("xml_selection_limit");
+            budget.Output(2);
             var array = new JsonArray();
-            foreach (var item in selected) array.Add(Fields(item, rule, ns, budget));
+            foreach (var item in selected)
+            {
+                budget.Output(1);
+                array.Add(Fields(item, rule, ns, budget));
+            }
             return array;
         }
         if (selected.Count == 0 && rule.TryGetProperty("optional", out var optional) && optional.GetBoolean()) return null;
@@ -132,7 +141,7 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
             XElement e when !e.HasElements => e.Value,
             _ => throw Error("xml_scalar_invalid")
         };
-        return type switch
+        var scalar = type switch
         {
             "string" => JsonValue.Create(text),
             "integer" => JsonValue.Create(long.Parse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture)),
@@ -141,6 +150,8 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
             "dateTime" => JsonValue.Create(ParseDate(text)),
             _ => throw Error("xml_rules_invalid")
         };
+        budget.Output(JsonSerializer.SerializeToUtf8Bytes(scalar).Length);
+        return scalar;
     }
 
     private static string ParseDate(string text)
@@ -155,12 +166,17 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
     private static JsonObject Fields(XObject context, JsonElement rule, IReadOnlyDictionary<string, string> ns, MappingBudget budget)
     {
         if (context is not (XElement or XDocument)) throw Error("xml_object_invalid");
+        budget.Output(2);
         var result = new JsonObject();
         foreach (var field in rule.GetProperty("fields").EnumerateObject())
         {
             budget.Spend();
             var value = Map(context, field.Value, ns, budget);
-            if (value is not null) result.Add(field.Name, value);
+            if (value is not null)
+            {
+                budget.Output(JsonSerializer.SerializeToUtf8Bytes(field.Name).Length + 2);
+                result.Add(field.Name, value);
+            }
         }
         return result;
     }
@@ -191,6 +207,11 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
     private sealed class MappingBudget(CancellationToken ct)
     {
         private int remaining = 32_768;
+        private int outputBytes = 65_536;
+        public void Output(int bytes)
+        {
+            if ((outputBytes -= bytes) < 0) throw Error("xml_output_limit");
+        }
         public void Spend()
         {
             ct.ThrowIfCancellationRequested();

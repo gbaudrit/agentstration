@@ -15,4 +15,5 @@
   <data name="Issue.xml_invalid" xml:space="preserve"><value>Document XML/XSD invalide ou non pris en charge, ou limite de traitement dépassée.</value></data>
   <data name="Issue.xml_contract_invalid" xml:space="preserve"><value>Le contenu XML ne respecte pas le contrat XSD autonome.</value></data>
   <data name="Issue.transformation_definition_invalid" xml:space="preserve"><value>Indiquez les versions exactes du moteur et des schémas d’entrée et de sortie, les alias d’espaces de noms et des règles de mapping bornées.</value></data>
+  <data name="NativeDefinitionSource" xml:space="preserve"><value>Définition native</value></data>
 </root>

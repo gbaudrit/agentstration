@@ -74,7 +74,7 @@ public static class FunctionEndpoints
     private static async Task<IResult> Execute(Func<Task<IResult>> action)
     {
         try { return await action(); }
-        catch (TransformationFunctionException error) { return Results.Problem(statusCode: error.Code == "function_use_denied" ? 403 : 422, title: error.Code, detail: error.Message); }
+        catch (TransformationFunctionException error) { return Results.Problem(statusCode: error.Code is "function_use_denied" or "schema_reference_forbidden" ? 403 : 422, title: error.Code, detail: error.Message); }
         catch (DataContractException error) { return Results.Problem(statusCode: 422, title: error.Code, detail: error.Message); }
         catch (ResourceConcurrencyException error) { return Results.Problem(statusCode: 412, title: "function_concurrency_conflict", detail: error.Message); }
         catch (ResourceScopeAccessDeniedException error) { return Results.Problem(statusCode: 403, title: "function_scope_denied", detail: error.Message); }

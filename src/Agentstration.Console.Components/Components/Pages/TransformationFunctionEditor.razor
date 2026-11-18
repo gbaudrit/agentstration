@@ -17,7 +17,7 @@ else
 {
     @if (original?.Definition.Versions.Any(v => v.TransformationSnapshot is not null) == true)
     {
-        <section class="panel form-section" data-testid="function-transformation-evidence">
+        <section class="panel form-section function-transformation-evidence" data-testid="function-transformation-evidence">
             <h2>@T("TransformationEvidence")</h2><p>@T("TransformationPinnedHelp")</p>
             @foreach (var item in original.Definition.Versions.Where(v => v.TransformationSnapshot is not null))
             {

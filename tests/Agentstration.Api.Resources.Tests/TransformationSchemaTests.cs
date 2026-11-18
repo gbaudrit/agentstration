@@ -53,6 +53,9 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         Assert.AreEqual(BootstrapResourceApplyResult.Skipped, await exposureHandler.ApplyAsync(RssTransformationTestData.Exposure, operation, default));
         Assert.AreEqual(firstFunction.ETag, (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default))!.ETag);
         Assert.AreEqual(BootstrapResourceDisposition.Skip, (await exposureHandler.PlanAsync(RssTransformationTestData.Exposure, operation, planning, default)).Disposition);
+        foreach (var invalidName in new[] { "", " ", "Bad Name", "../escape" })
+            Assert.AreEqual("function_definition_invalid", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.ExposeAsync(
+                RssTransformationTestData.Request(owner) with { Name = invalidName }, default))).Code);
         var accepted = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
         Assert.IsNotNull(accepted.Transformation!.Declaration.SchemaUid);
         Assert.IsNotNull(accepted.Transformation.Input.SchemaUid);
@@ -130,6 +133,30 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         var input = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-xml", default))!;
         await schemas.PutAsync(ResourceScopeRef.Instance, input.Value.Namespace, input.Value.Name, input.Value.Definition with { UsePolicy = new() }, input.ETag, default);
         Assert.AreEqual("schema_reference_forbidden", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(1) }), default))).Code);
+    }
+
+    [TestMethod]
+    public async Task GenericMappingHasNoFeedSpecificRulesAndRejectsLimitsAndInvalidConversions()
+    {
+        var function = new XmlToJsonFunction();
+        var rules = RssTransformationTestData.Json("""
+            {"root":{"path":"/catalog","type":"object","fields":{"entries":{"path":"entry","type":"array","fields":{"id":{"path":"@id","type":"string"},"note":{"path":"note","type":"string","optional":true},"when":{"path":"when","type":"dateTime","optional":true}}}}}}
+            """);
+        var result = await function.ExecuteAsync(JsonSerializer.SerializeToElement(new { value = "<catalog><entry id='opaque'><note /></entry></catalog>", rules }), default);
+        Assert.AreEqual("opaque", result.GetProperty("entries")[0].GetProperty("id").GetString());
+        Assert.AreEqual("", result.GetProperty("entries")[0].GetProperty("note").GetString());
+        Assert.IsFalse(result.GetProperty("entries")[0].TryGetProperty("when", out _));
+        foreach (var xml in new[] { "<catalog>" + string.Concat(Enumerable.Repeat("<entry id='x' />", 101)) + "</catalog>",
+            "<catalog><entry id='x'><when>2026-11-17T10:30:00</when></entry></catalog>", new string('x', 65_537), "<catalog><entry id='x'><note>" + new string('é', 20_000) + "</note></entry></catalog>" })
+            await Assert.ThrowsExactlyAsync<TransformationFunctionException>(async () => await function.ExecuteAsync(JsonSerializer.SerializeToElement(new { value = xml, rules }), default));
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await function.ExecuteAsync(JsonSerializer.SerializeToElement(new { value = "<catalog />", rules }), cancelled.Token));
+        var provider = new TransformationSchemaFormatHandler();
+        var invalid = RssTransformationTestData.Declarations[2].Definition.GetProperty("content");
+        var changed = JsonNode.Parse(invalid.GetRawText())!;
+        changed["rules"]!["root"]!["type"] = 42;
+        Assert.IsFalse((await provider.ValidateDefinitionAsync(JsonSerializer.SerializeToElement(changed), null, default)).IsValid);
     }
 
     [TestMethod]

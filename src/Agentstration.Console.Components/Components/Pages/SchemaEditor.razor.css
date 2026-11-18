@@ -18,6 +18,28 @@
     padding-top: 1.5rem;
 }
 
+.schema-exposure-fields {
+    border: 0;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+}
+
+.schema-exposure-fields label {
+    display: grid;
+    gap: .5rem;
+    min-width: 0;
+}
+
+.schema-exposure-fields input { width: 100%; }
+.schema-exposure-fields button { justify-self: start; }
+
+@media (max-width: 700px) {
+    .schema-exposure-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
 .schema-publish-card {
     background: var(--surface-2);
     border: 1px solid var(--border);
