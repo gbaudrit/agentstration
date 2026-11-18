@@ -65,19 +65,23 @@ The report records workload parameters, provider, elapsed time, runtime and OS m
 
 ## CI concurrency and memory diagnostics
 
-The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy API and Management modules also use one class worker per assembly. CI reruns the designated hosted modules on two isolated runners (Management API alone, the other modules sequentially) through `scripts/ci/run-test-module-with-diagnostics.ps1` in the dedicated `hosted-module-diagnostics` job. That job runs in parallel with functional coverage and compiles only the designated test projects after restoring the repository graph, so memory safeguards do not extend the `build-and-test` critical path. Each JSON artifact contains the discovered count, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, runtime, and OS. The diagnostic artifact deliberately excludes test output and payloads.
+The fast, integration, and performance lanes cap concurrent test modules at 4, 2, and 1 respectively. Host-heavy API and Management modules also use one class worker per assembly. CI reruns the designated hosted modules on two isolated runners (Management API alone, the other modules sequentially) through `scripts/ci/run-hosted-module-diagnostics.ps1` in the dedicated `hosted-module-diagnostics` job. It consumes the shared Release build and runs in parallel with functional coverage. Each module runs in a separate process through `scripts/ci/run-test-module-with-diagnostics.ps1`. A failed module no longer prevents collection for the remaining modules; the group still fails after attempting every selected module. The diagnostic artifact deliberately excludes test output and payloads.
+
+Each JSON report records total/passed/failed test counts, TRX availability, process exit code, duration, process peak working set, process peak private memory, aggregate peak working set for active `dotnet` processes, collector runtime and OS, and GitHub source revision/run/attempt. `failureReasons` distinguishes `working-set-budget-exceeded`, `test-process-exit`, `test-failures`, `test-count-below-minimum`, and missing/invalid test reports. Reasons can coexist. A successful test exit with only a working-set failure establishes a budget breach; it does not establish an OOM kill or a managed-memory leak. Aggregate `dotnet` working set is contextual and is not the per-module budget metric. Local runs may omit GitHub provenance. Run `./scripts/ci/test-hosted-module-diagnostics.ps1` to verify classification, unchanged budget enforcement, payload exclusion and collection after a failure.
+
+The [CI memory investigation for PR #1181](ci-memory-1181.md) retains the before/after evidence and its limits. The Resources module's 2432 MiB failure ceiling remains enforced; qualifying the failure does not recalibrate or fix that module's memory usage.
 
 The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. `Agentstration.Management.Api.Tests` was recalibrated during #745 from 108-test Release runs: 1784.1 MiB peak working set on Ubuntu 24.04.5 with .NET 10.0.12 and 1757.6 MiB on Windows 11 10.0.26200 with .NET 10.0.11. `Agentstration.Management.Security.Tests` was recalibrated from 59-test runs in the same change: 1193.7 MiB on Ubuntu and 1127.6 MiB on Windows. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
 | --- | ---: | ---: | ---: | ---: |
-| `Agentstration.Api.Tests` | Pending after split | 2048 | 2432 | 23 |
-| `Agentstration.Api.Flows.Tests` | Pending after split | 2048 | 2432 | 74 |
+| `Agentstration.Api.Tests` | Pending after split | 2048 | 2432 | 40 |
+| `Agentstration.Api.Flows.Tests` | Pending after split | 2048 | 2432 | 80 |
 | `Agentstration.Api.Execution.Tests` | Pending after split | 2048 | 2432 | 58 |
-| `Agentstration.Api.Resources.Tests` | Pending after split | 2048 | 2432 | 80 |
-| `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2304 | 108 |
-| `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 23 |
-| `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1536 | 59 |
+| `Agentstration.Api.Resources.Tests` | Pending after split | 2048 | 2432 | 118 |
+| `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2560 | 112 |
+| `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 31 |
+| `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1664 | 64 |
 | `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
 
 The four API modules inherit the consolidated module's current CI warning/failure limits of 2048/2432 MiB. These are retained ceilings, not measured baselines for the new assemblies. In main run `41710631042`, the consolidated module passed all 235 tests but exceeded its failure ceiling at 2464.2 MiB; the preceding run measured 2417.3 MiB. Retain measurements of the split modules before recalibrating their budgets or claiming a memory or duration improvement.

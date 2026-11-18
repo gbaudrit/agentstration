@@ -135,6 +135,9 @@ jobs:
       - name: Verify formatting of changed .NET files
         shell: pwsh
         run: ./scripts/ci/verify-dotnet-format.ps1 -BaseRevision "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: Verify hosted diagnostic failure classification
+        shell: pwsh
+        run: ./scripts/ci/test-hosted-module-diagnostics.ps1
       - name: Install patched Aspire CLI bundle
         run: bash scripts/ci/install-aspire-cli-linux.sh "$RUNNER_TEMP/aspire-cli"
       - name: Build Agentstration
@@ -261,28 +264,21 @@ jobs:
           @(
             '## Hosted test module diagnostics',
             '',
-            '| Module | Tests | Duration (s) | Peak working set (MiB) | Peak private memory (MiB) | Aggregate dotnet working set (MiB) | Status |',
-            '| --- | ---: | ---: | ---: | ---: | ---: | --- |'
+            '| Module | Tests | Duration (s) | Peak working set (MiB) | Peak private memory (MiB) | Aggregate dotnet working set (MiB) | Status | Failure reasons |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           $modules = @(
-          @{ Name = 'Agentstration.Api.Tests'; Tests = 40; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.Tests'; Tests = 40; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Execution.Tests'; Tests = 58; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 118; Warning = 2048; Failure = 2432 },
-          @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 112; Warning = 1920; Failure = 2560 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 112; Warning = 1920; Failure = 2560 },
             @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
             @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 29; Warning = 832; Failure = 1024 }
           )
           $modules = @($modules | Where-Object { ($_.Name -eq 'Agentstration.Management.Api.Tests') -eq ('${{ matrix.group }}' -eq 'management-api') })
-          foreach ($module in $modules) {
-            ./scripts/ci/run-test-module-with-diagnostics.ps1 `
-              -AssemblyPath "tests/$($module.Name)/bin/Release/net10.0/$($module.Name).dll" `
-              -ReportPath "artifacts/test-diagnostics/$($module.Name).json" `
-              -MinimumExpectedTests $module.Tests `
-              -WarningWorkingSetMiB $module.Warning `
-              -FailureWorkingSetMiB $module.Failure
-          }
+          ./scripts/ci/run-hosted-module-diagnostics.ps1 -Modules $modules
       - name: Upload hosted module diagnostics
         if: always()
         uses: actions/upload-artifact@v7

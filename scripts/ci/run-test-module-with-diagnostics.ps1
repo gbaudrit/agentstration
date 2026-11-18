@@ -81,13 +81,31 @@ $null = $standardOutput.GetAwaiter().GetResult()
 $null = $standardError.GetAwaiter().GetResult()
 
 $testCount = 0
+$passedTestCount = 0
+$failedTestCount = 0
+$testReportStatus = 'missing'
 if (Test-Path -LiteralPath $trxPath) {
+    $testReportStatus = 'invalid'
     try {
         [xml] $trx = Get-Content -LiteralPath $trxPath -Raw
         $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
         if ($null -ne $counters) {
+            foreach ($name in @('total', 'passed', 'failed')) {
+                $count = 0
+                if (-not [int]::TryParse($counters.GetAttribute($name), [ref]$count) -or $count -lt 0) {
+                    throw 'Invalid test counter.'
+                }
+            }
             $testCount = [int]$counters.GetAttribute('total')
+            $passedTestCount = [int]$counters.GetAttribute('passed')
+            $failedTestCount = [int]$counters.GetAttribute('failed')
+            $testReportStatus = 'available'
         }
+    }
+    catch {
+        # Retain the diagnostic report even when the test report is unreadable.
+        # Do not copy the exception or TRX: either can contain test payloads.
+        $testReportStatus = 'invalid'
     }
     finally {
         [System.IO.File]::Delete($trxPath)
@@ -97,9 +115,14 @@ $workingSetMiB = [Math]::Round($peakWorkingSetBytes / 1MB, 1)
 $privateMiB = [Math]::Round($peakPrivateBytes / 1MB, 1)
 $aggregateDotnetWorkingSetMiB = [Math]::Round($peakAggregateDotnetWorkingSetBytes / 1MB, 1)
 $moduleName = [System.IO.Path]::GetFileNameWithoutExtension($resolvedAssembly)
-$status = if ($process.ExitCode -ne 0 -or
-    $testCount -lt $MinimumExpectedTests -or
-    ($FailureWorkingSetMiB -gt 0 -and $workingSetMiB -ge $FailureWorkingSetMiB)) {
+$failureReasons = @(
+    if ($process.ExitCode -ne 0) { 'test-process-exit' }
+    if ($testReportStatus -ne 'available') { "test-report-$testReportStatus" }
+    if ($testCount -lt $MinimumExpectedTests) { 'test-count-below-minimum' }
+    if ($failedTestCount -gt 0) { 'test-failures' }
+    if ($FailureWorkingSetMiB -gt 0 -and $workingSetMiB -ge $FailureWorkingSetMiB) { 'working-set-budget-exceeded' }
+)
+$status = if ($failureReasons.Count -gt 0) {
     'failed'
 }
 elseif ($WarningWorkingSetMiB -gt 0 -and $workingSetMiB -ge $WarningWorkingSetMiB) {
@@ -112,7 +135,11 @@ else {
 [ordered]@{
     module = $moduleName
     status = $status
+    failureReasons = @($failureReasons)
+    testReportStatus = $testReportStatus
     testCount = $testCount
+    passedTestCount = $passedTestCount
+    failedTestCount = $failedTestCount
     minimumExpectedTests = $MinimumExpectedTests
     durationSeconds = [Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)
     peakWorkingSetMiB = $workingSetMiB
@@ -121,25 +148,24 @@ else {
     warningWorkingSetMiB = $WarningWorkingSetMiB
     failureWorkingSetMiB = $FailureWorkingSetMiB
     exitCode = $process.ExitCode
+    sourceRevision = $env:GITHUB_SHA
+    runId = $env:GITHUB_RUN_ID
+    runAttempt = $env:GITHUB_RUN_ATTEMPT
+    runnerOs = $env:RUNNER_OS
     runtime = [System.Runtime.InteropServices.RuntimeInformation]::FrameworkDescription
     os = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
 } | ConvertTo-Json | Set-Content -LiteralPath $resolvedReport -Encoding utf8
 
-$summary = "${moduleName}: $testCount tests, $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)) s, $workingSetMiB MiB working set, $privateMiB MiB private, $aggregateDotnetWorkingSetMiB MiB aggregate dotnet, status $status"
+$reasonSummary = if ($failureReasons.Count -gt 0) { $failureReasons -join ', ' } else { '-' }
+$summary = "${moduleName}: $testCount tests ($passedTestCount passed, $failedTestCount failed), $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)) s, $workingSetMiB MiB working set, $privateMiB MiB private, $aggregateDotnetWorkingSetMiB MiB aggregate dotnet, status $status, reasons $reasonSummary"
 Write-Host $summary
 if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
-    "| $moduleName | $testCount | $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)) | $workingSetMiB | $privateMiB | $aggregateDotnetWorkingSetMiB | $status |" |
+    "| $moduleName | $testCount ($passedTestCount passed, $failedTestCount failed) | $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)) | $workingSetMiB | $privateMiB | $aggregateDotnetWorkingSetMiB | $status | $reasonSummary |" |
         Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
 }
 
-if ($process.ExitCode -ne 0) {
-    throw "Test module '$moduleName' exited with code $($process.ExitCode). Rerun it directly for failure details."
-}
-if ($testCount -lt $MinimumExpectedTests) {
-    throw "Test module '$moduleName' discovered $testCount tests; expected at least $MinimumExpectedTests."
-}
-if ($FailureWorkingSetMiB -gt 0 -and $workingSetMiB -ge $FailureWorkingSetMiB) {
-    throw "Test module '$moduleName' peaked at $workingSetMiB MiB working set; failure budget is $FailureWorkingSetMiB MiB."
+if ($status -eq 'failed') {
+    throw "Test module '$moduleName' failed: $reasonSummary. See '$resolvedReport' for counts, exit code and budgets; rerun directly for test failure details."
 }
 if ($status -eq 'warning') {
     Write-Warning "Test module '$moduleName' peaked at $workingSetMiB MiB working set; warning budget is $WarningWorkingSetMiB MiB."
