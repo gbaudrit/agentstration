@@ -7,6 +7,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -135,7 +136,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     [DataRow("en-US", "Access")]
     [DataRow("fr-FR", "Accès")]
-    public void ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
+    public async Task ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext().WithCollectionPresentation();
@@ -150,9 +151,14 @@ public sealed class ExtensionManagedResourcePresentationTests
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new ProfileScopes(tenant));
         context.Services.AddSingleton<IConsoleNavigationContext>(new ProfileNavigationContext(Scope.Value));
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "access" })
+            module.Setup<string>("navigate", i => i.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance#" + path);
         var rendered = context.Render<DataSourceProfileEditor>(parameters => parameters.Add(component => component.Name, "crawl4ai-web"));
-        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll(".page-header button.button-danger")));
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == accessLabel).Click();
+        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll("button.button-danger")));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        Assert.AreEqual(accessLabel, rendered.Find("a[data-resource-section=access]").TextContent.Trim());
         rendered.WaitForElement("[data-testid=resource-access-target]").Change(tenant.Value);
         rendered.Find("[data-testid=resource-access-add]").Click();
         rendered.Find("[data-testid=resource-access-save]").Click();
@@ -163,7 +169,8 @@ public sealed class ExtensionManagedResourcePresentationTests
             Assert.IsNull(policies.Saved.Resource.Version);
             Assert.AreEqual(tenant, policies.Saved.Grants.Single().TargetScopeRef);
         });
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Définition" : "Definition")).Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.Sections.Any(value => value.Visible && value.Path.StartsWith("definition/", StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find("fieldset").HasAttribute("disabled"));
         Assert.IsEmpty(rendered.FindAll("button[type=submit]"));
     }

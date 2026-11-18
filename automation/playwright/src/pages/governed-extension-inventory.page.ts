@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { fillAndCommit } from './controls.js';
 import { TestIds } from '../contracts/test-ids.js';
@@ -112,13 +113,13 @@ export class GovernedExtensionInventoryPage {
         }
       }
       if (href.includes('/data-source-profiles/')) {
-        const text = GovernedInventoryTextByLocale[locale];
-        for (const tab of [text.definition, text.revisions, text.yaml]) {
-          await this.page.getByRole('tab', { name: tab, exact: true }).click();
+        await expect(this.page.locator('a[data-resource-section^="definition/"]')).toHaveCount(0);
+        for (const section of ['revisions', 'yaml']) {
+          await selectResourceSection(this.page, section);
           await this.assertNoMutation(locale);
-          if (tab !== text.yaml) await expect(this.page.locator('fieldset')).toHaveAttribute('disabled', '');
         }
-        await expect(this.page.locator('textarea')).toHaveAttribute('readonly', '');
+        await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveAttribute('readonly', '');
+        await expect(this.page.locator('fieldset')).toHaveAttribute('disabled', '');
       }
       await this.navigate(new URL(href, consoleUrl).href);
       await this.managed.locator('a').click();
@@ -183,9 +184,14 @@ export class GovernedExtensionInventoryPage {
     await this.navigate(`${consoleUrl}/data-source-profiles/qa-user?${query}`);
     await expect(this.managed).toHaveCount(0);
     await expect(this.page.getByRole('button', { name: text.delete, exact: true })).toBeEnabled();
-    await this.page.getByRole('tab', { name: text.definition, exact: true }).click();
-    await expect(this.page.locator('fieldset')).not.toHaveAttribute('disabled', '');
-    await expect(this.page.getByRole('button', { name: text.save, exact: true })).toBeEnabled();
+    await selectResourceSection(this.page, 'definition/configuration');
+    await expect(this.page.locator('#profile-resource-form fieldset')).not.toHaveAttribute('disabled', '');
+    const displayName = this.page.getByTestId(TestIds.sourceLifecycle.profileDisplayName);
+    const savedName = await displayName.inputValue();
+    await displayName.fill(savedName + ' editable');
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileSave)).toBeEnabled();
+    await displayName.fill(savedName);
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileSave)).toHaveCount(0);
   }
 
   public async inspectDegraded(consoleUrl: string, locale: SupportedTestLocale): Promise<void> {

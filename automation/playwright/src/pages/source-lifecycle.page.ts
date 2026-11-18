@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -306,9 +307,12 @@ export class SourceLifecyclePage {
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(f.profile);
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(f.profile);
+    await this.page.locator('[data-wizard-step=acquisition]').click();
     await choose(this.page.getByRole('combobox', { name: text.acquisitionFlow, exact: true }), f.acquisitionFlow);
+    await this.page.locator('[data-wizard-step=contracts]').click();
     await this.page.getByLabel(text.configurationSchema, { exact: true }).fill(JSON.stringify(sourceSchema));
-    await this.page.getByRole('button', { name: text.save, exact: true }).click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/data-source-profiles/${f.profile}\\?`));
     const profile = await this.read<ResourceWire & { activeVersion: string }>(consoleUrl, `/api/datasourceprofiles/${f.profile}`);
     expect(profile.activeVersion).toBe('1.0.0');
@@ -316,9 +320,9 @@ export class SourceLifecyclePage {
 
   private async inspectProfileYaml(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     await this.open(consoleUrl, `/data-source-profiles/${this.fixture.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await this.page.getByRole('tab', { name: text.yaml, exact: true }).click();
-    await expect(this.page.locator('textarea.runner-json')).toHaveValue(new RegExp(this.fixture.acquisitionFlow));
-    await this.page.getByRole('tab', { name: text.revisions, exact: true }).click();
+    await selectResourceSection(this.page, 'yaml');
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveValue(new RegExp(this.fixture.acquisitionFlow));
+    await selectResourceSection(this.page, 'revisions');
     await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' })).toHaveCount(1);
   }
 
@@ -346,12 +350,12 @@ export class SourceLifecyclePage {
   private async reviseProfile(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     const f = this.fixture;
     await this.open(consoleUrl, `/data-source-profiles/${f.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await this.page.getByRole('tab', { name: text.definition, exact: true }).click();
-    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
-    await this.page.getByRole('button', { name: text.save, exact: true }).click();
+    await selectResourceSection(this.page, 'definition/acquisition');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileVersion).fill('1.1.0');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).definition.version).toBe('1.1.0');
-    await this.page.getByRole('tab', { name: text.revisions, exact: true }).click();
-    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
+    await selectResourceSection(this.page, 'revisions');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profilePublishVersion).fill('1.1.0');
     await this.page.getByRole('button', { name: text.publish, exact: true }).click();
     await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' })).toBeVisible();
     // Explicit activation and rollback exercise the revision controls as well.

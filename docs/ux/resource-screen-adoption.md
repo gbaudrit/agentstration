@@ -12,7 +12,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ConnectedServiceEditor.razor | `/connected-services/new`, `/connected-services/{Name}/edit` | Pending review and migration |
 | ConsoleEntryInteraction.razor | `/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}` | Pending review and migration |
 | DataSourceEditor.razor | `/data-sources/new`, `/data-sources/{Name}` | Pending review and migration |
-| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Pending review and migration |
+| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Implemented; 16 profile/managed-family component cases pass, including exact pinned references, invalid JSON retention, header activation and publication-retry routing; TypeScript/catalog pass; existing lifecycle/inventory journeys maintained; browser checks pending |
 | EntryEditor.razor | `/entries/{Name}`, `/namespaces/{EntryNamespace}/entries/{Name}` | Pending review and migration |
 | ExtensionDetails.razor | `/extensions/{RegistrationName}`, `/extensions/enrollment/{EnrollmentInstanceId:guid}` | Pending review and migration |
 | FlowDesigner.razor | `/flows/{FlowId}/designer`, `/namespaces/{FlowNamespace}/flows/{FlowId}/designer` | Pending review and migration |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Saved configuration summaries add shared frames: **94 shared frames + 258 active specialized collections = 352**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **95 shared frames + 258 active specialized collections = 353**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 

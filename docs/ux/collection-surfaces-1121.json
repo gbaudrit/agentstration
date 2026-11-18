@@ -5714,6 +5714,39 @@
         "domainSemantics": "The extension is a real scoped resource reference. Contribution and option-contract IDs are configuration descriptors, without fictional resource ownership or publication state. Observed provider status is not an activation toggle.",
         "evidenceStatus": "Focused and browser validation pending this screen commit."
       }
+    },
+    {
+      "id": "data-source-profile-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/data-source-profiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-lifecycle.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved profile settings and exact declared Flow references; fresh browser validation remains pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved setting/value rows preserve schema, bindings, policies, state and declared exact Flow targets. Settings gain no resource identity or actions.",
+        "evidenceStatus": "Source adopted; browser validation reported separately."
+      }
     }
   ],
   "specialized": [

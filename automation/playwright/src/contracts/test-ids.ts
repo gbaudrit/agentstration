@@ -222,6 +222,7 @@ export const TestIds = {
     runError: 'flow-run-error',
     output: 'flow-run-output', outputRefresh: 'flow-run-output-refresh',
     outputExpired: 'flow-run-output-expired', outputEmpty: 'flow-run-output-empty', outputArtifact: 'flow-run-output-artifact',
+    profileSave: 'profile-save', profileDisplayName: 'profile-display-name', profileYaml: 'profile-yaml', profileVersion: 'profile-version', profilePublishVersion: 'profile-publish-version',
     profiles: 'resource-data-source-profiles', profileEditor: 'data-source-profile-editor', sources: 'resource-data-sources',
     knowledgeSources: 'resource-knowledge-sources', knowledgeDetails: 'resource-knowledge-source-details',
     projectionProvenance: 'knowledge-projection-provenance', snapshots: 'knowledge-snapshots',

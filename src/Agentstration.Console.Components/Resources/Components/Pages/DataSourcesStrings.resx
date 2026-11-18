@@ -272,4 +272,13 @@
   <data name="WizardFormInvalid" xml:space="preserve"><value>Correct the invalid fields before creating the Data Source.</value></data>
   <data name="WizardNotEntered" xml:space="preserve"><value>Not entered</value></data>
   <data name="WizardNotSelected" xml:space="preserve"><value>Not selected</value></data>
+  <data name="ProfileCreateAndPublish" xml:space="preserve"><value>Create and publish</value></data>
+  <data name="ProfileCreateAndPublishHelp" xml:space="preserve"><value>Creation saves the profile and publishes the version shown below.</value></data>
+  <data name="ProfileExecution" xml:space="preserve"><value>Execution policies</value></data>
+  <data name="ProfileFieldRequired" xml:space="preserve"><value>Enter a value.</value></data>
+  <data name="ProfileIdentityInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+  <data name="ProfileJsonInvalid" xml:space="preserve"><value>Enter valid JSON with the expected structure.</value></data>
+  <data name="ProfileSaveBeforeYaml" xml:space="preserve"><value>Save or discard the definition changes before editing YAML.</value></data>
+  <data name="ProfileSaveBeforePublication" xml:space="preserve"><value>Save or discard the definition changes before publishing or activating a version.</value></data>
+  <data name="ProfilePublicationPending" xml:space="preserve"><value>The profile was created, but publication was not confirmed. Review its published revisions, then retry publication if needed.</value></data>
 </root>

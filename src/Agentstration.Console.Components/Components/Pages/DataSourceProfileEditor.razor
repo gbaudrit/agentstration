@@ -6,52 +6,66 @@
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@(profile?.Definition.DisplayName ?? T(IsNew ? "CreateProfile" : "Profiles")) · Agentstration</PageTitle>
-<PageHeader ScopeRef="selectedScope" Title="@(profile?.Definition.DisplayName ?? T("CreateProfile"))" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor">
-    <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-source-profiles">@T("Back")</a></Actions>
-</PageHeader>
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+<PageTitle>@(profile?.Definition.DisplayName ?? T("CreateProfile")) · Agentstration</PageTitle>
+@{
+    RenderFragment feedback = @<div>
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+        @if (!IsNew && selectedScope is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
+        @if (PublicationPending && !revisions.Any(r => r.Version == profile?.Definition.Version)) { <div class="form-alert form-alert-warning" role="status">@T("ProfilePublicationPending")</div> }
+    </div>;
+}
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
-else
+else if (loadFailed) { @feedback }
+else if (IsNew)
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-    @if (!IsNew && selectedScope is not null) { <InheritedResourceNotice OwnerScopeRef="selectedScope.Value" /> }
-    @if (!IsNew)
-    {
-        <ResourceTabs Label="@T("Profiles")">@foreach (var value in Enum.GetValues<Tab>().Where(value => CanManageAccess || value is not Tab.Access)) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => tab = value">@T(value.ToString())</button> }</ResourceTabs>
-    }
-    @if (tab == Tab.Overview && !IsNew)
-    {
-        <section class="metric-grid"><MetricCard Label="@T("ActiveVersion")" Value="@(profile?.ActiveVersion ?? "—")" Detail="@T("Published")" Status="@(profile?.ActiveVersion is null ? UiStatus.Warning : UiStatus.Success)" /><MetricCard Label="@T("DraftVersion")" Value="@version" Detail="@T(enabled ? "Enabled" : "Disabled")" Status="@(enabled ? UiStatus.Success : UiStatus.Warning)" /></section>
-        <ExtensionManagedResourcePanel Governance="profile!.Governance" ScopeRef="profile.ScopeRef!.Value" Namespace="profile.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Uid="profile.Uid" />
-        <FormSection Title="@profile!.Definition.AcquisitionFlow.Name" Eyebrow="@T("Flow")"><ChildContent><ResourceScopeBadge ScopeRef="profile.ScopeRef" /></ChildContent></FormSection>
-    }
-    else if (tab == Tab.Definition || IsNew)
-    {
-        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)">
-            <FormGrid>
-                <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" />
-                <FormField Label="@T("Namespace")"><ClearableText @bind-Value="profileNamespace" Disabled="@(!IsNew)" /></FormField>
-                @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSourceProfile" @bind-Value="selectedScope" /> }
-                else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
+    <PageHeader Title="@T("CreateProfile")" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor"><Actions><a class="button-secondary" href="/data-source-profiles">@T("Back")</a></Actions></PageHeader>
+    @feedback
+    <EditForm EditContext="formContext" class="resource-form"><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p><fieldset class="resource-definition-fields" disabled="@busy"><CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" FinishLabel="@T("ProfileCreateAndPublish")" FinishTestId="profile-save" /></fieldset></EditForm>
+}
+else if (profile is not null)
+{
+    <ResourceDetailsTemplate Name="@profile.Definition.DisplayName" ResourceType="@T("Profile")" Domain="data" IconName="database"
+                             Description="@profile.Definition.Description" TechnicalName="@profile.Name" Namespace="@profile.Namespace.Value" ScopeRef="profile.ScopeRef"
+                             Enabled="enabled" EnabledChanged="value => enabled = value" EnabledDisabled="@(!CanManage || busy || HasRawDraft)" EnabledTestId="profile-enabled"
+                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{profile.Uid}")" DefaultSection="overview" SelectionChanged="SelectSection" Feedback="@feedback" HasDraft="@HasDefinitionDraft" TestId="data-source-profile-editor">
+        <Metadata>@if (section.StartsWith("definition/", StringComparison.Ordinal)) { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@busy" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-source-profiles">@T("Back")</a></Actions>
+        <Content>
+            <div hidden="@(section != "overview")">
+                <section class="metric-grid"><MetricCard Label="@T("ActiveVersion")" Value="@(profile.ActiveVersion ?? "—")" Detail="@T("Published")" Status="@(profile.ActiveVersion is null ? UiStatus.Neutral : UiStatus.Success)" /></section>
+                <ResourceIdentitySummary DisplayName="@profile.Definition.DisplayName" TechnicalName="@profile.Name" Namespace="@profile.Namespace.Value"><Scope><ResourceScopeBadge ScopeRef="profile.ScopeRef" /></Scope></ResourceIdentitySummary>
+                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></FormSection>
+                <ExtensionManagedResourcePanel Governance="profile.Governance" ScopeRef="profile.ScopeRef!.Value" Namespace="profile.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Uid="profile.Uid" />
+            </div>
+            <div hidden="@(!section.StartsWith("definition/", StringComparison.Ordinal))"><EditForm EditContext="formContext" OnSubmit="SaveAsync" id="profile-resource-form" class="resource-form"><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><fieldset class="resource-definition-fields" disabled="@(!CanManage || busy || HasRawDraft)"><div hidden="@(section != "definition/configuration")">@IdentityFields</div><div hidden="@(section != "definition/acquisition")">@AcquisitionFields</div><div hidden="@(section != "definition/contracts")">@ContractFields</div><div hidden="@(section != "definition/policies")">@PolicyFields</div></fieldset></EditForm></div>
+            <div hidden="@(section != "revisions")">@RevisionFields</div>
+            @if (accessVisited && CanManageAccess) { <div hidden="@(section != "access")"><ResourceAccessPanel OwnerScopeRef="selectedScope!.Value" Namespace="profile.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" ResourceUid="profile.Uid" Generation="profile.Generation" Governance="profile.Governance" DraftChanged="value => policyDirty = value" /></div> }
+            <div hidden="@(section != "yaml")"><FormSection Title="@T("Yaml")"><ChildContent>@if (HasMetadataDraft) { <p class="inline-info">@T("ProfileSaveBeforeYaml")</p> }<FormField Label="@T("Manifest")" Class="profile-yaml-field"><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="30" @bind-Value="rawYaml" ReadOnly="@(!CanManage || busy || HasMetadataDraft)" data-testid="profile-yaml" /></FormField></ChildContent></FormSection></div>
+        </Content>
+        <DraftActions><button class="button-secondary" type="button" disabled="@busy" @onclick="Discard">@Shared["Discard"]</button>@if (HasRawDraft) { <button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@T("ApplyYaml")</button> } else { <button class="button-primary" type="submit" form="profile-resource-form" disabled="@busy" data-testid="profile-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
+    </ResourceDetailsTemplate>
+}
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    private RenderFragment IdentityFields => @<FormSection Title="@T("WizardIdentity")"><FormGrid>
+                <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="profile-display-name" TechnicalNameTestId="profile-name" />
+                <FormField Label="@T("Namespace")"><Validation><ValidationMessage For="() => profileNamespace" /></Validation><ChildContent><ClearableText @bind-Value="profileNamespace" Disabled="@(!IsNew)" /></ChildContent></FormField>
+                @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSourceProfile" Value="selectedScope" ValueChanged="ScopeChanged" /> }
+                else { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSourceProfile" Value="selectedScope" Disabled="true" /> }
                 <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
-                <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="version" required /></FormField>
-                <FormField Label="@T("Flow")" Required="true"><ClearableSelect TValue="string" @bind-Value="flowKey" required><option value="">@T("Select")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></FormField>
-                <FormField Label="@T("DiscoveryFlow")"><ClearableSelect TValue="string" @bind-Value="discoveryFlowKey"><option value="">@T("None")</option>@foreach (var flow in flows) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></FormField>
-                <FormField Label="@T("Schema")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="14" @bind-Value="schemaJson"></ClearableText></ChildContent></FormField>
-                <FormField Label="@T("ToolBindings")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="toolBindingsJson"></ClearableText></ChildContent></FormField>
-                <FormField Label="@T("DiscoveryToolBindings")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="discoveryToolBindingsJson"></ClearableText></ChildContent></FormField>
-                <FormField Label="@T("Limits")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="6" @bind-Value="limitsJson"></ClearableText></ChildContent></FormField>
-                <FormField Label="@T("Policies")" Class="form-field-wide form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="6" @bind-Value="policiesJson"></ClearableText></ChildContent></FormField>
-                <label class="profile-choice form-span-2"><FormCheckbox @bind-Value="enabled" /><span class="profile-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong></span></label>
-            </FormGrid>
-            @if (CanManage) { <FormActions><button class="button-primary" type="submit" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></FormActions> }
-        </fieldset></EditForm>
-    }
-    else if (tab == Tab.Revisions)
-    {
-        <section class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><FormGrid><FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" /></FormField></FormGrid>@if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@busy" @onclick="PublishAsync">@T("Publish")</button></FormActions> }
-        @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <CollectionView TItem="DataSourceProfileRevisionResource" Items="revisions" InformationLabels="@(new string[] { T("Created") })" IdentityLabel="@T("Version")" StateLabel="@T("State")">
+<ValidationMessage For="() => selectedScope" />@if (IsNew) { <label class="resource-enabled-toggle"><FormCheckbox @bind-Value="enabled" role="switch" /><span>@T("Enabled")</span></label> }</FormGrid></FormSection>;
+    private RenderFragment AcquisitionFields => @<FormSection Title="@T("WizardAcquisition")"><FormGrid>
+        <FormField Label="@T("Version")" Required="true"><Validation><ValidationMessage For="() => version" /></Validation><ChildContent><ClearableText @bind-Value="version" data-testid="profile-version" /></ChildContent></FormField>
+        <FormField Label="@T("Flow")" Required="true"><Validation><ValidationMessage For="() => flowKey" /></Validation><ChildContent><ClearableSelect TValue="string" @bind-Value="flowKey" data-testid="profile-flow"><option value="">@T("Select")</option>@if (profile is not null) { <option value="saved-acquisition">@FlowLabel(profile.Definition.AcquisitionFlow)</option> }@foreach (var flow in flows.Where(f => f.ScopeRef is not null)) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></ChildContent></FormField>
+        <FormField Label="@T("DiscoveryFlow")" Optional="true"><ClearableSelect TValue="string" @bind-Value="discoveryFlowKey" data-testid="profile-discovery"><option value="">@T("None")</option>@if (profile?.Definition.DiscoveryFlow is { } discovery) { <option value="saved-discovery">@FlowLabel(discovery)</option> }@foreach (var flow in flows.Where(f => f.ScopeRef is not null)) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></FormField>
+    </FormGrid></FormSection>;
+    private RenderFragment ContractFields => @<FormSection Title="@T("WizardContracts")"><FormGrid><FormField Label="@T("Schema")" Class="form-span-2"><Validation><ValidationMessage For="() => schemaJson" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="14" @bind-Value="schemaJson" data-testid="profile-schemaJson" /></ChildContent></FormField><FormField Label="@T("ToolBindings")" Class="form-span-2"><Validation><ValidationMessage For="() => toolBindingsJson" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="toolBindingsJson" data-testid="profile-toolBindingsJson" /></ChildContent></FormField><FormField Label="@T("DiscoveryToolBindings")" Class="form-span-2"><Validation><ValidationMessage For="() => discoveryToolBindingsJson" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="10" @bind-Value="discoveryToolBindingsJson" data-testid="profile-discoveryToolBindingsJson" /></ChildContent></FormField></FormGrid></FormSection>;
+    private RenderFragment PolicyFields => @<FormSection Title="@T("ProfileExecution")"><FormGrid><FormField Label="@T("Limits")" Class="form-span-2"><Validation><ValidationMessage For="() => limitsJson" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="6" @bind-Value="limitsJson" data-testid="profile-limitsJson" /></ChildContent></FormField><FormField Label="@T("Policies")" Class="form-span-2"><Validation><ValidationMessage For="() => policiesJson" /></Validation><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="6" @bind-Value="policiesJson" data-testid="profile-policiesJson" /></ChildContent></FormField></FormGrid></FormSection>;
+    private RenderFragment RevisionFields => @<FormSection Title="@T("Revisions")"><ChildContent>@if (HasDefinitionDraft) { <p class="inline-info">@T("ProfileSaveBeforePublication")</p> }<fieldset class="resource-definition-fields" disabled="@(!CanManage || busy || HasDefinitionDraft)"><FormGrid><FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" data-testid="profile-publish-version" /></FormField></FormGrid>@if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@(busy || HasDefinitionDraft)" @onclick="PublishAsync">@T("Publish")</button></FormActions> }        @if (revisions.Count == 0) { <p class="muted">@T("NoRevisions")</p> } else { <CollectionView TItem="DataSourceProfileRevisionResource" Items="revisions" InformationLabels="@(new string[] { T("Created") })" IdentityLabel="@T("Version")" StateLabel="@T("State")">
         <Identity Context="revision">
 <code>@revision.Version</code></Identity>
         <State Context="revision">
@@ -60,58 +74,227 @@ else
             <CollectionValue Label="@T("Created")">@revision.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
         </Information>
         <Actions Context="revision">
-@if (CanManage && revision.Version != profile!.ActiveVersion) { <CollectionActions ResourceName="@(revision.Version)"> <button class="text-button" type="button" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button> </CollectionActions> }</Actions>
-    </CollectionView> }</fieldset></section>
-    }
-    else if (tab == Tab.Access && CanManageAccess)
-    {
-        <ResourceAccessPanel OwnerScopeRef="selectedScope!.Value" Namespace="profile!.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Generation="profile.Generation" Governance="profile.Governance" />
-    }
-    else if (tab == Tab.Yaml)
-    {
-        <section class="panel form-section"><FormField Label="@T("Manifest")" Class="profile-yaml-field"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor runner-json" rows="30" @bind-Value="rawYaml" ReadOnly="@(!CanManage)"></ClearableText></ChildContent></FormField>@if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@T("ApplyYaml")</button></FormActions> }</section>
-    }
-}
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+@if (CanManage && revision.Version != profile!.ActiveVersion) { <CollectionActions ResourceName="@(revision.Version)"><Primary><button class="text-button" type="button" disabled="@(busy || HasDefinitionDraft)" @onclick="() => ActivateAsync(revision.Version)">@T("Activate")</button></Primary></CollectionActions> }</Actions>
+    </CollectionView> }</fieldset></ChildContent></FormSection>;
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><p>@T("ProfileCreateAndPublishHelp")</p><dl class="resource-details"><dt>@T("WizardIdentity")</dt><dd>@displayName<br /><code>@profileNamespace/@technicalName</code></dd><dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd><dt>@T("Version")</dt><dd>@version</dd><dt>@T("Flow")</dt><dd>@(flows.FirstOrDefault(f => Key(f) == flowKey)?.Name ?? T("None"))</dd><dt>@T("State")</dt><dd>@T(enabled ? "Enabled" : "Disabled")</dd></dl></ChildContent></FormSection>;
 
-@code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
+    [SupplyParameterFromQuery(Name = "publicationPending")] public bool PublicationPending { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<FlowSummary> flows = [];
     private IReadOnlyList<DataSourceProfileRevisionResource> revisions = [];
     private DataSourceProfileResource? profile;
     private ResourceScopeRef? selectedScope;
-    private string? etag, error;
+    private string? etag, error, loadedKey;
+    private long loadVersion;
+    private string section = "overview", savedFingerprint = string.Empty, savedYaml = string.Empty;
     private string technicalName = string.Empty, displayName = string.Empty, profileNamespace = "default", description = string.Empty, version = "1.0.0", publishVersion = "1.0.0", flowKey = string.Empty, discoveryFlowKey = string.Empty;
     private string schemaJson = "{\n  \"type\": \"object\",\n  \"additionalProperties\": true\n}", toolBindingsJson = "[]", discoveryToolBindingsJson = "[]", limitsJson = "{}", policiesJson = "{}", rawYaml = string.Empty;
-    private bool enabled = true, loading = true, busy, confirmDelete;
-    private Tab tab = Tab.Definition;
+    private bool enabled = true, loading = true, loadFailed, busy, confirmDelete, invalidInput, policyDirty, accessVisited;
+    private EditContext formContext = null!;
+    private ValidationMessageStore messages = null!;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManageAccess => selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
+    private bool CanManageAccess => profile is not null && selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
     private bool CanManage => IsNew || profile?.Governance.IsManaged != true && CanManageAccess;
+    private bool HasMetadataDraft => !loading && CanManage && (Fingerprint != savedFingerprint || invalidInput);
+    private bool HasRawDraft => !loading && CanManage && rawYaml != savedYaml;
+    private bool HasDefinitionDraft => HasMetadataDraft || HasRawDraft;
+    private bool IsDirty => HasDefinitionDraft || policyDirty;
+    private string Fingerprint => JsonSerializer.Serialize(new { technicalName, displayName, profileNamespace, description, version, enabled, selectedScope, flowKey, discoveryFlowKey, schemaJson, toolBindingsJson, discoveryToolBindingsJson, limitsJson, policiesJson });
     private string T(string key) => Localizer[key];
-    protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { flows = await Flows.GetFlowsAsync(cancellation.Token); if (!IsNew) { selectedScope = ResourceScopeRef.Parse(ScopeRef!); var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope.Value, cancellation.Token); profile = snapshot.Value; etag = snapshot.ETag; revisions = await Client.GetRevisionsAsync(profile.Namespace, profile.Name, selectedScope.Value, cancellation.Token); LoadForm(); tab = Tab.Overview; } } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
-    private void LoadForm() { technicalName = profile!.Name; displayName = profile.Definition.DisplayName; profileNamespace = profile.Namespace.Value; description = profile.Definition.Description ?? string.Empty; version = profile.Definition.Version; publishVersion = version; enabled = profile.Definition.Enabled; flowKey = Key(profile.Definition.AcquisitionFlow, profile.Namespace); discoveryFlowKey = profile.Definition.DiscoveryFlow is null ? string.Empty : Key(profile.Definition.DiscoveryFlow, profile.Namespace); var options = new JsonSerializerOptions { WriteIndented = true }; schemaJson = JsonSerializer.Serialize(profile.Definition.ConfigurationSchema, options); toolBindingsJson = JsonSerializer.Serialize(profile.Definition.ToolBindings, options); discoveryToolBindingsJson = JsonSerializer.Serialize(profile.Definition.DiscoveryToolBindings, options); limitsJson = JsonSerializer.Serialize(profile.Definition.Limits, options); policiesJson = JsonSerializer.Serialize(profile.Definition.Policies, options); rawYaml = ResourceManifestSerializer.ToYaml(new RawProfile { ApiVersion = profile.ApiVersion, Kind = profile.Kind, Metadata = profile.Metadata, ScopeRef = profile.ScopeRef, Definition = profile.Definition }); }
-    private DataSourceProfileProperties Definition() { using var schema = JsonDocument.Parse(schemaJson); var parts = flowKey.Split('|', 3); var discoveryParts = discoveryFlowKey.Split('|', 3); if (parts.Length != 3) throw new InvalidOperationException(T("Select")); return new() { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Version = version.Trim(), ConfigurationSchema = schema.RootElement.Clone(), AcquisitionFlow = new() { ScopeRef = ResourceScopeRef.Parse(parts[0]), Name = parts[2], Namespace = ResourceNamespace.Parse(parts[1]), UseActiveVersion = true }, DiscoveryFlow = discoveryParts.Length == 3 ? new() { ScopeRef = ResourceScopeRef.Parse(discoveryParts[0]), Name = discoveryParts[2], Namespace = ResourceNamespace.Parse(discoveryParts[1]), UseActiveVersion = true } : null, ToolBindings = JsonSerializer.Deserialize<IReadOnlyList<DataSourceProfileToolBinding>>(toolBindingsJson) ?? [], DiscoveryToolBindings = JsonSerializer.Deserialize<IReadOnlyList<DataSourceProfileToolBinding>>(discoveryToolBindingsJson) ?? [], Limits = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(limitsJson) ?? new Dictionary<string, JsonElement>(), Policies = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(policiesJson) ?? new Dictionary<string, JsonElement>() }; }
-    private async Task SaveAsync() { busy = true; error = null; try { if (IsNew) { if (selectedScope is null) throw new InvalidOperationException(T("Scope")); var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), profileNamespace.Trim(), selectedScope), cancellation.Token); await Client.PublishAsync(saved.Value.Namespace, saved.Value.Name, selectedScope.Value, new(version.Trim()), cancellation.Token); Navigation.NavigateTo(Url(saved.Value)); } else { var saved = await Client.UpdateAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; LoadForm(); } } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task PublishAsync() { busy = true; try { await Client.PublishAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(publishVersion.Trim()), cancellation.Token); await ReloadAsync(); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task ActivateAsync(string value) { busy = true; try { var saved = await Client.ActivateAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(value), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task SaveYamlAsync() { try { var raw = ResourceManifestSerializer.FromYaml<RawProfile>(rawYaml); if (raw.Metadata.Name != profile!.Name || raw.Metadata.Namespace != profile.Namespace || raw.ScopeRef != profile.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(profile.Namespace, profile.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; LoadForm(); } catch (Exception exception) { error = exception.Message; } }
-    private async Task ReloadAsync() { var saved = await Client.GetAsync(profile!.Namespace, profile.Name, selectedScope!.Value, cancellation.Token); profile = saved.Value; etag = saved.ETag; revisions = await Client.GetRevisionsAsync(profile.Namespace, profile.Name, selectedScope.Value, cancellation.Token); LoadForm(); }
-    private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(profile!.Namespace, profile.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-source-profiles"); }
-    private static string Key(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
-    private string Key(DataSourceFlowTarget target, ResourceNamespace owner)
+    private IReadOnlyList<ResourceNavigationItem> Sections =>
+    [
+        new("overview", T("Overview"), "home"),
+        new("definition", T("Definition"), "settings") { Navigable = false, Visible = CanManage },
+        new("definition/configuration", Shared["Configuration"], "forms") { Visible = CanManage },
+        new("definition/acquisition", T("WizardAcquisition"), "arrows-shuffle") { Visible = CanManage },
+        new("definition/contracts", T("WizardContracts"), "file-code") { Visible = CanManage },
+        new("definition/policies", T("ProfileExecution"), "shield") { Visible = CanManage },
+        new("revisions", T("Revisions"), "history"),
+        new("access", T("Access"), "key") { Visible = CanManageAccess },
+        new("yaml", T("Yaml"), "code")
+    ];
+    private IReadOnlyList<CreationWizardStep> Steps =>
+    [
+        new("identity", T("WizardIdentity"), IdentityFields) { IsComplete = IdentityComplete },
+        new("acquisition", T("WizardAcquisition"), AcquisitionFields) { IsComplete = AcquisitionComplete },
+        new("contracts", T("WizardContracts"), ContractFields) { IsComplete = ContractsComplete },
+        new("policies", T("ProfileExecution"), PolicyFields) { IsComplete = PoliciesComplete },
+        new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && AcquisitionComplete && ContractsComplete && PoliciesComplete }
+    ];
+    private bool IdentityComplete
     {
-        var @namespace = target.Namespace ?? owner;
-        var scopeRef = target.ScopeRef ?? flows.Where(value => value.Namespace == @namespace && value.Id == target.Name)
-            .Select(value => value.ScopeRef).SingleOrDefault();
-        return scopeRef is null ? string.Empty : $"{scopeRef.Value.Value}|{@namespace.Value}|{target.Name}";
+        get
+        {
+            if (string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(technicalName) || selectedScope is null) return false;
+            return NamespaceValid;
+        }
     }
-    private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
+    private bool NamespaceValid { get { try { _ = ResourceNamespace.Parse(profileNamespace); return !string.IsNullOrWhiteSpace(profileNamespace); } catch (ArgumentException) { return false; } } }
+    private bool AcquisitionComplete => !string.IsNullOrWhiteSpace(version) && ResolveFlow(flowKey, false) is not null;
+    private bool ContractsComplete => ValidJson<JsonElement>(schemaJson, JsonValueKind.Object) && ValidJson<IReadOnlyList<DataSourceProfileToolBinding>>(toolBindingsJson, JsonValueKind.Array) && ValidJson<IReadOnlyList<DataSourceProfileToolBinding>>(discoveryToolBindingsJson, JsonValueKind.Array);
+    private bool PoliciesComplete => ValidJson<IReadOnlyDictionary<string, JsonElement>>(limitsJson, JsonValueKind.Object) && ValidJson<IReadOnlyDictionary<string, JsonElement>>(policiesJson, JsonValueKind.Object);
+    private static bool ValidJson<TValue>(string value, JsonValueKind kind)
+    {
+        try { using var json = JsonDocument.Parse(value); return json.RootElement.ValueKind == kind && JsonSerializer.Deserialize<TValue>(value) is not null; } catch (JsonException) { return false; }
+    }
+    private void NewContext()
+    {
+        if (formContext is not null) formContext.OnFieldChanged -= FieldChanged;
+        formContext = new(this); messages = new(formContext); formContext.OnFieldChanged += FieldChanged;
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) { messages.Clear(args.FieldIdentifier); formContext.NotifyValidationStateChanged(); }
+    private bool Validate()
+    {
+        messages.Clear();
+        void Require(bool valid, string field, string message) { if (!valid) messages.Add(new FieldIdentifier(this, field), T(message)); }
+        Require(!string.IsNullOrWhiteSpace(displayName), nameof(displayName), "ProfileFieldRequired");
+        Require(!string.IsNullOrWhiteSpace(technicalName), nameof(technicalName), "ProfileFieldRequired");
+        Require(NamespaceValid, nameof(profileNamespace), "ProfileIdentityInvalid");
+        Require(selectedScope is not null, nameof(selectedScope), "ProfileFieldRequired");
+        Require(!string.IsNullOrWhiteSpace(version), nameof(version), "ProfileFieldRequired");
+        Require(ResolveFlow(flowKey, false) is not null, nameof(flowKey), "ProfileFieldRequired");
+        Require(ValidJson<JsonElement>(schemaJson, JsonValueKind.Object), nameof(schemaJson), "ProfileJsonInvalid");
+        Require(ValidJson<IReadOnlyList<DataSourceProfileToolBinding>>(toolBindingsJson, JsonValueKind.Array), nameof(toolBindingsJson), "ProfileJsonInvalid");
+        Require(ValidJson<IReadOnlyList<DataSourceProfileToolBinding>>(discoveryToolBindingsJson, JsonValueKind.Array), nameof(discoveryToolBindingsJson), "ProfileJsonInvalid");
+        Require(ValidJson<IReadOnlyDictionary<string, JsonElement>>(limitsJson, JsonValueKind.Object), nameof(limitsJson), "ProfileJsonInvalid");
+        Require(ValidJson<IReadOnlyDictionary<string, JsonElement>>(policiesJson, JsonValueKind.Object), nameof(policiesJson), "ProfileJsonInvalid");
+        formContext.NotifyValidationStateChanged(); return !formContext.GetValidationMessages().Any();
+    }
+    private void ScopeChanged(ResourceScopeRef? value) { var initializing = selectedScope is null && Fingerprint == savedFingerprint; selectedScope = value; if (initializing) savedFingerprint = Fingerprint; }
+    private void SelectSection(string? path) { section = path ?? "overview"; if (section == "access" && CanManageAccess) accessVisited = true; }
+    private string InvalidStep => !IdentityComplete ? "identity" : !AcquisitionComplete ? "acquisition" : !ContractsComplete ? "contracts" : "policies";
+    private async Task FinishAsync(CreationWizardFinish finish) { if (!Validate()) { finish.ReturnToStepId = InvalidStep; return; } await SaveAsync(); }
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRef}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (key == loadedKey) return;
+        loadedKey = key; var request = ++loadVersion; loading = true; loadFailed = false; error = null; profile = null; policyDirty = accessVisited = false; section = "overview";
+        try
+        {
+            var available = await Flows.GetFlowsAsync(cancellation.Token);
+            if (IsNew)
+            {
+                if (request != loadVersion) return;
+                flows = available; selectedScope = string.IsNullOrWhiteSpace(ScopeRef) ? null : ResourceScopeRef.Parse(ScopeRef); profileNamespace = ResourceNamespace.Parse(Namespace).Value;
+                technicalName = displayName = description = flowKey = discoveryFlowKey = string.Empty; version = publishVersion = "1.0.0"; enabled = true;
+                schemaJson = "{\"type\":\"object\",\"additionalProperties\":true}"; toolBindingsJson = discoveryToolBindingsJson = "[]"; limitsJson = policiesJson = "{}"; rawYaml = savedYaml = string.Empty;
+                NewContext(); savedFingerprint = Fingerprint; return;
+            }
+            var owner = ResourceScopeRef.Parse(ScopeRef!);
+            var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, owner, cancellation.Token);
+            var history = await Client.GetRevisionsAsync(snapshot.Value.Namespace, snapshot.Value.Name, owner, cancellation.Token);
+            if (request != loadVersion) return;
+            flows = available; profile = snapshot.Value; selectedScope = profile.ScopeRef; etag = snapshot.ETag; revisions = history; LoadForm();
+        }
+        catch (Exception exception) { if (request == loadVersion) { error = exception.Message; loadFailed = true; loadedKey = null; } }
+        finally { if (request == loadVersion) { loading = false; invalidInput = false; } }
+    }
+    private static string Json<TValue>(TValue value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private void LoadForm()
+    {
+        technicalName = profile!.Name; displayName = profile.Definition.DisplayName; profileNamespace = profile.Namespace.Value; description = profile.Definition.Description ?? string.Empty;
+        version = publishVersion = profile.Definition.Version; enabled = profile.Definition.Enabled; flowKey = "saved-acquisition"; discoveryFlowKey = profile.Definition.DiscoveryFlow is null ? string.Empty : "saved-discovery";
+        schemaJson = Json(profile.Definition.ConfigurationSchema); toolBindingsJson = Json(profile.Definition.ToolBindings); discoveryToolBindingsJson = Json(profile.Definition.DiscoveryToolBindings); limitsJson = Json(profile.Definition.Limits); policiesJson = Json(profile.Definition.Policies);
+        rawYaml = savedYaml = ResourceManifestSerializer.ToYaml(new RawProfile { ApiVersion = profile.ApiVersion, Kind = profile.Kind, Metadata = profile.Metadata, ScopeRef = profile.ScopeRef, Definition = profile.Definition });
+        NewContext(); invalidInput = false; savedFingerprint = Fingerprint;
+    }
+    private DataSourceFlowTarget? ResolveFlow(string key, bool discovery)
+    {
+        if (key == "saved-acquisition" && !discovery) return profile?.Definition.AcquisitionFlow;
+        if (key == "saved-discovery" && discovery) return profile?.Definition.DiscoveryFlow;
+        var flow = flows.FirstOrDefault(f => f.ScopeRef is not null && Key(f) == key);
+        return flow is null ? null : new() { ScopeRef = flow.ScopeRef, Name = flow.Id, Namespace = flow.Namespace, UseActiveVersion = true };
+    }
+    private DataSourceProfileProperties Definition() => new()
+    {
+        DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Version = version.Trim(),
+        ConfigurationSchema = JsonSerializer.Deserialize<JsonElement>(schemaJson), AcquisitionFlow = ResolveFlow(flowKey, false)!, DiscoveryFlow = ResolveFlow(discoveryFlowKey, true),
+        ToolBindings = JsonSerializer.Deserialize<IReadOnlyList<DataSourceProfileToolBinding>>(toolBindingsJson)!, DiscoveryToolBindings = JsonSerializer.Deserialize<IReadOnlyList<DataSourceProfileToolBinding>>(discoveryToolBindingsJson)!,
+        Limits = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(limitsJson)!, Policies = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(policiesJson)!
+    };
+    private async Task SaveAsync()
+    {
+        if (!CanManage || busy || HasRawDraft) return;
+        if (!Validate()) { if (!IsNew) { section = "definition/" + (InvalidStep == "identity" ? "configuration" : InvalidStep); Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + section); } return; }
+        busy = true; error = null;
+        try
+        {
+            if (IsNew)
+            {
+                var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), profileNamespace.Trim(), selectedScope), cancellation.Token);
+                savedFingerprint = Fingerprint; invalidInput = false;
+                try { await Client.PublishAsync(saved.Value.Namespace, saved.Value.Name, saved.Value.ScopeRef!.Value, new(version.Trim()), cancellation.Token); }
+                catch (Exception) { Navigation.NavigateTo(Url(saved.Value) + "&publicationPending=true#revisions"); return; }
+                Navigation.NavigateTo(Url(saved.Value));
+            }
+            else
+            {
+                var saved = await Client.UpdateAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token);
+                profile = saved.Value; etag = saved.ETag; LoadForm();
+            }
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { busy = false; }
+    }
+    private void Discard() { if (!busy && profile is not null) { LoadForm(); error = null; } }
+    private async Task PublishAsync()
+    {
+        if (!CanManage || busy || HasDefinitionDraft) return;
+        busy = true; error = null;
+        try { await Client.PublishAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(publishVersion.Trim()), cancellation.Token); await ReloadAsync(); }
+        catch (Exception exception) { error = exception.Message; } finally { busy = false; }
+    }
+    private async Task ActivateAsync(string value)
+    {
+        if (!CanManage || busy || HasDefinitionDraft) return;
+        busy = true; error = null;
+        try { var saved = await Client.ActivateAsync(profile!.Namespace, profile.Name, selectedScope!.Value, new(value), etag!, cancellation.Token); profile = saved.Value; etag = saved.ETag; LoadForm(); }
+        catch (Exception exception) { error = exception.Message; } finally { busy = false; }
+    }
+    private async Task SaveYamlAsync()
+    {
+        if (!CanManage || busy || HasMetadataDraft) return;
+        busy = true; error = null;
+        try
+        {
+            var raw = ResourceManifestSerializer.FromYaml<RawProfile>(rawYaml);
+            if (raw.Metadata.Name != profile!.Name || raw.Metadata.Namespace != profile.Namespace || raw.ScopeRef != profile.ScopeRef) throw new ArgumentException(T("IdentityImmutable"));
+            var saved = await Client.UpdateAsync(profile.Namespace, profile.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token);
+            profile = saved.Value; etag = saved.ETag; LoadForm();
+        }
+        catch (Exception exception) { error = exception.Message; } finally { busy = false; }
+    }
+    private async Task ReloadAsync()
+    {
+        var saved = await Client.GetAsync(profile!.Namespace, profile.Name, selectedScope!.Value, cancellation.Token);
+        profile = saved.Value; etag = saved.ETag; revisions = await Client.GetRevisionsAsync(profile.Namespace, profile.Name, selectedScope.Value, cancellation.Token); LoadForm();
+    }
+    private async Task DeleteAsync()
+    {
+        if (!CanManage || busy) return;
+        confirmDelete = false; busy = true; error = null;
+        try { await Client.DeleteAsync(profile!.Namespace, profile.Name, selectedScope!.Value, etag!, cancellation.Token); savedFingerprint = Fingerprint; savedYaml = rawYaml; invalidInput = policyDirty = false; Navigation.NavigateTo("/data-source-profiles"); }
+        catch (Exception exception) { error = exception.Message; } finally { busy = false; }
+    }
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => profile is null ? [] :
+    [
+        new(T("State"), T(profile.Definition.Enabled ? "Enabled" : "Disabled")),
+        new(T("PublishedVersion"), profile.PublishedVersion ?? "—"),
+        new(T("Flow"), FlowLabel(profile.Definition.AcquisitionFlow)),
+        new(T("DiscoveryFlow"), profile.Definition.DiscoveryFlow is { } discovery ? FlowLabel(discovery) : T("None")),
+        new(T("Schema"), Json(profile.Definition.ConfigurationSchema)),
+        new(T("ToolBindings"), Json(profile.Definition.ToolBindings)),
+        new(T("DiscoveryToolBindings"), Json(profile.Definition.DiscoveryToolBindings)),
+        new(T("Limits"), Json(profile.Definition.Limits)),
+        new(T("Policies"), Json(profile.Definition.Policies))
+    ];
+    private string FlowLabel(DataSourceFlowTarget flow) => $"{flow.ScopeRef} · {flow.Namespace ?? profile?.Namespace ?? ResourceNamespace.Parse(profileNamespace)}/{flow.Name} · {(flow.UseActiveVersion ? T("ActiveVersion") : flow.Version ?? "—")}";
+    private static string Key(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
+    private string Url(DataSourceProfileResource item) => ResourceOwnershipContext.Resource(Services, "/data-source-profiles", item.Name, item.Namespace, item.ScopeRef);
     private sealed record RawProfile { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required ResourceMetadata Metadata { get; init; } public ResourceScopeRef? ScopeRef { get; init; } public required DataSourceProfileProperties Definition { get; init; } }
-    private enum Tab { Overview, Definition, Revisions, Access, Yaml }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { if (formContext is not null) formContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }
