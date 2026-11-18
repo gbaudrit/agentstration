@@ -89,7 +89,7 @@
     {
         <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
             <label><span>@Localizer[IsJsonSchema ? "DefinitionSource" : "NativeDefinitionSource"]</span></label>
-            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" Language="@(IsXml ? "xml" : "json")" />
+            <SchemaSourceEditor @key="Format" Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" Language="@(IsXml ? "xml" : "json")" />
             @if (!ReadOnly)
             {
                 <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>

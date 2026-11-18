@@ -187,14 +187,18 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         foreach (var part in Segments(path, ns))
         {
             var next = new List<XObject>();
+            var text = part == "text()";
+            var attribute = part.StartsWith('@');
+            var name = text ? null : Name(attribute ? part[1..] : part, ns);
             foreach (var node in current)
             {
-                IEnumerable<XObject> candidates = part == "text()" ? (node as XContainer)?.Nodes().OfType<XText>() ?? []
-                    : part.StartsWith('@') ? (node as XElement)?.Attributes(Name(part[1..], ns)) ?? []
-                    : (node as XContainer)?.Elements(Name(part, ns)) ?? [];
+                IEnumerable<XObject> candidates = attribute ? (node as XElement)?.Attributes() ?? []
+                    : (node as XContainer)?.Nodes() ?? [];
                 foreach (var candidate in candidates)
                 {
                     budget.Spend();
+                    if (!(text ? candidate is XText : attribute ? candidate is XAttribute a && a.Name == name
+                        : candidate is XElement e && e.Name == name)) continue;
                     if (next.Count == 8192) throw Error("xml_selection_limit");
                     next.Add(candidate);
                 }

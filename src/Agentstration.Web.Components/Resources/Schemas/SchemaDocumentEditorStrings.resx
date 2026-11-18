@@ -16,4 +16,5 @@
   <data name="Issue.xml_contract_invalid" xml:space="preserve"><value>The XML content does not satisfy the standalone XSD contract.</value></data>
   <data name="Issue.transformation_definition_invalid" xml:space="preserve"><value>Provide exact engine and input/output Schema versions, namespace aliases and bounded mapping rules.</value></data>
   <data name="NativeDefinitionSource" xml:space="preserve"><value>Native definition</value></data>
+  <data name="LoadingEditor" xml:space="preserve"><value>Loading the source editor…</value></data>
 </root>

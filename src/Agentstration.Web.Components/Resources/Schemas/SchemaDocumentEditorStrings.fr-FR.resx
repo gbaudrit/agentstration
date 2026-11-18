@@ -16,4 +16,5 @@
   <data name="Issue.xml_contract_invalid" xml:space="preserve"><value>Le contenu XML ne respecte pas le contrat XSD autonome.</value></data>
   <data name="Issue.transformation_definition_invalid" xml:space="preserve"><value>Indiquez les versions exactes du moteur et des schémas d’entrée et de sortie, les alias d’espaces de noms et des règles de mapping bornées.</value></data>
   <data name="NativeDefinitionSource" xml:space="preserve"><value>Définition native</value></data>
+  <data name="LoadingEditor" xml:space="preserve"><value>Chargement de l’éditeur source…</value></data>
 </root>

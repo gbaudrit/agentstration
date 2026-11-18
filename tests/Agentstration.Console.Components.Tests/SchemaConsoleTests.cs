@@ -376,6 +376,21 @@ public sealed class SchemaConsoleTests
         Assert.AreEqual("<replacement />", validated.Definition.GetString());
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Loading the source editor…")]
+    [DataRow("fr-FR", "Chargement de l’éditeur source…")]
+    public void NativeSourceEditorWaitsForTheLocalMonacoModule(string locale, string loading)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = Context(new SchemaClientStub([]));
+        var ready = context.JSInterop.SetupVoid("agentstrationMonaco.ready");
+        var rendered = context.Render<SchemaSourceEditor>(p => p.Add(v => v.Value, "<schema />").Add(v => v.Language, "xml"));
+        Assert.Contains(loading, rendered.Markup);
+        Assert.IsEmpty(rendered.FindComponents<BlazorMonaco.Editor.StandaloneCodeEditor>());
+        ready.SetVoidResult();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<BlazorMonaco.Editor.StandaloneCodeEditor>()));
+    }
+
     private sealed class ExposureContext(bool canWrite) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
