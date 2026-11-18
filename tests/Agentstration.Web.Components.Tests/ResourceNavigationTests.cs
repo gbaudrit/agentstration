@@ -71,7 +71,7 @@ public sealed class ResourceNavigationTests
         var owner = cut.Instance;
         await cut.InvokeAsync(() => navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#definition/tools"));
         cut.WaitForAssertion(() => Assert.AreEqual("definition/tools", owner.Selected));
-        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.ObserveLocation(navigation.Uri.Split('#')[0] + "#yaml"));
+        await cut.InvokeAsync(() => navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#yaml"));
         cut.WaitForAssertion(() => Assert.AreEqual("yaml", owner.Selected));
         Assert.AreSame(owner, cut.Instance);
         Assert.AreEqual("unsaved form", owner.Draft);

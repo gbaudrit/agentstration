@@ -9,6 +9,8 @@ function environment() {
   const rootListeners = new Map<string, (event: any) => void>();
   const windowListeners = new Map<string, () => void>();
   const mediaListeners = new Map<string, () => void>();
+  const entryListeners = new Map<string, (event: any) => void>();
+  const documentListeners = new Map<string, () => void>();
   const calls: unknown[][] = [];
   const link = { dataset: { resourceSection: 'definition/tools' } };
   const rail = { contains: () => true };
@@ -16,10 +18,10 @@ function environment() {
     addEventListener: (name: string, action: (event: any) => void) => rootListeners.set(name, action),
     removeEventListener: (name: string) => rootListeners.delete(name), querySelector: () => rail };
   const media = { matches: false, addEventListener: (name: string, action: () => void) => mediaListeners.set(name, action), removeEventListener: (name: string) => mediaListeners.delete(name) };
-  Object.assign(globalThis, { window: { location: { href: 'https://example.test/agents/a?namespace=demo&context=%2Finstance#yaml' }, matchMedia: () => media,
-    addEventListener: (name: string, action: () => void) => windowListeners.set(name, action), removeEventListener: (name: string) => windowListeners.delete(name) }, document: { activeElement: {} } });
+  Object.assign(globalThis, { window: { navigation: { addEventListener: (name: string, action: (event: any) => void) => entryListeners.set(name, action), removeEventListener: (name: string) => entryListeners.delete(name) }, location: { href: 'https://example.test/agents/a?namespace=demo&context=%2Finstance#yaml' }, matchMedia: () => media,
+    addEventListener: (name: string, action: () => void) => windowListeners.set(name, action), removeEventListener: (name: string) => windowListeners.delete(name) }, document: { activeElement: {}, addEventListener: (name: string, action: () => void) => documentListeners.set(name, action), removeEventListener: (name: string) => documentListeners.delete(name) } });
   const registration = module.observe(root, { invokeMethodAsync: async (...args: unknown[]) => { calls.push(args); } });
-  return { root, link, rootListeners, windowListeners, mediaListeners, media, calls, registration };
+  return { root, link, rootListeners, windowListeners, mediaListeners, media, rail, entryListeners, documentListeners, calls, registration };
 }
 test('plain activation is intercepted while browser modified/new-tab actions remain native', () => {
   const e = environment(); let prevented = 0;
@@ -31,35 +33,51 @@ test('plain activation is intercepted while browser modified/new-tab actions rem
   assert.equal(prevented, 1); assert.deepEqual(e.calls, [['NavigateSection', 'definition/tools']]);
   e.registration.dispose();
 });
-test('hash and browser history changes forward the actual URL', () => {
-  const e = environment(); e.windowListeners.get('hashchange')!(); e.windowListeners.get('popstate')!();
-  assert.equal(e.calls.length, 2); assert.equal(e.calls[0][0], 'ObserveLocation');
-  assert.match(String(e.calls[0][1]), /#yaml$/); e.registration.dispose();
+test('fragment pushes are observed while guarded traversals remain owned by Blazor', () => {
+  const e = environment();
+  e.entryListeners.get('currententrychange')!({ navigationType: 'traverse' });
+  assert.equal(e.calls.length, 0);
+  e.entryListeners.get('currententrychange')!({ navigationType: 'push' });
+  assert.deepEqual(e.calls, [['ObserveLocation', 'https://example.test/agents/a?namespace=demo&context=%2Finstance#yaml']]);
+  assert.equal(e.windowListeners.size, 0);
+  e.registration.dispose();
+  assert.equal(e.entryListeners.size, 0);
 });
 test('responsive transitions report focus context without changing section identity', () => {
   const e = environment(); e.media.matches = true; e.mediaListeners.get('change')!();
   assert.deepEqual(e.calls, [['BreakpointChanged', true, true]]); e.registration.dispose();
 });
+test('focus remembered before CSS hides the rail transfers to the mobile trigger', () => {
+  const e = environment(); e.media.matches = true; e.documentListeners.get('focusin')!();
+  e.rail.contains = () => false; e.media.matches = false; e.mediaListeners.get('change')!();
+  assert.deepEqual(e.calls, [['BreakpointChanged', false, true]]);
+  e.registration.dispose(); assert.equal(e.documentListeners.size, 0);
+});
 test('disposal removes every listener and stale callbacks do not reach a disposed component', () => {
-  const e = environment(); const changed = e.windowListeners.get('hashchange')!;
-  e.registration.dispose(); changed();
+  const e = environment(); const resized = e.mediaListeners.get('change')!;
+  e.registration.dispose(); resized();
   assert.equal(e.calls.length, 0); assert.equal(e.rootListeners.size + e.windowListeners.size + e.mediaListeners.size, 0);
   assert.equal(module.observe(null, {}), undefined);
 });
-test('native section history preserves Blazor state and cannot rewrite another resource/context', () => {
+test('public Blazor navigation owns section history and cannot rewrite another resource/context', () => {
   let current = new URL('https://example.test/agents/a?namespace=demo&context=%2Finstance&view=old#overview');
   const state = { _index: 4, application: 'preserved' }; const replacements: unknown[] = [];
   const location = { get href() { return current.href; }, set hash(value: string) { current.hash = value; } };
-  Object.assign(globalThis, { window: { location, history: { state, replaceState: (value: unknown, title: string, url: string) => { assert.equal(value, state); replacements.push(url); current = new URL(url); } }, dispatchEvent: () => true } });
+  Object.assign(globalThis, { window: { location, Blazor: { navigateTo: (url: string, options: { replaceHistoryEntry: boolean; historyEntryState?: string }) => { assert.equal(options.replaceHistoryEntry, false); assert.equal(options.historyEntryState, 'owned-state'); current = new URL(url); } }, history: { state, replaceState: (value: unknown, title: string, url: string) => { assert.equal(value, state); replacements.push(url); current = new URL(url); } }, dispatchEvent: () => true } });
   const destination = 'https://example.test/agents/a?namespace=demo&context=%2Finstance#definition/tools';
-  assert.equal(module.navigate(destination, false), destination);
+  assert.equal(module.navigate(destination, false, 'owned-state'), destination);
   assert.equal(replacements.length, 1);
   assert.equal(module.navigate('https://example.test/agents/a?context=%2Ftenants%2Fother#yaml', false), destination);
   assert.equal(module.navigate('https://example.test/agents/b?namespace=demo&context=%2Finstance#yaml', true), destination);
 });
-test('normalization replaces the current entry and emits a location observation', () => {
-  let current = 'https://example.test/agents/a#invalid'; let events = 0;
-  Object.assign(globalThis, { window: { location: { get href() { return current; } }, history: { state: {}, replaceState: (_state: unknown, _title: string, value: string) => { current = value; } }, dispatchEvent: () => { events++; } } });
+test('normalization replaces the current entry through Blazor navigation', () => {
+  let current = 'https://example.test/agents/a#invalid'; let navigations = 0;
+  Object.assign(globalThis, { window: { location: { get href() { return current; } }, Blazor: { navigateTo: (url: string, options: { replaceHistoryEntry: boolean }) => { assert.equal(options.replaceHistoryEntry, true); current = url; navigations++; } }, history: { state: {}, replaceState: (_state: unknown, _title: string, value: string) => { current = value; } } } });
   assert.equal(module.navigate('https://example.test/agents/a#overview', true), 'https://example.test/agents/a#overview');
-  assert.equal(events, 1);
+  assert.equal(navigations, 1);
+});
+test('selecting the current destination does not add duplicate history', () => {
+  const current = 'https://example.test/agents/a#yaml';
+  Object.assign(globalThis, { window: { location: { href: current }, Blazor: { navigateTo: () => assert.fail('duplicate navigation') } } });
+  assert.equal(module.navigate(current, false), current);
 });

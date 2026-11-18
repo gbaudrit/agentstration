@@ -136,7 +136,7 @@
     {
         if (disposed || module is null || BaseUri(Navigation.Uri) != identity || !CanSelect(path)) return;
         unavailable = false;
-        var actual = await module.InvokeAsync<string>("navigate", Link(path), false);
+        var actual = await module.InvokeAsync<string>("navigate", Link(path), false, Navigation.HistoryEntryState);
         if (disposed) return;
         ApplyLocation(actual);
         if (CurrentPath == path) drawerOpen = false;
@@ -182,7 +182,7 @@
         if (canonicalPending is { } canonical)
         {
             canonicalPending = null; correctedTarget = canonical;
-            var actual = await module!.InvokeAsync<string>("navigate", canonical, true);
+            var actual = await module!.InvokeAsync<string>("navigate", canonical, true, Navigation.HistoryEntryState);
             if (disposed) return;
             ApplyLocation(actual);
             StateHasChanged();

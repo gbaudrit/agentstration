@@ -1,7 +1,7 @@
 .resource-navigation { min-width: 0; max-width: 100%; }
 .resource-navigation-trigger { display: none; align-items: center; gap: .5rem; min-height: 2.75rem; }
 .resource-navigation-trigger ::deep svg, .resource-navigation-entry ::deep svg, .resource-navigation-expand ::deep svg, .resource-navigation-chevron ::deep svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
-.resource-navigation-rail { width: min(18rem, 100%); max-height: calc(100dvh - 5rem); overflow: auto; border: 1px solid var(--border); border-radius: .6rem; padding: .5rem; background: var(--surface); }
+.resource-navigation-rail { box-sizing: border-box; width: min(18rem, 100%); max-height: calc(100dvh - 5rem); overflow: auto; border: 1px solid var(--border); border-radius: .6rem; padding: .5rem; background: var(--surface); }
 .resource-navigation-list, .resource-navigation-children { margin: 0; padding: 0; list-style: none; }
 .resource-navigation-row { display: flex; align-items: stretch; position: relative; min-width: 0; }
 .resource-navigation-entry { display: flex; align-items: center; gap: .6rem; min-width: 0; width: 100%; min-height: 2.75rem; border: 0; border-radius: .4rem; padding: .65rem; background: transparent; text-decoration: none; text-align: left; font: inherit; color: var(--muted); }

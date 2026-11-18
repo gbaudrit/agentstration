@@ -1,5 +1,5 @@
 // Only section history belongs here. Resource/context navigation remains owned by Blazor.
-export function navigate(location, replace) {
+export function navigate(location, replace, historyEntryState) {
     const current = new URL(window.location.href), target = new URL(location, current);
     const identity = url => {
         const query = new URLSearchParams(url.search);
@@ -7,18 +7,13 @@ export function navigate(location, replace) {
         return url.origin + url.pathname + '?' + query.toString();
     };
     if (identity(current) !== identity(target)) return current.href;
-    if (replace) {
-        window.history.replaceState(window.history.state, '', target.href);
-        window.dispatchEvent(new Event('hashchange'));
-    } else {
-        if (current.search !== target.search) {
-            current.search = target.search;
-            window.history.replaceState(window.history.state, '', current.href);
-        }
-        // Native hash navigation produces the expected history/hash events even
-        // when Blazor optimizes same-document fragment navigation.
-        window.location.hash = target.hash;
+    // Drop obsolete selectors without creating a resource navigation. Preserve
+    // Blazor's history state; its public navigation API owns section entries.
+    if (current.search !== target.search) {
+        current.search = target.search;
+        window.history.replaceState(window.history.state, '', current.href);
     }
+    if (current.href !== target.href) window.Blazor.navigateTo(target.href, { replaceHistoryEntry: replace, historyEntryState });
     return window.location.href;
 }
 
@@ -33,7 +28,13 @@ export function observe(root, reference) {
             if (active && root.isConnected) console.error(error);
         });
     };
-    const changed = () => send("ObserveLocation", window.location.href);
+    // Blazor deliberately skips LocationChanged for same-document fragment
+    // pushes. Observe public entry changes; guarded traversals are reported by
+    // NavigationManager only after Blazor has accepted the destination.
+    const entryChanged = event => {
+        if (event.navigationType !== "traverse") send("ObserveLocation", window.location.href);
+    };
+    window.navigation?.addEventListener("currententrychange", entryChanged);
     const click = event => {
         const link = event.target.closest?.('a[data-resource-section]');
         if (!link || !root.contains(link) || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -41,10 +42,16 @@ export function observe(root, reference) {
         send("NavigateSection", link.dataset.resourceSection);
     };
     const media = window.matchMedia("(min-width: 900px)");
-    const resized = () => send("BreakpointChanged", media.matches, !!root.querySelector('.resource-navigation-rail')?.contains(document.activeElement));
+    let railHadFocus = false;
+    const railFocused = () => !!root.querySelector('.resource-navigation-rail')?.contains(document.activeElement);
+    const focused = () => { railHadFocus = media.matches && railFocused(); };
+    const resized = () => {
+        const transfer = railHadFocus || railFocused();
+        if (!media.matches) railHadFocus = false;
+        send("BreakpointChanged", media.matches, transfer);
+    };
+    document.addEventListener("focusin", focused);
     root.addEventListener("click", click);
-    window.addEventListener("hashchange", changed);
-    window.addEventListener("popstate", changed);
     media.addEventListener("change", resized);
     return {
         focusRail() {
@@ -56,9 +63,9 @@ export function observe(root, reference) {
         dispose() {
             active = false;
             root.removeEventListener("click", click);
-            window.removeEventListener("hashchange", changed);
-            window.removeEventListener("popstate", changed);
             media.removeEventListener("change", resized);
+            document.removeEventListener("focusin", focused);
+            window.navigation?.removeEventListener("currententrychange", entryChanged);
         }
     };
 }
