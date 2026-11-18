@@ -74,6 +74,7 @@ export class ConnectedStorageCollectionPage {
       await this.identity(row, `${namespace}/${fixture.name}`, fixture.name, namespace, touch);
     }
     await new CollectionContractPage(this.page).inspect(locale);
+    await this.inspectCatalog(consoleUrl, fixture);
     const row = rows.filter({ hasText: `${fixture.namespaces[0]}/${fixture.name}` });
     await row.getByTestId(TestIds.connectedStorageCollections.storageName).click();
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.storageDetails)).toBeVisible();
@@ -91,8 +92,14 @@ export class ConnectedStorageCollectionPage {
     await expect(row.locator('.collection-version code')).toHaveText('1.0.0');
     await new CollectionContractPage(this.page).inspect(locale);
     await row.getByTestId(TestIds.connectedStorageCollections.storageTypeName).click();
+    await expect(this.page).toHaveURL(url => url.pathname === `/storage-types/${fixture.type}`);
     expect(new URL(this.page.url()).pathname).toBe(`/storage-types/${fixture.type}`);
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
+    for (const namespace of fixture.namespaces) {
+      const usage = this.page.locator('.resource-links > li').filter({ hasText: `${namespace}/${fixture.name}` });
+      await expect(usage).toHaveCount(1);
+      await this.identity(usage, `${namespace}/${fixture.name}`, fixture.name, namespace, false);
+    }
     await this.assertNoOverflow();
   }
 
@@ -117,7 +124,55 @@ export class ConnectedStorageCollectionPage {
     const route = surface === 'types' ? '/storage-types' : surface === 'services' ? '/connected-services' : '/storages';
     await this.open(consoleUrl, route);
     await expect(this.page.locator('.resource-collection').first()).toBeVisible();
+    return this.captureCurrent();
+  }
+
+  public async layoutDiagnostics(): Promise<unknown[]> {
+    return this.page.locator('main *').evaluateAll(elements => elements
+      .filter(element => { const bounds = element.getBoundingClientRect(); return bounds.width > 0 && bounds.right > innerWidth + 1; })
+      .slice(0, 24).map(element => {
+        const bounds = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return { tag: element.tagName, classes: element.className, width: bounds.width, right: bounds.right,
+          minWidth: style.minWidth, maxWidth: style.maxWidth, columns: style.gridTemplateColumns,
+          display: style.display, overflowX: style.overflowX, whiteSpace: style.whiteSpace };
+      }));
+  }
+
+  public async captureCurrent(): Promise<Buffer> {
+    await this.page.evaluate(() => {
+      window.scrollTo(0, 0);
+      return new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    });
     return this.page.screenshot({ fullPage: true });
+  }
+
+  private async inspectCatalog(consoleUrl: string, fixture: ConnectedStorageFixture): Promise<void> {
+    const qualified = `${fixture.namespaces[0]}/${fixture.type}`;
+    const evidence = this.page.locator('details').filter({
+      has: this.page.locator('.collection-qualified-name').filter({ hasText: qualified }),
+    });
+    await expect(evidence).toHaveCount(1);
+    await expect(evidence).toHaveJSProperty('open', false);
+    const summary = evidence.locator('summary');
+    const copy = summary.locator('.copy-value');
+    const before = this.page.url();
+    await copy.focus();
+    await copy.click();
+    await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(qualified);
+    expect(this.page.url()).toBe(before);
+    await expect(evidence).toHaveJSProperty('open', false);
+    await summary.focus();
+    await summary.press('Enter');
+    await expect(evidence).toHaveJSProperty('open', true);
+    await summary.press('Enter');
+    await expect(evidence).toHaveJSProperty('open', false);
+    await summary.locator('.resource-name-link').click();
+    await expect(this.page).toHaveURL(url => url.pathname === `/storage-types/${fixture.type}`);
+    expect(new URL(this.page.url()).pathname).toBe(`/storage-types/${fixture.type}`);
+    expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
+    expect(new URL(this.page.url()).searchParams.get('scopeRef')).toBe('/instance');
+    await this.open(consoleUrl, '/storages');
   }
 
   private async identity(row: Locator, qualified: string, name: string, namespace: string, touch: boolean): Promise<void> {

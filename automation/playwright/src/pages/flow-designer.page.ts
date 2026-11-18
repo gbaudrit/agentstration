@@ -38,6 +38,10 @@ export class FlowDesignerPage {
       steps: [
         { type: 'input', name: 'input', displayName: 'Input' },
         {
+          type: 'condition', name: 'decision', displayName: 'Decision', mode: 'Simple',
+          left: '${input.approved}', operator: 'equals', right: 'true',
+        },
+        {
           type: 'output', name: 'completed', displayName: 'Completed', outcome: 'success',
           outputMapping: '${transition.output}',
         },
@@ -47,19 +51,25 @@ export class FlowDesignerPage {
         },
       ],
       transitions: [
-        { id: 'input-completed-completed', fromStep: 'input', event: 'completed', toStep: 'completed' },
-        { id: 'input-error-error', fromStep: 'input', event: 'error', toStep: 'error' },
+        { id: 'input-completed-decision', fromStep: 'input', event: 'completed', toStep: 'decision' },
+        { id: 'decision-true-completed', fromStep: 'decision', event: 'true', toStep: 'completed' },
+        { id: 'decision-false-error', fromStep: 'decision', event: 'false', toStep: 'error' },
       ],
       designer: {
         preferredLayout: 'Horizontal',
         nodePositions: {
           input: { x: 80, y: 220 },
-          completed: { x: 520, y: 120 },
-          error: { x: 520, y: 360 },
+          decision: { x: 420, y: 220 },
+          completed: { x: 780, y: 120 },
+          error: { x: 780, y: 360 },
         },
       },
     };
     await this.updateDraft(consoleUrl, name, created, definition);
+    const validation = await this.page.request.post(`${consoleUrl}/api/flows/${encodeURIComponent(name)}/validate`);
+    const validationBody = await validation.text();
+    expect(validation.status(), validationBody).toBe(200);
+    expect(JSON.parse(validationBody).issues, 'The responsive fixture must start without validation issues.').toEqual([]);
     await this.open(consoleUrl, 'default', name);
     await expect(this.node('Input')).toBeVisible();
     return name;
@@ -515,8 +525,10 @@ export class FlowDesignerPage {
     await expect(dock).not.toHaveClass(/expanded/);
     await expect(this.page.getByTestId(TestIds.flowObservability.designerValidate)).toBeVisible();
     await this.validate();
-    await expect(dock.locator('.validation-count')).toHaveText(new RegExp(`^${issueCount}\\b`));
+    // Expansion follows SetIssues in the completed validation response; the old
+    // count can remain visible while the request is still running.
     await expect(dock).toHaveClass(/expanded/);
+    await expect(dock.locator('.validation-count')).toHaveText(new RegExp(`^${issueCount}\\b`));
   }
 
   public async collapseValidation(): Promise<void> {

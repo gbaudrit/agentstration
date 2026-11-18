@@ -1,0 +1,3 @@
+- button "Error Step 'input' does not emit event 'error'. transition_event_invalid":
+- text: Step 'input' does not emit event 'error'.
+- code: transition_event_invalid

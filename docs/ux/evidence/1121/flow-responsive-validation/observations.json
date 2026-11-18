@@ -1,0 +1,19 @@
+{
+  "implementationPR": 1174,
+  "failedRun": 44253959261,
+  "failedJob": 134631307413,
+  "productSource": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+  "cause": "Existing responsive fixture used Input.error, which Input does not emit; the prior check could read the old count before the completed validation render.",
+  "correction": "Use actual Condition true/false ports; assert initial server issues=[]; wait for the completed expanded panel before the unchanged zero/one counts.",
+  "localStats": {
+    "startTime": "2026-11-18T07:27:09.493Z",
+    "duration": 99588.31,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "pageObjectSha256": "d61af0e72243d5ba661550d274497a25c2f24507eb2423e960baef5cf3eb910c",
+  "rawResultsSha256": "3082ce583d4d9c3e7e2a0d170689d142239843492d1973983f7a26af2e0d87a5",
+  "timeoutsAndRetriesChanged": false
+}

@@ -1,0 +1,132 @@
+{
+  "productSource": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+  "baselineMain": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a",
+  "rawReportSha256": "09cca16c6e3e412e625c26fecbe99135307dc86566571f1d817c13edb76324d6",
+  "stats": {
+    "startTime": "2026-11-18T07:29:36.809Z",
+    "duration": 98686.82,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "browser": "system Chromium 154.0.8037.57, Playwright 1.63.0",
+  "fixtures": "Fresh local Development hosts; offline authored metadata; no remote storage/service operation",
+  "sources": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor": "09fb6e5e6d9107bab12972a7e3917d3813e94da3ddbfb06b052aa6160bba69b1",
+    "tests/Agentstration.Console.Components.Tests/ToolDefinitionConsoleTests.cs": "43d01d8397895d9a6841fa19ab92b5ec084f4bcb735b2370cdcf6935165d9cde",
+    "src/Agentstration.Console.Components/Console/StorageEditorModel.cs": "b6b0a28d8eee7f033697b619dec251020cd6993881843d35aa93d0a364dbda80",
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor.css": "54078b9392d63493d3c906282b836c1fbcf932e4ff4c38903810b7b6767d6b18",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "fd69f0ea30ad06db2b40fe2d8aec55a11622e294568f4b455bca9e71d763f2db",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor.css": "1e789526b5cf151c54dbab41698870a61e1fb0605018e0c2d54ee8b94158fe10",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor": "3283d5e40f637ecee95cac2ea3c2d4b5fd007ddfdbe67ccb9f3c093773bcbdb2",
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor": "9e4f6c4e65a8d6a8da89068ae57ab2aff681d11c91fbf88e0e76d8d5db3ffe9d",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor": "74c4771cd98d025d06aab79ce92e4a66c6ac6e248af37031401d64e67719a2d4",
+    "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor": "b44c77fdd6947a877c4238f977fffd60386f05c70aeeda519774b9868c26fcdf",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor": "13930c3e8b8b6df9e1e11d7fbb83b71e4a416f34bffb72fbcafa7f5b851612be",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor": "89577057e65c06dad4fcbeb8b0e4cd5b6a8aadb863181adf397356fbc084c7d1",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor": "fcab503285ea70878296382916d8ca24ee873f67a83098866b21044f20f6cc9c",
+    "automation/playwright/src/pages/connected-storage-collection.page.ts": "4e382524ea2b91a57f2d60bb19150bc4745548d9240cd77527b53283d917870c",
+    "automation/playwright/tests/connected-storage-collection.spec.ts": "c6e5c10cb83576277e654bb9a8767027655b229512f925416ca5c9c73912f3fd"
+  },
+  "captures": [
+    {
+      "path": "en-US-dark-desktop-compact-storages-details.png",
+      "sha256": "c7a40bbd404c9983620547266e3e68c3d657242f178b375d5f5ca48550ef0cc1",
+      "bytes": 370165,
+      "width": 1440,
+      "height": 2803
+    },
+    {
+      "path": "en-US-dark-desktop-compact-storages-list.png",
+      "sha256": "b3dcf17cda95ffba77bbaa8586a1efef82e3b357f18f5d4671b4fd498129b101",
+      "bytes": 170483,
+      "width": 1440,
+      "height": 1046
+    },
+    {
+      "path": "en-US-dark-desktop-compact-types-details.png",
+      "sha256": "7a983d989756ea23ba360e6ace0b11e41a6af2ec84991902a9a7fd827fd961c9",
+      "bytes": 182106,
+      "width": 1440,
+      "height": 1062
+    },
+    {
+      "path": "en-US-dark-desktop-compact-types-list.png",
+      "sha256": "2d223a822bbafa1d70a1fd6305f5c137f30e98680601433106ab5845a78fdfff",
+      "bytes": 122669,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "path": "en-US-dark-desktop-compact-services-details.png",
+      "sha256": "7274d620c76dbb44556372891ca70fe308f2342938334331a896db49fd0c250f",
+      "bytes": 242803,
+      "width": 1440,
+      "height": 1992
+    },
+    {
+      "path": "en-US-dark-desktop-compact-services-list.png",
+      "sha256": "69294e886ca46b4e420e0b4b715211a547582bfe664ca5eefdf661816db8d984",
+      "bytes": 123939,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-storages-details.png",
+      "sha256": "a6d1d8f4d3fa166f0b55c8d8b6fd293e1de78fab353767a967194af2694f3257",
+      "bytes": 289179,
+      "width": 390,
+      "height": 3886
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-storages-list.png",
+      "sha256": "d0b123c4590abf289c4393a22a4dc626d9ccf2b46c65e0724afbe745f00021e6",
+      "bytes": 109333,
+      "width": 390,
+      "height": 1436
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-types-details.png",
+      "sha256": "aea16a0a2330d1492f88ee8cc4e70e475c3d0cd1b1191c1d6a22254c67e0501a",
+      "bytes": 110701,
+      "width": 390,
+      "height": 1608
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-types-list.png",
+      "sha256": "8feb170e8f692d44e6513e25987ceec7fc2b9e020a0ef52b1c14d76a523db907",
+      "bytes": 65782,
+      "width": 390,
+      "height": 880
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-services-details.png",
+      "sha256": "50fe21d33e28bfc9d05af3dadf2845298fc5d1f3c63dab7a660fe0d6d1cd48c7",
+      "bytes": 176020,
+      "width": 390,
+      "height": 2560
+    },
+    {
+      "path": "fr-FR-light-mobile-compact-services-list.png",
+      "sha256": "249d3b271ecddae5d9bc8c4ae7402d4b5562fd6d10dc6c1efb75ff4c74a012a8",
+      "bytes": 65058,
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "failureCaptures": [
+    {
+      "path": "failures/connected-service-long-type-mobile-before.png",
+      "sha256": "1661aec21c34c58fc63a966102ad23f42850e99cb52e4fdb28bc06182264dd20"
+    },
+    {
+      "path": "failures/embedded-storage-catalog-mobile-before.png",
+      "sha256": "30edb00961d3b6220a83498126b03e50fc9bdcee10af56be6f1a37b60bb98b59"
+    },
+    {
+      "path": "failures/storage-type-long-usage-desktop-before.png",
+      "sha256": "5e949f09712b74d3d61fdcc7961ff342526aa568eb125ed0fb576073be7b2c42"
+    }
+  ]
+}

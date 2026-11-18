@@ -11,7 +11,9 @@ for (const variant of [
 ] as const) {
   test.describe(variant.name, () => {
     test.use({ locale: variant.locale, colorScheme: variant.theme, hasTouch: variant.touch, viewport: { width: variant.width, height: variant.height } });
-    test.afterEach(async ({ page, product }) => {
+    test.afterEach(async ({ page, product }, testInfo) => {
+      if (testInfo.status !== testInfo.expectedStatus && !page.isClosed())
+        await testInfo.attach('layout-geometry', { body: JSON.stringify(await new ConnectedStorageCollectionPage(page).layoutDiagnostics(), null, 2), contentType: 'application/json' });
       if (variant.locale !== 'en-US') await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
     });
     test(`new Storage and Connected Service collections retain the compact contract ${variant.tag} @collections @smoke`, async ({ page, product, context }, testInfo) => {
@@ -26,7 +28,7 @@ for (const variant of [
         if (surface === 'storages') await collections.inspectStorages(product.consoleUrl, fixture, variant.locale, variant.touch);
         if (surface === 'types') await collections.inspectTypes(product.consoleUrl, fixture, variant.locale);
         if (surface === 'services') await collections.inspectServices(product.consoleUrl, fixture, variant.locale, variant.touch);
-        await testInfo.attach(`compact-${surface}-details`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+        await testInfo.attach(`compact-${surface}-details`, { body: await collections.captureCurrent(), contentType: 'image/png' });
         await testInfo.attach(`compact-${surface}-list`, { body: await collections.captureList(product.consoleUrl, surface), contentType: 'image/png' });
       }
     });

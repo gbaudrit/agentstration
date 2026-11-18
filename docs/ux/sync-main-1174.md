@@ -149,3 +149,37 @@ ordinary editable inputs in the same files still require the shared components.
 ## Tool creation/editor coverage split
 
 The maintained shared-form case and schema-contract creation flow open `/tools/definitions/new`, now owned by `NewToolDefinition.razor`. Their mapping belongs to that creator. `ToolDefinitionEditor.razor` owns only `/tools/definitions/{Name}` and receives no inherited browser field claim from the creation case. Its field coverage is explicitly pending under #1122; the total remains six pending routed adapters (five added adapters and this retained editor). The creator route is partial rather than complete CRUD coverage. Case assertions and test counts are unchanged.
+
+## Current local validation
+
+The Release solution builds with zero warnings and errors. The full required Fast
+lane passes 1,554 tests; Integration passes 1,537 with 28 environment-dependent
+optional checks skipped. TypeScript, six JavaScript lifecycle checks, five port
+fixture tests and seven catalog checks pass. The format gate passes on the 365
+changed C#/Razor sources before the final two-field guard correction; current-head
+CI remains the final format and browser authority.
+
+Two populated collection variants pass against product source `2c6a1adf`: English
+desktop/dark and French mobile/light with real touch. The [capture gallery](evidence/1121/main-sync-1181/README.md)
+records 12 unedited screenshots, source/image checksums and three retained layout
+failures. It covers exact homonymous navigation/copy, native type-contract
+disclosure, authorized scope/state/governance, required version selectors, shared
+fields, modal Escape/focus restoration and zero document overflow. It does not
+claim exhaustive populated evidence for every new dataset.
+
+The new Tool Definition publication fields now participate in the existing
+unsaved-change fingerprint; two regressions verify isolated edits, cancellation
+and reversion. No new dirty-state framework is introduced for other editors.
+
+A CI responsive Flow case exposed a pre-existing invalid fixture and stale-count
+assertion. Its Input step does not emit `error`; the fixture now uses a real
+Condition's `true`/`false` branches and asserts empty server validation before
+opening the designer. Verification waits for the completed result panel before
+checking the unchanged zero/one issue counts. Three local repetitions pass after
+the correction; no test timeout, retry or expected count is relaxed.
+
+The historical CI working-set failure on API Resources is tracked separately by
+#1219. Its diagnostic change preserves the 2,432 MiB failure ceiling and does not
+claim a memory reduction. The maintainer requested keeping that work separate;
+no experimental memory-fixture correction is included in this UX promotion.
+CI is not declared globally green while that gate remains failed.

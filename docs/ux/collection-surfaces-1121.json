@@ -5179,7 +5179,16 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation.",
+        "currentPopulatedEvidence": {
+          "specification": "tests/connected-storage-collection.spec.ts",
+          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+          "variants": [
+            "en-US/dark/desktop",
+            "fr-FR/light/mobile/touch"
+          ],
+          "gallery": "evidence/1121/main-sync-1181/README.md"
+        }
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5211,7 +5220,16 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation.",
+        "currentPopulatedEvidence": {
+          "specification": "tests/connected-storage-collection.spec.ts",
+          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+          "variants": [
+            "en-US/dark/desktop",
+            "fr-FR/light/mobile/touch"
+          ],
+          "gallery": "evidence/1121/main-sync-1181/README.md"
+        }
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5407,7 +5425,16 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation.",
+        "currentPopulatedEvidence": {
+          "specification": "tests/connected-storage-collection.spec.ts",
+          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+          "variants": [
+            "en-US/dark/desktop",
+            "fr-FR/light/mobile/touch"
+          ],
+          "gallery": "evidence/1121/main-sync-1181/README.md"
+        }
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -14925,19 +14952,28 @@
         "/storages"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Expandable type/version evidence preserves real immutable contracts and observed availability; expands without selecting or mutating a resource.",
+      "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
       "validation": "source-reviewed-current-validation-pending",
       "discoveredDuring": "2026-11-18 main synchronization #1174",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
         "routeEvidence": [],
-        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
+        "currentPopulatedEvidence": {
+          "specification": "tests/connected-storage-collection.spec.ts",
+          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+          "variants": [
+            "en-US/dark/desktop",
+            "fr-FR/light/mobile/touch"
+          ],
+          "gallery": "evidence/1121/main-sync-1181/README.md"
+        }
       },
       "compactAdoption": {
         "decision": "native-domain-presentation",
         "implementationPR": 1174,
-        "domainSemantics": "Expandable type/version evidence preserves real immutable contracts and observed availability; expands without selecting or mutating a resource.",
+        "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
         "evidenceStatus": "Fresh validation pending final merged source."
       }
     },
@@ -17011,7 +17047,27 @@
     "auditedRepeatedItemSources": 145,
     "validation": "Source reconciliation complete; fresh run status belongs to final PR1174 validation and sync-main-1174.md. Historical screenshots retain their original source provenance.",
     "auditDelta": "27 newly repeated @foreach sources, two incoming indexed-loop sources, and two pre-existing indexed controls newly checked by the stronger guard.",
-    "lastAuditFinding": "StorageDetails export-binding DataGrid was absent from the initial new-surface count. It is now a distinct shared frame included in the current total of346."
+    "lastAuditFinding": "StorageDetails export-binding DataGrid was absent from the initial new-surface count. It is now a distinct shared frame included in the current total of346.",
+    "localValidation": {
+      "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+      "releaseBuild": "passed, zero warnings/errors",
+      "fast": {
+        "passed": 1554,
+        "failed": 0,
+        "skipped": 0
+      },
+      "integration": {
+        "passed": 1537,
+        "failed": 0,
+        "skippedOptional": 28
+      },
+      "catalogChecks": 7,
+      "javascriptChecks": 6,
+      "portFixtureTests": 5,
+      "gallery": "evidence/1121/main-sync-1181/README.md",
+      "responsiveFlowEvidence": "evidence/1121/flow-responsive-validation/README.md",
+      "fullCI": "pending latest head; existing Resources memory budget failure owned separately in PR #1219"
+    }
   },
   "reconciliationHistory": [
     {
