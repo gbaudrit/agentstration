@@ -208,6 +208,15 @@ export class SourcePoliciesPage {
     await expect(active).toHaveAttribute('data-step-id', expected);
     await expect(this.page.getByTestId(TestIds.creationWizard.source).locator('[aria-current="step"]')).toHaveCount(1);
     await this.assertResponsive();
+    const alignment = await this.page.getByTestId(TestIds.creationWizard.source).locator('nav button').evaluateAll(buttons => buttons.map(button => {
+      const bounds = button.getBoundingClientRect();
+      const center = bounds.top + bounds.height / 2;
+      return Array.from(button.querySelectorAll('.creation-wizard-number, .creation-wizard-title, .creation-wizard-state')).filter(child => getComputedStyle(child).position !== 'absolute').map(child => {
+        const box = child.getBoundingClientRect();
+        return Math.abs(box.top + box.height / 2 - center);
+      });
+    }));
+    for (const offsets of alignment) for (const offset of offsets) expect(offset).toBeLessThanOrEqual(1);
   }
   private async assertNotCreated(base: string, name: string): Promise<void> {
     const response = await this.page.request.get(`${base}/api/datasources/${name}?scopeRef=%2Finstance`);

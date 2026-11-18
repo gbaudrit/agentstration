@@ -1,16 +1,14 @@
 .creation-wizard { min-width: 0; }
 .creation-wizard-progress { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: .5rem; padding: 0; margin: 0 0 1.5rem; list-style: none; }
 .creation-wizard-progress li { min-width: 0; }
-.creation-wizard-step { width: 100%; min-height: 2.75rem; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .6rem .5rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--muted); }
-.creation-wizard-step.is-incomplete { border-style: dashed; }
-.creation-wizard-step.is-current { border-style: solid; background: var(--primary-soft); border-color: var(--primary); color: var(--text); }
-.creation-wizard-number { position: relative; display: inline-flex; justify-content: center; align-items: center; width: 1.5rem; height: 1.5rem; flex-shrink: 0; border-radius: 50%; background: var(--primary-soft); color: var(--text); font-size: .8rem; }
-.creation-wizard-number ::deep svg { width: 1rem; height: 1rem; }
-.creation-wizard-heading { min-width: 0; display: grid; gap: .2rem; text-align: left; }
-.creation-wizard-status { font-size: .72rem; color: var(--muted); }
-.is-incomplete .creation-wizard-status { color: color-mix(in srgb, var(--color-warning) 45%, var(--text)); }
-.creation-wizard-incomplete { position: absolute; right: -.2rem; bottom: -.2rem; display: grid; place-items: center; width: .8rem; height: .8rem; border: 1px solid var(--color-warning); border-radius: 50%; background: var(--surface); color: color-mix(in srgb, var(--color-warning) 45%, var(--text)); font-size: .65rem; font-weight: 700; }
-.creation-wizard-title { overflow-wrap: anywhere; font-size: .85rem; }
+.creation-wizard-step { width: 100%; min-height: 2.75rem; display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) 1rem; align-items: center; gap: .5rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--muted); }
+.creation-wizard-step.is-current { background: var(--primary-soft); border-color: var(--primary); color: var(--text); }
+.creation-wizard-number { display: inline-flex; justify-content: center; align-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--primary-soft); color: var(--text); font-size: .8rem; }
+.creation-wizard-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: .85rem; }
+.creation-wizard-state { display: inline-flex; justify-content: center; align-items: center; width: 1rem; height: 1rem; color: var(--muted); }
+.creation-wizard-state ::deep svg { width: 1rem; height: 1rem; }
+.is-incomplete .creation-wizard-state { color: color-mix(in srgb, var(--color-warning) 45%, var(--text)); }
+.creation-wizard-incomplete { display: grid; place-items: center; width: .9rem; height: .9rem; border: 1px solid currentColor; border-radius: 50%; font-size: .65rem; font-weight: 700; line-height: 1; }
 .creation-wizard-content { min-width: 0; }
 .creation-wizard-content[hidden] { display: none; }
 .creation-wizard-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; padding: 1.25rem 0; border-top: 1px solid var(--border); }
@@ -19,8 +17,11 @@
 .creation-wizard-content:focus-visible { outline: 2px solid var(--primary); outline-offset: .3rem; }
 @media (max-width: 640px) {
     .creation-wizard-progress { gap: .35rem; grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(2.75rem, 1fr)); }
-    .creation-wizard-heading { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-    .creation-wizard-step { padding: .5rem .2rem; }
+    .creation-wizard-title { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .creation-wizard-step { grid-template-columns: 1.25rem .75rem; justify-content: center; gap: .125rem; padding: .5rem .25rem; }
+    .creation-wizard-number { width: 1.25rem; height: 1.25rem; font-size: .75rem; }
+    .creation-wizard-state, .creation-wizard-state ::deep svg { width: .75rem; height: .75rem; }
+    .creation-wizard-incomplete { width: .7rem; height: .7rem; font-size: .6rem; }
     .creation-wizard-actions { align-items: stretch; }
     .creation-wizard-actions > div { margin-left: auto; }
 }

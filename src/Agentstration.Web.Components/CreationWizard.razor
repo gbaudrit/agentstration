@@ -12,10 +12,11 @@
                     <button id="@(id + "-" + step.Id)" type="button" class="creation-wizard-step @(position == currentIndex ? "is-current" : null) @(step.IsComplete == false ? "is-incomplete" : step.IsComplete == true ? "is-complete" : null)"
                             data-wizard-step="@step.Id" data-step-complete="@step.IsComplete?.ToString().ToLowerInvariant()"
                             aria-current="@(position == currentIndex ? "step" : null)" disabled="@Locked"
-                            aria-label="@StepLabel(step, position)"
+                            aria-label="@StepLabel(step, position)" title="@StepLabel(step, position)"
                             @onclick="() => GoToStepAsync(step.Id)">
-                        <span class="creation-wizard-number" aria-hidden="true">@if (step.IsComplete == true) { <UiIcon Name="check" /> } else { @(position + 1) }@if (step.IsComplete == false) { <span class="creation-wizard-incomplete">!</span> }</span>
-                        <span class="creation-wizard-heading"><span class="creation-wizard-title">@step.Title</span>@if (step.IsComplete is { } complete) { <small class="creation-wizard-status" aria-hidden="true">@Localizer[complete ? "Complete" : "Incomplete"]</small> }</span>
+                        <span class="creation-wizard-number" aria-hidden="true">@(position + 1)</span>
+                        <span class="creation-wizard-title">@step.Title</span>
+                        <span class="creation-wizard-state" aria-hidden="true">@if (step.IsComplete == true) { <UiIcon Name="check" /> } else if (step.IsComplete == false) { <span class="creation-wizard-incomplete">!</span> }</span>
                     </button>
                 </li>
             }

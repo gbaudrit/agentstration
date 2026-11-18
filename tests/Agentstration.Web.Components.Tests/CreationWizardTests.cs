@@ -35,6 +35,8 @@ public sealed class CreationWizardTests
         Assert.AreEqual("my draft", cut.FindComponent<WizardProbe>().Instance.Value);
         cut.Render(p => p.Add(c => c.Steps, new[] { steps[0] with { IsComplete = true }, steps[1] }));
         Assert.Contains(complete, cut.Find("[data-wizard-step=identity]").GetAttribute("aria-label")!);
+        Assert.AreEqual("1", cut.Find("[data-wizard-step=identity] .creation-wizard-number").TextContent);
+        Assert.HasCount(1, cut.FindAll("[data-wizard-step=identity] .creation-wizard-state svg"));
         Assert.AreEqual("true", cut.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
         Assert.AreSame(instance, cut.FindComponent<WizardProbe>().Instance);
     }
