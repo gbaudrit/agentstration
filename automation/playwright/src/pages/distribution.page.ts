@@ -209,12 +209,14 @@ export class DistributionPage {
     await this.open(consoleUrl, '/sourceproviders/new', 'sourceProviderDetails');
     await this.page.locator(`[data-testid="${TestIds.distribution.sourceProviderDetails}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerDisplayName), displayName);
+    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
+    await this.page.locator('[data-wizard-step=extension]').click();
     const extension = this.page.getByTestId(TestIds.distribution.providerExtension);
     await extension.selectOption({ index: 1 });
     const contribution = this.page.getByTestId(TestIds.distribution.providerContribution);
     await expect(contribution.locator('option')).toHaveCount(2);
     await contribution.selectOption({ index: 1 });
-    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
+    await this.page.locator('[data-wizard-step=review]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/sourceproviders/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.providerSubmit).click(),

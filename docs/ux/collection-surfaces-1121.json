@@ -5682,6 +5682,38 @@
         "domainSemantics": "Runtime options and execution settings are configuration values, without invented publication versions, owners or resource commands.",
         "evidenceStatus": "Focused and browser validation pending this screen commit."
       }
+    },
+    {
+      "id": "source-provider-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved extension coordinates and source-provider contribution; option contracts remain specialized descriptors with their own preferred versions and source-channel context."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "The extension is a real scoped resource reference. Contribution and option-contract IDs are configuration descriptors, without fictional resource ownership or publication state. Observed provider status is not an activation toggle.",
+        "evidenceStatus": "Focused and browser validation pending this screen commit."
+      }
     }
   ],
   "specialized": [

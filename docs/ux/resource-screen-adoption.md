@@ -37,7 +37,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
 | SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Layout/wizard browser checks pass at `70897500`; access-draft/managed follow-up passes the 33-case grant/access regression selection; fresh browser checks for that follow-up remain pending. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
-| SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Pending review and migration |
+| SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Implemented; 6 suggestion/wizard/EN/FR overview/ETag cases pass; TypeScript/catalog pass; browser checks pending |
 | SourceRegistries.razor | `/settings/source-registries`, `/settings/source-registries/new`, `/settings/source-registries/{Name}` | Pending review and migration |
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
 | StagedArtifactDetails.razor | `/artifacts/staged/{Id}` | Pending review and migration |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Parameter, Vault, Secret, Tool Provider and Runtime Profile saved configuration add shared frames: **93 shared frames + 258 active specialized collections = 351**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **94 shared frames + 258 active specialized collections = 352**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 

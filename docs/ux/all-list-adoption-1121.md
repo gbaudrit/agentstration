@@ -1,6 +1,6 @@
 # All-list adoption inventory (#1121)
 
-**Resource-screen follow-up (2026-11-18):** [Current screen adoption and validation](resource-screen-adoption.md) records subsequent resource-template and wizard migrations. Parameter, Vault, Secret, Tool Provider and Runtime Profile saved configuration add shared frames; the current manifest has **93 shared frames + 258 active specialized collections = 351**. Earlier counts and screenshots below retain their historical baseline.
+**Resource-screen follow-up (2026-11-18):** [Current screen adoption and validation](resource-screen-adoption.md) records subsequent resource-template and wizard migrations. Saved resource configuration summaries add shared frames; the current manifest has **94 shared frames + 258 active specialized collections = 352**. Earlier counts and screenshots below retain their historical baseline.
 
 **Main synchronization (2026-11-18):** The current source inventory includes incoming main `8f164544` (#1181): **88 shared frames + 258 active specialized collections = 346 functional collections**, plus four retained unmounted renderers and **147 audited repeated-item sources**. The 75 new functional collections are recorded explicitly in the manifest. [New-source reconciliation, specialized decisions and coverage limits](sync-main-1174.md) distinguish this update from historical screenshots and test totals. Fresh validation is recorded in PR #1174.
 
