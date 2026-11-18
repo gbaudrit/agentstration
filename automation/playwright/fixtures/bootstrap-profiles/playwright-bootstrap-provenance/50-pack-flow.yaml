@@ -1,0 +1,33 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: bootstrap-provenance
+  namespace: default
+definition:
+  displayName: Bootstrap provenance Flow
+  description: Deterministic ordinary Flow for the bootstrap provenance regression.
+  version: 1.0.0
+  enabled: true
+  spec: { flowKind: direct, target: { kind: agent, id: bootstrap-provenance, namespace: default } }
+  graph:
+    entryStep: input
+    inputSchema:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 16000 }
+      required: [prompt]
+      additionalProperties: false
+    steps:
+      - { type: input, name: input, displayName: Diagnostic request }
+      - type: agent
+        name: diagnose
+        displayName: Echo fixture input
+        agent: { resourceId: bootstrap-provenance, namespace: default }
+      - { type: output, name: completed, displayName: Diagnostic findings, outcome: success, outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+      - { type: output, name: error, displayName: Diagnostics failed, outcome: error, code: BOOTSTRAP_PROVENANCE_FAILED, message: The Diagnostics Agent failed., outputMapping: "${transition.output}", schema: { type: object, additionalProperties: true } }
+    transitions:
+      - { id: input-to-diagnose, fromStep: input, event: completed, toStep: diagnose }
+      - { id: diagnose-completed, fromStep: diagnose, event: success, toStep: completed }
+      - { id: diagnose-error, fromStep: diagnose, event: error, toStep: error }
+  publish: true
+  activate: true

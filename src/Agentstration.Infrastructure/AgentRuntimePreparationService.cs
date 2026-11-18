@@ -50,6 +50,18 @@ public sealed class ExternalWorkerAgentDeploymentReconciler : IAgentDeploymentRe
             return Task.FromResult(new AgentDeploymentReconciliationResult(stopped, stopped != deployment, "Deployment is stopped."));
         }
 
+        if (deployment.Configurations.Count > 0)
+        {
+            var recorded = deployment with
+            {
+                ProvisioningState = ProvisioningState.Succeeded,
+                OperationalState = OperationalState.Unavailable,
+                ObservedRevisionName = null,
+                LastError = null
+            };
+            return Task.FromResult(new AgentDeploymentReconciliationResult(recorded, recorded != deployment, "Assignment recorded; placement is observed separately."));
+        }
+
         var unsupported = deployment with
         {
             ProvisioningState = ProvisioningState.Failed,

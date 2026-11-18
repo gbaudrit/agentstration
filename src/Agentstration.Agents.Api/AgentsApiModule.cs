@@ -27,6 +27,7 @@ public static class AgentsApiModule
         StartDeploymentEndpoint.Map(group);
         StopDeploymentEndpoint.Map(group);
         ReconcileDeploymentEndpoint.Map(group);
+        AgentDeploymentAssignmentsEndpoint.Map(group);
         return endpoints;
     }
 }

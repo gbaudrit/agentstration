@@ -278,9 +278,15 @@ Use **Proposed** when implementation or repository evidence does not establish a
 234. [ADR-0234 — Knowledge consultation reads only metadata](0234-knowledge-consultation-reads-only-metadata.md)
 
 235. [ADR-0235 — One Artifact owns a collection of JSON records](0235-json-record-projection.md)
-
 236. [ADR-0236 — Storage content has operator ceilings and resource envelopes](0236-storage-content-has-operator-ceilings-and-resource-envelopes.md)
-
 237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)
 
 238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
+238. [ADR-0238 — SystemGraph is an authorized rebuildable semantic projection](0238-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
+239. [ADR-0239 — SystemGraph impact uses authorized family evidence](0239-system-graph-impact-uses-authorized-family-evidence.md)
+240. [ADR-0240 — Authored systems and replaceable Explorer rendering](0240-authored-systems-and-replaceable-explorer-rendering.md)
+241. [ADR-0241 — Reconciliation preview reviews selected authorized evidence](0241-reconciliation-preview-reviews-selected-authorized-evidence.md)
+242. [ADR-0242 — System operations is a separate authorized volatile overlay](0242-system-operations-is-a-separate-authorized-volatile-overlay.md)
+243. [ADR-0243 — System Explorer streams provisional authorized observations](0243-system-explorer-streams-provisional-authorized-observations.md)
+244. [ADR-0244 — Agent deployments record exact durable assignments](0244-agent-deployments-record-exact-durable-assignments.md)
+245. [ADR-0245 — Tool access summaries preserve authorized provenance](0245-tool-access-summaries-preserve-authorized-provenance.md)

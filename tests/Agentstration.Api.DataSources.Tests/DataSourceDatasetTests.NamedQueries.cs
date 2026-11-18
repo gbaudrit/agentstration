@@ -12,6 +12,7 @@ using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.SystemGraph.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Microsoft.Extensions.Configuration;
@@ -100,6 +101,15 @@ public sealed partial class DataSourceDatasetTests
         var b = await service.PublishAsync(Owner, query.Namespace, query.Name, "1.0.0", draft.ETag, default);
         Assert.AreEqual(a.ContractDigest, b.ContractDigest);
         Assert.IsTrue(b.PublishedAt > a.PublishedAt);
+        var dynamicPublicationId = SystemGraphIds.Publication(publishedBefore.Value.Uid, "1.0.0");
+        var bGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, b.Version))))!;
+        var selectionEdge = bGraph.Relations.Single(edge => edge.Source == dynamicPublicationId && edge.Target == SystemGraphIds.Publication(query.Uid, b.Version));
+        Assert.AreEqual("latest-published-at", selectionEdge.Resolution);
+        Assert.AreEqual("compatible-dynamic-no-republication", selectionEdge.Assessment);
+        Assert.IsFalse(bGraph.Nodes.Any(node => node.Identity.Name == "alpha-exact"));
+        var aGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, a.Version))))!;
+        Assert.IsTrue(aGraph.Nodes.Any(node => node.Identity.Name == "alpha-exact"));
+        Assert.IsFalse(aGraph.Relations.Any(edge => edge.Source == dynamicPublicationId));
         var after = await RunNamedQueryToolAsync(client, dynamicTool);
         Assert.AreEqual("1.0.0", after.Query.Version, "Latest means publication order, not semantic version order.");
         Assert.HasCount(0, after.Result.Page.Documents);
@@ -164,6 +174,11 @@ public sealed partial class DataSourceDatasetTests
         draft = await service.UpdateAsync(Owner, query.Namespace, query.Name, draft.Value.Definition with
         { Query = StructuredStorageFixture.Json("""{"$select":"dataset"}""") }, draft.ETag, default);
         _ = await service.PublishAsync(Owner, query.Namespace, query.Name, "2.0.0", draft.ETag, default);
+        var changedRoot = Uri.EscapeDataString(SystemGraphIds.Publication(query.Uid, "2.0.0"));
+        var changedGraph = (await client.GetFromJsonAsync<SystemGraphPage>("/api/system-graph?root=" + changedRoot))!;
+        Assert.IsTrue(changedGraph.Relations.Any(edge => edge.Source == dynamicPublicationId && edge.Assessment == "contract-mismatch"));
+        Assert.DoesNotContain("$select", JsonSerializer.Serialize(changedGraph), StringComparison.Ordinal);
+        Assert.DoesNotContain("dataset eq", JsonSerializer.Serialize(changedGraph), StringComparison.Ordinal);
         using var incompatible = await client.PostAsJsonAsync($"/api/tools/{dynamicTool.Name}/run?scopeRef=/instance", new RunToolRequest(Empty, ToolRunMode.Execute));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, incompatible.StatusCode);
         Assert.Contains("data_source_query_contract_mismatch", await incompatible.Content.ReadAsStringAsync());

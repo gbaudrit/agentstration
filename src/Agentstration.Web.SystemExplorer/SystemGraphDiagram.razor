@@ -1,0 +1,55 @@
+@namespace Agentstration.Web.SystemExplorer
+@using Agentstration.SystemGraph.Contracts
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<div @ref="element" style="height: min(65vh, 640px); min-height: 320px; width:100%" role="region" aria-label="@Label"></div>
+@code {
+    [Parameter, EditorRequired] public SystemGraphPage Page { get; set; } = default!;
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> RelationshipLabels { get; set; } = new Dictionary<string, string>();
+    [Parameter] public IReadOnlyDictionary<string, string>? OverlayNotes { get; set; }
+    [Parameter] public SystemGraphDiagramOptions? Options { get; set; }
+    [Parameter] public EventCallback<string> LinkSelected { get; set; }
+    [Parameter] public EventCallback<string> Selected { get; set; }
+    [Parameter] public EventCallback Failed { get; set; }
+    private ElementReference element;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<SystemGraphDiagram>? callback;
+    private SystemGraphPage? rendered;
+    private bool disposed;
+    private IReadOnlyDictionary<string, string>? renderedNotes;
+    private SystemGraphDiagramOptions? renderedOptions;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (disposed || ReferenceEquals(rendered, Page) && ReferenceEquals(renderedNotes, OverlayNotes) && ReferenceEquals(renderedOptions, Options)) return;
+        var page = Page;
+        rendered = page;
+        var notes = renderedNotes = OverlayNotes;
+        var options = renderedOptions = Options;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.SystemExplorer/system-explorer.js");
+            if (disposed) { await module.DisposeAsync(); module = null; return; }
+            callback ??= DotNetObjectReference.Create(this);
+            var success = await module.InvokeAsync<bool>("render", element, page, RelationshipLabels, callback, notes, options);
+            if (!disposed && ReferenceEquals(page, Page) && ReferenceEquals(notes, OverlayNotes) && ReferenceEquals(options, Options) && !success) await Failed.InvokeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) when (disposed) { }
+        catch (JSException) { if (!disposed) await Failed.InvokeAsync(); }
+    }
+    [JSInvokable] public Task SelectNode(string id) => !disposed && Page.Nodes.Any(node => node.Id == id) ? Selected.InvokeAsync(id) : Task.CompletedTask;
+    [JSInvokable] public Task SelectLink(string id) => !disposed && Page.Relations.Any(edge => edge.Kind == id && id.StartsWith("summary:", StringComparison.Ordinal)) ? LinkSelected.InvokeAsync(id) : Task.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("dispose", element); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        callback?.Dispose();
+    }
+}

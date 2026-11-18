@@ -171,6 +171,37 @@ public sealed class SqliteRuntimeRunStore(IDbContextFactory<RuntimeRunDbContext>
         return documents.Select(Deserialize).ToArray();
     }
 
+    public async Task<IReadOnlyList<StoredRuntimeRun>> ListByIdentityAsync(RuntimeRunIdentityQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.AgentUid is null && query.RevisionUid is null || query.Take is < 1 or > 201)
+            throw new ArgumentException("A bounded exact Runtime identity is required.", nameof(query));
+        var agent = query.AgentUid?.ToString("D") ?? "";
+        var revision = query.RevisionUid?.ToString("D") ?? "";
+        var generation = query.Generation ?? -1;
+        var invocation = (query.InvocationScope ?? query.ExecutionScope).Value;
+        var hash = query.DefinitionHash ?? "";
+        var deployment = query.DeploymentUid?.ToString("D") ?? "";
+        var configuration = query.DeploymentConfigurationId?.ToString("D") ?? "";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await context.Runs.FromSqlInterpolated($"""
+            SELECT * FROM "RuntimeRuns"
+            WHERE "ScopeRef" = {query.ExecutionScope.Value}
+              AND json_extract("Payload", '$.properties.agent.scopeRef') = {query.DefinitionOwner.Value}
+              AND COALESCE(json_extract("Payload", '$.properties.agent.namespace'), 'default') = {query.Namespace.Value}
+              AND ({agent} = '' OR json_extract("Payload", '$.properties.agent.resourceUid') = {agent})
+              AND ({revision} = '' OR json_extract("Payload", '$.properties.agent.revisionUid') = {revision})
+              AND ({generation} = -1 OR json_extract("Payload", '$.properties.agent.version') = {generation})
+              AND COALESCE(json_extract("Payload", '$.scope.logicalScopeRef'), "ScopeRef") = {invocation}
+              AND ({hash} = '' OR json_extract("Payload", '$.properties.agent.definitionHash') = {hash})
+              AND ({deployment} = '' OR json_extract("Payload", '$.properties.agent.deployment.uid') = {deployment})
+              AND ({configuration} = '' OR json_extract("Payload", '$.properties.agent.deployment.configurationId') = {configuration})
+              AND ("UpdatedAt" >= {query.WindowStart.UtcTicks} OR "State" NOT IN ('Succeeded','Failed','Cancelled','TimedOut'))
+            ORDER BY "CreatedAt" DESC, "RunId" DESC LIMIT {query.Take}
+            """).AsNoTracking().ToArrayAsync(cancellationToken);
+        return documents.Select(Deserialize).ToArray();
+    }
+
     public async Task<IReadOnlyList<RuntimeRunKey>> ListRecoverableAsync(int skip, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(skip);

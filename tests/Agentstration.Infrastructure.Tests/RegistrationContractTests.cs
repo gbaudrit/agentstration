@@ -18,6 +18,7 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
 using Agentstration.Runtime.Local;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.SystemGraph.Contracts;
 using Agentstration.Tools;
 using Agentstration.Work;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +36,11 @@ public sealed class RegistrationContractTests
         var services = CreateServices("Deterministic", false);
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsService)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsAccess)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.SystemOperations.Contracts.ISystemOperationsEvidenceReader)] = (1, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService)] = (1, ServiceLifetime.Singleton),
+            [typeof(ISystemGraphContributor)] = (12, ServiceLifetime.Singleton),
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
@@ -75,6 +81,10 @@ public sealed class RegistrationContractTests
         AssertSingleton<ICurrentRequestContext>(services);
         AssertSingleton<IRequestContextScopeFactory>(services);
         AssertSingleton<TimeProvider>(services);
+        AssertSingleton<ISystemGraphQueryService>(services);
+        AssertSingleton<ISystemGraphImpactService>(services);
+        AssertSingleton<ISystemGraphAuthorization>(services);
+        AssertSingleton<ISystemGraphReadScope>(services);
         var frameworkHost = services.Single(descriptor => descriptor.ServiceType == typeof(IHostedService));
         Assert.AreEqual("Microsoft.AspNetCore.DataProtection.Internal.DataProtectionHostedService", frameworkHost.ImplementationType?.FullName);
         Assert.AreEqual(ServiceLifetime.Singleton, frameworkHost.Lifetime);
@@ -151,6 +161,10 @@ public sealed class RegistrationContractTests
         services.AddSingleton<TimeProvider>(clock);
         services.AddAgentstration(Path.GetTempPath(), enableHostedServices: false);
         AssertSingleton<TimeProvider>(services);
+        AssertSingleton<ISystemGraphQueryService>(services);
+        AssertSingleton<ISystemGraphImpactService>(services);
+        AssertSingleton<ISystemGraphAuthorization>(services);
+        AssertSingleton<ISystemGraphReadScope>(services);
         Assert.AreSame(clock, services.Single(descriptor => descriptor.ServiceType == typeof(TimeProvider)).ImplementationInstance);
     }
 

@@ -232,7 +232,8 @@ public sealed partial class FlowTests
         await using var fixture = await FlowFixture.CreateAsync();
         var parent = await fixture.Service.CreateAsync(TestScope.WorkspaceId, new CreateFlowCommand(
             "parent", null, "1.0.0", true, PlaceholderDefinition(), Graph: Graph()), default);
-        await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", true, default);
+        var publishedParent = await fixture.Service.PublishVersionAsync(TestScope.WorkspaceId, parent.Value.Id, "1.0.0", true, default);
+        Assert.AreEqual(parent.Value.Uid, publishedParent.Value.ResourceUid);
 
         var childGraph = Graph(new FlowCallStepDefinition
         {

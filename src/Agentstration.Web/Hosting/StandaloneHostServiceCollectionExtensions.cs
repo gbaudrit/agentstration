@@ -136,6 +136,7 @@ internal static class StandaloneHostServiceCollectionExtensions
                     .AddHttpClientInstrumentation()
                     .AddSource(
                         HttpDiagnosticsExtensions.ActivitySourceName,
+                        Agentstration.SystemOperations.SystemOperationsTelemetry.Name,
                         WorkItemService.ActivitySource.Name,
                         RuntimeRunService.ActivitySource.Name,
                         FlowRunService.ActivitySource.Name,
@@ -150,6 +151,7 @@ internal static class StandaloneHostServiceCollectionExtensions
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddMeter(
+                        Agentstration.SystemOperations.SystemOperationsTelemetry.Name,
                         WorkItemService.Meter.Name,
                         FlowRunService.Meter.Name,
                         SourceRegistryManagementService.Meter.Name,

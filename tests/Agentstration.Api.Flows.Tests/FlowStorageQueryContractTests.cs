@@ -176,6 +176,83 @@ public sealed partial class FlowTests
         }
     }
 
+    [TestMethod]
+    public async Task SqliteOperationalFlowQueryFiltersNativeIdentityAndActorBeforeTakingBoundedSample()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var uid = Guid.NewGuid();
+        var run = CreateStoredRun("own-attested", new("same-name"), FlowRunStatus.Pending);
+        run = run with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = uid, ScopeRef = ResourceScopeRef.Instance } };
+        await fixture.Repository.CreateRunAsync(run, default);
+        for (var index = 0; index < 6; index++)
+        {
+            var foreign = run with { Id = $"foreign-{index}" };
+            foreign = index switch
+            {
+                0 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = Guid.NewGuid() } },
+                1 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ResourceUid = null } },
+                2 => foreign with { Scope = run.Scope with { PrincipalId = Guid.NewGuid() } },
+                3 => foreign with { DefinitionSnapshot = run.DefinitionSnapshot with { ScopeRef = run.Scope.ScopeRef } },
+                4 => foreign with { Scope = run.Scope with { LogicalScopeRef = ResourceScopeRef.Instance } },
+                _ => foreign with { FlowVersion = "999.0.0" }
+            };
+            await fixture.Repository.CreateRunAsync(foreign, default);
+        }
+        var page = await fixture.Repository.ListRunsByIdentityAsync(new(run.Scope, ResourceScopeRef.Instance,
+            run.FlowId.Namespace, uid, run.FlowVersion, DateTimeOffset.MinValue, 1), default);
+        Assert.HasCount(1, page.Items); Assert.IsFalse(page.HasMore);
+        Assert.AreEqual(run.Id, page.Items[0].Value.Id);
+    }
+
+    [TestMethod]
+    public async Task SqliteAgentBindingQueryFiltersTargetIdentityAndActorBeforeLimitAcrossFlowNamespaces()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var uid = Guid.NewGuid(); var revision = Guid.NewGuid(); var targetNs = ResourceNamespace.Parse("agents");
+        var binding = new RuntimeExecutionBinding
+        {
+            ParticipantId = "participant",
+            AgentNamespace = targetNs,
+            AgentScopeRef = ResourceScopeRef.Instance,
+            AgentUid = uid,
+            RevisionUid = revision,
+            AgentResourceId = "same-name",
+            AgentGeneration = 2,
+            RevisionId = "revision-v2",
+            DeploymentId = "deployment",
+            DefinitionHash = "agent-hash",
+            RuntimeProfileName = "metadata-only",
+            ModelProfileName = "metadata-only"
+        };
+        var run = CreateStoredRun("own-binding", new("consumer", ResourceNamespace.Parse("flows")), FlowRunStatus.Pending)
+            with
+        { RuntimeBindings = [binding] };
+        await fixture.Repository.CreateRunAsync(run, default);
+        for (var index = 0; index < 8; index++)
+        {
+            var other = binding;
+            var foreign = run with { Id = $"foreign-binding-{index}" };
+            foreign = index switch
+            {
+                0 => foreign with { Scope = run.Scope with { PrincipalId = Guid.NewGuid() } },
+                1 => foreign with { Scope = run.Scope with { LogicalScopeRef = ResourceScopeRef.Instance } },
+                2 => foreign with { RuntimeBindings = [other with { AgentUid = Guid.NewGuid() }] },
+                3 => foreign with { RuntimeBindings = [other with { RevisionUid = Guid.NewGuid() }] },
+                4 => foreign with { RuntimeBindings = [other with { AgentNamespace = ResourceNamespace.Default }] },
+                5 => foreign with { RuntimeBindings = [other with { AgentScopeRef = run.Scope.ScopeRef }] },
+                6 => foreign with { RuntimeBindings = [other with { AgentGeneration = 1 }] },
+                _ => foreign with { RuntimeBindings = [other with { DefinitionHash = "different" }] }
+            };
+            await fixture.Repository.CreateRunAsync(foreign, default);
+        }
+        var page = await fixture.Repository.ListRunsByAgentBindingAsync(new(run.Scope, ResourceScopeRef.Instance, targetNs,
+            uid, revision, 2, "agent-hash", DateTimeOffset.MinValue, 1), default);
+        Assert.HasCount(1, page.Items); Assert.IsFalse(page.HasMore);
+        Assert.AreEqual(run.Id, page.Items[0].Value.Id);
+        Assert.IsEmpty((await fixture.Repository.ListRunsByAgentBindingAsync(new(run.Scope, ResourceScopeRef.Instance, targetNs,
+            uid, Guid.NewGuid(), 2, "agent-hash", DateTimeOffset.MinValue, 1), default)).Items);
+    }
+
     private static FlowRun CreateStoredRun(string id, FlowId flowId, FlowRunStatus status)
     {
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"));

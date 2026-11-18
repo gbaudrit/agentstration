@@ -22,12 +22,14 @@ public enum RuntimeRunEventKind { RunCreated, StatusChanged, StepStarted, StepCo
 
 public sealed record RuntimeAgentReference(string ResourceId, long Version)
 {
+    public RuntimeDeploymentReference? Deployment { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public Guid? ResourceUid { get; init; }
     public Guid? RevisionUid { get; init; }
     public string? DefinitionHash { get; init; }
 }
+public sealed record RuntimeDeploymentReference(Guid Uid, Guid ConfigurationId, ResourceScopeRef ScopeRef, ResourceNamespace Namespace, string Name);
 public sealed record RuntimeRunMessage(RuntimeMessageRole Role, string Content);
 public sealed record RuntimeRunScope(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] Guid TenantId,
@@ -176,6 +178,13 @@ public sealed record RuntimeRunEvent
 
 public sealed record StoredRuntimeRun(RuntimeRun Value, string ETag, DateTimeOffset UpdatedAt);
 
+public sealed record RuntimeRunIdentityQuery(ResourceScopeRef ExecutionScope, ResourceScopeRef DefinitionOwner,
+    ResourceNamespace Namespace, Guid? AgentUid, Guid? RevisionUid, long? Generation, DateTimeOffset WindowStart, int Take = 100, ResourceScopeRef? InvocationScope = null, string? DefinitionHash = null)
+{
+    public Guid? DeploymentUid { get; init; }
+    public Guid? DeploymentConfigurationId { get; init; }
+}
+
 public interface IRuntimeRunStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
@@ -191,6 +200,8 @@ public interface IRuntimeRunStore
         GetAsync(RequiredWorkspace(scopeRef), runId, cancellationToken);
     Task<IReadOnlyList<StoredRuntimeRun>> ListExactAsync(ResourceScopeRef scopeRef, string? agentResourceId, int skip, int take, CancellationToken cancellationToken) =>
         ListAsync(RequiredWorkspace(scopeRef), agentResourceId, skip, take, cancellationToken);
+    Task<IReadOnlyList<StoredRuntimeRun>> ListByIdentityAsync(RuntimeRunIdentityQuery query, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact Runtime execution identity projection is unavailable.");
     Task DeleteExactAsync(ResourceScopeRef scopeRef, string runId, string expectedETag, CancellationToken cancellationToken) =>
         DeleteAsync(RequiredWorkspace(scopeRef), runId, expectedETag, cancellationToken);
     Task<IReadOnlyList<RuntimeRunEvent>> ListEventsExactAsync(ResourceScopeRef scopeRef, string runId, long afterSequence, CancellationToken cancellationToken) =>

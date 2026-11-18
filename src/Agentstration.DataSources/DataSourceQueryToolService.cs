@@ -135,6 +135,14 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
         return new(AgentstrationToolProvider.ToolResourceName(ToolDefinitionService.VersionName(request.Name, request.Version)), scope, ns);
     }
 
+    internal static DataSourceQueryReference? ReadQueryReference(ToolDefinitionVersionResource version)
+    {
+        if (version.Definition is not RelayToolDefinitionProperties relay) return null;
+        var value = relay.Bindings.OfType<LiteralToolArgumentBinding>().FirstOrDefault(binding => binding.Path == "/query");
+        try { return value?.Value.Deserialize<DataSourceQueryReference>(Json); }
+        catch (JsonException) { return null; }
+    }
+
     public async Task<IReadOnlyList<DataSourceQueryToolPublication>> ListAsync(ResourceScopeRef scope, Guid sourceUid, CancellationToken ct)
     {
         var queryValues = await queries.ListAsync(scope, sourceUid, ct);
@@ -150,8 +158,7 @@ public sealed class DataSourceQueryToolService(DataSourceQueryService queries, T
             var reference = relay.Bindings.OfType<LiteralToolArgumentBinding>().FirstOrDefault(b => b.Path == "/query");
             if (reference is not null)
             {
-                DataSourceQueryReference? query;
-                try { query = reference.Value.Deserialize<DataSourceQueryReference>(Json); } catch (JsonException) { continue; }
+                var query = ReadQueryReference(version);
                 if (query is null || !ownedQueries.TryGetValue(query.QueryUid, out var owner)
                     || query.Query.Name != owner.Name || query.Query.ScopeRef != owner.ScopeRef || query.Query.Namespace != owner.Namespace) continue;
                 var acquisition = relay.Bindings.OfType<LiteralToolArgumentBinding>().FirstOrDefault(b => b.Path == "/acquisition")?.Value
