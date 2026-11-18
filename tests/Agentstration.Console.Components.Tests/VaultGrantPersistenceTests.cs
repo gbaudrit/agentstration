@@ -364,6 +364,56 @@ public sealed class VaultGrantPersistenceTests
         Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
     }
 
+    [TestMethod]
+    public async Task SecretAccessDraftSurvivesMetadataSaveAndRemainsGuarded()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid()); var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, workspace); var policies = new AccessPolicies();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new AccessScopes(client, tenant, workspace));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureSecretNavigation(context);
+        var cut = context.Render<SecretEditor>(p => p.Add(c => c.Name, "credential"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=secret-display-name]").Change("Updated secret");
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        var panel = cut.FindComponent<ResourceAccessPanel>().Instance;
+        cut.Find("[data-testid=resource-access-target]").Change(workspace.Value);
+        cut.Find("[data-testid=resource-access-add]").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        await cut.Find("#secret-resource-form").SubmitAsync();
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        Assert.AreSame(panel, cut.FindComponent<ResourceAccessPanel>().Instance);
+        Assert.HasCount(1, cut.FindAll("[data-testid=resource-access-grant]"));
+        Assert.IsNull(policies.Saved);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.AreEqual(workspace, policies.Saved!.Grants.Single().TargetScopeRef);
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    public void ManagedSecretKeepsDefinitionReadOnlyAndOwnerAccessAvailable()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid())) { ManagedSecret = true });
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureSecretNavigation(context);
+        var cut = context.Render<SecretEditor>(p => p.Add(c => c.Name, "credential"));
+        Assert.IsTrue(cut.Find("fieldset").HasAttribute("disabled"));
+        Assert.HasCount(1, cut.FindAll("a[data-resource-section=access]"));
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+    }
+
     private sealed class AccessPolicies : IResourceAccessPolicyClient
     {
         public ResourceAccessPolicy? Saved { get; private set; }
@@ -405,6 +455,7 @@ public sealed class VaultGrantPersistenceTests
     {
         public bool ValueConfigured { get; init; }
         public bool ManagedVault { get; init; }
+        public bool ManagedSecret { get; init; }
         public int SecretMetadataSaves { get; private set; }
         public int ValueWrites { get; private set; }
         public int ValueDeletes { get; private set; }
@@ -461,7 +512,7 @@ public sealed class VaultGrantPersistenceTests
         public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>
-            Task.FromResult(new ResourceSnapshot<SecretResponse>(new(SavedSecret, ValueConfigured ? "Configured" : "Missing", ValueConfigured), "\"1\""));
+            Task.FromResult(new ResourceSnapshot<SecretResponse>(new(ManagedSecret ? SavedSecret with { Governance = ResourceGovernance.Core("secret") } : SavedSecret, ValueConfigured ? "Configured" : "Missing", ValueConfigured), "\"1\""));
         public Task<ResourceSnapshot<SecretResource>> CreateSecretAsync(CreateSecretRequest request, CancellationToken token)
         {
             SavedSecret = SavedSecret with { Metadata = new() { Name = request.Name }, ScopeRef = request.ScopeRef, Definition = request.Properties };
@@ -471,7 +522,7 @@ public sealed class VaultGrantPersistenceTests
         public Task<ResourceSnapshot<SecretResource>> UpdateSecretAsync(string name, ResourceScopeRef scopeRef, PutSecretRequest request, string etag, CancellationToken token)
         {
             SecretMetadataSaves++;
-            SavedSecret = SavedSecret with { Definition = request.Properties };
+            SavedSecret = SavedSecret with { Definition = request.Properties, Generation = SavedSecret.Generation + 1 };
             return Task.FromResult(new ResourceSnapshot<SecretResource>(SavedSecret, "\"2\""));
         }
         public Task SetSecretValueAsync(string name, string value, CancellationToken token) { ValueWrites++; return Task.CompletedTask; }

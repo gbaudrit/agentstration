@@ -36,7 +36,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Implemented; 10 profile cases and 15 shared access-panel cases pass; TypeScript/catalog pass; browser page object maintained; browser checks pending |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
-| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
+| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Layout/wizard browser checks pass at `70897500`; access-draft/managed follow-up passes the 33-case grant/access regression selection; fresh browser checks for that follow-up remain pending. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
 | SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Pending review and migration |
 | SourceRegistries.razor | `/settings/source-registries`, `/settings/source-registries/new`, `/settings/source-registries/{Name}` | Pending review and migration |
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
