@@ -23,6 +23,8 @@
     <InternalsVisibleTo Include="Agentstration.Api.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Resources.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.DataSources.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Artifacts.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />
   </ItemGroup>
 </Project>

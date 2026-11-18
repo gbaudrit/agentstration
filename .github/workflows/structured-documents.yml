@@ -10,6 +10,8 @@ on:
       - 'src/Agentstration.Extensions.PostgreSql/**'
       - 'tests/Agentstration.Extensions.PostgreSql.Tests/**'
       - 'tests/Agentstration.Api.Resources.Tests/**'
+      - 'tests/Agentstration.Api.DataSources.Tests/**'
+      - 'tests/ApiResourceTestFixtures/**'
       - 'Directory.*.props'
       - '.github/workflows/structured-documents.yml'
   workflow_dispatch:
@@ -44,7 +46,7 @@ jobs:
       - name: V1 contracts and real JSONB provider
         run: dotnet test --project tests/Agentstration.Extensions.PostgreSql.Tests --configuration Release --minimum-expected-tests 19
       - name: V2 and V3 through product AEP, MCP, Tools and Snapshots
-        run: dotnet test --project tests/Agentstration.Api.Resources.Tests --configuration Release --filter 'FullyQualifiedName~TwoAgentRelaysUseLateBoundExports|FullyQualifiedName~AcquiredJsonProjectsToImmutableStructuredKnowledge|FullyQualifiedName~PostgreSqlJsonExplodePublishesIndependentRecords' --minimum-expected-tests 6
+        run: dotnet test --project tests/Agentstration.Api.DataSources.Tests --configuration Release --filter 'FullyQualifiedName~TwoAgentRelaysUseLateBoundExports|FullyQualifiedName~AcquiredJsonProjectsToImmutableStructuredKnowledge|FullyQualifiedName~PostgreSqlJsonExplodePublishesIndependentRecords' --minimum-expected-tests 6
       - name: Publish independent provider
         run: dotnet publish src/Agentstration.Extensions.PostgreSql --configuration Release --output artifacts/postgresql-documents
       - uses: actions/upload-artifact@v7

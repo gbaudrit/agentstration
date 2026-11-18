@@ -6,6 +6,10 @@ The approved all-list contract applies to new Connected Service, Storage, Storag
 
 The scope below audits every added/changed Razor source in the incoming delta, including shared helpers and existing screens. `—` denotes an embedded component, not an extra route. Route aliases share one functional source. No Workplace Razor file changed in this incoming main commit; the existing Workplace implementation and regression cases remain in the merged branch.
 
+## CI follow-up after merged #1219
+
+Main `eb0a616429ee4f1195160705bd60e48a6699b3ce` is now merged into the promotion branch. The merge is conflict-free and retains all UX sources and assertions. It includes the Resources/DataSources/Artifacts process split, shared test-root fixtures, complete Integration/coverage registration and unchanged 2,432 MiB ceilings. The earlier CI memory failure below belongs to the previous head. Fresh validation of this synchronized head is recorded in #1174; the old green UX result is not substituted for that run.
+
 ## Incoming source/route reconciliation
 
 | Change | Source | Actual routes / mounting |

@@ -6,6 +6,8 @@ captured from the running application, using fresh local Development hosts and
 public disposable fixture data. No remote storage, service or LLM operation is
 required. The authored fixture types and resources exist only in browser-test data.
 
+The automation page/spec files were exercised in the working tree and subsequently committed as `5c5159d8`; their hashes in observations.json identify that harness separately from the product source above.
+
 The populated regression extends #1122's collection contract on `/storages`,
 `/storage-types` and `/connected-services`. It checks two same-named Storages in
 different namespaces, long display/qualified identities, exact namespace/scope
