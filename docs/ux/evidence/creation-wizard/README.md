@@ -1,6 +1,6 @@
 # Data Source creation Wizard — real application evidence
 
-These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `0a4f46e030445167c187fd3011781d51971b920e`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
+These are unedited screenshots of the running Console, not generated mockups. The application was built from implementation commit `0039eb6e884e83a90e28ee969b6d8e684cf8f883`, based on main `efbf247a`. Capture-only files and this evidence were untracked during that build. Product assemblies were not rebuilt during the browser campaign.
 
 ## Capture matrix
 
@@ -24,6 +24,7 @@ The capture wrapper reuses the existing `SourcePoliciesPage.exerciseLifecycle` j
 
 - All six creation steps and the incomplete review render in both matrix cells; the product theme is asserted after language preference persistence.
 - Step numbers and titles stay on one line, with a fixed trailing status slot. Browser assertions check the vertical centers of the number, title and status through mixed completion states.
+- Top Continue/Previous and invalid top creation are exercised; the final valid creation uses the footer command. Both positions use the same serialized handlers and validation.
 - Only one content pane is active. Focus moves to its region after navigation. Horizontal overflow is checked at every forward transition.
 - Header navigation and Continue work with incomplete fields. Missing identity/operation/Storage are marked separately in the banner; optional empty sections remain complete.
 - Attempting creation with missing identity, missing Storage or incompatible direct-input freshness/history returns to the first incomplete section, exposes the localized error and leaves the resource absent from the API.
