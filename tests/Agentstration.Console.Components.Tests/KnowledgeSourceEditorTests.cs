@@ -1033,7 +1033,8 @@ public sealed partial class KnowledgeSourceEditorTests
         internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
 
-        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>(
+        public TaskCompletionSource<IReadOnlyList<FlowSummary>>? PendingListing { get; set; }
+        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => PendingListing?.Task ?? Task.FromResult<IReadOnlyList<FlowSummary>>(
         [
             new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
             new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },

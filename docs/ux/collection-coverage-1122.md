@@ -1,5 +1,22 @@
 # Reusable collection coverage (#1122)
 
+## Current delivery status — 2026-11-18
+
+The maintainer merged #1132 as `2c18b47fd42b6547c475e32bd24bb73b6fe3fd9f`
+into `ux/unification-formulaires`. Its original coverage/lifetime-fix head
+`f80a1758` was already an ancestor of promotion #1174, so no coverage is lost or
+replayed. The attempted local fast-forward of the former child was never pushed;
+its remote base and history were preserved for the maintainer's merge.
+
+At the maintainer's direction, subsequent test corrections are concentrated in
+#1174. The Source Flow refresh/queued-action regressions and the inspector
+fixture-consumer updates are recorded there. This does not claim all CI checks
+pass, accept the implemented UX, close #1121/#1122, or complete the six explicitly
+pending form-adapter scenarios. The following reconstruction and earlier totals
+are historical evidence.
+
+## Historical reconstruction and validation
+
 This coverage remains a separate draft in #1132 for #1122. Implementation #1123 was squash-merged into `ux/unification-formulaires` as `d08ebe55848e7d0996e8ebda5bcccdd7a049c8ef` on 2026-11-13. The maintainer authorized post-merge realignment and a separate promotion PR toward `main`. Coverage now starts from that integration commit, replacing its historical pre-merge stack. Both issues remain open; coverage acceptance and merge are still maintainer decisions.
 
 The post-merge CI exposed a product lifetime defect in the parent collection component: both coverage and promotion server logs show CollectionActions using a disposed JavaScript module during an overlapping render. This PR also carries the narrow #1121 lifecycle correction required by its regression coverage. [Archived server stacks and deterministic failing/passing component cases](evidence/1122/circuit-lifetime/README.md) distinguish this diagnosed failure from the older unattributed incident. Promotion draft #1174 includes the same correction. Browser health checks and assertions are unchanged.

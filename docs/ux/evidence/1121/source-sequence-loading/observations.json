@@ -1,0 +1,28 @@
+{
+  "baseline": "5c5159d8",
+  "validation": "2026-11-18",
+  "browser_incident_attribution": "The exact CI failure has no preserved matching server stack in the job log.",
+  "files": [
+    {
+      "path": "component-red.txt",
+      "bytes": 5591,
+      "sha256": "5d0e5f59d18f388ada4b29811c1d373c72714c191d0374a00de4fcc2b04ce10a"
+    },
+    {
+      "path": "component-green.txt",
+      "bytes": 443,
+      "sha256": "0f4049c9077c94ef249f7539648bd89957d1bdf76926b14d17748445b18ce26d"
+    },
+    {
+      "path": "component-console.txt",
+      "bytes": 452,
+      "sha256": "a7d43ab2a4e8f11a2899719666737e2d13997e53bc95338c432e56be7fe1319b"
+    }
+  ],
+  "rawTranscriptArchive": {
+    "path": "component-red.raw.txt.gz",
+    "uncompressedSha256": "5df91761bab3740ef2a6fcbcb69ed11b7f5cc1b7df70e036148fccbb4fb9e2c0",
+    "archiveSha256": "2548ba75c2738f55b2b9d5b583b61818861f9562bd22251e36c022c6c6999bb0"
+  },
+  "readableTranscriptNormalization": "Trailing whitespace only; all diagnostic text and test results retained. Original bytes are preserved in the gzip archive."
+}

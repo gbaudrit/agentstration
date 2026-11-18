@@ -174,7 +174,16 @@ export class SourceCompositionPage {
     const unchanged = (await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value;
     expect(unchanged.generation).toBe(before.generation);
     expect(unchanged.definition.displayName).toBe(before.definition.displayName);
-    await sequence.getByTestId(TestIds.sourcePolicies.refreshFlows).click();
+    const refresh = sequence.getByTestId(TestIds.sourcePolicies.refreshFlows);
+    await expect(sequence).toHaveAttribute('aria-busy', 'false');
+    await expect(refresh).toBeEnabled();
+    const previousLoad = await sequence.getAttribute('data-load-revision');
+    expect(previousLoad).not.toBeNull();
+    await refresh.click();
+    // Click dispatch can precede Blazor's loading render. Match the completed
+    // refresh before issuing an Add against the newly loaded catalog.
+    await expect(sequence).not.toHaveAttribute('data-load-revision', previousLoad!);
+    await expect(sequence).toHaveAttribute('aria-busy', 'false');
     const rows = sequence.getByTestId(TestIds.sourcePolicies.call);
     const count = await rows.count();
     await sequence.getByTestId(TestIds.sourcePolicies.add).click();
