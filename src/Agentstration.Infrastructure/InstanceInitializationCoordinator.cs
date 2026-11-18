@@ -8,7 +8,7 @@ namespace Agentstration.Infrastructure;
 public interface IInstanceInitializationCoordinator
 {
     bool IsReady { get; }
-    Task RunAsync(Func<CancellationToken, Task> initialize, CancellationToken cancellationToken);
+    Task RunAsync(Func<CancellationToken, Task> initialize, CancellationToken cancellationToken, bool runWhenReady = false);
 }
 
 public sealed class InstanceInitializationOptions
@@ -33,10 +33,11 @@ internal sealed class InstanceInitializationCoordinator(
 
     public bool IsReady => isReady;
 
-    public async Task RunAsync(Func<CancellationToken, Task> initialize, CancellationToken cancellationToken)
+    public async Task RunAsync(Func<CancellationToken, Task> initialize, CancellationToken cancellationToken, bool runWhenReady = false)
     {
         ArgumentNullException.ThrowIfNull(initialize);
         ValidateOptions();
+        if (runWhenReady) isReady = false;
 
         while (true)
         {
@@ -44,7 +45,7 @@ internal sealed class InstanceInitializationCoordinator(
             var current = await ReadAsync(cancellationToken);
             if (current is not null && current.Value.Definition.TargetVersion > options.TargetVersion)
                 throw new InvalidOperationException($"Instance initialization target version {current.Value.Definition.TargetVersion} is newer than the supported version {options.TargetVersion}.");
-            if (current?.Value.Definition is { Status: InstanceInitializationStatus.Ready } ready
+            if (!runWhenReady && current?.Value.Definition is { Status: InstanceInitializationStatus.Ready } ready
                 && ready.TargetVersion == options.TargetVersion)
             {
                 isReady = true;

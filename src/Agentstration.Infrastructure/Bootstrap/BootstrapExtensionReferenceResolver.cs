@@ -39,14 +39,19 @@ public sealed class BootstrapExtensionReferenceResolver(
     {
         if (string.IsNullOrWhiteSpace(selector.Id) || selector.Id.Length > 256 || selector.InstanceId == Guid.Empty)
             throw new BootstrapDependencyException("extension_selector_invalid", "A public extension selector requires a bounded ID and a valid optional installation ID.");
-        var candidates = (await store.ListVisibleAsync<ExtensionRegistrationResource>(consumerScope,
-                ExtensionKinds.ExtensionRegistration, 0, 1001, cancellationToken))
+        var visible = await store.ListVisibleAsync<ExtensionRegistrationResource>(consumerScope,
+            ExtensionKinds.ExtensionRegistration, 0, 1001, cancellationToken);
+        if (visible.Count > 1000)
+            throw new BootstrapDependencyException("extension_resolution_limit", "Bootstrap extension resolution exceeds its bounded candidate window.");
+        var candidates = visible
             .Where(value => value.Value.Definition.Enabled
                 && value.Value.Definition.ExpectedExtensionId == selector.Id).ToArray();
         var requests = await store.ListExactAsync<AepEnrollmentRequestResource>(ResourceScopeRef.Instance,
             ExtensionKinds.AepEnrollmentRequest, 0, 1001, cancellationToken);
         if (requests.Count > 1000 || candidates.Length > 1000)
             throw new BootstrapDependencyException("extension_resolution_limit", "Bootstrap extension resolution exceeds its bounded candidate window.");
+        if (selector.InstanceId is null && candidates.Length > 1)
+            throw new BootstrapDependencyException("extension_ambiguous", $"Extension '{selector.Id}' has several visible installations; select instanceId explicitly.");
         // An installation selector binds to its durable server-owned enrollment,
         // never to a similarly named registration or a caller-supplied endpoint.
         candidates = candidates.Where(candidate =>

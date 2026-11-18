@@ -82,6 +82,46 @@ public sealed partial class AepEnrollmentTests
     }
 
     [TestMethod]
+    public async Task AutomaticInstallationsWithTheSamePublicIdKeepIndependentTrustAndRegistrations()
+    {
+        var firstPath = Path.GetTempFileName();
+        var secondPath = Path.GetTempFileName();
+        var first = AutomaticAnnouncement() with { Endpoint = new("https://first-automatic.example/") };
+        var second = AutomaticAnnouncement() with { Endpoint = new("https://second-automatic.example/") };
+        const string firstKey = "first-installation-disposable-independent-test-key";
+        const string secondKey = "second-installation-disposable-independent-test-key";
+        await File.WriteAllTextAsync(firstPath, firstKey);
+        await File.WriteAllTextAsync(secondPath, secondKey);
+        try
+        {
+            await using var factory = EnrollmentFactory().WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Agentstration:Aep:Enrollment:AutoEnrollmentLevel", "/instance");
+                builder.UseSetting("Agentstration:Extensions:extension.automatic:EnrollmentMode", "SharedKeyFile");
+                builder.UseSetting($"Agentstration:Extensions:extension.automatic:Instances:{first.InstanceId:D}:SharedKeyFile:Path", firstPath);
+                builder.UseSetting($"Agentstration:Extensions:extension.automatic:Instances:{second.InstanceId:D}:SharedKeyFile:Path", secondPath);
+                builder.ConfigureServices(services => services.RemoveAll<IAepEnrollmentResourceProvisioner>());
+            });
+            var context = await GetBootstrapContextAsync(factory);
+            var service = factory.Services.GetRequiredService<AepEnrollmentService>();
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            _ = await service.AnnounceAsync(first, new(timestamp, AepEnrollmentProofs.Sign(first, timestamp, firstKey)), default);
+            var failure = await Assert.ThrowsAsync<AepEnrollmentException>(() => service.AnnounceAsync(second,
+                new(timestamp, AepEnrollmentProofs.Sign(second, timestamp, firstKey)), default));
+            Assert.AreEqual("shared_key_proof_invalid", failure.Code);
+            _ = await service.AnnounceAsync(second, new(timestamp, AepEnrollmentProofs.Sign(second, timestamp, secondKey)), default);
+            await factory.Services.GetRequiredService<AepAutomaticEnrollmentService>().ProcessPendingAsync(default);
+            var requests = (await service.ListAsync(context, default)).Where(value => value.Definition.ExtensionId == "extension.automatic").ToArray();
+            Assert.HasCount(2, requests);
+            Assert.IsTrue(requests.All(value => value.Definition.State == AepEnrollmentState.Available));
+            Assert.HasCount(2, requests.Select(value => value.Definition.RegistrationName).Distinct().ToArray());
+            Assert.AreEqual(first.Endpoint, requests.Single(value => value.Definition.InstanceId == first.InstanceId).Definition.Endpoint);
+            Assert.AreEqual(second.Endpoint, requests.Single(value => value.Definition.InstanceId == second.InstanceId).Definition.Endpoint);
+        }
+        finally { File.Delete(firstPath); File.Delete(secondPath); }
+    }
+
+    [TestMethod]
     [DataRow("")]
     [DataRow("/workspaces/default")]
     [DataRow("/tenants/dev/")]

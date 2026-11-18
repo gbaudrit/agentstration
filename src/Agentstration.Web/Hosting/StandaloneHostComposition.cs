@@ -33,6 +33,9 @@ internal static class StandaloneHostCompositionExtensions
     internal static StandaloneHostComposition AddAgentstrationStandaloneHost(this WebApplicationBuilder builder)
     {
         var bootstrapOptions = new LocalBootstrapOptions();
+        var declarativeBootstrap = builder.Configuration.GetSection("Agentstration:Bootstrap").Get<DeclarativeBootstrapOptions>() ?? new();
+        if (!declarativeBootstrap.PhasedStartupEnabled && declarativeBootstrap.InitialApplications.Count > 0)
+            throw new InvalidOperationException("Bootstrap InitialApplications require PhasedStartupEnabled.");
         var configuredAuthentication = builder.Configuration.GetSection("Agentstration:Authentication").Get<ApiAuthenticationOptions>() ?? new();
         if (string.Equals(configuredAuthentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
         {
@@ -165,6 +168,8 @@ internal static class StandaloneHostCompositionExtensions
             : [];
         builder.Services.AddAgentstrationTestingCleanup(testingStorageDirectory, sqliteConnectionStrings);
         builder.Services.AddAgentstrationHostObservability(builder.Logging, builder.Configuration, openTelemetryEnabled);
+        if (builder.Configuration.GetValue("Agentstration:Bootstrap:PhasedStartupEnabled", false))
+            builder.Services.DeferBootstrapWorkers();
 
         return new(configuredAuthentication, genAiObservability, testingStorageDirectory, apiOnlyTesting);
     }
@@ -180,6 +185,19 @@ internal static class StandaloneHostCompositionExtensions
                 composition.GenAiObservability.HttpPayloadCapture.MaximumBodyLength);
         }
 
+        app.Use(async (context, next) =>
+        {
+            var startup = context.RequestServices.GetRequiredService<BootstrapStartupState>();
+            var announcement = HttpMethods.IsPost(context.Request.Method)
+                && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
+            if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement)
+            {
+                await Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                    extensions: new Dictionary<string, object?> { ["code"] = "bootstrap_initializing" }).ExecuteAsync(context);
+                return;
+            }
+            await next(context);
+        });
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseRequestLocalization();
@@ -207,6 +225,9 @@ internal static class StandaloneHostCompositionExtensions
         this WebApplication app,
         StandaloneHostComposition composition)
     {
+        var startupState = app.Services.GetRequiredService<BootstrapStartupState>();
+        var phased = app.Configuration.GetValue("Agentstration:Bootstrap:PhasedStartupEnabled", false);
+        startupState.Begin();
         var testingDataDirectoryCleanup = composition.TestingDataDirectory is not null
             ? app.Services.GetRequiredService<TestingDataDirectoryCleanup>()
             : null;
@@ -225,7 +246,12 @@ internal static class StandaloneHostCompositionExtensions
                 await app.Services.GetRequiredService<FlowRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<RuntimeRunService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<ResourcePlanService>().InitializeAsync(app.Lifetime.ApplicationStopping);
-
+            }
+            // Do not let the startup System execution context flow into the HTTP
+            // listener or background service execution contexts.
+            if (phased) await app.StartAsync(app.Lifetime.ApplicationStopping);
+            using (startupScopes.PushSystem())
+            {
                 await app.Services.GetRequiredService<IInstanceInitializationCoordinator>().RunAsync(async token =>
                 {
                     await app.Services.GetRequiredService<SourceRegistryManagementService>().EnsureOfficialAsync(token);
@@ -235,7 +261,13 @@ internal static class StandaloneHostCompositionExtensions
                     await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
-                    await app.Services.ApplyDeclarativeBootstrapAsync(token);
+                    if (phased)
+                    {
+                        await using var execution = app.Services.CreateAsyncScope();
+                        await execution.ServiceProvider.GetRequiredService<BootstrapStartupCoordinator>().ExecuteAsync(token);
+                    }
+                    else
+                        await app.Services.ApplyDeclarativeBootstrapAsync(token);
                     await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
@@ -246,13 +278,16 @@ internal static class StandaloneHostCompositionExtensions
                             bootstrapContext,
                             includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
                             token);
-                }, app.Lifetime.ApplicationStopping);
+                }, app.Lifetime.ApplicationStopping, runWhenReady: phased);
                 await app.Services.GetRequiredService<AepAutomaticEnrollmentService>().ActivateAsync(app.Lifetime.ApplicationStopping);
             }
-
+            startupState.Complete();
         }
-        catch
+        catch (Exception exception)
         {
+            startupState.Fail(exception.Message);
+            if (app.Lifetime.ApplicationStarted.IsCancellationRequested)
+                await app.StopAsync(CancellationToken.None);
             testingDataDirectoryCleanup?.Dispose();
             throw;
         }

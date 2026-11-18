@@ -24,7 +24,7 @@ public sealed partial class AepAutomaticEnrollmentService(
         active = true;
     }
 
-    public async Task ProcessPendingAsync(CancellationToken cancellationToken)
+    public async Task ProcessPendingAsync(CancellationToken cancellationToken, IReadOnlySet<string>? requiredExtensionIds = null)
     {
         if (!active) return;
         using var system = scopes.PushSystem();
@@ -37,6 +37,7 @@ public sealed partial class AepAutomaticEnrollmentService(
             foreach (var request in requests)
             {
                 var definition = request.Value.Definition;
+                if (requiredExtensionIds is not null && !requiredExtensionIds.Contains(definition.ExtensionId)) continue;
                 if (definition.EnrollmentMode != AepEnrollmentMode.SharedKeyFile) continue;
                 var newCandidate = definition.State == AepEnrollmentState.Pending && definition.TargetScopeRef is null;
                 var retry = definition.AutomaticEnrollmentPolicy is not null

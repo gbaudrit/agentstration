@@ -7,6 +7,7 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Local;
@@ -20,7 +21,8 @@ public sealed class ExtensionSourceDiscoveryService(
     IIdentityStore identities,
     AepEnrollmentSettingsService enrollmentSettings,
     IRequestContextScopeFactory requestScopes,
-    TimeProvider timeProvider) : IAepEnrollmentAnnouncementProvisioner
+    TimeProvider timeProvider,
+    IResourceStore store) : IAepEnrollmentAnnouncementProvisioner
 {
     public AepEnrollmentMethod Method => AepEnrollmentMethod.SharedKeyFile;
 
@@ -30,9 +32,9 @@ public sealed class ExtensionSourceDiscoveryService(
         CancellationToken cancellationToken)
     {
         var section = configuration.GetSection($"Agentstration:Extensions:{announcement.Extension.Id}");
-        if (EnrollmentMode(section["EnrollmentMode"]) != AepEnrollmentMode.SharedKeyFile)
+        if (EnrollmentMode(InstallationValue(section, announcement.InstanceId, "EnrollmentMode")) != AepEnrollmentMode.SharedKeyFile)
             throw new AepEnrollmentException("shared_key_not_configured", $"SharedKeyFile enrollment is not configured for extension '{announcement.Extension.Id}'.", 404);
-        var configuredPath = section["SharedKeyFile:Path"];
+        var configuredPath = InstallationValue(section, announcement.InstanceId, "SharedKeyFile:Path");
         if (string.IsNullOrWhiteSpace(configuredPath))
             throw new AepEnrollmentException("shared_key_not_configured", $"SharedKeyFile enrollment for extension '{announcement.Extension.Id}' has no configured key.", 404);
         var path = Path.GetFullPath(configuredPath);
@@ -46,14 +48,34 @@ public sealed class ExtensionSourceDiscoveryService(
         CancellationToken cancellationToken)
     {
         var section = configuration.GetSection($"Agentstration:Extensions:{announcement.Extension.Id}");
-        if (EnrollmentMode(section["EnrollmentMode"]) != AepEnrollmentMode.SharedKeyFile)
+        if (EnrollmentMode(InstallationValue(section, announcement.InstanceId, "EnrollmentMode")) != AepEnrollmentMode.SharedKeyFile)
             throw new AepEnrollmentException("shared_key_not_configured", $"SharedKeyFile enrollment is not configured for extension '{announcement.Extension.Id}'.", 404);
-        var configuredPath = section["SharedKeyFile:Path"];
+        var configuredPath = InstallationValue(section, announcement.InstanceId, "SharedKeyFile:Path");
         if (string.IsNullOrWhiteSpace(configuredPath))
             throw new AepEnrollmentException("shared_key_not_configured", $"SharedKeyFile enrollment for extension '{announcement.Extension.Id}' has no configured key.", 404);
         var path = Path.GetFullPath(configuredPath);
         SharedKeyFileSecretVaultProvider.Validate(path);
-        var name = RegistrationName(section, announcement.Extension.Id);
+        var explicitName = InstallationValue(section, announcement.InstanceId, "RegistrationName");
+        var name = string.IsNullOrWhiteSpace(explicitName) ? Slug(announcement.Extension.Id) : explicitName;
+        var requests = await store.ListExactAsync<AepEnrollmentRequestResource>(ResourceScopeRef.Instance,
+            ExtensionKinds.AepEnrollmentRequest, 0, 1001, cancellationToken);
+        if (requests.Count > 1000)
+            throw new AepEnrollmentException("enrollment_resolution_limit", "The enrollment candidate window exceeds its supported bound.");
+        bool AnotherInstallation(string candidate) => requests.Any(value => value.Value.Definition.InstanceId != announcement.InstanceId
+            && value.Value.Definition.TargetScopeRef == targetScopeRef && value.Value.Definition.RegistrationName == candidate);
+        var existing = await registrations.GetExactAsync(targetScopeRef, ResourceNamespace.Default, name, cancellationToken);
+        if (existing is not null && (AnotherInstallation(name)
+            || existing.Value.Definition.Endpoint != announcement.Endpoint
+            || existing.Value.Definition.ExpectedExtensionId != announcement.Extension.Id))
+        {
+            if (!string.IsNullOrWhiteSpace(explicitName))
+                throw new AepEnrollmentException("registration_conflict", "The configured registration name is already bound to another installation or endpoint.", 409);
+            name = $"{name[..Math.Min(name.Length, 96)]}-{announcement.InstanceId.ToString("N")[..12]}";
+            var candidate = await registrations.GetExactAsync(targetScopeRef, ResourceNamespace.Default, name, cancellationToken);
+            if (candidate is not null && (AnotherInstallation(name) || candidate.Value.Definition.Endpoint != announcement.Endpoint
+                || candidate.Value.Definition.ExpectedExtensionId != announcement.Extension.Id))
+                throw new AepEnrollmentException("registration_conflict", "The installation registration identity conflicts with an existing connection.", 409);
+        }
         var source = new ExtensionSource(
             name,
             section["DisplayName"] ?? announcement.Extension.Name,
@@ -216,6 +238,9 @@ public sealed class ExtensionSourceDiscoveryService(
         endpoint = null!;
         return false;
     }
+
+    private static string? InstallationValue(IConfigurationSection section, Guid instanceId, string key) =>
+        section[$"Instances:{instanceId:D}:{key}"] ?? section[key];
 
     private static string RegistrationName(IConfigurationSection section, string extensionId) =>
         string.IsNullOrWhiteSpace(section["RegistrationName"])

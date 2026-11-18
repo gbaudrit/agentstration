@@ -17,6 +17,9 @@ public sealed class BootstrapToolContributionResolver(IResourceStore store) : IB
         ExtensionRegistrationResource registration, BootstrapContributionSelector selector, CancellationToken cancellationToken)
     {
         var tools = await store.ListExactAsync<ToolResource>(registration.ScopeRef!.Value, Kind, 0, 1001, cancellationToken);
+        if (tools.Any(value => value.Value.Definition.ExternalId == selector.ContributionId
+            && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration) && !value.Value.Definition.Enabled))
+            throw new BootstrapDependencyException("contribution_disabled", $"Required Tool '{selector.ContributionId}' is disabled. Bootstrap preserves its enablement decision.");
         var matches = tools.Where(value => value.Value.Definition.ExternalId == selector.ContributionId
             && value.Value.Definition.Enabled && value.Value.Definition.Discovery?.Available == true
             && value.Value.Definition.Provider?.Name == registration.Name
@@ -38,6 +41,9 @@ public sealed class BootstrapConnectedServiceTypeContributionResolver(IResourceS
         ExtensionRegistrationResource registration, BootstrapContributionSelector selector, CancellationToken cancellationToken)
     {
         var resources = await store.ListExactAsync<ConnectedServiceTypeResource>(registration.ScopeRef!.Value, Kind, 0, 1001, cancellationToken);
+        if (resources.Any(value => value.Value.Name == selector.ContributionId
+            && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration) && !value.Value.Definition.Enabled))
+            throw new BootstrapDependencyException("contribution_disabled", $"Required Connected Service Type '{selector.ContributionId}' is disabled.");
         var matches = resources.Where(value => value.Value.Name == selector.ContributionId
             && value.Value.Definition.Enabled && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration)
             && value.Value.Definition.Versions.Any(version => !version.Deprecated
@@ -64,6 +70,9 @@ public sealed class BootstrapStorageTypeContributionResolver(IResourceStore stor
         ExtensionRegistrationResource registration, BootstrapContributionSelector selector, CancellationToken cancellationToken)
     {
         var resources = await store.ListExactAsync<StorageTypeResource>(registration.ScopeRef!.Value, Kind, 0, 1001, cancellationToken);
+        if (resources.Any(value => value.Value.Name == selector.ContributionId
+            && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration) && !value.Value.Definition.Enabled))
+            throw new BootstrapDependencyException("contribution_disabled", $"Required Storage Type '{selector.ContributionId}' is disabled.");
         var matches = resources.Where(value => value.Value.Definition.Enabled
             && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration)
             && value.Value.Definition.Versions.Any(version => !version.Deprecated

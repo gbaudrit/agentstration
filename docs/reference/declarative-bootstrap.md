@@ -2,7 +2,7 @@
 
 Agentstration treats `Agentstration:Bootstrap:Path` as the root of a profile catalog. Each immediate child directory is one independently selectable profile. Startup applies the ordered `Agentstration:Bootstrap:InitialProfiles` list only when `Agentstration:Bootstrap:InitialBootstrapEnabled` is `true`. Initial bootstrap is disabled by default.
 
-Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs during every enabled process startup after persistence initialization and the first automatic extension-discovery pass. Handlers only create absent resources and never reconcile existing ones. A second idempotent discovery pass covers Workspaces created by the initial instance profiles. Set `Agentstration:Extensions:DiscoverOnStartup` to `false` to disable both automatic passes and keep discovery manual.
+Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs after persistence initialization under the fenced instance initialization lifecycle. Handlers only create absent resources and never reconcile existing ones. Legacy endpoint synchronization can run before and after Bootstrap only when `Agentstration:Extensions:DiscoverOnStartup` is explicitly enabled; it is disabled by default. New staged startup accepts extension-initiated announcements instead.
 
 For example:
 
@@ -184,6 +184,72 @@ An invalid or duplicate profile name, a missing selected profile, malformed YAML
 
 ## Extension boundary
 
+### Staged initial startup
+
+Enable phased startup when selected resources depend on extension announcements
+or on contributions that do not exist yet:
+
+```json
+{
+  "Agentstration": {
+    "Bootstrap": {
+      "Path": "./bootstrap/profiles",
+      "InitialBootstrapEnabled": true,
+      "PhasedStartupEnabled": true,
+      "ExtensionDependencyTimeout": "00:10:00",
+      "InitialProfiles": ["base"],
+      "InitialApplications": [
+        {
+          "Profiles": ["tenant-resources"],
+          "TargetLevel": "/tenants/acme"
+        },
+        {
+          "Profiles": ["workspace-resources"],
+          "TargetLevel": "/tenants/acme/workspaces/operations"
+        }
+      ]
+    },
+    "Aep": { "Enrollment": { "AutoEnrollmentLevel": "/instance" } }
+  }
+}
+```
+
+`InitialProfiles` target the instance. Each additional application selects profiles
+of one scope and an explicit target resolved after topology creation. Scoped
+applications use an existing global Platform administrator; the initial topology
+may create it first. `InitialApplications` require `PhasedStartupEnabled`.
+
+The sequence is storage, structural preparation, topology, enrollment policies,
+required contributions, resolved references, dependent resources, then readiness.
+Within each phase, file/profile order remains deterministic. Required extensions
+are derived from selected public references and consumed bindings, not a global
+list. Unrelated optional extensions do not block startup.
+
+The listener accepts health and `POST /api/aep/enrollments/announce` during this
+sequence. `/health/ready` and other operations return 503 until completion.
+Application workers start afterward, preserving their original order. A required
+extension may therefore arrive after its destination Workspace is created.
+
+The dependency timeout is bounded between one second and thirty minutes and
+defaults to ten minutes, allowing recovery of an interrupted automatic assignment
+lease. Missing contributions report the profile/file, consumer and public identity;
+disabled contributions and ambiguous selectors fail explicitly. Newly discovered
+ordinary Tools keep their existing disabled default. An extension-declared bundle
+may enable its own required Tools through the existing trusted bundle lifecycle.
+Bootstrap never overrides an operator's disabled-resource decision just to satisfy
+a reference.
+
+Changing the catalog while startup waits fails the application. Completed topology,
+assignments and resources survive retries; the handlers preserve existing state.
+Staged startup repeats the idempotent readiness sequence under the initialization
+lease even when the durable initialization version is already Ready. New optional
+announcements remain eligible for policy-driven assignment after startup.
+
+The default non-staged startup and `NoBootstrap` activation settings remain valid.
+Manual preview stays read-only and reports unavailable dependencies without
+enrolling or preparing them. Durable manual progress remains the separate workflow
+tracked by issue #871.
+
 ### Public extension and contribution references
 
 A `ModelProvider` can select its extension by public AEP identity instead of a
@@ -280,6 +346,13 @@ The effective policy is also applied to verified announcements arriving later.
 Each extension must still be configured with its own key file, authority URL,
 public endpoint and durable installation state. Aspire, Compose or the operator
 owns that process and key lifecycle; Bootstrap never launches extensions.
+
+Several installations of one public extension can use independent trusted files
+under `Agentstration:Extensions:<extension-id>:Instances:<instance-id>:SharedKeyFile:Path`.
+An installation-specific `EnrollmentMode` or `RegistrationName` can also override
+that extension's defaults. Default registration names receive an installation
+suffix when needed; an explicitly configured name that is already bound to another
+installation fails instead of replacing its connection.
 
 Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns its business identity and calls the existing resource boundary. This avoids assuming that all resources use `kind + metadata.name` as their existence key.
 

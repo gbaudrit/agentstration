@@ -14,7 +14,7 @@ namespace Agentstration.Web.Hosting;
 public sealed class DeclarativeBootstrapException(string message, Exception? innerException = null)
     : BootstrapRequestException(message, innerException);
 
-public sealed class DeclarativeBootstrapService(
+public sealed partial class DeclarativeBootstrapService(
     IConfiguration configuration,
     BootstrapProfileCatalog catalog,
     IEnumerable<IBootstrapResourceHandler> resourceHandlers,
@@ -43,16 +43,18 @@ public sealed class DeclarativeBootstrapService(
         return execution.Resources.Count;
     }
 
-    public async Task<BootstrapCompositionPreview> PreviewAsync(
-        BootstrapProfileSelection selection,
-        CancellationToken cancellationToken)
+    public Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken) =>
+        PreviewPhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken);
+
+    private async Task<BootstrapCompositionPreview> PreviewPhaseAsync(
+        BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selection);
         if (selection.Source is null && selection.Profiles.Count == 0)
             throw new DeclarativeBootstrapException("At least one bootstrap profile must be selected.");
         if (selection.Source is not null && selection.Profiles.Count != 0)
             throw new DeclarativeBootstrapException("Local and Source Bootstrap profiles cannot be composed in one application.");
-        await using var loadedSelection = await LoadAsync(selection, cancellationToken);
+        await using var loadedSelection = await LoadAsync(selection, cancellationToken, phase);
         var profiles = loadedSelection.Profiles;
         var scope = profiles[0].Summary.Scope;
         var incompatible = profiles.FirstOrDefault(profile => profile.Summary.Scope != scope);
@@ -120,16 +122,22 @@ public sealed class DeclarativeBootstrapService(
             loadedSelection.SourceProvenance);
     }
 
-    public async Task<BootstrapExecutionResult> ExecuteAsync(
-        BootstrapProfileSelection selection,
-        CancellationToken cancellationToken)
+    public Task<BootstrapExecutionResult> ExecuteAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken) =>
+        ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken);
+
+    internal async Task<BootstrapExecutionResult> ExecutePhaseAsync(
+        BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
+        IReadOnlyList<string>? expectedProfileDigests = null)
     {
-        var preview = await PreviewAsync(selection, cancellationToken);
+        var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
+        if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
+            .SequenceEqual(expectedProfileDigests, StringComparer.Ordinal))
+            return new(preview, [], "The Bootstrap catalog changed after structural preparation.");
         var invalid = preview.Resources.FirstOrDefault(resource => resource.Disposition == BootstrapResourceDisposition.Invalid);
         if (invalid is not null)
             return new(preview, [], $"Bootstrap resource '{invalid.Kind}/{invalid.Name}' from '{invalid.Location}' is invalid: {invalid.Message}");
 
-        await using var loadedSelection = await LoadAsync(selection, cancellationToken);
+        await using var loadedSelection = await LoadAsync(selection, cancellationToken, phase);
         var loaded = loadedSelection.Profiles;
         var fingerprints = new List<string>();
         var bindings = await ResolveBindingsAsync(loaded, selection, fingerprints, cancellationToken);
@@ -230,12 +238,20 @@ public sealed class DeclarativeBootstrapService(
     }
 
     private async Task<LoadedBootstrapSelection> LoadAsync(
-        BootstrapProfileSelection selection,
-        CancellationToken cancellationToken) =>
-        selection.Source is { } source
-            ? await (sourceProfiles ?? throw new DeclarativeBootstrapException("Source Bootstrap profiles are not configured."))
-                .LoadAsync(source, cancellationToken)
-            : new(await catalog.LoadAsync(selection.Profiles, cancellationToken));
+        BootstrapProfileSelection selection, CancellationToken cancellationToken,
+        BootstrapStartupPhase phase = BootstrapStartupPhase.All)
+    {
+        if (phase != BootstrapStartupPhase.All && selection.Source is not null)
+            throw new DeclarativeBootstrapException("Phased initial Bootstrap uses local catalog profiles.");
+        if (selection.Source is { } source)
+            return await (sourceProfiles ?? throw new DeclarativeBootstrapException("Source Bootstrap profiles are not configured."))
+                .LoadAsync(source, cancellationToken);
+        var loaded = await catalog.LoadAsync(selection.Profiles, cancellationToken);
+        return new(phase == BootstrapStartupPhase.All ? loaded : loaded.Select(profile => profile with
+        {
+            Resources = profile.Resources.Where(item => Includes(phase, item.Resource.Kind)).ToArray()
+        }).ToArray());
+    }
 
     private async Task<IReadOnlyList<BootstrapBindingSelection>> ResolveBindingsAsync(
         IReadOnlyList<LoadedBootstrapProfile> profiles,
@@ -413,6 +429,9 @@ public sealed class DeclarativeBootstrapOptions
     public string? Path { get; set; }
     public bool InitialBootstrapEnabled { get; set; }
     public List<string> InitialProfiles { get; set; } = [];
+    public bool PhasedStartupEnabled { get; set; }
+    public TimeSpan ExtensionDependencyTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    public List<BootstrapInitialApplication> InitialApplications { get; set; } = [];
 }
 
 public static class DeclarativeBootstrapServiceProviderExtensions
