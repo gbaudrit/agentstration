@@ -18,7 +18,7 @@ public sealed partial class KnowledgeSourceEditorTests
     public async Task BuiltinFunctionsAreIdentifiedAndReadOnlyEvenForAnInstanceAdministrator(string locale, string badge, string help)
     {
         using var culture = new TestCultureScope(locale);
-        using var context = CreateContext(new KnowledgeClientStub());
+        using var context = CreateContext(new KnowledgeClientStub()).WithCollectionPresentation();
         var owner = new ConsoleContextState(new BuiltinFunctionContextProvider());
         await owner.EnsureLoadedAsync(default);
         context.Services.AddSingleton(owner);

@@ -3,15 +3,13 @@
 <section class="acquired-artifacts" data-testid="data-source-acquisition-artifacts">
     @if (Artifacts.Count > 1)
     {
-        <label class="form-field-wide">
-            <span>@Localizer["AcquiredArtifacts"]</span>
-            <select @bind="selectedIndex" data-testid="data-source-acquisition-artifact-select">
+        <FormField Label="@Localizer["AcquiredArtifacts"]" Class="form-field-wide form-span-2"><ChildContent><ClearableSelect @bind-Value="selectedIndex" data-testid="data-source-acquisition-artifact-select">
                 @for (var index = 0; index < Artifacts.Count; index++)
                 {
                     <option value="@index">@ArtifactName(Artifacts[index])</option>
                 }
-            </select>
-        </label>
+            </ClearableSelect>
+        </ChildContent></FormField>
     }
     @{
         var selected = Artifacts[selectedIndex];

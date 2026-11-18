@@ -1,0 +1,71 @@
+{
+  "testedSource": "776d164cb202d2dacc0d8c5bf85fd577c31bcecb",
+  "productStyleSource": "21c96e5b1a340cf034f247a7fe01fa546d89c209",
+  "browser": "System Chromium 154.0.8037.57; CI retains pinned Playwright Chromium",
+  "variants": {
+    "en-US": "1440x1000 desktop, both themes",
+    "fr-FR": "390x844 mobile viewport, both themes"
+  },
+  "results": {
+    "passed": 4,
+    "failed": 0
+  },
+  "styles": {
+    "src/Agentstration.Web.Components/wwwroot/management.css": "8a9c9ce2cb58f118ce823be65cc18981dece15f66cb59923274119cf239130e3",
+    "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor.css": "365cf0e013565a33f9269bc7b540001bcb3bce3047ada63096c3c5edeba0f3f6",
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor.css": "ee0453fe448adcf4aed4ad0d6f299e2ae833521b490083d94ee9e51bbd4c0d0a",
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor.css": "3ae7bf2a06f16738b3a8c351831ead1cbd8fd54dcfd9dfc17bb7b56233b6aab2"
+  },
+  "captures": [
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "file": "data-source-profiles-table-en-US-dark.png",
+      "sha256": "03f17bb500aa2bdecd671f59a1bf119c2360b50ea176b36c7a6c2eb748048017"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "file": "flows-table-en-US-dark.png",
+      "sha256": "b3a1d96ff98692cd4764b10e9534bc0852810948dee5073cc4165b28050a8dfe"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "file": "agents-table-en-US-dark.png",
+      "sha256": "b42f8cb5efbb6a32ce80a8e8221c61db636d70ea1f80bee5cf8661aa05e2ac6b"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "file": "tools-table-en-US-dark.png",
+      "sha256": "bf91d81b28f76b8b9914db1c390ce6fcf4ee17c4dfcd33cd6de45015af87d7c1"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "file": "data-source-profiles-table-en-US-light.png",
+      "sha256": "417b851d6e9cc355f9564ebd810f7517540bca3342ac5b19f1658741540645e2"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "file": "flows-table-en-US-light.png",
+      "sha256": "0c06e47f6de8dcd3aac29a8c3396d7fb935380bbdeecbfb6331e85ad5d1bb0da"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "file": "agents-table-en-US-light.png",
+      "sha256": "5bc90a7bfaa4750cbfca66117558013856212cffd07ce00c0f98eb615371e262"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "file": "tools-table-en-US-light.png",
+      "sha256": "fbc7d2a999583826834bf91cf1b2e104408e0a2251b0c1fc1efd8880a2a41736"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "file": "tools-fr-FR-dark.png",
+      "sha256": "4f9fb38cb8983533a7f49f3f90f815a263ba7d89b505dfa31a03f8d33994fe79"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "file": "tools-fr-FR-light.png",
+      "sha256": "016d9a0db1d33bd62c6705419ad559c7610730c58400f9268a2dee307385c31e"
+    }
+  ]
+}

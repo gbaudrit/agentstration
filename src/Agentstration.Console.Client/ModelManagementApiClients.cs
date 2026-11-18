@@ -234,6 +234,30 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
 public interface IModelProfilesClient
 {
     Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken);
+    async Task<ModelProfileLookupPageResponse> LookupModelProfilesAsync(string? search, string? provider, string? ownerKind, string? cursor, CancellationToken cancellationToken)
+    {
+        var values = await GetModelProfilesAsync(search, provider, null, cancellationToken);
+        var offset = int.TryParse(cursor, out var parsed) ? parsed : 0;
+        var filtered = values.Where(value => (string.IsNullOrEmpty(ownerKind) || value.ScopeRef?.Kind.ToString() == ownerKind)
+            && (string.IsNullOrWhiteSpace(provider) || value.Properties.Provider.Name.Contains(provider.Trim(), StringComparison.OrdinalIgnoreCase))
+            && (string.IsNullOrWhiteSpace(search) || new[] { value.Name, value.Namespace, value.Properties.DisplayName, value.Properties.Provider.Name, value.Properties.Model.Name }
+                .Any(text => text.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)))).ToArray();
+        return new(filtered.Skip(offset).Take(20).ToArray(), offset + 20 < filtered.Length ? (offset + 20).ToString(System.Globalization.CultureInfo.InvariantCulture) : null);
+    }
+    async Task<ModelProfileSummaryResponse?> FindModelProfileChoiceAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scope, CancellationToken cancellationToken)
+    {
+        var matches = (await GetModelProfilesAsync(name, null, null, cancellationToken)).Where(value => value.Name == name && value.Namespace == @namespace.Value && (scope is null || value.ScopeRef == scope)).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+    async Task<ModelProfileUsagePageResponse> GetModelProfileUsagePageAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scope, ResourceScopeRef? context, string? search, string? cursor, CancellationToken cancellationToken)
+    {
+        var response = scope is { } exact && context is { } target ? await GetModelProfileUsagesAsync(@namespace, name, exact, target, cancellationToken)
+            : scope is { } owner ? await GetModelProfileUsagesAsync(@namespace, name, owner, cancellationToken) : await GetModelProfileUsagesAsync(@namespace, name, cancellationToken);
+        var filtered = response.Value.Where(value => string.IsNullOrEmpty(search) || new[] { value.DisplayName, value.Name, value.Namespace, value.ScopeDisplayName }.Any(text => text.Contains(search, StringComparison.OrdinalIgnoreCase))).ToArray();
+        var offset = int.TryParse(cursor, out var parsed) ? parsed : 0;
+        return new(filtered.Skip(offset).Take(20).ToArray(), offset + 20 < filtered.Length ? (offset + 20).ToString(System.Globalization.CultureInfo.InvariantCulture) : null, filtered.Length);
+    }
+
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(string profileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetModelProfileAsync(profileName, cancellationToken);
     Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => GetModelProfileAsync(@namespace, profileName, cancellationToken);
@@ -417,6 +441,30 @@ public sealed class ModelProfilesApiClient(HttpClient httpClient) : IModelProfil
         AddQuery(query, "status", status);
         var suffix = query.Count == 0 ? string.Empty : "?" + string.Join('&', query);
         return (await ApiResponse.ReadAsync<ValueResponse<ModelProfileSummaryResponse>>(httpClient, "api/modelprofiles" + suffix, cancellationToken)).Value;
+    }
+
+    public Task<ModelProfileLookupPageResponse> LookupModelProfilesAsync(string? search, string? provider, string? ownerKind, string? cursor, CancellationToken cancellationToken)
+    {
+        var query = new List<string>();
+        AddQuery(query, "search", search); AddQuery(query, "provider", provider); AddQuery(query, "ownerKind", ownerKind); AddQuery(query, "cursor", cursor);
+        return ApiResponse.ReadAsync<ModelProfileLookupPageResponse>(httpClient, "api/modelprofiles/queries/lookup?" + string.Join('&', query), cancellationToken);
+    }
+    public async Task<ModelProfileSummaryResponse?> FindModelProfileChoiceAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scope, CancellationToken cancellationToken)
+    {
+        var stored = scope is { } exact ? await GetModelProfileAsync(@namespace, name, exact, cancellationToken) : await GetModelProfileAsync(@namespace, name, cancellationToken);
+        var profile = stored.Value;
+        var resolved = scope is { } owner ? await GetModelProfileResolutionAsync(@namespace, name, owner, cancellationToken) : await GetModelProfileResolutionAsync(@namespace, name, cancellationToken);
+        return new(profile.Name, profile.Name, new(profile.Definition.DisplayName, profile.Definition.Description,
+            new(profile.Definition.Provider.Name, profile.Definition.Provider.Name, resolved.Provider?.DisplayName), new(profile.Definition.Model.Name),
+            profile.Definition.Generation, profile.Definition.Reasoning, profile.Definition.Output, resolved.Status, null), profile.Namespace.Value, profile.ScopeRef);
+    }
+    public Task<ModelProfileUsagePageResponse> GetModelProfileUsagePageAsync(ResourceNamespace @namespace, string name, ResourceScopeRef? scope, ResourceScopeRef? context, string? search, string? cursor, CancellationToken cancellationToken)
+    {
+        var path = ProfilePath(@namespace, name, "usages/page", scope);
+        var query = new List<string>(); AddQuery(query, "search", search); AddQuery(query, "cursor", cursor);
+        if (query.Count > 0) path += (path.Contains('?', StringComparison.Ordinal) ? "&" : "?") + string.Join('&', query);
+        return context is { } target ? ApiResponse.ReadAsync<ModelProfileUsagePageResponse>(httpClient, path, target, cancellationToken)
+            : ApiResponse.ReadAsync<ModelProfileUsagePageResponse>(httpClient, path, cancellationToken);
     }
 
     public async Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(string profileName, CancellationToken cancellationToken)

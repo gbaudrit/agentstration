@@ -1,0 +1,202 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <data name="ClearValue" xml:space="preserve">
+    <value>Clear value</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Filters" xml:space="preserve">
+    <value>Resource filters</value>
+  </data>
+  <data name="Sections" xml:space="preserve">
+    <value>Resource sections</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="Results" xml:space="preserve">
+    <value>{0} results</value>
+  </data>
+  <data name="Page" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
+  <data name="NoMatches" xml:space="preserve">
+    <value>No matching results</value>
+  </data>
+  <data name="NoMatchesHelp" xml:space="preserve">
+    <value>Change or clear the filters.</value>
+  </data>
+  <data name="UnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="UnsavedMessage" xml:space="preserve">
+    <value>Save your changes before leaving this resource.</value>
+  </data>
+  <data name="LeaveTitle" xml:space="preserve">
+    <value>Discard unsaved changes?</value>
+  </data>
+  <data name="LeaveMessage" xml:space="preserve">
+    <value>Your unsaved changes will be lost.</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="ConfirmTitle" xml:space="preserve">
+    <value>Confirm action</value>
+  </data>
+  <data name="ConfirmMessage" xml:space="preserve">
+    <value>This action cannot be undone.</value>
+  </data>
+  <data name="Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Definition</value>
+  </data>
+  <data name="Access" xml:space="preserve">
+    <value>Access</value>
+  </data>
+  <data name="Yaml" xml:space="preserve">
+    <value>YAML</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Saved configuration</value>
+  </data>
+  <data name="SearchProfiles" xml:space="preserve">
+    <value>Search model profiles</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="Scope" xml:space="preserve">
+    <value>Owner scope</value>
+  </data>
+  <data name="All" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>Choose</value>
+  </data>
+  <data name="Change" xml:space="preserve">
+    <value>Change selection</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Unavailable selection</value>
+  </data>
+  <data name="NoSelection" xml:space="preserve">
+    <value>No selection</value>
+  </data>
+  <data name="UsedBy" xml:space="preserve">
+    <value>Used by</value>
+  </data>
+  <data name="SearchUsages" xml:space="preserve">
+    <value>Search usages</value>
+  </data>
+  <data name="YamlConflict" xml:space="preserve">
+    <value>A YAML draft is pending. Apply it or explicitly discard it before changing the form.</value>
+  </data>
+  <data name="DiscardYaml" xml:space="preserve">
+    <value>Discard YAML draft</value>
+  </data>
+  <data name="ContinueSearch" xml:space="preserve">
+    <value>No matches in this window. Continue to search the following pages.</value>
+  </data>
+  <data name="NoMatchesPage" xml:space="preserve">
+    <value>No matching results on this page.</value>
+  </data>
+  <data name="MayAffect" xml:space="preserve">
+    <value>Changing this profile may affect dependent agents. Review usages before saving.</value>
+  </data>
+  <data name="Realtime.Live" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="Realtime.Reconnecting" xml:space="preserve">
+    <value>Reconnecting</value>
+  </data>
+  <data name="Realtime.Connecting" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="Realtime.Offline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="LoadedResults" xml:space="preserve">
+    <value>{0} loaded resources</value>
+  </data>
+  <data name="ClearField" xml:space="preserve">
+    <value>Clear {0}</value>
+  </data>
+  <data name="LookupError" xml:space="preserve">
+    <value>Model profiles could not be loaded. Try again.</value>
+  </data>
+  <data name="UsageError" xml:space="preserve">
+    <value>Usages could not be loaded. Try again.</value>
+  </data>
+  <data name="ProviderName" xml:space="preserve">
+    <value>Provider technical name</value>
+  </data>
+  <data name="NumberRequired" xml:space="preserve">
+    <value>Enter a number for {0}.</value>
+  </data>
+  <data name="SelectionRequired" xml:space="preserve">
+    <value>Select a value for {0}.</value>
+  </data>
+  <data name="SelectValue" xml:space="preserve">
+    <value>Select a value</value>
+  </data>
+  <data name="Optional" xml:space="preserve">
+    <value>optional</value>
+  </data>
+  <data name="Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Description" xml:space="preserve"><value>Description</value></data>
+  <data name="NotProvided" xml:space="preserve"><value>Not provided</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="CopyValue" xml:space="preserve"><value>Copy {0}</value></data>
+  <data name="Copied" xml:space="preserve"><value>Copied</value></data>
+  <data name="CopyFailed" xml:space="preserve"><value>Copy unavailable. Select the value to copy it.</value></data>
+  <data name="ResourceActions" xml:space="preserve"><value>Resource actions</value></data>
+  <data name="MoreActions" xml:space="preserve"><value>More actions</value></data>
+  <data name="DismissNotification" xml:space="preserve"><value>Dismiss notification</value></data>
+  <data name="LabelKey" xml:space="preserve"><value>Key</value></data>
+  <data name="LabelValue" xml:space="preserve"><value>Value</value></data>
+  <data name="AddLabel" xml:space="preserve"><value>Add a label</value></data>
+  <data name="RemoveLabel" xml:space="preserve"><value>Remove label {0}</value></data>
+  <data name="NoLabels" xml:space="preserve"><value>No labels</value></data>
+  <data name="LabelInvalid" xml:space="preserve"><value>Enter a key without = or line breaks and a non-empty value.</value></data>
+  <data name="LabelDuplicate" xml:space="preserve"><value>This key is already used.</value></data>
+  <data name="LabelRow" xml:space="preserve"><value>Label {0}</value></data>
+  <data name="CollectionView" xml:space="preserve"><value>Collection view</value></data>
+  <data name="TableView" xml:space="preserve"><value>Table</value></data>
+  <data name="CardView" xml:space="preserve"><value>List / cards</value></data>
+  <data name="CollectionResource" xml:space="preserve"><value>Resource</value></data>
+  <data name="CollectionState" xml:space="preserve"><value>State</value></data>
+  <data name="CollectionActions" xml:space="preserve"><value>Actions</value></data>
+  <data name="ActionsFor" xml:space="preserve"><value>Actions for {0}</value></data>
+  <data name="ManagedReadOnly" xml:space="preserve"><value>Managed / read-only</value></data>
+  <data name="InheritedReadOnly" xml:space="preserve"><value>Read-only in this scope</value></data>
+  <data name="ResourceScope.Instance" xml:space="preserve"><value>Instance</value></data>
+  <data name="ResourceScope.Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ResourceScope.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="OpenItem" xml:space="preserve"><value>Open</value></data>
+<data name="EventLevel.Trace" xml:space="preserve"><value>Trace</value></data>
+<data name="EventLevel.Debug" xml:space="preserve"><value>Debug</value></data>
+<data name="EventLevel.Information" xml:space="preserve"><value>Information</value></data>
+<data name="EventLevel.Warning" xml:space="preserve"><value>Warning</value></data>
+<data name="EventLevel.Error" xml:space="preserve"><value>Error</value></data>
+<data name="EventLevel.Critical" xml:space="preserve"><value>Critical</value></data>
+<data name="EventLevel.Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Credential" xml:space="preserve"><value>Credential</value></data>
+  <data name="NoSecret" xml:space="preserve"><value>No secret</value></data>
+  <data name="SecretCoordinates" xml:space="preserve"><value>Vault: {0} · {1}/{2}</value></data>
+  <data name="SecretMissingValue" xml:space="preserve"><value>The selected Secret has no configured value.</value></data>
+</root>

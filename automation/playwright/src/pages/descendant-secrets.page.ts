@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
@@ -86,7 +87,9 @@ export class DescendantSecretsPage {
 
   public async removeGrant(scopeRef: string): Promise<void> {
     await this.openAccessTab();
-    await this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove).click();
+    const remove = this.grantRow(scopeRef).getByTestId(TestIds.secretGrants.grantRemove);
+    await revealCollectionAction(remove);
+    await remove.click();
     await this.grantRow(scopeRef).waitFor({ state: 'detached' });
   }
 

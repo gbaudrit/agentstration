@@ -15,7 +15,10 @@ public sealed record RuntimeProfileSummaryResponse(
     RuntimeProfileProperties Properties,
     int UsageCount,
     string Namespace = "default",
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null)
+{
+    public bool IsManaged { get; init; }
+}
 public sealed record RuntimeProfileUsageResponse(
     string ResourceId,
     string Name,

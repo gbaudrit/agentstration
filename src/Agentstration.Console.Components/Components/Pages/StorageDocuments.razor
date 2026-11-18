@@ -1,24 +1,25 @@
 @implements IDisposable
 @inject IStoragesClient Client
 @inject ConsoleContextState Context
+@inject IServiceProvider Services
 @inject TimeProvider Clock
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 <section class="panel form-section" data-testid="storage-document-access">
     <div class="panel-header"><h2>@T("Documents.Access")</h2></div>
     <p>@T("Documents.AccessHelp")</p>
     <fieldset class="form-grid" disabled="@busy">
-        <label><span>@T("Documents.Collection")</span><select aria-label="@T("Documents.Collection")" @bind="collection" @bind:after="Reset"><option value="@Guid.Empty">@T("Documents.SelectCollection")</option>@foreach (var c in Resource.Definition.Collections.Where(c => c.Enabled)) { <option value="@c.Uid">@c.DisplayName · @c.Name</option> }</select></label>
+        <FormField Label="@T("Documents.Collection")"><ClearableSelect TValue="Guid" aria-label="@T("Documents.Collection")" @bind-Value="collection" @bind-Value:after="Reset"><option value="@Guid.Empty">@T("Documents.SelectCollection")</option>@foreach (var c in Resource.Definition.Collections.Where(c => c.Enabled)) { <option value="@c.Uid">@c.DisplayName · @c.Name</option> }</ClearableSelect></FormField>
         <button type="button" class="button-secondary" @onclick="DescribeAsync" disabled="@(collection == Guid.Empty)">@T("Documents.Discover")</button>
         @if (description is not null)
         {
             <p class="form-span-2"><code>@description.SchemaDigest</code> · @T("Documents.PageSize"): @description.Policy.MaximumPageSize</p>
-            <label><span>@T("Documents.Operation")</span><select aria-label="@T("Documents.Operation")" @bind="operation" @bind:after="ResetResult">
+            <FormField Label="@T("Documents.Operation")"><ClearableSelect TValue="string" AllowClear="false" aria-label="@T("Documents.Operation")" @bind-Value="operation" @bind-Value:after="ResetResult">
                 @if (string.IsNullOrEmpty(operation)) { <option value="">@T("Documents.NoOperations")</option> }
                 @if (description.Policy.Get) { <option value="get">@T("Documents.Get")</option> }
                 @if (description.Policy.Query) { <option value="query">@T("Documents.Query")</option> }
                 @if (description.Policy.Put && Context.HasPermission("resources/write")) { <option value="put">@T("Documents.Put")</option> }
                 @if (description.Policy.Delete && Context.HasPermission("resources/delete")) { <option value="delete">@T("Documents.Delete")</option> }
-            </select></label>
+            </ClearableSelect></FormField>
             @if (operation == "query")
             {
                 <div class="form-span-2"><StructuredDocumentQueryEditor @key="collection" Description="description" Busy="busy" CanExecute="@Context.HasPermission("runs/execute")"
@@ -27,10 +28,10 @@
             }
             else
             {
-                <label><span>@T("Documents.Id")</span><input @bind="documentId" maxlength="128" @bind:after="ResetResult" /></label>
-                @if (operation is "put" or "delete") { <label><span>@T("Documents.Revision")</span><input @bind="revision" maxlength="128" @bind:after="ResetResult" /><small>@T("Documents.RevisionHelp")</small></label> }
+                <FormField Label="@T("Documents.Id")"><ClearableText @bind-Value="documentId" maxlength="128" @bind-Value:after="ResetResult" /></FormField>
+                @if (operation is "put" or "delete") { <FormField Label="@T("Documents.Revision")"><ClearableText @bind-Value="revision" maxlength="128" @bind-Value:after="ResetResult" /><small>@T("Documents.RevisionHelp")</small></FormField> }
             }
-            @if (operation == "put") { <label class="form-span-2"><span>@T("Documents.Value")</span><textarea class="form-code-editor" rows="8" @bind="payload" @bind:after="ResetResult" maxlength="65536"></textarea></label> }
+            @if (operation == "put") { <FormField Label="@T("Documents.Value")" Class="form-span-2"><ClearableText Multiline class="form-code-editor" rows="8"  @bind-Value="payload" @bind-Value:after="ResetResult" maxlength="65536" /></FormField> }
             @if (operation != "query")
             {
                 <button type="button" class="button-primary" disabled="@(!Context.HasPermission("runs/execute") || string.IsNullOrEmpty(operation))" @onclick="RunAsync">@T("Documents.Run")</button>
@@ -38,8 +39,8 @@
             }
             @if (Context.HasPermission("resources/write"))
             {
-                <label><span>@T("Documents.ToolVersion")</span><input @bind="version" maxlength="32" /></label>
-                <label><span>@T("Documents.ToolApproval")</span><input type="checkbox" @bind="requiresApproval" /></label>
+                <FormField Label="@T("Documents.ToolVersion")"><ClearableText @bind-Value="version" maxlength="32" /></FormField>
+                <FormField Label="@T("Documents.ToolApproval")"><FormCheckbox @bind-Value="requiresApproval" /></FormField>
                 <button type="button" class="button-secondary" disabled="@(string.IsNullOrEmpty(operation) || operation == "query" && queryProfile is null)" @onclick="PublishAsync">@T("Documents.PublishTool")</button>
                 <p class="form-span-2">@T("Documents.PublishToolHelp")</p>
             }
@@ -47,7 +48,7 @@
     </fieldset>
     <StorageError Error="error" />
     @if (result is not null) { <pre data-testid="storage-document-result">@result</pre> }
-    @foreach (var tool in tools) { <p><code>@tool.Name</code></p> }
+    <ul class="resource-links">@foreach (var tool in tools) { <li><CollectionIdentity DisplayName="@tool.Name" Namespace="@((tool.Namespace ?? Resource.Namespace).Value)" Name="@tool.Name" Href="@ResourceOwnershipContext.Resource(Services, "tools", tool.Name, tool.Namespace ?? Resource.Namespace, tool.ScopeRef ?? Resource.ScopeRef)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="@(tool.ScopeRef ?? Resource.ScopeRef)" IconOnly /></IconBadges></CollectionIdentity></li> }</ul>
 </section>
 @code {
     [Parameter, EditorRequired] public StorageResource Resource { get; set; } = null!;

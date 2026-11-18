@@ -14,11 +14,11 @@
     <input type="hidden" asp-for="ReturnUrl" />
     <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
     <label asp-for="Input.UserName">@Auth["Username"]</label>
-    <input asp-for="Input.UserName" autocomplete="username" autofocus />
-    <span asp-validation-for="Input.UserName" class="field-error"></span>
+    <input asp-for="Input.UserName" autocomplete="username" autofocus clear-label="@Auth["Username"]" validation-id="Input_UserName-error" />
+    <span id="Input_UserName-error" asp-validation-for="Input.UserName" class="field-error"></span>
     <label asp-for="Input.Password">@Auth["Password"]</label>
-    <input asp-for="Input.Password" autocomplete="current-password" />
-    <span asp-validation-for="Input.Password" class="field-error"></span>
+    <input asp-for="Input.Password" autocomplete="current-password" clear-label="@Auth["Password"]" validation-id="Input_Password-error" />
+    <span id="Input_Password-error" asp-validation-for="Input.Password" class="field-error"></span>
     <label class="check-field"><input asp-for="Input.RememberMe" /> <span>@Auth["KeepSignedIn"]</span></label>
     <button type="submit" class="primary-action">@Auth["SignIn"]</button>
 </form>

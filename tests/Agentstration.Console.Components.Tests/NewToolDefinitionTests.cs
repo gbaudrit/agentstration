@@ -277,7 +277,7 @@ public sealed class NewToolDefinitionTests
 
     private static BunitContext Context(ApiHandler handler, ResourceScopeRef? owner = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var navigation = new CreationContext(owner ?? Scope);
         context.Services.AddSingleton<IConsoleNavigationContext>(navigation);

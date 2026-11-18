@@ -14,13 +14,17 @@ else if (error is not null) { <StorageError Error="error" /> }
 else
 {
     <section class="panel">
-        <div class="toolbar"><label><span>@T("Type.Search")</span><input type="search" @bind="search" @bind:event="oninput" /></label></div>
+        <ResourceToolbar Label="@T("Type.Search")"><FormField Label="@T("Type.Search")"><ClearableText Type="search" @bind-Value="search" /></FormField></ResourceToolbar>
         @if (Filtered.Count == 0) { <EmptyState Title="@T("NoTypes")" Message="@T("Type.ListHelp")" /> }
         else
         {
-            <DataGrid TItem="StorageTypeResource" Items="Filtered"><Header><tr><th>@T("Type")</th><th>@T("Scope")</th><th>@T("Origin")</th><th>@T("Type.PreferredVersion")</th><th>@T("Availability")</th></tr></Header>
-                <Row Context="item"><tr data-testid="storage-type-row"><td><a href="@StorageTypeLinks.Details(item)" data-testid="storage-type-name-link">@item.Definition.DisplayName</a><br /><code>@item.Namespace/@item.Name</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td>@T($"Origin.{item.Governance.Origin.Kind}")</td><td>@item.Definition.PreferredVersion</td><td>@T($"Availability.{item.ObservedVersions.FirstOrDefault(value => value.Version == item.Definition.PreferredVersion)?.Availability ?? StorageAvailability.Unavailable}")</td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="StorageTypeResource" Items="Filtered" IdentityLabel="@T("Type")" RowTestId="storage-type-row" InformationLabels="@(new[] { T("Origin") })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@StorageTypeLinks.Details(item)" IconName="database" data-testid="storage-type-name-link">
+                    <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@(Availability(item) == StorageAvailability.Ready ? UiStatus.Success : Availability(item) is StorageAvailability.Unavailable or StorageAvailability.Stale ? UiStatus.Warning : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
+                    <Versions><CollectionVersion Label="@T("Type.PreferredVersion")" Value="@item.Definition.PreferredVersion" /></Versions>
+                </CollectionIdentity></Identity>
+                <Information Context="item"><CollectionValue Label="@T("Origin")">@T($"Origin.{item.Governance.Origin.Kind}")</CollectionValue></Information>
+            </CollectionView>
         }
     </section>
 }
@@ -31,6 +35,7 @@ else
     private Exception? error;
     private string search = string.Empty;
     private IReadOnlyList<StorageTypeResource> Filtered => resources.Where(value => $"{value.Namespace}/{value.Name} {value.Definition.DisplayName}".Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private static StorageAvailability Availability(StorageTypeResource item) => item.ObservedVersions.FirstOrDefault(value => value.Version == item.Definition.PreferredVersion)?.Availability ?? StorageAvailability.Unavailable;
     private string T(string key) => Localizer[key].Value;
     protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync()

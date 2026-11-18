@@ -31,22 +31,33 @@ public sealed class ConnectedServiceManagementService(
     public Task<StoredResource<ConnectedServiceResource>?> GetAsync(string name, CancellationToken cancellationToken) =>
         store.GetAsync<ConnectedServiceResource>(new(ConnectedServiceResourceKinds.ConnectedService, name), cancellationToken);
 
+    public Task<StoredResource<ConnectedServiceResource>?> GetAsync(
+        ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        store.GetAsync<ConnectedServiceResource>(new(ConnectedServiceResourceKinds.ConnectedService, name, @namespace), cancellationToken);
+
     public Task<StoredResource<ConnectedServiceResource>?> GetExactAsync(
         ResourceScopeRef scopeRef,
         string name,
         CancellationToken cancellationToken) =>
         store.GetExactAsync<ConnectedServiceResource>(Scoped(scopeRef, name), cancellationToken);
 
+    public Task<IReadOnlyList<ConnectedServiceUsage>> GetUsagesAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        CancellationToken cancellationToken) =>
+        GetUsagesAsync(scopeRef, ResourceNamespace.Default, name, cancellationToken);
+
     public async Task<IReadOnlyList<ConnectedServiceUsage>> GetUsagesAsync(
         ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
         string name,
         CancellationToken cancellationToken)
     {
-        _ = await GetExactAsync(scopeRef, name, cancellationToken)
+        _ = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
         var usages = new List<ConnectedServiceUsage>();
         foreach (var provider in usageProviders)
-            usages.AddRange(await provider.GetUsagesAsync(Scoped(scopeRef, name), cancellationToken));
+            usages.AddRange(await provider.GetUsagesAsync(new ScopedResourceAddress(scopeRef, @namespace, ConnectedServiceResourceKinds.ConnectedService, name), cancellationToken));
         return usages;
     }
 
@@ -84,25 +95,51 @@ public sealed class ConnectedServiceManagementService(
         return await PutAsync(existing, definition, etag, cancellationToken);
     }
 
+    public Task<StoredResource<ConnectedServiceResource>> PutExactAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        ConnectedServiceProperties definition,
+        string? etag,
+        CancellationToken cancellationToken) =>
+        PutExactAsync(scopeRef, ResourceNamespace.Default, name, definition, etag, cancellationToken);
+
+    public async Task<StoredResource<ConnectedServiceResource>> PutAsync(
+        ResourceNamespace @namespace, string name, ConnectedServiceProperties definition,
+        string? etag, CancellationToken cancellationToken)
+    {
+        var existing = await GetAsync(@namespace, name, cancellationToken)
+            ?? throw new ConnectedServiceNotFoundException(name);
+        return await PutAsync(existing, definition, etag, cancellationToken);
+    }
+
     public async Task<StoredResource<ConnectedServiceResource>> PutExactAsync(
         ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
         string name,
         ConnectedServiceProperties definition,
         string? etag,
         CancellationToken cancellationToken)
     {
-        var existing = await GetExactAsync(scopeRef, name, cancellationToken)
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
         return await PutAsync(existing, definition, etag, cancellationToken);
     }
 
+    public Task<StoredResource<ConnectedServiceResource>> ReconcileAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        string? etag,
+        CancellationToken cancellationToken) =>
+        ReconcileAsync(scopeRef, ResourceNamespace.Default, name, etag, cancellationToken);
+
     public async Task<StoredResource<ConnectedServiceResource>> ReconcileAsync(
         ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
         string name,
         string? etag,
         CancellationToken cancellationToken)
     {
-        var existing = await GetExactAsync(scopeRef, name, cancellationToken)
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
@@ -116,13 +153,21 @@ public sealed class ConnectedServiceManagementService(
         }, cancellationToken);
     }
 
+    public Task<StoredResource<ConnectedServiceResource>> DeactivateAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        string? etag,
+        CancellationToken cancellationToken) =>
+        DeactivateAsync(scopeRef, ResourceNamespace.Default, name, etag, cancellationToken);
+
     public async Task<StoredResource<ConnectedServiceResource>> DeactivateAsync(
         ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
         string name,
         string? etag,
         CancellationToken cancellationToken)
     {
-        var existing = await GetExactAsync(scopeRef, name, cancellationToken)
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
         if (!existing.Value.Definition.Enabled) return existing;
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
@@ -136,13 +181,21 @@ public sealed class ConnectedServiceManagementService(
             }, etag, false, token), cancellationToken);
     }
 
+    public Task DeleteAsync(
+        ResourceScopeRef scopeRef,
+        string name,
+        string? etag,
+        CancellationToken cancellationToken) =>
+        DeleteAsync(scopeRef, ResourceNamespace.Default, name, etag, cancellationToken);
+
     public async Task DeleteAsync(
         ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace,
         string name,
         string? etag,
         CancellationToken cancellationToken)
     {
-        var existing = await GetExactAsync(scopeRef, name, cancellationToken)
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(name);
         var hasOperations = (await store.ListAllAsync<ConnectedServiceOperationResource>(
                 ConnectedServiceResourceKinds.ConnectedServiceOperation, cancellationToken))
@@ -150,11 +203,11 @@ public sealed class ConnectedServiceManagementService(
         var hasDiscoveries = (await store.ListAllAsync<ConnectedServiceOperationDiscoveryResource>(
                 ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, cancellationToken))
             .Any(item => item.Value.Service.ServiceUid == existing.Value.Uid);
-        if (hasOperations || hasDiscoveries || (await GetUsagesAsync(scopeRef, name, cancellationToken)).Count != 0)
+        if (hasOperations || hasDiscoveries || (await GetUsagesAsync(scopeRef, @namespace, name, cancellationToken)).Count != 0)
             throw new ConnectedServiceInUseException(name);
         await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesDelete, async token =>
         {
-            await store.DeleteExactAsync(Scoped(scopeRef, name), etag, token);
+            await store.DeleteExactAsync(new ScopedResourceAddress(scopeRef, @namespace, ConnectedServiceResourceKinds.ConnectedService, name), etag, token);
             return true;
         }, cancellationToken);
     }

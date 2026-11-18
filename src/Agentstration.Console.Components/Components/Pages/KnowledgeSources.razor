@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/knowledge-sources"
 @inject IKnowledgeSourcesClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
@@ -12,10 +13,17 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a></EmptyState> }
 else
 {
-    <DataGrid TItem="KnowledgeSourceResource" Items="sources">
-        <Header><tr><th>@T("KnowledgeSource")</th><th>@T("DataSources")</th><th>@T("ProjectionFlow")</th><th>@T("RetrievalFlow")</th><th>@T("State")</th><th></th></tr></Header>
-        <Row Context="source"><tr data-testid="knowledge-source-row"><td><span class="resource-name-with-scope"><strong><a class="resource-name-link" href="@DetailsUrl(source)" data-testid="knowledge-source-name-link">@source.Definition.DisplayName</a></strong><ResourceScopeBadge ScopeRef="source.ScopeRef" Compact /></span><code>@source.Namespace/@source.Name</code></td><td>@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</td><td>@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</td><td>@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button" href="@FlowUrl(source, retrieval)">@Flow(retrieval)</a> } else { <span>—</span> }</td><td><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" /></td><td><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="KnowledgeSourceResource" Items="sources" InformationLabels="@(new string[] { T("DataSources"), T("ProjectionFlow"), T("RetrievalFlow") })" RowTestId="knowledge-source-row" IdentityLabel="@T("KnowledgeSource")" StateLabel="@T("State")">
+        <Identity Context="source">
+<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link"><IconBadges><ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="source">
+            <CollectionValue Label="@T("DataSources")">@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</CollectionValue>
+            <CollectionValue Label="@T("ProjectionFlow")">@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</CollectionValue>
+            <CollectionValue Label="@T("RetrievalFlow")">@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button" href="@FlowUrl(source, retrieval)">@Flow(retrieval)</a> } else { <span>—</span> }</CollectionValue>
+        </Information>
+        <Actions Context="source">
+<CollectionActions ResourceName="@($"{source.Definition.DisplayName} ({source.Namespace}/{source.Name}, {source.ScopeRef})")"><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -33,9 +41,7 @@ else
         finally { loading = false; }
     }
     private static string Flow(KnowledgeFlowTarget? value) => value is null ? "—" : $"{value.Namespace ?? ResourceNamespace.Default}/{value.Name}:{value.Version ?? "active"}";
-    private static string DetailsUrl(KnowledgeSourceResource value) => value.Namespace.IsDefault
-        ? $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}"
-        : $"/knowledge-sources/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    private string DetailsUrl(KnowledgeSourceResource value) => ResourceOwnershipContext.Resource(Services, "/knowledge-sources", value.Name, value.Namespace, value.ScopeRef);
     private static string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value)
     {
         var ns = value.Namespace ?? source.Namespace;

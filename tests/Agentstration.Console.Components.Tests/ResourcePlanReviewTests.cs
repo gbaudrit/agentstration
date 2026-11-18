@@ -116,7 +116,7 @@ public sealed class ResourcePlanReviewTests
     {
         using var culture = new TestCultureScope("en-US");
         var set = ChangeSet(1, [Change(0, "triage", [], "Triage")]);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set));
         RegisterProfiles(context);
@@ -165,7 +165,7 @@ public sealed class ResourcePlanReviewTests
         using var culture = new TestCultureScope("fr-FR");
         var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
         var client = new FakeClient(set);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(client);
         RegisterProfiles(context);
@@ -190,7 +190,7 @@ public sealed class ResourcePlanReviewTests
         using var culture = new TestCultureScope("fr-FR");
         var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage")]);
         var client = new FakeClient(set);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(client);
         RegisterProfiles(context);
@@ -240,7 +240,7 @@ public sealed class ResourcePlanReviewTests
         using var culture = new TestCultureScope("fr-FR");
         var change = Change(0, "triage", [], "Triage");
         var set = ChangeSet(Plan.Revision, [change with { Proposed = change.Proposed with { Definition = JsonSerializer.SerializeToElement(new { displayName = "Triage", modelProfile = new { name = "default" } }) } }]);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(new FakeClient(set, blockOnValidate: true));
         RegisterProfiles(context);
@@ -268,7 +268,7 @@ public sealed class ResourcePlanReviewTests
         using var culture = new TestCultureScope("en-US");
         var set = ChangeSet(Plan.Revision, [Change(0, "triage", [], "Triage"), Change(1, "workflow", ["triage"], "Workflow")]);
         var client = new FakeClient(set, supportMaterialization: true);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourcePlansApiClient>(client);
         RegisterProfiles(context, true);

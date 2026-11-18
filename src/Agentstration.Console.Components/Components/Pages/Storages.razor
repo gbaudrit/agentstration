@@ -14,16 +14,19 @@ else if (error is not null) { <StorageError Error="error" /> }
 else
 {
     <section class="panel">
-        <div class="toolbar">
-            <label><span>@T("Search")</span><input type="search" @bind="search" @bind:event="oninput" /></label>
-            <label><span>@T("Availability")</span><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach (var value in Enum.GetValues<StorageAvailability>()) { <option value="@value">@T($"Availability.{value}")</option> }</select></label>
-        </div>
+        <ResourceToolbar Label="@T("Search")">
+            <FormField Label="@T("Search")"><ClearableText Type="search" @bind-Value="search" /></FormField>
+            <FormField Label="@T("Availability")"><ClearableSelect TValue="string" @bind-Value="status"><option value="">@T("AllStatuses")</option>@foreach (var value in Enum.GetValues<StorageAvailability>()) { <option value="@value">@T($"Availability.{value}")</option> }</ClearableSelect></FormField>
+        </ResourceToolbar>
         @if (Filtered.Count == 0) { <EmptyState Title="@T("Empty.Title")" Message="@T("Empty.Description")" /> }
         else
         {
-            <DataGrid TItem="StorageResource" Items="Filtered"><Header><tr><th>@T("Storage")</th><th>@T("Type")</th><th>@T("Scope")</th><th>@T("Availability")</th></tr></Header>
-                <Row Context="item"><tr data-testid="storage-row"><td><a class="resource-name-link" href="@StorageLinks.Details(item)" data-testid="storage-name-link">@item.Definition.DisplayName</a><br /><code>@item.Namespace/@item.Name</code></td><td><code>@item.Definition.Type.Type.Name · @item.Definition.Type.Version</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" /></td><td><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@(Availability(item) == StorageAvailability.Ready ? UiStatus.Success : UiStatus.Warning)" /></td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="StorageResource" Items="Filtered" IdentityLabel="@T("Storage")" RowTestId="storage-row" InformationLabels="@(new[] { T("Type") })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@StorageLinks.Details(item)" IconName="database" data-testid="storage-name-link">
+                    <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@AvailabilityStatus(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
+                </CollectionIdentity></Identity>
+                <Information Context="item"><CollectionValue Label="@T("Type")"><code>@item.Definition.Type.Type.Name · @item.Definition.Type.Version</code></CollectionValue></Information>
+            </CollectionView>
         }
     </section>
     <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2><a href="/storage-types" data-testid="storage-types-manage">@T("Type.Manage")</a></div><p>@T("TypeCatalog.Help")</p>
@@ -32,7 +35,10 @@ else
         {
             @foreach (var version in type.Definition.Versions)
             {
-                <details data-testid="storage-type-evidence"><summary>@type.Definition.DisplayName · @version.Version · @T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")</summary><StorageTypeEvidence Choice="new(type, version)" /></details>
+                <details data-testid="storage-type-evidence"><summary><span class="collection-identity storage-type-catalog-identity">
+                    <span class="collection-family-icon"><ResourceIcon IconName="database" /><span class="collection-icon-badges"><ResourceScopeBadge ScopeRef="type.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")" Status="@AvailabilityStatus(type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable)" IconOnly /><ManagedResourceBadge IsManaged="@type.Governance.IsManaged" IsReadOnly="@(type.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></span></span>
+                    <span class="collection-identity-text"><span class="collection-name-heading"><a class="resource-name-link" href="@StorageTypeLinks.Details(type)" title="@type.Definition.DisplayName">@type.Definition.DisplayName</a></span><span class="collection-qualified-name"><CopyableValue Value="@($"{type.Namespace}/{type.Name}")" /></span><span class="collection-identity-versions"><CollectionVersion Label="@T("Version")" Value="@version.Version" /></span></span>
+                </span></summary><StorageTypeEvidence Choice="new(type, version)" /></details>
             }
         }
     </section>
@@ -47,6 +53,12 @@ else
     private string search = string.Empty, status = string.Empty;
     private bool CanWrite => Context.HasPermission("resources/write");
     private IReadOnlyList<StorageResource> Filtered => resources.Where(value => (string.IsNullOrEmpty(search) || $"{value.Name} {value.Definition.DisplayName} {value.Definition.Type.Type.Name}".Contains(search, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrEmpty(status) || Availability(value).ToString() == status)).ToArray();
+    private static UiStatus AvailabilityStatus(StorageAvailability value) => value switch
+    {
+        StorageAvailability.Ready => UiStatus.Success,
+        StorageAvailability.Unavailable or StorageAvailability.Stale => UiStatus.Warning,
+        _ => UiStatus.Neutral
+    };
     private string T(string key) => Localizer[key].Value;
     private static StorageAvailability Availability(StorageResource value) => value.ObservedState?.Availability ?? (value.Definition.Enabled ? StorageAvailability.Unavailable : StorageAvailability.Disabled);
     protected override Task OnInitializedAsync() => LoadAsync();

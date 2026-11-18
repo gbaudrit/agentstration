@@ -13,10 +13,10 @@
         }
         <form @onsubmit="CreateAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <div class="form-grid">
+                <FormGrid>
                     <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="true"
                         DisplayNameTestId="acquisition-tool-display-name" TechnicalNameTestId="acquisition-tool-name" />
-                </div>
+                </FormGrid>
                 <dl class="resource-details acquisition-tool-recipe">
                     <dt>@Localizer["AcquisitionToolSource"]</dt><dd>@SourceDisplayName <ResourceScopeBadge ScopeRef="Acquisition.DataSourceScopeRef" Compact /></dd>
                     <dt>@Localizer["AcquisitionTarget"]</dt><dd>@(Acquisition.Target?.DisplayName ?? Localizer["None"].Value)</dd>
@@ -26,13 +26,13 @@
                     <dd>
                         @if (publishableArtifacts.Count > 1)
                         {
-                            <select aria-label="@Localizer["AcquisitionToolOutput"]" @bind="artifactId" required data-testid="acquisition-tool-artifact">
+                            <ClearableSelect aria-label="@Localizer["AcquisitionToolOutput"]" @bind-Value="artifactId" required data-testid="acquisition-tool-artifact">
                                 <option value="">@Localizer["Select"]</option>
                                 @foreach (var artifact in publishableArtifacts)
                                 {
                                     <option value="@artifact.ArtifactId">@ArtifactLabel(artifact)</option>
                                 }
-                            </select>
+                            </ClearableSelect>
                         }
                         else if (publishableArtifacts.Count == 1)
                         {
@@ -41,12 +41,12 @@
                     </dd>
                 </dl>
             </fieldset>
-            <div class="dialog-actions">
+            <FormActions Class="dialog-actions">
                 <button class="button-secondary" type="button" disabled="@busy" @onclick="OnCancel">@Localizer["Cancel"]</button>
                 <button class="button-primary" type="submit" disabled="@(busy || !CanCreate)" data-testid="acquisition-tool-create">
                     @Localizer[busy ? "Saving" : "CreateAcquisitionTool"]
                 </button>
-            </div>
+            </FormActions>
         </form>
     </section>
 </div>

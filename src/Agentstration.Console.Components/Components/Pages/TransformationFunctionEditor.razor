@@ -15,22 +15,22 @@
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    <form class="panel form-section" @onsubmit="SaveAsync" @onsubmit:preventDefault @formname="transformation-function">
-        <fieldset disabled="@(!CanEdit || busy || !interactive)">
-            <label>@T("Name")<input @bind="technicalName" disabled="@(original is not null)" required data-testid="function-name" /></label>
-            <label>@T("DisplayName")<input @bind="displayName" required /></label>
+    <form class="resource-form" @onsubmit="SaveAsync" @onsubmit:preventDefault @formname="transformation-function">
+        <FormSection Title="@T("Functions")"><fieldset class="resource-definition-fields" disabled="@(!CanEdit || busy || !interactive)">
+            <FormGrid><FormField Label="@T("Name")" Required><ClearableText @bind-Value="technicalName" Disabled="@(original is not null)" required data-testid="function-name" /></FormField>
+            <FormField Label="@T("DisplayName")" Required><ClearableText @bind-Value="displayName" required /></FormField>
             @if (original?.Governance.Origin.Kind != ResourceOriginKind.BuiltIn)
-            { <label>@T("FunctionDescription")<textarea @bind="description" maxlength="4000" data-testid="function-description-input"></textarea></label> }
-            <label>@T("Enabled")<input type="checkbox" @bind="enabled" /></label>
-            <label>@T("Version")<input @bind="version" required /></label>
-            <label>@T("Kind")<select @bind="kindKey" data-testid="function-kind">
+            { <FormField Label="@T("FunctionDescription")" Optional Class="form-span-2"><ClearableText Multiline @bind-Value="description" maxlength="4000" data-testid="function-description-input" /></FormField> }
+            <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="enabled" /></FormField>
+            <FormField Label="@T("Version")" Required><ClearableText @bind-Value="version" required /></FormField>
+            <FormField Label="@T("Kind")" Required><ClearableSelect @bind-Value="kindKey" data-testid="function-kind">
                 <option value="">@T("SelectKind")</option>
-                @foreach (var kind in kinds) { @foreach (var descriptor in kind.Definition.Versions) { <option value="@KindKey(kind, descriptor.Version)">@kind.Definition.DisplayName · @descriptor.Version</option> } }
-            </select></label>
-            <label>@T("Implementation")<select @bind="implementationKey" data-testid="function-implementation">
+                @foreach (var kind in kinds) { @foreach (var descriptor in kind.Definition.Versions) { <option value="@KindKey(kind, descriptor.Version)">@kind.Definition.DisplayName · @descriptor.Version · @kind.Namespace/@kind.Name · @kind.ScopeRef</option> } }
+            </ClearableSelect></FormField>
+            <FormField Label="@T("Implementation")" Required><ClearableSelect @bind-Value="implementationKey" data-testid="function-implementation">
                 <option value="">@T("SelectImplementation")</option>
                 @foreach (var implementation in implementations) { <option value="@ImplementationKey(implementation)">@implementation.Id · @implementation.Version</option> }
-            </select></label>
+            </ClearableSelect></FormField></FormGrid>
             @if (Selected is { } selected)
             {
                 <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" />
@@ -38,8 +38,8 @@ else
                 <h2>@T("OutputSchema")</h2><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" />
             }
             <p>@T("ImmutableHelp")</p>
-            <div class="form-actions"><button type="submit" class="button-primary" disabled="@(Selected is null || string.IsNullOrEmpty(kindKey))" data-testid="function-save">@T("Save")</button><a href="@ScopedUri("/transformation-functions")">@T("Back")</a></div>
-        </fieldset>
+            <FormActions Busy="@busy"><button type="submit" class="button-primary" disabled="@(Selected is null || string.IsNullOrEmpty(kindKey))" data-testid="function-save">@T("Save")</button><a href="@ScopedUri("/transformation-functions")">@T("Back")</a></FormActions>
+        </fieldset></FormSection>
     </form>
 }
 

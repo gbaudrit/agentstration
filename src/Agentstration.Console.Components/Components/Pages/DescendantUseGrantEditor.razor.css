@@ -18,7 +18,7 @@
 .grant-target-identity strong { overflow-wrap: anywhere; font-size: .85rem; }
 .grant-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .grant-checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: .8rem; font-weight: 600; }
-.grant-checkbox input[type="checkbox"] {
+.grant-checkbox ::deep input[type="checkbox"] {
     flex: 0 0 auto;
     width: 17px;
     height: 17px;
@@ -32,7 +32,7 @@
 .grant-add-button { width: auto; min-height: 38px; white-space: nowrap; }
 .grant-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
 .grant-add label { display: grid; gap: 7px; min-width: 0; }
-.grant-add select {
+.grant-add ::deep select {
     width: 100%;
     min-height: var(--field-height, 42px);
     padding: 9px 12px;
@@ -42,7 +42,7 @@
     color: var(--text);
     box-shadow: var(--field-shadow, none);
 }
-.grant-add select:focus-visible {
+.grant-add ::deep select:focus-visible {
     outline: 0;
     border-color: var(--primary);
     background: var(--surface);

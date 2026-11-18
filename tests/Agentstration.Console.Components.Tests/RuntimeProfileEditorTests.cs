@@ -20,7 +20,7 @@ public sealed class RuntimeProfileEditorTests
     public void ExistingProfileExposesLocalizedAccessManagement()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(new NotificationState());
         context.Services.AddSingleton<IRuntimeProfilesClient>(new RuntimeProfilesClientStub());

@@ -31,6 +31,8 @@ export class AgentEditorPage {
       { waitUntil: 'domcontentloaded' },
     );
     if (!response?.ok()) throw new Error(`Agent page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
+    await this.openEdit();
     await this.form.waitFor({ state: 'visible' });
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
@@ -40,6 +42,7 @@ export class AgentEditorPage {
   }
 
   public async openTools(): Promise<void> {
+    if (!await this.form.isVisible()) await this.openEdit();
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
     await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });
@@ -53,24 +56,75 @@ export class AgentEditorPage {
   }
 
   public async configureBehavior(agent: Pick<AgentDefinition, 'instructions' | 'modelProfile' | 'runtimeProfile'>): Promise<void> {
-    await selectFirstAvailable(this.page.getByTestId(TestIds.agentEditor.modelProfile), agent.modelProfile, 'Model profile');
+    await this.selectModelProfile(agent.modelProfile);
     await selectFirstAvailable(this.page.getByTestId(TestIds.agentEditor.runtimeProfile), agent.runtimeProfile, 'Runtime profile');
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.instructions), agent.instructions);
   }
 
   public async createAndDeploy(name: string): Promise<void> {
+    const submit = this.page.getByTestId(TestIds.agentEditor.createAndDeploy);
+    if ((this.page.viewportSize()?.width ?? 1440) <= 620) {
+      await submit.scrollIntoViewIfNeeded();
+      const button = await submit.boundingBox();
+      const navigation = await this.page.getByTestId(TestIds.console.sidebar).boundingBox();
+      expect(button).not.toBeNull();
+      expect(navigation).not.toBeNull();
+      expect(button!.y + button!.height, 'The primary action must clear the fixed mobile navigation').toBeLessThanOrEqual(navigation!.y);
+    }
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/agents/${encodeURIComponent(name)}`),
-      this.page.getByTestId(TestIds.agentEditor.createAndDeploy).click(),
+      submit.click(),
     ]);
+    await this.page.getByTestId(TestIds.agentEditor.overview).waitFor({ state: 'visible' });
+    await this.openEdit();
     await this.page.getByTestId(TestIds.agentEditor.form).waitFor({ state: 'visible' });
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
+  public async openOverview(): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.agentEditor.overviewTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
+    }).toPass();
+  }
+
+  public async openEdit(): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.agentEditor.editTab);
+    await expect(tab).toBeVisible();
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(this.form).toBeVisible();
+    }).toPass();
+  }
+
+  public async selectModelProfile(selection: ProfileSelection): Promise<void> {
+    const candidates = typeof selection === 'string' ? [selection] : [...selection];
+    const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    for (const candidate of candidates) {
+      const name = candidate.split('|').at(-1)!;
+      await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.modelProfileSearch), name);
+      const choice = this.page.getByTestId(TestIds.agentEditor.modelProfileChoice)
+        .and(this.page.locator(`[data-profile="${candidate}"]`));
+      try { await expect(choice).toBeEnabled({ timeout: 5000 }); }
+      catch { continue; }
+      await expect(choice).toBeVisible();
+      await expect(choice.locator('xpath=ancestor::details')).toHaveCount(0);
+      await choice.click(); return;
+    }
+    throw new Error(`No available model profile matches [${candidates.join(', ')}].`);
+  }
+
   public async expectModelProfileUnavailable(value: string): Promise<void> {
-    const option = this.page.getByTestId(TestIds.agentEditor.modelProfile).locator(`option[value="${value}"]`);
-    if (await option.count() === 0) return;
-    await expect(option).toBeDisabled();
+    const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.modelProfileSearch), value.split('|').at(-1)!);
+    const choice = this.page.getByTestId(TestIds.agentEditor.modelProfileChoice)
+      .and(this.page.locator(`[data-profile="${value}"]`));
+    if (await choice.count()) await expect(choice).toBeDisabled();
   }
 
   public get form(): Locator { return this.page.getByTestId(TestIds.agentEditor.form); }

@@ -10,27 +10,27 @@
         </div>
     </header>
     <div class="schema-property-grid">
-        <label><span>@Localizer["PropertyName"]</span><input value="@Name" disabled="@Disabled" data-testid="schema-property-name" @onchange="RenameAsync" /></label>
-        <label><span>@Localizer["Type"]</span><select value="@(Text(Schema, "type", "string"))" disabled="@Disabled" data-testid="schema-property-type" @onchange="ChangeTypeAsync">@foreach (var type in Types) { <option value="@type">@type</option> }</select></label>
-        <label class="schema-required"><input type="checkbox" checked="@IsRequired(ParentSchema, Name)" disabled="@Disabled" @onchange="ChangeRequiredAsync" /> <span>@Localizer["Required"]</span></label>
-        <label class="schema-property-wide"><span>@Localizer["Description"]</span><input value="@(Text(Schema, "description"))" disabled="@Disabled" @onchange="@(args => SetTextAsync("description", args.Value?.ToString()))" /></label>
-        <label><span>@Localizer["Default"]</span><input value="@(Raw(Schema, "default"))" disabled="@Disabled" @onchange="@(args => SetJsonAsync("default", args.Value?.ToString()))" /></label>
-        <label><span>@Localizer["Enum"]</span><textarea rows="3" disabled="@Disabled" @onchange="SetEnumAsync">@EnumText(Schema)</textarea></label>
+        <FormField Label="@Localizer["PropertyName"]"><ChildContent><ClearableText UpdateOnInput="false" Value="@Name" Disabled="@Disabled" data-testid="schema-property-name" ValueChanged="changed => RenameAsync(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
+        <FormField Label="@Localizer["Type"]"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(Text(Schema, "type", "string"), System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" data-testid="schema-property-type" ValueChanged="changed => ChangeTypeAsync(new ChangeEventArgs { Value = changed })">@foreach (var type in Types) { <option value="@type">@type</option> }</ClearableSelect></ChildContent></FormField>
+        <label class="schema-required"><FormCheckbox Value="@IsRequired(ParentSchema, Name)" disabled="@Disabled" ValueChanged="changed => ChangeRequiredAsync(new ChangeEventArgs { Value = changed })" /> <span>@Localizer["Required"]</span></label>
+        <FormField Label="@Localizer["Description"]" Class="schema-property-wide"><ChildContent><ClearableText UpdateOnInput="false" Value="@(Text(Schema, "description"))" Disabled="@Disabled" ValueChanged="@(changed => SetTextAsync("description", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
+        <FormField Label="@Localizer["Default"]"><ChildContent><ClearableText UpdateOnInput="false" Value="@(Raw(Schema, "default"))" Disabled="@Disabled" ValueChanged="@(changed => SetJsonAsync("default", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
+        <FormField Label="@Localizer["Enum"]"><ChildContent><ClearableText Multiline="true" rows="3" Disabled="@Disabled" Value="@EnumText(Schema)" ValueChanged="changed => SetEnumAsync(new ChangeEventArgs { Value = changed })"></ClearableText></ChildContent></FormField>
         @if (Text(Schema, "type") is "integer" or "number")
         {
-            <label><span>@Localizer["Minimum"]</span><input type="number" value="@(Raw(Schema, "minimum"))" disabled="@Disabled" @onchange="@(args => SetNumberAsync("minimum", args.Value?.ToString()))" /></label>
-            <label><span>@Localizer["Maximum"]</span><input type="number" value="@(Raw(Schema, "maximum"))" disabled="@Disabled" @onchange="@(args => SetNumberAsync("maximum", args.Value?.ToString()))" /></label>
+            <FormField Label="@Localizer["Minimum"]"><ChildContent><ClearableText UpdateOnInput="false" Type="number" Value="@(Raw(Schema, "minimum"))" Disabled="@Disabled" ValueChanged="@(changed => SetNumberAsync("minimum", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
+            <FormField Label="@Localizer["Maximum"]"><ChildContent><ClearableText UpdateOnInput="false" Type="number" Value="@(Raw(Schema, "maximum"))" Disabled="@Disabled" ValueChanged="@(changed => SetNumberAsync("maximum", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
         }
         @if (Text(Schema, "type") == "string")
         {
-            <label><span>@Localizer["MinimumLength"]</span><input type="number" min="0" value="@(Raw(Schema, "minLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync("minLength", args.Value?.ToString()))" /></label>
-            <label><span>@Localizer["MaximumLength"]</span><input type="number" min="0" value="@(Raw(Schema, "maxLength"))" disabled="@Disabled" @onchange="@(args => SetIntegerAsync("maxLength", args.Value?.ToString()))" /></label>
+            <FormField Label="@Localizer["MinimumLength"]"><ChildContent><ClearableText UpdateOnInput="false" Type="number" min="0" Value="@(Raw(Schema, "minLength"))" Disabled="@Disabled" ValueChanged="@(changed => SetIntegerAsync("minLength", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
+            <FormField Label="@Localizer["MaximumLength"]"><ChildContent><ClearableText UpdateOnInput="false" Type="number" min="0" Value="@(Raw(Schema, "maxLength"))" Disabled="@Disabled" ValueChanged="@(changed => SetIntegerAsync("maxLength", (new ChangeEventArgs { Value = changed }).Value?.ToString()))" /></ChildContent></FormField>
         }
     </div>
     @if (Text(Schema, "type") == "object")
     {
         <div class="schema-object-options">
-            <label class="schema-additional-properties"><input type="checkbox" checked="@AdditionalProperties" disabled="@Disabled" @onchange="ChangeAdditionalPropertiesAsync" /> <span>@Localizer["AdditionalProperties"]</span></label>
+            <label class="schema-additional-properties"><FormCheckbox Value="@AdditionalProperties" disabled="@Disabled" ValueChanged="changed => ChangeAdditionalPropertiesAsync(new ChangeEventArgs { Value = changed })" /> <span>@Localizer["AdditionalProperties"]</span></label>
             <button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-add-child-property" @onclick="AddChildAsync">@Localizer["AddChildProperty"]</button>
         </div>
     }

@@ -1,0 +1,6 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<div class="labels-summary">
+    @if (Values.Count == 0) { <span class="muted">@Shared["NoLabels"]</span> }
+    @foreach (var pair in Values.OrderBy(pair => pair.Key, StringComparer.Ordinal)) { <span class="resource-label"><strong>@pair.Key</strong><span>: @pair.Value</span></span> }
+</div>
+@code { [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> Values { get; set; } = new Dictionary<string, string>(); }

@@ -16,8 +16,8 @@
                 var candidate = Step.Candidates[index];
                 <article class="route-card">
                     <header><span class="route-key-badge">@candidate.Route</span><button disabled="@ReadOnly" @onclick="() => RemoveRouterCandidateAsync.InvokeAsync(routeIndex)">×</button></header>
-                    <label>@T("RouteKey")<input disabled="@ReadOnly" value="@candidate.Route" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Route = Text(e) })" /></label>
-                    <label>@T("Agent")<select disabled="@ReadOnly" value="@AgentSelectionValue(candidate.Agent)" @onchange="e => UpdateRouterCandidateAgentAsync(routeIndex, e)">
+                    <FormField Label="@T("RouteKey")"><ChildContent><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@candidate.Route" ValueChanged="changed => UpdateRouterCandidateAsync(routeIndex, c => c with { Route = Text(new ChangeEventArgs { Value = changed }) })" /></ChildContent></FormField>
+                    <FormField Label="@T("Agent")"><ChildContent><ClearableSelect TValue="string" disabled="@ReadOnly" Value="@Convert.ToString(AgentSelectionValue(candidate.Agent), System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateRouterCandidateAgentAsync(routeIndex, new ChangeEventArgs { Value = changed })">
                             @if (ResolveAgent(candidate.Agent) is null)
                             {
                                 <option value="@AgentSelectionValue(candidate.Agent)">@(candidate.Agent.ResourceId == "unconfigured"
@@ -25,9 +25,9 @@
                                     : T("UnavailableReference", ResourceIdentity(candidate.Agent.ScopeRef, candidate.Agent.Namespace ?? Namespace, candidate.Agent.ResourceId)))</option>
                             }
                             @foreach (var item in RouterAgents) { <option value="@ResourceKey(item.ScopeRef, item.Namespace, item.Name)">@ResourceOptionLabel(Localizer, item.DisplayName, item.Namespace, item.ScopeRef)</option> }
-                    </select></label>
-                    <label>@T("Description")<input disabled="@ReadOnly" value="@candidate.Description" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Description = EmptyToNull(Text(e)) })" /></label>
-                    <label>@T("Examples")<input disabled="@ReadOnly" value="@string.Join(", ", candidate.Examples ?? [])" @onchange="e => UpdateRouterCandidateAsync(routeIndex, c => c with { Examples = Text(e).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) })" /></label>
+                    </ClearableSelect></ChildContent></FormField>
+                    <FormField Label="@T("Description")"><ChildContent><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@candidate.Description" ValueChanged="changed => UpdateRouterCandidateAsync(routeIndex, c => c with { Description = EmptyToNull(Text(new ChangeEventArgs { Value = changed })) })" /></ChildContent></FormField>
+                    <FormField Label="@T("Examples")"><ChildContent><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@string.Join(", ", candidate.Examples ?? [])" ValueChanged="changed => UpdateRouterCandidateAsync(routeIndex, c => c with { Examples = Text(new ChangeEventArgs { Value = changed }).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) })" /></ChildContent></FormField>
                 </article>
             }
         </div>

@@ -26,4 +26,19 @@
   <data name="Status.Draft" xml:space="preserve"><value>Draft</value></data>
   <data name="Status.Published" xml:space="preserve"><value>Published</value></data>
   <data name="Status.Failed" xml:space="preserve"><value>Failed</value></data>
+<data name="Status.Disabled" xml:space="preserve"><value>Disabled</value></data>
+<data name="Status.Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="PageSize" xml:space="preserve"><value>Rows per page</value></data>
+  <data name="LoadError" xml:space="preserve"><value>Flow definitions could not be loaded.</value></data>
+  <data name="Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="VersionHelp" xml:space="preserve"><value>Published version, or an em dash when this Flow has not been published.</value></data>
+  <data name="ActiveVersion" xml:space="preserve"><value>Active version</value></data>
+  <data name="NoActiveVersion" xml:space="preserve"><value>No active version</value></data>
+  <data name="DefinitionVersion" xml:space="preserve"><value>Definition version</value></data>
+  <data name="Kind.Direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Kind.Routing" xml:space="preserve"><value>Routing</value></data>
+  <data name="Kind.Workflow" xml:space="preserve"><value>Workflow</value></data>
+  <data name="Kind.Orchestration" xml:space="preserve"><value>Orchestration</value></data>
+  <data name="Kind.Composite" xml:space="preserve"><value>Composite</value></data>
+  <data name="PublishedVersion" xml:space="preserve"><value>Published version</value></data>
 </root>

@@ -1,0 +1,65 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Resources
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+@if (EffectiveKind is { } kind)
+{
+    <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null)" data-scope-ref="@ScopeRef?.Value">
+        @if (IconOnly)
+        {
+            <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" Marker="@(kind switch { ResourceScopeKind.Instance => "I", ResourceScopeKind.Tenant => "T", _ => "W" })" />
+        }
+        else
+        {
+        <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
+        @if (ShowName && ReadableName is { } name)
+        {
+            <ValueDisclosure Value="@name" />
+        }
+        }
+    </span>
+}
+
+@code {
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public ResourceScopeKind? Kind { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool ShowName { get; set; } = true;
+    [Parameter] public bool IconOnly { get; set; }
+    [Parameter] public string? DisplayName { get; set; }
+    private ConsoleContextState? context;
+    private WorkplaceContextState? workplaceContext;
+    private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
+    // Only names already authorized in the shared context snapshot may be disclosed.
+    private string? ReadableName
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(DisplayName)) return DisplayName;
+            if (ScopeRef is not { } scope || scope.Kind == ResourceScopeKind.Instance) return null;
+            var current = context?.Current;
+            var option = current?.Contexts.FirstOrDefault(value => value.ScopeRef == scope.Value);
+            if (option is not null) return option.DisplayName;
+            if (current is not null && scope.Value == current.SelectedScopeRef)
+                return scope.Kind == ResourceScopeKind.Tenant ? current.TenantDisplayName : current.WorkspaceDisplayName;
+            if (workplaceContext?.Current is { WorkspaceId: { } workspaceId } workplace
+                && scope == ResourceScopeRef.Workspace(workspaceId)) return workplace.WorkspaceDisplayName;
+            return null;
+        }
+    }
+    protected override void OnInitialized()
+    {
+        context = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+        if (context is not null) context.Changed += ContextChanged;
+        workplaceContext = Services.GetService(typeof(WorkplaceContextState)) as WorkplaceContextState;
+        if (workplaceContext is not null) workplaceContext.Changed += ContextChanged;
+    }
+    private void ContextChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        if (context is not null) context.Changed -= ContextChanged;
+        if (workplaceContext is not null) workplaceContext.Changed -= ContextChanged;
+    }
+}

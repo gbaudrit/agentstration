@@ -24,7 +24,7 @@ public sealed class DataSourceEditorTests
     public void DetailsExposeOperationalOverviewAndConsistentForms()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
@@ -81,7 +81,7 @@ public sealed class DataSourceEditorTests
     public async Task AcquisitionToolUsesSavedRecipeAndSelectsOnePublishableArtifact(bool canWrite)
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var acquisition = Acquisition with
         {
             Target = Target,
@@ -151,7 +151,7 @@ public sealed class DataSourceEditorTests
     public void AcquisitionOpensFormattedArtifactsOnDemandInTheSameTab(bool hasLocalCopy)
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var json = JsonSerializer.Serialize(new { Result = new { items = new[] { 1, 2 }, text = new string('a', 47_000) } });
         var artifacts = new ArtifactAdministrationComponentTests.ArtifactClient(json, mediaType: "application/vnd.example+json")
         {
@@ -226,7 +226,7 @@ public sealed class DataSourceEditorTests
     {
         using var culture = new TestCultureScope("en-US");
         var client = new SourceClientStub();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(client);
@@ -248,7 +248,7 @@ public sealed class DataSourceEditorTests
     public void DiscoveryTabShowsGovernedChoicesAndStaleTargets()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(targeted: true));
@@ -271,7 +271,7 @@ public sealed class DataSourceEditorTests
     public void HistoryFailureKeepsDefinitionAndYamlLoaded(string cultureName, string expectedMessage)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(historyFails: true));
@@ -292,7 +292,7 @@ public sealed class DataSourceEditorTests
     [TestMethod]
     public void ReadinessKeepsPinnedProfileSelectableWhenCatalogueOmitsIt()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
@@ -484,14 +484,16 @@ public sealed class DataSourceEditorTests
         await using var context = DiscoveryContext(client, new ManualTimeProvider());
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         rendered.Find("[data-testid=data-source-discovery-choice] input").Input("documents-v2");
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         rendered.Find("[data-testid=data-source-discovery-choice] input").Input(targetName);
-        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
         var button = rendered.Find("[data-testid=data-source-reconcile-target]");
         Assert.AreEqual(reconcile, button.TextContent);
         Assert.IsFalse(button.HasAttribute("disabled"));
+        Assert.IsNotNull(button.Closest(".collection-primary-actions"), "Reconciliation remains a direct primary command.");
+        Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-discovery-choice] .collection-actions-menu"));
         button.Click();
         rendered.WaitForAssertion(() =>
         {
@@ -501,7 +503,7 @@ public sealed class DataSourceEditorTests
             Assert.AreEqual("documents", client.Reconciled.Value.Request.ChoiceId);
             Assert.AreEqual("\"target-v1\"", client.Reconciled.Value.ETag);
             StringAssert.Contains(rendered.Find("[data-testid=data-source-acquisition-target-row]").TextContent, current);
-            var promotedButton = rendered.Find("[data-testid=data-source-discovery-choice] button");
+            var promotedButton = rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)");
             Assert.AreEqual(cultureName == "fr-FR" ? "Déjà promu" : "Already promoted", promotedButton.TextContent);
             Assert.IsTrue(promotedButton.HasAttribute("disabled"));
             Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-reconcile-target]"));
@@ -545,12 +547,15 @@ public sealed class DataSourceEditorTests
             Assert.IsTrue(rendered.Find("[data-testid=data-source-reconcile-target]").HasAttribute("disabled"));
         else
             Assert.HasCount(0, rendered.FindAll("[data-testid=data-source-reconcile-target]"));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings>>();
+        Assert.AreEqual(strings["ReconcileUnavailable"].Value,
+            rendered.Find("[data-testid=data-source-acquisition-target-row] .status-badge").ParentElement!.GetAttribute("title"));
         Assert.IsNull(client.Reconciled);
     }
 
     private static BunitContext DiscoveryContext(SourceClientStub client, TimeProvider clock)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(clock);
         context.Services.AddSingleton<IDataSourcesClient>(client);

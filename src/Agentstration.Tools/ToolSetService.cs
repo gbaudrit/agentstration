@@ -17,8 +17,21 @@ public sealed class ToolSetService(
     IEnumerable<IToolSetDeletionGuard>? deletionGuards = null,
     IResourceGovernanceContext? governanceContext = null)
 {
-    public Task<IReadOnlyList<StoredResource<ToolSetResource>>> ListAsync(CancellationToken cancellationToken) =>
-        store.ListAllAsync<ToolSetResource>(ToolResourceKinds.ToolSet, cancellationToken);
+    public async Task<IReadOnlyList<StoredResource<ToolSetResource>>> ListAsync(CancellationToken cancellationToken)
+    {
+        var resources = await store.ListAllAsync<ToolSetResource>(ToolResourceKinds.ToolSet, cancellationToken);
+        if (resources.Count == 0) return resources;
+        var latest = new Dictionary<Guid, string>();
+        foreach (var batch in resources.Select(value => value.Value.Uid).Distinct().Chunk(200))
+        {
+            foreach (var publication in await store.FindLatestToolSetVersionsAsync(batch, cancellationToken))
+                latest.Add(publication.Key, publication.Value);
+        }
+        return resources.Select(stored => stored with
+        {
+            Value = stored.Value with { PublishedVersion = latest.GetValueOrDefault(stored.Value.Uid) }
+        }).ToArray();
+    }
 
     public Task<StoredResource<ToolSetResource>?> GetAsync(
         ResourceNamespace @namespace,

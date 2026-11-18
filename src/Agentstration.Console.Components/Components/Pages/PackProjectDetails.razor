@@ -22,39 +22,39 @@ else
     <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="@T("PackProject.Description")">
         <Actions>
             <button class="button-secondary" @onclick="BackToPacks">@T("BackToPacks")</button>
-            <button class="button-secondary" disabled="@(busy || !dirty)" @onclick="SaveAsync">@T("Save")</button>
-            <button class="button-primary" disabled="@busy" @onclick="BuildAsync" data-testid="pack-project-build">@(building ? T("Building") : T("BuildPack"))</button>
+            <button class="button-secondary" disabled="@(busy || invalidMetadata || !dirty)" @onclick="SaveAsync">@T("Save")</button>
+            <button class="button-primary" disabled="@(busy || invalidMetadata)" @onclick="BuildAsync" data-testid="pack-project-build">@(building ? T("Building") : T("BuildPack"))</button>
         </Actions>
     </PageHeader>
 
     <section class="studio-layout">
         <div class="panel studio-editor">
             <div class="panel-header"><div><p class="eyebrow">@T("ProjectDefinition")</p><h2>@T("ManifestMetadata")</h2></div><StatusBadge Text="@T($"ProjectState.{project.Value.Definition.State}")" Status="@ProjectTone" /></div>
+            <CascadingValue Value="MetadataContext"><FormDraftMonitor InvalidInputChanged="value => invalidMetadata = value" /><ValidationSummary />
             <div class="studio-grid">
-                <label>@T("Publisher")<input value="@project.Value.Definition.Publisher" disabled /></label>
-                <label>@T("DisplayName")<input @bind="displayName" @bind:after="MarkDirty" /></label>
-                <label>@T("TechnicalName")<input value="@project.Value.Definition.PackName" readonly /></label>
-                <label>@T("Version")<input @bind="version" @bind:after="MarkDirty" /></label>
+                <FormField Label="@T("Publisher")"><ChildContent><ClearableText Value="@project.Value.Definition.Publisher" Disabled="true" /></ChildContent></FormField>
+                <FormField Label="@T("DisplayName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="displayName" @bind-Value:after="MarkDirty" /></ChildContent></FormField>
+                <FormField Label="@T("TechnicalName")"><ChildContent><ClearableText Value="@project.Value.Definition.PackName" ReadOnly="true" /></ChildContent></FormField>
+                <FormField Label="@T("Version")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="version" @bind-Value:after="MarkDirty" /></ChildContent></FormField>
             </div>
-            <label class="studio-field">@T("Description")<textarea rows="4" @bind="description" @bind:after="MarkDirty"></textarea></label>
+            <FormField Label="@T("Description")" Class="studio-field"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="4" @bind-Value="description" @bind-Value:after="MarkDirty"></ClearableText></ChildContent></FormField>
             <div class="studio-grid">
-                <label>@T("Audience")
-                    <select @bind="audience" @bind:after="MarkDirty">
+                <FormField Label="@T("Audience")"><ChildContent><ClearableSelect @bind-Value="audience" @bind-Value:after="MarkDirty">
                         <option value="@PackAudience.Universal">@T("Audience.Universal")</option>
                         <option value="@PackAudience.Personal">@T("Audience.Personal")</option>
                         <option value="@PackAudience.Professional">@T("Audience.Professional")</option>
-                    </select>
-                </label>
-                <label>@T("Purpose")
-                    <select @bind="purpose" @bind:after="MarkDirty">
+                    </ClearableSelect>
+                </ChildContent></FormField>
+                <FormField Label="@T("Purpose")"><ChildContent><ClearableSelect @bind-Value="purpose" @bind-Value:after="MarkDirty">
                         <option value="@PackPurpose.Standard">@T("Purpose.Standard")</option>
                         <option value="@PackPurpose.Sample">@T("Purpose.Sample")</option>
                         <option value="@PackPurpose.Template">@T("Purpose.Template")</option>
-                    </select>
-                </label>
-                <label>@T("Categories")<input @bind="categories" @bind:after="MarkDirty" placeholder="game, sample" /></label>
-                <label>@T("Tags")<input @bind="tags" @bind:after="MarkDirty" placeholder="local, experimental" /></label>
+                    </ClearableSelect>
+                </ChildContent></FormField>
+                <FormField Label="@T("Categories")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="categories" @bind-Value:after="MarkDirty" placeholder="game, sample" /></ChildContent></FormField>
+                <FormField Label="@T("Tags")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="tags" @bind-Value:after="MarkDirty" placeholder="local, experimental" /></ChildContent></FormField>
             </div>
+            </CascadingValue>
             <dl class="resource-details studio-origin">
                 @if (project.Value.Definition.Origin is { } origin)
                 {
@@ -102,9 +102,7 @@ else
                         <div><strong>@T("ResourceBindings")</strong><small>@T("BindingsRetained")</small></div>
                         @foreach (var binding in preview.Bindings)
                         {
-                            <label>
-                                <span>@binding.DisplayName <small>@(binding.Required ? T("Required") : T("Optional")) · @BindingKindLabel(binding.TargetKind)</small></span>
-                                <select value="@SelectedBinding(binding.Name)" @onchange="args => BindingChanged(binding.Name, args)">
+                            <FormField Label="@BindingKindLabel(binding.TargetKind)"><LabelContent>@binding.DisplayName <small>@(binding.Required ? T("Required") : T("Optional")) · @BindingKindLabel(binding.TargetKind)</small></LabelContent><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(SelectedBinding(binding.Name), System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => BindingChanged(binding.Name, new ChangeEventArgs { Value = changed })">
                                     <option value="">@T("SelectBinding", BindingKindLabel(binding.TargetKind).ToLowerInvariant())</option>
                                     @if (binding.TargetKind == PackBindingTargetKind.ModelProfile)
                                     {
@@ -148,14 +146,14 @@ else
                                             <option value="@BindingValue(secret.Resource.Name, secret.Resource.Namespace)">@secret.Resource.Definition.DisplayName — @secret.Resource.Name (@T($"SecretStatus.{secret.ValueStatus}"))</option>
                                         }
                                     }
-                                </select>
-                            </label>
+                                </ClearableSelect>
+                            </ChildContent></FormField>
                         }
                     </section>
                 }
                 @if (preview.AlreadyInstalled)
                 {
-                    <label class="studio-checkbox"><input type="checkbox" @bind="replaceExisting" /> @T("ReinstallPackBuild")</label>
+                    <label class="studio-checkbox"><FormCheckbox @bind-Value="replaceExisting" /> @T("ReinstallPackBuild")</label>
                     <p class="studio-warning">@T("ModifiedResourcesPreserved")</p>
                 }
             }
@@ -192,9 +190,9 @@ else
                 }
                 else
                 {
-                    <textarea class="form-code-editor runner-json" rows="30" @bind="sourceYaml" @bind:event="oninput" aria-label="@T("PackSourceYaml")"></textarea>
+                    <ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" @bind-Value="sourceYaml" aria-label="@T("PackSourceYaml")"></ClearableText>
                 }
-                <div class="form-actions"><button class="button-secondary" type="button" @onclick="CloseSource">@T("Cancel")</button><button class="button-primary" type="button" disabled="@busy" @onclick="SaveSourceAsync">@(busy ? T("Saving") : T("SaveResource"))</button></div>
+                <FormActions><button class="button-secondary" type="button" @onclick="CloseSource">@T("Cancel")</button><button class="button-primary" type="button" disabled="@busy" @onclick="SaveSourceAsync">@(busy ? T("Saving") : T("SaveResource"))</button></FormActions>
             </div>
         }
     </section>
@@ -211,16 +209,17 @@ else
         }
         else
         {
-            <DataGrid TItem="PackProjectBuildResource" Items="builds">
-                <Header><tr><th>@T("Version")</th><th>@T("Revision")</th><th>@T("Created")</th><th>@T("Artifact")</th><th></th></tr></Header>
-                <Row Context="build"><tr class="@(selectedBuild?.Uid == build.Uid ? "selected-build" : null)">
-                    <td><strong>@build.Definition.Version</strong></td>
-                    <td>@build.Definition.ProjectRevision</td>
-                    <td>@build.Definition.CreatedAt.ToLocalTime().ToString("g")</td>
-                    <td><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></td>
-                    <td class="studio-action-cell"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">@T("Preview")</button><a class="text-button" href="@DownloadPath(build)">@T("Download")</a></div></td>
-                </tr></Row>
-            </DataGrid>
+            <CollectionView TItem="PackProjectBuildResource" Items="builds" InformationLabels="@(new string[] { T("Revision"), T("Created"), T("Artifact") })" ItemAttributes="@((build) => new Dictionary<string, object> { ["class"] = selectedBuild?.Uid == build.Uid ? "selected-build" : string.Empty })" IdentityLabel="@T("Version")">
+        <Identity Context="build">
+<CollectionIdentity DisplayName="@build.Definition.Version" Namespace="@build.Namespace.Value" Name="@build.Name" OnOpen="() => PreviewAsync(build)" IconName="package" ><IconBadges><ResourceScopeBadge ScopeRef="build.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(build.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="build">
+            <CollectionValue Label="@T("Revision")">@build.Definition.ProjectRevision</CollectionValue>
+            <CollectionValue Label="@T("Created")">@build.Definition.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Artifact")"><code>@ShortHash(build.Definition.Artifact.Sha256)</code><br /><small>@FormatBytes(build.Definition.Artifact.Length)</small></CollectionValue>
+        </Information>
+        <Actions Context="build">
+<CollectionActions ResourceName="@(build.Definition.Version)"><div class="studio-actions"><button class="text-button" @onclick="() => PreviewAsync(build)">@T("Preview")</button><a class="text-button" href="@DownloadPath(build)">@T("Download")</a></div></CollectionActions></Actions>
+    </CollectionView>
         }
     </section>
 }
@@ -249,6 +248,9 @@ else
     private readonly Dictionary<string, string> bindingSelections = new(StringComparer.Ordinal);
     private AgentstrationApiException? error;
     private string version = string.Empty;
+    private EditContext? metadataContext;
+    private EditContext MetadataContext => metadataContext ??= new(this);
+    private bool invalidMetadata;
     private PackAudience audience = PackAudience.Universal;
     private PackPurpose purpose = PackPurpose.Standard;
     private string displayName = string.Empty;
@@ -325,7 +327,7 @@ else
     }
     private async Task SaveAsync()
     {
-        if (project is null) return;
+        if (project is null || invalidMetadata) return;
         await ExecuteAsync(async () =>
         {
             project = await Client.UpdateProjectAsync(ProjectId,
@@ -337,6 +339,7 @@ else
 
     private async Task BuildAsync()
     {
+        if (invalidMetadata) return;
         building = true;
         try
         {

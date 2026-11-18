@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/tools/definitions"
 @inject IToolDefinitionsClient Client
 @inject IConsoleNavigationContext NavigationContext
@@ -14,10 +15,16 @@ else if (error is not null) { <ErrorState Message="@error" /> }
 else if (definitions.Count == 0) { <EmptyState Title="@T("DefinitionsEmptyTitle")" Message="@T("DefinitionsEmptyMessage")" /> }
 else
 {
-    <DataGrid TItem="ToolDefinitionResource" Items="definitions">
-        <Header><tr><th>@T("Tool")</th><th>@T("ToolKind")</th><th>@T("Enabled")</th><th>@T("RequiresApproval")</th><th></th></tr></Header>
-        <Row Context="definition"><tr><td><span class="resource-name-with-scope"><strong>@definition.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="definition.ScopeRef" Compact /></span><code>@PublicName(definition)</code></td><td>@T(definition.Definition switch { RelayToolDefinitionProperties => "Kind.Relay", AcquisitionToolDefinitionProperties => "Kind.Acquisition", _ => "Kind.Flow" })<br /><code>@Flow(definition)</code></td><td>@BooleanLabel(definition.Definition.Enabled)</td><td>@BooleanLabel(definition.Definition.RequiresApproval)</td><td><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView StateLabel="@T("Enabled")" TItem="ToolDefinitionResource" Items="definitions" InformationLabels="@(new string[] { T("ToolKind"), T("RequiresApproval") })" IdentityLabel="@T("Tool")">
+        <Identity Context="definition">
+<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@EditUrl(definition)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="definition.ScopeRef" ShowName IconOnly /><StatusBadge Text="@BooleanLabel(definition.Definition.Enabled)" Status="@(definition.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@definition.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(definition.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="definition">
+            <CollectionValue Label="@T("ToolKind")">@T(definition.Definition switch { RelayToolDefinitionProperties => "Kind.Relay", AcquisitionToolDefinitionProperties => "Kind.Acquisition", _ => "Kind.Flow" })<br /><code>@Flow(definition)</code></CollectionValue>
+            <CollectionValue Label="@T("RequiresApproval")">@BooleanLabel(definition.Definition.RequiresApproval)</CollectionValue>
+        </Information>
+        <Actions Context="definition">
+<CollectionActions ResourceName="@($"{definition.Definition.DisplayName} ({definition.Namespace}/{definition.Name}, {definition.ScopeRef})")"><Primary><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></Primary></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -30,5 +37,5 @@ else
     private async Task LoadAsync() { loading=true;error=null;try{definitions=await Client.GetAsync(default);}catch(Exception ex){error=ex.Message;}finally{loading=false;} }
     private static string PublicName(ToolDefinitionResource value) => value.Namespace.IsDefault ? value.Name : $"{value.Namespace.Value}.{value.Name}";
     private static string Flow(ToolDefinitionResource value) => value.Definition is RelayToolDefinitionProperties relay ? $"{relay.Target.Namespace}/{relay.Target.Name} · {relay.Target.Generation}" : value.Definition is AcquisitionToolDefinitionProperties acquisition ? $"{acquisition.Acquisition.TemplateNamespace}/{acquisition.Acquisition.TemplateId}" : $"{((FlowToolDefinitionProperties)value.Definition).Flow.Namespace ?? value.Namespace}/{((FlowToolDefinitionProperties)value.Definition).Flow.Name}:{(((FlowToolDefinitionProperties)value.Definition).Flow.UseActiveVersion ? "active" : ((FlowToolDefinitionProperties)value.Definition).Flow.Version)}";
-    private static string EditUrl(ToolDefinitionResource value) => $"/tools/definitions/{Uri.EscapeDataString(value.Name)}?namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    private string EditUrl(ToolDefinitionResource value) => ResourceOwnershipContext.Resource(Services, "/tools/definitions", value.Name, value.Namespace, value.ScopeRef);
 }

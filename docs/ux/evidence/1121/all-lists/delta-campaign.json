@@ -1,0 +1,148 @@
+{
+  "records": [
+    {
+      "route": "/agent-instances",
+      "language": "en-US",
+      "theme": "Dark",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "agent-instances-active-desktop-en-dark.png"
+    },
+    {
+      "route": "/agent-instances",
+      "language": "en-US",
+      "theme": "Light",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "agent-instances-active-desktop-en-light.png"
+    },
+    {
+      "route": "/agent-instances",
+      "language": "fr-FR",
+      "theme": "Dark",
+      "width": 390,
+      "height": 844,
+      "screenshot": "agent-instances-active-mobile-fr-dark.png"
+    },
+    {
+      "route": "/agent-instances",
+      "language": "fr-FR",
+      "theme": "Light",
+      "width": 390,
+      "height": 844,
+      "screenshot": "agent-instances-active-mobile-fr-light.png"
+    },
+    {
+      "route": "/artifacts",
+      "language": "en-US",
+      "theme": "Dark",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "artifacts-desktop-en-dark.png"
+    },
+    {
+      "route": "/artifacts",
+      "language": "en-US",
+      "theme": "Light",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "artifacts-desktop-en-light.png"
+    },
+    {
+      "route": "/artifacts",
+      "language": "fr-FR",
+      "theme": "Dark",
+      "width": 390,
+      "height": 844,
+      "screenshot": "artifacts-mobile-fr-dark.png"
+    },
+    {
+      "route": "/artifacts",
+      "language": "fr-FR",
+      "theme": "Light",
+      "width": 390,
+      "height": 844,
+      "screenshot": "artifacts-mobile-fr-light.png"
+    },
+    {
+      "route": "/artifacts?tab=staged",
+      "language": "en-US",
+      "theme": "Dark",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "artifacts-staged-desktop-en-dark.png"
+    },
+    {
+      "route": "/artifacts?tab=staged",
+      "language": "en-US",
+      "theme": "Light",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "artifacts-staged-desktop-en-light.png"
+    },
+    {
+      "route": "/artifacts?tab=staged",
+      "language": "fr-FR",
+      "theme": "Dark",
+      "width": 390,
+      "height": 844,
+      "screenshot": "artifacts-staged-mobile-fr-dark.png"
+    },
+    {
+      "route": "/artifacts?tab=staged",
+      "language": "fr-FR",
+      "theme": "Light",
+      "width": 390,
+      "height": 844,
+      "screenshot": "artifacts-staged-mobile-fr-light.png"
+    },
+    {
+      "route": "/account/pat",
+      "language": "en-US",
+      "theme": "Dark",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "account-pat-desktop-en-dark.png"
+    },
+    {
+      "route": "/account/pat",
+      "language": "en-US",
+      "theme": "Light",
+      "width": 1920,
+      "height": 1080,
+      "screenshot": "account-pat-desktop-en-light.png"
+    },
+    {
+      "route": "/account/pat",
+      "language": "fr-FR",
+      "theme": "Dark",
+      "width": 390,
+      "height": 844,
+      "screenshot": "account-pat-mobile-fr-dark.png"
+    },
+    {
+      "route": "/account/pat",
+      "language": "fr-FR",
+      "theme": "Light",
+      "width": 390,
+      "height": 844,
+      "screenshot": "account-pat-mobile-fr-light.png"
+    },
+    {
+      "host": "workplace",
+      "route": "/w/default/d/home",
+      "screenshot": "workplace-home-mobile-fr-light.png"
+    },
+    {
+      "host": "workplace",
+      "route": "/w/default/tasks",
+      "screenshot": "workplace-tasks-mobile-fr-light.png"
+    },
+    {
+      "host": "workplace",
+      "route": "/w/default/notifications",
+      "screenshot": "workplace-notifications-mobile-fr-light.png"
+    }
+  ],
+  "errors": []
+}

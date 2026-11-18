@@ -34,7 +34,7 @@ public sealed class PackAgentDefinitionFormTests
     [TestMethod]
     public async Task EditableFormUpdatesTheOriginalPackManifestWithoutResolvingBindings()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var rendered = context.Render<PackAgentDefinitionForm>(parameters => parameters.Add(component => component.Source, Source));
 
@@ -50,7 +50,7 @@ public sealed class PackAgentDefinitionFormTests
     [TestMethod]
     public void ReadOnlyFormDisablesEveryDefinitionControl()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var rendered = context.Render<PackAgentDefinitionForm>(parameters => parameters
             .Add(component => component.Source, Source)

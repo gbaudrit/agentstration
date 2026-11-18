@@ -18,7 +18,7 @@ public sealed class StorageDocumentExecutionTests
     [DataRow(ConsoleContextKind.Workspace)]
     public async Task AuthorizedContextExecutesWithTheInitiallyDisplayedQueryProfile(ConsoleContextKind kind)
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         using var fixture = new StructuredStorageUiFixture(true);
         using var handler = new DocumentHandler();
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
@@ -44,7 +44,7 @@ public sealed class StorageDocumentExecutionTests
     public async Task MissingExecutionPermissionRemainsBlockedWithAnExplanation(string culture, string help)
     {
         using var currentCulture = new TestCultureScope(culture);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         using var fixture = new StructuredStorageUiFixture(true);
         using var handler = new DocumentHandler();
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };

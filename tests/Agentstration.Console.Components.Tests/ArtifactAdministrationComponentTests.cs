@@ -13,12 +13,29 @@ namespace Agentstration.Web.Tests;
 public sealed class ArtifactAdministrationComponentTests
 {
     [TestMethod]
+    public void ArtifactIdentityCopiesTheCompleteIdentifierOutsideTheNavigationLink()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        const string identifier = "artifact-0123456789abcdef0123456789abcdef";
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ArtifactReference>(parameters => parameters
+            .Add(value => value.Name, "Report")
+            .Add(value => value.Identifier, identifier)
+            .Add(value => value.IdentifierLabel, "Identifier")
+            .Add(value => value.Href, "/artifacts/staged/" + identifier));
+        Assert.AreEqual(identifier, rendered.Find(".copyable-value code").TextContent);
+        Assert.HasCount(0, rendered.FindAll("a .copy-value"));
+        Assert.IsNotNull(rendered.Find(".resource-icon svg path"));
+        Assert.AreEqual("/artifacts/staged/" + identifier, rendered.Find("a").GetAttribute("href"));
+    }
+
+    [TestMethod]
     [DataRow("/instance")]
     [DataRow("/tenants/11111111-1111-1111-1111-111111111111")]
     public void ArtifactDetailsKeepTheAdministrativeContextInContentAndDownloadLinks(string scopeRef)
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("downloadable");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -43,7 +60,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void TransformedArtifactsLinkTheirExactInputAndProcessingRun(string language, string inputLabel, string processingLabel)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("redacted");
         var inputId = Guid.NewGuid().ToString("N");
         client.Durable = client.Durable with
@@ -84,7 +101,7 @@ public sealed class ArtifactAdministrationComponentTests
         string producerLabel, string keyLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("produced content");
         var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
         var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "output-storage"),
@@ -125,7 +142,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesTabs()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("governed preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -155,7 +172,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactCanLoadCompleteContentInBoundedChunks()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         const string expected = "complete governed artifact content";
         var client = new ArtifactClient(expected, maximumBackendChunk: 8);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -183,7 +200,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisablesInlineFullContentWhenArtifactIsTooLarge()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview", declaredLength: 4L * 1024 * 1024 + 1);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -205,7 +222,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactMovesDeleteToHeaderAndRequiresALaterRetentionDate()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -230,7 +247,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactListUsesReadableClickableReferencesForStagedAndDurableArtifacts()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -240,9 +257,8 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.WaitForElement("[data-testid='durable-artifact-row']");
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']").TextContent,
-            client.Durable.ArtifactId.ToString());
+        Assert.AreEqual(client.Durable.ArtifactId.ToString(),
+            rendered.Find("[data-testid='durable-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
 
         rendered.FindAll("button").Single(value => value.TextContent.Contains("Local copies", StringComparison.Ordinal)).Click();
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
@@ -255,16 +271,15 @@ public sealed class ArtifactAdministrationComponentTests
             rendered.Find(".artifact-status .metric-help").GetAttribute("class"),
             "metric-help-left");
         StringAssert.Contains(rendered.Markup, "index.html");
-        StringAssert.Contains(
-            rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']").TextContent,
-            client.Artifact.ArtifactId.ToString());
+        Assert.AreEqual(client.Artifact.ArtifactId.ToString(),
+            rendered.Find("[data-testid='staged-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
     }
 
     [TestMethod]
     public void ArtifactTerminologyExplainsAvailabilityInFrench()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("aperçu");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -292,7 +307,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisplaysMegabytesAndKeepsTheExactByteCount()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview", declaredLength: 19_343);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -312,7 +327,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactProvenanceLinksToGovernedResources()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -337,7 +352,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void DurableArtifactHasGovernedMetadataDetails()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -375,7 +390,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void RecordMetadataNeedsNoContentReadAndExplicitFailureKeepsTheMetadata(string language, string title, string action, string contractLabel)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactClient("{\"id\":2}");
         var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
         var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "records"), Guid.NewGuid(), 1, "binding");
@@ -400,13 +415,13 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.Contains(contractLabel, rendered.Markup);
         Assert.AreEqual(0, client.RecordReadCount);
         Assert.AreEqual(0, client.ContentReadCount);
-        var buttons = rendered.FindAll("[data-testid=artifact-records] button");
+        var buttons = rendered.FindAll("[data-testid=artifact-records] button").Where(button => button.TextContent == action).ToArray();
         Assert.AreEqual(action, buttons[1].TextContent);
         buttons[1].Click();
         rendered.WaitForAssertion(() => Assert.Contains("2", rendered.Find("[data-testid=artifact-record-content]").TextContent));
         Assert.AreEqual("second", client.SelectedRecord);
         client.RejectRecordRead = true;
-        rendered.FindAll("[data-testid=artifact-records] button")[0].Click();
+        rendered.FindAll("[data-testid=artifact-records] button").Where(button => button.TextContent == action).ToArray()[0].Click();
         rendered.WaitForElement("[role=alert]");
         Assert.Contains(title, rendered.Markup);
         Assert.Contains(contractLabel, rendered.Markup);

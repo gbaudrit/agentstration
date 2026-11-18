@@ -10,7 +10,7 @@
                 }
                 else
                 {
-                    <label class="agent-search"><UiIcon Name="search" /><span class="sr-only">@T("SearchAgents")</span><input type="search" @bind="agentSearch" @bind:event="oninput" placeholder="@T("SearchAgents")" /></label>
+                    <FormField Label="@T("SearchAgents")" Class="agent-search"><LabelContent><UiIcon Name="search" /><span class="sr-only">@T("SearchAgents")</span></LabelContent><ChildContent><ClearableText Type="search" @bind-Value="agentSearch" placeholder="@T("SearchAgents")" /></ChildContent></FormField>
                     <div class="agent-picker">
                         @foreach (var agent in FilteredAgents)
                         {
@@ -19,7 +19,7 @@
                                 <span class="agent-avatar">@Initial(agent.Name)</span>
                                 <span class="agent-copy"><strong>@agent.Name</strong><small><code>@agent.Id</code><span>@agent.ModelProfile</span></small></span>
                                 <span class="agent-status">@agent.Status</span>
-                                <input type="checkbox" checked="@selected" @onchange="eventArgs => ToggleParticipant(agent.Id, eventArgs)" aria-label="@agent.Name" data-testid="flow-participant" data-agent-id="@agent.Id" />
+                                <FormCheckbox Value="@selected" aria-label="@agent.Name" data-testid="flow-participant" data-agent-id="@agent.Id" ValueChanged="changed => ToggleParticipant(agent.Id, new ChangeEventArgs { Value = changed })" />
                             </label>
                         }
                         @if (!FilteredAgents.Any())
@@ -48,47 +48,45 @@
 
             <section class="panel orchestration-strategy-panel" data-testid="flow-strategy-section">
                 <div class="panel-header orchestration-section-header"><div><p class="eyebrow">@T("BehaviorEyebrow")</p><h2>@T("Strategy")</h2><p>@T("StrategyHelp")</p></div></div>
-                <label class="strategy-picker"><span>@T("StrategyMode")</span>
-                    <InputSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged" data-testid="flow-strategy">
+                <FormField Label="@T("StrategyMode")" Class="strategy-picker"><HelpContent>@T($"StrategyHelp.{Model.Strategy}")</HelpContent><ChildContent><ClearableSelect @bind-Value="Model.Strategy" @bind-Value:after="StrategyChanged" data-testid="flow-strategy">
                         @foreach (var strategy in Enum.GetValues<FlowOrchestrationStrategy>()) { <option value="@strategy">@Label(strategy)</option> }
-                    </InputSelect>
-                    <small>@T($"StrategyHelp.{Model.Strategy}")</small>
-                </label>
+                    </ClearableSelect>
+
+                </ChildContent></FormField>
 
                 <div class="strategy-options">
                     @switch (Model.Strategy)
                     {
                         case FlowOrchestrationStrategy.Sequential:
-                            <label class="check-option"><InputCheckbox @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
+                            <label class="check-option"><FormCheckbox @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
                             break;
                         case FlowOrchestrationStrategy.Concurrent:
                             <p class="strategy-note"><UiIcon Name="activity" />@T("ConcurrentHelp")</p>
                             break;
                         case FlowOrchestrationStrategy.Handoff:
-                            <label>@T("InitialParticipant")<InputSelect @bind-Value="Model.InitialParticipant" data-testid="flow-initial-participant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect></label>
+                            <FormField Label="@T("InitialParticipant")"><ChildContent><ClearableSelect @bind-Value="Model.InitialParticipant" data-testid="flow-initial-participant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect></ChildContent></FormField>
                             <div class="panel-header handoff-heading"><div><h3>@T("HandoffRoutes")</h3><p>@T("HandoffRoutesHelp")</p></div><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute" data-testid="flow-add-route">@T("AddRoute")</button></div>
                             @for (var routeIndex = 0; routeIndex < Model.Handoffs.Count; routeIndex++)
                             {
                                 var route = Model.Handoffs[routeIndex];
                                 <div class="handoff-route" data-testid="flow-handoff-route" data-route-index="@routeIndex" @key="route">
-                                    <InputSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                    <ClearableSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect>
                                     <span>→</span>
-                                    <InputSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</InputSelect>
+                                    <ClearableSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect>
                                     <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")" data-testid="flow-remove-route">×</button>
                                 </div>
                             }
-                            <label class="check-option"><InputCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
-                            <label>@T("MaximumTurns")<InputNumber @bind-Value="Model.MaximumTurnsPerParticipant" data-testid="flow-maximum-turns" /></label>
-                            <label>@T("TerminationPhrase")<InputText @bind-Value="Model.TerminationPhrase" data-testid="flow-termination-phrase" /></label>
+                            <label class="check-option"><FormCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
+                            <FormField Label="@T("MaximumTurns")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumTurnsPerParticipant" data-testid="flow-maximum-turns" /></ChildContent></FormField>
+                            <FormField Label="@T("TerminationPhrase")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="Model.TerminationPhrase" data-testid="flow-termination-phrase" /></ChildContent></FormField>
                             break;
                         case FlowOrchestrationStrategy.GroupChat:
-                            <label>@T("MaximumIterations")<InputNumber @bind-Value="Model.MaximumIterations" /></label>
+                            <FormField Label="@T("MaximumIterations")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumIterations" /></ChildContent></FormField>
                             break;
                         case FlowOrchestrationStrategy.Magentic:
-                            <label>@T("Manager")
-                                <InputSelect @bind-Value="Model.ManagerId"><option value="">@T("SelectAgent")</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</InputSelect>
-                            </label>
-                            <div class="form-columns"><label>@T("MaximumRounds")<InputNumber @bind-Value="Model.MaximumRounds" /></label><label>@T("MaximumStalls")<InputNumber @bind-Value="Model.MaximumStalls" /></label><label>@T("MaximumResets")<InputNumber @bind-Value="Model.MaximumResets" /></label></div>
+                            <FormField Label="@T("Manager")"><ChildContent><ClearableSelect @bind-Value="Model.ManagerId"><option value="">@T("SelectAgent")</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</ClearableSelect>
+                            </ChildContent></FormField>
+                            <div class="form-columns"><FormField Label="@T("MaximumRounds")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumRounds" /></ChildContent></FormField><FormField Label="@T("MaximumStalls")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumStalls" /></ChildContent></FormField><FormField Label="@T("MaximumResets")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumResets" /></ChildContent></FormField></div>
                             break;
                     }
                 </div>

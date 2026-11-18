@@ -25,21 +25,29 @@ else
     @if (view == "versions")
     {
         <section class="panel"><h2>@T("RelayVersions")</h2>
-            <table class="data-table"><thead><tr><th>@T("RelayVersion")</th><th>@T("SourceToolVersion")</th><th>@T("PublishedAt")</th><th></th></tr></thead><tbody>
-                @foreach (var version in versions)
-                {
-                    <tr><td data-label="@T("RelayVersion")">@version.Definition.Version</td><td data-label="@T("SourceToolVersion")">@version.Source?.Tool.Name · @SourceVersion(version.Source?.Tool)</td><td data-label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(version)">@T("NewVersion")</button></td></tr>
-                }
-            </tbody></table>
+            <CollectionView TItem="ToolDefinitionVersionResource" Items="versions" Compact IdentityLabel="@T("RelayVersion")" InformationLabels="@(new[] { T("SourceToolVersion"), T("PublishedAt") })">
+                <Identity Context="version"><CollectionIdentity DisplayName="@version.Definition.Version" IconName="history" /></Identity>
+                <Information Context="version">
+                    <CollectionValue Label="@T("SourceToolVersion")">@if (version.Source is { } source) { <CopyableValue Value="@($"{source.Tool.Namespace}/{source.Tool.Name}")" /> }<span>@SourceVersion(version.Source?.Tool)</span></CollectionValue>
+                    <CollectionValue Label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+                </Information>
+                <Actions Context="version"><button type="button" class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(version)">@T("NewVersion")</button></Actions>
+            </CollectionView>
         </section>
     }
     else if (view == "usages")
     {
         <section class="panel"><h2>@T("RelayUsages")</h2><p>@T("ConsumerAdoptionHelp")</p>
-            <table class="data-table"><thead><tr><th>@T("Tool")</th><th>@T("Version")</th><th>@T("RelayVersion")</th></tr></thead><tbody>
-                @foreach (var usage in usages)
-                { <tr><td data-label="@T("Tool")"><a href="@UsageUrl(usage)">@usage.Namespace/@usage.Name</a> <ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /> · @T($"UsageKind.{usage.Kind}")</td><td data-label="@T("Version")">@usage.Version</td><td data-label="@T("RelayVersion")">@usage.RelayVersion</td></tr> }
-            </tbody></table>
+            <CollectionView TItem="ToolDefinitionUsage" Items="usages" Compact IdentityLabel="@T("Tool")" InformationLabels="@(new[] { T("Version"), T("RelayVersion") })">
+                <Identity Context="usage"><CollectionIdentity DisplayName="@usage.Name" Namespace="@usage.Namespace.Value" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="@(usage.Kind == "Agent" ? "robot" : usage.Kind == "Flow" ? "workflow" : "tools")">
+                    <IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /></IconBadges>
+                    <Badges><small>@T($"UsageKind.{usage.Kind}")</small></Badges>
+                </CollectionIdentity></Identity>
+                <Information Context="usage">
+                    <CollectionValue Label="@T("Version")"><CollectionVersion Label="@T("Version")" Value="@usage.Version" Compact /></CollectionValue>
+                    <CollectionValue Label="@T("RelayVersion")"><CollectionVersion Label="@T("RelayVersion")" Value="@usage.RelayVersion" Compact /></CollectionValue>
+                </Information>
+            </CollectionView>
         </section>
     }
     else
@@ -55,29 +63,29 @@ else
             @if (CreationIdentity is null)
             {
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@(snapshot is null)" />
-            <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(snapshot is not null)" /></label>
-            <label><span>@T("RelayVersion")</span><input data-testid="relay-version" @bind="relayVersion" disabled="@(!CanManage)" /></label>
-            <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" disabled="@(!CanManage)"></textarea></label>
+            <FormField Label="@T("Namespace")"><ClearableText UpdateOnInput="false" @bind-Value="resourceNamespace" Disabled="@(snapshot is not null)" /></FormField>
+            <FormField Label="@T("RelayVersion")"><ClearableText UpdateOnInput="false" data-testid="relay-version" @bind-Value="relayVersion" Disabled="@(!CanManage)" /></FormField>
+            <FormField Label="@T("DefinitionDescription")" Class="form-span-2"><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="description" Disabled="@(!CanManage)" /></FormField>
             }
             @if (CreationIdentity is not null)
             {
-                <label><span>@T("CreationSourceTool")</span><select data-testid="relay-source-tool" value="@SourceGroup" @onchange="SourceGroupChanged" disabled="@(!CanManage)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</select></label>
-                <label><span>@T("SourceToolVersion")</span><select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</select></label>
+                <FormField Label="@T("CreationSourceTool")"><ClearableSelect TValue="string" data-testid="relay-source-tool" Value="@SourceGroup" ValueExpression="@(() => SourceGroup)" ValueChanged="value => SourceGroupChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanManage)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</ClearableSelect></FormField>
+                <FormField Label="@T("SourceToolVersion")"><ClearableSelect TValue="string" data-testid="relay-source" Value="@SelectedKey" ValueExpression="@(() => SelectedKey)" ValueChanged="value => SourceChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanManage || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</ClearableSelect></FormField>
             }
-            <label class="relay-toggle"><input type="checkbox" @bind="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
-            <label class="relay-toggle"><input type="checkbox" @bind="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
-            <label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="900" @bind="timeout" disabled="@(!CanManage)" /></label>
+            <label class="relay-toggle"><FormCheckbox @bind-Value="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
+            <label class="relay-toggle"><FormCheckbox @bind-Value="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
+            <FormField Label="@T("TimeoutSeconds")"><ClearableNumber TValue="int" min="1" max="900" @bind-Value="timeout" disabled="@(!CanManage)" /></FormField>
             @if (CreationIdentity is null)
             {
-            <label class="form-span-2"><span>@T("SourceToolVersion")</span>
-                <select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage)">
+            <FormField Label="@T("SourceToolVersion")" Class="form-span-2">
+                <ClearableSelect TValue="string" data-testid="relay-source" Value="@SelectedKey" ValueExpression="@(() => SelectedKey)" ValueChanged="value => SourceChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanManage)">
                     <option value="">@T("SelectSourceTool")</option>
                     @if (selected is not null && !tools.Any(tool => tool.Uid == selected.Uid && tool.Generation == selected.Generation))
                     { <option value="@SelectedKey">@T("PinnedSourceUnavailable", selected.Name, SourceVersion(selected))</option> }
                     @foreach (var tool in tools)
                     { <option value="@ToolKey(tool)">@tool.Definition.DisplayName · @SourceVersion(tool) · @tool.ScopeRef · @tool.Namespace/@tool.Name</option> }
-                </select>
-            </label>
+                </ClearableSelect>
+            </FormField>
             }
         </div><p class="inline-info">@T(CreationIdentity is null ? "SourceSelectionHelp" : "CreationIndependentVersions")</p></section>
         @if (sourceUpdateRequested) { <p class="inline-info" role="status">@T("ChooseNewSource")</p> }

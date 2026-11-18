@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/settings/runtime-workers/{WorkerId:guid}"
 @implements IDisposable
 @inject IRuntimeApiClient Client
@@ -46,10 +47,18 @@ else
                 else
                 {
                     <div class="worker-assignments-grid">
-                    <DataGrid TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments">
-                        <Header><tr><th>@T("Run")</th><th>@T("State")</th><th>@T("Runtime")</th><th>@T("Attempts")</th><th>@T("Updated")</th></tr></Header>
-                        <Row Context="item"><tr data-testid="runtime-worker-assignment-row" data-run-id="@item.RunId" data-assignment-id="@item.AssignmentId.ToString("D")" data-assignment-state="@item.State"><td data-label="@T("Run")"><a class="text-button worker-run-link" href="@RunUrl(item)">@item.RunId</a><small>@T($"TargetKind.{item.TargetKind}")</small></td><td data-label="@T("State")"><StatusBadge Text="@T($"AssignmentState.{item.State}")" Status="@PlatformDashboardService.ToStatus(item.State)" /></td><td data-label="@T("Runtime")">@item.RuntimeCapability · @item.RuntimeCapabilityVersion</td><td data-label="@T("Attempts")">@item.Attempts.Count</td><td data-label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="RuntimeAssignmentPlacementResponse" Items="details.RecentAssignments" InformationLabels="@(new string[] { T("Runtime"), T("Attempts"), T("Updated") })" RowTestId="runtime-worker-assignment-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-run-id"] = item.RunId, ["data-assignment-id"] = item.AssignmentId.ToString("D"), ["data-assignment-state"] = item.State })" IdentityLabel="@T("Run")" StateLabel="@T("State")">
+        <Identity Context="item">
+<a class="text-button worker-run-link" href="@RunUrl(item)">@item.RunId</a><small>@T($"TargetKind.{item.TargetKind}")</small></Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"AssignmentState.{item.State}")" Status="@PlatformDashboardService.ToStatus(item.State)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Runtime")">@item.RuntimeCapability · @item.RuntimeCapabilityVersion</CollectionValue>
+            <CollectionValue Label="@T("Attempts")">@item.Attempts.Count</CollectionValue>
+            <CollectionValue Label="@T("Updated")">@item.UpdatedAt.LocalDateTime.ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@item.RunId"><a href="@RunUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
+    </CollectionView>
                     </div>
                     @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))
                     {

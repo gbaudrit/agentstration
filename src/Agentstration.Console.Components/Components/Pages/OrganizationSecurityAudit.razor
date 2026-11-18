@@ -22,18 +22,20 @@ else if (events.Count == 0)
 }
 else
 {
-    <DataGrid TItem="Agentstration.Security.Contracts.SecurityAuditEvent" Items="events">
-        <Header><tr><th>@T("Time")</th><th>@T("Action")</th><th>@T("Outcome")</th><th>@T("Actor")</th><th>@T("Target")</th><th>@T("Scope")</th><th>@T("Correlation")</th></tr></Header>
-        <Row Context="entry"><tr>
-            <td>@entry.OccurredAt.ToLocalTime().ToString("g")</td>
-            <td><strong>@T($"AuditAction.{entry.Action}")</strong>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <br /><small>@entry.ReasonCode</small> }</td>
-            <td><StatusBadge Text="@T($"AuditOutcome.{entry.Outcome}")" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : UiStatus.Warning)" /></td>
-            <td><code>@ShortId(entry.ActorPrincipalId)</code></td>
-            <td>@if (entry.TargetPrincipalId is not null) { <span>@T("Principal") <code>@ShortId(entry.TargetPrincipalId)</code></span> } else if (entry.TargetAccountId is not null) { <span>@T("Account") <code>@ShortId(entry.TargetAccountId)</code></span> } else { <span>—</span> }</td>
-            <td>@if (entry.WorkspaceId is not null) { <span>@T("Workspace") <code>@ShortId(entry.WorkspaceId)</code></span> } else if (entry.TenantId is not null) { <span>@T("Tenant") <code>@ShortId(entry.TenantId)</code></span> } else { <span>@T("Instance")</span> }</td>
-            <td><code>@(string.IsNullOrWhiteSpace(entry.CorrelationId) ? "—" : entry.CorrelationId[..Math.Min(12, entry.CorrelationId.Length)])</code></td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="Agentstration.Security.Contracts.SecurityAuditEvent" Items="events" InformationLabels="@(new string[] { T("Time"), T("Actor"), T("Target"), T("Correlation") })" IdentityLabel="@T("Action")" ScopeLabel="@T("Scope")" StateLabel="@T("Outcome")">
+        <Identity Context="entry">
+<strong>@T($"AuditAction.{entry.Action}")</strong>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <br /><small>@entry.ReasonCode</small> }</Identity>
+        <Scope Context="entry">
+@if (entry.WorkspaceId is not null) { <span>@T("Workspace") <code>@ShortId(entry.WorkspaceId)</code></span> } else if (entry.TenantId is not null) { <span>@T("Tenant") <code>@ShortId(entry.TenantId)</code></span> } else { <span>@T("Instance")</span> }</Scope>
+        <State Context="entry">
+<StatusBadge Text="@T($"AuditOutcome.{entry.Outcome}")" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : UiStatus.Warning)" /></State>
+        <Information Context="entry">
+            <CollectionValue Label="@T("Time")">@entry.OccurredAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Actor")"><code>@ShortId(entry.ActorPrincipalId)</code></CollectionValue>
+            <CollectionValue Label="@T("Target")">@if (entry.TargetPrincipalId is not null) { <span>@T("Principal") <code>@ShortId(entry.TargetPrincipalId)</code></span> } else if (entry.TargetAccountId is not null) { <span>@T("Account") <code>@ShortId(entry.TargetAccountId)</code></span> } else { <span>—</span> }</CollectionValue>
+            <CollectionValue Label="@T("Correlation")"><code>@(string.IsNullOrWhiteSpace(entry.CorrelationId) ? "—" : entry.CorrelationId[..Math.Min(12, entry.CorrelationId.Length)])</code></CollectionValue>
+        </Information>
+    </CollectionView>
 }
 </div>
 

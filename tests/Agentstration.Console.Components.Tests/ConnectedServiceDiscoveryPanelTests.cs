@@ -70,7 +70,7 @@ public sealed class ConnectedServiceDiscoveryPanelTests
 
     private static async Task<BunitContext> SetupAsync(HttpClient http, bool write)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var state = new ConsoleContextState(new ContextProvider(write));
         await state.EnsureLoadedAsync(default);

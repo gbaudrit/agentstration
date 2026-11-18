@@ -22,18 +22,18 @@ else
         <fieldset disabled="@busy" class="storage-fields">
             <section class="panel form-section"><div class="panel-header"><h2>@T("Identity")</h2></div><div class="form-grid">
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Generic" IsNew="IsNew" DisplayNameTestId="storage-display-name" TechnicalNameTestId="storage-name" />
-                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+                <FormField Label="@T("Description")" Class="form-span-2"><ClearableText Multiline @bind-Value="model.Description" /></FormField>
                 <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="ownerScope" /></label>
                 <label><span>@T("Namespace")</span><code>@resourceNamespace</code></label>
-                <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="model.Enabled" /></label>
+                <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="model.Enabled" /></FormField>
             </div><p>@T("Identity.Help")</p></section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("ExactType")</h2></div>
                 @if (model.Type is { } savedType) { <p>@T("SelectedType"): <code>@savedType.Type.ScopeRef/@savedType.Type.Namespace/@savedType.Type.Name · @savedType.TypeUid · @savedType.Version · @savedType.SchemaDigest · @savedType.ContractDigest</code></p> }
-                <label><span>@T("Type")</span><select value="@TypeKey" @onchange="TypeChanged" data-testid="storage-type">
+                <FormField Label="@T("Type")"><ClearableSelect TValue="string" Value="@TypeKey" ValueChanged="value => TypeChanged(new ChangeEventArgs { Value = value })" data-testid="storage-type">
                     <option value="">@T("SelectType")</option>
                     @if (model.Type is not null && SelectedType is null) { <option value="@TypeKey" disabled>@T("SavedTypeUnavailable")</option> }
                     @foreach (var choice in variants) { <option value="@choice.Key" disabled="@(!Available(choice))">@choice.Resource.Definition.DisplayName · @choice.Version.Version · @choice.Resource.ScopeRef/@choice.Resource.Namespace/@choice.Resource.Name · @T($"Origin.{choice.Resource.Governance.Origin.Kind}") · @T($"Availability.{TypeAvailability(choice)}") · @T(choice.Resource.ObservedUse?.Use.Allowed == true ? "Type.UseGranted" : "Type.UseNotGranted")</option> }
-                </select></label>
+                </ClearableSelect></FormField>
                 <p role="note">@T("Type.AccessHelp")</p>
                 <StorageTypeEvidence Choice="SelectedType" />
             </section>
@@ -43,24 +43,24 @@ else
                 {
                     <section class="panel form-section"><div class="panel-header"><h2>@T("ConnectedService")</h2></div>
                         @if (model.ConnectedService is { } savedService) { <p>@T("SelectedService"): <code>@savedService.Service.ScopeRef/@savedService.Service.Address · @savedService.ServiceUid · @savedService.Generation</code></p> }
-                        <label><span>@T("ConnectedService")</span><select value="@ServiceKey" @onchange="ServiceChanged" data-testid="storage-service">
+                        <FormField Label="@T("ConnectedService")"><ClearableSelect TValue="string" Value="@ServiceKey" ValueChanged="value => ServiceChanged(new ChangeEventArgs { Value = value })" data-testid="storage-service">
                             <option value="">@T("SelectService")</option>
                             @if (model.ConnectedService is not null && SelectedService is null) { <option value="@ServiceKey" disabled>@T("SavedServiceUnavailable")</option> }
                             @foreach (var service in services.Where(ServiceAvailable)) { <option value="@Key(service)">@service.Definition.DisplayName · @service.ScopeRef/@service.Namespace/@service.Name · @service.Uid · @service.Generation</option> }
-                        </select></label>
+                        </ClearableSelect></FormField>
                         <p>@T("Service.Help")</p>
                         @if (servicesUnavailable) { <p role="status">@T("Error.Service")</p> }
                         @foreach (var requirement in current.Version.Requirements)
                         {
                             var savedExport = model.Bindings.SingleOrDefault(value => value.RequirementId == requirement.Id)?.Export;
                             var candidates = Exports.Where(value => Compatible(requirement, value)).ToArray();
-                            <label class="storage-requirement"><span><code>@requirement.Id</code> · @T(requirement.Required ? "Required" : "Optional") · @T($"ValueType.{requirement.Type}") · @T($"Protection.{requirement.Protection}") @requirement.Format</span>
-                                <select value="@ExportKey(savedExport)" @onchange="args => ExportChanged(requirement.Id, args)" disabled="@(SelectedService is null)" data-testid="storage-export">
+                            <FormField Label="@requirement.Id" Class="storage-requirement"><LabelContent><code>@requirement.Id</code> · @T(requirement.Required ? "Required" : "Optional") · @T($"ValueType.{requirement.Type}") · @T($"Protection.{requirement.Protection}") @requirement.Format</LabelContent><ChildContent>
+                                <ClearableSelect TValue="string" Value="@ExportKey(savedExport)" ValueChanged="value => ExportChanged(requirement.Id, new ChangeEventArgs { Value = value })" disabled="@(SelectedService is null)" data-testid="storage-export">
                                     <option value="">@T("SelectExport")</option>
                                     @if (savedExport is not null && !candidates.Contains(savedExport)) { <option value="@ExportKey(savedExport)" disabled>@savedExport.Id · @T("SavedExportUnavailable")</option> }
                                     @foreach (var export in candidates) { <option value="@ExportKey(export)">@export.Id · @T($"ValueType.{export.Type}") · @T($"Protection.{export.Protection}") · @export.Format</option> }
-                                </select>
-                            </label>
+                                </ClearableSelect>
+                            </ChildContent></FormField>
                         }
                     </section>
                 }

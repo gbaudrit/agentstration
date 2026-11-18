@@ -33,9 +33,9 @@ else
     }
     <EditForm Model="model" OnValidSubmit="SaveAsync" data-testid="flow-orchestration-editor">
         <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
-            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
-            <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
-            <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
+            <div class="form-columns"><FormField Label="@T("TechnicalName")"><ChildContent><ClearableText Value="@model.Name" ReadOnly="true" /></ChildContent></FormField><FormField Label="@T("CurrentDefinitionVersion")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.Version" /></ChildContent></FormField><ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
+            <FormField Label="@T("Description")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.Description" /></ChildContent></FormField>
+            <label class="check-option"><FormCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
         </fieldset>
         <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@IsReadOnly" />
         @if (error is not null) { <p class="error-panel orchestration-message">@error</p> }
@@ -45,7 +45,7 @@ else
             <div class="orchestration-actions">
                 <span class="save-state">@T("EtagProtected") · @(saving ? T("Saving") : T("Ready"))</span>
                 <button type="submit" class="button-secondary" disabled="@saving">@T("Save")</button>
-                <label>@T("PublishVersion")<input @bind="publishVersion" /></label>
+                <FormField Label="@T("PublishVersion")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="publishVersion" /></ChildContent></FormField>
                 <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync" data-testid="flow-publish-and-activate">@T("PublishAndActivate")</button>
             </div>
         }

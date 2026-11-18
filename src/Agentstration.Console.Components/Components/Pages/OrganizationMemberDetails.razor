@@ -15,34 +15,37 @@ else
         <article class="panel"><div class="panel-header"><h2>@T("Membership")</h2><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></div><p>@T("JoinedAt", member.Membership.JoinedAt.ToLocalTime().ToString("g"))</p></article>
     </section>
     <section class="panel" style="margin-top:18px"><div class="panel-header"><h2>@T("RoleAssignments")</h2></div>@if(member.Roles.Count == 0){<EmptyState Title="@T("NoAccessAssigned")" Message="@T("MembershipNoAccess")" />}else{@foreach(var assigned in member.Roles){<article><p><strong>@assigned.Role.DisplayName</strong> @if(assigned.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}</p><code>@assigned.Scope</code></article>}}</section>
-    <section class="panel" style="margin-top:18px">
-        <div class="panel-header"><div><h2>@T("CurrentWorkspaceMembership")</h2><p class="muted">@T("WorkspaceMembershipHelp")</p></div></div>
+    <FormSection Title="@T("CurrentWorkspaceMembership")" style="margin-top:18px"><ChildContent>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")">@message</p> }
-        <div class="form-grid"><label><span>@T("Role")</span><select @bind="selectedRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</select></label></div>
-        <div class="form-actions"><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</div>
-    </section>
+        <FormGrid><FormField Label="@T("Role")"><ChildContent><ClearableSelect @bind-Value="selectedRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</ClearableSelect></ChildContent></FormField></FormGrid>
+        <FormActions><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</FormActions>
+    </ChildContent></FormSection>
     @if (canManagePlatformAdministrators)
     {
-        <section class="panel" style="margin-top:18px">
-            <div class="panel-header"><div><h2>@T("ExternalAuthentication")</h2><p class="muted">@T("ExternalAuthenticationHelp")</p></div></div>
+        <FormSection Title="@T("ExternalAuthentication")" style="margin-top:18px"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(identityMessage)) { <p class="form-alert @(identityError ? "form-alert-danger" : "form-alert-success")">@identityMessage</p> }
-            <div class="form-grid">
-                <label><span>@T("Issuer")</span><input @bind="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></label>
-                <label><span>@T("Subject")</span><input @bind="newSubject" autocomplete="off" /></label>
-            </div>
-            <div class="form-actions"><button class="button-primary" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></div>
+            <FormGrid>
+                <FormField Label="@T("Issuer")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></ChildContent></FormField>
+                <FormField Label="@T("Subject")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newSubject" autocomplete="off" /></ChildContent></FormField>
+            </FormGrid>
+            <FormActions><button class="button-primary" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></FormActions>
             @if (member.ExternalIdentities.Count > 0)
             {
-                <DataGrid TItem="ExternalIdentity" Items="member.ExternalIdentities">
-                    <Header><tr><th>@T("Issuer")</th><th>@T("Subject")</th><th>@T("Linked")</th><th></th></tr></Header>
-                    <Row Context="identity"><tr><td><code>@identity.Issuer</code></td><td><code>@identity.Subject</code></td><td>@identity.LinkedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExternalIdentity" Items="member.ExternalIdentities" InformationLabels="@(new string[] { T("Subject"), T("Linked") })" IdentityLabel="@T("Issuer")">
+        <Identity Context="identity">
+<code>@identity.Issuer</code></Identity>
+        <Information Context="identity">
+            <CollectionValue Label="@T("Subject")"><code>@identity.Subject</code></CollectionValue>
+            <CollectionValue Label="@T("Linked")">@identity.LinkedAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+        <Actions Context="identity">
+<CollectionActions ResourceName="@(identity.Subject)"><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></CollectionActions></Actions>
+    </CollectionView>
             }
-        </section>
-        <section class="panel" style="margin-top:18px">
-            <div class="panel-header"><div><h2>@T("InstanceAdministration")</h2><p class="muted">@T("InstanceAdministrationHelp")</p></div></div>
+        </ChildContent></FormSection>
+        <FormSection Title="@T("InstanceAdministration")" style="margin-top:18px"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(platformMessage)) { <p class="form-alert @(platformError ? "form-alert-danger" : "form-alert-success")">@platformMessage</p> }
-            <div class="form-actions">
+            <FormActions>
                 @if (targetIsPlatformAdministrator)
                 {
                     <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == ContextState.Current?.UserId)">@T("RevokePlatformAdmin")</button>
@@ -51,8 +54,8 @@ else
                 {
                     <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(member.Principal.Status != PrincipalStatus.Active)">@T("GrantPlatformAdmin")</button>
                 }
-            </div>
-        </section>
+            </FormActions>
+        </ChildContent></FormSection>
     }
 }
 </div>

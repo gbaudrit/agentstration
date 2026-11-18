@@ -56,7 +56,7 @@
     font-weight: 650;
 }
 
-.icon-picker-search input {
+.icon-picker-search ::deep input {
     width: 100%;
 }
 

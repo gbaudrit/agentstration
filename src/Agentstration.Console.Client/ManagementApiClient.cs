@@ -48,6 +48,7 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
             return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
             {
                 Namespace = agent.Namespace,
+                IsManaged = agent.Governance.IsManaged,
                 ScopeRef = agent.ScopeRef,
                 ModelProfileNamespace = modelProfile.Namespace,
                 ModelProfileScopeRef = agent.Definition.ModelProfile.ScopeRef,

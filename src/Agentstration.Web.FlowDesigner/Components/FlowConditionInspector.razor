@@ -3,9 +3,9 @@
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
-    <label>@T("LeftValue")<input disabled="@ReadOnly" value="@Step.Left" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Left = Text(e) })" /></label>
-    <label>@T("Operator")<input disabled="@ReadOnly" value="@Step.Operator" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Operator = Text(e) })" /></label>
-    <label>@T("RightValue")<input disabled="@ReadOnly" value="@Step.Right" @onchange="e => UpdateSelectedAsync.InvokeAsync(Step with { Right = Text(e) })" /></label>
+    <FormField Label="@T("LeftValue")"><ChildContent><ClearableText Disabled="@ReadOnly" Value="@Step.Left" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { Left = Text(new ChangeEventArgs { Value = changed }) })" /></ChildContent></FormField>
+    <FormField Label="@T("Operator")"><ChildContent><ClearableText Disabled="@ReadOnly" Value="@Step.Operator" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { Operator = Text(new ChangeEventArgs { Value = changed }) })" /></ChildContent></FormField>
+    <FormField Label="@T("RightValue")"><ChildContent><ClearableText Disabled="@ReadOnly" Value="@Step.Right" ValueChanged="changed => UpdateSelectedAsync.InvokeAsync(Step with { Right = Text(new ChangeEventArgs { Value = changed }) })" /></ChildContent></FormField>
 }
 
 @code {

@@ -6,6 +6,7 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -27,7 +28,9 @@ public sealed class DataSourceDatasetEditorTests
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
-        rendered.WaitForElement("[data-testid='dataset-service']");
+        var serviceSelection = rendered.WaitForElement("[data-testid='dataset-service']");
+        Assert.IsNotNull(rendered.Find($"label[for='{serviceSelection.Id}']"));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(serviceSelection.GetAttribute("aria-describedby")));
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}");
         await rendered.Find("[data-testid='data-source-display-name']").ChangeAsync("Direct inventory");
@@ -215,8 +218,8 @@ public sealed class DataSourceDatasetEditorTests
         Assert.DoesNotContain("Unsaved draft", rendered.Find("#dataset-panel-overview").TextContent);
         Assert.DoesNotContain("draft/", rendered.Find("[data-testid=dataset-saved-configuration]").TextContent);
         await rendered.Find("[data-testid=dataset-yaml-tab]").ClickAsync();
-        Assert.Contains("Inventory", rendered.Find("[data-testid=dataset-yaml]").TextContent);
-        Assert.DoesNotContain("Unsaved draft", rendered.Find("[data-testid=dataset-yaml]").TextContent);
+        Assert.Contains("Inventory", rendered.Find("[data-testid=dataset-yaml]").GetAttribute("value")!);
+        Assert.DoesNotContain("Unsaved draft", rendered.Find("[data-testid=dataset-yaml]").GetAttribute("value")!);
         await rendered.Find("[data-testid=dataset-definition-tab]").ClickAsync();
         Assert.AreEqual("Unsaved draft", rendered.Find("[data-testid=data-source-display-name]").GetAttribute("value"));
         Assert.AreEqual("draft/", rendered.Find("[data-testid=dataset-prefix]").GetAttribute("value"));
@@ -242,6 +245,11 @@ public sealed class DataSourceDatasetEditorTests
         Assert.Contains("flow-3", rendered.Find("[data-testid=dataset-latest-acquisition] a").GetAttribute("href")!);
         await rendered.Find("[data-testid=dataset-acquisitions-tab]").ClickAsync();
         Assert.HasCount(4, rendered.FindAll("[data-testid=data-source-acquisition-row]"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<CollectionView<DataSourceAcquisitionResource>>().Instance.SetNarrow(true));
+        Assert.HasCount(4, rendered.FindAll("li[data-testid=data-source-acquisition-row]"));
+        Assert.Contains("acq-3", rendered.FindAll("[data-testid=data-source-acquisition-row]")[0].TextContent);
+        Assert.AreEqual("Succeeded", rendered.FindAll("[data-testid=data-source-acquisition-row]")[0].GetAttribute("data-state"));
+        Assert.IsNotNull(rendered.Find("[data-testid=data-source-acquisition-row] .collection-actions [data-testid=dataset-read-content]"));
         await rendered.FindAll("[data-testid=dataset-read-content]")[1].ClickAsync();
         rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-testid=dataset-content-tab]").GetAttribute("aria-selected")));
         Assert.Contains("acq-2", rendered.Find("[data-testid=dataset-content]").TextContent);
@@ -298,6 +306,9 @@ public sealed class DataSourceDatasetEditorTests
     {
         var context = new BunitContext();
         context.JSInterop.SetupVoid("agentstrationDataSources.focusTab", _ => true).SetVoidResult();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
+        foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
+            module.SetupVoid(method, _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);

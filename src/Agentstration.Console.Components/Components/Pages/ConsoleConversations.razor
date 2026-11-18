@@ -4,6 +4,7 @@
 @inject IEntryAdministrationApiClient Entries
 @inject IWorkOperationsRealtimeClient Realtime
 @inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ConsoleConversationsStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
@@ -32,27 +33,16 @@ else
         <header class="conversation-browser-summary">
             <span>@F("RecentCount", conversations.Count)</span>
         </header>
-        <div class="conversation-list">
+        <div class="conversation-list" role="list">
             @foreach (var conversation in conversations)
             {
-                <a class="conversation-row" href="@conversation.Url" data-testid="conversation-row" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status">
-                    <span class="conversation-icon" aria-hidden="true"><UiIcon Name="message-circle" /></span>
-                    <span class="conversation-main">
-                        <strong>@conversation.Title</strong>
-                        <span>@conversation.Entry.DisplayName</span>
-                    </span>
-                    <span class="conversation-meta">
-                        <span class="conversation-state">
-                            <StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" />
-                            @if (conversation.Interaction.PendingActionId is not null)
-                            {
-                                <small class="conversation-pending">@T("NeedsInput")</small>
-                            }
-                        </span>
-                        <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
-                        <span class="conversation-open" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
-                    </span>
-                </a>
+                <article class="conversation-row" role="listitem" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status">
+                    <CollectionIdentity DisplayName="@conversation.Title" Name="@conversation.Interaction.Id.ToString()" Href="@conversation.Url" IconName="message-circle" data-testid="conversation-row" data-interaction-id="@conversation.Interaction.Id" data-entry-name="@conversation.Entry.Name" data-status="@conversation.Interaction.Status" ><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(WorkspaceId)" DisplayName="@ContextState.Current?.WorkspaceDisplayName" IconOnly /><StatusBadge Text="@StatusLabel(conversation.Interaction.Status)" Status="@Status(conversation.Interaction.Status)" IconOnly /></IconBadges></CollectionIdentity>
+                    <span>@conversation.Entry.DisplayName</span>
+                    @if (conversation.Interaction.PendingActionId is not null) { <small class="conversation-pending">@T("NeedsInput")</small> }
+                    <time datetime="@conversation.Interaction.LastActivityAt.ToString("O")">@conversation.Interaction.LastActivityAt.ToLocalTime().ToString("g")</time>
+                    <CollectionActions ResourceName="@conversation.Title"><a href="@conversation.Url">@Shared["OpenItem"]</a></CollectionActions>
+                </article>
             }
         </div>
         @if (conversations.Count == MaximumConversations)

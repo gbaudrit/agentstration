@@ -170,4 +170,4 @@
 <data name="Structure.CreateFailed"><value>Creation failed. Refresh the structure before trying again.</value></data>
 <data name="OpenTenant.Named"><value>Open Tenant {0}</value></data>
 <data name="OpenWorkspace.Named"><value>Open Workspace {0}</value></data>
-</root>
+<data name="ToggleTenant" xml:space="preserve"><value>Expand or collapse tenant: {0}</value></data></root>

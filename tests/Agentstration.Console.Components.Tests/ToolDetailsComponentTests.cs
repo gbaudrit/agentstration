@@ -189,7 +189,7 @@ public sealed class ToolDetailsComponentTests
 
     private static BunitContext CreateContext(ToolSchema schema, string? description = "Create one durable notification.")
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new ToolClient(new ToolResource
         {

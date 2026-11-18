@@ -18,7 +18,7 @@
     font-weight: 700;
 }
 
-.schema-input-editor textarea {
+.schema-input-editor ::deep textarea {
     box-sizing: border-box;
     width: 100%;
     min-height: 13rem;

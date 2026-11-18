@@ -26,34 +26,25 @@
         @if (operations.Count == 0) { <p data-testid="connected-service-no-operations">@T("Discovery.NoOperations")</p> }
         else
         {
-            <DataGrid TItem="ConnectedServiceOperationResource" Items="operations">
-                <Header><tr><th>@T("Discovery.Operation")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th>@T("Generation")</th><th>@T("Discovery.Actions")</th></tr></Header>
-                <Row Context="operation"><tr data-testid="connected-service-operation-row" data-operation-uid="@operation.Uid">
-                    <td><strong>@operation.Definition.DisplayName</strong><small><code>@operation.Definition.ExternalId</code></small>@if (operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out _))
-                        { <OperationSchemaCandidate Operation="operation" CanManage="@CanAuthorSchema" TargetScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /> }</td>
-                    <td>@T($"Discovery.Availability.{operation.ObservedState.Availability}")</td>
-                    <td>@T(operation.Enabled ? "Yes" : "No")</td><td>@operation.Generation</td>
-                    <td>@if (CanManage && ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))
-                        {
-                            <button class="button-secondary" type="button" data-testid="connected-service-operation-enabled" disabled="@(busy || !interactive || !operation.Enabled && (!Service.Definition.Enabled || operation.ObservedState.Availability != ConnectedServiceOperationAvailability.Available || operation.Definition.Service.Generation != Service.Generation))" @onclick="() => ToggleAsync(operation)">@T(operation.Enabled ? "Discovery.DisableOperation" : "Discovery.EnableOperation")</button>
-                        }
-                    </td>
-                </tr></Row>
-            </DataGrid>
+            <CollectionView TItem="ConnectedServiceOperationResource" Items="operations" IdentityLabel="@T("Discovery.Operation")" InformationLabels="@(new[] { T("Enabled"), T("Generation") })" RowTestId="connected-service-operation-row" ItemAttributes="OperationAttributes">
+                <Identity Context="operation"><CollectionIdentity DisplayName="@operation.Definition.DisplayName" Namespace="@operation.Namespace.Value" Name="@operation.Name" IconName="puzzle" Domain="tools"><IconBadges><ResourceScopeBadge ScopeRef="operation.ScopeRef" IconOnly /><StatusBadge Text="@T($"Discovery.Availability.{operation.ObservedState.Availability}")" Status="@OperationColor(operation.ObservedState.Availability)" IconOnly /><ManagedResourceBadge IsManaged="@operation.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))" IconOnly /></IconBadges><Badges><CopyableValue Value="@operation.Definition.ExternalId" /></Badges></CollectionIdentity></Identity>
+                <Information Context="operation"><CollectionValue Label="@T("Enabled")">@T(operation.Enabled ? "Yes" : "No")</CollectionValue><CollectionValue Label="@T("Generation")">@operation.Generation</CollectionValue></Information>
+                <Actions Context="operation">
+                    @if (operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out _))
+                    { <OperationSchemaCandidate Operation="operation" CanManage="@CanAuthorSchema" TargetScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /> }
+                    @if (CanManage && ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))
+                    { <button class="button-secondary" type="button" data-testid="connected-service-operation-enabled" disabled="@(busy || !interactive || !operation.Enabled && (!Service.Definition.Enabled || operation.ObservedState.Availability != ConnectedServiceOperationAvailability.Available || operation.Definition.Service.Generation != Service.Generation))" @onclick="() => ToggleAsync(operation)">@T(operation.Enabled ? "Discovery.DisableOperation" : "Discovery.EnableOperation")</button> }
+                </Actions>
+            </CollectionView>
         }
         <h3>@T("Discovery.History")</h3>
         @if (history.Count == 0) { <p>@T("Discovery.NoHistory")</p> }
         else
         {
-            <DataGrid TItem="ConnectedServiceOperationDiscoveryResource" Items="history">
-                <Header><tr><th>@T("Discovery.Created")</th><th>@T("Discovery.State")</th><th>@T("Discovery.FlowRun")</th><th>@T("Code")</th></tr></Header>
-                <Row Context="discovery"><tr data-testid="connected-service-discovery-row" data-state="@discovery.State">
-                    <td>@discovery.CreatedAt.ToLocalTime().ToString("g")</td>
-                    <td>@T($"Discovery.State.{discovery.State}")</td>
-                    <td><a class="text-button" href="@FlowUrl(discovery)" data-testid="connected-service-discovery-flow-link"><code>@discovery.FlowRunId</code></a></td>
-                    <td><code>@(discovery.ErrorCode ?? "—")</code></td>
-                </tr></Row>
-            </DataGrid>
+            <CollectionView TItem="ConnectedServiceOperationDiscoveryResource" Items="history" IdentityLabel="@T("Discovery.FlowRun")" InformationLabels="@(new[] { T("Discovery.Created"), T("Code") })" RowTestId="connected-service-discovery-row" ItemAttributes="DiscoveryAttributes">
+                <Identity Context="discovery"><CollectionIdentity DisplayName="@discovery.FlowRunId" Name="@discovery.FlowRunId" Href="@FlowUrl(discovery)" IconName="clock" data-testid="connected-service-discovery-flow-link"><IconBadges><StatusBadge Text="@T($"Discovery.State.{discovery.State}")" Status="@DiscoveryColor(discovery.State)" IconOnly /></IconBadges></CollectionIdentity></Identity>
+                <Information Context="discovery"><CollectionValue Label="@T("Discovery.Created")">@discovery.CreatedAt.ToLocalTime().ToString("g")</CollectionValue><CollectionValue Label="@T("Code")"><code>@(discovery.ErrorCode ?? "—")</code></CollectionValue></Information>
+            </CollectionView>
         }
     }
 </section>
@@ -119,6 +110,10 @@
         catch (Exception exception) when (exception is not OperationCanceledException) { error = true; }
         finally { busy = false; }
     }
+    private static IReadOnlyDictionary<string, object> OperationAttributes(ConnectedServiceOperationResource operation) => new Dictionary<string, object> { ["data-operation-uid"] = operation.Uid };
+    private static IReadOnlyDictionary<string, object> DiscoveryAttributes(ConnectedServiceOperationDiscoveryResource discovery) => new Dictionary<string, object> { ["data-state"] = discovery.State };
+    private static UiStatus OperationColor(ConnectedServiceOperationAvailability status) => status switch { ConnectedServiceOperationAvailability.Available => UiStatus.Success, ConnectedServiceOperationAvailability.Stale => UiStatus.Warning, ConnectedServiceOperationAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
+    private static UiStatus DiscoveryColor(ConnectedServiceOperationDiscoveryState state) => state switch { ConnectedServiceOperationDiscoveryState.Succeeded => UiStatus.Success, ConnectedServiceOperationDiscoveryState.Failed or ConnectedServiceOperationDiscoveryState.TimedOut => UiStatus.Danger, ConnectedServiceOperationDiscoveryState.Running => UiStatus.Info, ConnectedServiceOperationDiscoveryState.WaitingForInput or ConnectedServiceOperationDiscoveryState.WaitingForChild => UiStatus.Warning, _ => UiStatus.Neutral };
     private static string FlowUrl(ConnectedServiceOperationDiscoveryResource discovery) =>
         $"/flow-runs/{Uri.EscapeDataString(discovery.FlowRunId)}?scopeRef={Uri.EscapeDataString(discovery.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(discovery.LogicalScopeRef?.Value ?? discovery.ScopeRef.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

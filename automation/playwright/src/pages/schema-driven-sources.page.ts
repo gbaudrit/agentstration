@@ -145,6 +145,8 @@ export class SchemaDrivenSourcesPage {
     await endpoint.pressSequentially('https://example.test/schema-inputs', { delay: 25 });
     await expect(endpoint).toHaveValue('https://example.test/schema-inputs');
     await this.page.keyboard.press('Tab');
+    await expect(endpoint.locator('..').getByRole('button')).toBeFocused();
+    await this.page.keyboard.press('Tab');
     await expect(modeRules).toBeFocused();
     await this.page.keyboard.press('Tab');
     await expect(mode).toBeFocused();

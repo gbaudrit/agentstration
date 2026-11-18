@@ -161,6 +161,11 @@ public interface IEntryAdministrationApiClient
 public interface IFlowApiClient
 {
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken);
+    async Task<FlowSummaryPage> GetFlowsPageAsync(int skip, int take, CancellationToken cancellationToken)
+    {
+        var items = await GetFlowsAsync(cancellationToken);
+        return new(items.Skip(skip).Take(take).ToArray(), items.Count > skip + take);
+    }
     Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         GetFlowsAsync(cancellationToken);
     Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken);

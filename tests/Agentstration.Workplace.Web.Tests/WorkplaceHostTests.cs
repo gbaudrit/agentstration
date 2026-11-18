@@ -25,7 +25,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void FirstVisitKeepsLoadingWhileRedirectingToTheCanonicalWorkspace()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new WorkspaceListHandler())
         {
@@ -47,7 +47,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void WorkspaceArrivalSelectsTheConfiguredDefaultDashboard()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new DefaultDashboardHandler()) { BaseAddress = new Uri("http://localhost/") };
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
@@ -65,7 +65,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void UnavailableStateRetryUsesANativePageReloadWithoutBlazorInteractivity()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("w/personal");
@@ -137,7 +137,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void ActivityListsConversationsWithLinksToTheirDedicatedPage()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new ActivityHandler()) { BaseAddress = new Uri("http://localhost/") };
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
@@ -149,7 +149,7 @@ public sealed class WorkplaceHostTests
         {
             Assert.AreEqual(2, rendered.FindAll("[role='tab']").Count);
             var conversation = rendered.Find(".conversation-list-card");
-            Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.GetAttribute("href"));
+            Assert.AreEqual("/w/personal/d/home/conversations/11111111-1111-1111-1111-111111111111", conversation.QuerySelector("a.resource-name-link")!.GetAttribute("href"));
             StringAssert.Contains(conversation.TextContent, "Prepare the quarterly review");
             var expectedResumeLabel = context.Services
                 .GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<WorkplacePageStrings>>()["Resume"];
@@ -168,7 +168,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void HomeLinksCompactAlternativeEntriesToADedicatedStartPage()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));
@@ -195,7 +195,7 @@ public sealed class WorkplaceHostTests
     [TestMethod]
     public void DedicatedStartPageLoadsTheSelectedEntryWithoutTheDashboardCatalog()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         using var httpClient = new HttpClient(new HomeEntriesHandler()) { BaseAddress = new Uri("http://localhost/") };
         context.Services.AddSingleton<IWorkplaceApiClient>(new WorkplaceApiClient(httpClient));

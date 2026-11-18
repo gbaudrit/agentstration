@@ -1,0 +1,16 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+<nav class="collection-pager" aria-label="@Localizer["Page", Page]">
+    @if (Total is { } count) { <span role="status">@Localizer["Results", count]</span> }
+    <button class="button-secondary" type="button" disabled="@(Busy || Page <= 1)" @onclick="() => PageChanged.InvokeAsync(Page - 1)">@Localizer["Previous"]</button>
+    <span>@Localizer["Page", Page]</span>
+    <button class="button-secondary" type="button" disabled="@(Busy || !HasMore)" @onclick="() => PageChanged.InvokeAsync(Page + 1)">@Localizer["Next"]</button>
+</nav>
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int? Total { get; set; }
+    [Parameter] public bool HasMore { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+}

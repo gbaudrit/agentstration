@@ -49,7 +49,16 @@ else if (source is not null && readiness is not null)
             </div>
             @if (readiness.DataSources is { Count: > 0 } inputReadiness)
             {
-                <DataGrid TItem="KnowledgeDataSourceBindingReadiness" Items="inputReadiness"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("State")</th><th>@T("TransformationFlowOptional")</th></tr></Header><Row Context="item"><tr><td><strong>@item.Name</strong></td><td><code>@(item.DataSourceUid?.ToString("D") ?? "—")</code></td><td><StatusBadge Text="@T(item.Ready ? "Ready" : "NotReady")" Status="@(item.Ready ? UiStatus.Success : UiStatus.Warning)" />@if (item.Issue is not null) { <small>@(IsUnresolvedDraft ? T("DisabledDraftNotReady") : item.Issue)</small> }</td><td>@TransformationLabel(item)</td></tr></Row></DataGrid>
+                <CollectionView TItem="KnowledgeDataSourceBindingReadiness" Items="inputReadiness" InformationLabels="@(new string[] { T("DataSource"), T("TransformationFlowOptional") })" IdentityLabel="@T("BindingName")" StateLabel="@T("State")">
+        <Identity Context="item">
+<strong>@item.Name</strong></Identity>
+        <State Context="item">
+<StatusBadge Text="@T(item.Ready ? "Ready" : "NotReady")" Status="@(item.Ready ? UiStatus.Success : UiStatus.Warning)" />@if (item.Issue is not null) { <small>@(IsUnresolvedDraft ? T("DisabledDraftNotReady") : item.Issue)</small> }</State>
+        <Information Context="item">
+            <CollectionValue Label="@T("DataSource")"><code>@(item.DataSourceUid?.ToString("D") ?? "—")</code></CollectionValue>
+            <CollectionValue Label="@T("TransformationFlowOptional")">@TransformationLabel(item)</CollectionValue>
+        </Information>
+    </CollectionView>
             }
         </section>
     }
@@ -74,12 +83,32 @@ else if (source is not null && readiness is not null)
             @if (projections.Count == 0) { <p class="muted">@T("NoProjections")</p> }
             else
             {
-                <DataGrid TItem="KnowledgeProjectionResource" Items="projections"><Header><tr><th>@T("Projection")</th><th>@T("State")</th><th>@T("Inputs")</th><th>@T("FlowRun")</th><th>@T("Snapshot")</th><th>@T("Created")</th></tr></Header><Row Context="item"><tr data-testid="knowledge-projection-row"><td><button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></td><td><StatusBadge Text="@T($"ProjectionState.{item.State}")" Status="@ProjectionTone(item.State)" /></td><td>@item.Inputs.Count</td><td>@if (item.State == KnowledgeProjectionState.Failed && item.Inputs.Count == 0) { <span>@T("ProjectionFlowNotStarted")</span> } else { <a class="text-button" href="@FlowRunUrl(item.ProjectionFlowRunId, ResourceScopeRef.Workspace(item.WorkspaceId), item.LogicalScopeRef)" target="@(IsActiveProjection(item.State) ? "_blank" : null)" rel="@(IsActiveProjection(item.State) ? "noopener" : null)" aria-label="@(IsActiveProjection(item.State) ? T("FlowRunNewTab", item.ProjectionFlowRunId) : null)"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a> }</td><td>@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</td><td>@item.CreatedAt.ToLocalTime().ToString("g")</td></tr></Row></DataGrid>
+                <CollectionView TItem="KnowledgeProjectionResource" Items="projections" InformationLabels="@(new string[] { T("Inputs"), T("FlowRun"), T("Snapshot"), T("Created") })" RowTestId="knowledge-projection-row" IdentityLabel="@T("Projection")" StateLabel="@T("State")">
+        <Identity Context="item">
+<button class="text-button" type="button" title="@item.Name" @onclick="() => selectedProjection = item"><code>@ShortIdentifier(item.Name)</code></button></Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"ProjectionState.{item.State}")" Status="@ProjectionTone(item.State)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Inputs")">@item.Inputs.Count</CollectionValue>
+            <CollectionValue Label="@T("FlowRun")">@if (item.State == KnowledgeProjectionState.Failed && item.Inputs.Count == 0) { <span>@T("ProjectionFlowNotStarted")</span> } else { <a class="text-button" href="@FlowRunUrl(item.ProjectionFlowRunId, ResourceScopeRef.Workspace(item.WorkspaceId), item.LogicalScopeRef)" target="@(IsActiveProjection(item.State) ? "_blank" : null)" rel="@(IsActiveProjection(item.State) ? "noopener" : null)" aria-label="@(IsActiveProjection(item.State) ? T("FlowRunNewTab", item.ProjectionFlowRunId) : null)"><code>@ShortIdentifier(item.ProjectionFlowRunId)</code></a> }</CollectionValue>
+            <CollectionValue Label="@T("Snapshot")">@if (item.SnapshotName is not null) { <code>@item.SnapshotName</code> }</CollectionValue>
+            <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+    </CollectionView>
                 @if (selectedProjection is { } selected)
                 {
                     <section class="knowledge-projection-provenance" data-testid="knowledge-projection-provenance">
                         <div><p class="eyebrow">@T("Provenance")</p><h3>@selected.Name</h3><p>@T("ProjectionProvenanceHelp")</p></div>
-                        <DataGrid TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs"><Header><tr><th>@T("BindingName")</th><th>@T("DataSource")</th><th>@T("Acquisition")</th><th>@T("Transformation")</th><th>@T("Artifacts")</th></tr></Header><Row Context="input"><tr><td><strong>@input.BindingName</strong></td><td><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></td><td><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small>@if (input.DirectInput is not null) { <small data-testid="knowledge-input-direct">@T("DirectInput")</small> }@if (input.RefreshFailure is { } refreshFailure) { <div data-testid="knowledge-input-fallback"><StatusBadge Text="@T("InputFallbackUsed")" Status="UiStatus.Warning" /><small>@T("InputRefreshFailed") <code>@refreshFailure.Code</code></small>@if (refreshFailure.AcquisitionId is { } refreshId) { <small><code title="@refreshId">@ShortIdentifier(refreshId)</code></small> }</div> }</td><td>@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@FlowRunUrl(input.TransformationFlowRunId!, selected.ScopeRef, selected.LogicalScopeRef)">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</td><td>@foreach (var artifact in input.PreparedArtifacts) { @if (artifact.Kind == KnowledgeArtifactKind.Inline) { <code>@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</code> } else { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> } }</td></tr></Row></DataGrid>
+                        <CollectionView TItem="KnowledgeProjectionInputEvidence" Items="selected.Inputs" InformationLabels="@(new string[] { T("DataSource"), T("Acquisition"), T("Transformation"), T("Artifacts") })" IdentityLabel="@T("BindingName")">
+        <Identity Context="input">
+<strong>@input.BindingName</strong></Identity>
+        <Information Context="input">
+            <CollectionValue Label="@T("DataSource")"><a class="text-button" href="@DataSourceUrl(input)">@input.DataSourceName</a><small>@input.DataSourceScopeRef · g@(input.DataSourceGeneration)</small></CollectionValue>
+            <CollectionValue Label="@T("Acquisition")"><code title="@input.AcquisitionId">@ShortIdentifier(input.AcquisitionId)</code><small>@input.AcquiredAt.ToLocalTime().ToString("g")</small>@if (input.DirectInput is not null) { <small data-testid="knowledge-input-direct">@T("DirectInput")</small> }@if (input.RefreshFailure is { } refreshFailure) { <div data-testid="knowledge-input-fallback"><StatusBadge Text="@T("InputFallbackUsed")" Status="UiStatus.Warning" /><small>@T("InputRefreshFailed") <code>@refreshFailure.Code</code></small>@if (refreshFailure.AcquisitionId is { } refreshId) { <small><code title="@refreshId">@ShortIdentifier(refreshId)</code></small> }</div> }</CollectionValue>
+            <CollectionValue Label="@T("Transformation")">@if (input.TransformationFlow is { } transformation) { <a class="text-button" href="@FlowUrl(transformation)">@transformation.Name</a><small><a class="text-button" href="@FlowRunUrl(input.TransformationFlowRunId!, selected.ScopeRef, selected.LogicalScopeRef)">@ShortIdentifier(input.TransformationFlowRunId!)</a></small> } else { <span>@T("IdentityTransformation")</span> }</CollectionValue>
+            <CollectionValue Label="@T("Artifacts")">@foreach (var artifact in input.PreparedArtifacts) { @if (artifact.Kind == KnowledgeArtifactKind.Inline) { <code>@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</code> } else { <a class="text-button" href="@ArtifactUrl(artifact)">@(artifact.Name ?? ShortIdentifier(artifact.ArtifactId))</a> } }</CollectionValue>
+        </Information>
+    </CollectionView>
                         @foreach (var issue in selected.InputIssues)
                         {
                             <p class="inline-warning"><strong>@issue.BindingName</strong> · @issue.Message <code>@issue.Code</code></p>
@@ -96,7 +125,18 @@ else if (source is not null && readiness is not null)
         @if (snapshots.Count == 0) { <p class="muted">@T("NoSnapshots")</p> }
         else
         {
-            <DataGrid TItem="KnowledgeSnapshotView" Items="snapshots"><Header><tr><th>@T("Snapshot")</th><th>@T("State")</th><th>@T("Published")</th><th>@T("Artifacts")</th><th></th></tr></Header><Row Context="view"><tr data-testid="knowledge-snapshot-row"><td><button class="text-button knowledge-snapshot-link" type="button" title="@view.Snapshot.Name" aria-expanded="@(selectedSnapshot?.Snapshot.Name == view.Snapshot.Name ? "true" : "false")" @onclick="() => selectedSnapshot = view"><code>@view.Snapshot.Name</code></button></td><td><StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></td><td>@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="text-button" type="button" @onclick="() => selectedSnapshot = view">@view.Snapshot.Artifacts.Count</button></td><td>@if (CanManage && view.LifecycleState == KnowledgeSnapshotLifecycleState.Superseded) { <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> }</td></tr></Row></DataGrid>
+            <CollectionView TItem="KnowledgeSnapshotView" Items="snapshots" InformationLabels="@(new string[] { T("Published"), T("Artifacts") })" RowTestId="knowledge-snapshot-row" IdentityLabel="@T("Snapshot")" StateLabel="@T("State")">
+        <Identity Context="view">
+<button class="text-button knowledge-snapshot-link" type="button" title="@view.Snapshot.Name" aria-expanded="@(selectedSnapshot?.Snapshot.Name == view.Snapshot.Name ? "true" : "false")" @onclick="() => selectedSnapshot = view"><code>@view.Snapshot.Name</code></button></Identity>
+        <State Context="view">
+<StatusBadge Text="@T($"SnapshotState.{view.LifecycleState}")" Status="@(view.LifecycleState == KnowledgeSnapshotLifecycleState.Active ? UiStatus.Success : UiStatus.Neutral)" /></State>
+        <Information Context="view">
+            <CollectionValue Label="@T("Published")">@view.Snapshot.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("Artifacts")"><button class="text-button" type="button" @onclick="() => selectedSnapshot = view">@view.Snapshot.Artifacts.Count</button></CollectionValue>
+        </Information>
+        <Actions Context="view">
+@if (CanManage && view.LifecycleState == KnowledgeSnapshotLifecycleState.Superseded) { <CollectionActions ResourceName="@(view.Snapshot.Name)"> <button class="text-button" type="button" @onclick="() => SelectSnapshotAsync(view)">@T("MakeActive")</button> </CollectionActions> }</Actions>
+    </CollectionView>
             @if (selectedSnapshot is { } selectedSnapshotView)
             {
                 <section class="knowledge-snapshot-details" data-testid="knowledge-snapshot-details">
@@ -106,10 +146,16 @@ else if (source is not null && readiness is not null)
                         <dt>@T("Projection")</dt><dd><code>@selectedSnapshotView.Snapshot.ProjectionId</code></dd>
                         <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(selectedSnapshotView.Snapshot.ProjectionFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)">@selectedSnapshotView.Snapshot.ProjectionFlowRunId</a></dd>
                     </dl>
-                    <DataGrid TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts">
-                        <Header><tr><th>@T("ArtifactId")</th><th>@T("MediaType")</th><th>@T("Size")</th><th>@T("ProducerFlow")</th><th>@T("OutputStorage")</th></tr></Header>
-                        <Row Context="artifact"><tr data-testid="knowledge-snapshot-artifact-row"><td><a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact, selectedSnapshotView.Snapshot)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></td><td><code>@artifact.MediaType</code></td><td>@FormatSize(artifact.Length)@if (artifact.Content?.Records is { } records) { <small>@T("RecordCount", records.Members.Count)</small> }</td><td><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></td><td>@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="KnowledgeSnapshotArtifact" Items="selectedSnapshotView.Snapshot.Artifacts" InformationLabels="@(new string[] { T("MediaType"), T("Size"), T("ProducerFlow"), T("OutputStorage") })" RowTestId="knowledge-snapshot-artifact-row" IdentityLabel="@T("ArtifactId")">
+        <Identity Context="artifact">
+<a class="text-button knowledge-artifact-id-link" href="@SnapshotArtifactUrl(artifact, selectedSnapshotView.Snapshot)" title="@artifact.ArtifactId"><code>@artifact.ArtifactId</code></a></Identity>
+        <Information Context="artifact">
+            <CollectionValue Label="@T("MediaType")"><code>@artifact.MediaType</code></CollectionValue>
+            <CollectionValue Label="@T("Size")">@FormatSize(artifact.Length)@if (artifact.Content?.Records is { } records) { <small>@T("RecordCount", records.Members.Count)</small> }</CollectionValue>
+            <CollectionValue Label="@T("ProducerFlow")"><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.ProducerFlowRunId"><code>@ShortIdentifier(artifact.ProducerFlowRunId)</code></a></CollectionValue>
+            <CollectionValue Label="@T("OutputStorage")">@if (artifact.Content is { } content) { <code>@content.Target.Storage.Storage.Name</code><small>@content.Target.Storage.Storage.ScopeRef · g@(content.Target.Storage.Generation)</small><code title="@content.Key">@ShortIdentifier(content.Key)</code><small>@T("ContentVersion"): <code title="@content.Version">@ShortIdentifier(content.Version)</code></small> } else { <a class="text-button" href="@FlowRunUrl(artifact.StorageFlowRunId, selectedSnapshotView.Snapshot.ScopeRef)" title="@artifact.StorageFlowRunId"><code>@ShortIdentifier(artifact.StorageFlowRunId)</code></a> }</CollectionValue>
+        </Information>
+    </CollectionView>
                 </section>
             }
         }
@@ -121,8 +167,7 @@ else if (source is not null && readiness is not null)
     }
     else if (activeTab == DetailsTab.Tools)
     {
-        <section class="panel form-section" data-testid="knowledge-source-tool-exposure">
-        <div class="panel-header"><div><p class="eyebrow">@T("Governance")</p><h2>@T("ToolExposure")</h2><p>@T("ExposureExplanation")</p></div>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</div>
+        <FormSection Title="@T("ToolExposure")" Eyebrow="@T("Governance")" Description="@T("ExposureExplanation")" TestId="knowledge-source-tool-exposure"><Actions>@if (exposure is not null) { <a class="button-secondary" href="@ToolSetUrl">@T("OpenToolSet")</a> }</Actions><ChildContent>
         @if (exposure is not null)
         {
             <p data-testid="knowledge-tool-exposure-current-version">@T("PublishedExposureVersion", exposure.ToolSetVersion)</p>
@@ -135,13 +180,11 @@ else if (source is not null && readiness is not null)
             <h3>@T("ProposedTools")</h3>
             <p class="resource-hint">@T("ToolProposalHelp")</p>
             @foreach (var issue in proposal.Issues) { <p class="inline-warning">@ProposalIssueLabel(issue) <code>@issue</code></p> }
-            <DataGrid TItem="KnowledgeToolProposal" Items="proposal.Tools">
-                <Header><tr><th>@T("Tool")</th><th>@T("ProposalChange")</th><th>@T("ToolContract")</th></tr></Header>
-                <Row Context="candidate">
-                    <tr data-testid="knowledge-proposed-tool">
-                        <td><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></td>
-                        <td>@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p>@ProposalIssueLabel(issue) <code>@issue</code></p> }</td>
-                        <td><details><summary>@T("InspectToolContract")</summary>
+            <CollectionView TItem="KnowledgeToolProposal" Items="proposal.Tools" IdentityLabel="@T("Tool")" InformationLabels="@(new[] { T("ProposalChange"), T("ToolContract") })" RowTestId="knowledge-proposed-tool">
+                <Identity Context="candidate"><strong>@candidate.DisplayName</strong><p>@candidate.Description</p><code>@candidate.DefinitionName</code></Identity>
+                <Information Context="candidate">
+                    <CollectionValue Label="@T("ProposalChange")">@T($"ProposalChange.{candidate.Change}") @if (candidate.Issue is { } issue) { <p>@ProposalIssueLabel(issue) <code>@issue</code></p> }</CollectionValue>
+                    <CollectionValue Label="@T("ToolContract")"><details><summary>@T("InspectToolContract")</summary>
                             @if (candidate.Contribution is { } contribution)
                             {
                                 <p><strong>@T("ToolFixedContribution")</strong> <code>@contribution.BindingName</code> · <code>@contribution.DataSourceUid</code></p>
@@ -154,27 +197,31 @@ else if (source is not null && readiness is not null)
                             <h4>@T("ToolInputContract")</h4><pre class="runner-json">@candidate.InputSchema.ToString()</pre>
                             @if (candidate.OutputSchema is { } outputSchema) { <h4>@T("ToolOutputContract")</h4><pre class="runner-json">@outputSchema.ToString()</pre> }
                             @if (candidate.DataSchema is { } dataSchema) { <h4>@T("ToolStorageDataSchema")</h4><pre class="runner-json">@dataSchema.ToString()</pre> }
-                        </details></td>
-                    </tr>
-                </Row>
-            </DataGrid>
+                        </details></CollectionValue>
+                </Information>
+            </CollectionView>
         }
         @if (CanManage)
         {
-            <div class="form-grid"><label><span>@T("Version")</span><input @bind="version" @bind:event="oninput" disabled="@(busy || !interactive)" data-testid="knowledge-tool-exposure-version" /></label><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><input type="checkbox" @bind="requiresApproval" disabled="@(busy || !interactive)" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></div>
+            <FormGrid><FormField Label="@T("Version")"><ClearableText @bind-Value="version" Disabled="@(busy || !interactive)" data-testid="knowledge-tool-exposure-version" /></FormField><label class="knowledge-choice" data-testid="knowledge-source-approval-option"><FormCheckbox @bind-Value="requiresApproval" disabled="@(busy || !interactive)" /><span class="knowledge-choice-icon"><UiIcon Name="shield" /></span><span><strong>@T("RequireApproval")</strong><small>@T("RequireApprovalHelp")</small></span></label></FormGrid>
             <div class="form-actions"><button class="button-primary" type="button" @onclick="PublishAsync" data-testid="knowledge-publish-tools" disabled="@(!CanPublishTools)">@(busy ? T("Publishing") : T(exposure is null ? "PublishExposure" : "PublishNewExposureVersion"))</button></div>
             @if (!readiness.Ready) { <p class="inline-warning">@T("ReadyRequired")</p> }
             @if (exposure is not null && string.Equals(version.Trim(), exposure.ToolSetVersion, StringComparison.Ordinal)) { <p class="inline-warning">@T("NewExposureVersionRequired")</p> }
         }
         @if (exposure is not null)
         {
-            <DataGrid TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations">
-                <Header><tr><th>@T("Operation")</th><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th></tr></Header>
-                <Row Context="operation"><tr><td>@OperationLabel(operation.Operation)</td><td><code>@operation.Capability</code></td><td><code>@operation.Route</code></td><td><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></td></tr></Row>
-            </DataGrid>
+            <CollectionView TItem="KnowledgeSourceToolOperationExposure" Items="exposure.Operations" InformationLabels="@(new string[] { T("Capability"), T("Route"), T("Tool") })" IdentityLabel="@T("Operation")">
+        <Identity Context="operation">
+@OperationLabel(operation.Operation)</Identity>
+        <Information Context="operation">
+            <CollectionValue Label="@T("Capability")"><code>@operation.Capability</code></CollectionValue>
+            <CollectionValue Label="@T("Route")"><code>@operation.Route</code></CollectionValue>
+            <CollectionValue Label="@T("Tool")"><a class="resource-name-link knowledge-tool-link" href="@ToolUrl(operation.Tool)" data-testid="knowledge-tool-link"><strong>@operation.Tool.Name</strong><span>@ToolNamespace(operation.Tool)</span></a></CollectionValue>
+        </Information>
+    </CollectionView>
             <p class="resource-hint">@T("PinnedSourceHelp")</p>
         }
-        </section>
+        </ChildContent></FormSection>
     }
     else if (activeTab == DetailsTab.Access && CanManage)
     {
@@ -182,12 +229,11 @@ else if (source is not null && readiness is not null)
     }
     else
     {
-        <section class="panel form-section" data-testid="knowledge-source-yaml">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("KnowledgeSourceYaml")</h2><p>@T("KnowledgeSourceYamlHelp")</p></div></div>
+        <FormSection Title="@T("KnowledgeSourceYaml")" Eyebrow="@T("RawResource")" Description="@T("KnowledgeSourceYamlHelp")" TestId="knowledge-source-yaml"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="knowledge-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="knowledge-source-yaml-editor" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
-            @if (CanManage) { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="knowledge-source-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></div> }
-        </section>
+            <FormField Label="@T("ResourceManifest")" Class="knowledge-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="knowledge-source-yaml-editor" @bind-Value="rawYaml" ReadOnly="@(!CanManage)"></ClearableText></ChildContent></FormField>
+            @if (CanManage) { <FormActions><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="knowledge-source-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></FormActions> }
+        </ChildContent></FormSection>
     }
     </main>
 }

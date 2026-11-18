@@ -82,6 +82,7 @@
   <data name="AcquisitionToolForbidden"><value>You do not have permission to create a Tool from this acquisition.</value></data>
   <data name="AcquisitionToolCreateFailed"><value>The Tool could not be created from this acquisition.</value></data>
   <data name="Cancel"><value>Cancel</value></data>
+<data name="VersionState.Active"><value>Active</value></data><data name="VersionState.Published"><value>Published</value></data>  <data name="PublishedVersion" xml:space="preserve"><value>Published version</value></data>
   <data name="DatasetStorageOrProfile" xml:space="preserve"><value>Storage / profile</value></data>
   <data name="DatasetHelp" xml:space="preserve"><value>A logical dataset acquired from a governed operation into an existing Storage.</value></data>
   <data name="DatasetStorage" xml:space="preserve"><value>Storage</value></data>

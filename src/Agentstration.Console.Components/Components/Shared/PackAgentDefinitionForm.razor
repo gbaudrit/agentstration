@@ -5,34 +5,34 @@
 <div class="resource-form pack-agent-definition-form" data-testid="pack-agent-definition-form">
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h3>@T("AgentResource")</h3></div>@if (ReadOnly) { <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /> }</div>
-        <div class="form-grid">
-            <label><span>@T("DisplayName")</span><input @bind="displayName" disabled="@ReadOnly" /></label>
-            <label><span>@T("TechnicalName")</span><input value="@name" readonly disabled /></label>
-            <label><span>@T("Handler")</span><input @bind="handler" disabled="@ReadOnly" /></label>
-            <label class="form-span-2"><span>@T("Description")</span><textarea rows="3" @bind="description" disabled="@ReadOnly"></textarea></label>
-            <label class="form-span-2"><span>@T("Instructions")</span><textarea rows="9" @bind="instructions" disabled="@ReadOnly"></textarea></label>
-        </div>
+        <FormGrid>
+            <FormField Label="@T("DisplayName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="displayName" Disabled="@ReadOnly" /></ChildContent></FormField>
+            <FormField Label="@T("TechnicalName")"><ChildContent><ClearableText Value="@name" ReadOnly="true" Disabled="true" /></ChildContent></FormField>
+            <FormField Label="@T("Handler")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="handler" Disabled="@ReadOnly" /></ChildContent></FormField>
+            <FormField Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="3" @bind-Value="description" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="9" @bind-Value="instructions" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+        </FormGrid>
     </section>
 
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h3>@T("ModelRuntimeTools")</h3></div></div>
-        <div class="form-grid">
-            <label><span>@T("ModelProfile")</span><input @bind="modelProfile" disabled="@ReadOnly" /><small>@T("ResourceReferenceHelp")</small></label>
-            <label><span>@T("RuntimeProfile")</span><input @bind="runtimeProfile" disabled="@ReadOnly" /><small>@T("ResourceReferenceHelp")</small></label>
-            <label class="form-span-2"><span>@T("Tools")</span><textarea rows="4" @bind="tools" disabled="@ReadOnly"></textarea><small>@T("ReferencePerLine")</small></label>
-            <label><span>@T("Tags")</span><textarea rows="5" @bind="tags" disabled="@ReadOnly"></textarea><small>@T("KeyValuePerLine")</small></label>
-            <label><span>@T("Annotations")</span><textarea rows="5" @bind="annotations" disabled="@ReadOnly"></textarea><small>@T("KeyValuePerLine")</small></label>
-        </div>
+        <FormGrid>
+            <FormField Label="@T("ModelProfile")"><HelpContent>@T("ResourceReferenceHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="modelProfile" Disabled="@ReadOnly" /></ChildContent></FormField>
+            <FormField Label="@T("RuntimeProfile")"><HelpContent>@T("ResourceReferenceHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="runtimeProfile" Disabled="@ReadOnly" /></ChildContent></FormField>
+            <FormField Label="@T("Tools")" Class="form-span-2"><HelpContent>@T("ReferencePerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="4" @bind-Value="tools" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("Tags")"><HelpContent>@T("KeyValuePerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="5" @bind-Value="tags" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("Annotations")"><HelpContent>@T("KeyValuePerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="5" @bind-Value="annotations" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+        </FormGrid>
     </section>
 
     <section class="panel form-section">
         <div class="panel-header"><div><p class="eyebrow">@T("AdvancedDefinition")</p><h3>@T("PipelineAndSettings")</h3></div></div>
-        <div class="form-grid">
-            <label><span>@T("Behaviors")</span><textarea rows="4" @bind="behaviors" disabled="@ReadOnly"></textarea><small>@T("IdentifierPerLine")</small></label>
-            <label><span>@T("Middleware")</span><textarea rows="4" @bind="middleware" disabled="@ReadOnly"></textarea><small>@T("IdentifierPerLine")</small></label>
-            <label><span>@T("ContextProviders")</span><textarea rows="4" @bind="contextProviders" disabled="@ReadOnly"></textarea><small>@T("IdentifierPerLine")</small></label>
-            <label><span>@T("SettingsJson")</span><textarea class="form-code-editor" rows="8" @bind="settings" disabled="@ReadOnly"></textarea></label>
-        </div>
+        <FormGrid>
+            <FormField Label="@T("Behaviors")"><HelpContent>@T("IdentifierPerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="4" @bind-Value="behaviors" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("Middleware")"><HelpContent>@T("IdentifierPerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="4" @bind-Value="middleware" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("ContextProviders")"><HelpContent>@T("IdentifierPerLine")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="4" @bind-Value="contextProviders" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+            <FormField Label="@T("SettingsJson")"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor" rows="8" @bind-Value="settings" Disabled="@ReadOnly"></ClearableText></ChildContent></FormField>
+        </FormGrid>
     </section>
 </div>
 

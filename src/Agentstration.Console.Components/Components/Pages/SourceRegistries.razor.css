@@ -2,7 +2,6 @@
 .registry-list-panel { overflow: hidden; }
 .registry-table { min-width: 0; overflow-x: auto; }
 .registry-table ::deep .data-grid { min-width: 72rem; white-space: normal; }
-.registry-table ::deep td { vertical-align: top; }
 .registry-table small, .registry-kind-note { display: block; margin-top: .25rem; color: var(--muted); }
 .registry-table .registry-kind-note { color: var(--primary); font-weight: 700; }
 .registry-table .registry-error, .registry-history .registry-error { color: var(--danger); max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

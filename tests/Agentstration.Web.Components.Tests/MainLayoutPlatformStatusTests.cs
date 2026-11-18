@@ -64,7 +64,7 @@ public sealed class MainLayoutPlatformStatusTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("Aucun déploiement actif", rendered.Find(".health-indicator small").TextContent);
-            Assert.IsTrue(rendered.Find(".health-pulse").ClassList.Contains("health-success"));
+            Assert.IsTrue(rendered.Find(".health-indicator .status-badge").ClassList.Contains("status-success"));
         });
     }
 

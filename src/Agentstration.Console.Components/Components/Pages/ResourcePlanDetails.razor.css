@@ -41,7 +41,7 @@
 .resource-plan-binding-card strong, .resource-plan-binding-card small, .resource-plan-binding-card label span { display: block; }
 .resource-plan-binding-card small { margin-top: .25rem; color: var(--muted); }
 .resource-plan-binding-card label span { margin-bottom: .4rem; font-size: .8rem; font-weight: 700; }
-.resource-plan-binding-card select { width: 100%; min-width: 0; }
+.resource-plan-binding-card ::deep select { width: 100%; min-width: 0; }
 .resource-plan-binding-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); }
 .resource-plan-binding-progress { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .65rem; min-width: 0; font-size: .82rem; }
 .resource-plan-binding-progress strong { color: var(--primary); }
@@ -68,7 +68,7 @@
 ::deep .resource-plan-section-heading p:last-child { margin: .4rem 0 0; color: var(--muted); line-height: 1.5; }
 .resource-plan-change-set-picker { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .75rem; }
 .resource-plan-change-set-picker label { font-weight: 700; }
-.resource-plan-change-set-picker select { max-width: 100%; }
+.resource-plan-change-set-picker ::deep select { max-width: 100%; }
 .resource-plan-review-notice { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .75rem 0 1rem; padding: 1rem 1.15rem; border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border)); border-radius: .7rem; background: color-mix(in srgb, var(--primary) 5%, var(--surface)); color: var(--text); font-size: .84rem; }
 .resource-plan-review-notice > div { min-width: 0; }
 .resource-plan-review-notice strong { color: var(--primary); }

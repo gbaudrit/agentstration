@@ -1,0 +1,39 @@
+{
+  "baseline": "1e2c797ebf3713226454ae19008e5d98d72cbb15",
+  "stats": {
+    "startTime": "2026-11-11T00:54:40.788Z",
+    "duration": 876400.984,
+    "expected": 115,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "ownerCaptures": [
+    {
+      "variant": "desktop dark",
+      "screenshot": "long-owner-desktop-dark.png",
+      "status": "passed",
+      "project": "desktop-chromium"
+    },
+    {
+      "variant": "desktop light",
+      "screenshot": "long-owner-desktop-light.png",
+      "status": "passed",
+      "project": "desktop-chromium"
+    },
+    {
+      "variant": "mobile French dark",
+      "screenshot": "long-owner-mobile-french-dark.png",
+      "status": "passed",
+      "project": "mobile-chromium"
+    },
+    {
+      "variant": "mobile French light",
+      "screenshot": "long-owner-mobile-french-light.png",
+      "status": "passed",
+      "project": "mobile-chromium"
+    }
+  ],
+  "catalogFollowup": "3 catalog checks passed after distinguishing unmounted legacy renderers; see collection-surface-catalog.spec.ts.",
+  "acceptance": "Draft evidence only; implemented-UX acceptance and merges remain pending."
+}

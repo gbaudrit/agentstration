@@ -1,7 +1,7 @@
 <article class="artifact-card">
-    <span class="artifact-icon"><UiIcon Name="document" /></span>
-    <div><strong>@Artifact.Name</strong><small>@Localizer["Version", Artifact.Sequence] · @Artifact.CreatedAt.LocalDateTime.ToString("g") · @FormatType(Artifact.ContentType) · @FormatSize(Artifact.Length)</small></div>
-    <a class="artifact-download" href="@ContentUrl" download aria-label="@Localizer["DownloadArtifact", Artifact.Name]"><UiIcon Name="download" /><span>@Localizer["Download"]</span></a>
+    <CollectionIdentity DisplayName="@Artifact.Name" Name="@Artifact.Id.ToString()" Href="@ContentUrl" IconName="document" ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Artifact.WorkspaceId.Value)" IconOnly /></IconBadges></CollectionIdentity>
+    <small>@Localizer["Version", Artifact.Sequence] · @Artifact.CreatedAt.LocalDateTime.ToString("g") · @FormatType(Artifact.ContentType) · @FormatSize(Artifact.Length)</small>
+    <CollectionActions ResourceName="@Artifact.Name"><a class="artifact-download" href="@ContentUrl" download aria-label="@Localizer["DownloadArtifact", Artifact.Name]"><UiIcon Name="download" /><span>@Localizer["Download"]</span></a></CollectionActions>
 </article>
 
 @code {

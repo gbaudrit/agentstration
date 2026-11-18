@@ -13,7 +13,7 @@
     @foreach (var location in FlowRunInspection.ActiveLocations(Runs))
     {
         <dl class="execution-progress-location">
-            <div><dt>@Localizer["ExecutionProgress.CurrentFlow"]</dt><dd><a href="@FlowRunInspection.RunUrl(location.Run.Id, location.Run.ExecutionScopeRef, location.Run.Scope.LogicalScopeRef, location.Step?.StepName)" target="_blank" rel="noopener">@FlowRunInspection.FlowLabel(location.Run)</a></dd></div>
+            <div><dt>@Localizer["ExecutionProgress.CurrentFlow"]</dt><dd><CollectionIdentity DisplayName="@FlowRunInspection.FlowLabel(location.Run)" Name="@location.Run.Id" Href="@FlowRunInspection.RunUrl(location.Run.Id, location.Run.ExecutionScopeRef, location.Run.Scope.LogicalScopeRef, location.Step?.StepName)" IconName="workflow" target="_blank" rel="noopener" /></dd></div>
             <div><dt>@Localizer["ExecutionProgress.CurrentStep"]</dt><dd><strong>@(location.Step is null ? Localizer["ExecutionProgress.WaitingStep"].Value : StepLabel(location.Run, location.Step.StepName))</strong></dd></div>
         </dl>
     }

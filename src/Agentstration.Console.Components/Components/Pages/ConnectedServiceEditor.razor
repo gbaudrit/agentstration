@@ -20,13 +20,13 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
 <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="connected-service-editor" class="resource-form" data-testid="connected-service-form"><DataAnnotationsValidator /><ValidationSummary />
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ConnectedServiceResource")</h2></div></div><div class="form-grid">
         <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Generic" IsNew="@IsNew" DisplayNameTestId="connected-service-display-name" TechnicalNameTestId="connected-service-name" />
-        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" /></label>
+        <FormField Label="@T("Description")" Optional Class="form-span-2"><ClearableText Multiline @bind-Value="model.Description" /></FormField>
         @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-        <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="model.Enabled" /></label>
+        <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="model.Enabled" /></FormField>
     </div></section>
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Contribution")</p><h2>@T("ExactTypeRevision")</h2></div></div>
         @if (Variants.Count == 0) { <div class="form-alert form-alert-warning">@T("NoTypes")</div> }
-        else { <div class="form-grid"><label class="form-span-2"><span>@T("Type")</span><select value="@selectedVariantKey" @onchange="VariantChanged" disabled="@(!IsNew)" data-testid="connected-service-type">@foreach (var variant in Variants) { <option value="@variant.Key">@variant.Label</option> }</select><small>@T("TypePinnedHelp")</small></label>@if (SelectedVariant is { } selected) { <label><span>@T("ExtensionRegistration")</span><code>@selected.Type.ScopeRef/@selected.Type.Namespace/@selected.Type.Name</code></label><label><span>@T("ResourceId")</span><code>@selected.Type.Uid</code></label><label><span>@T("SchemaDigest")</span><code>@selected.Version.SchemaDigest</code></label><p class="form-span-2">@(selected.Type.Definition.Description ?? T("NoTypeDescription"))</p> }</div> }
+        else { <div class="form-grid"><FormField Label="@T("Type")" Required Class="form-span-2" Help="@T("TypePinnedHelp")"><ClearableSelect TValue="string" Value="@selectedVariantKey" ValueChanged="VariantSelected" AllowClear="false" disabled="@(!IsNew)" data-testid="connected-service-type">@foreach (var variant in Variants) { <option value="@variant.Key">@variant.Label</option> }</ClearableSelect></FormField>@if (SelectedVariant is { } selected) { <label><span>@T("ExtensionRegistration")</span><code>@selected.Type.ScopeRef/@selected.Type.Namespace/@selected.Type.Name</code></label><label><span>@T("ResourceId")</span><code>@selected.Type.Uid</code></label><label><span>@T("SchemaDigest")</span><code>@selected.Version.SchemaDigest</code></label><p class="form-span-2">@(selected.Type.Definition.Description ?? T("NoTypeDescription"))</p> }</div> }
     </section>
     @if (SelectedVariant is { } current)
     {
@@ -51,7 +51,7 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
         </section>
     }
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
-    <div class="form-actions">@if (!Embedded) { <a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a> }<button type="submit" class="button-primary" disabled="@(!CanSave)" data-testid="connected-service-save">@(busy ? T("Saving") : T("Save"))</button></div>
+    <FormActions Busy="@busy">@if (!Embedded) { <a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a> }<button type="submit" class="button-primary" disabled="@(!CanSave)" data-testid="connected-service-save">@(busy ? T("Saving") : T("Save"))</button></FormActions>
 </EditForm>
 @foreach (var binding in model.Bindings) { <Microsoft.AspNetCore.Components.Sections.SectionOutlet SectionId="@binding" /> }
 }
@@ -59,6 +59,9 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [Parameter] public ResourceNamespace? EmbeddedNamespace { get; set; }
+    private ResourceNamespace ResourceNamespaceValue => EmbeddedNamespace ?? ResourceNamespace.Parse(Namespace ?? ResourceNamespace.DefaultValue);
     [Parameter] public bool Embedded { get; set; }
     [Parameter] public ResourceScopeRef? EmbeddedScopeRef { get; set; }
     [Parameter] public EventCallback Saved { get; set; }
@@ -83,7 +86,7 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
     protected override async Task OnParametersSetAsync()
     {
         var scopeRefValue = EmbeddedScopeRef?.Value ?? ScopeRefValue;
-        var key = $"{Name}|{scopeRefValue}|{IsNew}";
+        var key = $"{Name}|{scopeRefValue}|{IsNew}|{ResourceNamespaceValue}";
         if (string.Equals(loadedKey, key, StringComparison.Ordinal)) return;
         loadedKey = key;
         loading = true; error = null;
@@ -92,11 +95,12 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
             var catalogTask = Client.GetTypesAsync(cancellation.Token); var scopesTask = Client.GetScopeTargetsAsync(cancellation.Token); var parametersTask = ParametersClient.GetParametersAsync(cancellation.Token); var secretsTask = SecretsClient.GetSecretsAsync(cancellation.Token);
             await Task.WhenAll(catalogTask, scopesTask, parametersTask, secretsTask); catalog = await catalogTask; scopeTargets = await scopesTask; parameters = await parametersTask; secrets = await secretsTask;
             if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; selectedVariantKey = Variants.FirstOrDefault(value => value.Version.Version == value.Type.Definition.PreferredVersion)?.Key ?? Variants.FirstOrDefault()?.Key ?? string.Empty; PrepareBindings(); }
-            else { var scope = ResourceScopeRef.Parse(scopeRefValue ?? throw new ArgumentException(T("ScopeRequired"))); var snapshot = await Client.GetConnectedServiceAsync(Name!, scope, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); selectedScope = scope; etag = snapshot.ETag; selectedVariantKey = Variants.FirstOrDefault(value => Matches(snapshot.Value, value))?.Key ?? string.Empty; PrepareBindings(); }
+            else { var scope = ResourceScopeRef.Parse(scopeRefValue ?? throw new ArgumentException(T("ScopeRequired"))); var snapshot = await Client.GetConnectedServiceAsync(Name!, scope, ResourceNamespaceValue, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); selectedScope = scope; etag = snapshot.ETag; selectedVariantKey = Variants.FirstOrDefault(value => Matches(snapshot.Value, value))?.Key ?? string.Empty; PrepareBindings(); }
         }
         catch (Exception exception) { error = exception; }
         finally { loading = false; }
     }
+    private void VariantSelected(string value) => VariantChanged(new ChangeEventArgs { Value = value });
     private void VariantChanged(ChangeEventArgs args) { selectedVariantKey = args.Value?.ToString() ?? string.Empty; model.Options = JsonSerializer.SerializeToElement(new { }); model.Bindings.Clear(); PrepareBindings(); }
     private void PrepareBindings() { if (SelectedVariant is not { } variant) return; foreach (var input in variant.Version.Inputs) if (model.Bindings.All(value => value.InputId != input.Id)) model.Bindings.Add(new() { InputId = input.Id, Kind = input.Protection == ConnectedServiceValueProtection.Standard ? ConnectedServiceBindingKind.Literal : ConnectedServiceBindingKind.Secret }); }
     private ConnectedServiceBindingEditorModel Binding(ConnectedServiceInputDescriptor input) => model.Bindings.Single(value => value.InputId == input.Id);
@@ -189,8 +193,8 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
     private static bool Matches(ConnectedServiceResource resource, TypeVariant variant) { var reference = resource.Definition.Type.Type; return reference.Name == variant.Type.Name && reference.ScopeRef == variant.Type.ScopeRef && (reference.Namespace ?? resource.Namespace) == variant.Type.Namespace && resource.Definition.Type.TypeUid == variant.Type.Uid && variant.Version.Version == resource.Definition.Type.Version && variant.Version.SchemaDigest == resource.Definition.Type.SchemaDigest; }
-    private async Task SaveAsync() { if (!CanSave) return; busy = true; error = null; try { var variant = SelectedVariant!; var properties = model.Properties(variant.Type, variant.Version); var snapshot = IsNew ? await Client.CreateConnectedServiceAsync(new(model.Name, properties, selectedScope), cancellation.Token) : await Client.UpdateConnectedServiceAsync(model.Name, selectedScope!.Value, new(properties), etag!, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); etag = snapshot.ETag; PrepareBindings(); if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo($"/connected-services/{Uri.EscapeDataString(snapshot.Value.Name)}?scopeRef={Uri.EscapeDataString(snapshot.Value.ScopeRef!.Value.Value)}"); } catch (Exception exception) { error = exception; } finally { busy = false; } }
-    private string DetailsUrl() => $"/connected-services/{Uri.EscapeDataString(Name ?? model.Name)}?scopeRef={Uri.EscapeDataString(selectedScope?.Value ?? EmbeddedScopeRef?.Value ?? ScopeRefValue ?? string.Empty)}";
+    private async Task SaveAsync() { if (!CanSave) return; busy = true; error = null; try { var variant = SelectedVariant!; var properties = model.Properties(variant.Type, variant.Version); var snapshot = IsNew ? await Client.CreateConnectedServiceAsync(new(model.Name, properties, selectedScope), cancellation.Token) : await Client.UpdateConnectedServiceAsync(model.Name, selectedScope!.Value, ResourceNamespaceValue, new(properties), etag!, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); etag = snapshot.ETag; PrepareBindings(); if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo($"/connected-services/{Uri.EscapeDataString(snapshot.Value.Name)}?scopeRef={Uri.EscapeDataString(snapshot.Value.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(snapshot.Value.Namespace.Value)}"); } catch (Exception exception) { error = exception; } finally { busy = false; } }
+    private string DetailsUrl() => $"/connected-services/{Uri.EscapeDataString(Name ?? model.Name)}?scopeRef={Uri.EscapeDataString(selectedScope?.Value ?? EmbeddedScopeRef?.Value ?? ScopeRefValue ?? string.Empty)}&namespace={Uri.EscapeDataString(ResourceNamespaceValue.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
-    private sealed record TypeVariant(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version) { public string Key => $"{Type.ScopeRef?.Value}|{Type.Namespace.Value}|{Type.Name}|{Type.Uid:D}|{Version.Version}|{Version.SchemaDigest}"; public string Label => $"{Type.Definition.DisplayName} · {Version.Version} · {Type.Governance.Origin.Reference ?? Type.Namespace.Value}"; }
+    private sealed record TypeVariant(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version) { public string Key => $"{Type.ScopeRef?.Value}|{Type.Namespace.Value}|{Type.Name}|{Type.Uid:D}|{Version.Version}|{Version.SchemaDigest}"; public string Label => $"{Type.Definition.DisplayName} · {Version.Version} · {Type.Namespace}/{Type.Name} · {Type.ScopeRef}"; }
 }

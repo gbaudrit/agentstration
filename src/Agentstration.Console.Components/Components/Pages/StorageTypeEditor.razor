@@ -38,20 +38,20 @@ else
                 {
                     <section class="panel form-section"><h2>@T("Identity")</h2><div class="form-grid">
                         <ResourceIdentityFields @bind-DisplayName="draft.DisplayName" @bind-TechnicalName="draft.Name" Policy="ResourceNamePolicy.Generic" IsNew="IsNew" DisplayNameTestId="storage-type-display-name" TechnicalNameTestId="storage-type-name" />
-                        <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="draft.Description" maxlength="2000" /></label>
-                        <label><span>@T("Namespace")</span>@if (IsNew) { <InputText @bind-Value="draft.Namespace" maxlength="128" /> } else { <code>@draft.Namespace</code> }</label>
+                        <FormField Label="@T("Description")" Class="form-span-2"><ClearableText Multiline @bind-Value="draft.Description" maxlength="2000" /></FormField>
+                        <FormField Label="@T("Namespace")">@if (IsNew) { <ClearableText @bind-Value="draft.Namespace" maxlength="128" /> } else { <code>@draft.Namespace</code> }</FormField>
                         <div><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="ownerScope" /></div>
-                        <label><span>@T("Enabled")</span><InputCheckbox @bind-Value="draft.Enabled" /></label>
+                        <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="draft.Enabled" /></FormField>
                         @if (!IsNew && original is not null)
                         {
-                            <label><span>@T("Type.PreferredVersion")</span><InputSelect @bind-Value="draft.PreferredVersion">@foreach (var version in original.Definition.Versions) { <option value="@version.Version">@version.Version</option> }</InputSelect></label>
+                            <FormField Label="@T("Type.PreferredVersion")"><ClearableSelect AllowClear="false" @bind-Value="draft.PreferredVersion">@foreach (var version in original.Definition.Versions) { <option value="@version.Version">@version.Version</option> }</ClearableSelect></FormField>
                         }
                     </div></section>
                 }
                 @if (IsNew || IsPublishing)
                 {
                     <StorageTypeVersionFields Draft="draft.Version" />
-                    @if (IsPublishing) { <label><InputCheckbox @bind-Value="draft.SetPreferred" />@T("Type.SetPreferred")</label> }
+                    @if (IsPublishing) { <FormField Label="@T("Type.SetPreferred")"><FormCheckbox @bind-Value="draft.SetPreferred" /></FormField> }
                 }
                 <div class="form-actions"><button type="submit" class="button-primary" data-testid="storage-type-save">@(busy ? T("Saving") : IsPublishing ? T("Type.Publish") : T("Save"))</button></div>
             </fieldset>

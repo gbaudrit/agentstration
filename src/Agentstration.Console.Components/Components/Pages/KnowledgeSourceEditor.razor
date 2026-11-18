@@ -23,24 +23,24 @@ else
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
     <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
         <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-        @if (!IsNew) { <div class="form-actions"><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></div> }
-        <div class="form-grid">
+        @if (!IsNew) { <FormActions><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></FormActions> }
+        <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
             {
-                <label><span>@T("Namespace")</span><input @bind="sourceNamespace" maxlength="128" /></label>
+                <FormField Label="@T("Namespace")"><ClearableText @bind-Value="sourceNamespace" maxlength="128" /></FormField>
             }
-            <label class="form-field-wide"><span>@T("SourceDescription")</span><textarea @bind="description" maxlength="2000"></textarea></label>
-            <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><input type="checkbox" @bind="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
+            <FormField Label="@T("SourceDescription")" Optional="true" Class="form-span-2"><ClearableText Multiline @bind-Value="description" maxlength="2000" /></FormField>
+            <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><FormCheckbox @bind-Value="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
             @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
-            <label class="form-field-wide"><span>@T("OutputStorage")</span><select @bind="outputStorageKey" @bind:after="() => outputCollectionUid = Guid.Empty" data-testid="knowledge-output-storage">
+            <FormField Label="@T("OutputStorage")" Help="@T("OutputStorageHelp")" Class="form-span-2"><ClearableSelect TValue="string" Value="@outputStorageKey" ValueExpression="@(() => outputStorageKey)" ValueChanged="value => { outputStorageKey = value; outputCollectionUid = Guid.Empty; }" data-testid="knowledge-output-storage">
                 <option value="">@T("ArtifactOutputDefault")</option>
                 @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef</option> }
                 @if (savedOutput is not null && !storages.Any(value => StorageKey(value) == outputStorageKey)) { <option value="@outputStorageKey">@T("PinnedOutputStorage")</option> }
-            </select><small>@T("OutputStorageHelp")</small></label>
+            </ClearableSelect></FormField>
             @if (SelectedOutputStorage is { } structuredStorage && (RequiresOutputCollection || structuredStorage.Definition.Collections.Count > 0))
             {
-                <label class="form-field-wide"><span>@T("StructuredOutputCollection")</span><select @bind="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T(RequiresOutputCollection ? "StructuredOutputSelect" : "StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(CompatibleOutputCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</select><small>@T("StructuredOutputHelp")</small></label>
+                <FormField Label="@T("StructuredOutputCollection")" Help="@T("StructuredOutputHelp")" Class="form-span-2"><ClearableSelect TValue="Guid" AllowClear="false" @bind-Value="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T(RequiresOutputCollection ? "StructuredOutputSelect" : "StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(CompatibleOutputCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
                 @if (!OutputCollectionValid)
                 {
                     <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="knowledge-output-collection-required">@T("StructuredOutputRequired") <a href="@(StorageLinks.Details(structuredStorage) + "&view=definition")">@T("ConfigureOutputStorage")</a></p>
@@ -48,13 +48,13 @@ else
             }
             @if (!RequiresOutputCollection && outputCollectionUid == Guid.Empty)
             {
-                <label class="form-field-wide"><span>@T("OutputPrefix")</span><input @bind="outputPrefix" data-testid="knowledge-output-prefix" /><small>@T("OutputPrefixHelp")</small></label>
+                <FormField Label="@T("OutputPrefix")" Help="@T("OutputPrefixHelp")" Class="form-span-2"><ClearableText UpdateOnInput="false" @bind-Value="outputPrefix" data-testid="knowledge-output-prefix" /></FormField>
             }
-            <label><span>@T("ProjectionFlow")</span><select @bind="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
-            <label><span>@T("NativeLegacyRetrieval")</span><select @bind="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select><small>@T("NativeLegacyRetrievalHelp")</small></label>
+            <FormField Label="@T("ProjectionFlow")" Required="true"><ClearableSelect TValue="string" @bind-Value="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
+            <FormField Label="@T("NativeLegacyRetrieval")" Help="@T("NativeLegacyRetrievalHelp")"><ClearableSelect TValue="string" @bind-Value="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
             <div class="form-span-2" data-testid="knowledge-automatic-parameters"><span>@T("NativeAutomaticParameters")</span><JsonSchemaInputEditor Schema="AutomaticParametersSchema" Value="automaticParameters" ValueChanged="value => automaticParameters = value" ValidationChanged="state => automaticParametersValid = state.IsValid" Disabled="busy" /><small>@T("NativeAutomaticParametersHelp")</small></div>
             <div class="form-span-2"><SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="projectionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
-                @if (lifecycleEnabled) { <label class="knowledge-choice"><input type="checkbox" @bind="allowExpiredFallback" data-testid="knowledge-expired-fallback" /><span>@T("AllowExpiredFallback")</span></label> }
+                @if (lifecycleEnabled) { <label class="knowledge-choice"><FormCheckbox @bind-Value="allowExpiredFallback" data-testid="knowledge-expired-fallback" /><span>@T("AllowExpiredFallback")</span></label> }
             </div>
             <div class="form-span-2"><SourceFlowCompositionEditor Boundary="projection" StandardPoint="postAggregate" @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="busy" /></div>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
@@ -63,29 +63,29 @@ else
                 @foreach (var binding in bindings)
                 {
                     <div class="form-grid knowledge-binding-card" data-testid="knowledge-source-binding">
-                        <label><span>@T("BindingName")</span><input @bind="binding.Name" maxlength="128" /></label>
-                        <label><span>@T("ContributionDescription")</span><textarea @bind="binding.Description" placeholder="@InheritedDescription(binding)" maxlength="2000" rows="2"></textarea><small>@T("ContributionDescriptionHelp")</small></label>
-                        <label><span>@T("DataSource")</span><select value="@binding.DataSourceKey" @onchange="args => ChangeDataSourceAsync(binding, args)" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</select></label>
-                        @if (TargetOptions(binding).Count > 0) { <label><span>@T("AcquisitionTarget")</span><select @bind="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</select></label> }
-                        <label><span>@T("TransformationFlowOptional")</span><select @bind="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</select></label>
+                        <FormField Label="@T("BindingName")"><ClearableText UpdateOnInput="false" @bind-Value="binding.Name" maxlength="128" /></FormField>
+                        <FormField Label="@T("ContributionDescription")" Help="@T("ContributionDescriptionHelp")"><ClearableText Multiline @bind-Value="binding.Description" placeholder="@InheritedDescription(binding)" maxlength="2000" rows="2" /></FormField>
+                        <FormField Label="@T("DataSource")" Required="true"><ClearableSelect TValue="string" Value="@binding.DataSourceKey" ValueExpression="@(() => binding.DataSourceKey)" ValueChanged="value => ChangeDataSourceAsync(binding, new ChangeEventArgs { Value = value })" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</ClearableSelect></FormField>
+                        @if (TargetOptions(binding).Count > 0) { <FormField Label="@T("AcquisitionTarget")" Required="true"><ClearableSelect TValue="string" @bind-Value="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</ClearableSelect></FormField> }
+                        <FormField Label="@T("TransformationFlowOptional")"><ClearableSelect TValue="string" @bind-Value="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
                         <div class="form-span-2"><FlowSequenceEditor Title="@T("BindingTransformations")" @bind-Value="binding.Transformations" TemplateFlow="TransformationSequence" ReadOnly="@(busy || !string.IsNullOrEmpty(binding.TransformationFlowKey))" /></div>
-                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
-                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.AllowStaleOnRefreshFailure" disabled="@IsDirectBinding(binding)" data-testid="knowledge-binding-fallback" /><span>@T("AllowInputFallback")</span></label>
-                        @if (binding.AllowStaleOnRefreshFailure) { <label><span>@T("InputFallbackAge")</span><input @bind="binding.MaximumFallbackAgeText" placeholder="hh:mm:ss" data-testid="knowledge-binding-fallback-age" /><small>@T("InputFallbackAgeHelp")</small></label> }
+                        <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
+                        <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.AllowStaleOnRefreshFailure" disabled="@IsDirectBinding(binding)" data-testid="knowledge-binding-fallback" /><span>@T("AllowInputFallback")</span></label>
+                        @if (binding.AllowStaleOnRefreshFailure) { <FormField Label="@T("InputFallbackAge")" Help="@T("InputFallbackAgeHelp")"><ClearableText UpdateOnInput="false" @bind-Value="binding.MaximumFallbackAgeText" placeholder="hh:mm:ss" data-testid="knowledge-binding-fallback-age" /></FormField> }
                         @if (!FallbackValid(binding)) { <p class="form-alert form-alert-danger" role="alert">@T("FallbackInvalid")</p> }
                         @if (HasInputLifecycle(binding)) { <p class="form-span-2">@T("DataSourceOwnsFreshness")</p> }
                         else
                         {
-                        <label class="knowledge-choice"><input type="checkbox" @bind="binding.RefreshIfNecessary" data-testid="knowledge-binding-refresh" /><span>@T("RefreshIfNecessary")</span></label>
-                        <label><span>@T("MaximumAge")</span><input type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /><small>@T("MaximumAgeHelp")</small></label>
+                        <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.RefreshIfNecessary" data-testid="knowledge-binding-refresh" /><span>@T("RefreshIfNecessary")</span></label>
+                        <FormField Label="@T("MaximumAge")" Help="@T("MaximumAgeHelp")"><ClearableText UpdateOnInput="false" type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind-Value="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /></FormField>
                         }
                         <div class="form-span-2 knowledge-transformation-configuration" data-testid="knowledge-source-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
-                        <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
+                        <FormActions Class="form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></FormActions>
                     </div>
                 }
             </section>
-        </div>
-        <div class="form-actions"><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></div>
+        </FormGrid>
+        <FormActions><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></FormActions>
         </fieldset>
     </EditForm>
 }

@@ -15,6 +15,40 @@ namespace Agentstration.Application.Tests;
 public sealed partial class FlowTests
 {
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task VisiblePaginationScansPastHiddenAncestorPagesWithoutRequestingZeroRows(bool filterNamespace)
+    {
+        await using var fixture = await FlowFixture.CreateAsync(
+            scopeHierarchy: new TestFlowScopeHierarchy(Guid.NewGuid()),
+            discoveryPolicy: new SparseFlowDiscoveryPolicy());
+        for (var index = 0; index < 30; index++)
+        {
+            var name = $"flow-{index:00}-{(index is 20 or 27 ? "visible" : "hidden")}";
+            await fixture.Service.CreateExactAsync(ResourceScopeRef.Instance,
+                new CreateFlowCommand(name, null, "1.0.0", true,
+                    new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "assistant"))),
+                ResourceNamespace.Default, default);
+        }
+        var consumer = ResourceScopeRef.Workspace(TestScope.WorkspaceId.Value);
+        ResourceNamespace? resourceNamespace = filterNamespace ? ResourceNamespace.Default : null;
+        var first = await fixture.Service.ListVisibleAsync(consumer, resourceNamespace, 0, 1, default);
+        Assert.HasCount(1, first.Items);
+        Assert.AreEqual("flow-20-visible", first.Items[0].Value.Id.Value);
+        Assert.IsTrue(first.HasMore);
+        var second = await fixture.Service.ListVisibleAsync(consumer, resourceNamespace, 1, 1, default);
+        Assert.HasCount(1, second.Items);
+        Assert.AreEqual("flow-27-visible", second.Items[0].Value.Id.Value);
+        Assert.IsFalse(second.HasMore);
+    }
+
+    private sealed class SparseFlowDiscoveryPolicy : IFlowDiscoveryPolicy
+    {
+        public Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef, CancellationToken cancellationToken) =>
+            Task.FromResult(flow.Id.Value.EndsWith("-visible", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ExactScopeOperationsKeepSameFlowIdentityIsolated()
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

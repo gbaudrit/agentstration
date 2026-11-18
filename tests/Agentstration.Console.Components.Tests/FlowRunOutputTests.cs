@@ -15,7 +15,7 @@ public sealed class FlowRunOutputTests
     [TestMethod]
     [DataRow("en-US", "temporary content")]
     [DataRow("fr-FR", "contenu temporaire")]
-    public void ExpiredDirectOutputStillLinksTheProducedArtifact(string language, string explanation)
+    public async Task ExpiredDirectOutputStillLinksTheProducedArtifact(string language, string explanation)
     {
         using var culture = new TestCultureScope(language);
         using var context = new BunitContext();
@@ -27,6 +27,16 @@ public sealed class FlowRunOutputTests
         Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-output-expired']").TextContent);
         var link = rendered.Find("[data-testid='flow-run-output-artifact'] a");
         Assert.AreEqual($"/artifacts/durable/{client.Durable.ArtifactId}?context=%2Finstance", link.GetAttribute("href"));
+        var artifact = rendered.Find("[data-testid='flow-run-output-artifact']");
+        Assert.AreEqual(client.Durable.ArtifactId.ToString(), artifact.QuerySelector(".collection-qualified-name code")!.TextContent);
+        Assert.AreEqual(link.GetAttribute("href"), artifact.QuerySelector(".collection-primary-actions a")!.GetAttribute("href"));
+        Assert.AreEqual(0, artifact.QuerySelectorAll("a button").Length, "Copy must remain separate from artifact navigation.");
+        Assert.AreEqual(0, artifact.QuerySelectorAll(".collection-actions-menu").Length, "Inspect is a direct primary action.");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-ui.js");
+        var copy = module.SetupVoid("copyText", client.Durable.ArtifactId.ToString());
+        copy.SetVoidResult();
+        await artifact.QuerySelector(".copy-value")!.ClickAsync(new());
+        Assert.HasCount(1, copy.Invocations);
         Assert.AreEqual(0, client.ContentReadCount);
     }
 

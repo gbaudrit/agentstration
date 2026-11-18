@@ -35,16 +35,16 @@ else
     <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-provider-editor" class="resource-form" data-testid="model-provider-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
         <DataAnnotationsValidator /><ValidationSummary />
         <fieldset class="resource-definition-fields" disabled="@(!CanManage)" data-testid="model-provider-definition-fields">
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProviderResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</div><div class="form-grid">
+        <FormSection Title="@T("ProviderResource")" Eyebrow="@T("Identity")"><Actions>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</Actions><ChildContent><FormGrid>
             <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-provider-display-name" TechnicalNameTestId="model-provider-name" />
-            <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
+            <FormField Label="@T("Namespace")"><Validation><ValidationMessage For="() => model.Namespace" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.Namespace" Disabled="@(!IsNew)" /></ChildContent></FormField>
             <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-            <label><span>@T("ExtensionRegistration")</span><select value="@model.ExtensionId" @onchange="ExtensionChanged" data-testid="model-provider-extension"><option value="">@T("SelectExtension")</option>@foreach (var extension in extensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</select><ValidationMessage For="() => model.ExtensionId" /></label>
-            <label><span>@T("ModelProviderContribution")</span><select value="@model.ContributionId" @onchange="ContributionChanged" data-testid="model-provider-contribution"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</select><ValidationMessage For="() => model.ContributionId" /></label>
-        </div></section>
+            <FormField Label="@T("ExtensionRegistration")"><Validation><ValidationMessage For="() => model.ExtensionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(model.ExtensionId, System.Globalization.CultureInfo.InvariantCulture)" data-testid="model-provider-extension" ValueChanged="changed => ExtensionChanged(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectExtension")</option>@foreach (var extension in extensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T("ModelProviderContribution")"><Validation><ValidationMessage For="() => model.ContributionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(model.ContributionId, System.Globalization.CultureInfo.InvariantCulture)" data-testid="model-provider-contribution" ValueChanged="changed => ContributionChanged(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</ClearableSelect></ChildContent></FormField>
+        </FormGrid></ChildContent></FormSection>
         @if (Requirements.Count > 0)
         {
-            <section class="panel form-section" data-testid="model-provider-value-bindings"><div class="panel-header"><div><p class="eyebrow">@T("ConfigurationValues")</p><h2>@T("ValueBindings")</h2><p>@T("ValueBindingsHelp")</p></div></div>
+            <FormSection Title="@T("ValueBindings")" Eyebrow="@T("ConfigurationValues")" Description="@T("ValueBindingsHelp")" TestId="model-provider-value-bindings"><ChildContent>
                 <div class="binding-requirements">
                     @foreach (var requirement in Requirements)
                     {
@@ -56,11 +56,11 @@ else
                             Disabled="@(!CanManage)" TestIdPrefix="model-provider" DialogSectionId="@binding" />
                     }
                 </div>
-            </section>
+            </ChildContent></FormSection>
         }
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ExtensionOwnedEndpoint")</h2><p>@T("ConnectionHelp")</p></div>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button> }</div>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")" data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</section>
+        <FormSection Title="@T("ExtensionOwnedEndpoint")" Eyebrow="@T("Connection")" Description="@T("ConnectionHelp")"><Actions>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button> }</Actions><ChildContent>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")" data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</ChildContent></FormSection>
         </fieldset>
-        @if (CanManage) { <div class="form-actions"><a class="button-secondary" href="/modelproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-provider-save">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></div> }
+        @if (CanManage) { <FormActions><a class="button-secondary" href="/modelproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-provider-save">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></FormActions> }
     </EditForm>
     }
 
@@ -76,9 +76,18 @@ else
             @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
             @if (discoveryResult is not null) { <div class="form-alert form-alert-success" role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</div> }
             @if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> }
-            else { <DataGrid TItem="AvailableModelResponse" Items="models"><Header><tr><th>@T("Model")</th><th>@T("Status")</th><th>@T("Capabilities")</th><th>@T("Input")</th><th>@T("Output")</th><th>@T("Actions")</th></tr></Header><Row Context="item"><tr><td>@if (!string.IsNullOrWhiteSpace(item.ResourceName)) { <a class="text-button model-details-link" href="@ModelDetailsUrl(item)" data-testid="open-model-details"><strong>@item.DisplayName</strong></a> } else { <strong>@item.DisplayName</strong> }<br /><code>@item.Name</code></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" /></td><td>@Features(item)</td><td>@ContentTypes(item.Specification.Input)</td><td>@ContentTypes(item.Specification.Output)</td><td>@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> }</td></tr></Row></DataGrid> }
+            else { <CollectionView TItem="AvailableModelResponse" Items="models" InformationLabels="@(new string[] { T("Capabilities"), T("Input"), T("Output") })" IdentityLabel="@T("Model")" StateLabel="@T("Status")">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : model!.Namespace)" Name="@(item.ResourceName ?? item.Name)" Href="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details" ><IconBadges>@if (!string.IsNullOrWhiteSpace(item.ResourceName)) { <ResourceScopeBadge ScopeRef="selectedScope" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(selectedScope, Services))" IconOnly /> }<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" IconOnly /></IconBadges></CollectionIdentity><code>@item.Name</code></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue>
+            <CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue>
+            <CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue>
+        </Information>
+        <Actions Context="item">
+@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@(item.DisplayName)"> <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> </CollectionActions> }</Actions>
+    </CollectionView> }
         </section>
-        @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><a href="@ProfileUrl(usage)"><strong>@usage.DisplayName</strong><code>@usage.Name</code></a></li> }</ul></section> }
+        @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@ProfileUrl(usage)" IconName="layers" Domain="model" /></li> }</ul></section> }
     }
     @if (!IsNew && CanManage && activeTab == ProviderTab.Access && resource is not null && resource.ScopeRef is { } ownerScope)
     {
@@ -314,7 +323,7 @@ else
         ModelFeatureSupport.Native or ModelFeatureSupport.Emulated or ModelFeatureSupport.Partial;
     private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
     private string ModelDetailsUrl(AvailableModelResponse item) => ConsoleResourceUrls.Model(
-        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!));
+        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!), resource?.ScopeRef ?? selectedScope);
     private string CreateModelProfileUrl(string? modelName = null)
     {
         var providerNamespace = ResourceNamespace.Parse(model?.Namespace ?? Namespace).Value;

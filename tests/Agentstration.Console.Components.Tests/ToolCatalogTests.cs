@@ -13,7 +13,7 @@ public sealed class ToolCatalogTests
     [TestMethod]
     public void CatalogLoadsToolsAcrossAllProviders()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new CatalogClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(client);

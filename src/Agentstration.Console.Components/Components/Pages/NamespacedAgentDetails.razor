@@ -129,7 +129,7 @@ else if (agent is not null)
         {
             <section class="panel namespaced-instructions" data-testid="pack-agent-yaml">
                 <div class="panel-header"><div><p class="eyebrow">@T("OriginalDefinition")</p><h2>@T("AgentSourceYaml")</h2><p>@T("AgentSourceYamlHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div>
-                <textarea class="form-code-editor runner-json namespaced-definition-source" rows="30" readonly aria-label="@T("OriginalAgentYamlDefinition")">@DefinitionYaml</textarea>
+                <ClearableText Multiline="true" class="form-code-editor runner-json namespaced-definition-source" rows="30" ReadOnly="true" aria-label="@T("OriginalAgentYamlDefinition")" Value="@DefinitionYaml"></ClearableText>
             </section>
         }
     </main>

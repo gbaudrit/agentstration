@@ -1,24 +1,21 @@
-<label class="entry-field" data-testid="workplace-form-input" data-field-name="@Definition.Name" data-field-type="@Definition.Type">
-    <span>@(Definition.Label ?? Definition.Name)@if (Definition.Required) { <em>@Localizer["Required"]</em> }</span>
+<FormField Label="@(Definition.Label ?? Definition.Name)" Required="@Definition.Required" Help="@Definition.Description" Class="entry-field" data-testid="workplace-form-input" data-field-name="@Definition.Name" data-field-type="@Definition.Type">
     @if (Definition.Type is EntryFieldType.Textarea or EntryFieldType.Prompt)
     {
-        <textarea value="@StringValue" @oninput="ChangeString" placeholder="@Definition.Placeholder" disabled="@Disabled"></textarea>
+        <ClearableText Multiline="true" Value="@StringValue" placeholder="@Definition.Placeholder" Disabled="@Disabled" ValueChanged="changed => ChangeString(new ChangeEventArgs { Value = changed })"></ClearableText>
     }
     else if (Definition.Type == EntryFieldType.Choice)
     {
-        <select value="@StringValue" @onchange="ChangeString" disabled="@Disabled"><option value="">@Localizer["SelectOption"]</option>@foreach (var option in Definition.Options) { <option value="@option.Value">@option.Label</option> }</select>
+        <ClearableSelect TValue="string" Value="@Convert.ToString(StringValue, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" ValueChanged="changed => ChangeString(new ChangeEventArgs { Value = changed })"><option value="">@Localizer["SelectOption"]</option>@foreach (var option in Definition.Options) { <option value="@option.Value">@option.Label</option> }</ClearableSelect>
     }
     else if (Definition.Type == EntryFieldType.Boolean)
     {
-        <input type="checkbox" checked="@BooleanValue" @onchange="ChangeBoolean" disabled="@Disabled" />
+        <FormCheckbox Value="@BooleanValue" disabled="@Disabled" ValueChanged="changed => ChangeBoolean(new ChangeEventArgs { Value = changed })" />
     }
     else
     {
-        <input type="@(Definition.Type == EntryFieldType.Date ? "date" : Definition.Type == EntryFieldType.Number ? "number" : "text")" value="@StringValue" @oninput="ChangeString" placeholder="@Definition.Placeholder" disabled="@Disabled" />
+        <ClearableText Type="@(Definition.Type == EntryFieldType.Date ? "date" : Definition.Type == EntryFieldType.Number ? "number" : "text")" Value="@StringValue" placeholder="@Definition.Placeholder" Disabled="@Disabled" ValueChanged="changed => ChangeString(new ChangeEventArgs { Value = changed })" />
     }
-    @if (Definition.Description is not null) { <small>@Definition.Description</small> }
-</label>
-
+</FormField>
 @code {
     [Parameter, EditorRequired] public required EntryFieldDefinition Definition { get; set; }
     [Parameter] public JsonElement Value { get; set; }

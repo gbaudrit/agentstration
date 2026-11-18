@@ -1,3 +1,4 @@
+import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
@@ -137,6 +138,7 @@ export class WorkplacePage {
     ).first();
     await unread.waitFor({ state: 'visible' });
     const notificationId = await unread.getAttribute('data-notification-id');
+    await revealCollectionAction(unread.getByTestId(TestIds.workplace.markRead));
     await unread.getByTestId(TestIds.workplace.markRead).click();
     if (notificationId) {
       await this.page.locator(

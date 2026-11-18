@@ -1,0 +1,8 @@
+<span class="collection-version @(Compact ? "collection-version-compact" : null)">
+    <span class="@(Compact ? "sr-only" : "collection-version-label")">@Label</span><code title="@Value">@(string.IsNullOrWhiteSpace(Value) ? "—" : Value)</code>
+</span>
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string? Value { get; set; }
+    [Parameter] public bool Compact { get; set; }
+}

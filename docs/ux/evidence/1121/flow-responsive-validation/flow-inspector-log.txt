@@ -1,0 +1,19 @@
+
+Running 8 tests using 1 worker
+
+(node:50953) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [desktop-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector en-US light  @smoke (11.6s)
+  ✓  2 [desktop-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector en-US dark  @smoke (8.8s)
+(node:51641) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [mobile-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector en-US light @responsive @smoke (10.8s)
+  ✓  4 [mobile-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector en-US dark @responsive @smoke (8.4s)
+  ✓  5 [mobile-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector fr-FR light @responsive @smoke (8.6s)
+  ✓  6 [mobile-chromium] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector fr-FR dark @responsive @smoke (9.2s)
+(node:52436) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  7 [locale-contracts] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector fr-FR light @locale @smoke (11.1s)
+  ✓  8 [locale-contracts] › tests/form-workflows.spec.ts:9:5 › form workflow flow-inspector fr-FR dark @locale @smoke (9.9s)
+
+  8 passed (2.4m)

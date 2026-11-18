@@ -103,6 +103,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Find("form").Submit();
         Assert.IsNull(client.CreatedRequest);
         sources.FailTargets = false;
+        rendered.Find("[data-testid='knowledge-source-binding-data-source']").Change(string.Empty);
         rendered.Find("[data-testid='knowledge-source-binding-data-source']").Change($"{DataSourceScope.Value}|default|documentation");
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-save']").HasAttribute("disabled")));
         rendered.Find("form").Submit();
@@ -168,7 +169,7 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.AreEqual("knowledge-source-editor", rendered.FindComponent<EditForm>().Instance.FormName);
             Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-definition-fields']").GetAttribute("data-interactive"));
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-definition-fields']").HasAttribute("disabled"));
-            var fields = rendered.FindAll(".form-grid > label");
+            var fields = rendered.FindAll(".form-grid > .form-field");
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.AreEqual("knowledge-source-name", fields[1].QuerySelector("input")?.GetAttribute("data-testid"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-display-name']").HasAttribute("autofocus"));
@@ -672,7 +673,7 @@ public sealed partial class KnowledgeSourceEditorTests
         {
             var link = rendered.Find("[data-testid='knowledge-source-name-link']");
             Assert.AreEqual("Agentstration documentation", link.TextContent);
-            Assert.AreEqual("/knowledge-sources/agentstration-documentation", link.GetAttribute("href"));
+            Assert.AreEqual($"/knowledge-sources/agentstration-documentation?namespace=default&scopeRef={Uri.EscapeDataString(DataSourceScope.Value)}&context={Uri.EscapeDataString(DataSourceScope.Value)}", link.GetAttribute("href"));
             var headers = rendered.FindAll("th").Select(value => value.TextContent).ToArray();
             CollectionAssert.Contains(headers, "Data Sources");
             CollectionAssert.Contains(headers, "Projection Flow");
@@ -685,6 +686,29 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.AreEqual("default/knowledge-projection-builtin:1.0.0", projection.TextContent);
             Assert.AreEqual("/flows/knowledge-projection-builtin", projection.GetAttribute("href"));
         });
+    }
+
+    [TestMethod]
+    public void ClearingDataSourceSelectionAlsoClearsItsDependentAcquisitionTarget()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext(new KnowledgeClientStub(), new DataSourcesClientStub(withTarget: true));
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var editor = context.Render<KnowledgeSourceEditor>();
+        editor.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        var target = editor.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']");
+        var option = target.QuerySelectorAll("option").First(value => !string.IsNullOrEmpty(value.GetAttribute("value")));
+        target.Change(option.GetAttribute("value"));
+        var source = editor.Find("[data-testid='knowledge-source-binding-data-source']");
+        Assert.AreEqual(source.Id, source.Closest(".form-field")!.QuerySelector("label")!.GetAttribute("for"));
+        source.Closest(".form-field")!.QuerySelector(".field-clear")!.Click();
+
+        Assert.AreEqual(string.Empty, editor.Find("[data-testid='knowledge-source-binding-data-source']").GetAttribute("value"));
+        Assert.IsEmpty(editor.FindAll("[data-testid='knowledge-source-binding-acquisition-target']"));
+        editor.Find("[data-testid='knowledge-source-binding-data-source']")
+            .Change($"{DataSourceScope.Value}|default|documentation");
+        Assert.AreEqual(string.Empty, editor.WaitForElement("[data-testid='knowledge-source-binding-acquisition-target']").GetAttribute("value"));
     }
 
     [TestMethod]
@@ -719,7 +743,8 @@ public sealed partial class KnowledgeSourceEditorTests
 
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null, IFlowApiClient? flows = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
         context.Services.AddSingleton(TimeProvider.System);
@@ -1008,7 +1033,8 @@ public sealed partial class KnowledgeSourceEditorTests
         internal static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
 
-        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowSummary>>(
+        public TaskCompletionSource<IReadOnlyList<FlowSummary>>? PendingListing { get; set; }
+        public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => PendingListing?.Task ?? Task.FromResult<IReadOnlyList<FlowSummary>>(
         [
             new("knowledge-projection-builtin", "Knowledge projection", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },
             new("knowledge-retrieval-builtin", "Knowledge retrieval", "flow", "1.0.0", "Published", 1, 0, DateTimeOffset.UtcNow) { ActiveVersion = "1.0.0", ScopeRef = WorkspaceScope },

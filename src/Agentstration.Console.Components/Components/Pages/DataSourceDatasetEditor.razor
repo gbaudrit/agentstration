@@ -92,29 +92,29 @@ else
                     @if (IsNew)
                     {
                         <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="true" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
-                        <label><span>@T("Namespace")</span><input @bind="resourceNamespace" /></label>
+                        <FormField Label="@T("Namespace")"><ClearableText UpdateOnInput="false" @bind-Value="resourceNamespace" /></FormField>
                         <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" Value="scope" ValueChanged="ChangeScopeAsync" />
                     }
-                    else { <label><span>@T("DisplayName")</span><input @bind="displayName" required maxlength="200" data-testid="data-source-display-name" /></label> }
-                    <label class="checkbox-field"><input type="checkbox" @bind="enabled" /><span>@T("Enabled")</span></label>
-                    <label class="form-field-wide"><span>@T("Description")</span><textarea @bind="description" maxlength="2000"></textarea></label>
+                    else { <FormField Label="@T("DisplayName")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="displayName" required maxlength="200" data-testid="data-source-display-name" /></FormField> }
+                    <label class="checkbox-field"><FormCheckbox @bind-Value="enabled" /><span>@T("Enabled")</span></label>
+                    <FormField Label="@T("Description")" Class="form-field-wide"><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="description" maxlength="2000" /></FormField>
                 </div></section>
                 <div class="dataset-definition-grid">
                     <section class="panel form-section"><h2>@T("DatasetSavedAcquisition")</h2><div class="form-grid">
-                <label class="form-field-wide"><span>@T("DatasetService")</span><select value="@serviceKey" @onchange="ChangeServiceAsync" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
+                <FormField Label="@T("DatasetService")" Class="form-field-wide" Help="@T("DatasetServiceHelp")" Required="@(!HasSavedOperationPin)"><ClearableSelect TValue="string" Value="@serviceKey" ValueExpression="@(() => serviceKey)" ValueChanged="value => ChangeServiceAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var service in connectedServices) { <option value="@service.Uid.ToString()">@service.Definition.DisplayName · @service.ScopeRef · @service.Namespace/@service.Name</option> }
                     @if (!string.IsNullOrEmpty(serviceKey) && SelectedService is null) { <option value="@serviceKey">@T("DatasetPinnedUnavailable")</option> }
-                </select><small>@T("DatasetServiceHelp")</small></label>
+                </ClearableSelect></FormField>
                 @if (SelectedService is { } selectedService)
                 {
                     <p class="form-field-wide"><a class="text-button" href="@ServiceDiscoveryUrl(selectedService)" data-testid="dataset-service-discovery-link">@T("DatasetManageOperations")</a></p>
                 }
-                <label class="form-field-wide"><span>@T("DatasetOperation")</span><select value="@operationKey" @onchange="ChangeOperation" data-testid="dataset-operation" required disabled="@(SelectedService is null && !HasSavedOperationPin)">
+                <FormField Label="@T("DatasetOperation")" Class="form-field-wide" Help="@T("DatasetOperationHelp")" Required="true"><ClearableSelect TValue="string" Value="@operationKey" ValueExpression="@(() => operationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var operation in ServiceOperations) { <option value="@OperationKey(operation)">@operation.Definition.DisplayName · @operation.Generation · @T(operation.Enabled ? "Enabled" : "Disabled")</option> }
                     @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != operationKey)) { <option value="@operationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
-                </select><small>@T("DatasetOperationHelp")</small></label>
+                </ClearableSelect></FormField>
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
                 @if (SelectedOperation is not null && AcquisitionIssue is { } issue)
                 { <p class="form-field-wide form-alert" role="status" data-testid="dataset-operation-ineligible">@T(issue)</p> }
@@ -127,19 +127,19 @@ else
                 </div>
                     </div></section>
                     <section class="panel form-section"><h2>@T("DatasetDestination")</h2><div class="form-grid">
-                <label class="checkbox-field form-field-wide"><input type="checkbox" @bind="allowDirect" data-testid="dataset-allow-direct" /><span>@T("DirectPermission")</span><small>@T("DirectPermissionHelp")</small></label>
-                <label class="form-field-wide"><span>@T("DatasetStorage")</span><select @bind="storageKey" @bind:after="() => documentCollectionUid = Guid.Empty" data-testid="dataset-storage" required="@(!allowDirect)">
+                <label class="checkbox-field form-field-wide"><FormCheckbox @bind-Value="allowDirect" data-testid="dataset-allow-direct" /><span>@T("DirectPermission")</span><small>@T("DirectPermissionHelp")</small></label>
+                <FormField Label="@T("DatasetStorage")" Class="form-field-wide" Help="@T("DatasetStorageHelp")" Required="@(!allowDirect)"><ClearableSelect TValue="string" @bind-Value="storageKey" @bind-Value:after="() => documentCollectionUid = Guid.Empty" data-testid="dataset-storage" required="@(!allowDirect)">
                     <option value="">@T(allowDirect ? "DirectInput" : "Select")</option>
                     @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef · @storage.Namespace/@storage.Name · @storage.Generation</option> }
                     @if (source?.Definition.Dataset is { } saved && storages.All(value => StorageKey(value) != storageKey)) { <option value="@storageKey">@saved.Storage?.Storage · @T("DatasetPinnedUnavailable")</option> }
-                </select><small>@T("DatasetStorageHelp")</small></label>
+                </ClearableSelect></FormField>
                 @if (!RequiresDocumentCollection && documentCollectionUid == Guid.Empty)
                 {
-                    <label class="form-field-wide"><span>@T("DatasetPrefix")</span><input @bind="prefix" maxlength="256" data-testid="dataset-prefix" /><small>@T("DatasetPrefixHelp")</small></label>
+                    <FormField Label="@T("DatasetPrefix")" Class="form-field-wide" Help="@T("DatasetPrefixHelp")"><ClearableText UpdateOnInput="false" @bind-Value="prefix" maxlength="256" data-testid="dataset-prefix" /></FormField>
                 }
                     @if (SelectedStorage is { } documentStorage && (RequiresDocumentCollection || documentStorage.Definition.Collections.Count > 0))
                     {
-                        <label class="form-field-wide"><span>@T("DatasetDocumentCollection")</span><select @bind="documentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</select><small>@T("DatasetDocumentHelp")</small></label>
+                        <FormField Label="@T("DatasetDocumentCollection")" Class="form-field-wide" Help="@T("DatasetDocumentHelp")" Required="@RequiresDocumentCollection"><ClearableSelect AllowClear="false" TValue="Guid" @bind-Value="documentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
                         @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "&view=definition")">@T("DatasetConfigureStorage")</a></p> }
                     }
                     </div><p class="dataset-note"><UiIcon Name="layers" />@T(allowDirect && string.IsNullOrEmpty(storageKey) ? "DirectPermissionHelp" : "DatasetIsolatedContent")</p></section>
@@ -170,18 +170,25 @@ else
                 @if (history.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> }
                 else
                 {
-                    <DataGrid TItem="DataSourceAcquisitionResource" Items="VisibleHistory"><Header><tr><th>@T("Created")</th><th>@T("State")</th><th>@T("DatasetContent")</th><th>@T("FlowRun")</th></tr></Header><Row Context="item">
-                        <tr data-testid="data-source-acquisition-row" data-state="@item.State"><td data-label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</td><td data-label="@T("State")"><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" /></td><td data-label="@T("DatasetContent")">
-                            @if (item.DirectResult is { } directResult) { <span data-testid="dataset-direct-result">@T("DirectResult") · @Localizer["DatasetBytes", directResult.Length]</span><small>@T("DirectResultHelp")</small> }
-                            @if (item.ContentRetiredAt is not null) { <span data-testid="dataset-content-retired">@T("ContentRetired")</span> }
-                            else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
-                            @if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button><small>@Localizer["DatasetBytes", item.Content.Length]</small> }
-                            @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
-                            @if (item.ErrorCode is not null) { <span role="status">@FailureMessage(item.ErrorCode) <code>@item.ErrorCode</code>
-                                @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
-                            </span> }
-                        </td><td data-label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></td></tr>
-                    </Row></DataGrid>
+                    <CollectionView TItem="DataSourceAcquisitionResource" Items="VisibleHistory" Compact RowTestId="data-source-acquisition-row" ItemAttributes="AcquisitionAttributes" IdentityLabel="@T("Created")" InformationLabels="@(new[] { T("DatasetContent"), T("FlowRun") })">
+                        <Identity Context="item"><CollectionIdentity DisplayName="@item.CreatedAt.ToLocalTime().ToString("g")" Name="@item.Name" IconName="download">
+                            <IconBadges><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges>
+                        </CollectionIdentity></Identity>
+                        <Information Context="item">
+                            <CollectionValue Label="@T("DatasetContent")">
+                                @if (item.DirectResult is { } directResult) { <span data-testid="dataset-direct-result">@T("DirectResult") · @Localizer["DatasetBytes", directResult.Length]</span><small>@T("DirectResultHelp")</small> }
+                                @if (item.ContentRetiredAt is not null) { <span data-testid="dataset-content-retired">@T("ContentRetired")</span> }
+                                else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
+                                @if (item.Content is not null && item.ContentRetiredAt is null) { <small>@Localizer["DatasetBytes", item.Content.Length]</small> }
+                                @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
+                                @if (item.ErrorCode is not null) { <span role="status">@FailureMessage(item.ErrorCode) <code>@item.ErrorCode</code>
+                                    @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
+                                </span> }
+                            </CollectionValue>
+                            <CollectionValue Label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></CollectionValue>
+                        </Information>
+                        <Actions Context="item">@if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button> }</Actions>
+                    </CollectionView>
                 }
             </section>
         }
@@ -192,7 +199,7 @@ else
                 @if (!ContentAcquisitions.Any()) { <p class="muted">@T("DatasetNoContent")</p> }
                 else
                 {
-                    <label class="dataset-content-picker"><span>@T("DatasetContentAcquisition")</span><select value="@contentAcquisitionKey" @onchange="ChangeContentAcquisitionAsync" disabled="@(busy || !interactive)"><option value="">@T("Select")</option>@foreach (var item in ContentAcquisitions) { <option value="@item.Uid">@item.CreatedAt.ToLocalTime().ToString("g") · @item.Name</option> }</select></label>
+                    <FormField Label="@T("DatasetContentAcquisition")" Class="dataset-content-picker"><ClearableSelect TValue="string" Value="@contentAcquisitionKey" ValueExpression="@(() => contentAcquisitionKey)" ValueChanged="value => ChangeContentAcquisitionAsync(new ChangeEventArgs { Value = value })" Disabled="@(busy || !interactive)"><option value="">@T("Select")</option>@foreach (var item in ContentAcquisitions) { <option value="@item.Uid">@item.CreatedAt.ToLocalTime().ToString("g") · @item.Name</option> }</ClearableSelect></FormField>
                 }
                 @if (SelectedContentAcquisition is { Publication.Document: not null, ContentRetiredAt: null } selectedDocuments)
                 {
@@ -216,7 +223,7 @@ else
         }
         else if (activeTab == DatasetTab.Yaml)
         {
-            <section class="panel form-section" id="@PanelId(DatasetTab.Yaml)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Yaml)"><h2>@T("DataSourceYaml")</h2><p>@T("DatasetYamlHelp")</p><textarea class="form-code-editor runner-json" rows="24" readonly aria-label="@T("DataSourceYaml")" data-testid="dataset-yaml">@ResourceYaml</textarea></section>
+            <section class="panel form-section" id="@PanelId(DatasetTab.Yaml)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Yaml)"><h2>@T("DataSourceYaml")</h2><p>@T("DatasetYamlHelp")</p><FormField Label="@T("DataSourceYaml")"><ClearableText Multiline class="form-code-editor runner-json" rows="24" ReadOnly aria-label="@T("DataSourceYaml")" data-testid="dataset-yaml" Value="@ResourceYaml" /></FormField></section>
         }
     }
 }
@@ -245,6 +252,7 @@ else
         (tab != DatasetTab.Access || CanManage) && (tab is not (DatasetTab.Queries or DatasetTab.Tools)
             || source?.Definition.Dataset?.DocumentCollectionUid is not null));
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
+    private static IReadOnlyDictionary<string, object> AcquisitionAttributes(DataSourceAcquisitionResource item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() };
     private IReadOnlyList<DataSourceAcquisitionResource> VisibleHistory => (activeTab == DatasetTab.Overview ? OrderedHistory.Take(3) : OrderedHistory).ToArray();
     private IEnumerable<DataSourceAcquisitionResource> ContentAcquisitions => OrderedHistory.Where(item => item.Content is not null && item.ContentRetiredAt is null);
     private DataSourceAcquisitionResource? SelectedContentAcquisition => ContentAcquisitions.FirstOrDefault(item => item.Uid.ToString() == contentAcquisitionKey);

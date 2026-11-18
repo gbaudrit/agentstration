@@ -11,27 +11,32 @@
         @if (tools.Count == 0) { <p>@T("Queries.NoTools")</p> }
         else
         {
-            <DataGrid TItem="DataSourceQueryToolPublication" Items="tools"><Header><tr><th>@T("Tools")</th><th>@T("Queries.Version")</th><th>@T("Queries.QueryVersion")</th><th>@T("DatasetContentAcquisition")</th><th>@T("Queries.EditTool")</th></tr></Header><Row Context="item">
-                <tr data-testid="dataset-query-tool-row"><td data-label="@T("Tools")"><a href="@ToolUrl(item.Tool)">@(item.DisplayName ?? item.Tool.Name)</a></td>
-                    <td data-label="@T("Queries.Version")">@item.ToolVersion</td><td data-label="@T("Queries.QueryVersion")">@(item.Generic ? T("Queries.Generic") : item.Legacy ? T("Queries.Legacy") : item.QueryName + " / " + (item.SelectedQueryVersion ?? T("Queries.Latest")))</td>
-                    <td data-label="@T("DatasetContentAcquisition")">@(item.Acquisition?.Id ?? T("Queries.LatestAcquisition"))</td>
-                    <td data-label="@T("Queries.EditTool")">@if (CanWrite && item.Definition is { } definition && definition.ScopeRef == Owner)
-                        { <a href="@DefinitionUrl(definition)" data-testid="dataset-query-tool-edit">@T("Queries.EditTool")</a> }</td></tr>
-            </Row></DataGrid>
+            <CollectionView TItem="DataSourceQueryToolPublication" Items="tools" Compact RowTestId="dataset-query-tool-row" IdentityLabel="@T("Tools")" InformationLabels="@(new[] { T("Queries.Version"), T("Queries.QueryVersion"), T("DatasetContentAcquisition") })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@(item.DisplayName ?? item.Tool.Name)" Namespace="@((item.Tool.Namespace ?? ResourceNamespace.Default).Value)" Name="@item.Tool.Name" Href="@ToolUrl(item.Tool)" IconName="tools">
+                    <IconBadges><ResourceScopeBadge ScopeRef="item.Tool.ScopeRef" Compact /></IconBadges>
+                </CollectionIdentity></Identity>
+                <Information Context="item">
+                    <CollectionValue Label="@T("Queries.Version")"><CollectionVersion Label="@T("Queries.Version")" Value="@item.ToolVersion" Compact /></CollectionValue>
+                    <CollectionValue Label="@T("Queries.QueryVersion")">@(item.Generic ? T("Queries.Generic") : item.Legacy ? T("Queries.Legacy") : item.QueryName + " / " + (item.SelectedQueryVersion ?? T("Queries.Latest")))</CollectionValue>
+                    <CollectionValue Label="@T("DatasetContentAcquisition")">@(item.Acquisition?.Id ?? T("Queries.LatestAcquisition"))</CollectionValue>
+                </Information>
+                <Actions Context="item">@if (CanWrite && item.Definition is { } definition && definition.ScopeRef == Owner)
+                    { <a class="button-secondary" href="@DefinitionUrl(definition)" data-testid="dataset-query-tool-edit">@T("Queries.EditTool")</a> }</Actions>
+            </CollectionView>
         }
         @if (CanWrite)
         {
             <h3>@T("Documents.ToolTitle")</h3>
             <fieldset class="form-grid" disabled="@busy">
-                <label><span>@T("Queries.Select")</span><select value="@selectedUid" @onchange="SelectQueryAsync" data-testid="dataset-tool-query"><option value="">@T("Select")</option>@foreach (var query in queries) { <option value="@query.Uid">@query.Definition.DisplayName · @query.Namespace/@query.Name</option> }</select></label>
+                <FormField Label="@T("Queries.Select")"><ClearableSelect TValue="string" Value="@selectedUid" ValueExpression="@(() => selectedUid)" ValueChanged="value => SelectQueryAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-tool-query"><option value="">@T("Select")</option>@foreach (var query in queries) { <option value="@query.Uid">@query.Definition.DisplayName · @query.Namespace/@query.Name</option> }</ClearableSelect></FormField>
                 @if (selected is not null)
                 {
-                    <label><span>@T("Queries.QueryVersion")</span><select @bind="selectedVersion" @bind:after="ClearResult" data-testid="dataset-tool-query-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version</option> }</select><small>@T("Queries.VersionHelp")</small></label>
+                    <FormField Label="@T("Queries.QueryVersion")" Help="@T("Queries.VersionHelp")"><ClearableSelect TValue="string" @bind-Value="selectedVersion" @bind-Value:after="ClearResult" data-testid="dataset-tool-query-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version</option> }</ClearableSelect></FormField>
                     <ResourceIdentityFields @bind-DisplayName="toolDisplayName" @bind-TechnicalName="toolName" IsNew="true" DisplayNameTestId="dataset-query-tool-display-name" TechnicalNameTestId="dataset-query-tool-name" />
-                    <label><span>@T("Queries.Version")</span><input @bind="toolVersion" maxlength="32" data-testid="dataset-query-tool-version" /></label>
-                    <label><span>@T("Documents.ToolMode")</span><select @bind="acquisitionMode" data-testid="dataset-query-tool-mode"><option value="latest">@T("Documents.ToolLatest")</option><option value="exact">@T("Documents.ToolExact")</option></select></label>
-                    @if (acquisitionMode == "exact") { <label><span>@T("DatasetContentAcquisition")</span><select @bind="acquisitionUid"><option value="">@T("Select")</option>@foreach (var item in Retained) { <option value="@item.Uid">@item.Name</option> }</select></label> }
-                    <label><span>@T("Queries.Approval")</span><input type="checkbox" @bind="approval" /></label>
+                    <FormField Label="@T("Queries.Version")"><ClearableText UpdateOnInput="false" @bind-Value="toolVersion" maxlength="32" data-testid="dataset-query-tool-version" /></FormField>
+                    <FormField Label="@T("Documents.ToolMode")"><ClearableSelect AllowClear="false" TValue="string" @bind-Value="acquisitionMode" data-testid="dataset-query-tool-mode"><option value="latest">@T("Documents.ToolLatest")</option><option value="exact">@T("Documents.ToolExact")</option></ClearableSelect></FormField>
+                    @if (acquisitionMode == "exact") { <FormField Label="@T("DatasetContentAcquisition")"><ClearableSelect TValue="string" @bind-Value="acquisitionUid"><option value="">@T("Select")</option>@foreach (var item in Retained) { <option value="@item.Uid">@item.Name</option> }</ClearableSelect></FormField> }
+                    <label><span>@T("Queries.Approval")</span><FormCheckbox @bind-Value="approval" /></label>
                     <button class="button-primary" type="button" disabled="@(!selected.Value.Definition.Enabled || versions.Count == 0 || string.IsNullOrWhiteSpace(toolName) || string.IsNullOrWhiteSpace(toolDisplayName) || string.IsNullOrWhiteSpace(toolVersion) || acquisitionMode == "exact" && string.IsNullOrEmpty(acquisitionUid))"
                         @onclick="PublishToolAsync" data-testid="dataset-query-tool-publish">@T("Documents.PublishTool")</button>
                 }
@@ -43,20 +48,24 @@
         @if (queries.Count == 0) { <p>@T("Queries.Empty")</p> }
         else
         {
-            <DataGrid TItem="DataSourceQueryResource" Items="queries"><Header><tr><th>@T("Queries")</th><th>@T("Queries.State")</th><th>@T("Queries.Edit")</th></tr></Header><Row Context="item">
-                <tr data-testid="dataset-query-row"><td data-label="@T("Queries")">@item.Definition.DisplayName <code>@item.Namespace/@item.Name</code></td><td data-label="@T("Queries.State")">@T(item.Definition.Enabled ? "Enabled" : "Disabled")</td><td><button class="text-button" type="button" disabled="@busy" @onclick="() => LoadQueryAsync(item)">@T("Queries.Edit")</button></td></tr>
-            </Row></DataGrid>
+            <CollectionView TItem="DataSourceQueryResource" Items="queries" Compact RowTestId="dataset-query-row" IdentityLabel="@T("Queries")" InformationLabels="@(Array.Empty<string>())">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" OnOpen="() => LoadQueryAsync(item)" disabled="@busy" IconName="search">
+                    <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef != Owner)" IconOnly /></IconBadges>
+                </CollectionIdentity></Identity>
+                <Information></Information>
+                <Actions Context="item"><button class="button-secondary" type="button" disabled="@busy" @onclick="() => LoadQueryAsync(item)">@T("Queries.Edit")</button></Actions>
+            </CollectionView>
         }
         @if (selected is not null)
         {
             <fieldset class="form-grid" disabled="@(busy || !CanEdit)">
                 <ResourceIdentityFields @bind-DisplayName="displayName" TechnicalName="@selected.Value.Name" IsNew="false" DisplayNameTestId="dataset-query-edit-display-name" TechnicalNameTestId="dataset-query-edit-name" />
-                <label><span>@T("Enabled")</span><input type="checkbox" @bind="enabled" disabled="@(!CanEdit)" /></label>
-                <label class="form-span-2"><span>@T("Queries.Json")</span><textarea class="form-code-editor" rows="10" @bind="payload" readonly="@(!CanEdit)" maxlength="8192" data-testid="dataset-query-edit-json"></textarea></label>
+                <label><span>@T("Enabled")</span><FormCheckbox @bind-Value="enabled" disabled="@(!CanEdit)" /></label>
+                <FormField Label="@T("Queries.Json")" Class="form-span-2"><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor" rows="10" @bind-Value="payload" ReadOnly="@(!CanEdit)" maxlength="8192" data-testid="dataset-query-edit-json" /></FormField>
                 @if (CanEdit)
                 {
                     <button class="button-secondary" type="button" @onclick="SaveAsync" data-testid="dataset-query-edit-save">@T("Queries.SaveDraft")</button>
-                    <label><span>@T("Queries.Version")</span><input @bind="publishVersion" maxlength="32" data-testid="dataset-query-publish-version" /></label>
+                    <FormField Label="@T("Queries.Version")"><ClearableText UpdateOnInput="false" @bind-Value="publishVersion" maxlength="32" data-testid="dataset-query-publish-version" /></FormField>
                     <button class="button-primary" type="button" disabled="@(!enabled)" @onclick="PublishAsync" data-testid="dataset-query-publish">@T("Queries.Publish")</button>
                 }
             </fieldset>
@@ -67,7 +76,7 @@
                 @if (showAccess) { <ResourceAccessPanel OwnerScopeRef="Owner" Namespace="selected.Value.Namespace" Kind="@DataSourceResourceKinds.DataSourceQuery" Name="@selected.Value.Name" Generation="selected.Value.Generation" Governance="selected.Value.Governance" /> }
             }
             <h3>@T("Queries.Published")</h3>
-            <label><span>@T("Queries.QueryVersion")</span><select @bind="selectedVersion" @bind:after="ClearResult" data-testid="dataset-query-run-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version · @item.PublishedAt.ToLocalTime().ToString("g")</option> }</select></label>
+            <FormField Label="@T("Queries.QueryVersion")"><ClearableSelect TValue="string" @bind-Value="selectedVersion" @bind-Value:after="ClearResult" data-testid="dataset-query-run-version"><option value="">@T("Queries.Latest")</option>@foreach (var item in versions) { <option value="@item.Version">@item.Version · @item.PublishedAt.ToLocalTime().ToString("g")</option> }</ClearableSelect></FormField>
             <p class="muted">@T("Queries.VersionHelp")</p>
             <button class="button-primary" type="button" disabled="@(busy || !Context.HasPermission("runs/execute") || versions.Count == 0)" @onclick="RunAsync" data-testid="dataset-query-run">@T("Queries.Run")</button>
             @if (result is not null)

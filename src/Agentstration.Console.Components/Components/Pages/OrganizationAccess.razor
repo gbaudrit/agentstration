@@ -9,10 +9,16 @@
 @if (view is null) { <LoadingState Message="@T("LoadingAccess")" /> }
 else
 {
-    <DataGrid TItem="AccessRow" Items="Rows">
-        <Header><tr><th>@T("Principal")</th><th>@T("Role")</th><th>@T("Scope")</th><th>@T("Inheritance")</th></tr></Header>
-        <Row Context="row"><tr><td>@row.Member.Principal.DisplayName</td><td><strong>@row.Assignment.Role.DisplayName</strong></td><td><code>@row.Assignment.Scope</code></td><td>@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}else{<span>@T("Explicit")</span>}</td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="AccessRow" Items="Rows" InformationLabels="@(new string[] { T("Role"), T("Inheritance") })" IdentityLabel="@T("Principal")" ScopeLabel="@T("Scope")">
+        <Identity Context="row">
+@row.Member.Principal.DisplayName</Identity>
+        <Scope Context="row">
+<ResourceScopeBadge ScopeRef="@ResourceScopeRef.Parse(row.Assignment.Scope)" /></Scope>
+        <Information Context="row">
+            <CollectionValue Label="@T("Role")"><strong>@row.Assignment.Role.DisplayName</strong></CollectionValue>
+            <CollectionValue Label="@T("Inheritance")">@if(row.Assignment.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}else{<span>@T("Explicit")</span>}</CollectionValue>
+        </Information>
+    </CollectionView>
 }
 </div>
 @code {

@@ -1,5 +1,6 @@
 @page "/agents"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IManagementApiClient Client
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> Localizer
@@ -13,7 +14,7 @@
 
 <ResourceToolbar Label="@T("AgentFilters")">
     <ChildContent>
-        <SearchBox Value="search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
+        <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
         <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Deployed">@T("StatusDeployed")</option><option value="Failed">@T("StatusFailed")</option></select>
     </ChildContent>
     <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? T("Refreshing") : T("Refresh"))</button></Actions>
@@ -33,20 +34,21 @@ else if (Filtered.Count == 0)
 }
 else
 {
-    <DataGrid TItem="AgentSummary" Items="Filtered">
-        <Header><tr><th>Agent</th><th>@T("Namespace")</th><th>@T("Definition")</th><th>@T("GenerationHeader")</th><th>@T("ModelProfile")</th><th>@T("Deployment")</th><th>@T("LastActivity")</th><th>@T("Status")</th><th><span class="sr-only">@T("Actions")</span></th></tr></Header>
-        <Row Context="item"><tr class="agent-row">
-            <td><span class="resource-name-with-scope"><a class="resource-name-link" href="@EditUrl(item)">@item.Name</a><ResourceScopeBadge ScopeRef="@item.ScopeRef" Compact /></span><span class="resource-secondary"><code>@TechnicalName(item)</code></span></td>
-            <td><code>@item.Namespace.Value</code></td>
-            <td><strong>@ResourceName(item.Type)</strong></td>
-            <td class="agent-generation"><code>@item.Version</code></td>
-            <td><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></td>
-            <td>@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</td>
-            <td>@LastActivity(item.LastActivity)</td>
-            <td><span class="agent-state">@StatusLabel(item.Status)</span></td>
-            <td><div class="table-actions">@if(item.Namespace.IsDefault){<a class="text-button" href="@RunUrl(item)">@T("Run")</a>}<details class="row-actions-menu"><summary aria-label="@F("MoreActions", item.Name)">•••</summary><div><a href="@EditUrl(item)">@T("Open")</a>@if(item.Namespace.IsDefault){<a href="@RunUrl(item)">@T("Run")</a><a href="@EditUrl(item)#definition">@T("EditDefinition")</a><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button>}<button type="button" @onclick="() => selected = item">@T("QuickInspect")</button></div></details></div></td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="AgentSummary" Items="Filtered" InformationLabels="@(new[] { T("Definition"), T("ModelProfile"), T("Deployment"), T("LastActivity") })">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("Definition")"><strong>@ResourceName(item.Type)</strong></CollectionValue>
+            <CollectionValue Label="@T("ModelProfile")"><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></CollectionValue>
+            <CollectionValue Label="@T("Deployment")">@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</CollectionValue>
+            <CollectionValue Label="@T("LastActivity")">@LastActivity(item.LastActivity)</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")">
+            <a href="@EditUrl(item)">@T("Open")</a>
+            @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)">@T("Run")</a></PermissionGate> }
+            @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@EditUrl(item)#definition">@T("EditDefinition")</a></PermissionGate><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
+            <button type="button" @onclick="() => selected = item">@T("QuickInspect")</button>
+        </CollectionActions></Actions>
+    </CollectionView>
 }
 
 @if (selected is not null)
@@ -122,13 +124,17 @@ else
         }
     }
 
-    private static string EditUrl(AgentSummary item) => item.DetailsUrl;
-    private static string RunUrl(AgentSummary item) => $"{EditUrl(item)}/run";
+    private string EditUrl(AgentSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
+    private string RunUrl(AgentSummary item)
+    {
+        var url = EditUrl(item); var query = url.IndexOf('?');
+        return query < 0 ? $"{url}/run" : $"{url[..query]}/run{url[query..]}";
+    }
     private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress, item.ModelProfileScopeRef);
     private static string TechnicalName(AgentSummary item) => item.Id;
     private static string ResourceName(string resourceId) => resourceId;
     private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");
-    private string StatusLabel(string value) => value switch { "Accepted" => T("StatusValid"), "Succeeded" => T("StatusPublished"), "Failed" => T("StatusFailed"), _ => value };
+    private string StatusLabel(string value) => value switch { "Accepted" => T("StatusValid"), "Succeeded" => T("StatusPublished"), "Failed" => T("StatusFailed"), "Unknown" or "" => T("StatusUnknown"), _ => value };
     private string DeploymentStatusLabel(string value) => string.Equals(value, "Not deployed", StringComparison.OrdinalIgnoreCase)
         ? DeploymentLocalizer["Status.NotDeployed"]
         : DeploymentLocalizer[$"Status.{value}"];

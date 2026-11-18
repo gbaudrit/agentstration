@@ -40,7 +40,10 @@ else
                 else { <p>@T("LocalStorage")</p> }
                 <h3>@T("Mappings")</h3>
                 @if (resource.Definition.Bindings.Count == 0) { <p>@T("NoMappings")</p> }
-                else { <DataGrid TItem="StorageExportBinding" Items="resource.Definition.Bindings"><Header><tr><th>@T("Requirement")</th><th>@T("Export")</th><th>@T("ValueType")</th><th>@T("Protection")</th></tr></Header><Row Context="binding"><tr data-testid="storage-mapping"><td><code>@binding.RequirementId</code></td><td><code>@binding.Export.Id</code></td><td>@T($"ValueType.{binding.Export.Type}")</td><td>@T($"Protection.{binding.Export.Protection}")</td></tr></Row></DataGrid> }
+                else { <CollectionView TItem="StorageExportBinding" Items="resource.Definition.Bindings" IdentityLabel="@T("Requirement")" InformationLabels="@(new[] { T("Export"), T("ValueType"), T("Protection") })" RowTestId="storage-mapping">
+                    <Identity Context="binding"><CollectionIdentity DisplayName="@binding.RequirementId" Name="@binding.RequirementId" IconName="plug" /></Identity>
+                    <Information Context="binding"><CollectionValue Label="@T("Export")"><CopyableValue Value="@binding.Export.Id" /></CollectionValue><CollectionValue Label="@T("ValueType")">@T($"ValueType.{binding.Export.Type}")</CollectionValue><CollectionValue Label="@T("Protection")">@T($"Protection.{binding.Export.Protection}")</CollectionValue></Information>
+                </CollectionView> }
             </section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Configuration")</h2></div><JsonSchemaInputEditor Schema="typeChoice?.Version.ConfigurationSchema" Value="resource.Definition.Configuration" ReadOnly /></section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Envelope")</h2></div><p>@T("Envelope.Help")</p><JsonSchemaInputEditor Schema="typeChoice?.Version.EnvelopeSchema" Value="resource.Definition.Envelope" ReadOnly /></section>
@@ -51,7 +54,7 @@ else
             </section>
             <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("Dependents.Help")</p>
                 @if (usages.Count == 0) { <p>@T("NoDependents")</p> }
-                else { <ul class="resource-links">@foreach (var usage in usages) { <li><a href="@UsageUrl(usage)">@usage.DisplayName</a><code>@usage.Kind · @usage.Name</code></li> }</ul> }
+                else { <ul class="resource-links">@foreach (var usage in usages) { var usageIdentity = StorageLinks.UsageIdentity(usage); <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usageIdentity.Namespace" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="layers"><IconBadges>@if (usageIdentity.ScopeRef is { } usageScope) { <ResourceScopeBadge ScopeRef="usageScope" IconOnly /> }</IconBadges><Badges><span>@usage.Kind</span></Badges></CollectionIdentity></li> }</ul> }
                 <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="/data-sources">@T("DataSources")</a><a href="/knowledge-sources">@T("KnowledgeSources")</a></nav>
             </section>
         }

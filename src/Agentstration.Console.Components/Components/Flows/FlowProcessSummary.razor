@@ -12,7 +12,13 @@
             <ul>@foreach (var unit in Admission.Units.OrderBy(unit => unit.Ordinal))
             {
                 var node = Nodes.FirstOrDefault(node => node.FlowRunId == unit.RunId);
-                <li><a href="@FlowRunInspection.RunUrl(unit.RunId, Scope, LogicalScope)">@Localizer["ProcessUnit", unit.Ordinal + 1]</a>@if (unit.Descriptor is not null) { <span>@unit.Descriptor</span> }@if (node?.ActiveStepName is { } activeStep) { <small>@Localizer["ProcessActiveStep"]: @activeStep</small> }<span class="process-unit-status">@(node is null ? Localizer["ProcessAdmitted"].Value : Localizer[$"Status.{node.Status}"].Value)</span></li>
+                <li>
+                    <CollectionIdentity DisplayName="@Localizer["ProcessUnit", unit.Ordinal + 1]" Name="@unit.RunId"
+                        Href="@FlowRunInspection.RunUrl(unit.RunId, Scope, LogicalScope)" IconName="workflow">
+                        <IconBadges><StatusBadge Text="@(node is null ? Localizer["ProcessAdmitted"].Value : Localizer[$"Status.{node.Status}"].Value)" Status="@(node is null ? UiStatus.Neutral : PlatformDashboardService.ToStatus(node.Status.ToString()))" IconOnly /></IconBadges>
+                        <Badges>@if (unit.Descriptor is not null) { <span>@unit.Descriptor</span> }@if (node?.ActiveStepName is { } activeStep) { <small>@Localizer["ProcessActiveStep"]: @activeStep</small> }</Badges>
+                    </CollectionIdentity>
+                </li>
             }</ul>
         }
     </div>

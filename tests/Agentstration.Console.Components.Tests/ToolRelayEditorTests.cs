@@ -8,6 +8,7 @@ using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Values;
@@ -37,6 +38,35 @@ public sealed class ToolRelayEditorTests
         page.Find("[data-testid='relay-save-draft']").Click();
         page.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         Assert.AreEqual("request", Assert.IsInstanceOfType<RelayToolDefinitionProperties>(handler.Saved!.Properties).InputEnvelope);
+    }
+
+    [TestMethod]
+    public async Task PublishedRelayVersionsAndUsagesKeepTheirExactReferencesInCards()
+    {
+        using var handler = new ApiHandler
+        {
+            Usages = [new("Flow", "same-name", ResourceNamespace.Parse("team"), Scope, "4.2.0", "1.2.0")]
+        };
+        using var context = Context(handler);
+        var page = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        page.WaitForElement("[data-testid=relay-version]");
+        await page.FindAll(".resource-tabs button")[1].ClickAsync();
+        var versions = page.FindComponent<CollectionView<ToolDefinitionVersionResource>>();
+        await page.InvokeAsync(() => versions.Instance.SetNarrow(true));
+        Assert.HasCount(1, page.FindAll(".collection-cards > li"));
+        Assert.Contains("1.2.0", page.Find(".collection-cards").TextContent);
+        Assert.Contains("2.4.0", page.Find(".collection-cards").TextContent);
+        Assert.AreEqual("default/source.v2.4.0", page.Find(".copyable-value code").TextContent);
+        Assert.IsFalse(page.Find(".collection-actions button").HasAttribute("disabled"));
+        await page.FindAll(".resource-tabs button")[2].ClickAsync();
+        var usages = page.FindComponent<CollectionView<ToolDefinitionUsage>>();
+        await page.InvokeAsync(() => usages.Instance.SetNarrow(true));
+        Assert.AreEqual("team/same-name", page.Find(".copyable-value code").TextContent);
+        Assert.AreEqual($"/flows/same-name?namespace=team&context={Uri.EscapeDataString(Scope.Value)}", page.Find(".resource-name-link").GetAttribute("href"));
+        Assert.Contains("4.2.0", page.Find(".collection-cards").TextContent);
+        Assert.Contains("1.2.0", page.Find(".collection-cards").TextContent);
+        Assert.IsEmpty(page.FindAll(".collection-actions"));
+        Assert.IsEmpty(handler.Writes);
     }
 
     private static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
@@ -372,6 +402,10 @@ public sealed class ToolRelayEditorTests
     private static BunitContext Context(ApiHandler handler, ResourceScopeRef? navigationScope = null)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
+        foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
+            module.SetupVoid(method, _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(navigationScope ?? Scope));
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
@@ -397,6 +431,7 @@ public sealed class ToolRelayEditorTests
         public ToolResource Source { get; } = Tool("source.v2.4.0", "2.4.0", """{"type":"object","properties":{"store":{"type":"object","properties":{"id":{"type":"string"}}},"query":{"type":"string"}},"required":["query"]}""");
         public ToolResource Incompatible { get; } = Tool("source.v3.0.0", "3.0.0", """{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}""");
         public string? InputEnvelope { get; init; }
+        public IReadOnlyList<ToolDefinitionUsage> Usages { get; init; } = [];
         public int Publications { get; private set; }
         public PutToolDefinitionRequest? Saved { get; private set; }
         public List<string> Writes { get; } = [];
@@ -468,7 +503,7 @@ public sealed class ToolRelayEditorTests
                 if (request.Method == HttpMethod.Post) { Publications++; return Ok(version); }
                 return Ok(new { value = new[] { version } });
             }
-            if (path.EndsWith("/usages", StringComparison.Ordinal)) return Ok(new { value = Array.Empty<ToolDefinitionUsage>() });
+            if (path.EndsWith("/usages", StringComparison.Ordinal)) return Ok(new { value = Usages });
             if (request.Method == HttpMethod.Put) Saved = await request.Content!.ReadFromJsonAsync<PutToolDefinitionRequest>(cancellationToken);
             return Ok(new ToolDefinitionResource
             {

@@ -28,10 +28,10 @@
                 <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationIdentityEyebrow")</p><h2>@T("CreationIdentityTitle")</h2><p>@T("CreationIdentityHelp")</p></div><span class="tool-create-section-number">01</span></div>
                 <div class="form-grid tool-create-identity-grid">
                     <ResourceIdentityFields @bind-DisplayName="identity.DisplayName" @bind-TechnicalName="identity.Name" IsNew="true" DisplayNameHelp="@T("CreationDisplayNameHelp")" TechnicalNameHelp="@T("CreationTechnicalNameHelp")" DisplayNameTestId="tool-definition-display-name" TechnicalNameTestId="tool-definition-name" />
-                    <label><span>@T("CreationInitialVersion")</span><InputText @bind-Value="identity.Version" data-testid="tool-definition-initial-version" /><small>@T("CreationInitialVersionHelp")</small></label>
+                    <FormField Label="@T("CreationInitialVersion")" Help="@T("CreationInitialVersionHelp")"><ClearableText UpdateOnInput="false" @bind-Value="identity.Version" data-testid="tool-definition-initial-version" /></FormField>
                     <div><ResourceScopeFormField @key="lastContextScope" ResourceKind="@ToolResourceKinds.ToolDefinition" Value="identity.ScopeRef" ValueChanged="ScopeChanged" /><small>@T("CreationScopeHelp")</small></div>
-                    <label><span>@T("Namespace")</span><InputText @bind-Value="identity.Namespace" data-testid="tool-definition-namespace" /></label>
-                    <label class="tool-create-span-all"><span>@T("DefinitionDescription")</span><InputTextArea @bind-Value="identity.Description" rows="3" data-testid="tool-definition-description" /><small>@T("CreationDescriptionHelp")</small></label>
+                    <FormField Label="@T("Namespace")"><ClearableText UpdateOnInput="false" @bind-Value="identity.Namespace" data-testid="tool-definition-namespace" /></FormField>
+                    <FormField Label="@T("DefinitionDescription")" Class="tool-create-span-all" Help="@T("CreationDescriptionHelp")"><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="identity.Description" rows="3" data-testid="tool-definition-description" /></FormField>
                 </div>
             </section>
             <section class="panel tool-create-section">
@@ -64,8 +64,8 @@
                     <div class="tool-create-summary"><span><strong>@identity.DisplayName</strong><code>@identity.Name</code><ResourceScopeBadge ScopeRef="identity.ScopeRef" Compact /></span><span>@T("RelayVersion") <strong>@identity.Version</strong></span></div>
                     @if (loadingFlow) { <LoadingState Message="@T("LoadingFlowContract")" /> }
                     <div class="form-grid">
-                        <label><span>@T("Flow")</span><select data-testid="tool-definition-flow" @bind="selectedFlow" @bind:after="FlowChangedAsync" disabled="@(loadingFlow || saving)"><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@FlowKey(flow)">@flow.Name · @flow.ScopeRef · @flow.Namespace/@flow.Id</option> }</select></label>
-                        <label><span>@T("CreationFlowVersion")</span><select data-testid="tool-definition-version" @bind="selectedVersion" @bind:after="LoadContractAsync" disabled="@(loadingFlow || saving || versions.Count == 0)"><option value="">@T("CreationSelectVersion")</option>@foreach (var version in versions) { <option value="@version.Version">@version.Version</option> }</select></label>
+                        <FormField Label="@T("Flow")"><ClearableSelect TValue="string" data-testid="tool-definition-flow" @bind-Value="selectedFlow" @bind-Value:after="FlowChangedAsync" disabled="@(loadingFlow || saving)"><option value="">@T("SelectFlow")</option>@foreach (var flow in flows) { <option value="@FlowKey(flow)">@flow.Name · @flow.ScopeRef · @flow.Namespace/@flow.Id</option> }</ClearableSelect></FormField>
+                        <FormField Label="@T("CreationFlowVersion")"><ClearableSelect TValue="string" data-testid="tool-definition-version" @bind-Value="selectedVersion" @bind-Value:after="LoadContractAsync" disabled="@(loadingFlow || saving || versions.Count == 0)"><option value="">@T("CreationSelectVersion")</option>@foreach (var version in versions) { <option value="@version.Version">@version.Version</option> }</ClearableSelect></FormField>
                     </div>
                     @if (contractLoaded)
                     {

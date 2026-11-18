@@ -1,0 +1,9 @@
+Running tests from /workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64)
+/workspace/agentstration-1122/tests/Agentstration.Web.Components.Tests/bin/Release/net10.0/Agentstration.Web.Components.Tests.dll (net10.0|x64) passed (1s 600ms)
+
+Test run summary: Passed!
+  total: 91
+  failed: 0
+  succeeded: 91
+  skipped: 0
+  duration: 1s 792ms

@@ -4,7 +4,7 @@ export type SupportedTestLocale = typeof SupportedTestLocales[number];
 export const GovernedInventoryTextByLocale = {
   'en-US': {
     resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',
-    managed: 'Managed · read-only', technical: 'Technical details', publications: 'Published versions',
+    managed: 'Managed · read-only', managedBadge: 'Managed / read-only', technical: 'Technical details', publications: 'Published versions',
     available: 'Available', unavailable: 'Unavailable', missing: 'Not materialized', conflict: 'Conflict',
     definition: 'Definition', revisions: 'Revisions', yaml: 'YAML', deployments: 'Deployments',
     kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
@@ -15,7 +15,7 @@ export const GovernedInventoryTextByLocale = {
   },
   'fr-FR': {
     resources: 'Ressources gérées', contributions: 'Contributions', installed: 'Installée', degraded: 'Dégradée',
-    managed: 'Gérée · lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
+    managed: 'Gérée · lecture seule', managedBadge: 'Géré / lecture seule', technical: 'Détails techniques', publications: 'Versions publiées',
     available: 'Disponible', unavailable: 'Indisponible', missing: 'Non matérialisée', conflict: 'En conflit',
     definition: 'Définition', revisions: 'Révisions', yaml: 'YAML', deployments: 'Déploiements',
     kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',
@@ -305,6 +305,28 @@ export const OrganizationStructureTextByLocale = {
   },
 } as const;
 
+/** Independent collection vocabulary; deliberately not derived from product RESX. */
+export const CollectionTextByLocale = {
+  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
+  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
+} as const;
+
+export const CollectionVersionTextByLocale = {
+  'en-US': { version: 'Version', active: 'Published version', draft: 'Draft version', generation: 'Generation', targetArchive: 'Target archive version', configure: 'Configure' },
+  'fr-FR': { version: 'Version', active: 'Version publiée', draft: 'Version du brouillon', generation: 'Génération', targetArchive: 'Version cible de l’archive', configure: 'Configurer' },
+} as const;
+
+/** Independent field expectations; do not import product resource files. */
+export const SharedFormTextByLocale = {
+  'en-US': { clear: 'Clear', selectionRequired: 'Select a value' },
+  'fr-FR': { clear: 'Vider', selectionRequired: 'Sélectionnez une valeur' },
+} as const;
+
+export const FlowCollectionTextByLocale = {
+  'en-US': { resource: 'Resource', version: 'Version', updated: 'Updated', actions: 'Actions', pageSize: 'Rows per page', previous: 'Previous', next: 'Next', pageOne: 'Page 1', pageTwo: 'Page 2', draft: 'Draft, revision 1', inheritedReadOnly: 'Read-only in this scope' },
+  'fr-FR': { resource: 'Ressource', version: 'Version', updated: 'Mis à jour', actions: 'Actions', pageSize: 'Lignes par page', previous: 'Précédent', next: 'Suivant', pageOne: 'Page 1', pageTwo: 'Page 2', draft: 'Brouillon, révision 1', inheritedReadOnly: 'Lecture seule dans ce périmètre' },
+} as const;
+
 /** Independent acceptance text for the #1116/#1118 lifecycle/composition delta. */
 export const SourcePolicyTextByLocale = {
   'en-US': { createTransformation: 'Create a transformation Flow', createdTransformation: 'Draft created.', ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
@@ -313,4 +335,9 @@ export const SourcePolicyTextByLocale = {
   'fr-FR': { createTransformation: 'Créer un flow de transformation', createdTransformation: 'Brouillon créé.', ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
     direct: 'Résultat direct', composition: 'Composition des Flows', failed: 'Échec', retired: 'Retiré',
     storageRequired: 'La fraîcheur et la conservation nécessitent un Storage d’entrée.', fallback: 'Autoriser une ancienne acquisition après un échec de rafraîchissement' },
+} as const;
+
+export const ConnectedStorageCollectionTextByLocale = {
+  'en-US': { deactivate: 'Deactivate', cancel: 'Cancel' },
+  'fr-FR': { deactivate: 'Désactiver', cancel: 'Annuler' },
 } as const;

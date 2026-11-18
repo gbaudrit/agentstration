@@ -12,13 +12,13 @@
 <ResourceToolbar Label="@T("Filters")">
     <ChildContent>
         <label for="resource-plan-status">@T("Status")</label>
-        <select id="resource-plan-status" @bind="statusFilter" @bind:after="ApplyFilterAsync">
+        <ClearableSelect id="resource-plan-status" @bind-Value="statusFilter" @bind-Value:after="ApplyFilterAsync">
             <option value="">@T("AllStatuses")</option>
             @foreach (var status in Enum.GetValues<ResourcePlanStatus>())
             {
                 <option value="@status">@T($"Status.{status}")</option>
             }
-        </select>
+        </ClearableSelect>
     </ChildContent>
     <Actions>
         <span class="resource-plan-workspace">@T("CurrentWorkspace", ContextState.Current?.WorkspaceDisplayName ?? "—")</span>
@@ -41,20 +41,20 @@ else if (page is not null && page.Items.Count == 0)
 else if (page is not null)
 {
     <section class="resource-plan-list" aria-label="@T("ListLabel")">
-        <DataGrid TItem="ResourcePlanSnapshot" Items="page.Items">
-            <Header><tr><th>@T("Plan")</th><th>@T("Status")</th><th>@T("Changes")</th><th>@T("Validation")</th><th>@T("Updated")</th><th><span class="sr-only">@T("Open")</span></th></tr></Header>
-            <Row Context="item">
-                @{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
-                <tr>
-                    <td><a class="resource-name-link" href="@($"/resource-plans/{item.Value.Id.Value:D}")">@item.Value.Title</a><span class="resource-secondary resource-plan-goal">@item.Value.Goal</span></td>
-                    <td><StatusBadge Text="@T($"Status.{item.Value.Status}")" Status="@Tone(item.Value.Status)" /><span class="resource-secondary">@T("Revision", item.Value.Revision)</span></td>
-                    <td><strong class="resource-plan-change-count">@(summary?.Changes.ToString() ?? "—")</strong> @if (summary?.Stale == true) { <StatusBadge Text="@T("Stale")" Status="UiStatus.Warning" /> }</td>
-                    <td><StatusBadge Text="@(summary?.Readiness is null ? T("NotValidated") : T($"Readiness.{summary.Readiness}"))" Status="@ReadinessTone(summary?.Readiness)" /></td>
-                    <td><time datetime="@item.Value.UpdatedAt.ToString("O")">@item.Value.UpdatedAt.ToLocalTime().ToString("g")</time></td>
-                    <td><a class="text-button" href="@($"/resource-plans/{item.Value.Id.Value:D}")">@T("Open")</a></td>
-                </tr>
-            </Row>
-        </DataGrid>
+        <CollectionView TItem="ResourcePlanSnapshot" Items="page.Items" InformationLabels="@(new string[] { T("Changes"), T("Validation"), T("Updated") })" IdentityLabel="@T("Plan")" StateLabel="@T("Status")">
+        <Identity Context="item">@{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
+<CollectionIdentity DisplayName="@item.Value.Title" Name="@item.Value.Id.ToString()" Href="@($"/resource-plans/{item.Value.Id.Value:D}")" IconName="clipboard-list" /><span class="resource-secondary resource-plan-goal">@item.Value.Goal</span></Identity>
+        <Scope Context="item"><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(item.Value.Scope.WorkspaceId.Value)" /></Scope>
+        <State Context="item">@{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
+<StatusBadge Text="@T($"Status.{item.Value.Status}")" Status="@Tone(item.Value.Status)" /><span class="resource-secondary">@T("Revision", item.Value.Revision)</span></State>
+        <Information Context="item">@{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
+            <CollectionValue Label="@T("Changes")"><strong class="resource-plan-change-count">@(summary?.Changes.ToString() ?? "—")</strong> @if (summary?.Stale == true) { <StatusBadge Text="@T("Stale")" Status="UiStatus.Warning" /> }</CollectionValue>
+            <CollectionValue Label="@T("Validation")"><StatusBadge Text="@(summary?.Readiness is null ? T("NotValidated") : T($"Readiness.{summary.Readiness}"))" Status="@ReadinessTone(summary?.Readiness)" /></CollectionValue>
+            <CollectionValue Label="@T("Updated")"><time datetime="@item.Value.UpdatedAt.ToString("O")">@item.Value.UpdatedAt.ToLocalTime().ToString("g")</time></CollectionValue>
+        </Information>
+        <Actions Context="item">@{ var summary = summaries.GetValueOrDefault(item.Value.Id.Value); }
+<CollectionActions ResourceName="@(item.Value.Title)"><a class="text-button" href="@($"/resource-plans/{item.Value.Id.Value:D}")">@T("Open")</a></CollectionActions></Actions>
+    </CollectionView>
         <nav class="resource-plan-pagination" aria-label="@T("Pages")">
             <span>@T("Page", skip / PageSize + 1)</span>
             <div><button class="button-secondary" type="button" @onclick="PreviousAsync" disabled="@(loading || skip == 0)">@T("Previous")</button>

@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { revealCollectionAction } from './collection-actions.js';
 
 export interface ResourceAccessIdentity {
   uid: string;
@@ -112,16 +113,18 @@ export class ResourceAccessPage {
   }
 
   public async addGrant(scopeRef: string): Promise<void> {
+    await this.openAddition();
     await this.page.getByTestId(TestIds.resourceAccess.target).selectOption(scopeRef);
-    await this.page.getByTestId(TestIds.resourceAccess.add).click();
-    await this.grant(scopeRef).waitFor({ state: 'visible' });
     await this.save();
+    await this.grant(scopeRef).waitFor({ state: 'visible' });
     await this.expectPersistedGrant(scopeRef, true);
   }
 
   public async removeGrant(scopeRef: string): Promise<void> {
     const grant = this.grant(scopeRef);
-    await grant.getByTestId(TestIds.resourceAccess.remove).click();
+    const remove = grant.getByTestId(TestIds.resourceAccess.remove);
+    await revealCollectionAction(remove);
+    await remove.click();
     await grant.waitFor({ state: 'detached' });
     await this.save();
     await this.expectPersistedGrant(scopeRef, false);
@@ -149,6 +152,7 @@ export class ResourceAccessPage {
   }
 
   public async rejectInjectedTarget(scopeRef: string, expectedMessage: string): Promise<void> {
+    await this.openAddition();
     const target = this.page.getByTestId(TestIds.resourceAccess.target);
     await target.evaluate((element, value) => {
       const option = document.createElement('option');
@@ -178,6 +182,12 @@ export class ResourceAccessPage {
 
   public async assertIdentity(expected: ResourceAccessIdentity): Promise<void> {
     expect(await this.identity()).toEqual(expected);
+  }
+
+  private async openAddition(): Promise<void> {
+    const toggle = this.page.getByTestId(TestIds.resourceAccess.openAdd);
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await this.page.getByTestId(TestIds.resourceAccess.target).waitFor({ state: 'visible' });
   }
 
   private async save(): Promise<void> {

@@ -496,6 +496,16 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public void DiscoveredModelLinksCarryTheOwnerContextBeforeInteractiveNavigationStarts()
+    {
+        var address = ResourceAddress.Create(new ResourceNamespace("shared.models"), ModelResourceKinds.Model, "provider.model");
+        Assert.AreEqual("/models/provider.model?namespace=shared.models&context=%2Finstance",
+            ConsoleResourceUrls.Model(address, ResourceScopeRef.Instance));
+        Assert.AreEqual("/models/provider.model?context=%2Finstance",
+            ConsoleResourceUrls.Model(address with { Namespace = ResourceNamespace.Default }, ResourceScopeRef.Instance));
+    }
+
+    [TestMethod]
     public async Task SourceProvidersClientPreservesNamespaceAndETag()
     {
         var scopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));

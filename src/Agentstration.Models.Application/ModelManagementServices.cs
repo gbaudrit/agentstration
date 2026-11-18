@@ -13,7 +13,10 @@ public sealed record ModelProfileUsage(
     string Name,
     string DisplayName,
     ResourceScopeRef ScopeRef,
-    string ScopeDisplayName);
+    string ScopeDisplayName)
+{
+    public bool IsManaged { get; init; }
+}
 public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
 public sealed record ModelProfileResolution(
     ModelProfileResource Profile,

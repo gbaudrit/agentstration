@@ -18,7 +18,7 @@
     background: color-mix(in srgb, var(--primary-soft) 32%, var(--surface-2));
 }
 
-.knowledge-choice input {
+.knowledge-choice ::deep input {
     width: 1.05rem !important;
     min-height: 1.05rem !important;
     margin: 0;

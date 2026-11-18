@@ -159,7 +159,7 @@ export class OperationalWorkspacesPage {
     await this.open(`${consoleUrl}/agents`, TestIds.resourceAdministration.agents);
     await this.selectContext(consoleUrl, evidence.logicalScopeRef);
     await this.open(`${consoleUrl}/flow-runs`, TestIds.flowObservability.runs);
-    const link = this.page.locator(`a[href^="/flow-runs/${evidence.flowRunId}?"]`);
+    const link = this.page.locator(`a.resource-name-link[href^="/flow-runs/${evidence.flowRunId}?"]`);
     await expect(link).toBeVisible();
     await link.click();
     await this.runDetails.waitFor({ state: 'visible' });

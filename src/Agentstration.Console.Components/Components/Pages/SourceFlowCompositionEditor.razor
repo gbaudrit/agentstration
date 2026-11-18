@@ -4,11 +4,11 @@
 
 <section class="panel form-section" data-testid="source-flow-composition">
     <h2>@T("CompositionTitle")</h2>
-    <label><span>@T("CompositionOrchestration")</span><select value="@SelectedKey" @onchange="ChangeRootAsync" disabled="@ReadOnly" data-testid="source-orchestration">
+    <FormField Label="@T("CompositionOrchestration")" Help="@T("CompositionBoundaryHelp")"><ClearableSelect TValue="string" Value="@SelectedKey" ValueChanged="changed => ChangeRootAsync(new ChangeEventArgs { Value = changed })" disabled="@ReadOnly" data-testid="source-orchestration">
         <option value="">@T("CompositionStandard")</option>
         @foreach (var option in options) { <option value="@Key(option.Reference)">@option.Label</option> }
         @if (Orchestration is not null && options.All(option => Key(option.Reference) != SelectedKey)) { <option value="@SelectedKey">@Orchestration.ResourceId · @T("SequenceUnavailable")</option> }
-    </select><small>@T("CompositionBoundaryHelp")</small></label>
+    </ClearableSelect></FormField>
     @if (loadFailed) { <p role="status">@T("SequenceUnavailable")</p> }
     @foreach (var point in PointNames)
     {

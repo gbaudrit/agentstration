@@ -98,8 +98,8 @@
     font-weight: 650;
 }
 
-.flow-definition-fields input,
-.flow-definition-fields textarea {
+.flow-definition-fields ::deep input,
+.flow-definition-fields ::deep textarea {
     width: 100%;
     min-height: var(--field-height);
     padding: 10px 12px;
@@ -112,21 +112,21 @@
     box-shadow: var(--field-shadow);
 }
 
-.flow-definition-fields textarea {
+.flow-definition-fields ::deep textarea {
     min-height: 112px;
     resize: vertical;
 }
 
-.flow-definition-fields input:focus-visible,
-.flow-definition-fields textarea:focus-visible {
+.flow-definition-fields ::deep input:focus-visible,
+.flow-definition-fields ::deep textarea:focus-visible {
     outline: 0;
     border-color: var(--primary);
     box-shadow: var(--field-focus-ring), var(--field-shadow);
 }
 
-.flow-definition-fields input:read-only,
-.flow-definition-fields input:disabled,
-.flow-definition-fields textarea:disabled {
+.flow-definition-fields ::deep input:read-only,
+.flow-definition-fields ::deep input:disabled,
+.flow-definition-fields ::deep textarea:disabled {
     background: var(--surface-2);
     color: var(--muted);
     box-shadow: none;

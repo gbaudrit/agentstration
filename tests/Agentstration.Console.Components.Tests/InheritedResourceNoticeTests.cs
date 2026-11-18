@@ -41,7 +41,7 @@ public sealed class InheritedResourceNoticeTests
 
     private static BunitContext CreateContext(string scopeRef)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConsoleNavigationContext>(new StubNavigationContext(scopeRef));
         return context;

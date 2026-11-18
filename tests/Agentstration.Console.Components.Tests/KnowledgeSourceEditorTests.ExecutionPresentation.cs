@@ -51,6 +51,8 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.DoesNotContain("orchestration · 1.0.0", rendered.Markup);
         Assert.Contains("step=agent", rendered.Find("a").GetAttribute("href")!);
         Assert.AreEqual("_blank", rendered.Find("a").GetAttribute("target"));
+        Assert.AreEqual("child", rendered.Find(".execution-progress-location .collection-qualified-name code").TextContent);
+        Assert.HasCount(0, rendered.FindAll(".execution-progress-location a button"));
     }
 
     [TestMethod]

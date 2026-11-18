@@ -65,6 +65,12 @@ export function registerCollapsedNavigationTooltips(shell) {
         if (link && link === activeLink && !isInside(link, event.relatedTarget)) hide();
     };
 
+    const onTabKey = event => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.target instanceof Element && event.target.matches('.resource-tabs [role="tab"]')
+            && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) event.preventDefault();
+    };
+    shell.addEventListener("keydown", onTabKey);
     shell.addEventListener("pointerover", onPointerOver);
     shell.addEventListener("pointerout", onPointerOut);
     shell.addEventListener("focusin", onFocusIn);
@@ -74,6 +80,7 @@ export function registerCollapsedNavigationTooltips(shell) {
 
     return {
         dispose() {
+            shell.removeEventListener("keydown", onTabKey);
             shell.removeEventListener("pointerover", onPointerOver);
             shell.removeEventListener("pointerout", onPointerOut);
             shell.removeEventListener("focusin", onFocusIn);

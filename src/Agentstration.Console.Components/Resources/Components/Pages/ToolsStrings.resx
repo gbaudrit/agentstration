@@ -64,6 +64,7 @@
   <data name="AcquisitionImplementationHelp"><value>This Tool reuses the target and parameters from its acquisition template.</value></data>
   <data name="AcquisitionTemplate"><value>Acquisition template</value></data>
   <data name="AcquisitionOutput"><value>Output artifact</value></data>
+  <data name="TimeoutRange"><value>Timeout must be between 1 and 900 seconds.</value></data>
   <data name="ToolKind" xml:space="preserve"><value>Tool kind</value></data>
   <data name="RelayViews" xml:space="preserve"><value>Relay views</value></data>
   <data name="RelayConfiguration" xml:space="preserve"><value>Configuration</value></data>

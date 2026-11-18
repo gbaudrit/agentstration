@@ -11,15 +11,15 @@
     }
     @if (Schema.Kind == JsonSchemaInputKind.Union)
     {
-        <label><span>@Label @RequiredMark @Localizer["UnionType"]</span>
-            <select value="@SelectedVariantIndex" disabled="@FieldDisabled" @onchange="ChangeVariantAsync">
+        <FormField Label="@($"{Label} {Localizer["UnionType"]}")" Required="@Schema.Required" Validation="@FieldValidation">
+            <ClearableSelect TValue="string" AllowClear="false" Value="@SelectedVariantIndex.ToString(CultureInfo.InvariantCulture)" disabled="@FieldDisabled" ValueChanged="changed => ChangeVariantAsync(new ChangeEventArgs { Value = changed })">
                 <option value="-1" disabled="@(PreservePresence && !ValueRemoved.HasDelegate)">@Localizer["NotSet"]</option>
                 @foreach (var variant in Schema.Variants!.Select((value, index) => (value, index)))
                 {
                     <option value="@variant.index">@(variant.value.Title ?? Localizer[$"Kind.{variant.value.Kind}"])</option>
                 }
-            </select>
-        </label>
+            </ClearableSelect>
+        </FormField>
         @if (SelectedVariantIndex is >= 0 and var selected)
         {
             <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" Compact="Compact" />
@@ -49,14 +49,14 @@
     {
         @if (Compact && ValueRemoved.HasDelegate)
         {
-            <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@(IsPresent ? BooleanValue.ToString().ToLowerInvariant() : string.Empty)" disabled="@FieldDisabled" @onchange="ChangeBooleanSelectionAsync">
+            <FormField Label="@Label" Required="@Schema.Required" Tooltip="@RulesText" Help="@HelpText"><ClearableSelect TValue="string" Value="@(IsPresent ? BooleanValue.ToString().ToLowerInvariant() : string.Empty)" disabled="@FieldDisabled" ValueChanged="changed => ChangeBooleanSelectionAsync(new ChangeEventArgs { Value = changed })">
                 <option value="">@Localizer["ChooseValue"]</option><option value="true">@Localizer["TrueValue"]</option><option value="false">@Localizer["FalseValue"]</option>
-            </select></label>
+            </ClearableSelect></FormField>
         }
         else
         {
         <label class="schema-toggle">
-            <input class="schema-toggle-input" type="checkbox" checked="@BooleanValue" disabled="@FieldDisabled" @onchange="ChangeBooleanAsync" />
+            <FormCheckbox class="schema-toggle-input" Value="@BooleanValue" disabled="@FieldDisabled" ValueChanged="changed => ChangeBooleanAsync(new ChangeEventArgs { Value = changed })" />
             <span class="schema-toggle-switch" aria-hidden="true"></span>
             <span class="schema-toggle-copy">
                 <span class="schema-toggle-title">@Label @RequiredMark @RulesTooltip</span>
@@ -67,28 +67,28 @@
     }
     else if (Schema.AllowedValues.Count > 0)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span><select value="@SerializedValue" disabled="@FieldDisabled" @onchange="ChangeEnumAsync"><option value="" disabled="@(PreservePresence && !ValueRemoved.HasDelegate)">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</select></label>@Help
+        <FormField Label="@Label" Required="@Schema.Required" Tooltip="@RulesText" Help="@HelpText" Validation="@FieldValidation"><ClearableSelect TValue="string" AllowClear="@(!PreservePresence || ValueRemoved.HasDelegate)" Value="@Convert.ToString(SerializedValue, System.Globalization.CultureInfo.InvariantCulture)" disabled="@FieldDisabled" ValueChanged="changed => ChangeEnumAsync(new ChangeEventArgs { Value = changed })"><option value="" disabled="@(PreservePresence && !ValueRemoved.HasDelegate)">@Localizer["NotSet"]</option>@foreach (var option in Schema.AllowedValues) { <option value="@option.GetRawText()">@Display(option)</option> }</ClearableSelect></FormField>
     }
     else if (Schema.Kind == JsonSchemaInputKind.Text)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span>
+        <FormField Label="@Label" Required="@Schema.Required" Tooltip="@RulesText" Help="@HelpText" Validation="@FieldValidation">
             @if (UsesMultilineText)
             {
-                <textarea class="schema-long-text @(Compact ? "schema-compact-text" : null)" rows="@(Compact ? 3 : 6)" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync"></textarea>
+                <ClearableText Multiline="true" class="@($"schema-long-text {(Compact ? "schema-compact-text" : null)}")" rows="@(Compact ? 3 : 6)" Value="@StringValue" Disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" ValueChanged="changed => ChangeStringAsync(new ChangeEventArgs { Value = changed })"></ClearableText>
             }
             else
             {
-                <input type="@(string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase) ? "url" : "text")" value="@StringValue" disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" @oninput="ChangeStringAsync" />
+                <ClearableText Type="@(string.Equals(Schema.Format, "uri", StringComparison.OrdinalIgnoreCase) ? "url" : "text")" Value="@StringValue" Disabled="@FieldDisabled" minlength="@Schema.MinimumLength" maxlength="@Schema.MaximumLength" ValueChanged="changed => ChangeStringAsync(new ChangeEventArgs { Value = changed })" />
             }
-        </label>@Help
+        </FormField>
     }
     else if (Schema.Kind is JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber)
     {
-        <label><span>@Label @RequiredMark @RulesTooltip</span><input type="number" value="@NumberValue" disabled="@FieldDisabled" step="@(Schema.Kind == JsonSchemaInputKind.WholeNumber ? "1" : "any")" min="@Schema.Minimum" max="@Schema.Maximum" @oninput="ChangeNumberAsync" /></label>@Help
+        <FormField Label="@Label" Required="@Schema.Required" Tooltip="@RulesText" Help="@HelpText" Validation="@FieldValidation"><ClearableText Type="number" Value="@NumberValue" Disabled="@FieldDisabled" step="@(Schema.Kind == JsonSchemaInputKind.WholeNumber ? "1" : "any")" min="@Schema.Minimum" max="@Schema.Maximum" ValueChanged="changed => ChangeNumberAsync(new ChangeEventArgs { Value = changed })" /></FormField>
     }
     else
     {
-        <label><span>@Label @RequiredMark</span><input value="null" readonly /></label>@Help
+        <FormField Label="@Label" Required="@Schema.Required" Help="@HelpText" Validation="@FieldValidation"><ClearableText Value="null" ReadOnly="true" /></FormField>
     }
     @if (CanSetEmptyString)
     {
@@ -102,10 +102,7 @@
     {
         <button type="button" class="button-secondary schema-presence-action" disabled="@FieldDisabled" aria-label="@Localizer["ClearValueFor", Label]" @onclick="RemoveValueAsync">@Localizer["ClearValue"]</button>
     }
-    @foreach (var issue in FieldIssues.Where(issue => !Compact || IsPresent || issue.Code != "Required"))
-    {
-        <span class="field-validation-error" role="alert">@IssueText(issue)</span>
-    }
+    @if (Schema.Kind is JsonSchemaInputKind.Map or JsonSchemaInputKind.List or JsonSchemaInputKind.Toggle) { @FieldValidation }
 </div>
 
 @code {
@@ -147,6 +144,24 @@
         }
     }
     private string Label => Schema.Title ?? Schema.Name;
+    private string? HelpText => string.Join(" ", new[]
+    {
+        Schema.Required && AllowsEmptyString ? Localizer["RequiredEmptyStringMarker"].Value : null,
+        !string.IsNullOrWhiteSpace(Schema.Description) ? Schema.Description
+            : Schema.Examples.Count > 0 ? Localizer["Example", Display(Schema.Examples[0])].Value : null
+    }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    private RenderFragment? FieldValidation => !VisibleFieldIssues.Any() ? null : builder =>
+    {
+        foreach (var issue in VisibleFieldIssues)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "field-validation-error");
+            builder.AddAttribute(2, "role", "alert");
+            builder.AddContent(3, IssueText(issue));
+            builder.CloseElement();
+        }
+    };
+
     private bool IsLocked => LockedPaths.Contains(Schema.Path);
     private bool FieldDisabled => Disabled || IsLocked;
     private string RequiredMark => Schema.Required ? Localizer[AllowsEmptyString ? "RequiredEmptyStringMarker" : "RequiredMarker"] : string.Empty;
@@ -197,6 +212,7 @@
             return rules.Count == 0 ? null : string.Join(" ", rules);
         }
     }
+    private IEnumerable<JsonSchemaInputIssue> VisibleFieldIssues => FieldIssues.Where(issue => !Compact || IsPresent || issue.Code != "Required");
     private IEnumerable<JsonSchemaInputIssue> FieldIssues => Issues.Where(issue => issue.Path == Schema.Path);
     private string IssueText(JsonSchemaInputIssue issue) => issue is { Code: "MinimumLength", Constraint: "1" }
         ? Localizer["Validation.MinimumLength.One"]

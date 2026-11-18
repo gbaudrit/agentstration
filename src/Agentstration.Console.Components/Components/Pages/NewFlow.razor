@@ -25,9 +25,9 @@
                 </div>
                 <div class="form-grid flow-identity-grid">
                     <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameHelp="@T("DisplayNameHelp")" TechnicalNameHelp="@T("TechnicalNameHelp")" DisplayNameTestId="flow-display-name" TechnicalNameTestId="flow-name" />
-                    <label><span>@T("InitialVersion")</span><InputText @bind-Value="orchestration.Version" data-testid="flow-version" /><small>@T("InitialVersionHelp")</small></label>
+                    <FormField Label="@T("InitialVersion")"><HelpContent>@T("InitialVersionHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="orchestration.Version" data-testid="flow-version" /></ChildContent></FormField>
                     <ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" />
-                    <label class="flow-form-span-all"><span>@T("Field.Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="flow-description" /><small>@T("DescriptionHelp")</small></label>
+                    <FormField Label="@T("Field.Description")" Class="flow-form-span-all"><HelpContent>@T("DescriptionHelp")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="model.Description" rows="3" data-testid="flow-description" /></ChildContent></FormField>
                 </div>
             </section>
 
@@ -85,7 +85,7 @@
                 </div>
                 <label class="flow-enabled-option">
                     <span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span>
-                    <InputCheckbox @bind-Value="orchestration.Enabled" data-testid="flow-enabled" />
+                    <FormCheckbox @bind-Value="orchestration.Enabled" data-testid="flow-enabled" />
                 </label>
             </section>
             <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" />

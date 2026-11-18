@@ -1,0 +1,42 @@
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.WebUtilities
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+<NavigationLock ConfirmExternalNavigation="@CurrentIsDirty" OnBeforeInternalNavigation="BeforeNavigation" />
+<ConfirmationDialog IsOpen="@(pendingLocation is not null)" Title="@Localizer["LeaveTitle"]" Message="@Localizer["LeaveMessage"]" ConfirmLabel="@Localizer["Discard"]" OnConfirm="DiscardAsync" OnCancel="Cancel" />
+
+@code {
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public Func<bool>? HasUnsavedChanges { get; set; }
+    private bool CurrentIsDirty => HasUnsavedChanges?.Invoke() ?? IsDirty;
+    [Parameter] public IReadOnlyList<string> ViewQueryParameters { get; set; } = [];
+    private string? pendingLocation;
+    private bool allowNextNavigation;
+    private void BeforeNavigation(LocationChangingContext context)
+    {
+        if (allowNextNavigation) { allowNextNavigation = false; return; }
+        if (!CurrentIsDirty || PreservesResource(context.TargetLocation)) return;
+        context.PreventNavigation();
+        pendingLocation = context.TargetLocation;
+        StateHasChanged();
+    }
+    private bool PreservesResource(string location)
+    {
+        var current = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var target = Navigation.ToAbsoluteUri(location);
+        if (current.GetLeftPart(UriPartial.Path) != target.GetLeftPart(UriPartial.Path)) return false;
+        var before = QueryHelpers.ParseQuery(current.Query);
+        var after = QueryHelpers.ParseQuery(target.Query);
+        foreach (var key in ViewQueryParameters) { before.Remove(key); after.Remove(key); }
+        return before.Count == after.Count && before.All(pair => after.TryGetValue(pair.Key, out var value) && pair.Value.Equals(value));
+    }
+    private void Cancel() => pendingLocation = null;
+    private Task DiscardAsync()
+    {
+        if (pendingLocation is not { } location) return Task.CompletedTask;
+        pendingLocation = null;
+        allowNextNavigation = true;
+        Navigation.NavigateTo(location);
+        return Task.CompletedTask;
+    }
+}

@@ -10,7 +10,7 @@
 .runtime-workers-grid ::deep th:nth-child(5) { width: 10%; }
 .runtime-workers-grid ::deep th:nth-child(6) { width: 17%; }
 .runtime-workers-grid ::deep th:nth-child(7) { width: 10%; }
-.runtime-workers-grid ::deep td { min-width: 0; overflow-wrap: anywhere; vertical-align: top; }
+.runtime-workers-grid ::deep td { min-width: 0; overflow-wrap: anywhere; }
 .runtime-workers-grid ::deep td small { display: block; margin-top: .3rem; color: var(--muted); }
 .runtime-workers-grid ::deep .runtime-primary { display: block; min-width: 0; font-weight: 700; }
 .runtime-workers-grid ::deep .runtime-token { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

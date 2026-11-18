@@ -109,7 +109,7 @@
     gap: .5rem;
 }
 
-.schema-additional-properties input {
+.schema-additional-properties ::deep input {
     width: auto;
 }
 

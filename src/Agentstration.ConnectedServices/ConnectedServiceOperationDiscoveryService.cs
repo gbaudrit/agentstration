@@ -106,8 +106,16 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         return (discovery, service.Value, type, version);
     }
 
-    public async Task<StoredResource<ConnectedServiceOperationDiscoveryResource>> StartAsync(
+    public Task<StoredResource<ConnectedServiceOperationDiscoveryResource>> StartAsync(
         ResourceScopeRef serviceScope,
+        string serviceName,
+        string? correlationId,
+        string? idempotencyKey,
+        CancellationToken cancellationToken) =>
+        StartAsync(serviceScope, ResourceNamespace.Default, serviceName, correlationId, idempotencyKey, cancellationToken);
+
+    public async Task<StoredResource<ConnectedServiceOperationDiscoveryResource>> StartAsync(
+        ResourceScopeRef serviceScope, ResourceNamespace @namespace,
         string serviceName,
         string? correlationId,
         string? idempotencyKey,
@@ -117,7 +125,7 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         if (idempotencyKey?.Length > MaximumIdempotencyKeyLength)
             throw Error("connected_service_discovery_idempotency_key_too_long",
                 $"Idempotency keys cannot exceed {MaximumIdempotencyKeyLength} characters.");
-        var service = await services.GetExactAsync(serviceScope, serviceName, cancellationToken)
+        var service = await services.GetExactAsync(serviceScope, @namespace, serviceName, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(serviceName);
         EnsureDiscoverable(service.Value);
         var (serviceType, version) = await ResolveServiceTypeAsync(service.Value, cancellationToken);
@@ -235,11 +243,15 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         }
     }
 
+    public Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> ListAsync(
+        ResourceScopeRef serviceScope, string serviceName, CancellationToken cancellationToken) =>
+        ListAsync(serviceScope, ResourceNamespace.Default, serviceName, cancellationToken);
+
     public async Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> ListAsync(
-        ResourceScopeRef serviceScope, string serviceName, CancellationToken cancellationToken)
+        ResourceScopeRef serviceScope, ResourceNamespace @namespace, string serviceName, CancellationToken cancellationToken)
     {
         var context = RequireContext();
-        var service = await services.GetExactAsync(serviceScope, serviceName, cancellationToken)
+        var service = await services.GetExactAsync(serviceScope, @namespace, serviceName, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(serviceName);
         var stored = await InWorkspaceAsync(context, () => store.ListExactAsync<ConnectedServiceOperationDiscoveryResource>(
             ResourceScopeRef.Workspace(context.WorkspaceId),
@@ -321,10 +333,14 @@ public sealed class ConnectedServiceOperationDiscoveryService(
         }
     }
 
+    public Task<IReadOnlyList<ConnectedServiceOperationResource>> ListOperationsAsync(
+        ResourceScopeRef serviceScope, string serviceName, CancellationToken cancellationToken) =>
+        ListOperationsAsync(serviceScope, ResourceNamespace.Default, serviceName, cancellationToken);
+
     public async Task<IReadOnlyList<ConnectedServiceOperationResource>> ListOperationsAsync(
-        ResourceScopeRef serviceScope, string serviceName, CancellationToken cancellationToken)
+        ResourceScopeRef serviceScope, ResourceNamespace @namespace, string serviceName, CancellationToken cancellationToken)
     {
-        var service = await services.GetExactAsync(serviceScope, serviceName, cancellationToken)
+        var service = await services.GetExactAsync(serviceScope, @namespace, serviceName, cancellationToken)
             ?? throw new ConnectedServiceNotFoundException(serviceName);
         return (await store.ListAllAsync<ConnectedServiceOperationResource>(
                 ConnectedServiceResourceKinds.ConnectedServiceOperation, cancellationToken))

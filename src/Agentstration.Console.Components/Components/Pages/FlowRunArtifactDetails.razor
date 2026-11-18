@@ -39,8 +39,7 @@ else if (artifact is not null)
 
             @if (artifact.Receipt.DataContract is { } contract)
             {
-                <section class="panel form-section">
-                    <h2>@T("DataContract")</h2>
+                <FormSection Title="@T("DataContract")"><ChildContent>
                     <p>@T(contract.Validated ? contract.HasStructuralConstraints ? "DataContractValidated" : "DataContractGenericValidated" : "DataContractUnvalidated")</p>
                     <dl class="resource-details durable-artifact-details-grid">
                         <dt>@T("DataContractOrigin")</dt><dd><code>@contract.Origin</code></dd>
@@ -55,10 +54,9 @@ else if (artifact is not null)
                         <p class="schema-evidence">@T("DataContractSelectedHash") <code>@evidence.DefinitionHash</code></p>
                     }
                     @if (contract.Schema is { } schema) { <pre>@JsonSerializer.Serialize(schema, ContractJson)</pre> }
-                </section>
+                </ChildContent></FormSection>
             }
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+            <FormSection Title="@T("Producer")" Eyebrow="@T("Provenance")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     <dt>@T("FlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.ProducerFlowRunId)">@artifact.ProducerFlowRunId</a></dd>
                     @if (!string.IsNullOrEmpty(artifact.ProducerFlowStepId)) { <dt>@T("FlowStep")</dt><dd><code>@artifact.ProducerFlowStepId</code></dd> }
@@ -83,7 +81,7 @@ else if (artifact is not null)
                     @if (artifact.Receipt.Materialization is { } location)
                     { <dt>@T("Storage")</dt><dd><a class="text-button" data-testid="artifact-storage-link" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a><small>@location.Target.Storage.Storage.ScopeRef · g@(location.Target.Storage.Generation)</small></dd> }
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
             @if (artifact.Receipt.Materialization?.Publication?.Records is { } records)
             {
@@ -102,18 +100,11 @@ else if (artifact is not null)
                         }
                         @if (rowContract.Schema is { } rowSchema) { <pre>@JsonSerializer.Serialize(rowSchema, ContractJson)</pre> }
                     }
-                    <div class="table-scroll">
-                        <table>
-                            <thead><tr><th>@T("RecordOrdinal")</th><th>@T("Size")</th><th>@T("Actions")</th></tr></thead>
-                            <tbody>
-                                @for (var index = 0; index < records.Members.Count; index++)
-                                {
-                                    var member = records.Members[index];
-                                    <tr><td>@(index + 1)</td><td>@ExactSize(member.Length)</td><td><button type="button" class="button-secondary" disabled="@(readingRecord || !interactive)" @onclick="() => ReadRecordAsync(member.Id)">@T("ReadRecord")</button></td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <CollectionView TItem="RecordRow" Items="@(records.Members.Select((member, index) => new RecordRow(member, index + 1)).ToArray())" IdentityLabel="@T("RecordOrdinal")" InformationLabels="@(new[] { T("Size") })">
+                        <Identity Context="row"><strong>@row.Ordinal</strong></Identity>
+                        <Information Context="row"><CollectionValue Label="@T("Size")">@ExactSize(row.Member.Length)</CollectionValue></Information>
+                        <Actions Context="row"><button type="button" class="button-secondary" disabled="@(readingRecord || !interactive)" @onclick="() => ReadRecordAsync(row.Member.Id)">@T("ReadRecord")</button></Actions>
+                    </CollectionView>
                     @if (recordReadError is not null) { <p role="alert">@recordReadError</p> }
                     @if (recordContent is not null) { <pre data-testid="artifact-record-content">@recordContent</pre> }
                 </section>
@@ -126,8 +117,7 @@ else if (artifact is not null)
         }
         else
         {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Storage")</p><h2>@T("StorageReceipt")</h2><p>@T("StorageReceiptHelp")</p></div></div>
+            <FormSection Title="@T("StorageReceipt")" Eyebrow="@T("Storage")" Description="@T("StorageReceiptHelp")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     @if (!string.IsNullOrEmpty(artifact.Receipt.StorageFlowRunId)) { <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd> }
                     @if (artifact.Receipt.Materialization is { } location)
@@ -141,10 +131,9 @@ else if (artifact is not null)
                     <dt>@T("Size")</dt><dd>@SizeInMegabytes(artifact.Receipt.Length) · @ExactSize(artifact.Receipt.Length)</dd>
                     <dt>SHA-256</dt><dd><code>@artifact.Receipt.Sha256</code></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("StorageProvenance")</h2></div></div>
+            <FormSection Title="@T("StorageProvenance")" Eyebrow="@T("Provenance")"><ChildContent>
                 @if (VisibleProvenance(artifact).Count == 0)
                 {
                     <p class="muted">@T("NoStorageProvenance")</p>
@@ -158,7 +147,7 @@ else if (artifact is not null)
                         }
                     </dl>
                 }
-            </section>
+            </ChildContent></FormSection>
         }
     </main>
 }
@@ -224,6 +213,7 @@ else if (artifact is not null)
     private string ExactSize(long value) => T("ExactBytes", value);
     private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
     private enum DetailsTab { Overview, Content, Storage }
+    private sealed record RecordRow(StorageRecordMember Member, int Ordinal);
 
     public void Dispose()
     {

@@ -317,4 +317,6 @@
   <data name="EventType.ProcessUnitChanged" xml:space="preserve"><value>Process unit updated</value></data>
   <data name="ProcessProgressKnown" xml:space="preserve"><value>{0}/{1} completed · {2} running</value></data>
   <data name="ProcessActiveStep" xml:space="preserve"><value>Current step</value></data>
+  <data name="ToolStatus.Governed" xml:space="preserve"><value>Governance evaluated</value></data>
+  <data name="ToolStatus.Unknown" xml:space="preserve"><value>Unknown</value></data>
 </root>

@@ -1,0 +1,142 @@
+{
+  "implementationPR": 1174,
+  "relatedCI": {
+    "job": 134652376093,
+    "note": "The four mobile Flow Inspector consumers still used the former transition label and ID after the valid responsive fixture changed. The job ID identifies the reported failure; see PR CI history for its owning run."
+  },
+  "testedState": {
+    "headDuringRun": "5c5159d87d09af959670095a54a834418a24639e",
+    "workingTreeChanges": [
+      "automation/playwright/src/journeys/exercise-form-workflow.journey.ts",
+      "automation/playwright/src/pages/form-workflows.page.ts"
+    ],
+    "subsequentCommitWithExactTestedFileContents": "d8ea04a2ccf8f9c0b72a9362f8533371a52f1005",
+    "provenance": "The run preceded the d8ea04a2 commit. That commit records the two tested consumer updates; the fixture, test and configuration hashes below are identical. No newer Source composition fix is part of this evidence.",
+    "fileSha256": {
+      "automation/playwright/src/pages/flow-designer.page.ts": "d61af0e72243d5ba661550d274497a25c2f24507eb2423e960baef5cf3eb910c",
+      "automation/playwright/src/journeys/exercise-form-workflow.journey.ts": "873048c212fa42d8428a1399dedead2ee33eb285b589716c0708e0b0bfcd0b01",
+      "automation/playwright/src/pages/form-workflows.page.ts": "c7465f93ad24502b23e46da44450abc047cf038a27ea8e29528cc0128d5ee73b",
+      "automation/playwright/tests/form-workflows.spec.ts": "5f64b2d365a237fa03040cea6b0c9c9a4febbb9d0d18fe0a799a8cbe9fcf3488",
+      "automation/playwright/playwright.config.ts": "4631ec0e4708b3521d9bc37092ddd93487cbef8dbde59a7f28f8bb9ecff75dc1"
+    }
+  },
+  "execution": {
+    "command": "AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm exec playwright test -- --config local-flow-inspector.config.ts --grep flow-inspector",
+    "workers": 1,
+    "retries": 0,
+    "testTimeoutMs": 120000,
+    "expectTimeoutMs": 15000,
+    "browserExecutable": "/usr/bin/chromium",
+    "browserMode": "headless",
+    "productAssemblies": "Existing Release host build 10; no rebuild during campaign",
+    "temporaryConfigRemovedAfterRun": true
+  },
+  "fixture": {
+    "graph": "Input.completed -> Decision; Decision.true -> Completed, Decision.false -> Error",
+    "initialServerValidation": "issues=[]",
+    "selectedTransitionLabel": "input —completed→ decision",
+    "selectedTransitionId": "input-completed-decision"
+  },
+  "preservedAssertions": [
+    "Priority 7 is persisted to the exact selected transition.",
+    "Clearing an edited priority persists null rather than a fallback numeric value.",
+    "Transition IDs and their order remain unchanged.",
+    "All controls stay within the viewport.",
+    "Responsive verification separately retains zero initial issues, then one intentionally unreachable step, after the fresh completed response."
+  ],
+  "stats": {
+    "startTime": "2026-11-18T08:06:55.543Z",
+    "duration": 141078.506,
+    "expected": 8,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "form workflow flow-inspector en-US light  @smoke",
+      "project": "desktop-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 11590,
+      "retry": 0,
+      "startTime": "2026-11-18T08:06:56.288Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector en-US dark  @smoke",
+      "project": "desktop-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 8775,
+      "retry": 0,
+      "startTime": "2026-11-18T08:07:28.358Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector en-US light @responsive @smoke",
+      "project": "mobile-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 10844,
+      "retry": 0,
+      "startTime": "2026-11-18T08:07:38.284Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector en-US dark @responsive @smoke",
+      "project": "mobile-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 8423,
+      "retry": 0,
+      "startTime": "2026-11-18T08:08:08.055Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector fr-FR light @responsive @smoke",
+      "project": "mobile-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 8574,
+      "retry": 0,
+      "startTime": "2026-11-18T08:08:16.501Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector fr-FR dark @responsive @smoke",
+      "project": "mobile-chromium",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 9230,
+      "retry": 0,
+      "startTime": "2026-11-18T08:08:25.092Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector fr-FR light @locale @smoke",
+      "project": "locale-contracts",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 11108,
+      "retry": 0,
+      "startTime": "2026-11-18T08:08:35.556Z",
+      "errorCount": 0
+    },
+    {
+      "title": "form workflow flow-inspector fr-FR dark @locale @smoke",
+      "project": "locale-contracts",
+      "expectedStatus": "passed",
+      "status": "passed",
+      "durationMs": 9884,
+      "retry": 0,
+      "startTime": "2026-11-18T08:09:05.734Z",
+      "errorCount": 0
+    }
+  ],
+  "rawResultsSha256": "110bab73a969798e0442f77dcee66f9e63cf5ccc4538a8f74517f130130deefd",
+  "rawResultsLocalPath": "/tmp/1174-flow-inspector/results.json",
+  "archivedLogSha256": "cf73dd05af465e4d676227f904ff1393f4ebf2618382620b3c7469f1a6387fb7",
+  "timeoutsRetriesAndAssertionsRelaxed": false,
+  "typescript": "npm exec tsc -- --noEmit passed before the campaign; no additional build/test performed for this documentation update."
+}

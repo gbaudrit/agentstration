@@ -79,8 +79,8 @@
     padding: 16px 20px;
 }
 
-.agent-toolset-assignment input,
-.agent-toolset-member input {
+.agent-toolset-assignment ::deep input,
+.agent-toolset-member ::deep input {
     width: 18px;
     height: 18px;
     margin: 2px 0 0;
@@ -134,7 +134,7 @@
     cursor: pointer;
 }
 
-.agent-toolset-member:has(input:checked) {
+.agent-toolset-member:has(::deep input:checked) {
     border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
     background: color-mix(in srgb, var(--primary-soft) 42%, var(--surface));
 }

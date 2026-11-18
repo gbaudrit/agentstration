@@ -57,15 +57,15 @@ else
             <p>@pendingInput.Prompt</p>
             @if (pendingInput.Type == InputRequestType.Text)
             {
-                <input @bind="responseText" placeholder="@T("ResponsePlaceholder")" disabled="@submittingInput" />
+                <ClearableText UpdateOnInput="false" @bind-Value="responseText" placeholder="@T("ResponsePlaceholder")" Disabled="@submittingInput" />
                 <button class="button-primary" @onclick="SubmitTextAsync" disabled="@(submittingInput || string.IsNullOrWhiteSpace(responseText))">@T("SendResponse")</button>
             }
             else if (pendingInput.Type == InputRequestType.Choice)
             {
-                <select @bind="selectedChoice" disabled="@submittingInput">
+                <ClearableSelect @bind-Value="selectedChoice" disabled="@submittingInput">
                     <option value="">@T("SelectOption")</option>
                     @foreach (var option in pendingInput.Options) { <option value="@option">@option</option> }
-                </select>
+                </ClearableSelect>
                 <button class="button-primary" @onclick="SubmitChoiceAsync" disabled="@(submittingInput || string.IsNullOrWhiteSpace(selectedChoice))">@T("Continue")</button>
             }
             else
@@ -186,8 +186,8 @@ else
                         {
                             <li @key="node.FlowRunId" style="--causality-depth:@node.NestingDepth">
                                 <article class="panel causality-node">
-                                    <div class="panel-header"><h2><a href="@CausalRunUrl(node.FlowRunId)">@(node.ProcessOrigin is { } processNode ? ProcessLabel(processNode) : $"{node.FlowId.Value} · {node.FlowVersion}")</a></h2><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" /></div>
-                                    <div class="causality-meta"><a href="@CausalRunUrl(node.FlowRunId)"><code>@node.FlowRunId</code></a><a href="@CausalRunUrl(node.FlowRunId)">@T("OpenExecution") ↗</a><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <a href="@CausalRunUrl(node.ParentFlowRunId ?? run.Id, parentStep)">@T("CalledByStep", parentStep)</a> }</div>
+                                    <div class="panel-header"><CollectionIdentity DisplayName="@(node.ProcessOrigin is { } processNode ? ProcessLabel(processNode) : $"{node.FlowId.Value} · {node.FlowVersion}")" Name="@node.FlowRunId" Href="@CausalRunUrl(node.FlowRunId)" HeadingLevel="2" IconName="workflow"><IconBadges><StatusBadge Text="@StatusLabel(node.Status)" Status="@PlatformDashboardService.ToStatus(node.Status.ToString())" IconOnly /></IconBadges></CollectionIdentity></div>
+                                    <div class="causality-meta"><a href="@CausalRunUrl(node.FlowRunId)">@T("OpenExecution") ↗</a><span>@(node.ResolvedFromActiveReference ? T("ResolvedFromActive") : T("ExactReference"))</span>@if (node.ParentStepName is { } parentStep) { <a href="@CausalRunUrl(node.ParentFlowRunId ?? run.Id, parentStep)">@T("CalledByStep", parentStep)</a> }</div>
                                     @if (node.ProcessOrigin is { } processOrigin)
                                     { <p class="muted">@T("SourceFlow"): @processOrigin.Definition.SourceFlowId.Value · @processOrigin.Definition.SourceVersion · @T("ProcessAttempt", processOrigin.OwnerAttempt)</p> }
                                     @if (node.ErrorOrigin is { } originFailure && originFailure.RunId != node.FlowRunId)
@@ -198,7 +198,10 @@ else
                                     @if (node.AgentExecutions.Count > 0)
                                     {
                                         <h3>@T("AgentExecutions")</h3>
-                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions) { <li><strong>@agent.StepName</strong><span>@agent.AgentResourceId @if (agent.AgentVersion is { } version) { <text>· v@(version)</text> }</span><span>@StepStatusLabel(agent.Status) · @(agent.Provider ?? "—")</span></li> }</ul>
+                                        <ul class="causality-details">@foreach (var agent in node.AgentExecutions)
+                                        {
+                                            <li><CollectionIdentity DisplayName="@agent.StepName" Name="@agent.AgentResourceId" IconName="robot"><IconBadges><StatusBadge Text="@StepStatusLabel(agent.Status)" Status="@PlatformDashboardService.ToStatus(agent.Status.ToString())" IconOnly /></IconBadges><Badges>@if (agent.AgentVersion is { } version) { <span>@T("AgentVersion") · @version</span> }<span>@T("Provider"): @(agent.Provider ?? "—")</span></Badges></CollectionIdentity></li>
+                                        }</ul>
                                     }
                                     @if (node.ToolCalls.Count > 0)
                                     {
@@ -206,8 +209,9 @@ else
                                         <ul class="causality-details">
                                             @foreach (var tool in node.ToolCalls)
                                             {
-                                                <li><strong>@if (tool.ToolId is { } toolId) { <a href="@($"/tools/{Uri.EscapeDataString(toolId)}")">@(tool.ToolName ?? toolId)</a> } else { <text>@(tool.ToolName ?? tool.LogicalCallId)</text> }</strong><span>@T("LogicalCall") <a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId)"><code>@tool.LogicalCallId</code></a></span><span>@T("Provider"): @if (tool.ProviderId is { } providerId) { <a href="@($"/tools/providers/{Uri.EscapeDataString(providerId)}")">@providerId</a> } else { <text>—</text> } · @tool.Status</span>
-                                                    <ul class="tool-attempts">@foreach (var attempt in tool.Attempts) { <li><span>@T("Attempt") @attempt.Attempt · @attempt.Status</span><a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId, attempt.InvocationId)">@T("GovernanceEvaluations", attempt.GovernanceEvaluationCount)</a></li> }</ul>
+                                                <li><CollectionIdentity DisplayName="@(tool.ToolName ?? tool.ToolId ?? tool.LogicalCallId)" Name="@(tool.ToolId ?? tool.LogicalCallId)" Namespace="@(tool.ToolId is null ? null : tool.ToolNamespace)" Href="@(tool.ToolId is { } toolId ? $"/tools/{Uri.EscapeDataString(toolId)}" : null)" IconName="tools"><IconBadges><StatusBadge Text="@ToolStatusLabel(tool.Status)" Status="@PlatformDashboardService.ToStatus(tool.Status)" IconOnly /></IconBadges></CollectionIdentity>
+                                                    <span>@T("LogicalCall") <CopyableValue Value="@tool.LogicalCallId" /><a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId)">@T("ToolGovernance")</a></span><span>@T("Provider"): @if (tool.ProviderId is { } providerId) { <a href="@($"/tools/providers/{Uri.EscapeDataString(providerId)}")">@providerId</a> } else { <text>—</text> }</span>
+                                                    <ul class="tool-attempts">@foreach (var attempt in tool.Attempts) { <li><span>@T("Attempt") @attempt.Attempt <StatusBadge Text="@ToolStatusLabel(attempt.Status)" Status="@PlatformDashboardService.ToStatus(attempt.Status)" /></span><CopyableValue Value="@attempt.InvocationId" /><a href="@GovernanceUrl(node.FlowRunId, tool.LogicalCallId, attempt.InvocationId)">@T("GovernanceEvaluations", attempt.GovernanceEvaluationCount)</a></li> }</ul>
                                                 </li>
                                             }
                                         </ul>
@@ -248,6 +252,9 @@ else
     private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
     private string OriginLabel(FlowInvocationOrigin value) => Localizer[$"Origin.{value}"];
     private string StepStatusLabel(FlowStepRunStatus value) => Localizer[$"StepStatus.{value}"];
+    private string ToolStatusLabel(string value) => Enum.TryParse<FlowRunStatus>(value, true, out var status) ? StatusLabel(status)
+        : value.Equals("governed", StringComparison.OrdinalIgnoreCase) ? T("ToolStatus.Governed")
+        : value.Equals("unknown", StringComparison.OrdinalIgnoreCase) ? T("ToolStatus.Unknown") : value;
     private string TokenUsage(FlowStepRunUsage? usage) => usage is null
         ? T("UnavailableValue")
         : T("TokenUsage", TokenCount(usage.InputTokens), TokenCount(usage.OutputTokens));

@@ -23,13 +23,17 @@ public sealed class RuntimeObservabilityConsoleTests
                 new("instance-1", ResourceNamespace.Default, "concierge", 3, "concierge--000003",
                     "maf-local", "FlowRun", "flowrun-1", "support", Guid.NewGuid(), 2,
                     Guid.NewGuid(), Guid.NewGuid(), workerId, Guid.NewGuid(), DateTimeOffset.UtcNow,
-                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddSeconds(30))
+                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddSeconds(30), ResourceScopeRef.Instance)
             ]
         });
 
         var cut = context.Render<Deployments>();
 
         StringAssert.Contains(cut.Markup, "concierge");
+        Assert.AreEqual("instance-1", cut.Find(".collection-identity .copyable-value code").TextContent);
+        Assert.AreEqual("Instance", cut.Find(".resource-scope-badge").TextContent);
+        Assert.IsNotNull(cut.Find(".collection-actions-menu"));
+        Assert.AreEqual("/flow-runs/flowrun-1?scopeRef=%2Finstance", cut.Find(".collection-identity a").GetAttribute("href"));
         StringAssert.Contains(cut.Markup, "2 turn(s)");
         StringAssert.Contains(cut.Markup, $"/settings/runtime-workers/{workerId:D}");
         Assert.AreEqual("instance-1", cut.Find("[data-testid='runtime-agent-instance-row']").GetAttribute("data-instance-id"));
@@ -119,7 +123,7 @@ public sealed class RuntimeObservabilityConsoleTests
 
     private static BunitContext CreateContext(IRuntimeApiClient client)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLogging();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(client);

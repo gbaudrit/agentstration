@@ -1,0 +1,13 @@
+
+Running 4 tests using 1 worker
+
+(node:54889) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [desktop-chromium] › tests/source-policies.spec.ts:20:3 › Source Flow composition en-US @smoke (1.2m)
+  ✓  2 [desktop-chromium] › tests/source-policies.spec.ts:20:3 › Source Flow composition fr-FR @smoke (1.2m)
+(node:55937) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [mobile-chromium] › tests/source-policies.spec.ts:24:3 › Source Flow composition en-US on mobile @smoke @responsive (1.6m)
+  ✓  4 [mobile-chromium] › tests/source-policies.spec.ts:24:3 › Source Flow composition fr-FR on mobile @smoke @responsive (1.1m)
+
+  4 passed (6.0m)

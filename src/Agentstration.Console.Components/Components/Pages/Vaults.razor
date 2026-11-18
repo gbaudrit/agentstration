@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/vaults"
 @implements IDisposable
 @inject ISecretsClient Client
@@ -11,10 +12,14 @@ else if (error is not null) { <div class="form-alert form-alert-danger">@error.M
 else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoVaultsMessage")" /> }
 else
 {
-    <DataGrid TItem="VaultResponse" Items="items">
-        <Header><tr><th>@T("Name")</th><th>@T("Provider")</th><th>@T("Status")</th><th>@T("Location")</th><th></th></tr></Header>
-        <Row Context="item"><tr><td><span class="resource-name-with-scope"><strong>@item.Resource.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="@item.Resource.ScopeRef" Compact /></span><code>@item.Resource.Name</code></td><td>@ProviderText(item.Resource.Definition.ProviderType)</td><td><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" /></td><td>@T("Local")</td><td><a class="text-button" href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="VaultResponse" Items="items" InformationLabels="@(new string[] { T("Provider"), T("Location") })" >
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral" ><IconBadges><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("Provider")">@ProviderText(item.Resource.Definition.ProviderType)</CollectionValue>
+            <CollectionValue Label="@T("Location")">@T("Local")</CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Resource.Definition.DisplayName} ({item.Resource.Namespace}/{item.Resource.Name}, {item.Resource.ScopeRef})")"><a href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {
@@ -23,10 +28,10 @@ else
     private bool loading = true;
     private Exception? error;
     private string T(string key) => Localizer[key].Value;
-    private string StatusText(string status) => status.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{status}") };
+    private string StatusText(string status) => status.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T("Status.Unknown") };
     private string ProviderText(string provider) => T($"Provider.{provider}");
     private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
     protected override async Task OnInitializedAsync() { try { items = await Client.GetVaultsAsync(cancellation.Token); } catch (Exception ex) { error = ex; } finally { loading = false; } }
-    private static UiStatus Tone(string value) => value.Equals("available", StringComparison.OrdinalIgnoreCase) ? UiStatus.Success : UiStatus.Danger;
+    private static UiStatus Tone(string value) => value.ToLowerInvariant() switch { "available" => UiStatus.Success, "unavailable" or "uninitialized" => UiStatus.Danger, _ => UiStatus.Neutral };
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

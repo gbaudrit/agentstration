@@ -16,7 +16,7 @@ public sealed class DescendantUseGrantEditorTests
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);
         var workspace = new ResourceScopeTargetResponse(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceScopeKind.Workspace, "Default", true);
         var grants = new List<DescendantUseGrant> { new(workspace.ScopeRef) };
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<DescendantUseGrantEditor>(parameters => parameters
@@ -26,7 +26,7 @@ public sealed class DescendantUseGrantEditorTests
 
         Assert.AreEqual("Tenant · Development", rendered.Find($"option[value='{tenant.ScopeRef.Value}']").TextContent);
         Assert.AreEqual("Workspace", rendered.Find(".grant-target-identity .resource-scope-badge").TextContent);
-        Assert.AreEqual("Default", rendered.Find(".grant-target-identity strong").TextContent);
+        Assert.AreEqual("Default", rendered.Find(".grant-target-identity .disclosure-trigger").TextContent);
         Assert.AreEqual(workspace.ScopeRef.Value, rendered.Find(".grant-target-identity").GetAttribute("title"));
         Assert.AreEqual(0, rendered.FindAll(".grant-checkbox").Count);
     }
@@ -36,7 +36,7 @@ public sealed class DescendantUseGrantEditorTests
     {
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);
         var grants = new List<DescendantUseGrant>();
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<DescendantUseGrantEditor>(parameters => parameters
@@ -46,7 +46,7 @@ public sealed class DescendantUseGrantEditorTests
 
         rendered.Find(".grant-add select").Change(tenant.ScopeRef.Value);
         rendered.Find(".grant-add-button").Click();
-        Assert.AreEqual("Development", rendered.Find(".grant-target-identity strong").TextContent);
+        Assert.AreEqual("Development", rendered.Find(".grant-target-identity .disclosure-trigger").TextContent);
         Assert.AreEqual(tenant.ScopeRef, grants.Single().ScopeRef);
 
         rendered.Find(".grant-checkbox input").Change(true);
@@ -61,7 +61,7 @@ public sealed class DescendantUseGrantEditorTests
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<DescendantUseGrantEditor>(parameters => parameters
@@ -69,7 +69,7 @@ public sealed class DescendantUseGrantEditorTests
             .Add(component => component.Targets, Array.Empty<ResourceScopeTargetResponse>())
             .Add(component => component.Grants, [new(workspace)]));
 
-        Assert.AreEqual(workspace.Value, rendered.Find(".grant-target-identity strong").TextContent);
+        Assert.AreEqual(workspace.Value, rendered.Find(".grant-target-identity .disclosure-trigger").TextContent);
         Assert.AreEqual(0, rendered.FindAll(".grant-add").Count);
     }
 }

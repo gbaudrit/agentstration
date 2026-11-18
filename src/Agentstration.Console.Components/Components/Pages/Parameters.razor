@@ -1,3 +1,4 @@
+@inject IServiceProvider Services
 @page "/parameters"
 @implements IDisposable
 @inject IParametersClient Client
@@ -14,10 +15,14 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
 else if (Filtered.Count == 0) { <EmptyState Title="@T("NoParameters")" Message="@T("NoParametersMessage")" /> }
 else
 {
-    <DataGrid TItem="ParameterResource" Items="Filtered">
-        <Header><tr><th>@T("Name")</th><th>@T("ValueType")</th><th>@T("Value")</th><th>@T("Scope")</th><th></th></tr></Header>
-        <Row Context="item"><tr data-testid="parameter-row"><td><strong>@item.Definition.DisplayName</strong><br /><code>@item.Name</code></td><td>@TypeLabel(item.Definition.ValueType)</td><td><code>@VisibleValue(item)</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td><td><a class="text-button" href="@ResourceUrl(item)">@T("ManageArrow")</a></td></tr></Row>
-    </DataGrid>
+    <CollectionView TItem="ParameterResource" Items="Filtered" InformationLabels="@(new string[] { T("ValueType"), T("Value") })" RowTestId="parameter-row">
+        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@ResourceUrl(item)" IconName="settings" Domain="neutral" ><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="item">
+            <CollectionValue Label="@T("ValueType")">@TypeLabel(item.Definition.ValueType)</CollectionValue>
+            <CollectionValue Label="@T("Value")"><code>@VisibleValue(item)</code></CollectionValue>
+        </Information>
+        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a href="@ResourceUrl(item)">@T("ManageArrow")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 
 @code {

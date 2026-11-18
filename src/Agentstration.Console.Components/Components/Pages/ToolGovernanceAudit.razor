@@ -71,10 +71,18 @@ else
                 }
                 else
                 {
-                    <DataGrid TItem="ToolExecutionHookEvaluation" Items="record.Evaluations">
-                        <Header><tr><th>@T("Order")</th><th>@T("Hook")</th><th>@T("Source")</th><th>@T("ResourceGeneration")</th><th>@T("Decision")</th><th>@T("Code")</th></tr></Header>
-                        <Row Context="evaluation"><tr><td>@evaluation.Hook.Order</td><td><code>@evaluation.Hook.Id</code>@if (evaluation.Hook.ResourceId is not null) { <small>@evaluation.Hook.ResourceId</small> }</td><td>@SourceLabel(evaluation.Hook.Source)</td><td>@(evaluation.Hook.ResourceGeneration?.ToString() ?? "—")</td><td><StatusBadge Text="@DecisionLabel(evaluation.Decision)" Status="@DecisionTone(evaluation.Decision)" /></td><td><code>@(evaluation.Code ?? "—")</code></td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="ToolExecutionHookEvaluation" Items="record.Evaluations" InformationLabels="@(new string[] { T("Order"), T("Source"), T("ResourceGeneration"), T("Code") })" IdentityLabel="@T("Hook")" StateLabel="@T("Decision")">
+        <Identity Context="evaluation">
+<code>@evaluation.Hook.Id</code>@if (evaluation.Hook.ResourceId is not null) { <small>@evaluation.Hook.ResourceId</small> }</Identity>
+        <State Context="evaluation">
+<StatusBadge Text="@DecisionLabel(evaluation.Decision)" Status="@DecisionTone(evaluation.Decision)" /></State>
+        <Information Context="evaluation">
+            <CollectionValue Label="@T("Order")">@evaluation.Hook.Order</CollectionValue>
+            <CollectionValue Label="@T("Source")">@SourceLabel(evaluation.Hook.Source)</CollectionValue>
+            <CollectionValue Label="@T("ResourceGeneration")">@(evaluation.Hook.ResourceGeneration?.ToString() ?? "—")</CollectionValue>
+            <CollectionValue Label="@T("Code")"><code>@(evaluation.Code ?? "—")</code></CollectionValue>
+        </Information>
+    </CollectionView>
                 }
             </article>
         }

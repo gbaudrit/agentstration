@@ -143,10 +143,69 @@ public sealed class StorageTypeComponentTests
         }
     }
 
+    [TestMethod]
+    public void CompactTypeKeepsActualPreferredContractAndManagedLockInCards()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new TypesClient();
+        client.Resource = client.Resource with { Governance = ResourceGovernance.Core("storage.local") };
+        using var context = Setup(client);
+        var page = context.Render<StorageTypes>();
+        page.WaitForElement("[data-testid=storage-type-row]");
+        page.Find(".collection-view-switch button:last-child").Click();
+        Assert.AreEqual(client.Resource.Definition.PreferredVersion, page.Find(".collection-version code").TextContent);
+        Assert.AreEqual("catalog/custom", page.Find(".copyable-value code").GetAttribute("title"));
+        StringAssert.Contains(page.Find(".managed-resource-badge").TextContent, "Managed");
+        Assert.IsEmpty(page.FindAll(".collection-actions-menu"));
+    }
+
+    [TestMethod]
+    public void UsageHomonymsExposeOnlyExplicitAuthorizedNamespaceAndOwnerMetadata()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        StorageUsage[] usages = [
+            new("Storage", "documents", "Documents", $"/storages/documents?namespace=first&scopeRef={Uri.EscapeDataString(tenant.Value)}"),
+            new("Storage", "documents", "Documents", $"/storages/documents?namespace=second&scopeRef={Uri.EscapeDataString(workspace.Value)}")
+        ];
+        var client = new TypesClient { Usages = usages };
+        using var context = Setup(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
+        var page = context.Render<StorageTypeDetails>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+        page.WaitForAssertion(() => Assert.HasCount(2, page.FindAll(".resource-links li")));
+        var rows = page.FindAll(".resource-links li");
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            Assert.AreEqual(usages[index].Url, row.QuerySelector("a.resource-name-link")!.GetAttribute("href"));
+            Assert.AreEqual(index == 0 ? "first/documents" : "second/documents", row.QuerySelector(".copyable-value code")!.GetAttribute("title"));
+            Assert.AreEqual(index == 0 ? "T" : "W", row.QuerySelector(".scope-letter")!.TextContent);
+            StringAssert.StartsWith(row.QuerySelector(".resource-owner-icon button")!.GetAttribute("aria-label")!, index == 0 ? "Tenant" : "Workspace");
+            Assert.IsNull(row.QuerySelector(".managed-resource-badge"));
+            Assert.IsNull(row.QuerySelector(".status-icon-only"));
+        }
+        Assert.AreEqual(1, client.UsageCalls);
+    }
+
+    [TestMethod]
+    [DataRow("https://elsewhere.test/storages/item?namespace=private&scopeRef=/instance")]
+    [DataRow("//elsewhere.test/storages/item?namespace=private&scopeRef=/instance")]
+    [DataRow("/storages/item")]
+    [DataRow("/storages/item?namespace=&scopeRef=unknown")]
+    [DataRow("/storages/item?namespace=first&namespace=second&scopeRef=/instance&scopeRef=/instance")]
+    [DataRow("/storages/item?namespace=invalid/slash&scopeRef=/workspaces/invalid")]
+    public void UsageIdentityNeverInventsMetadataForMissingOrUnusableQueries(string url)
+    {
+        var identity = StorageLinks.UsageIdentity(new("Storage", "item", "Item", url));
+        Assert.IsNull(identity.Namespace);
+        Assert.IsNull(identity.ScopeRef);
+    }
+
     private static BunitContext Setup(TypesClient client, string? selectedScope = null)
     {
-        var context = new BunitContext();
-        context.JSInterop.SetupModule("./_content/Agentstration.Console.Components/Components/Pages/StorageConfirmation.razor.js").SetupVoid("open", _ => true);
+        var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IStorageTypesClient>(client);
         context.Services.AddSingleton(new ConsoleContextState(new ContextProvider(selectedScope ?? Scope.Value)));
@@ -160,6 +219,9 @@ public sealed class StorageTypeComponentTests
     }
     private sealed class TypesClient : IStorageTypesClient
     {
+        public IReadOnlyList<StorageUsage> Usages { get; init; } = [];
+        public int UsageCalls { get; private set; }
+
         public StorageTypeResource Resource { get; set; } = Type();
         public bool FailWrites { get; set; }
         public string CurrentEtag { get; set; } = "\"original\"";
@@ -170,7 +232,7 @@ public sealed class StorageTypeComponentTests
         public PublishStorageTypeVersionRequest? Published { get; private set; }
         public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) { ListScope = scope; return Task.FromResult<IReadOnlyList<StorageTypeResource>>([Resource]); }
         public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag));
-        public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult<IReadOnlyList<StorageUsage>>([]);
+        public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
         public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) { Created = body; return Result(); }
         public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; return Result(); }
         public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) { Published = body; LastEtag = etag; return Result(); }

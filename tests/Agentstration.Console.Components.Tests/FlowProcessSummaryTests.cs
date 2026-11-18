@@ -17,7 +17,7 @@ public sealed class FlowProcessSummaryTests
     public void HistorySeparatesProcessUnitsAndHonorsTheExactExecutionScope()
     {
         using var locale = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = DispatchProxy.Create<IFlowApiClient, HistoryClient>();
         var proxy = (HistoryClient)(object)client;
@@ -66,7 +66,7 @@ public sealed class FlowProcessSummaryTests
     public void ProcessProgressShowsKnownAndUnknownTotalsAndExactScopedUnitLinks(string culture, string heading, string discovering, string unitLabel)
     {
         using var locale = new TestCultureScope(culture);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         var admission = new FlowProcessAdmission(2, "process", false, [new("fragment-A", 0, "child-unit", null)]);
@@ -81,6 +81,9 @@ public sealed class FlowProcessSummaryTests
         Assert.Contains("scopeRef=" + Uri.EscapeDataString(scope.Value), unit.GetAttribute("href")!);
         Assert.Contains("context=%2Finstance", unit.GetAttribute("href")!);
         Assert.Contains("parent-run", rendered.Find("summary a").GetAttribute("href")!);
+        Assert.AreEqual("child-unit", rendered.Find("li .collection-qualified-name code").TextContent);
+        Assert.HasCount(1, rendered.FindAll("li .status-neutral.status-icon-only button[aria-label]"));
+        Assert.HasCount(0, rendered.FindAll("li .resource-scope-badge"), "Execution context must not become invented ownership.");
         rendered.Render(parameters => parameters.Add(component => component.Admission, admission with { Closed = true, TotalUnits = 1 }));
         Assert.AreEqual("1", rendered.Find("progress").GetAttribute("max"));
         Assert.AreEqual("0", rendered.Find("progress").GetAttribute("value"));

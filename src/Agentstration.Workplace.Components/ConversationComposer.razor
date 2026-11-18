@@ -1,7 +1,7 @@
 <div class="conversation-composer" aria-busy="@(Busy || submitting)">
     <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
         <label class="sr-only" for="conversation-message">@Localizer["ContinueConversation"]</label>
-        <textarea id="conversation-message" @ref="composer" @bind="message" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@EffectivePlaceholder" disabled="@IsDisabled" aria-describedby="composer-help composer-reason" data-testid="workplace-composer-input"></textarea>
+        <ClearableText Multiline="true" id="conversation-message" @ref="composer" @bind-Value="message" @onkeydown="HandleKeyDown" placeholder="@EffectivePlaceholder" Disabled="@IsDisabled" aria-describedby="composer-help composer-reason" data-testid="workplace-composer-input"></ClearableText>
         <button type="submit" disabled="@(IsDisabled || string.IsNullOrWhiteSpace(message))" aria-label="@Localizer["SendMessage"]" data-testid="workplace-composer-submit"><UiIcon Name="send" /><span>@(Busy || submitting ? Localizer["Sending"] : Localizer["Send"])</span></button>
     </form>
     <div class="composer-meta">
@@ -17,7 +17,7 @@
     [Parameter] public EventCallback<string> OnSubmit { get; set; }
     private string message = string.Empty;
     private bool submitting;
-    private ElementReference composer;
+    private ClearableText composer = null!;
     private bool IsDisabled => Busy || submitting || !string.IsNullOrWhiteSpace(DisabledReason);
     private string EffectivePlaceholder => Placeholder ?? Localizer["ComposerPlaceholder"];
 

@@ -26,7 +26,7 @@ public sealed class ConnectedServiceComponentTests
     public void CatalogRendersTypeAvailabilityAndExactScope()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(Resource(scope)));
@@ -48,7 +48,7 @@ public sealed class ConnectedServiceComponentTests
     [TestMethod]
     public void EditorUsesSharedBindingsAndOnlyOffersCompatibleUsableConfiguredResources()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -101,7 +101,7 @@ public sealed class ConnectedServiceComponentTests
     [TestMethod]
     public void DetailsUseResourceTabsEmbedDefinitionAndDoNotExposeAnEditAction()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var type = TypeCatalog();
         var resource = Resource(workspace, type);

@@ -2,17 +2,17 @@
 
 <section class="panel form-section" data-testid="source-lifecycle-editor">
     <h2>@Title</h2>
-    <label class="checkbox-field"><input type="checkbox" checked="@Enabled" @onchange="args => EnabledChanged.InvokeAsync(args.Value is true)" data-testid="lifecycle-enable" /><span>@T("LifecycleEnable")</span></label>
+    <label class="checkbox-field"><FormCheckbox Value="@Enabled" ValueChanged="EnabledChanged" data-testid="lifecycle-enable" /><span>@T("LifecycleEnable")</span></label>
     @if (Enabled)
     {
-        <div class="form-grid">
-            <label><span>@T("LifecycleTtl")</span><input value="@TimeToLiveText" @onchange="args => TimeToLiveTextChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-ttl" /><small>@T("LifecycleTtlHelp")</small></label>
-            <label class="checkbox-field"><input type="checkbox" checked="@KeepHistory" @onchange="args => KeepHistoryChanged.InvokeAsync(args.Value is true)" data-testid="lifecycle-history" /><span>@T("LifecycleHistory")</span></label>
+        <FormGrid>
+            <FormField Label="@T("LifecycleTtl")" Help="@T("LifecycleTtlHelp")"><ClearableText UpdateOnInput="false" Value="@TimeToLiveText" ValueChanged="TimeToLiveTextChanged" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-ttl" /></FormField>
+            <label class="checkbox-field"><FormCheckbox Value="@KeepHistory" ValueChanged="KeepHistoryChanged" data-testid="lifecycle-history" /><span>@T("LifecycleHistory")</span></label>
             @if (KeepHistory)
             {
-                <label><span>@T("LifecycleRetention")</span><input value="@HistoryRetentionText" @onchange="args => HistoryRetentionTextChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-retention" /></label>
+                <FormField Label="@T("LifecycleRetention")"><ClearableText UpdateOnInput="false" Value="@HistoryRetentionText" ValueChanged="HistoryRetentionTextChanged" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-retention" /></FormField>
             }
-        </div>
+        </FormGrid>
         <p>@T("LifecycleHistoryHelp")</p>
         @if (!Valid) { <p class="form-alert form-alert-danger" role="alert">@T("LifecycleDurationInvalid")</p> }
     }

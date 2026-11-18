@@ -57,7 +57,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     [TestMethod]
     public void PageRendersAttemptAndExplainsWhenArgumentsWereNotRetained()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient());
 
@@ -79,7 +79,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     [TestMethod]
     public void PageRendersRetainedInvocationArguments()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient("{\"query\":\"latest dotnet version\"}"));
 

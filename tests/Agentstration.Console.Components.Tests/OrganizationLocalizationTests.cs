@@ -20,7 +20,7 @@ public sealed class OrganizationLocalizationTests
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
-            using var context = new BunitContext();
+            using var context = new BunitContext().WithCollectionPresentation();
             context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
             var strings = context.Services.GetRequiredService<IStringLocalizer<OrganizationStrings>>();
