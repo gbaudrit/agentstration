@@ -126,7 +126,25 @@ else
 
     @if (lastApplication is not null)
     {
-        <FormSection Title="@ApplicationStatusLabel(lastApplication.Definition.Status)" Eyebrow="@T("LatestResult")"><Actions><StatusBadge Text="@ApplicationStatusLabel(lastApplication.Definition.Status)" Status="@ApplicationTone(lastApplication.Definition.Status)" /></Actions><ChildContent>
+        <FormSection TestId="bootstrap-application-progress" aria-live="polite" Title="@ApplicationStatusLabel(lastApplication.Definition.Status)" Eyebrow="@T("LatestResult")"><Actions><StatusBadge Text="@ApplicationStatusLabel(lastApplication.Definition.Status)" Status="@ApplicationTone(lastApplication.Definition.Status)" /></Actions><ChildContent>
+            <p>@ProgressLabel(lastApplication)</p>
+            @if (lastApplication.Definition.Status == BootstrapApplicationStatus.Running)
+            {
+                <button class="button-secondary" disabled="@(busy || lastApplication.Definition.CancellationRequested)" @onclick="CancelApplicationAsync">@(lastApplication.Definition.CancellationRequested ? T("CancellationRequested") : T("CancelApplication"))</button>
+            }
+            @if (lastApplication.Definition.TotalResources > 0)
+            {
+                <progress class="bootstrap-progress" max="@lastApplication.Definition.TotalResources" value="@lastApplication.Definition.Resources.Count" aria-label="@T("ProgressLabel")"></progress>
+            }
+            else if (lastApplication.Definition.Status == BootstrapApplicationStatus.Running)
+            {
+                <p class="muted">@T("PreparingApplication")</p>
+            }
+            @if (lastApplication.Definition.CurrentResource is { } current)
+            {
+                <p>@T("CurrentResource", lastApplication.Definition.Resources.Count + 1) <code>@current.Kind/@current.Name</code></p>
+            }
+            @if (observationInterrupted) { <p class="inline-warning" role="status">@T("ObservationInterrupted")</p> }
             <div class="bootstrap-preview-summary"><span>@T("CreatedCount", Count(lastApplication, BootstrapResourceDisposition.Create))</span><span>@T("SkippedCount", Count(lastApplication, BootstrapResourceDisposition.Skip))</span><span>@T("ConflictsCount", Count(lastApplication, BootstrapResourceDisposition.Conflict))</span><span>@T("FailedCount", Count(lastApplication, BootstrapResourceDisposition.Failed))</span></div>
         </ChildContent></FormSection>
     }
@@ -144,7 +162,7 @@ else
 <StatusBadge Text="@ApplicationStatusLabel(application.Definition.Status)" Status="@ApplicationTone(application.Definition.Status)" /></State>
         <Information Context="application">
             <CollectionValue Label="@T("Started")">@application.Definition.StartedAt.ToLocalTime().ToString("g")</CollectionValue>
-            <CollectionValue Label="@T("Results")">@application.Definition.Resources.Count</CollectionValue>
+            <CollectionValue Label="@T("Results")">@ProgressLabel(application)</CollectionValue>
         </Information>
         <Actions Context="application">
 <CollectionActions ResourceName="@(application.Metadata.Name)"><button class="text-button" disabled="@busy" @onclick="() => ShowApplicationAsync(application.Metadata.Name)">@T("View")</button></CollectionActions></Actions>
@@ -171,8 +189,12 @@ else
                 <dt>@T("Started")</dt><dd>@selectedApplication.Definition.StartedAt.ToLocalTime().ToString("G")</dd>
                 <dt>@T("Completed")</dt><dd>@(selectedApplication.Definition.CompletedAt?.ToLocalTime().ToString("G") ?? T("NotCompleted"))</dd>
             </dl>
-            @if (selectedApplication.Definition.Error is not null) { <p class="error-panel">@selectedApplication.Definition.Error</p> }
-            @if (selectedApplication.Definition.Resources.Count == 0)
+            @if (selectedApplication.Definition.Error is not null) { <p class="error-panel">@ApplicationError(selectedApplication.Definition.Error)</p> }
+            @if (selectedApplication.Definition.Resources.Count == 0 && selectedApplication.Definition.Status == BootstrapApplicationStatus.Running)
+            {
+                <LoadingState Message="@T("PreparingApplication")" />
+            }
+            else if (selectedApplication.Definition.Resources.Count == 0)
             {
                 <EmptyState Title="@T("NoResourceOutcome")" Message="@T("NoResourceOutcomeMessage")" />
             }
@@ -185,7 +207,7 @@ else
 <StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></State>
         <Information Context="item">
             <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
-            <CollectionValue Label="@T("Message")">@item.Message</CollectionValue>
+            <CollectionValue Label="@T("Message")">@(item.Message is null ? null : ApplicationError(item.Message))</CollectionValue>
         </Information>
     </CollectionView>
             }
@@ -237,6 +259,9 @@ else
     private bool previewing;
     private bool applying;
     private bool confirmApply;
+    private bool observationInterrupted;
+    private Guid requestId = Guid.NewGuid();
+    private Task? observation;
 
     private BootstrapProfileScope? SelectedScope => sourceProfile?.Scope ?? (selectedProfiles.Count == 0 ? null : view?.Catalog.Profiles.First(profile => profile.Name == selectedProfiles[0]).Scope);
     private IReadOnlyList<(string Profile, BootstrapProfileBinding Binding)> SelectedBindings => sourceProfile is not null
@@ -257,6 +282,9 @@ else
         try
         {
             view = await Client.GetAsync(lifetime.Token);
+            lastApplication ??= view.Applications.FirstOrDefault();
+            selectedApplication ??= lastApplication;
+            observation ??= ObserveApplicationsAsync();
             if (TrySourceSelection() is { } selection)
             {
                 sourceSelection = selection;
@@ -267,7 +295,7 @@ else
             }
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { denied = true; }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
         finally { busy = false; }
     }
 
@@ -303,7 +331,7 @@ else
                 if (!available) { input.Name = string.Empty; input.Namespace = "default"; input.ScopeRef = null; }
             }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
         finally { busy = false; }
     }
     private BootstrapApplicationTarget? Target() => SelectedScope switch { BootstrapProfileScope.Tenant => new(selectedTenantId), BootstrapProfileScope.Workspace => new(selectedTenantId, selectedWorkspaceId), _ => null };
@@ -319,23 +347,23 @@ else
     {
         if (!CanPreview) return;
         busy = previewing = true; error = null; lastApplication = null;
-        try { preview = await Client.PreviewAsync(Selection(), lifetime.Token); }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        try { preview = await Client.PreviewAsync(Selection(), lifetime.Token); requestId = Guid.NewGuid(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
         finally { busy = previewing = false; }
     }
 
     private async Task ApplyAsync()
     {
-        if (preview is null) return;
+        if (preview is null || applying) return;
         busy = applying = true; error = null;
         try
         {
-            lastApplication = await Client.ApplyAsync(Selection(), preview.Digest, lifetime.Token);
+            lastApplication = await Client.ApplyAsync(Selection(), preview.Digest, lifetime.Token, requestId);
             selectedApplication = lastApplication;
             confirmApply = false; preview = null;
-            view = await Client.GetAsync(lifetime.Token);
+            UpdateApplication(lastApplication);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; confirmApply = false; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); confirmApply = false; }
         finally { busy = applying = false; }
     }
 
@@ -343,8 +371,61 @@ else
     {
         busy = true; error = null;
         try { selectedApplication = await Client.GetApplicationAsync(applicationId, lifetime.Token); }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = exception.Message; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
         finally { busy = false; }
+    }
+
+    private async Task CancelApplicationAsync()
+    {
+        if (lastApplication is null || busy) return;
+        busy = true;
+        try { UpdateApplication(await Client.CancelAsync(lastApplication.Metadata.Name, lifetime.Token)); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { observationInterrupted = true; }
+        finally { busy = false; }
+    }
+
+    private async Task ObserveApplicationsAsync()
+    {
+        var cancellationToken = lifetime.Token;
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                var running = view?.Applications.Where(application => application.Definition.Status == BootstrapApplicationStatus.Running).ToArray() ?? [];
+                foreach (var application in running)
+                {
+                    try
+                    {
+                        var latest = await Client.GetApplicationAsync(application.Metadata.Name, cancellationToken);
+                        if (latest is null) { observationInterrupted = true; continue; }
+                        UpdateApplication(latest);
+                        observationInterrupted = false;
+                    }
+                    catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    {
+                        denied = true;
+                        await InvokeAsync(StateHasChanged);
+                        return;
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        observationInterrupted = true;
+                    }
+                }
+                if (running.Length > 0) await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private void UpdateApplication(BootstrapApplicationResource application)
+    {
+        if (view is not null)
+            view = view with { Applications = view.Applications.Where(item => item.Metadata.Name != application.Metadata.Name)
+                .Append(application).OrderByDescending(item => item.Definition.StartedAt).ToArray() };
+        if (lastApplication?.Metadata.Name == application.Metadata.Name) lastApplication = application;
+        if (selectedApplication?.Metadata.Name == application.Metadata.Name) selectedApplication = application;
     }
 
     private string TargetLabel(BootstrapApplicationTarget? target)
@@ -363,6 +444,19 @@ else
             || string.IsNullOrWhiteSpace(SourceLocale) || string.IsNullOrWhiteSpace(SourcePath)) return null;
         return new(ResourceScopeRef.Parse(SourceScope), SourcePublisher, SourceName, SourceVersionUid.Value, SourceChannel, SourceSnapshotUid.Value, SourceCatalog, SourceEntry, SourceLocale, SourcePath);
     }
+    private string ProgressLabel(BootstrapApplicationResource application) => application.Definition.TotalResources > 0
+        ? T("ProcessedCount", application.Definition.Resources.Count, application.Definition.TotalResources)
+        : T("ProcessedResources", application.Definition.Resources.Count);
+    private string ApplicationError(string code) => code switch
+    {
+        "bootstrap_application_cancelled" => T("ApplicationCancelled"),
+        "bootstrap_application_interrupted" => T("ApplicationInterrupted"),
+        "bootstrap_application_failed" or "bootstrap_resource_failed" => T("ApplicationFailed"),
+        "bootstrap_application_invalid" or "bootstrap_request_identity_required" or "bootstrap_selection_invalid" => T("ApplicationInvalid"),
+        "bootstrap_request_identity_conflict" => T("RequestIdentityConflict"),
+        "bootstrap_request_identity_limit" or "bootstrap_application_queue_full" => T("ApplicationQueueFull"),
+        _ => code
+    };
     private string ScopeLabel(BootstrapProfileScope scope) => T($"Scope.{scope}");
     private string BindingTargetKindLabel(BootstrapBindingTargetKind kind) => T($"BindingTargetKind.{kind}");
     private string DispositionLabel(BootstrapResourceDisposition disposition) => T($"Disposition.{disposition}");

@@ -416,6 +416,7 @@ public sealed partial class DeclarativeBootstrapTests
             Definition = application.Definition with
             {
                 Status = BootstrapApplicationStatus.Running,
+                ExecutionOwner = null,
                 CompletedAt = null,
                 Error = null,
                 Resources = []

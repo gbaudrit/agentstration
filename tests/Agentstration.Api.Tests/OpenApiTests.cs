@@ -93,6 +93,9 @@ public sealed class OpenApiTests
             ("GET", "/api/bootstrap/startup", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/bootstrap/source-profile", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/bootstrap/binding-targets", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/bootstrap/applications", AgentstrationPolicies.PlatformAdmin),
+            ("GET", "/api/bootstrap/applications/{applicationId}", AgentstrationPolicies.PlatformAdmin),
+            ("POST", "/api/bootstrap/applications/{applicationId}/cancel", AgentstrationPolicies.PlatformAdmin),
             ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),
             ("POST", "/api/modelproviders", AgentstrationPolicies.CanWriteResources),
             ("DELETE", "/api/modelproviders/{providerName}", AgentstrationPolicies.CanDeleteResources),
@@ -254,6 +257,22 @@ public sealed class OpenApiTests
         Assert.AreEqual("Validate a Flow draft", validate.GetProperty("summary").GetString());
         AssertSchemaHasProperty(validate, "200", "isValid");
         AssertSchemaHasProperty(validate, "200", "issues");
+    }
+
+    [TestMethod]
+    public async Task BootstrapApplicationsDocumentAcceptanceProgressAndCancellation()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync(OpenApiConfiguration.DocumentPath));
+        var paths = document.RootElement.GetProperty("paths");
+        var start = paths.GetProperty("/api/bootstrap/applications").GetProperty("post");
+        AssertSchemaHasProperty(start, "202", "definition");
+        Assert.IsFalse(start.GetProperty("responses").TryGetProperty("201", out _));
+        var cancel = paths.GetProperty("/api/bootstrap/applications/{applicationId}/cancel").GetProperty("post");
+        AssertSchemaHasProperty(cancel, "202", "definition");
+        var read = paths.GetProperty("/api/bootstrap/applications/{applicationId}").GetProperty("get");
+        AssertSchemaHasProperty(read, "200", "definition");
     }
 
     [TestMethod]

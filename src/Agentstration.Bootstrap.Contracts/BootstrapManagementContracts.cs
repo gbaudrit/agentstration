@@ -98,7 +98,13 @@ public sealed record ApplyBootstrapProfilesRequest(
     string ExpectedDigest,
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
+    BootstrapSourceProfileSelection? Source = null,
+    Guid? RequestId = null);
+
+public sealed record BootstrapExecutionProgress(
+    BootstrapCompositionPreview Preview,
+    IReadOnlyList<BootstrapAppliedResource> Resources,
+    BootstrapResourcePreview? CurrentResource);
 
 public sealed record BootstrapBindingTargetsRequest(
     BootstrapApplicationTarget? Target,

@@ -342,7 +342,12 @@ export class ExecutionScopesPage {
     const apply = await this.page.request.post(`${consoleUrl}/api/bootstrap/applications`, {
       data: { profiles: [siblingProfileName], expectedDigest: preview.digest },
     });
-    expect(apply.status(), await apply.text()).toBe(201);
+    expect(apply.status(), await apply.text()).toBe(202);
+    const application = await apply.json() as { metadata: { name: string } };
+    await expect.poll(async () => {
+      const current = await this.read<{ definition: { status: string } }>(`${consoleUrl}/api/bootstrap/applications/${application.metadata.name}`);
+      return current.definition.status;
+    }, { timeout: 60_000 }).toBe('succeeded');
   }
 
   private async ensureSiblingWorkspace(consoleUrl: string, tenantId: string): Promise<void> {
