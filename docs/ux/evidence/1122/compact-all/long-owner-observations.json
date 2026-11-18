@@ -1,0 +1,102 @@
+[
+  {
+    "title": "long owners and homonymous identities  @collections @smoke",
+    "groups": [
+      "",
+      "collection-long-identities.spec.ts",
+      "desktop dark"
+    ],
+    "project": "desktop-chromium",
+    "status": "passed",
+    "durationMs": 17436,
+    "artifactId": 14022007559,
+    "artifactUrl": "https://github.com/gbaudrit/agentstration/actions/runs/43391503391/artifacts/14022007559",
+    "file": "long-owner-desktop-en-dark.png",
+    "checkpoint": "long-owner-disclosure",
+    "sha256": "dc1459c614a2e0843214623c98c46313956cb62df7f56fbf709b4824d4dac5fc",
+    "captureSize": {
+      "width": 1440,
+      "height": 1000
+    },
+    "kind": "long-owner-and-homonymous-identities",
+    "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+    "coverageCommit": "d3ccdf873b2d952b3f284d58883544f44486bb08",
+    "browser": "CI pinned Chromium / Playwright 1.63.0",
+    "source": "Unedited success attachment from the real executable"
+  },
+  {
+    "title": "long owners and homonymous identities  @collections @smoke",
+    "groups": [
+      "",
+      "collection-long-identities.spec.ts",
+      "desktop light"
+    ],
+    "project": "desktop-chromium",
+    "status": "passed",
+    "durationMs": 16206,
+    "artifactId": 14022007559,
+    "artifactUrl": "https://github.com/gbaudrit/agentstration/actions/runs/43391503391/artifacts/14022007559",
+    "file": "long-owner-desktop-en-light.png",
+    "checkpoint": "long-owner-disclosure",
+    "sha256": "b251d8e2308699d43eaad82b03623fb236ac947085060b5714c6771532819dac",
+    "captureSize": {
+      "width": 1440,
+      "height": 1000
+    },
+    "kind": "long-owner-and-homonymous-identities",
+    "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+    "coverageCommit": "d3ccdf873b2d952b3f284d58883544f44486bb08",
+    "browser": "CI pinned Chromium / Playwright 1.63.0",
+    "source": "Unedited success attachment from the real executable"
+  },
+  {
+    "title": "long owners and homonymous identities @responsive @collections @smoke",
+    "groups": [
+      "",
+      "collection-long-identities.spec.ts",
+      "mobile French dark"
+    ],
+    "project": "mobile-chromium",
+    "status": "passed",
+    "durationMs": 15664,
+    "artifactId": 14021837069,
+    "artifactUrl": "https://github.com/gbaudrit/agentstration/actions/runs/43391503391/artifacts/14021837069",
+    "file": "long-owner-mobile-fr-dark.png",
+    "checkpoint": "long-owner-disclosure",
+    "sha256": "9dafcef1e99b4bde52d5cf6a235be3c96ec8ca7ef4c7b0c8ab94431309e540bc",
+    "captureSize": {
+      "width": 390,
+      "height": 994
+    },
+    "kind": "long-owner-and-homonymous-identities",
+    "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+    "coverageCommit": "d3ccdf873b2d952b3f284d58883544f44486bb08",
+    "browser": "CI pinned Chromium / Playwright 1.63.0",
+    "source": "Unedited success attachment from the real executable"
+  },
+  {
+    "title": "long owners and homonymous identities @responsive @collections @smoke",
+    "groups": [
+      "",
+      "collection-long-identities.spec.ts",
+      "mobile French light"
+    ],
+    "project": "mobile-chromium",
+    "status": "passed",
+    "durationMs": 13991,
+    "artifactId": 14021837069,
+    "artifactUrl": "https://github.com/gbaudrit/agentstration/actions/runs/43391503391/artifacts/14021837069",
+    "file": "long-owner-mobile-fr-light.png",
+    "checkpoint": "long-owner-disclosure",
+    "sha256": "43f91128081c241d46bf554b78960654d3505e2eaa4b682bdc3cb938b861f089",
+    "captureSize": {
+      "width": 390,
+      "height": 994
+    },
+    "kind": "long-owner-and-homonymous-identities",
+    "productCommit": "44058e720b118545a19a73bb08a3f9c20552ec05",
+    "coverageCommit": "d3ccdf873b2d952b3f284d58883544f44486bb08",
+    "browser": "CI pinned Chromium / Playwright 1.63.0",
+    "source": "Unedited success attachment from the real executable"
+  }
+]

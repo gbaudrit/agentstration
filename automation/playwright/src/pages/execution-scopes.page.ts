@@ -500,7 +500,7 @@ export class ExecutionScopesPage {
     await this.grantDescendantUse(consoleUrl, flow, tenantScope);
   }
 
-  private async grantDescendantUse(consoleUrl: string, resource: ResourceIdentityWire, tenantScope: string): Promise<void> {
+  public async grantDescendantUse(consoleUrl: string, resource: ResourceIdentityWire, tenantScope: string): Promise<void> {
     const url = `${consoleUrl}/api/resource-access-policies/${resource.uid}`;
     const contextHeaders = { 'X-Agentstration-Context': '/instance' };
     const current = await this.page.request.get(url, { headers: contextHeaders });

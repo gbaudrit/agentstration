@@ -1,4 +1,5 @@
 export const TestIds = {
+  collections: { modelProfileOverview: 'model-profile-overview' },
   formAdapters: {
     requirement: 'model-provider-value-requirement',
     bindingKind: 'model-provider-binding-kind',

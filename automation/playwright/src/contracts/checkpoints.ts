@@ -1,4 +1,11 @@
 export const Checkpoints = {
+  collections: {
+    contract: 'collections-contract-verified',
+    workplaceActivity: 'collections-workplace-activity',
+    workplaceTasks: 'collections-workplace-tasks',
+    workplaceTask: 'collections-workplace-task',
+    workplaceNotifications: 'collections-workplace-notifications',
+  },
   flowCollection: { table: 'flows-compact-table', cards: 'flows-compact-cards', managed: 'flows-compact-managed', inherited: 'flows-compact-inherited' },
   sharedForms: {
     editorCleared: 'shared-form-editor-cleared',
