@@ -11,6 +11,8 @@ internal static class SchemasServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationSchemas(this IServiceCollection services)
     {
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
+        services.AddSingleton<ISchemaFormatHandler, BuiltinXmlSchemaFormatHandler>();
+        services.AddSingleton<ISchemaFormatHandler, Agentstration.Functions.TransformationSchemaFormatHandler>();
         services.AddSingleton(new AepSchemaFormatOptions());
         services.AddSingleton<ISchemaFormatHandlerSource, AepSchemaFormatHandlerSource>();
         services.AddSingleton<ISchemaFormatRegistry, SchemaFormatRegistry>();

@@ -15,6 +15,16 @@
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else
 {
+    @if (original?.Definition.Versions.Any(v => v.TransformationSnapshot is not null) == true)
+    {
+        <section class="panel form-section" data-testid="function-transformation-evidence">
+            <h2>@T("TransformationEvidence")</h2><p>@T("TransformationPinnedHelp")</p>
+            @foreach (var item in original.Definition.Versions.Where(v => v.TransformationSnapshot is not null))
+            {
+                <details><summary>@item.Version</summary><pre>@JsonSerializer.Serialize(item.TransformationSnapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre></details>
+            }
+        </section>
+    }
     <form class="panel form-section" @onsubmit="SaveAsync" @onsubmit:preventDefault @formname="transformation-function">
         <fieldset disabled="@(!CanEdit || busy || !interactive)">
             <label>@T("Name")<input @bind="technicalName" disabled="@(original is not null)" required data-testid="function-name" /></label>
@@ -56,8 +66,17 @@ else
     private bool enabled = true, loading = true, busy, interactive;
     private Exception? error;
     private ResourceScopeRef? Owner => ScopeRef is null ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
-    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || !original.Governance.IsManaged && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
-    private NativeFunctionDescriptor? Selected => implementations.FirstOrDefault(item => ImplementationKey(item) == implementationKey);
+    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || !original.Governance.IsManaged
+        && !original.Definition.Versions.Any(v => v.TransformationSchema is not null) && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
+    private NativeFunctionDescriptor? Selected
+    {
+        get
+        {
+            var descriptor = implementations.FirstOrDefault(item => ImplementationKey(item) == implementationKey);
+            return descriptor is not null && original?.Definition.Versions.Last().TransformationSnapshot is { } mapping
+                ? descriptor with { InputSchema = FunctionInvocationSchemas.XmlContent, OutputSchema = mapping.Output.Content } : descriptor;
+        }
+    }
     private string T(string key) => Localizer[key];
     private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
     private static string KindKey(FunctionKindResource kind, string value) => $"{kind.ScopeRef}|{kind.Namespace}|{kind.Name}|{value}";

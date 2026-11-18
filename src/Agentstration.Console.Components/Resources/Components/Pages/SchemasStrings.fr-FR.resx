@@ -18,4 +18,9 @@
   <data name="ImmutableVersion"><value>Version immuable</value></data><data name="VersionDetails"><value>Version {0}</value></data><data name="Published"><value>Publiée</value></data><data name="SourceGeneration"><value>Génération source</value></data><data name="ImmutableContent"><value>Contenu natif publié</value></data><data name="ImmutableContentHelp"><value>Explorez cette définition immuable en lecture seule.</value></data>
   <data name="ScopeKind.Instance"><value>Instance</value></data><data name="ScopeKind.Tenant"><value>Tenant</value></data><data name="ScopeKind.Workspace"><value>Workspace</value></data>
 <data name="SourceEvidence" xml:space="preserve"><value>Preuve de découverte d’origine</value></data>
+  <data name="ExposeAsFunction" xml:space="preserve"><value>Exposer comme fonction</value></data>
+  <data name="ExposureHelp" xml:space="preserve"><value>Créez une fonction nommée figée sur cette déclaration publiée, son moteur et ses contrats d’entrée et de sortie. Publier la déclaration seule ne crée aucune fonction.</value></data>
+  <data name="ExposureFailed" xml:space="preserve"><value>La fonction n’a pas pu être exposée. Vérifiez le nom, la version, les dépendances et les permissions.</value></data>
+  <data name="Format.XmlXsd" xml:space="preserve"><value>Schéma XML (XSD 1.0)</value></data>
+  <data name="Format.XmlJsonTransformation" xml:space="preserve"><value>Transformation XML vers JSON</value></data>
 </root>

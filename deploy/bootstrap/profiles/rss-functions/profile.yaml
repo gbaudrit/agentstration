@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: rss-functions
+definition:
+  displayName: rss-functions
+  description: Explicitly expose the previously published RSS mapping. Apply rss-schemas first in the same scope.
+  targetScope: workspace

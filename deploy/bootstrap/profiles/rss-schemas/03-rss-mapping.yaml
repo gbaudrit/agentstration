@@ -1,0 +1,90 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "Schema",
+  "metadata": {
+    "name": "rss-mapping"
+  },
+  "definition": {
+    "displayName": "rss-mapping",
+    "format": "xml-json-transformation",
+    "dialect": "agentstration.io/xml-json-transformation/v1",
+    "content": {
+      "engine": {
+        "name": "xml-to-json-builtin",
+        "version": "1.0.0",
+        "scopeRef": "/instance"
+      },
+      "input": {
+        "name": "rss-xml",
+        "version": "1.0.0"
+      },
+      "output": {
+        "name": "rss-json",
+        "version": "1.0.0"
+      },
+      "rules": {
+        "namespaces": {
+          "ext": "urn:agentstration:rss:example"
+        },
+        "root": {
+          "path": "/rss",
+          "type": "object",
+          "fields": {
+            "version": {
+              "path": "@version",
+              "type": "string"
+            },
+            "title": {
+              "path": "channel/title",
+              "type": "string"
+            },
+            "link": {
+              "path": "channel/link",
+              "type": "string"
+            },
+            "description": {
+              "path": "channel/description",
+              "type": "string",
+              "optional": true
+            },
+            "items": {
+              "path": "channel/item",
+              "type": "array",
+              "fields": {
+                "guid": {
+                  "path": "guid",
+                  "type": "string"
+                },
+                "title": {
+                  "path": "title",
+                  "type": "string"
+                },
+                "description": {
+                  "path": "description",
+                  "type": "string",
+                  "optional": true
+                },
+                "publishedAt": {
+                  "path": "pubDate",
+                  "type": "dateTime",
+                  "optional": true
+                },
+                "sourceUrl": {
+                  "path": "source/@url",
+                  "type": "string",
+                  "optional": true
+                },
+                "rating": {
+                  "path": "ext:rating",
+                  "type": "integer",
+                  "optional": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "publishVersion": "1.0.0"
+  }
+}

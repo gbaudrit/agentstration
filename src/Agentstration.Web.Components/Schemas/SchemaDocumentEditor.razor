@@ -89,7 +89,7 @@
     {
         <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
             <label><span>@Localizer["DefinitionSource"]</span></label>
-            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" />
+            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" Language="@(IsXml ? "xml" : "json")" />
             @if (!ReadOnly)
             {
                 <div class="form-actions"><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></div>
@@ -124,6 +124,8 @@
     private bool visualSupported, sourceActivated;
     private SchemaPropertySelection? selectedProperty;
     private bool IsJsonSchema => string.Equals(Format, SchemaFormatIds.JsonSchema, StringComparison.Ordinal);
+    private bool IsXml => Format == BuiltinXmlSchemaFormatHandler.Format;
+    private JsonElement nativeValue;
     private bool CanPreview => IsJsonSchema && (Descriptor?.Capabilities.HasFlag(SchemaFormatCapabilities.InstancePreview) ?? true);
     private JsonObject Properties => document["properties"] as JsonObject ?? [];
     private bool AdditionalProperties => document["additionalProperties"]?.GetValue<bool>() ?? true;
@@ -134,7 +136,8 @@
         var nextKey = Value.ValueKind == JsonValueKind.Undefined ? "{}" : Value.GetRawText();
         if (nextKey == valueKey) return;
         valueKey = nextKey;
-        source = Pretty(nextKey);
+        nativeValue = Value;
+        source = IsXml && Value.ValueKind == JsonValueKind.String ? Value.GetString()! : Pretty(nextKey);
         document = JsonNode.Parse(nextKey) as JsonObject ?? [];
         visualSupported = IsJsonSchema && SupportsVisual(document);
         selectedProperty = FirstProperty(document);
@@ -159,6 +162,14 @@
         sourceError = null;
         try
         {
+            if (!IsJsonSchema)
+            {
+                nativeValue = IsXml ? JsonSerializer.SerializeToElement(source) : JsonSerializer.Deserialize<JsonElement>(source);
+                valueKey = nativeValue.GetRawText();
+                await ValueChanged.InvokeAsync(nativeValue);
+                await ValidateDefinitionAsync();
+                return;
+            }
             document = JsonNode.Parse(source) as JsonObject
                 ?? throw new JsonException("The root value must be an object.");
             visualSupported = IsJsonSchema && SupportsVisual(document);
@@ -210,7 +221,7 @@
         try
         {
             definitionValidation = await DefinitionValidator(
-                new(Format, Dialect, JsonSerializer.SerializeToElement(document)));
+                new(Format, Dialect, IsJsonSchema ? JsonSerializer.SerializeToElement(document) : nativeValue));
         }
         catch (Exception exception)
         {
@@ -288,7 +299,8 @@
             {
                 builder.OpenElement(6, "li");
                 builder.OpenElement(7, "code"); builder.AddContent(8, issue.Path); builder.CloseElement();
-                builder.AddContent(9, $" — {issue.Message}");
+                builder.AddContent(9, " — " + (issue.Code is "xml_invalid" or "xml_contract_invalid" or "transformation_definition_invalid"
+                    ? Localizer["Issue." + issue.Code].Value : issue.Message));
                 builder.CloseElement();
             }
             builder.CloseElement();

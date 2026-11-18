@@ -3,6 +3,8 @@
 @using System.Text.Json
 @using Agentstration.Schemas
 @using Agentstration.Schemas.Contracts
+@using Agentstration.Functions.Contracts
+@inject IServiceProvider Services
 @implements IDisposable
 @inject ISchemasClient Client
 @inject NavigationManager Navigation
@@ -120,6 +122,18 @@ else
                                     Descriptor="@VersionFormatDescriptor(selectedVersion)" Value="@selectedVersion.Content"
                                     ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                             </div>
+                            @if (selectedVersion.Format == "xml-json-transformation")
+                            {
+                                <section class="panel form-section" data-testid="schema-exposure">
+                                    <h4>@T("ExposeAsFunction")</h4><p>@T("ExposureHelp")</p>
+                                    <fieldset disabled="@(!CanExpose || busy)">
+                                        <label><span>@T("TechnicalName")</span><input @bind="functionName" data-testid="exposure-name" /></label>
+                                        <label><span>@T("DisplayName")</span><input @bind="functionDisplayName" data-testid="exposure-display-name" /></label>
+                                        <label><span>@T("Version")</span><input @bind="functionVersion" data-testid="exposure-version" /></label>
+                                        <button type="button" class="button-primary" @onclick="ExposeAsync" data-testid="schema-expose">@T("ExposeAsFunction")</button>
+                                    </fieldset>
+                                </section>
+                            }
                         </section>
                     }
                 }
@@ -160,7 +174,7 @@ else
                         else { <label><span>@T("Scope")</span><span class="schema-scope-field"><ResourceScopeBadge ScopeRef="selectedScope" /></span></label> }
                     @if (FormatAvailable)
                     {
-                        <label><span>@T("Format")</span><select value="@format" disabled="@(!IsNew || busy)" @onchange="ChangeFormat">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@descriptor.DisplayName (@descriptor.Format)</option> }</select></label>
+                        <label><span>@T("Format")</span><select value="@format" disabled="@(!IsNew || busy)" @onchange="ChangeFormat">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@FormatLabel(descriptor) (@descriptor.Format)</option> }</select></label>
                         <label><span>@T("Dialect")</span><select value="@dialect" disabled="@(!IsNew || busy)" @onchange="ChangeDialect">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }</select></label>
                     }
                     else
@@ -209,6 +223,8 @@ else
     private IReadOnlyList<SchemaVersionResource> versions = [];
     private SchemaVersionResource? selectedVersion;
     private bool loading = true, busy;
+    private string functionName = string.Empty, functionDisplayName = string.Empty, functionVersion = "1.0.0";
+    private bool CanExpose => (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
     private SchemaTab activeTab = SchemaTab.Overview;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private IReadOnlyList<SchemaFormatDescriptor> AvailableFormats => formats.Where(value => value.IsAvailable)
@@ -217,6 +233,12 @@ else
         && value.IsDefault && string.Equals(value.Format, format, StringComparison.Ordinal))
         ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, format, StringComparison.Ordinal));
     private bool FormatAvailable => SelectedFormatDescriptor is not null;
+    private string FormatLabel(SchemaFormatDescriptor descriptor) => descriptor.Format switch
+    {
+        "xml-xsd" => T("Format.XmlXsd"),
+        "xml-json-transformation" => T("Format.XmlJsonTransformation"),
+        _ => descriptor.DisplayName
+    };
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
         Client.ValidateDefinitionAsync(request, cancellation.Token);
@@ -374,6 +396,22 @@ else
         finally { busy = false; }
     }
 
+    private async Task ExposeAsync()
+    {
+        if (!CanExpose || busy || schema is null || selectedVersion is null) return;
+        busy = true; error = null; message = null;
+        try
+        {
+            var client = (ITransformationFunctionsClient)Services.GetService(typeof(ITransformationFunctionsClient))!;
+            var exposed = await client.ExposeAsync(new(functionName.Trim(), functionDisplayName.Trim(), functionVersion.Trim(),
+                new() { Name = schema.Name, Version = selectedVersion.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace },
+                schema.ScopeRef!.Value, schema.Namespace), cancellation.Token);
+            Navigation.NavigateTo($"/transformation-functions/{Uri.EscapeDataString(exposed.Name)}?scopeRef={Uri.EscapeDataString(exposed.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(exposed.Namespace.Value)}");
+        }
+        catch (Exception) { error = T("ExposureFailed"); }
+        finally { busy = false; }
+    }
+
     private RawSchemaResource RawResource() => new()
     {
         ApiVersion = schema!.ApiVersion,
@@ -406,6 +444,7 @@ else
     {
         format = args.Value?.ToString() ?? string.Empty;
         dialect = SelectedFormatDescriptor?.Dialects.FirstOrDefault() ?? string.Empty;
+        if (format == BuiltinXmlSchemaFormatHandler.Format) content = JsonSerializer.SerializeToElement("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" />");
     }
     private void ChangeDialect(ChangeEventArgs args) => dialect = args.Value?.ToString() ?? string.Empty;
     private Task ChangeContent(JsonElement value) { content = value.Clone(); return Task.CompletedTask; }

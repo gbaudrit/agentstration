@@ -13,6 +13,10 @@ public static class FunctionEndpoints
     public static void MapFunctionsApi(this IEndpointRouteBuilder endpoints)
     {
         var functions = endpoints.MapGroup("/api/transformation-functions").WithTags("Transformation functions");
+        functions.MapPost("/expose-schema", async (ExposeTransformationSchemaRequest body, TransformationFunctionService service, HttpResponse response, CancellationToken ct) =>
+            await Execute(async () => Written(await service.ExposeAsync(body, ct), response, 201)))
+            .WithSummary("Explicitly expose an exact published transformation Schema as a named function")
+            .Produces<TransformationFunctionResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         functions.MapGet("/", async (string? scopeRef, int? skip, int? take, TransformationFunctionService service, IResourceScopeOperations scopes, CancellationToken ct) => await Execute(async () =>
         {
             Page(skip, take);

@@ -22,10 +22,17 @@ public interface ITransformationFunctionsClient
     Task<ResourceSnapshot<FunctionKindResource>> GetKindAsync(FunctionReference reference, CancellationToken ct);
     Task SaveAsync(TransformationFunctionResource resource, string? etag, CancellationToken ct);
     Task SaveKindAsync(FunctionKindResource resource, string? etag, CancellationToken ct);
+    Task<TransformationFunctionResource> ExposeAsync(ExposeTransformationSchemaRequest request, CancellationToken ct) => throw new NotSupportedException();
 }
 
 public sealed class TransformationFunctionsApiClient(HttpClient http) : ITransformationFunctionsClient
 {
+    public async Task<TransformationFunctionResource> ExposeAsync(ExposeTransformationSchemaRequest request, CancellationToken ct)
+    {
+        using var response = await http.PostAsJsonAsync("api/transformation-functions/expose-schema", request, ct);
+        await ApiResponse.EnsureSuccessAsync(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TransformationFunctionResource>(ct))!;
+    }
     public async Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) =>
         (await ApiResponse.ReadAsync<ValueResponse<TransformationFunctionResource>>(http, "api/transformation-functions" + Query(scope), ct)).Value;
     public async Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) =>

@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: rss-schemas
+definition:
+  displayName: rss-schemas
+  description: Standalone RSS contracts and independent transformation declaration; creates no named function.
+  targetScope: workspace

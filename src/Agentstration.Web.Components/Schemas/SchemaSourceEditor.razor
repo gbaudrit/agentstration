@@ -9,6 +9,7 @@
 
 @code {
     [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Language { get; set; } = "json";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     private StandaloneCodeEditor? editor;
@@ -43,7 +44,7 @@
     private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor _) => new()
     {
         AutomaticLayout = true,
-        Language = "json",
+        Language = Language,
         Value = Value,
         Theme = Theme,
         ReadOnly = ReadOnly,
