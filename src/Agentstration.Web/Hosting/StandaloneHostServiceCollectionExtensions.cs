@@ -45,14 +45,17 @@ internal static class StandaloneHostServiceCollectionExtensions
         services.AddSingleton<ExtensionRegistrationManagementService>();
         services.AddSingleton<AepEnrollmentSettingsService>();
         services.AddSingleton<AepEnrollmentService>();
+        services.AddSingleton<AepAutomaticEnrollmentService>();
         services.AddSingleton<AwpWorkerIdentityService>();
         services.AddSingleton<StandardRuntimeProfileSeeder>();
         services.AddSingleton<ResourceScopeInventoryService>();
         services.AddSingleton<ExtensionManagementService>();
         services.AddSingleton<ExtensionInventoryService>();
-        services.AddSingleton(configuration
+        var policyOptions = configuration
             .GetSection(AepEnrollmentPolicyOptions.SectionName)
-            .Get<AepEnrollmentPolicyOptions>() ?? new());
+            .Get<AepEnrollmentPolicyOptions>() ?? new();
+        ExtensionEnrollmentPolicyService.ValidateLevel(policyOptions.AutoEnrollmentLevel);
+        services.AddSingleton(policyOptions);
         services.AddSingleton<ExtensionSourceDiscoveryService>();
         services.AddSingleton<IAepEnrollmentAnnouncementProvisioner>(provider => provider.GetRequiredService<ExtensionSourceDiscoveryService>());
         return services;
@@ -91,6 +94,7 @@ internal static class StandaloneHostServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationBackgroundWorkers(this IServiceCollection services, bool enabled)
     {
         if (!enabled) return services;
+        services.AddHostedService<AepAutomaticEnrollmentWorker>();
         services.AddHostedService<LocalWorkExecutionWorker>();
         services.AddHostedService<RuntimeAssignmentLeaseReaper>();
         services.AddHostedService<FlowRunRecoveryWorker>();

@@ -9,6 +9,7 @@ public static class ExtensionKinds
     public const string ExtensionBundleInstallation = "ExtensionBundleInstallation";
     public const string AepEnrollmentSettings = "AepEnrollmentSettings";
     public const string AepEnrollmentRequest = "AepEnrollmentRequest";
+    public const string ExtensionEnrollmentPolicy = "ExtensionEnrollmentPolicy";
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ExtensionBundleInstallationState>))]
@@ -124,6 +125,8 @@ public enum AepEnrollmentState
 
 public sealed record AepEnrollmentRequestProperties
 {
+    public string? AutomaticEnrollmentPolicy { get; init; }
+    public DateTimeOffset? AutomaticEnrollmentLeaseExpiresAt { get; init; }
     public required Guid InstanceId { get; init; }
     public ResourceScopeRef? TargetScopeRef { get; init; }
     public Guid? TargetTenantId { get; init; }

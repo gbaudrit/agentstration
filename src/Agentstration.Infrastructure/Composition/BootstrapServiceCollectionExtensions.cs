@@ -1,7 +1,9 @@
 using Agentstration.Identity;
+using Agentstration.Extensions.Aep;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Packs;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Agentstration.Infrastructure;
 
@@ -9,6 +11,9 @@ internal static class BootstrapServiceCollectionExtensions
 {
     internal static IServiceCollection AddAgentstrationBootstrapHandlers(this IServiceCollection services)
     {
+        services.TryAddSingleton<AepEnrollmentPolicyOptions>();
+        services.AddSingleton<ExtensionEnrollmentPolicyService>();
+        services.AddScoped<IBootstrapResourceHandler, ExtensionEnrollmentPolicyBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, TenantBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, PrincipalDefaultContextBootstrapResourceHandler>();

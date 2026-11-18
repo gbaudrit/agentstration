@@ -184,6 +184,40 @@ An invalid or duplicate profile name, a missing selected profile, malformed YAML
 
 ## Extension boundary
 
+### Automatic SharedKeyFile enrollment
+
+Set `Agentstration:Aep:Enrollment:AutoEnrollmentLevel` to `/instance`,
+`/tenants/<name-or-id>`, or `/tenants/<name-or-id>/workspaces/<name-or-id>` to
+assign verified SharedKeyFile installations without manual scope selection.
+UUID-shaped segments select IDs; other segments select exact names. The target
+must exist and be active, and a Workspace must belong to the selected Tenant.
+Without a configured destination, assignment remains manual.
+
+An instance profile can override the default for one extension or installation:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: ExtensionEnrollmentPolicy
+metadata:
+  name: utilities-enrollment
+definition:
+  extensionId: Agentstration.Extensions.Utilities
+  # instanceId: <stable-installation-uuid> # optional
+  autoEnrollmentLevel: /tenants/dev/workspaces/default
+```
+
+An installation-specific policy takes precedence over an extension policy, then
+the global default. Omit `autoEnrollmentLevel` from a policy to retain manual
+assignment for its selector even when a global default exists. Conflicting
+selectors are rejected. Policies are instance-owned and create-only; existing
+assignments, disabled registrations and explicitly unenrolled installations are
+preserved. `SharedKeyFileAllowed: false` cannot be overridden by a policy.
+The effective policy is also applied to verified announcements arriving later.
+
+Each extension must still be configured with its own key file, authority URL,
+public endpoint and durable installation state. Aspire, Compose or the operator
+owns that process and key lifecycle; Bootstrap never launches extensions.
+
 Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns its business identity and calls the existing resource boundary. This avoids assuming that all resources use `kind + metadata.name` as their existence key.
 
 Workspace profiles support direct editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.

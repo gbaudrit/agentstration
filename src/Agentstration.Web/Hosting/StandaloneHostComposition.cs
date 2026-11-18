@@ -1,4 +1,5 @@
 using Agentstration.Agents;
+using Agentstration.Extensions.Aep;
 using Agentstration.Application.Work;
 using Agentstration.Flows.Application;
 using Agentstration.Identity;
@@ -246,6 +247,7 @@ internal static class StandaloneHostCompositionExtensions
                             includeInteractiveDemo: !app.Environment.IsEnvironment("Testing"),
                             token);
                 }, app.Lifetime.ApplicationStopping);
+                await app.Services.GetRequiredService<AepAutomaticEnrollmentService>().ActivateAsync(app.Lifetime.ApplicationStopping);
             }
 
         }

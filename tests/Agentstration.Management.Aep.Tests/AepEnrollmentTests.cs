@@ -32,7 +32,7 @@ using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class AepEnrollmentTests
+public sealed partial class AepEnrollmentTests
 {
     private static WebApplicationFactory<Program> EnrollmentFactory() => new AepEnrollmentTestFactory();
 
