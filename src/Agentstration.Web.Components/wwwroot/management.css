@@ -165,3 +165,7 @@
 .resource-collection .data-grid td { padding-block: .4rem; }
 
 .collection-name-heading > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Embedded identities must shrink inside list grid tracks before truncating. */
+.resource-links { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.resource-links > li { min-width: 0; }
