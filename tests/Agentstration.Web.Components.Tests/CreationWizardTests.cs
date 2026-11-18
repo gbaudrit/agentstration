@@ -10,13 +10,16 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class CreationWizardTests
 {
     [TestMethod]
-    [DataRow("en-US", "Continue", "Previous")]
-    [DataRow("fr-FR", "Continuer", "Précédent")]
-    public async Task StepsPreserveTheirContentAndFocusWhenNavigating(string culture, string next, string previous)
+    [DataRow("en-US", "Continue", "Previous", "Incomplete", "Complete")]
+    [DataRow("fr-FR", "Continuer", "Précédent", "À compléter", "Complète")]
+    public async Task StepsPreserveTheirContentAndFocusWhenNavigating(string culture, string next, string previous, string incomplete, string complete)
     {
         using var cultureScope = new CultureScope(culture);
         using var context = Context();
-        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, Steps()));
+        var steps = Steps().Select(step => step with { IsComplete = false }).ToArray();
+        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, steps));
+        Assert.Contains(incomplete, cut.Find("[data-wizard-step=identity]").GetAttribute("aria-label")!);
+        Assert.IsFalse(cut.Find("[data-wizard-step=configuration]").HasAttribute("disabled"));
         Assert.AreEqual("identity", cut.Instance.CurrentStepId);
         Assert.Contains(next, cut.Find("[data-testid=creation-wizard-next]").TextContent);
         await cut.Find("input").InputAsync("my draft");
@@ -30,10 +33,14 @@ public sealed class CreationWizardTests
         await cut.Find("[data-testid=creation-wizard-previous]").ClickAsync();
         Assert.AreSame(instance, cut.FindComponent<WizardProbe>().Instance);
         Assert.AreEqual("my draft", cut.FindComponent<WizardProbe>().Instance.Value);
+        cut.Render(p => p.Add(c => c.Steps, new[] { steps[0] with { IsComplete = true }, steps[1] }));
+        Assert.Contains(complete, cut.Find("[data-wizard-step=identity]").GetAttribute("aria-label")!);
+        Assert.AreEqual("true", cut.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        Assert.AreSame(instance, cut.FindComponent<WizardProbe>().Instance);
     }
 
     [TestMethod]
-    public async Task FailedValidationPreventsAdvanceAndFutureStepsCannotBeSkipped()
+    public async Task ExplicitCallerCancellationCanStillPreventNavigation()
     {
         using var context = Context();
         var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, Steps())
@@ -53,7 +60,7 @@ public sealed class CreationWizardTests
         var finishes = 0;
         var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, Steps())
             .Add(c => c.OnStepChanging, async (CreationWizardStepChange _) => { validations++; await pending.Task; })
-            .Add(c => c.OnFinish, () => finishes++));
+            .Add(c => c.OnFinish, (CreationWizardFinish _) => finishes++));
         await cut.InvokeAsync(cut.Instance.FinishAsync);
         Assert.AreEqual(0, finishes);
         var moving = cut.Find("[data-testid=creation-wizard-next]").ClickAsync();
@@ -73,7 +80,7 @@ public sealed class CreationWizardTests
         var steps = Steps();
         var finishes = 0;
         var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, new[] { steps[0] with { Visible = false }, steps[1] })
-            .Add(c => c.Busy, true).Add(c => c.OnFinish, () => finishes++));
+            .Add(c => c.Busy, true).Add(c => c.OnFinish, (CreationWizardFinish _) => finishes++));
         Assert.AreEqual("configuration", cut.Instance.CurrentStepId);
         Assert.IsEmpty(cut.FindAll("[data-step-id=identity]"));
         await cut.InvokeAsync(cut.Instance.FinishAsync);
@@ -103,18 +110,34 @@ public sealed class CreationWizardTests
     }
 
     [TestMethod]
-    public async Task ANewlyVisibleEarlierStepCannotBeBypassedByFinishing()
+    public async Task ANewlyVisibleIncompleteStepDoesNotForceNavigationOrBlockOtherSteps()
     {
         using var context = Context();
         var steps = Steps();
-        var finishes = 0;
-        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, new[] { steps[0] with { Visible = false }, steps[1] })
-            .Add(c => c.OnFinish, () => finishes++));
+        steps[0] = steps[0] with { IsComplete = false };
+        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, new[] { steps[0] with { Visible = false }, steps[1] }));
         Assert.AreEqual("configuration", cut.Instance.CurrentStepId);
         cut.Render(p => p.Add(c => c.Steps, steps));
+        Assert.AreEqual("configuration", cut.Instance.CurrentStepId);
+        await cut.Find("[data-wizard-step=identity]").ClickAsync();
         Assert.AreEqual("identity", cut.Instance.CurrentStepId);
-        await cut.InvokeAsync(cut.Instance.FinishAsync);
-        Assert.AreEqual(0, finishes);
+        Assert.AreEqual("false", cut.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await cut.Find("[data-wizard-step=configuration]").ClickAsync();
+        Assert.AreEqual("configuration", cut.Instance.CurrentStepId);
+    }
+
+    [TestMethod]
+    public async Task FinalValidationCanReturnToAnIncompleteStepAndFocusIt()
+    {
+        using var context = Context();
+        var steps = Steps();
+        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, steps)
+            .Add(c => c.OnFinish, (CreationWizardFinish finish) => finish.ReturnToStepId = "identity"));
+        await cut.Find("[data-wizard-step=configuration]").ClickAsync();
+        await cut.Find("[data-testid=creation-wizard-finish]").ClickAsync();
+        Assert.AreEqual("identity", cut.Instance.CurrentStepId);
+        Assert.IsFalse(cut.Find("[data-step-id=identity]").HasAttribute("hidden"));
+        Assert.IsTrue(context.JSInterop.Invocations.Any(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
     }
 
     private static CreationWizardStep[] Steps() =>

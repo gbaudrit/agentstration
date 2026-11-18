@@ -36,14 +36,14 @@ public sealed class DataSourceDatasetEditorTests
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}");
         await rendered.Find("[data-testid='data-source-display-name']").ChangeAsync("Direct inventory");
         await rendered.Find("[data-testid='data-source-name']").ChangeAsync("direct-inventory");
-        Assert.IsFalse(CanFinish(rendered));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         await rendered.Find("[data-testid='dataset-allow-direct']").ChangeAsync(true);
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
         await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("01:00:00");
-        Assert.IsFalse(CanFinish(rendered));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsNull(handler.Created);
         await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("");
-        Assert.IsTrue(CanFinish(rendered));
+        Assert.IsTrue(ConfigurationComplete(rendered));
         await CompleteCreationAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
         Assert.IsNull(handler.Created!.Properties.Dataset!.Storage);
@@ -120,7 +120,7 @@ public sealed class DataSourceDatasetEditorTests
         await rendered.Find("[data-testid='dataset-parameters'] [data-schema-path='$.query'] input").InputAsync("first-service-query");
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.OtherService.Uid.ToString());
         Assert.AreEqual("", rendered.Find("[data-testid='dataset-operation']").GetAttribute("value"));
-        Assert.IsFalse(CanFinish(rendered));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsEmpty(rendered.FindAll($"[data-testid='dataset-operation'] option[value='{operationKey}']"));
         Assert.HasCount(1, rendered.FindAll($"[data-testid='dataset-operation'] option[value='{otherKey}']"));
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync(otherKey);
@@ -140,7 +140,7 @@ public sealed class DataSourceDatasetEditorTests
         {
             Assert.AreEqual(handler.Service.Uid.ToString(), rendered.Find("[data-testid='dataset-service']").GetAttribute("value"));
             Assert.AreEqual($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}", rendered.Find("[data-testid='dataset-operation']").GetAttribute("value"));
-            Assert.IsFalse(CanFinish(rendered));
+            Assert.IsFalse(ConfigurationComplete(rendered));
             Assert.IsNull(handler.Created);
         });
     }
@@ -157,7 +157,7 @@ public sealed class DataSourceDatasetEditorTests
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[data-testid='dataset-operation-ineligible']").TextContent));
-        Assert.IsFalse(CanFinish(rendered));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         await rendered.Find("form").SubmitAsync();
         Assert.IsNull(handler.Created);
     }
@@ -170,7 +170,7 @@ public sealed class DataSourceDatasetEditorTests
         using var context = await SetupAsync(http);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
-        Assert.IsFalse(CanFinish(rendered));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsNotNull(rendered.Find("[data-testid='dataset-operation-ineligible']"));
         Assert.IsNull(handler.Created);
     }
@@ -281,12 +281,12 @@ public sealed class DataSourceDatasetEditorTests
         await SelectAsync(page, handler);
         await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Acquired alerts");
         await page.Find("[data-testid=data-source-name]").ChangeAsync("acquired-alerts");
-        Assert.IsFalse(CanFinish(page));
+        Assert.IsFalse(ConfigurationComplete(page));
         Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href*='view=definition']"));
         Assert.IsNull(handler.Created);
         if (!hasCollection) return;
         await page.Find("[data-testid=dataset-document-collection]").ChangeAsync(documents.Collection.ToString());
-        Assert.IsTrue(CanFinish(page));
+        Assert.IsTrue(ConfigurationComplete(page));
         await CompleteCreationAsync(page);
         page.WaitForAssertion(() => Assert.AreEqual(documents.Collection, handler.Created?.Properties.Dataset?.DocumentCollectionUid));
         page.WaitForAssertion(() => Assert.HasCount(8, page.FindAll("[role=tab]")));
@@ -297,7 +297,7 @@ public sealed class DataSourceDatasetEditorTests
     [TestMethod]
     [DataRow("en-US")]
     [DataRow("fr-FR")]
-    public async Task WizardRequiresIdentityAndCannotCreateBySubmittingAnEarlierStep(string cultureName)
+    public async Task IncompleteStepsAllowNavigationButCreationReturnsToTheFirstInvalidStep(string cultureName)
     {
         using var culture = new TestCultureScope(cultureName);
         using var handler = new DatasetHandler();
@@ -305,17 +305,27 @@ public sealed class DataSourceDatasetEditorTests
         using var context = await SetupAsync(http);
         var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         page.WaitForElement("[data-testid=data-source-creation-wizard]");
+        Assert.AreEqual("false", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await page.Find("form").SubmitAsync();
+        Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNull(handler.Created);
+        await page.Find("[data-wizard-step=review]").ClickAsync();
+        Assert.AreEqual("review", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsFalse(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
         await page.Find("form").SubmitAsync();
         Assert.AreEqual("identity", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
         Assert.IsNotNull(page.Find("[role=alert]"));
         Assert.IsNull(handler.Created);
         await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Inventory");
         await page.Find("[data-testid=data-source-name]").ChangeAsync("inventory");
+        Assert.AreEqual("true", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await page.Find("[data-wizard-step=review]").ClickAsync();
         await page.Find("form").SubmitAsync();
         Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNotNull(page.Find("[role=alert]"));
         Assert.IsNull(handler.Created);
-        await page.Find("form").SubmitAsync();
-        Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.AreEqual("storage", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
         Assert.IsNull(handler.Created);
     }
 
@@ -382,8 +392,8 @@ public sealed class DataSourceDatasetEditorTests
         page.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
     }
 
-    private static bool CanFinish(IRenderedComponent<DataSourceDatasetEditor> page) =>
-        page.FindComponents<CreationWizard>().FirstOrDefault()?.Instance.CanFinish
+    private static bool ConfigurationComplete(IRenderedComponent<DataSourceDatasetEditor> page) =>
+        page.FindComponents<CreationWizard>().FirstOrDefault()?.Instance.Steps.All(step => step.IsComplete != false)
             ?? !page.Find("[data-testid=data-source-save]").HasAttribute("disabled");
 
     private static async Task CompleteCreationAsync(IRenderedComponent<DataSourceDatasetEditor> page)

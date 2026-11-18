@@ -270,4 +270,6 @@
   <data name="WizardEditContracts" xml:space="preserve"><value>Edit contracts</value></data>
   <data name="WizardTransformationCount" xml:space="preserve"><value>{0} transformation(s), in configured order</value></data>
   <data name="WizardFormInvalid" xml:space="preserve"><value>Correct the invalid fields before creating the Data Source.</value></data>
+  <data name="WizardNotEntered" xml:space="preserve"><value>Not entered</value></data>
+  <data name="WizardNotSelected" xml:space="preserve"><value>Not selected</value></data>
 </root>

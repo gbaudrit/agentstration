@@ -103,6 +103,18 @@ export class SourcePoliciesPage {
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     const text = SourcePolicyTextByLocale[locale];
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+    await this.wizardSelect('review');
+    for (const step of ['identity', 'acquisition', 'storage']) {
+      await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
+      await expect(this.wizardButton(step)).toHaveAccessibleName(new RegExp(text.wizardIncomplete + '$'));
+    }
+    await onStep?.('review-incomplete');
+    await this.activate(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave));
+    await this.assertWizardStep('identity');
+    await expect(this.page.getByRole('alert').filter({ hasText: text.wizardIdentityRequired })).toBeVisible();
+    await this.assertNotCreated(base, name);
+    await this.wizardNext('acquisition');
+    await this.wizardSelect('identity');
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).fill(name);
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceName)).toHaveValue(name);
@@ -114,21 +126,22 @@ export class SourcePoliciesPage {
     await this.page.keyboard.press('Tab');
     await onStep?.('acquisition');
     await this.wizardNext('storage');
-    await this.wizardNext('storage');
-    await expect(this.page.getByRole('alert').filter({ hasText: text.wizardStorageRequired })).toBeVisible();
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.wizardStorageRequired);
     await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.direct).check();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.lifecycle)).toContainText(ttlLabel);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
-    await this.wizardNext('storage');
-    await expect(this.page.getByRole('alert').filter({ hasText: text.datasetStorageRequired })).toBeVisible();
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.datasetStorageRequired);
     await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
     await this.page.getByTestId(TestIds.sourcePolicies.history).check();
     await this.page.getByTestId(TestIds.sourcePolicies.retention).fill('24:00:00');
-    await this.wizardNext('storage');
+    await this.wizardNext('treatments');
+    await this.rejectIncompleteCreation('storage', text.datasetStorageRequired);
     await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.history).uncheck();
     await this.wizardNext('treatments');
@@ -144,6 +157,8 @@ export class SourcePoliciesPage {
     await expect(this.page.getByTestId(TestIds.creationWizard.review)).toContainText(`default/${name}`);
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();
     await this.assertNotCreated(base, name);
+    await expect(this.page.getByTestId(TestIds.creationWizard.source).locator('nav [data-step-complete="false"]')).toHaveCount(0);
+    await expect(this.wizardButton('storage')).toHaveAccessibleName(new RegExp(text.wizardComplete + '$'));
     await onStep?.('review');
     await this.activate(this.page.getByRole('button', { name: text.wizardEditAcquisition, exact: true }));
     await this.assertWizardStep('acquisition');
@@ -159,6 +174,23 @@ export class SourcePoliciesPage {
     await this.openDataset(base, name);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.storage)).toHaveValue('');
+  }
+
+  private wizardButton(step: string): Locator {
+    return this.page.getByTestId(TestIds.creationWizard.source).locator(`nav button[data-wizard-step="${step}"]`);
+  }
+  private async wizardSelect(step: string): Promise<void> {
+    await expect(this.wizardButton(step)).toBeEnabled();
+    await this.activate(this.wizardButton(step));
+    await this.assertWizardStep(step);
+    await expect.poll(() => this.page.evaluate(() => document.activeElement?.getAttribute('data-step-id'))).toBe(step);
+  }
+  private async rejectIncompleteCreation(step: string, message: string): Promise<void> {
+    await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
+    await this.wizardSelect('review');
+    await this.activate(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave));
+    await this.assertWizardStep(step);
+    await expect(this.page.getByRole('alert').filter({ hasText: message })).toBeVisible();
   }
 
   private async activate(button: Locator): Promise<void> {
