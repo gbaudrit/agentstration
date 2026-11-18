@@ -19,8 +19,10 @@ public sealed class DeclarativeBootstrapService(
     BootstrapProfileCatalog catalog,
     IEnumerable<IBootstrapResourceHandler> resourceHandlers,
     ILogger<DeclarativeBootstrapService> logger,
-    SourceBootstrapProfileLoader? sourceProfiles = null)
+    SourceBootstrapProfileLoader? sourceProfiles = null,
+    IBootstrapExtensionReferenceResolver? extensionReferences = null)
 {
+    private readonly BootstrapExtensionReferencePreparation extensionPreparation = new(extensionReferences);
     private const string ConfigurationSection = "Agentstration:Bootstrap";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IReadOnlyDictionary<string, IBootstrapResourceHandler> handlers = resourceHandlers
@@ -58,7 +60,8 @@ public sealed class DeclarativeBootstrapService(
             throw new DeclarativeBootstrapException(
                 $"Bootstrap profile '{incompatible.Summary.Name}' has scope '{incompatible.Summary.Scope}' and cannot be composed with scope '{scope}'.");
         ValidateTarget(scope, selection.Target);
-        var bindings = ResolveBindings(profiles, selection.Bindings ?? []);
+        var fingerprints = new List<string>();
+        var bindings = await ResolveBindingsAsync(profiles, selection, fingerprints, cancellationToken);
 
         var planning = new BootstrapPlanningContext();
         var resources = new List<BootstrapResourcePreview>();
@@ -68,7 +71,13 @@ public sealed class DeclarativeBootstrapService(
             foreach (var source in profile.Resources)
             {
                 BootstrapResourceDocument resource;
-                try { resource = ResolveResource(source, profile, bindings); }
+                try
+                {
+                    resource = ResolveResource(source, profile, bindings);
+                    resource = await extensionPreparation.ResolveDocumentAsync(resource,
+                        handlers.TryGetValue(resource.Kind, out var owner) ? owner.ExtensionReferencePaths : [],
+                        BootstrapExtensionReferencePreparation.ConsumerScope(operation), fingerprints, cancellationToken);
+                }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, source.Resource.Kind, source.Resource.Metadata.Name,
@@ -106,7 +115,7 @@ public sealed class DeclarativeBootstrapService(
             scope,
             selection.Target,
             bindings,
-            ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance),
+            ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints),
             resources,
             loadedSelection.SourceProvenance);
     }
@@ -122,8 +131,21 @@ public sealed class DeclarativeBootstrapService(
 
         await using var loadedSelection = await LoadAsync(selection, cancellationToken);
         var loaded = loadedSelection.Profiles;
-        var bindings = ResolveBindings(loaded, selection.Bindings ?? []);
-        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance);
+        var fingerprints = new List<string>();
+        var bindings = await ResolveBindingsAsync(loaded, selection, fingerprints, cancellationToken);
+        var prepared = new Dictionary<string, BootstrapResourceDocument>(StringComparer.Ordinal);
+        foreach (var profile in loaded)
+        {
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target);
+            foreach (var source in profile.Resources)
+            {
+                var resource = ResolveResource(source, profile, bindings);
+                prepared.Add(source.Location, await extensionPreparation.ResolveDocumentAsync(resource,
+                    handlers[resource.Kind].ExtensionReferencePaths,
+                    BootstrapExtensionReferencePreparation.ConsumerScope(operation), fingerprints, cancellationToken));
+            }
+        }
+        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints);
         if (!string.Equals(executionDigest, preview.Digest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog changed while the application was being prepared. Preview the application again.");
         var resources = new List<BootstrapAppliedResource>();
@@ -135,7 +157,7 @@ public sealed class DeclarativeBootstrapService(
                 var resource = source.Resource;
                 try
                 {
-                    resource = ResolveResource(source, profile, bindings);
+                    resource = prepared[source.Location];
                     var result = await handlers[resource.Kind].ApplyAsync(resource, operation, cancellationToken);
                     var disposition = result switch
                     {
@@ -174,7 +196,8 @@ public sealed class DeclarativeBootstrapService(
         BootstrapProfileScope scope,
         BootstrapApplicationTarget? target,
         IReadOnlyList<BootstrapBindingSelection> bindings,
-        BootstrapSourceProvenance? source)
+        BootstrapSourceProvenance? source,
+        IReadOnlyList<string>? fingerprints = null)
     {
         var lines = new List<string>
         {
@@ -182,6 +205,7 @@ public sealed class DeclarativeBootstrapService(
             target?.TenantId?.ToString("D") ?? string.Empty,
             target?.WorkspaceId?.ToString("D") ?? string.Empty
         };
+        if (fingerprints is not null) lines.AddRange(fingerprints.Select(value => $"resolved:{value}"));
         lines.AddRange(profiles.Select(profile => $"{profile.Summary.Name}:{profile.Summary.Digest}"));
         lines.AddRange(bindings.Select(binding =>
             $"{binding.Profile}:{binding.Name}:{binding.Target.Name}:{binding.Target.Namespace?.Value ?? string.Empty}:{binding.Target.ScopeRef?.Value ?? string.Empty}"));
@@ -213,10 +237,13 @@ public sealed class DeclarativeBootstrapService(
                 .LoadAsync(source, cancellationToken)
             : new(await catalog.LoadAsync(selection.Profiles, cancellationToken));
 
-    private static IReadOnlyList<BootstrapBindingSelection> ResolveBindings(
+    private async Task<IReadOnlyList<BootstrapBindingSelection>> ResolveBindingsAsync(
         IReadOnlyList<LoadedBootstrapProfile> profiles,
-        IReadOnlyList<BootstrapBindingSelection> selections)
+        BootstrapProfileSelection application,
+        List<string> fingerprints,
+        CancellationToken cancellationToken)
     {
+        var selections = application.Bindings ?? [];
         var selected = new Dictionary<(string Profile, string Name), BootstrapBindingSelection>();
         foreach (var selection in selections)
         {
@@ -227,10 +254,32 @@ public sealed class DeclarativeBootstrapService(
         var resolved = new List<BootstrapBindingSelection>();
         foreach (var profile in profiles)
         {
+            var usedBindings = BootstrapExtensionReferencePreparation.UsedBindings(profile);
             foreach (var binding in profile.Summary.Bindings)
             {
                 selected.Remove((profile.Summary.Name, binding.Name), out var explicitSelection);
+                if (explicitSelection is not null && binding.ExtensionTarget is not null)
+                    throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' selects a public contribution; change extensionTarget rather than supplying a local-name override.");
+                JsonElement? targetValue = null;
                 var target = explicitSelection?.Target ?? binding.DefaultTarget;
+                if (target is null && binding.ExtensionTarget is { } extensionTarget)
+                {
+                    if (!usedBindings.Contains(binding.Name)) continue;
+                    try
+                    {
+                        var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath,
+                            profile.Summary.Scope, application.Target);
+                        var resolvedTarget = await extensionPreparation.ResolveAsync(extensionTarget,
+                            BootstrapExtensionReferencePreparation.ConsumerScope(operation), cancellationToken);
+                        target = resolvedTarget.Reference;
+                        targetValue = resolvedTarget.TargetValue;
+                        fingerprints.Add(resolvedTarget.Fingerprint);
+                    }
+                    catch (BootstrapDependencyException exception)
+                    {
+                        throw new DeclarativeBootstrapException($"Bootstrap binding '{profile.Summary.Name}/{binding.Name}' [{exception.Code}]: {exception.Message}", exception);
+                    }
+                }
                 if (target is null)
                 {
                     if (binding.Required)
@@ -242,7 +291,7 @@ public sealed class DeclarativeBootstrapService(
                 resolved.Add(new(
                     profile.Summary.Name,
                     binding.Name,
-                    new ResourceReference(target.Name, target.ScopeRef, target.Namespace ?? ResourceNamespace.Default)));
+                    new ResourceReference(target.Name, target.ScopeRef, target.Namespace ?? ResourceNamespace.Default), targetValue));
             }
         }
         if (selected.Count > 0)
@@ -252,6 +301,21 @@ public sealed class DeclarativeBootstrapService(
             throw new DeclarativeBootstrapException($"Bootstrap binding '{unknown.Profile}/{unknown.Name}' is not declared by the selected profiles.");
         }
         return resolved;
+    }
+
+    internal async Task<IReadOnlyList<BootstrapExtensionRequirement>> GetExtensionRequirementsAsync(
+        BootstrapProfileSelection selection, CancellationToken cancellationToken)
+    {
+        await using var loaded = await LoadAsync(selection, cancellationToken);
+        var requirements = new List<BootstrapExtensionRequirement>();
+        foreach (var profile in loaded.Profiles)
+        {
+            ValidateTarget(profile.Summary.Scope, selection.Target);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath,
+                profile.Summary.Scope, selection.Target);
+            requirements.AddRange(BootstrapExtensionReferencePreparation.Requirements(profile, operation, handlers, selection.Bindings ?? []));
+        }
+        return requirements;
     }
 
     private static BootstrapResourceDocument ResolveResource(
@@ -303,7 +367,9 @@ public sealed class DeclarativeBootstrapService(
                         ["scopeRef"] = scopeRef.Value
                     };
                 }
-                return JsonSerializer.SerializeToNode(selection.Target, JsonOptions);
+                return selection.TargetValue is { } valueTarget
+                    ? JsonNode.Parse(valueTarget.GetRawText())
+                    : JsonSerializer.SerializeToNode(selection.Target, JsonOptions);
             }
             foreach (var property in value.ToArray())
             {

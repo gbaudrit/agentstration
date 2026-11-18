@@ -26,6 +26,7 @@ internal sealed record BootstrapProfileBindingDefinition
     public string? Description { get; init; }
     public bool Required { get; init; } = true;
     public ResourceReference? DefaultTarget { get; init; }
+    public BootstrapContributionSelector? ExtensionTarget { get; init; }
 }
 
 internal sealed record BootstrapProfileDefinition
@@ -270,7 +271,7 @@ public sealed class BootstrapProfileCatalog(
         IReadOnlyList<BootstrapProfileBindingDefinition> definitions)
     {
         if (definitions.Count == 0) return [];
-        if (scope != BootstrapProfileScope.Workspace)
+        if (scope != BootstrapProfileScope.Workspace && definitions.Any(binding => binding.ExtensionTarget is null))
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' can declare bindings only with Workspace scope.");
         if (definitions.Count > MaximumBindingsPerProfile)
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares more than {MaximumBindingsPerProfile} bindings.");
@@ -284,13 +285,22 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares binding '{binding.Name}' more than once.");
             if (binding.TargetKind is null)
                 throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' requires targetKind.");
+            if (binding.ExtensionTarget is not null && binding.DefaultTarget is not null)
+                throw new DeclarativeBootstrapException($"Bootstrap binding '{profile}/{binding.Name}' cannot declare both defaultTarget and extensionTarget.");
+            if (binding.ExtensionTarget is { } extensionTarget)
+            {
+                BootstrapExtensionReferencePreparation.Validate(extensionTarget);
+                if (BootstrapExtensionReferencePreparation.BindingKind(binding.TargetKind.Value) != extensionTarget.Kind)
+                    throw new DeclarativeBootstrapException($"Bootstrap binding '{profile}/{binding.Name}' has a contribution kind incompatible with targetKind.");
+            }
             result.Add(new(
                 binding.Name,
                 binding.TargetKind.Value,
                 string.IsNullOrWhiteSpace(binding.DisplayName) ? binding.Name : binding.DisplayName.Trim(),
                 string.IsNullOrWhiteSpace(binding.Description) ? null : binding.Description.Trim(),
                 binding.Required,
-                binding.DefaultTarget));
+                binding.DefaultTarget,
+                binding.ExtensionTarget));
         }
         return result;
     }

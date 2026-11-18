@@ -33,7 +33,7 @@ public enum BootstrapResourceDisposition
 }
 
 public sealed record BootstrapApplicationTarget(Guid? TenantId = null, Guid? WorkspaceId = null);
-public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target);
+public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target, JsonElement? TargetValue = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<BootstrapBindingTargetKind>))]
 public enum BootstrapBindingTargetKind
@@ -43,6 +43,9 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("runtimeProfile")] RuntimeProfile,
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("tool")] Tool,
+    [JsonStringEnumMemberName("connectedServiceType")] ConnectedServiceType,
+    [JsonStringEnumMemberName("storageType")] StorageType,
+    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile,
     [JsonStringEnumMemberName("parameter")] Parameter,
     [JsonStringEnumMemberName("secret")] Secret
 }
@@ -71,6 +74,7 @@ public sealed class BootstrapPlanningContext
 
 public interface IBootstrapResourceHandler
 {
+    IReadOnlyList<string> ExtensionReferencePaths => [];
     string Kind { get; }
     BootstrapProfileScope Scope { get; }
     bool SupportsProfileScope(BootstrapProfileScope profileScope) =>

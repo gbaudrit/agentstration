@@ -284,3 +284,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)
 
 238. [ADR-0238 — Bootstrap policies assign SharedKeyFile extension installations](0238-bootstrap-policies-assign-shared-key-extensions.md)
+
+239. [ADR-0239 — Bootstrap resolves public extension and contribution identities](0239-bootstrap-resolves-public-extension-contribution-identities.md)

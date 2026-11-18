@@ -240,8 +240,8 @@ else
 
     private BootstrapProfileScope? SelectedScope => sourceProfile?.Scope ?? (selectedProfiles.Count == 0 ? null : view?.Catalog.Profiles.First(profile => profile.Name == selectedProfiles[0]).Scope);
     private IReadOnlyList<(string Profile, BootstrapProfileBinding Binding)> SelectedBindings => sourceProfile is not null
-        ? sourceProfile.Bindings.Select(binding => (sourceProfile.Name, binding)).ToArray()
-        : view is null ? [] : selectedProfiles.SelectMany(profile => view.Catalog.Profiles.First(value => value.Name == profile).Bindings.Select(binding => (profile, binding))).ToArray();
+        ? sourceProfile.Bindings.Where(binding => binding.ExtensionTarget is null).Select(binding => (sourceProfile.Name, binding)).ToArray()
+        : view is null ? [] : selectedProfiles.SelectMany(profile => view.Catalog.Profiles.First(value => value.Name == profile).Bindings.Where(binding => binding.ExtensionTarget is null).Select(binding => (profile, binding))).ToArray();
     private bool CanPreview => selectedProfiles.Count > 0
         && (SelectedScope switch { BootstrapProfileScope.Tenant => selectedTenantId is not null, BootstrapProfileScope.Workspace => selectedWorkspaceId is not null, _ => true })
         && SelectedBindings.All(item => !item.Binding.Required || !string.IsNullOrWhiteSpace(bindingTargets[BindingKey(item.Profile, item.Binding.Name)].Name));

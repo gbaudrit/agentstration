@@ -13,6 +13,11 @@ internal static class BootstrapServiceCollectionExtensions
     {
         services.TryAddSingleton<AepEnrollmentPolicyOptions>();
         services.AddSingleton<ExtensionEnrollmentPolicyService>();
+        services.AddSingleton<IBootstrapExtensionReferenceResolver, BootstrapExtensionReferenceResolver>();
+        services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapToolContributionResolver>();
+        services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapConnectedServiceTypeContributionResolver>();
+        services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapStorageTypeContributionResolver>();
+        services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapDataSourceProfileContributionResolver>();
         services.AddScoped<IBootstrapResourceHandler, ExtensionEnrollmentPolicyBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, TenantBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();

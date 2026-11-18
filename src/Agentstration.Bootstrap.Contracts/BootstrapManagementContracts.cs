@@ -22,7 +22,8 @@ public sealed record BootstrapProfileBinding(
     string DisplayName,
     string? Description,
     bool Required,
-    ResourceReference? DefaultTarget = null);
+    ResourceReference? DefaultTarget = null,
+    BootstrapContributionSelector? ExtensionTarget = null);
 
 public sealed record BootstrapCatalogSnapshot(
     string? Path,

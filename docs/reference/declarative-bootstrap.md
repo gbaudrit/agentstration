@@ -85,7 +85,7 @@ A Platform administrator has instance-wide access to every active Tenant and Wor
 
 After initialization, a Platform administrator can open **System → Bootstrap profiles** to compose profiles in lexical dependency order, choose an explicit Tenant or Workspace target, resolve profile bindings, preview the complete application, and apply it. Preview is side-effect free and its digest covers the ordered profile contents, scope, target, and binding selections. The retained application history records the actor, target, selections, outcomes, and partial failures.
 
-Only Workspace profiles can declare bindings. Each declaration is typed and may provide a default target for non-interactive application:
+Workspace profiles can declare ordinary interactive bindings. Automatic extension contribution bindings are also supported in Instance and Tenant profiles. Each declaration is typed and may provide a default target for non-interactive application:
 
 ```yaml
 apiVersion: agentstration.io/v1
@@ -183,6 +183,69 @@ An invalid or duplicate profile name, a missing selected profile, malformed YAML
 `InitialBootstrapEnabled` controls startup application only. It does not disable profile loading itself: the PlatformAdmin-only Console and HTTP API can preview and apply explicit ordered profile lists independently of the startup flag.
 
 ## Extension boundary
+
+### Public extension and contribution references
+
+A `ModelProvider` can select its extension by public AEP identity instead of a
+local registration name:
+
+```yaml
+definition:
+  extension:
+    id: Agentstration.Extensions.Foundry
+    # instanceId: <stable-installation-uuid> # disambiguates several installations
+  contributionId: microsoft-foundry
+```
+
+Use either the existing name-based reference or the public selector, not both.
+Bootstrap resolves the selector to the enabled registration visible from the
+consumer's scope. An enrollment record must be Available. Multiple visible
+installations require an explicit `instanceId`; resolution never picks the first.
+
+For an extension-owned resource, use a typed automatic profile binding:
+
+```yaml
+definition: # inside profile.yaml
+  targetScope: workspace
+  bindings:
+    - name: search-tool
+      targetKind: tool
+      extensionTarget:
+        extensionId: example.search
+        kind: Tool
+        contributionId: search
+        # version: 1.0.0
+```
+
+The consumer uses the existing `{ binding: search-tool }` placeholder at its Tool
+reference. Only bindings used by selected resources become extension requirements.
+The same replacement works inside a `PackInstallation` binding's `target` while
+Pack resources retain their normal ownership. Public contribution bindings cannot
+also declare `defaultTarget` or receive a local-name override from the apply API.
+
+A direct structured placeholder is also available:
+
+```yaml
+definition:
+  type:
+    extensionContribution:
+      extensionId: example.services
+      kind: ConnectedServiceType
+      contributionId: example-api
+      version: 1.0.0
+```
+
+Supported contribution kinds are `Tool`, `ConnectedServiceType`, `StorageType`
+and an installed bundle's `DataSourceProfile`. Their binding target kinds are
+`tool`, `connectedServiceType`, `storageType` and `dataSourceProfile` respectively.
+`ExtensionRegistration` selects the registration itself. Service and Storage Type
+placeholders replace the complete native type reference, including UID/version/
+digest pins. Ordinary resources authored by Bootstrap keep their declared names
+and are referenced normally by later manifests.
+
+Preview is read-only. Missing, disabled, wrong-version or ambiguous contributions
+invalidate it with a diagnostic. Resolved identities participate in its digest;
+application rejects changed authoritative selections.
 
 ### Automatic SharedKeyFile enrollment
 

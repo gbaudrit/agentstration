@@ -21,4 +21,7 @@
   <data name="SourceSelection" xml:space="preserve"><value>Source {0}/{1} · locale du contenu {2}</value></data><data name="SourceVersion" xml:space="preserve"><value>Version de la Source</value></data><data name="ContentLocale" xml:space="preserve"><value>Locale du contenu</value></data><data name="ContentPath" xml:space="preserve"><value>Chemin du contenu</value></data>
 <data name="BindingTargetKind.Parameter"><value>Paramètre</value></data><data name="InheritedScope"><value>portée visible</value></data>
   <data name="BindingTargetKind.Tool" xml:space="preserve"><value>Outil</value></data>
+  <data name="BindingTargetKind.ConnectedServiceType" xml:space="preserve"><value>Type de service connecté</value></data>
+  <data name="BindingTargetKind.StorageType" xml:space="preserve"><value>Type de stockage</value></data>
+  <data name="BindingTargetKind.DataSourceProfile" xml:space="preserve"><value>Profil de source de données</value></data>
 </root>

@@ -1,4 +1,7 @@
 using Agentstration.Bootstrap.Contracts;
+using Agentstration.ConnectedServices.Contracts;
+using Agentstration.Storage.Contracts;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
@@ -111,6 +114,15 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Tool => Options(
                 await store.ListAsync<ToolResource>(ToolResourceKinds.Tool, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.ConnectedServiceType => Options(
+                await store.ListAsync<ConnectedServiceTypeResource>(ConnectedServiceResourceKinds.ConnectedServiceType, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.StorageType => Options(
+                await store.ListAsync<StorageTypeResource>(StorageResourceKinds.StorageType, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.DataSourceProfile => Options(
+                await store.ListAsync<DataSourceProfileResource>(DataSourceResourceKinds.DataSourceProfile, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Parameter => Options(
                 await store.ListAsync<ParameterResource>(ParameterResourceKinds.Parameter, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
@@ -126,6 +138,9 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.RuntimeProfile => RuntimeProfileResourceKinds.RuntimeProfile,
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
             BootstrapBindingTargetKind.Tool => ToolResourceKinds.Tool,
+            BootstrapBindingTargetKind.ConnectedServiceType => ConnectedServiceResourceKinds.ConnectedServiceType,
+            BootstrapBindingTargetKind.StorageType => StorageResourceKinds.StorageType,
+            BootstrapBindingTargetKind.DataSourceProfile => DataSourceResourceKinds.DataSourceProfile,
             BootstrapBindingTargetKind.Parameter => ParameterResourceKinds.Parameter,
             BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")

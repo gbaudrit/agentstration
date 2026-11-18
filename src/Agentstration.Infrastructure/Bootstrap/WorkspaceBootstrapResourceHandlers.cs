@@ -60,6 +60,7 @@ internal static class WorkspaceBootstrapResource
 
 public sealed class ModelProviderBootstrapResourceHandler(ModelProviderManagementService service) : IBootstrapResourceHandler
 {
+    public IReadOnlyList<string> ExtensionReferencePaths => ["extension"];
     public string Kind => ModelResourceKinds.ModelProvider;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
 
