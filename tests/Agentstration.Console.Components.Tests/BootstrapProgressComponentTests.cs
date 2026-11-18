@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using Agentstration.Sources.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -32,6 +33,31 @@ public sealed class BootstrapProgressComponentTests
             StringAssert.Contains(panel.TextContent, "Parameter/bootstrap-load-test-002");
         });
         Assert.AreEqual(0, client.Submissions);
+    }
+
+    [TestMethod]
+    public void PinnedIdentitySurvivesANewerApplicationInHistory()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StubClient { IncludeNewerApplication = true };
+        using var context = Context(client);
+        context.Services.GetRequiredService<NavigationManager>()
+            .NavigateTo("/settings/bootstrap?applicationId=retained-application");
+        var rendered = context.Render<BootstrapProfiles>();
+        rendered.WaitForAssertion(() => Assert.AreEqual("retained-application",
+            rendered.Find("#bootstrap-application-detail h2").TextContent));
+        Assert.AreEqual(0, client.Submissions);
+    }
+
+    [TestMethod]
+    public void SelectingHistoryPinsItsIdentityForReload()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = Context(new StubClient());
+        var rendered = context.Render<BootstrapProfiles>();
+        rendered.FindAll("button").Single(button => button.TextContent == "View").Click();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        Assert.AreEqual("?applicationId=retained-application", new Uri(navigation.Uri).Query);
     }
 
     [TestMethod]
@@ -91,13 +117,20 @@ public sealed class BootstrapProgressComponentTests
             }
         };
         public bool DisconnectOnce { get; init; }
+        public bool IncludeNewerApplication { get; init; }
+        private BootstrapApplicationResource Newer => application with
+        {
+            Metadata = application.Metadata with { Name = "newer-application" },
+            Definition = application.Definition with { StartedAt = DateTimeOffset.UnixEpoch.AddMinutes(1) }
+        };
         public int Submissions { get; private set; }
         public int Observations { get; private set; }
         public string? CancelledId { get; private set; }
         public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) => Task.FromResult(
-            new BootstrapManagementView(new(null, false, [], []), [], [], [application]));
+            new BootstrapManagementView(new(null, false, [], []), [], [], IncludeNewerApplication ? [Newer, application] : [application]));
         public Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
         {
+            if (applicationId == "newer-application") return Task.FromResult<BootstrapApplicationResource?>(Newer);
             Assert.AreEqual(application.Metadata.Name, applicationId);
             Observations++;
             if (DisconnectOnce && Observations == 1) throw new HttpRequestException("Synthetic disconnect");

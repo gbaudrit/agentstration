@@ -1,6 +1,7 @@
 @page "/settings/bootstrap"
 @implements IDisposable
 @inject IBootstrapProfilesApiClient Client
+@inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
@@ -230,6 +231,7 @@ else
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "applicationId")] public string? ApplicationId { get; set; }
     [SupplyParameterFromQuery(Name = "sourceScope")] public string? SourceScope { get; set; }
     [SupplyParameterFromQuery(Name = "publisher")] public string? SourcePublisher { get; set; }
     [SupplyParameterFromQuery(Name = "source")] public string? SourceName { get; set; }
@@ -276,14 +278,30 @@ else
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (view is not null && !string.IsNullOrWhiteSpace(ApplicationId)
+            && lastApplication?.Metadata.Name != ApplicationId)
+            await ShowApplicationAsync(ApplicationId);
+    }
+
     private async Task LoadAsync()
     {
         busy = true; error = null;
         try
         {
             view = await Client.GetAsync(lifetime.Token);
-            lastApplication ??= view.Applications.FirstOrDefault();
-            selectedApplication ??= lastApplication;
+            if (!string.IsNullOrWhiteSpace(ApplicationId))
+            {
+                lastApplication = await Client.GetApplicationAsync(ApplicationId, lifetime.Token);
+                selectedApplication = lastApplication;
+                if (lastApplication is not null) UpdateApplication(lastApplication);
+            }
+            else
+            {
+                lastApplication ??= view.Applications.FirstOrDefault();
+                selectedApplication ??= lastApplication;
+            }
             observation ??= ObserveApplicationsAsync();
             if (TrySourceSelection() is { } selection)
             {
@@ -362,6 +380,7 @@ else
             selectedApplication = lastApplication;
             confirmApply = false; preview = null;
             UpdateApplication(lastApplication);
+            PinApplication(lastApplication.Metadata.Name);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); confirmApply = false; }
         finally { busy = applying = false; }
@@ -370,10 +389,22 @@ else
     private async Task ShowApplicationAsync(string applicationId)
     {
         busy = true; error = null;
-        try { selectedApplication = await Client.GetApplicationAsync(applicationId, lifetime.Token); }
+        try
+        {
+            selectedApplication = await Client.GetApplicationAsync(applicationId, lifetime.Token);
+            if (selectedApplication is not null)
+            {
+                lastApplication = selectedApplication;
+                UpdateApplication(selectedApplication);
+                PinApplication(applicationId);
+            }
+        }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
         finally { busy = false; }
     }
+
+    private void PinApplication(string applicationId) => Navigation.NavigateTo(
+        Navigation.GetUriWithQueryParameter("applicationId", applicationId), replace: true);
 
     private async Task CancelApplicationAsync()
     {

@@ -744,7 +744,9 @@ applications may be pending or running in the authoritative process.
 
 The Console at `/settings/bootstrap` displays processed/total resources, the current
 resource when available, and created, skipped, conflict and failed counts. Refresh
-loads retained applications and resumes observing active ones; a temporary network
+loads retained applications and resumes observing active ones. The application
+identity is pinned in the page URL, so a newer application from another action or
+administrator does not replace the selected application after reload. A temporary network
 failure reconnects to the same identity without submitting again. Progress is
 persisted at resource boundaries. It stores resource identifiers and outcomes,
 never manifest bodies or resolved Secret/Parameter values.
