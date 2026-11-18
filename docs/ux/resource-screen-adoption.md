@@ -36,7 +36,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Pending review and migration |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
-| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Implemented; 3 new wizard/write-only/EN/FR overview cases and existing regressions pass (17 focused cases across the first 3 screens); TypeScript/catalog pass; browser checks pending |
+| SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
 | SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Pending review and migration |
 | SourceRegistries.razor | `/settings/source-registries`, `/settings/source-registries/new`, `/settings/source-registries/{Name}` | Pending review and migration |
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
