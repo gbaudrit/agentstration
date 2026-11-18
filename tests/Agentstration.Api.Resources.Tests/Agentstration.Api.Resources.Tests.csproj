@@ -47,4 +47,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs" Link="Fixtures/ResourceManagementApiTestBase.cs" />
+    <Compile Include="../ApiResourceTestFixtures/ResourceServiceFixture.cs" Link="Fixtures/ResourceServiceFixture.cs" />
+    <Compile Include="../ApiResourceTestFixtures/AwpTestWorker.cs" Link="Fixtures/AwpTestWorker.cs" />
+  </ItemGroup>
 </Project>
