@@ -1,0 +1,12 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<label class="resource-enabled-toggle">
+    <input type="checkbox" role="switch" @bind:get="Enabled" @bind:set="Changed" disabled="@(Disabled || !EnabledChanged.HasDelegate)" data-testid="@TestId" />
+    <span>@Shared["Enabled"]</span>
+</label>
+@code {
+    [Parameter] public bool Enabled { get; set; }
+    [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    private Task Changed(bool value) => EnabledChanged.InvokeAsync(value);
+}

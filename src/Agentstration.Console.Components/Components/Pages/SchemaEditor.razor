@@ -29,7 +29,7 @@ else
 {
     @if (!IsNew && schema is not null)
     {
-        <ResourceHeader ResourceType="@T("Schema")" Domain="schema" IconName="document" Name="@schema.Definition.DisplayName" Description="@schema.Definition.Description" StatusText="@(versions.Count == 0 ? T("Draft") : T("PublishedVersionsCount", versions.Count))" Status="@(versions.Count == 0 ? UiStatus.Neutral : UiStatus.Success)" TestId="schema-editor">
+        <ResourceHeader ScopeRef="schema.ScopeRef" ResourceType="@T("Schema")" Domain="schema" IconName="document" Name="@schema.Definition.DisplayName" Description="@schema.Definition.Description" StatusText="@(versions.Count == 0 ? T("Draft") : T("PublishedVersionsCount", versions.Count))" Status="@(versions.Count == 0 ? UiStatus.Neutral : UiStatus.Success)" TestId="schema-editor">
             <Metadata><span><code>@schema.Namespace/@schema.Name</code></span><span>@T("Generation") @schema.Generation</span></Metadata>
             <Actions><a class="button-secondary" href="/schemas">@T("Back")</a></Actions>
         </ResourceHeader>

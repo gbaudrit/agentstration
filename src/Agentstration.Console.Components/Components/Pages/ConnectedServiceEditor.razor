@@ -1,6 +1,7 @@
 @page "/connected-services/new"
 @page "/connected-services/{Name}/edit"
 @implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IConnectedServicesClient Client
 @inject IParametersClient ParametersClient
 @inject ISecretsClient SecretsClient
@@ -10,31 +11,25 @@
 @if (!Embedded)
 {
 <PageTitle>@(IsNew ? T("Create") : T("EditConnectedService")) · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("Create") : model.DisplayName)" Description="@T("Editor.Description")" TestId="connected-service-editor"><Actions><a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a></Actions></PageHeader>
+<PageHeader Enabled="model.Enabled" EnabledChanged="SetEnabled" EnabledDisabled="IsBusy" EnabledTestId="connected-service-enabled" ScopeRef="selectedScope" Title="@(IsNew ? T("Create") : model.DisplayName)" Description="@T("Editor.Description")" TestId="connected-service-editor"><Actions><a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a></Actions></PageHeader>
 }
-<div class="form-alert form-alert-info"><strong>@T("ManualBinding")</strong><span>@T("ManualBindingExplanation")</span></div>
 @if (loading) { <LoadingState Message="@T("LoadingEditor")" /> }
 else if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
 @if (!loading)
 {
-<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="connected-service-editor" class="resource-form" data-testid="connected-service-form"><DataAnnotationsValidator /><ValidationSummary />
+<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="connected-service-editor" class="resource-form" data-testid="connected-service-form"><DataAnnotationsValidator />
+    <p class="required-fields-hint"><span class="field-required" aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
     <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ConnectedServiceResource")</h2></div></div><div class="form-grid">
         <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Generic" IsNew="@IsNew" DisplayNameTestId="connected-service-display-name" TechnicalNameTestId="connected-service-name" />
         <FormField Label="@T("Description")" Optional Class="form-span-2"><ClearableText Multiline @bind-Value="model.Description" /></FormField>
-        @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-        <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="model.Enabled" /></FormField>
-    </div></section>
-    <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Contribution")</p><h2>@T("ExactTypeRevision")</h2></div></div>
+        @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> }
         @if (Variants.Count == 0) { <div class="form-alert form-alert-warning">@T("NoTypes")</div> }
-        else { <div class="form-grid"><FormField Label="@T("Type")" Required Class="form-span-2" Help="@T("TypePinnedHelp")"><ClearableSelect TValue="string" Value="@selectedVariantKey" ValueChanged="VariantSelected" AllowClear="false" disabled="@(!IsNew)" data-testid="connected-service-type">@foreach (var variant in Variants) { <option value="@variant.Key">@variant.Label</option> }</ClearableSelect></FormField>@if (SelectedVariant is { } selected) { <label><span>@T("ExtensionRegistration")</span><code>@selected.Type.ScopeRef/@selected.Type.Namespace/@selected.Type.Name</code></label><label><span>@T("ResourceId")</span><code>@selected.Type.Uid</code></label><label><span>@T("SchemaDigest")</span><code>@selected.Version.SchemaDigest</code></label><p class="form-span-2">@(selected.Type.Definition.Description ?? T("NoTypeDescription"))</p> }</div> }
-    </section>
+        else { <FormField Label="@T("ServiceType")" Required Class="form-span-2"><ClearableSelect TValue="string" Value="@selectedVariantKey" ValueChanged="VariantSelected" AllowClear="false" disabled="@(!IsNew)" data-testid="connected-service-type">@foreach (var variant in Variants) { <option value="@variant.Key">@VariantLabel(variant)</option> }</ClearableSelect>@if (SelectedVariant is { } selected) { <small class="resource-hint">@selected.Type.ScopeRef/@selected.Type.Namespace/@selected.Type.Name</small> }</FormField> }
+    </div></section>
     @if (SelectedVariant is { } current)
     {
-        @if (IsHttpUrlDiscovery) { <p class="form-alert form-alert-info">@T("Http.DiscoveryHelp")</p> }
-        <section class="panel form-section"><div class="panel-header"><h2>@T("Options")</h2></div><JsonSchemaInputEditor Schema="current.Version.Schema" Value="model.Options" ValueChanged="value => model.Options = value" ValidationChanged="state => optionsValid = state.IsValid" Disabled="busy" /></section>
-        <section class="panel form-section"><div class="panel-header"><div><h2>@T("Bindings")</h2><p>@T("Bindings.Description")</p></div></div>
-            @if (current.Version.Inputs.Count == 0) { <p>@T("NoInputs")</p> }
-            else
+        <section class="panel form-section connected-service-configuration"><div class="panel-header"><h2>@T("Configuration")</h2></div>
+            @if (current.Version.Inputs.Count > 0)
             {
                 <div class="binding-requirements">
                     @foreach (var input in current.Version.Inputs)
@@ -44,10 +39,11 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
                             AllowedSources="@BindingSources(input)" Options="@BindingOptions(input)"
                             Selection="@BindingSelection(binding)" SelectionChanged="value => BindingChanged(binding, value)"
                             CreationContext="@CreationContext(input)" ResourceCreated="ValueCreatedAsync"
-                            Disabled="busy" TestIdPrefix="connected-service" DialogSectionId="@binding" />
+                            Disabled="IsBusy" TestIdPrefix="connected-service" DialogSectionId="@binding" />
                     }
                 </div>
             }
+            <JsonSchemaInputEditor Schema="current.Version.Schema" Value="model.Options" ValueChanged="value => model.Options = value" ValidationChanged="state => optionsValid = state.IsValid" Disabled="IsBusy" />
         </section>
     }
     <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />
@@ -57,6 +53,17 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
 }
 
 @code {
+    [Parameter] public bool ExternalBusy { get; set; }
+    [Parameter] public EventCallback<bool> SavingChanged { get; set; }
+    private bool IsBusy => loading || busy || ExternalBusy;
+    private void SetEnabled(bool value) => model.Enabled = value;
+    public void ApplyActivationSnapshot(ResourceSnapshot<ConnectedServiceResource> snapshot)
+    {
+        if (IsNew || snapshot.Value.Name != model.Name || snapshot.Value.ScopeRef != selectedScope || snapshot.Value.Namespace != ResourceNamespaceValue) return;
+        model.Enabled = snapshot.Value.Definition.Enabled;
+        etag = snapshot.ETag;
+        StateHasChanged();
+    }
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
@@ -78,9 +85,11 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
     private bool loading = true, busy, optionsValid = true;
     private Exception? error;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanSave => !busy && optionsValid && selectedScope is not null && SelectedVariant is not null && RequiredBindingsPresent;
+    private bool CanSave => !IsBusy && optionsValid && selectedScope is not null && SelectedVariant is not null && RequiredBindingsPresent;
     private bool RequiredBindingsPresent => SelectedVariant is { } variant && variant.Version.Inputs.Where(value => value.Required).All(value => Binding(value).IsConfigured);
     private IReadOnlyList<TypeVariant> Variants => catalog.Where(type => type.Definition.Enabled).SelectMany(type => type.Definition.Versions.Select(version => new TypeVariant(type, version))).OrderBy(value => value.Label, StringComparer.OrdinalIgnoreCase).ToArray();
+    private string VariantLabel(TypeVariant variant) => Variants.Count(value => value.Label == variant.Label) > 1
+        ? $"{variant.Label} · {variant.Type.ScopeRef}/{variant.Type.Namespace}/{variant.Type.Name}" : variant.Label;
     private TypeVariant? SelectedVariant => Variants.FirstOrDefault(value => value.Key == selectedVariantKey);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     protected override async Task OnParametersSetAsync()
@@ -193,8 +202,8 @@ else if (error is not null) { <div class="form-alert form-alert-danger" role="al
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
     private static bool Matches(ConnectedServiceResource resource, TypeVariant variant) { var reference = resource.Definition.Type.Type; return reference.Name == variant.Type.Name && reference.ScopeRef == variant.Type.ScopeRef && (reference.Namespace ?? resource.Namespace) == variant.Type.Namespace && resource.Definition.Type.TypeUid == variant.Type.Uid && variant.Version.Version == resource.Definition.Type.Version && variant.Version.SchemaDigest == resource.Definition.Type.SchemaDigest; }
-    private async Task SaveAsync() { if (!CanSave) return; busy = true; error = null; try { var variant = SelectedVariant!; var properties = model.Properties(variant.Type, variant.Version); var snapshot = IsNew ? await Client.CreateConnectedServiceAsync(new(model.Name, properties, selectedScope), cancellation.Token) : await Client.UpdateConnectedServiceAsync(model.Name, selectedScope!.Value, ResourceNamespaceValue, new(properties), etag!, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); etag = snapshot.ETag; PrepareBindings(); if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo($"/connected-services/{Uri.EscapeDataString(snapshot.Value.Name)}?scopeRef={Uri.EscapeDataString(snapshot.Value.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(snapshot.Value.Namespace.Value)}"); } catch (Exception exception) { error = exception; } finally { busy = false; } }
+    private async Task SaveAsync() { if (!CanSave) return; busy = true; await SavingChanged.InvokeAsync(true); error = null; try { var variant = SelectedVariant!; var properties = model.Properties(variant.Type, variant.Version); var snapshot = IsNew ? await Client.CreateConnectedServiceAsync(new(model.Name, properties, selectedScope), cancellation.Token) : await Client.UpdateConnectedServiceAsync(model.Name, selectedScope!.Value, ResourceNamespaceValue, new(properties), etag!, cancellation.Token); model = ConnectedServiceEditorModel.From(snapshot.Value); etag = snapshot.ETag; PrepareBindings(); if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo($"/connected-services/{Uri.EscapeDataString(snapshot.Value.Name)}?scopeRef={Uri.EscapeDataString(snapshot.Value.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(snapshot.Value.Namespace.Value)}"); } catch (Exception exception) { error = exception; } finally { busy = false; await SavingChanged.InvokeAsync(false); } }
     private string DetailsUrl() => $"/connected-services/{Uri.EscapeDataString(Name ?? model.Name)}?scopeRef={Uri.EscapeDataString(selectedScope?.Value ?? EmbeddedScopeRef?.Value ?? ScopeRefValue ?? string.Empty)}&namespace={Uri.EscapeDataString(ResourceNamespaceValue.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
-    private sealed record TypeVariant(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version) { public string Key => $"{Type.ScopeRef?.Value}|{Type.Namespace.Value}|{Type.Name}|{Type.Uid:D}|{Version.Version}|{Version.SchemaDigest}"; public string Label => $"{Type.Definition.DisplayName} · {Version.Version} · {Type.Namespace}/{Type.Name} · {Type.ScopeRef}"; }
+    private sealed record TypeVariant(ConnectedServiceTypeResource Type, ConnectedServiceTypeVersionDescriptor Version) { public string Key => $"{Type.ScopeRef?.Value}|{Type.Namespace.Value}|{Type.Name}|{Type.Uid:D}|{Version.Version}|{Version.SchemaDigest}"; public string Label => $"{Type.Definition.DisplayName} · {Version.Version}"; }
 }

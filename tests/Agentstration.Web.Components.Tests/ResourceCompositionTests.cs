@@ -11,6 +11,39 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class ResourceCompositionTests
 {
     [TestMethod]
+    public void HeadersShowExactOwnerAndOmitTheProductEyebrow()
+    {
+        const string scopeLabel = "Instance";
+        using var context = Context();
+        var page = context.Render<PageHeader>(p => p.Add(v => v.Title, "Service")
+            .Add(v => v.ScopeRef, Agentstration.Resources.ResourceScopeRef.Instance));
+        Assert.IsEmpty(page.FindAll(".eyebrow"));
+        Assert.AreEqual(scopeLabel, page.Find(".page-title-row .resource-scope-badge").TextContent);
+        Assert.AreEqual("/instance", page.Find(".resource-owner-scope").GetAttribute("data-scope-ref"));
+        var resource = context.Render<ResourceHeader>(p => p.Add(v => v.Name, "Service")
+            .Add(v => v.ResourceType, "Type").Add(v => v.ScopeRef, Agentstration.Resources.ResourceScopeRef.Instance));
+        Assert.AreEqual(scopeLabel, resource.Find(".resource-title-row .resource-scope-badge").TextContent);
+        page.Render(p => p.Add(v => v.ScopeRef, (Agentstration.Resources.ResourceScopeRef?)null));
+        Assert.IsEmpty(page.FindAll(".resource-owner-scope"));
+    }
+
+    [TestMethod]
+    public void HeaderActivationIsOptionalAndDelegatesChanges()
+    {
+        using var context = Context();
+        var changed = false;
+        var page = context.Render<PageHeader>(p => p.Add(v => v.Title, "Service"));
+        Assert.IsEmpty(page.FindAll("input[role=switch]"));
+        page.Render(p => p.Add(v => v.Enabled, true).Add(v => v.EnabledChanged, value => changed = !value));
+        page.Find("input[role=switch]").Change(false);
+        Assert.IsTrue(changed);
+        page.Render(p => p.Add(v => v.EnabledDisabled, true));
+        Assert.IsTrue(page.Find("input[role=switch]").HasAttribute("disabled"));
+        var resource = context.Render<ResourceHeader>(p => p.Add(v => v.Name, "Service").Add(v => v.ResourceType, "Type").Add(v => v.Enabled, false));
+        Assert.IsTrue(resource.Find("input[role=switch]").HasAttribute("disabled"), "A header without a mutation handler must be read-only.");
+    }
+
+    [TestMethod]
     public async Task HeaderCopiesTheQualifiedIdentityAndKeepsUnqualifiedCallersCompatible()
     {
         using var context = Context();
@@ -89,18 +122,27 @@ public sealed class ResourceCompositionTests
     [TestMethod]
     public async Task IdentityKeepsMissingDescriptionExplicitAndCopiesOnlyTheRequestedValue()
     {
-        using var context = Context();
-        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-ui.js");
-        var copy = module.SetupVoid("copyText", "welcome-agent");
-        copy.SetVoidResult();
-        var cut = context.Render<ResourceIdentitySummary>(parameters => parameters
-            .Add(value => value.DisplayName, "Welcome agent")
-            .Add(value => value.TechnicalName, "welcome-agent")
-            .Add(value => value.Namespace, "default"));
-        StringAssert.Contains(cut.Markup, "Not provided");
-        await cut.Find("button").ClickAsync(new());
-        Assert.HasCount(1, copy.Invocations);
-        Assert.AreEqual("Copied", cut.Find("[role='status']").TextContent);
+        var previousCulture = System.Globalization.CultureInfo.CurrentUICulture;
+        System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+        try
+        {
+            using var context = Context();
+            var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-ui.js");
+            var copy = module.SetupVoid("copyText", "welcome-agent");
+            copy.SetVoidResult();
+            var cut = context.Render<ResourceIdentitySummary>(parameters => parameters
+                .Add(value => value.DisplayName, "Welcome agent")
+                .Add(value => value.TechnicalName, "welcome-agent")
+                .Add(value => value.Namespace, "default"));
+            StringAssert.Contains(cut.Markup, "Not provided");
+            await cut.Find("button").ClickAsync(new());
+            Assert.HasCount(1, copy.Invocations);
+            Assert.AreEqual("Copied", cut.Find("[role='status']").TextContent);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = previousCulture;
+        }
     }
 
     private static BunitContext Context()

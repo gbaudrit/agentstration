@@ -9,7 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
 
 <PageTitle>@(item?.DisplayName ?? T("Extension")) · Agentstration</PageTitle>
-<PageHeader Title="@(item?.DisplayName ?? T("Extension"))" Description="@(item?.Extension?.Extension?.Description ?? T("ExtensionDetails.Description"))">
+<PageHeader ScopeRef="registration?.Value.ScopeRef" Title="@(item?.DisplayName ?? T("Extension"))" Description="@(item?.Extension?.Extension?.Description ?? T("ExtensionDetails.Description"))">
     <Actions><a class="button-secondary" href="/extensions">@T("BackToExtensions")</a></Actions>
 </PageHeader>
 

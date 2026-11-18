@@ -12,7 +12,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourceRegistriesStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
-<PageHeader Title="@(IsList ? T("Title") : IsNew ? T("CreateTitle") : model?.DisplayName ?? Name)" Description="@T(IsList ? "Description" : "EditorDescription")">
+<PageHeader ScopeRef="@(IsList ? null : view?.Registration.ScopeRef)" Title="@(IsList ? T("Title") : IsNew ? T("CreateTitle") : model?.DisplayName ?? Name)" Description="@T(IsList ? "Description" : "EditorDescription")">
     <Actions>
         @if (IsList)
         {

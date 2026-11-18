@@ -15,7 +15,7 @@
 else
 {
 <PageTitle>@(source?.Definition.DisplayName ?? T(IsNew ? "CreateSource" : "DataSources")) · Agentstration</PageTitle>
-<PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DataSourcesHelp")" TestId="data-source-editor">
+<PageHeader ScopeRef="selectedScope" Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DataSourcesHelp")" TestId="data-source-editor">
     <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
 </PageHeader>
 @if (loading) { <LoadingState Message="@T("Loading")" /> }

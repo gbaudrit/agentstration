@@ -28,7 +28,7 @@
   <data name="Availability.Stale"><value>Stale</value></data>
   <data name="Availability.Unavailable"><value>Unavailable</value></data>
   <data name="Availability.Disabled"><value>Disabled</value></data>
-  <data name="Details.Description"><value>Inspect the pinned type resource, safe configuration, exports and diagnostics.</value></data>
+  <data name="Details.Description"><value>Manage the service configuration and review its availability.</value></data>
   <data name="DetailsSections"><value>Connected Service sections</value></data>
   <data name="Tab.Overview"><value>Overview</value></data>
   <data name="Tab.Definition"><value>Definition</value></data>
@@ -155,4 +155,9 @@
 <data name="SchemaCandidate.Unsupported" xml:space="preserve"><value>This candidate cannot be exported with the supported acquisition schema profile. Its original evidence remains available.</value></data>
 <data name="SchemaCandidate.Failed" xml:space="preserve"><value>The Schema draft could not be created. Check the name, permissions and supported schema constructs.</value></data>
 <data name="SchemaCandidate.Library" xml:space="preserve"><value>Inspect or reuse a published Schema</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="NoMatches" xml:space="preserve"><value>No matching connected services</value></data>
+  <data name="NoMatches.Message" xml:space="preserve"><value>Try another search or clear the filters to see all connected services.</value></data>
+  <data name="ClearFilters" xml:space="preserve"><value>Clear filters</value></data>
+  <data name="ServiceType" xml:space="preserve"><value>Service type</value></data>
 </root>

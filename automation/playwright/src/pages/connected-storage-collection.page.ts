@@ -112,7 +112,17 @@ export class ConnectedStorageCollectionPage {
     await row.getByTestId(TestIds.connectedStorageCollections.serviceName).click();
     const header = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDetails);
     await expect(header).toBeVisible();
-    await this.cancelConfirmation(header.getByRole('button', { name: ConnectedStorageCollectionTextByLocale[locale].deactivate, exact: true }), locale);
+    const activation = header.getByRole('switch');
+    await expect(activation).toBeChecked();
+    await this.cancelConfirmation(activation, locale);
+    await expect(activation).toBeChecked();
+    for (const tab of [TestIds.connectedStorageCollections.serviceOverview, TestIds.connectedStorageCollections.serviceDiscovery, TestIds.connectedStorageCollections.serviceAccess, TestIds.connectedStorageCollections.serviceYaml]) {
+      await this.page.getByTestId(tab).click();
+      await expect(activation).toBeVisible();
+      await expect(activation).toBeChecked();
+      await this.assertNoOverflow();
+    }
+    await expect(this.page.getByTestId(TestIds.connectedStorageCollections.serviceYamlViewer).locator('textarea[readonly]')).toBeVisible();
     await this.page.getByTestId(TestIds.connectedStorageCollections.serviceDefinition).click();
     const field = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDisplayName);
     await expect(field).toBeVisible();

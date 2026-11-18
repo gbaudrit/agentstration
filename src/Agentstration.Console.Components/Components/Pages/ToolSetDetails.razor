@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
 
 <PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-<PageHeader Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
+<PageHeader ScopeRef="toolSet?.ScopeRef" Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
     <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null && CanMutate) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
 </PageHeader>
 

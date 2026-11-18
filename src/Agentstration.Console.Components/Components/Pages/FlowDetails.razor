@@ -12,7 +12,7 @@
 @if (flow is null) { <LoadingState Message="@T("Loading")" /> }
 else
 {
-    <PageHeader Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
+    <PageHeader ScopeRef="flow.ScopeRef" Title="@flow.Name" Description="@(flow.Description ?? T("DefaultDescription"))">
         <Status><StatusBadge Text="@StatusLabel" Status="@PlatformDashboardService.ToStatus(Status)" /></Status>
         <Actions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@EditorLabel</a> }</Actions>
     </PageHeader>

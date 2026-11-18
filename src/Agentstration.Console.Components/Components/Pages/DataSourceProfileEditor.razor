@@ -8,7 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 
 <PageTitle>@(profile?.Definition.DisplayName ?? T(IsNew ? "CreateProfile" : "Profiles")) · Agentstration</PageTitle>
-<PageHeader Title="@(profile?.Definition.DisplayName ?? T("CreateProfile"))" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor">
+<PageHeader ScopeRef="selectedScope" Title="@(profile?.Definition.DisplayName ?? T("CreateProfile"))" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor">
     <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-source-profiles">@T("Back")</a></Actions>
 </PageHeader>
 @if (loading) { <LoadingState Message="@T("Loading")" /> }

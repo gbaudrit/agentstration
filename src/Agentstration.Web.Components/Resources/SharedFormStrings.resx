@@ -199,4 +199,6 @@
   <data name="NoSecret" xml:space="preserve"><value>No secret</value></data>
   <data name="SecretCoordinates" xml:space="preserve"><value>Vault: {0} · {1}/{2}</value></data>
   <data name="SecretMissingValue" xml:space="preserve"><value>The selected Secret has no configured value.</value></data>
+  <data name="RequiredFields" xml:space="preserve"><value>Required fields</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
 </root>

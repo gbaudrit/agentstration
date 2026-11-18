@@ -23,7 +23,7 @@ else
 {
     @if (!Embedded)
     {
-        <PageHeader Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
+        <PageHeader ScopeRef="selectedScope" Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
             <Actions><a class="button-secondary" href="@DetailsUrl">@T("FlowDetails")</a></Actions>
         </PageHeader>
     }

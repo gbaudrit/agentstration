@@ -17,7 +17,7 @@ else if (error is not null)
 }
 else if (model is not null)
 {
-    <ResourceHeader ResourceType="@T("Model")" Domain="model" Icon="◈" Name="@model.Definition.DisplayName" Description="@T("ReadOnlyDescription")" StatusText="@ObservationLabel" Status="@ObservationTone" TestId="resource-model-details">
+    <ResourceHeader ScopeRef="model.ScopeRef" ResourceType="@T("Model")" Domain="model" Icon="◈" Name="@model.Definition.DisplayName" Description="@T("ReadOnlyDescription")" StatusText="@ObservationLabel" Status="@ObservationTone" TestId="resource-model-details">
         <Metadata><span><code>@model.Namespace.Value/@model.Name</code></span><span><code>@model.Definition.ExternalId</code></span></Metadata>
         <Actions><a class="button-secondary" href="@ProviderUrl">@T("OpenProvider")</a><a class="button-secondary" href="/modelproviders">@T("BackToProviders")</a></Actions>
     </ResourceHeader>

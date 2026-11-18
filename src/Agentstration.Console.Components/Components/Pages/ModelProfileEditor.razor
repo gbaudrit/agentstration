@@ -12,7 +12,7 @@
 
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" ViewQueryParameters="@(new[] { "tab" })" />
 <PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateModelProfile") : resource?.Definition.DisplayName ?? model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
+<PageHeader ScopeRef="selectedScope" Title="@(IsNew ? T("CreateModelProfile") : resource?.Definition.DisplayName ?? model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
     <Actions>@if (!IsNew && CanManage) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
 </PageHeader>
 

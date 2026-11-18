@@ -5,7 +5,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
 
 <PageTitle>@T("CreatePackProject") · Agentstration</PageTitle>
-<PageHeader Title="@T("CreatePackFromWorkspace")" Description="@T("PackComposer.Description")">
+<PageHeader ScopeRef="selectedScope" Title="@T("CreatePackFromWorkspace")" Description="@T("PackComposer.Description")">
     <Actions>
         <a class="button-secondary" href="/packs">@T("Cancel")</a>
         <button class="button-primary" disabled="@(!CanCreate || creating)" @onclick="CreateAsync" data-testid="pack-project-create">@(creating ? T("Creating") : T("CreatePackProject"))</button>

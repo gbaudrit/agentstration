@@ -6,49 +6,52 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
 
 <PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-<PageHeader Title="@(resource?.Definition.DisplayName ?? Name ?? T("ConnectedService"))" Description="@T("Details.Description")" TestId="connected-service-details">
-    <Actions>@if (resource is not null) { <button class="button-secondary" @onclick="RequestReconcile">@T("Reconcile")</button>@if (resource.Definition.Enabled) { <button class="button-danger" @onclick="() => confirmDeactivate = true">@T("Deactivate")</button> } }<a class="button-secondary" href="/connected-services">@T("Back")</a></Actions>
+<PageHeader Enabled="resource?.Definition.Enabled" EnabledChanged="ChangeEnabledAsync" EnabledDisabled="@(changingEnabled || editorBusy || !CanChangeEnabled)" EnabledTestId="connected-service-enabled" ScopeRef="resource?.ScopeRef" Title="@(resource?.Definition.DisplayName ?? Name ?? T("ConnectedService"))" Description="@T("Details.Description")" TestId="connected-service-details">
+    <Metadata>@if (resource is not null) { <CopyableValue Value="@($"{resource.Namespace}/{resource.Name}")" /> }</Metadata>
+    <Actions>@if (resource is not null) { <button class="button-secondary" disabled="@(loading || changingEnabled || editorBusy)" @onclick="RequestReconcile">@T("Reconcile")</button> }<a class="button-secondary" href="/connected-services">@T("Back")</a></Actions>
 </PageHeader>
 @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
-else if (error is not null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
+else if (error is not null && resource is null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
 else if (resource is not null)
 {
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
     <InheritedResourceNotice OwnerScopeRef="@(resource.ScopeRef ?? ResourceScopeRef.Instance)" />
     <ResourceTabs Label="@T("DetailsSections")">
         @foreach (var tab in AvailableTabs)
         {
-            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => SelectTab(tab)">@T($"Tab.{tab}")</button>
         }
     </ResourceTabs>
 
     @if (activeTab == DetailsTab.Overview)
     {
+        <div class="resource-overview connected-service-overview">
         <section class="metric-grid">
             <MetricCard Label="@T("Availability")" Value="@StatusLabel(Availability)" Status="@StatusColor(Availability)" />
             <MetricCard Label="@T("Enabled")" Value="@(resource.Definition.Enabled ? T("Yes") : T("No"))" />
             <MetricCard Label="@T("Generation")" Value="@resource.Generation.ToString()" />
-            <MetricCard Label="@T("Scope")" Value="@(resource.ScopeRef?.Value ?? "—")" />
         </section>
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("PinnedContribution")</h2></div></div>
-            <dl class="details-list"><dt>@T("ResourceId")</dt><dd><code>@resource.Uid</code></dd><dt>@T("TechnicalName")</dt><dd><code>@resource.Name</code></dd><dt>@T("ExtensionRegistration")</dt><dd><code>@TypeReference(resource)</code></dd><dt>@T("TypeResourceId")</dt><dd><code>@resource.Definition.Type.TypeUid</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(TypeResource?.Governance.Origin.Reference ?? TypeResource?.Namespace.Value ?? "—")</code></dd><dt>@T("Type")</dt><dd><code>@resource.Definition.Type.Type.Name@@@resource.Definition.Type.Version</code></dd><dt>@T("SchemaDigest")</dt><dd><code>@resource.Definition.Type.SchemaDigest</code></dd></dl>
-        </section>
-        <section class="panel form-section"><div class="panel-header"><h2>@T("Options")</h2></div><JsonSchemaInputEditor Schema="TypeVersion?.Schema" Value="resource.Definition.Options" ReadOnly /></section>
-        <section class="panel form-section"><div class="panel-header"><h2>@T("Bindings")</h2></div>
-            @if (resource.Definition.Bindings.Count == 0) { <p>@T("NoBindings")</p> } else { <CollectionView TItem="ConnectedServiceValueBinding" Items="resource.Definition.Bindings" IdentityLabel="@T("Input")" InformationLabels="@(new[] { T("SourceKind"), T("ValueOrResource") })"><Identity Context="binding"><CollectionIdentity DisplayName="@binding.InputId" Name="@binding.InputId" IconName="layers" /></Identity><Information Context="binding"><CollectionValue Label="@T("SourceKind")">@BindingKindLabel(binding.Kind)</CollectionValue><CollectionValue Label="@T("ValueOrResource")"><ValueDisclosure Value="@BindingValue(binding)" /></CollectionValue></Information></CollectionView> }
-        </section>
-        <section class="panel form-section"><div class="panel-header"><h2>@T("Exports")</h2></div>
-            @if (TypeVersion is null) { <div class="form-alert form-alert-warning">@T("ContributionUnavailable")</div> } else if (TypeVersion.Exports.Count == 0) { <p>@T("NoExports")</p> } else { <CollectionView TItem="ConnectedServiceExportDescriptor" Items="TypeVersion.Exports" IdentityLabel="@T("Export")" InformationLabels="@(new[] { T("ValueType"), T("Protection"), T("Format") })"><Identity Context="export"><CollectionIdentity DisplayName="@export.Id" Name="@export.Id" IconName="entry"><Badges><small>@export.Description</small></Badges></CollectionIdentity></Identity><Information Context="export"><CollectionValue Label="@T("ValueType")">@ValueTypeLabel(export.Type)</CollectionValue><CollectionValue Label="@T("Protection")">@ProtectionLabel(export.Protection)</CollectionValue><CollectionValue Label="@T("Format")">@(export.Format ?? "—")</CollectionValue></Information></CollectionView> }
-        </section>
+        <ResourceIdentitySummary DisplayName="@resource.Definition.DisplayName" TechnicalName="@resource.Name" Description="@resource.Definition.Description" Namespace="@resource.Namespace.Value">
+            <AdditionalDetails><dt>@T("ServiceType")</dt><dd>@(TypeResource?.Definition.DisplayName ?? resource.Definition.Type.Type.Name) · @resource.Definition.Type.Version</dd></AdditionalDetails>
+        </ResourceIdentitySummary>
+        <FormSection Title="@T("Configuration")" Class="connected-service-configuration-summary">
+            @if (ConfigurationRows.Count == 0) { <p>@T("NoBindings")</p> }
+            else
+            {
+                <CollectionView TItem="ConfigurationRow" Items="ConfigurationRows" IdentityLabel="@T("Input")" InformationLabels="@(new[] { T("SourceKind"), T("ValueOrResource") })">
+                    <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity>
+                    <Information Context="row"><CollectionValue Label="@T("SourceKind")">@row.Source</CollectionValue><CollectionValue Label="@T("ValueOrResource")"><span class="configuration-value">@row.Value</span></CollectionValue></Information>
+                </CollectionView>
+            }
+        </FormSection>
+
         <section class="panel form-section"><div class="panel-header"><h2>@T("Diagnostics")</h2></div>@if (resource.ObservedState is null) { <p>@T("NotObserved")</p> } else { <dl class="details-list"><dt>@T("ObservedAt")</dt><dd>@resource.ObservedState.ObservedAt.ToLocalTime().ToString("g")</dd><dt>@T("Code")</dt><dd><code>@(resource.ObservedState.Code ?? "—")</code></dd><dt>@T("Message")</dt><dd>@(resource.ObservedState.Message ?? "—")</dd></dl> }</section>
         <section class="panel form-section"><div class="panel-header"><h2>@T("Dependents")</h2><span>@usages.Count</span></div><p>@T("DependentsExplanation")</p>@if (usages.Count == 0) { <p>@T("NoDependents")</p> } else { <ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="layers"><Badges><small>@usage.ResourceType</small></Badges></CollectionIdentity><CollectionActions ResourceName="@usage.DisplayName"><a href="@UsageUrl(usage)">@Shared["OpenItem"]</a></CollectionActions></li> }</ul> }</section>
+        </div>
     }
     else if (activeTab == DetailsTab.Discovery)
     {
         <ConnectedServiceDiscoveryPanel Service="resource" Supported="@(TypeVersion?.OperationDiscovery is not null)" />
-    }
-    else if (activeTab == DetailsTab.Definition)
-    {
-        <ConnectedServiceEditor Name="@resource.Name" EmbeddedScopeRef="resource.ScopeRef" EmbeddedNamespace="resource.Namespace" Embedded="true" Saved="DefinitionSavedAsync" />
     }
     else if (activeTab == DetailsTab.Access && CanManageAccess)
     {
@@ -56,7 +59,15 @@ else if (resource is not null)
     }
     else if (activeTab == DetailsTab.YAML)
     {
-        <section class="panel form-section" data-testid="connected-service-yaml-viewer"><div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("YAML")</h2><p>@T("YamlReadOnlyHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div><textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("YamlDefinition")">@ResourceYaml</textarea></section>
+        <FormSection Title="@Shared["Yaml"]" TestId="connected-service-yaml-viewer">
+            <FormField Label="@T("YamlDefinition")"><ClearableText Multiline Value="@ResourceYaml" ReadOnly class="form-code-editor runner-json" rows="30" /></FormField>
+        </FormSection>
+    }
+    @if (definitionVisited)
+    {
+        <div hidden="@(activeTab != DetailsTab.Definition)">
+            <ConnectedServiceEditor @ref="editor" @key="loadedKey" Name="@resource.Name" EmbeddedScopeRef="resource.ScopeRef" EmbeddedNamespace="resource.Namespace" Embedded="true" ExternalBusy="changingEnabled" SavingChanged="EditorSavingChanged" Saved="DefinitionSavedAsync" />
+        </div>
     }
 }
 <ConfirmationDialog IsOpen="@confirmReconcile" Title="@T("Reconcile")" Message="@T("ReconcileConfirm")" ConfirmLabel="@T("Reconcile")" OnConfirm="ReconcileAsync" OnCancel="() => confirmReconcile = false" />
@@ -67,6 +78,8 @@ else if (resource is not null)
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private ConnectedServiceEditor? editor;
+    private bool definitionVisited, changingEnabled, editorBusy;
     private readonly CancellationTokenSource cancellation = new();
     private ConnectedServiceResource? resource;
     private IReadOnlyList<ConnectedServiceTypeResource> catalog = [];
@@ -78,6 +91,7 @@ else if (resource is not null)
     private ConnectedServiceAvailability Availability => resource?.ObservedState?.Availability ?? (resource?.Definition.Enabled == true ? ConnectedServiceAvailability.Stale : ConnectedServiceAvailability.Disabled);
     private ConnectedServiceTypeResource? TypeResource => resource is null ? null : catalog.SingleOrDefault(type => MatchesType(type));
     private ConnectedServiceTypeVersionDescriptor? TypeVersion => TypeResource?.Definition.Versions.SingleOrDefault(version => resource is not null && version.Version == resource.Definition.Type.Version && version.SchemaDigest == resource.Definition.Type.SchemaDigest);
+    private bool CanChangeEnabled => !loading && CanManageAccess && resource?.Governance.IsManaged == false;
     private bool CanManageAccess => resource?.ScopeRef is { } scopeRef && ResourceOwnershipContext.CanManage(scopeRef, Services);
     private IReadOnlyList<DetailsTab> AvailableTabs => CanManageAccess ? Enum.GetValues<DetailsTab>() : Enum.GetValues<DetailsTab>().Where(value => value != DetailsTab.Access).ToArray();
     private string ResourceYaml => resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(new RawConnectedService
@@ -94,21 +108,65 @@ else if (resource is not null)
         var key = $"{Name}|{ScopeRefValue}|{Namespace}|{View}";
         if (string.Equals(loadedKey, key, StringComparison.Ordinal)) return;
         loadedKey = key;
+        confirmDeactivate = confirmReconcile = false;
         activeTab = ParseTab(View);
+        definitionVisited = activeTab == DetailsTab.Definition;
+        editor = null;
         await LoadAsync();
     }
     private async Task LoadAsync() { loading = true; error = null; try { var scope = ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException(T("ScopeRequired"))); var resourceTask = Client.GetConnectedServiceAsync(Name!, scope, ResourceNamespace.Parse(Namespace ?? ResourceNamespace.DefaultValue), cancellation.Token); var catalogTask = Client.GetTypesAsync(cancellation.Token); var usagesTask = Client.GetUsagesAsync(Name!, scope, ResourceNamespace.Parse(Namespace ?? ResourceNamespace.DefaultValue), cancellation.Token); await Task.WhenAll(resourceTask, catalogTask, usagesTask); var snapshot = await resourceTask; resource = snapshot.Value; etag = snapshot.ETag; catalog = await catalogTask; usages = (await usagesTask).Value; if (!CanManageAccess && activeTab == DetailsTab.Access) activeTab = DetailsTab.Overview; } catch (AgentstrationApiException exception) { error = exception; } catch (Exception exception) { error = new(exception.Message, Guid.NewGuid().ToString("N")); } finally { loading = false; } }
-    private async Task DefinitionSavedAsync() { await LoadAsync(); activeTab = DetailsTab.Definition; }
+    private void SelectTab(DetailsTab tab) { activeTab = tab; if (tab == DetailsTab.Definition) definitionVisited = true; }
+    private void EditorSavingChanged(bool value) => editorBusy = value;
+    private async Task DefinitionSavedAsync()
+    {
+        var snapshot = await Client.GetConnectedServiceAsync(resource!.Name, resource.ScopeRef!.Value, resource.Namespace, cancellation.Token);
+        resource = snapshot.Value;
+        etag = snapshot.ETag;
+    }
+    private Task ChangeEnabledAsync(bool value)
+    {
+        if (!CanChangeEnabled || changingEnabled || editorBusy || resource is null || resource.Definition.Enabled == value) return Task.CompletedTask;
+        if (!value) { confirmDeactivate = true; return Task.CompletedTask; }
+        return ExecuteAsync(() => Client.UpdateConnectedServiceAsync(resource.Name, resource.ScopeRef!.Value, resource.Namespace,
+            new(resource.Definition with { Enabled = true }), etag!, cancellation.Token));
+    }
     private bool MatchesType(ConnectedServiceTypeResource type) { if (resource is null) return false; var reference = resource.Definition.Type.Type; return reference.Name == type.Name && reference.ScopeRef == type.ScopeRef && (reference.Namespace ?? resource.Namespace) == type.Namespace && resource.Definition.Type.TypeUid == type.Uid; }
     private void RequestReconcile() => confirmReconcile = true;
     private async Task ReconcileAsync() { confirmReconcile = false; await ExecuteAsync(() => Client.ReconcileAsync(resource!.Name, resource.ScopeRef!.Value, resource.Namespace, etag!, cancellation.Token)); }
-    private async Task DeactivateAsync() { confirmDeactivate = false; await ExecuteAsync(() => Client.DeactivateAsync(resource!.Name, resource.ScopeRef!.Value, resource.Namespace, etag!, cancellation.Token)); }
-    private async Task ExecuteAsync(Func<Task<ResourceSnapshot<ConnectedServiceResource>>> action) { try { var snapshot = await action(); resource = snapshot.Value; etag = snapshot.ETag; } catch (AgentstrationApiException exception) { error = exception; } }
+    private async Task DeactivateAsync() { confirmDeactivate = false; if (!CanChangeEnabled) return; await ExecuteAsync(() => Client.DeactivateAsync(resource!.Name, resource.ScopeRef!.Value, resource.Namespace, etag!, cancellation.Token)); }
+    private async Task ExecuteAsync(Func<Task<ResourceSnapshot<ConnectedServiceResource>>> action)
+    {
+        if (loading || changingEnabled || editorBusy) return;
+        changingEnabled = true;
+        error = null;
+        try
+        {
+            var snapshot = await action();
+            resource = snapshot.Value;
+            etag = snapshot.ETag;
+            editor?.ApplyActivationSnapshot(snapshot);
+        }
+        catch (AgentstrationApiException exception) { error = exception; }
+        finally { changingEnabled = false; }
+    }
+
     private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
     private static UiStatus StatusColor(ConnectedServiceAvailability status) => status switch { ConnectedServiceAvailability.Ready => UiStatus.Success, ConnectedServiceAvailability.Stale => UiStatus.Warning, ConnectedServiceAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
+    private IReadOnlyList<ConfigurationRow> ConfigurationRows
+    {
+        get
+        {
+            if (resource is null) return [];
+            var rows = resource.Definition.Bindings.Select(binding => new ConfigurationRow(binding.InputId, BindingKindLabel(binding.Kind), BindingValue(binding))).ToList();
+            if (resource.Definition.Options.ValueKind == JsonValueKind.Object)
+                rows.AddRange(resource.Definition.Options.EnumerateObject().Select(option => new ConfigurationRow(option.Name, BindingKindLabel(ConnectedServiceBindingKind.Literal), ConfigurationValue(option.Value))));
+            return rows;
+        }
+    }
+    private static string ConfigurationValue(JsonElement value) => value.ValueKind == JsonValueKind.String
+        ? value.GetString() ?? string.Empty : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private sealed record ConfigurationRow(string Name, string Source, string Value);
     private string BindingKindLabel(ConnectedServiceBindingKind kind) => T($"BindingKind.{kind}");
-    private string ValueTypeLabel(ConnectedServiceValueType type) => T($"ValueType.{type}");
-    private string ProtectionLabel(ConnectedServiceValueProtection protection) => T($"Protection.{protection}");
     private static string BindingValue(ConnectedServiceValueBinding binding)
     {
         if (binding.Kind == ConnectedServiceBindingKind.Literal && binding.Literal is { } literal)
@@ -118,7 +176,6 @@ else if (resource is not null)
         return address is not { } exact ? "—" : $"{scope}/{exact.Namespace}/{exact.Name}";
     }
     private static string UsageUrl(ConnectedServiceUsageResponse usage) => usage.ResourceType == StorageResourceKinds.Storage ? StorageLinks.FromApi(usage.Url) : usage.Url;
-    private static string TypeReference(ConnectedServiceResource value) { var reference = value.Definition.Type.Type; return $"{reference.ScopeRef}/{reference.Namespace ?? value.Namespace}/{reference.Name}"; }
     private static string TabId(DetailsTab tab) => $"connected-service-{tab.ToString().ToLowerInvariant()}-tab";
     private static DetailsTab ParseTab(string? value) => Enum.TryParse<DetailsTab>(value, true, out var tab) ? tab : DetailsTab.Overview;
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }

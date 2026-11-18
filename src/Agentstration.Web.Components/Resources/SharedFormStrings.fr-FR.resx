@@ -199,4 +199,6 @@
   <data name="NoSecret" xml:space="preserve"><value>Aucun secret</value></data>
   <data name="SecretCoordinates" xml:space="preserve"><value>Coffre : {0} · {1}/{2}</value></data>
   <data name="SecretMissingValue" xml:space="preserve"><value>Le secret sélectionné ne possède aucune valeur configurée.</value></data>
+  <data name="RequiredFields" xml:space="preserve"><value>Champs obligatoires</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Activé</value></data>
 </root>

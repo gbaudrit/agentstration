@@ -12,6 +12,9 @@ export const TestIds = {
     storageDeactivate: 'storage-deactivate', storageDisplayName: 'storage-display-name',
     serviceDetails: 'connected-service-details', serviceDefinition: 'connected-service-definition-tab',
     serviceDisplayName: 'connected-service-display-name',
+    serviceOverview: 'connected-service-overview-tab', serviceDiscovery: 'connected-service-discovery-tab',
+    serviceAccess: 'connected-service-access-tab', serviceYaml: 'connected-service-yaml-tab',
+    serviceYamlViewer: 'connected-service-yaml-viewer',
   },
   collections: { modelProfileOverview: 'model-profile-overview' },
   formAdapters: {

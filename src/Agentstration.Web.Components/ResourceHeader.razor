@@ -4,7 +4,7 @@
         <div class="resource-header-copy">
             <div class="resource-title-row">
                 <span class="eyebrow resource-type">@ResourceType</span>
-                <h1>@Name</h1>
+                <h1>@Name</h1>@if (ScopeRef is not null) { <ResourceScopeBadge ScopeRef="ScopeRef" Compact /> }
                 @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
             </div>
             @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description" title="@Description" tabindex="0">@Description</p> }
@@ -22,10 +22,15 @@
             }
         </div>
     </div>
-    @if (Actions is not null || PrimaryActions is not null || MoreActions is not null) { <div class="page-actions"><ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
+    @if (Enabled is not null || Actions is not null || PrimaryActions is not null || MoreActions is not null) { <div class="page-actions">@if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="EnabledTestId" /> }<ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
 </header>
 
 @code {
+    [Parameter] public bool? Enabled { get; set; }
+    [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
+    [Parameter] public bool EnabledDisabled { get; set; }
+    [Parameter] public string? EnabledTestId { get; set; }
+    [Parameter] public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; set; }
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
     [Parameter] public string Domain { get; set; } = "neutral";

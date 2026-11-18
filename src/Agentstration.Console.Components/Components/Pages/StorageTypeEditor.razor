@@ -8,7 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
 <PageTitle>@Title · Agentstration</PageTitle>
-<PageHeader Title="@Title" Description="@T("Type.ImmutableHelp")" TestId="storage-type-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+<PageHeader ScopeRef="ownerScope" Title="@Title" Description="@T("Type.ImmutableHelp")" TestId="storage-type-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
 @if (loading) { <LoadingState Message="@T("Type.Loading")" /> }
 else
 {

@@ -5,7 +5,7 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewFlowStrings> Localizer
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" />
+<PageHeader ScopeRef="selectedScope" Title="@T("Title")" Description="@T("Description")" />
 
 <EditForm Model="model" OnValidSubmit="CreateAsync" class="flow-create-shell" data-testid="flow-create-form" data-interactive="@(interactive ? "true" : "false")">
     <DataAnnotationsValidator />

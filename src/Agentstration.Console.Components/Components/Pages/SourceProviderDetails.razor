@@ -9,7 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourceProviderDetailsStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateProvider") : $"{Name} · {T("SourceProvider")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")">
+<PageHeader ScopeRef="selectedScope" Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")">
     <Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete">@T("Delete")</button> }<a class="button-secondary" href="/sourceproviders">@T("Back")</a></Actions>
 </PageHeader>
 

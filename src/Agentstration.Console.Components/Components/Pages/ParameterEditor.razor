@@ -8,7 +8,7 @@
 
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@(IsNew ? T("CreateParameter") : $"{Name} · {T("Parameter")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateParameter") : model.DisplayName)" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="/parameters">@T("Back")</a></Actions></PageHeader>
+<PageHeader ScopeRef="selectedScope" Title="@(IsNew ? T("CreateParameter") : model.DisplayName)" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="RequestDelete" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="/parameters">@T("Back")</a></Actions></PageHeader>
 <div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
 @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
 @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }

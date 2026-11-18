@@ -12,7 +12,7 @@
 @if (!Embedded)
 {
     <PageTitle>@T(IsNew ? "CreateSource" : "EditSource") · Agentstration</PageTitle>
-    <PageHeader Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor">
+    <PageHeader ScopeRef="ownerScope" Title="@T(IsNew ? "CreateSource" : "EditSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor">
         <Actions><a class="button-secondary" href="@(IsNew ? "/knowledge-sources" : DetailsUrl)">@T("Cancel")</a></Actions>
     </PageHeader>
 }
@@ -125,6 +125,7 @@ else
     private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
     private readonly List<BindingModel> bindings = [];
+    private ResourceScopeRef? ownerScope;
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
@@ -166,6 +167,7 @@ else
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
+                ownerScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
                 technicalName = snapshot.Value.Name;
                 displayName = snapshot.Value.Definition.DisplayName;

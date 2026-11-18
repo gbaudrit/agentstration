@@ -19,7 +19,7 @@ else if (project is null)
 }
 else
 {
-    <PageHeader Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="@T("PackProject.Description")">
+    <PageHeader ScopeRef="project.Value.ScopeRef" Title="@(project.Value.Definition.DisplayName ?? project.Value.Definition.PackName)" Description="@T("PackProject.Description")">
         <Actions>
             <button class="button-secondary" @onclick="BackToPacks">@T("BackToPacks")</button>
             <button class="button-secondary" disabled="@(busy || invalidMetadata || !dirty)" @onclick="SaveAsync">@T("Save")</button>

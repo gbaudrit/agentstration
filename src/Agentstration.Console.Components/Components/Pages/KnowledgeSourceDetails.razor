@@ -8,7 +8,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-<PageHeader Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
+<PageHeader ScopeRef="source?.ScopeRef" Title="@(source?.Definition.DisplayName ?? Name)" Description="@(source?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-knowledge-source-details">
     <Actions>@if (source is not null && CanManage) { <button class="button-danger" type="button" disabled="@busy" data-testid="knowledge-source-delete" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/knowledge-sources">@T("Back")</a></Actions>
 </PageHeader>
 

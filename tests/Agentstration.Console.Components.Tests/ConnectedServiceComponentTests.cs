@@ -7,6 +7,8 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Values;
 using Agentstration.Web.Console;
 using Bunit;
@@ -46,8 +48,11 @@ public sealed class ConnectedServiceComponentTests
     }
 
     [TestMethod]
-    public void EditorUsesSharedBindingsAndOnlyOffersCompatibleUsableConfiguredResources()
+    [DataRow("en-US", "Required fields")]
+    [DataRow("fr-FR", "Champs obligatoires")]
+    public void EditorUsesSharedBindingsAndOnlyOffersCompatibleUsableConfiguredResources(string locale, string requiredHint)
     {
+        using var culture = new TestCultureScope(locale);
         using var context = new BunitContext().WithCollectionPresentation();
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
@@ -74,6 +79,15 @@ public sealed class ConnectedServiceComponentTests
 
         rendered.WaitForAssertion(() =>
         {
+            Assert.AreEqual("* " + requiredHint, rendered.Find(".required-fields-hint").TextContent.Trim());
+            Assert.IsEmpty(rendered.FindAll(".form-alert-info"));
+            Assert.IsEmpty(rendered.FindAll(".page-header .eyebrow"));
+            Assert.HasCount(1, rendered.FindAll(".connected-service-configuration .schema-input-editor"));
+            Assert.IsNotNull(rendered.Find(".page-header input[role=switch]"));
+            Assert.IsEmpty(rendered.FindAll(".validation-errors"));
+            var configuration = rendered.Find(".connected-service-configuration");
+            Assert.IsTrue(configuration.InnerHtml.IndexOf("binding-requirements", StringComparison.Ordinal) < configuration.InnerHtml.IndexOf("schema-input-editor", StringComparison.Ordinal));
+            Assert.IsNotNull(rendered.Find(".form-grid [data-testid='connected-service-type']"));
             var editors = rendered.FindComponents<ValueBindingRequirementEditor>();
             Assert.HasCount(3, editors);
 
@@ -96,15 +110,24 @@ public sealed class ConnectedServiceComponentTests
             Assert.IsNotNull(credential.CreationContext);
             Assert.AreEqual(workspace, credential.CreationContext.ScopeRef);
         });
+        rendered.Find("input[role=switch]").Change(false);
+        Assert.IsFalse(((ConnectedServiceEditorModel)rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance.Model!).Enabled);
     }
 
     [TestMethod]
-    public void DetailsUseResourceTabsEmbedDefinitionAndDoNotExposeAnEditAction()
+    [DataRow("en-US", "Manage the service configuration and review its availability.")]
+    [DataRow("fr-FR", "Gérez la configuration du service et consultez sa disponibilité.")]
+    public void DetailsUseResourceTabsEmbedDefinitionAndDoNotExposeAnEditAction(string locale, string description)
     {
+        using var culture = new TestCultureScope(locale);
         using var context = new BunitContext().WithCollectionPresentation();
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var type = TypeCatalog();
-        var resource = Resource(workspace, type);
+        var original = Resource(workspace, type);
+        var resource = original with { Definition = original.Definition with {
+            Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/api/explore/v2.1/swagger.json" }, retries = 3 }),
+            Bindings = [new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement("https://example.test/" + new string('a', 200)) }]
+        } };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(resource, type, workspace));
         context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
@@ -117,8 +140,20 @@ public sealed class ConnectedServiceComponentTests
 
         rendered.WaitForAssertion(() =>
         {
+            StringAssert.Contains(rendered.Find(".page-header").TextContent, description);
             Assert.HasCount(5, rendered.FindAll(".resource-tabs button"));
+            Assert.AreEqual(workspace.Value, rendered.Find(".page-header .resource-owner-scope").GetAttribute("data-scope-ref"));
+            Assert.HasCount(3, rendered.FindAll(".metric-card"));
+            Assert.HasCount(1, rendered.FindAll(".resource-overview .resource-identity-summary"));
+            Assert.IsEmpty(rendered.FindAll(".resource-overview .schema-input-editor"));
+            Assert.DoesNotContain("Exports and capabilities", rendered.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("sha256:", rendered.Find(".resource-overview").TextContent, StringComparison.Ordinal);
             Assert.IsEmpty(rendered.FindAll("a[href*='/edit']"));
+            Assert.HasCount(3, rendered.FindAll(".connected-service-configuration-summary tbody tr"));
+            StringAssert.Contains(rendered.Find(".connected-service-configuration-summary").TextContent, "/api/explore/v2.1/swagger.json");
+            StringAssert.Contains(rendered.Find(".connected-service-configuration-summary").TextContent, new string('a', 200));
+            Assert.HasCount(1, rendered.FindAll(".page-header input[role=switch]"));
+            Assert.IsEmpty(rendered.FindAll(".page-header .button-danger"));
             Assert.DoesNotContain("Saved configuration and observed availability", rendered.Markup,
                 StringComparison.Ordinal);
         });
@@ -129,12 +164,110 @@ public sealed class ConnectedServiceComponentTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-form']"));
             Assert.IsEmpty(rendered.FindAll(".form-alert-danger"));
             Assert.HasCount(3, rendered.FindComponents<ValueBindingRequirementEditor>());
+            Assert.HasCount(1, rendered.FindAll(".page-header input[role=switch]"));
         });
 
         rendered.Find("[data-testid='connected-service-yaml-tab']").Click();
         rendered.WaitForAssertion(() => StringAssert.Contains(
-            rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").TextContent,
+            rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").GetAttribute("value") ?? rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").TextContent,
             "apiVersion"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "No Connected Services")]
+    [DataRow("fr-FR", "Aucun service connecté")]
+    public void EmptyCatalogOffersCreationWithoutFiltersOrInformationBanner(string locale, string title)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(null));
+        var rendered = context.Render<ConnectedServicesPage>();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(title, rendered.Find(".empty-state h2").TextContent);
+            Assert.IsNotNull(rendered.Find(".empty-state a[href='/connected-services/new']"));
+            Assert.IsEmpty(rendered.FindAll(".connected-services-toolbar, .form-alert-info, .page-header .eyebrow"));
+        });
+    }
+
+    [TestMethod]
+    public void FilteredCatalogOffersResetWithoutAnotherRequest()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(Resource(ResourceScopeRef.Instance)));
+        var rendered = context.Render<ConnectedServicesPage>();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-row']")));
+        rendered.Find(".connected-services-toolbar input").Change("no-match");
+        Assert.IsNotNull(rendered.Find(".empty-state button"));
+        rendered.Find(".empty-state button").Click();
+        Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-row']"));
+    }
+
+    [TestMethod]
+    public async Task HeaderActivationPreservesDraftAndRefreshesEtagAcrossTabsAndFailures()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var originalType = TypeCatalog();
+        var type = originalType with { Definition = originalType.Definition with { Versions = [originalType.Definition.Versions[0] with { Inputs = [] }] } };
+        var resource = Resource(workspace, type);
+        var client = new DetailsClient(resource, type, workspace);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(client);
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/connected-services/{resource.Name}?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+        var rendered = context.Render<ConnectedServiceDetailsPage>(p => p.Add(v => v.Name, resource.Name));
+        rendered.Find("[data-testid=connected-service-definition-tab]").Click();
+        rendered.Find("[data-testid=connected-service-display-name]").Change("Unsaved name");
+        rendered.Find("[data-testid=connected-service-yaml-tab]").Click();
+        rendered.Find(".page-header input[role=switch]").Change(false);
+        await rendered.InvokeAsync(() => rendered.FindComponents<ConfirmationDialog>().Single(v => v.Instance.IsOpen).Instance.OnCancel.InvokeAsync());
+        Assert.AreEqual(0, client.Deactivations);
+        Assert.IsTrue(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
+        rendered.Find(".page-header input[role=switch]").Change(false);
+        await rendered.InvokeAsync(() => rendered.FindComponents<ConfirmationDialog>().Single(v => v.Instance.IsOpen).Instance.OnConfirm.InvokeAsync());
+        Assert.AreEqual(1, client.Deactivations);
+        Assert.IsFalse(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
+        client.FailUpdate = true;
+        rendered.Find(".page-header input[role=switch]").Change(true);
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll(".form-alert-danger")));
+        Assert.IsFalse(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
+        client.FailUpdate = false;
+        rendered.Find(".page-header input[role=switch]").Change(true);
+        rendered.WaitForAssertion(() => Assert.IsTrue(client.Current.Definition.Enabled));
+        Assert.AreEqual("Redis", client.Current.Definition.DisplayName, "Activation must not save other draft fields.");
+        rendered.Find("[data-testid=connected-service-definition-tab]").Click();
+        Assert.AreEqual("Unsaved name", rendered.Find("[data-testid=connected-service-display-name]").GetAttribute("value"));
+        rendered.Find("form").Submit();
+        rendered.WaitForAssertion(() => Assert.AreEqual("Unsaved name", client.Current.Definition.DisplayName));
+        Assert.AreEqual("etag-2", client.LastEtag);
+        Assert.AreEqual(workspace, client.LastScope);
+        Assert.IsTrue(client.Current.Definition.Enabled);
+    }
+
+    [TestMethod]
+    public void InheritedServiceActivationIsDisabled()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        var type = TypeCatalog();
+        var resource = Resource(ResourceScopeRef.Instance, type);
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationScope(workspace));
+        context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(resource, type, workspace));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/connected-services/{resource.Name}?scopeRef=%2Finstance");
+        var rendered = context.Render<ConnectedServiceDetailsPage>(p => p.Add(v => v.Name, resource.Name));
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".page-header input[role=switch]").HasAttribute("disabled")));
+    }
+
+    private sealed class NavigationScope(ResourceScopeRef scope) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scope.Value;
+        public string AddToUri(string uri) => uri;
     }
 
     private static ConnectedServiceTypeResource TypeCatalog() => new()
@@ -215,10 +348,10 @@ public sealed class ConnectedServiceComponentTests
             ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
         };
 
-    private sealed class StubClient(ConnectedServiceResource resource) : IConnectedServicesClient
+    private sealed class StubClient(ConnectedServiceResource? resource) : IConnectedServicesClient
     {
         public Task<IReadOnlyList<ConnectedServiceTypeResource>> GetTypesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<ConnectedServiceResource>> GetConnectedServicesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConnectedServiceResource>>([resource]);
+        public Task<IReadOnlyList<ConnectedServiceResource>> GetConnectedServicesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConnectedServiceResource>>(resource is null ? [] : [resource]);
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -244,15 +377,33 @@ public sealed class ConnectedServiceComponentTests
     private sealed class DetailsClient(ConnectedServiceResource resource, ConnectedServiceTypeResource type,
         ResourceScopeRef workspace) : IConnectedServicesClient
     {
+        public ConnectedServiceResource Current { get; private set; } = resource;
+        public bool FailUpdate { get; set; }
+        public int Deactivations { get; private set; }
+        private int revision;
+        public string? LastEtag { get; private set; }
+        public ResourceScopeRef? LastScope { get; private set; }
         public Task<IReadOnlyList<ConnectedServiceTypeResource>> GetTypesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ConnectedServiceTypeResource>>([type]);
         public Task<IReadOnlyList<ConnectedServiceResource>> GetConnectedServicesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(workspace, workspace.Kind, "Workspace", true)]);
-        public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(resource, "\"etag\""));
+        public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(Current, revision == 0 ? "\"etag\"" : $"etag-{revision}"));
         public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => Task.FromResult(new ConnectedServiceUsagesResponse([], 0));
         public Task<ResourceSnapshot<ConnectedServiceResource>> CreateConnectedServiceAsync(CreateConnectedServiceRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken)
+        {
+            LastEtag = etag;
+            LastScope = scopeRef;
+            if (FailUpdate) throw new AgentstrationApiException("Update failed", "fixture");
+            Current = Current with { Definition = request.Properties };
+            return Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(Current, $"etag-{++revision}"));
+        }
         public Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken)
+        {
+            Deactivations++;
+            Current = Current with { Definition = Current.Definition with { Enabled = false } };
+            return Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(Current, $"etag-{++revision}"));
+        }
     }
 
     private sealed class ParametersClientStub(IReadOnlyList<ParameterResource> resources) : IParametersClient

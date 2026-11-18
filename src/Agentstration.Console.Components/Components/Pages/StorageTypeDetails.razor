@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
 <PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-<PageHeader Title="@(resource?.Definition.DisplayName ?? Name ?? T("TypeCatalog"))" Description="@T("Type.ListHelp")" TestId="storage-type-details">
+<PageHeader ScopeRef="resource?.ScopeRef" Title="@(resource?.Definition.DisplayName ?? Name ?? T("TypeCatalog"))" Description="@T("Type.ListHelp")" TestId="storage-type-details">
     <Actions>
         <button class="button-secondary" @onclick="LoadAsync" disabled="@busy">@T("Refresh")</button>
         @if (CanWrite)
@@ -32,7 +32,7 @@ else
         {
             <section class="panel form-section"><h2>@T("Identity")</h2><dl class="details-list storage-evidence">
                 <dt>@T("TechnicalName")</dt><dd><code>@resource.Namespace/@resource.Name</code></dd>
-                <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="resource.ScopeRef" /></dd>
+
                 <dt>@T("Uid")</dt><dd><code>@resource.Uid</code></dd><dt>@T("Generation")</dt><dd>@resource.Generation</dd>
                 <dt>@T("Description")</dt><dd>@resource.Definition.Description</dd>
                 <dt>@T("Origin")</dt><dd>@T($"Origin.{resource.Governance.Origin.Kind}") · <code>@resource.Governance.Origin.Reference</code></dd>

@@ -11,7 +11,7 @@
 
 <PageTitle>@T("PageTitle")</PageTitle>
 <div data-testid="flow-observability-agent-runner" data-interactive="@(interactive ? "true" : "false")">
-<PageHeader Title="@T("Title")" Description="@T("Description")">
+<PageHeader ScopeRef="agent?.ScopeRef" Title="@T("Title")" Description="@T("Description")">
     <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(agent is null || preparing)">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button><a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a></Actions>
 </PageHeader>
 

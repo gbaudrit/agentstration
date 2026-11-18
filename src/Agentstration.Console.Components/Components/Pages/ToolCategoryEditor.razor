@@ -7,7 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
 
 <PageTitle>@(IsNew ? T("Create") : displayName) · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("Create") : displayName)" Description="@T("EditorDescription")" TestId="resource-tool-category-editor">
+<PageHeader ScopeRef="selectedScope" Title="@(IsNew ? T("Create") : displayName)" Description="@T("EditorDescription")" TestId="resource-tool-category-editor">
     <Actions><a class="button-secondary" href="/tools/categories">@T("Back")</a>@if (!IsNew) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
 </PageHeader>
 

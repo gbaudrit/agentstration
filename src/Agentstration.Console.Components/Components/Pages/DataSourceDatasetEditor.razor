@@ -10,7 +10,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> StorageLocalizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? T("CreateSource")) · Agentstration</PageTitle>
-<PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@(source?.Definition.Description ?? T("DatasetHelp"))" TestId="data-source-dataset-editor">
+<PageHeader ScopeRef="scope" Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@(source?.Definition.Description ?? T("DatasetHelp"))" TestId="data-source-dataset-editor">
     <Actions>
         @if (source is not null && !loading && activeTab != DatasetTab.Definition)
         {

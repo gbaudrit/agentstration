@@ -7,7 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateEntry") : displayName) · Agentstration</PageTitle>
-<PageHeader Eyebrow="@T("WorkplaceEntry")" Title="@(IsNew ? T("CreateEntry") : displayName)" Description="@T("Entry.Description")">
+<PageHeader ScopeRef="selectedScope" Eyebrow="@T("WorkplaceEntry")" Title="@(IsNew ? T("CreateEntry") : displayName)" Description="@T("Entry.Description")">
     <Actions>
         @if (!IsNew && published is not null) { <a class="button-primary" href="@WorkspaceConfigurationUrl">@T("UseInWorkplace")</a> }
         <a class="button-secondary" href="/entries">@T("BackToEntries")</a>

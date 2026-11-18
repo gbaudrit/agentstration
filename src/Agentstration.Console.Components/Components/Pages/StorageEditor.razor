@@ -10,7 +10,7 @@
 @if (!Embedded)
 {
     <PageTitle>@T(IsNew ? "Create" : "Edit") · Agentstration</PageTitle>
-    <PageHeader Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+    <PageHeader ScopeRef="ownerScope" Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
 }
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (!CanWrite) { <p role="alert">@T("ReadOnlyHelp")</p> }

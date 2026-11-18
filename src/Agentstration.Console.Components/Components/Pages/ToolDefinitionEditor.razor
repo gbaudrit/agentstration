@@ -6,7 +6,7 @@
 
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@T(IsNew ? "NewDefinition" : "EditDefinition") · Agentstration</PageTitle>
-<PageHeader Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" TestId="resource-tool-definition-editor" />
+<PageHeader ScopeRef="ownerScope" Title="@T(IsNew ? "NewDefinition" : "EditDefinition")" Description="@T("DefinitionEditorDescription")" TestId="resource-tool-definition-editor" />
 
 @if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
 else if (isRelay)
@@ -82,6 +82,7 @@ else
 }
 
 @code {
+    private ResourceScopeRef? ownerScope;
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name="namespace")] public string? NamespaceQuery { get; set; }
     private IReadOnlyList<FlowSummary> flows=[]; private string name="",namespaceValue="default",displayName="",description="",selectedFlow="",flowVersion="",inputSchema="{\n  \"type\": \"object\"\n}",outputSchema="",loadedContractVersion=""; private bool enabled=true,requiresApproval,useActiveVersion=true,loading=true,saving,loadingContract,contractLoaded; private int? timeoutSeconds=90; private string? etag,error;
@@ -111,6 +112,7 @@ else
             }
 
             var snapshot = await Client.GetAsync(Name!, ResourceNamespace.Parse(NamespaceQuery), default);
+            ownerScope = snapshot.Value.ScopeRef;
             if (snapshot.Value.Definition is RelayToolDefinitionProperties) { isRelay = true; return; }
             if (snapshot.Value.Definition is AcquisitionToolDefinitionProperties acquisition)
                 acquisitionDefinition = acquisition;

@@ -10,7 +10,7 @@
 else
 {
     <PageTitle>@tool.Definition.DisplayName · Agentstration</PageTitle>
-    <ResourceHeader ResourceType="@T("Tool")" Domain="tool" Icon="⌁" Name="@tool.Definition.DisplayName"
+    <ResourceHeader ScopeRef="tool.ScopeRef" ResourceType="@T("Tool")" Domain="tool" Icon="⌁" Name="@tool.Definition.DisplayName"
                     StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)"
                     Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
                     TestId="resource-tool-details">

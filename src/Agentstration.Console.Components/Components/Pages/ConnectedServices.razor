@@ -8,15 +8,17 @@
 <PageHeader Title="@T("ConnectedServices")" Description="@T("List.Description")" TestId="connected-services">
     <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-primary" href="/connected-services/new" data-testid="connected-service-create">@T("Create")</a></Actions>
 </PageHeader>
-<div class="form-alert form-alert-info"><strong>@T("ConfiguredInstances")</strong><span>@T("ExtensionDistinction")</span></div>
-<div class="toolbar">
+@if (items.Count > 0)
+{
+<div class="connected-services-toolbar">
     <FormField Label="@T("Search")"><ClearableText @bind-Value="search" placeholder="@T("Search")" /></FormField>
     <FormField Label="@T("TypeFilter")"><ClearableSelect @bind-Value="typeFilter"><option value="">@T("AllTypes")</option>@foreach (var type in Types) { <option value="@type">@type</option> }</ClearableSelect></FormField>
     <FormField Label="@T("StatusFilter")"><ClearableSelect @bind-Value="statusFilter"><option value="">@T("AllStatuses")</option>@foreach (var status in Enum.GetValues<ConnectedServiceAvailability>()) { <option value="@status">@StatusLabel(status)</option> }</ClearableSelect></FormField>
 </div>
+}
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
-else if (Filtered.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("Empty.Message")" /> }
+else if (Filtered.Count == 0) { <EmptyState Title="@(items.Count == 0 ? T("Empty") : T("NoMatches"))" Message="@(items.Count == 0 ? T("Empty.Message") : T("NoMatches.Message"))" IconName="puzzle">@if (items.Count == 0) { <a class="button-primary" href="/connected-services/new">@T("Create")</a> } else { <button class="button-secondary" @onclick="ClearFilters">@T("ClearFilters")</button> }</EmptyState> }
 else
 {
     <CollectionView TItem="ConnectedServiceResource" Items="Filtered" InformationLabels="@(new[] { T("Type") })" RowTestId="connected-service-row">
@@ -36,6 +38,7 @@ else
         (string.IsNullOrWhiteSpace(search) || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || item.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
         (string.IsNullOrWhiteSpace(typeFilter) || item.Definition.Type.Type.Name == typeFilter) &&
         (string.IsNullOrWhiteSpace(statusFilter) || Availability(item).ToString() == statusFilter)).ToArray();
+    private void ClearFilters() { search = string.Empty; typeFilter = string.Empty; statusFilter = string.Empty; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
     private static ConnectedServiceAvailability Availability(ConnectedServiceResource item) => item.ObservedState?.Availability ?? (item.Definition.Enabled ? ConnectedServiceAvailability.Stale : ConnectedServiceAvailability.Disabled);

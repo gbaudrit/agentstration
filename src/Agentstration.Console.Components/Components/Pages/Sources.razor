@@ -11,7 +11,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourcesStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")">
+<PageHeader ScopeRef="detail?.Source.Source.ScopeRef" Title="@T("Title")" Description="@T("Description")">
     <Actions>
         @if (detail is not null)
         {

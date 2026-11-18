@@ -9,7 +9,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("EditorHelp")" TestId="transformation-function-editor" />
+<PageHeader ScopeRef="original?.ScopeRef" Title="@T("Title")" Description="@T("EditorHelp")" TestId="transformation-function-editor" />
 @if (original?.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <p role="note">@T("BuiltInHelp")</p> }
 @if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
