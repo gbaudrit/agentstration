@@ -22,13 +22,9 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    [DataRow("data-source", false, false, 2)]
-    [DataRow("data-source", false, false, 0)]
-    [DataRow("data-source", false, true, 2)]
-    [DataRow("data-source", true, true, 2)]
-    [DataRow("binding", false, true, 2)]
-    [DataRow("postAggregate", false, true, 2)]
-    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(string point, bool documentStorage, bool explode, int itemCount)
+    [DataRow(0)]
+    [DataRow(2)]
+    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(int itemCount)
     {
         await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
@@ -39,8 +35,20 @@ public sealed partial class DataSourceDatasetTests
         await RssTransformationTestData.CreateAsync(factory.Services, Owner);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
+        (string Point, bool DocumentStorage, bool Explode)[] cases = itemCount == 0
+            ? [("data-source", false, false)]
+            : [("data-source", false, false), ("data-source", false, true), ("data-source", true, true),
+                ("binding", false, true), ("postAggregate", false, true)];
+        foreach (var (point, documentStorage, explode) in cases)
+            await VerifyRssPublicationAsync(factory.Services, client, fixture, point, documentStorage, explode);
+    }
+
+    private static async Task VerifyRssPublicationAsync(IServiceProvider services, HttpClient client, Fixture fixture,
+        string point, bool documentStorage, bool explode)
+    {
+        var suffix = point.ToLowerInvariant() + "-" + (documentStorage ? "document" : explode ? "records" : "feed");
         var itemSchema = RssTransformationTestData.Declarations[1].Definition.GetProperty("content").GetProperty("properties").GetProperty("items").GetProperty("items");
-        await using var structured = documentStorage ? await StructuredStorageFixture.StartAsync(factory.Services, client, Owner, false, itemSchema) : null;
+        await using var structured = documentStorage ? await StructuredStorageFixture.StartAsync(services, client, Owner, false, itemSchema) : null;
         var storage = structured?.Reference ?? fixture.Storage;
         var convert = new FlowCompositionCall { Function = new("rss-xml-to-json", "1.0.0", Owner) };
         var split = new FlowCompositionCall
@@ -49,8 +57,8 @@ public sealed partial class DataSourceDatasetTests
             Parameters = JsonSerializer.SerializeToElement(new { path = "/items", itemSchema = new SchemaBinding
             { Reference = new() { Name = "rss-json", Version = "1.0.0", ScopeRef = Owner, SchemaPath = "/properties/items/items" } } }, JsonSerializerOptions.Web)
         };
-        var sourceDefinition = Source("rss-input", fixture, JsonSerializer.SerializeToElement(new { dataset = "rss" }));
-        var source = await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(sourceDefinition with
+        var sourceDefinition = Source("rss-input-" + suffix, fixture, JsonSerializer.SerializeToElement(new { dataset = "rss" }));
+        var source = await services.GetRequiredService<DataSourceManagementService>().CreateAsync(sourceDefinition with
         {
             Definition = sourceDefinition.Definition with
             {
@@ -78,11 +86,11 @@ public sealed partial class DataSourceDatasetTests
         {
             // Knowledge receives Artifacts, so reuse its explicit content-processing region.
             // The same named function is executed in an ordinary Flow transform inside that region.
-            var flows = factory.Services.GetRequiredService<FlowService>();
+            var flows = services.GetRequiredService<FlowService>();
             var manifest = (await flows.GetVersionExactAsync(Owner, new("knowledge-projection-builtin"), "1.0.0", default))!.Value.Graph!.OutputSchema!.Value;
             var input = JsonSerializer.SerializeToElement(new { type = "object", properties = new { value = manifest, parameters = new { type = "object" } }, required = new[] { "value", "parameters" }, additionalProperties = false });
             var feedSchema = RssTransformationTestData.Declarations[1].Definition.GetProperty("content");
-            await flows.CreateExactAsync(Owner, new("rss-content", null, "1.0.0", true,
+            await flows.CreateExactAsync(Owner, new("rss-content-" + suffix, null, "1.0.0", true,
                 new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input)], []), Graph: new()
                 {
                     EntryStep = "input", InputSchema = input, OutputSchema = manifest,
@@ -98,14 +106,14 @@ public sealed partial class DataSourceDatasetTests
                         new("convert", "extract", "completed", "convert"), new("return", "convert", "completed", "process"),
                         new("done", "process", "completed", "output"), new("fail", "process", "error", "error")]
                 }), ResourceNamespace.Default, default);
-            var published = await flows.PublishVersionExactAsync(Owner, new("rss-content"), "1.0.0", true, default);
+            var published = await flows.PublishVersionExactAsync(Owner, new("rss-content-" + suffix), "1.0.0", true, default);
             Assert.IsNotNull(published.Value.Graph!.Steps.OfType<TransformFlowStepDefinition>().Single(s => s.Name == "convert").Function!.Digest);
-            process = new() { Flow = new("rss-content", FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: Owner) };
+            process = new() { Flow = new("rss-content-" + suffix, FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: Owner) };
         }
-        var knowledge = await factory.Services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
+        var knowledge = await services.GetRequiredService<KnowledgeSourceManagementService>().CreateAsync(new()
         {
             ApiVersion = ResourceApiVersions.CoreV1, Kind = KnowledgeResourceKinds.KnowledgeSource, ScopeRef = Owner,
-            Metadata = new() { Name = "rss-knowledge" },
+            Metadata = new() { Name = "rss-knowledge-" + suffix },
             Definition = new()
             {
                 DisplayName = "RSS knowledge", Output = new(storage, new(Write: true)) { DocumentCollectionUid = structured?.Collection },
@@ -115,9 +123,9 @@ public sealed partial class DataSourceDatasetTests
             }
         }, default);
         var id = new KnowledgeSourceId(knowledge.Value.Name, ScopeRef: Owner);
-        var projection = await factory.Services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
+        var projection = await services.GetRequiredService<KnowledgeProjectionService>().StartAsync(id, new(), default);
         Assert.AreEqual(KnowledgeProjectionState.Succeeded, projection.Value.State, projection.Value.ErrorMessage);
-        var snapshot = (await factory.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot;
+        var snapshot = (await services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(id, default))!.Snapshot;
         var artifact = snapshot.Artifacts.Single();
         Assert.HasCount(explode ? 2 : 1, artifact.Content!.Records!.Members);
         var member = artifact.Content.Records.Members[0];
@@ -131,7 +139,7 @@ public sealed partial class DataSourceDatasetTests
             Assert.AreEqual("/properties/items/items", artifact.RecordContract!.SchemaEvidence!.SchemaPath);
             if (structured is not null)
             {
-                var access = factory.Services.GetRequiredService<KnowledgeAccessService>();
+                var access = services.GetRequiredService<KnowledgeAccessService>();
                 var description = await access.DescribeDocumentsAsync(id, snapshot.Name, default);
                 var page = await access.QueryDocumentsAsync(id, new() { SnapshotId = snapshot.Name, Profile = description.QueryProfiles.Single(),
                     Query = RssTransformationTestData.Json("""{"$filter":"rating eq 1"}"""), PageSize = 1 }, default);
@@ -141,7 +149,7 @@ public sealed partial class DataSourceDatasetTests
             }
             else
             {
-                var directory = Path.Combine(factory.Services.GetRequiredService<LocalStoragePaths>().DirectoryFor(storage), "publications", fixture.Context.WorkspaceId.ToString("N"));
+                var directory = Path.Combine(services.GetRequiredService<LocalStoragePaths>().DirectoryFor(storage), "publications", fixture.Context.WorkspaceId.ToString("N"));
                 foreach (var record in artifact.Content.Records.Members)
                     Assert.IsTrue(File.Exists(Path.Combine(directory, record.Id + ".json")));
             }
