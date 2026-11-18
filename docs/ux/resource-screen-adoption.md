@@ -31,7 +31,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | OrganizationMemberDetails.razor | `/settings/organization/members/{UserId:guid}` | Pending review and migration |
 | PackComposer.razor | `/pack-projects/new` | Pending review and migration |
 | PackProjectDetails.razor | `/pack-projects/{ProjectId:guid}` | Pending review and migration |
-| ParameterEditor.razor | `/parameters/new`, `/parameters/{Name}` | Implemented; 3 component cases passed (EN/FR overview, draft, ETag and wizard); browser checks pending |
+| ParameterEditor.razor | `/parameters/new`, `/parameters/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/parameters/README.md). Full final validation remains pending. |
 | ResourcePlanDetails.razor | `/resource-plans/{Id:guid}` | Pending review and migration |
 | RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Pending review and migration |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
