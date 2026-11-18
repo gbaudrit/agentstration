@@ -15,9 +15,14 @@ export interface ProductAddresses {
 
 export interface ProductHosts extends ProductAddresses {
   formPendingInteractionId?: string;
+  sourcePolicy?: SourcePolicyTestControl;
   platformHealth?: PlatformHealthTestControl;
   runtimeWorker?: RuntimeWorkerTestControl;
   stop(): Promise<void>;
+}
+
+export interface SourcePolicyTestControl {
+  change(command: { advanceSeconds?: number; failWrites?: boolean; reconcile?: boolean }): Promise<void>;
 }
 
 export interface PlatformHealthTestControl {
@@ -71,13 +76,14 @@ export async function startProductHosts(
   acquisitionFailureFixture = false,
   governedInventoryFixture = false,
   organizationStructureFixture = false,
+  sourcePolicyFixture = false,
   initialBootstrapEnabled = true,
   formPendingFixture = false,
 ): Promise<ProductHosts> {
   if (formPendingFixture && !organizationStructureFixture) throw new Error('Pending form data requires the organization fixture.');
-  if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
+  if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   return await withReservedLoopbackPorts(7, ports => startProductHostsOnPorts(
-    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, initialBootstrapEnabled, formPendingFixture, ports,
+    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, ports,
   ));
 }
 
@@ -87,6 +93,7 @@ async function startProductHostsOnPorts(
   acquisitionFailureFixture: boolean,
   governedInventoryFixture: boolean,
   organizationStructureFixture: boolean,
+  sourcePolicyFixture: boolean,
   initialBootstrapEnabled: boolean,
   formPendingFixture: boolean,
   ports: readonly LoopbackPortReservation[],
@@ -167,7 +174,10 @@ async function startProductHostsOnPorts(
     throw error;
   }
 
-  const consoleProject = organizationStructureFixture
+  const sourcePolicyKey = randomBytes(32).toString('hex');
+  const consoleProject = sourcePolicyFixture
+    ? 'automation/playwright/fixtures/SourcePolicyHost/SourcePolicyHost.csproj'
+    : organizationStructureFixture
     ? 'automation/playwright/fixtures/OrganizationStructureHost/OrganizationStructureHost.csproj'
     : governedInventoryFixture
     ? 'automation/playwright/fixtures/GovernedInventoryHost/GovernedInventoryHost.csproj'
@@ -179,6 +189,7 @@ async function startProductHostsOnPorts(
     ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
     ...(formPendingFixture ? { SHARED_FORM_PENDING_FIXTURE: 'true' } : {}),
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
+    ...(sourcePolicyFixture ? { SOURCE_POLICY_FIXTURE_KEY: sourcePolicyKey } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: consoleUrl,
     Logging__EventLog__LogLevel__Default: 'None',
@@ -275,6 +286,12 @@ async function startProductHostsOnPorts(
   const formPending = formPendingFixture ? JSON.parse(await fs.readFile(fixtureReadyFile, 'utf8')) as { interactionId: string } : undefined;
   return {
     ...(formPending ? { formPendingInteractionId: formPending.interactionId } : {}),
+    ...(sourcePolicyFixture ? { sourcePolicy: { change: async (command: { advanceSeconds?: number; failWrites?: boolean; reconcile?: boolean }) => {
+      const response = await fetch(`${consoleUrl}/__fixture/source-policy`, { method: 'POST', signal: AbortSignal.timeout(30_000), headers: {
+        'Content-Type': 'application/json', 'X-Fixture-Control': sourcePolicyKey,
+      }, body: JSON.stringify(command) });
+      if (!response.ok) throw new Error(`Source policy control failed: ${response.status} ${await response.text()}`);
+    } } } : {}),
     consoleUrl,
     workplaceUrl,
     platformHealth: runtimeProxy,

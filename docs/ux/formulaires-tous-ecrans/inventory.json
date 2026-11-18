@@ -297,7 +297,6 @@
     {
       "path": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
       "routes": [
-        "/tools/definitions/new",
         "/tools/definitions/{Name}"
       ],
       "family": "resource editors"
@@ -381,6 +380,114 @@
         "/login"
       ],
       "family": "server account forms"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor",
+      "routes": [
+        "/connected-services/new",
+        "/connected-services/{Name}/edit"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "focused-smoke-planned",
+      "trackingIssue": 1122,
+      "specification": "tests/connected-storage-collection.spec.ts"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "routes": [
+        "/connected-services"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "focused-smoke-planned",
+      "trackingIssue": 1122,
+      "specification": "tests/connected-storage-collection.spec.ts"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "routes": [
+        "/tools/definitions/new"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "focused-smoke-planned",
+      "trackingIssue": 1122,
+      "specification": "tests/connected-storage-collection.spec.ts"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor",
+      "routes": [
+        "/storage-types/new",
+        "/storage-types/{Name}/edit",
+        "/storage-types/{Name}/versions/new"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
+      "routes": [
+        "/storage-types"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "focused-smoke-planned",
+      "trackingIssue": 1122,
+      "specification": "tests/connected-storage-collection.spec.ts"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "routes": [
+        "/storages"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "focused-smoke-planned",
+      "trackingIssue": 1122,
+      "specification": "tests/connected-storage-collection.spec.ts"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "family": "Connected Services / Storage / transformation delta",
+      "coverage": "pending",
+      "trackingIssue": 1122
     }
   ],
   "helpers": [
@@ -423,7 +530,25 @@
     "src/Agentstration.Workplace.Components/ConversationComposer.razor",
     "src/Agentstration.Workplace.Components/EntryFieldRenderer.razor",
     "src/Agentstration.Workplace.Components/PendingActionPanel.razor",
-    "src/Agentstration.Workplace.Components/PromptEntry.razor"
+    "src/Agentstration.Workplace.Components/PromptEntry.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionDocuments.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+    "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/FlowTransformationCreator.razor",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+    "src/Agentstration.Console.Components/Components/Pages/OperationSchemaCandidate.razor",
+    "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/SourceLifecycleEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor",
+    "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeVersionFields.razor",
+    "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+    "src/Agentstration.Console.Components/Components/StructuredDocumentQueryEditor.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowArtifactTransformInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowCompositionInspector.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowDataMappingEditor.razor",
+    "src/Agentstration.Web.FlowDesigner/Components/FlowForeachInspector.razor"
   ],
   "excluded": [
     {
@@ -514,5 +639,19 @@
         "/w/{WorkspaceName}/tasks"
       ]
     }
-  ]
+  ],
+  "reconciliation": {
+    "date": "2026-11-18",
+    "mainCommit": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a",
+    "previousMain": "cc8e906e1b833e86e365c549ce4c9696376f3407",
+    "meaning": "Routed field adapters and embedded form helpers. Pending denotes new reusable field coverage, independently of source adoption, local smoke, route checks and existing family regressions.",
+    "pendingScreens": [
+      "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor",
+      "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor"
+    ]
+  }
 }

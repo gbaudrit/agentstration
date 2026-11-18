@@ -5,6 +5,7 @@ import { isActionableAssetResponse, isActionableConsoleError, isActionableFirstP
 
 interface AgentstrationWorkerFixtures {
   product: ProductHosts;
+  sourcePolicyFixture: boolean;
   acquisitionFailureFixture: boolean;
   governedInventoryFixture: boolean;
   organizationStructureFixture: boolean;
@@ -24,19 +25,20 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   initialBootstrapEnabled: [true, { option: true, scope: 'worker' }],
   formPendingFixture: [false, { option: true, scope: 'worker' }],
   aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
+  sourcePolicyFixture: [false, { option: true, scope: 'worker' }],
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
   governedInventoryFixture: [false, { option: true, scope: 'worker' }],
   organizationStructureFixture: [false, { option: true, scope: 'worker' }],
   // The worker-scoped key gives the expanded campaign its own managed product data.
   collectionCampaign: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, initialBootstrapEnabled, formPendingFixture }, use) => {
+  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, initialBootstrapEnabled, formPendingFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture);
     try {
       await use(product);
     } finally {

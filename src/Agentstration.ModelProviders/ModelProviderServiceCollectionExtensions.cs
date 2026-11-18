@@ -15,6 +15,9 @@ public static class ModelProviderServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        var inferenceOptions = configuration.GetSection(AepInferenceOptions.SectionName).Get<AepInferenceOptions>() ?? new();
+        inferenceOptions.Validate();
+        services.Replace(ServiceDescriptor.Singleton(inferenceOptions));
         var transportOptions = configuration.GetSection(AepTransportSecurityOptions.SectionName).Get<AepTransportSecurityOptions>() ?? new();
         transportOptions.Validate();
         // Configuration explicitly selects these options over transport and AI fallbacks.
@@ -22,6 +25,10 @@ public static class ModelProviderServiceCollectionExtensions
         services.Replace(ServiceDescriptor.Singleton(configuration.GetSection(GenAiObservabilityOptions.SectionName).Get<GenAiObservabilityOptions>() ?? new()));
         services.TryAddTransient<GenAiHttpPayloadCaptureHandler>();
         services.AddHttpClient("agentstration-aep", client => client.Timeout = TimeSpan.FromSeconds(90))
+            .ConfigurePrimaryHttpMessageHandler(services =>
+                AepSecureHttpMessageHandler.Create(services.GetRequiredService<AepTransportSecurityOptions>()))
+            .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();
+        services.AddHttpClient(AepInferenceOptions.HttpClientName, client => client.Timeout = inferenceOptions.Timeout)
             .ConfigurePrimaryHttpMessageHandler(services =>
                 AepSecureHttpMessageHandler.Create(services.GetRequiredService<AepTransportSecurityOptions>()))
             .AddHttpMessageHandler<GenAiHttpPayloadCaptureHandler>();

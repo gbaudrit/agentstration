@@ -3,6 +3,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Knowledge.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Security.Contracts;
 using Agentstration.Tools;
 
@@ -23,7 +24,14 @@ public sealed record KnowledgeRetrievalExecutionContext(
     string? FlowRunId = null,
     string? FlowStepId = null,
     string? ToolCallId = null,
-    string? ToolInvocationId = null);
+    string? ToolInvocationId = null)
+{
+    public bool TransientPayloads { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
+    public JsonElement? SymbolicRequest { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<JsonElement, JsonElement>? ProtectState { get; init; }
+}
 
 public sealed record KnowledgeRetrievalFlowRequest(
     Guid TenantId,
@@ -35,7 +43,10 @@ public sealed record KnowledgeRetrievalFlowRequest(
     string CorrelationId,
     KnowledgeRetrievalInvocationOrigin Origin,
     JsonElement Input,
-    KnowledgeRetrievalExecutionContext? ExecutionContext = null);
+    KnowledgeRetrievalExecutionContext? ExecutionContext = null)
+{
+    public ResourceScopeRef? LogicalScopeRef { get; init; }
+}
 
 public sealed record KnowledgeRetrievalFlowResult(
     string RunId,
@@ -182,7 +193,7 @@ public sealed class KnowledgeRetrievalService(
             try
             {
                 source = await sources.ResolveForUseAsync(sourceId,
-                    ResourceScopeRef.Workspace(context.WorkspaceId), cancellationToken);
+                    KnowledgeOperationalRead.AdministrativeScope(requestContext) ?? ResourceScopeRef.Workspace(context.WorkspaceId), cancellationToken);
             }
             catch (KnowledgeSourceNotFoundException)
             {
@@ -234,6 +245,10 @@ public sealed class KnowledgeRetrievalService(
 
             var retrievalId = $"retrieval-{Guid.NewGuid():N}";
             var effectiveCorrelationId = string.IsNullOrWhiteSpace(correlationId) ? retrievalId : correlationId.Trim();
+            if (executionContext?.ProtectState is { } protectCorrelation
+                && !JsonElement.DeepEquals(protectCorrelation(JsonSerializer.SerializeToElement(effectiveCorrelationId)),
+                    JsonSerializer.SerializeToElement(effectiveCorrelationId)))
+                effectiveCorrelationId = retrievalId;
             if (effectiveCorrelationId.Length > 200)
                 throw Error("knowledge_retrieval_correlation_invalid", "Correlation identifiers cannot exceed 200 characters.");
             var input = JsonSerializer.SerializeToElement(new KnowledgeRetrievalInput
@@ -245,10 +260,12 @@ public sealed class KnowledgeRetrievalService(
                 Snapshot = new()
                 {
                     Name = snapshot.Name,
+                    Namespace = snapshot.Namespace,
                     Uid = snapshot.Uid,
                     Artifacts = snapshot.Artifacts
                 },
-                Request = request.Clone(),
+                Request = executionContext?.SymbolicRequest is { } symbolic
+                    ? SecretInputs.PreserveReferences(request, symbolic, executionContext.SecretInputs) : request.Clone(),
                 Caller = new()
                 {
                     PrincipalId = context.PrincipalId,
@@ -265,6 +282,7 @@ public sealed class KnowledgeRetrievalService(
                 CorrelationId = effectiveCorrelationId,
                 RetrievalId = retrievalId
             }, JsonOptions);
+            if (executionContext?.ProtectState is { } protectState) input = protectState(input);
             KnowledgeRetrievalFlowResult completed;
             try
             {
@@ -278,7 +296,8 @@ public sealed class KnowledgeRetrievalService(
                     effectiveCorrelationId,
                     origin,
                     input,
-                    executionContext), cancellationToken);
+                    executionContext)
+                { LogicalScopeRef = KnowledgeOperationalRead.AdministrativeScope(requestContext) }, cancellationToken);
             }
             catch (KnowledgeRetrievalException) { throw; }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -387,9 +406,9 @@ public sealed class KnowledgeRetrievalService(
                 $"Continuation metadata cannot exceed {MaximumContinuationCharacters} characters.");
     }
 
-    private RequestContext RequireContext() => requestContext.IsInitialized
+    private RequestContext RequireContext() => KnowledgeOperationalRead.AdministrativeContext(requestContext) ?? (requestContext.IsInitialized
         ? requestContext.Current
-        : throw Error("knowledge_retrieval_context_required", "A Workspace request context is required.");
+        : throw Error("knowledge_retrieval_context_required", "A Workspace request context is required."));
 
     private static KnowledgeRetrievalException Error(string code, string message, Exception? innerException = null) =>
         new(code, message, innerException);

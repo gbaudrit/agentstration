@@ -38,7 +38,7 @@ export const collectionSurfaces = [...collectionManifest.frames, ...collectionMa
   domainSpecifications: [...new Set(applicationSurfaces.filter(routeSurface =>
     routeSurface.coverage !== 'planned' && routeSurface.host === surface.host && (routeSurface.source === surface.source
       || routeSurface.routes.some(route => surface.routes.includes(route))),
-  ).map(routeSurface => routeSurface.specification))],
+  ).flatMap(routeSurface => [routeSurface.specification, ...(routeSurface.relatedSpecifications ?? [])]))],
   preexistingTrackingIssues: [...new Set(applicationSurfaces.filter(routeSurface =>
     routeSurface.host === surface.host && routeSurface.trackingIssue !== undefined
       && (routeSurface.source === surface.source || routeSurface.routes.some(route => surface.routes.includes(route))),

@@ -1,0 +1,143 @@
+@implements IDisposable
+@inject IKnowledgeSourcesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+<section class="panel form-section" data-testid="knowledge-retrieval-verification">
+    <div class="panel-header"><div><h2>@T("NativeAccessTitle")</h2><p>@T("NativeAccessHelp")</p></div></div>
+    <fieldset class="resource-definition-fields" disabled="@(!interactive || busy)" data-testid="knowledge-native-access-fields" data-interactive="@(interactive ? "true" : "false")">
+    <div class="form-grid">
+        <FormField Label="@T("Operation")"><ClearableSelect AllowClear="false" TValue="string" @bind-Value="operation" @bind-Value:after="Reset" data-testid="knowledge-retrieval-operation"><option value="read">@T("Operation.Read")</option><option value="search_regex">@T("Operation.SearchRegex")</option>@if (SupportsStructured) { <option value="query_documents">@T("Operation.StructuredQuery")</option> }<option value="get_status">@T("Operation.GetStatus")</option></ClearableSelect></FormField>
+        <FormField Label="@T("SnapshotOptional")"><ClearableSelect TValue="string" @bind-Value="snapshotId" @bind-Value:after="Reset" data-testid="knowledge-retrieval-snapshot"><option value="">@T("NativeAutomaticSnapshot")</option>@foreach (var view in Snapshots) { <option value="@view.Snapshot.Name">@view.Snapshot.Name</option> }</ClearableSelect></FormField>
+        @if (operation == "search_regex")
+        {
+            <FormField Label="@T("NativePattern")" Help="@T("NativePatternHelp")"><ClearableText @bind-Value="pattern" @bind-Value:after="Reset" maxlength="512" data-testid="knowledge-retrieval-text" /></FormField>
+            <FormField Label="@T("NativeMatchLimit")"><ClearableNumber TValue="int" min="1" max="100" @bind-Value="limit" /></FormField>
+        }
+        @if (operation == "query_documents")
+        {
+            <FormField Label="@T("StructuredQueryPayload")" Class="form-span-2" Help="@T("StructuredQueryHelp")"><ClearableText UpdateOnInput="false" Multiline="true" class="form-code-editor" rows="8" @bind-Value="queryPayload" @bind-Value:after="Reset" maxlength="8192" /></FormField>
+        }
+        @if (operation == "read") { <FormField Label="@T("NativeChunkSize")"><ClearableNumber TValue="int" min="1" max="32768" @bind-Value="maxCharacters" data-testid="knowledge-read-size" /></FormField> }
+    </div>
+    <div class="form-actions"><button class="button-primary" type="button" disabled="@(!interactive || busy || operation == "search_regex" && string.IsNullOrEmpty(pattern))" data-testid="knowledge-retrieval-run" @onclick="RunAsync">@T(result?.State == "preparing" ? "NativeRetryPreparation" : "RunVerification")</button>
+        @if (result?.NextCursor is not null) { <button class="button-secondary" type="button" disabled="@busy" data-testid="knowledge-read-next" @onclick="NextAsync">@T("NativeNextPage")</button> }
+    </div>
+    </fieldset>
+    @if (error) { <p class="form-alert form-alert-danger" role="alert">@T("NativeError")</p> }
+    @if (result is not null)
+    {
+        <section role="status" data-testid="knowledge-retrieval-result">
+            <p>@T($"NativeState.{result.State}") @if (result.SnapshotId is not null) { <code>@result.SnapshotId</code> }</p>
+            @if (result.State == "preparing") { <p>@T("NativePreparingHelp")</p> }
+            @if (result.ErrorCode is not null) { <code>@result.ErrorCode</code> }
+            @if (result.Chunks.Count > 0)
+            {
+            <ul class="collection-cards">
+            @foreach (var chunk in result.Chunks)
+            {
+                <li class="collection-card"><p><CopyableValue Value="@chunk.DocumentId" /> · @T("NativeRange", chunk.Range.Start, chunk.Range.End)</p><pre>@chunk.Content</pre></li>
+            }
+            </ul>
+            }
+            @if (result.Matches.Count > 0)
+            {
+            <ul class="collection-cards">
+            @foreach (var match in result.Matches)
+            {
+                <li class="collection-card"><p><CopyableValue Value="@match.DocumentId" /> · @T("NativeRange", match.MatchRange.Start, match.MatchRange.End)</p><pre>@match.Excerpt</pre><div class="collection-actions"><button class="button-secondary" type="button" disabled="@busy" data-testid="knowledge-read-match" @onclick="() => ReadMatchAsync(match)">@T("NativeReadMatch")</button></div></li>
+            }
+            </ul>
+            }
+            @if (result.DocumentPage is { } page) { <p><code>@result.QueryProfile?.Id / @result.QueryProfile?.Version · @result.QueryProfile?.ModelDigest</code></p><pre data-testid="knowledge-document-query-result">@JsonSerializer.Serialize(page)</pre> }
+            @if (result.Records.Count > 0)
+            {
+            <ul class="collection-cards">
+            @foreach (var record in result.Records)
+            {
+                <li class="collection-card knowledge-record-lineage" data-testid="knowledge-record-lineage"><CopyableValue Value="@record.DocumentId" /> · @T("RecordArtifact") <CopyableValue Value="@record.ArtifactId" /> · @T("RecordOrdinal", record.MemberOrdinal + 1)</li>
+            }
+            </ul>
+            }
+            @if (result.EndOfSelection) { <p>@T("NativeEnd")</p> }
+            @if (result.CursorExpiresAt is { } expires && result.NextCursor is not null) { <small>@T("NativeCursorExpiry", expires.ToLocalTime().ToString("g"))</small> }
+        </section>
+    }
+    @if (status is not null)
+    {
+        <section data-testid="knowledge-content-status" role="status">
+            <p>@T(status.State == "ready" ? "NativeStatusReady" : $"NativeState.{status.State}") · @status.CheckedAt.ToLocalTime().ToString("g")</p>
+            <p data-testid="knowledge-content-availability">@T("ContentAvailability"): @T($"ContentAvailability.{status.ContentAvailability}")</p>
+            <p>@T("ContentAvailabilityHelp")</p>
+            <dl><dt>@T("ActiveSnapshot")</dt><dd><code>@(status.ActiveSnapshotId ?? T("None"))</code></dd><dt>@T("NativeLatestPublished")</dt><dd><code>@(status.LatestPublishedSnapshotId ?? T("None"))</code></dd></dl>
+            @if (status.ComparedSnapshotId is not null) { <p><code>@status.ComparedSnapshotId</code> · @T("NativeComparison", T(status.IsActive == true ? "Yes" : "No"), T(status.IsLatestPublished == true ? "Yes" : "No"))</p> }
+            <p>@T("NativeEvidenceHelp")</p>
+            @if (status.Inputs.Count > 0) { <ul class="collection-cards">@foreach (var input in status.Inputs) { <li class="collection-card"><strong>@input.BindingName</strong><span>@input.AcquiredAt?.ToLocalTime().ToString("g")</span><StatusBadge Text="@T(input.Fresh ? "NativeFresh" : "NativeStale")" Status="@(input.Fresh ? UiStatus.Success : UiStatus.Warning)" /></li> }</ul> }
+            @if (status.Documents.Count > 0) { <ul class="collection-cards">@foreach (var document in status.Documents) { <li class="collection-card"><CopyableValue Value="@document.DocumentId" /><span>@document.MediaType · @T("NativeDocumentBytes", document.Bytes)</span></li> }</ul> }
+            @if (status.ErrorCode is not null) { <code>@status.ErrorCode</code> }
+        </section>
+    }
+</section>
+@code {
+    [Parameter, EditorRequired] public string SourceName { get; set; } = string.Empty;
+    [Parameter] public bool SupportsStructured { get; set; }
+    [Parameter] public ResourceNamespace SourceNamespace { get; set; } = ResourceNamespace.Default;
+    [Parameter] public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = [];
+    private readonly CancellationTokenSource cancellation = new();
+    private string operation = "read", snapshotId = string.Empty, pattern = string.Empty;
+    private string queryPayload = "{}";
+    private int maxCharacters = 4000, limit = 20;
+    private bool busy, error, interactive;
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
+    private KnowledgeAccessResult? result;
+    private KnowledgeAccessStatus? status;
+    private string? selectedDocument;
+    private KnowledgeCharacterRange? selectedRange;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private void Reset() { result = null; status = null; selectedDocument = null; selectedRange = null; error = false; }
+    private string? SelectedSnapshot => string.IsNullOrWhiteSpace(snapshotId) ? null : snapshotId;
+    private Task RunAsync() => ExecuteAsync(async () =>
+    {
+        if (operation == "get_status")
+        {
+            status = await Client.GetContentStatusAsync(SourceNamespace, SourceName, new(SelectedSnapshot), cancellation.Token);
+            result = null;
+        }
+        else if (operation == "query_documents")
+        {
+            var description = await Client.DescribeDocumentsAsync(SourceNamespace, SourceName, SelectedSnapshot, cancellation.Token);
+            var profile = description.QueryProfiles.FirstOrDefault() ?? throw new InvalidOperationException();
+            using var query = JsonDocument.Parse(queryPayload);
+            result = await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
+                PreparationId = result?.PreparationId, Profile = profile, Query = query.RootElement.Clone(), PageSize = Math.Min(50, description.Policy.MaximumPageSize) }, cancellation.Token);
+        }
+        else if (operation == "read")
+            result = await Client.ReadContentAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
+                PreparationId = result?.PreparationId, DocumentId = selectedDocument, Range = selectedRange, MaxCharacters = maxCharacters }, cancellation.Token);
+        else result = await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Pattern = pattern,
+            SnapshotId = SelectedSnapshot, PreparationId = result?.PreparationId, Limit = limit }, cancellation.Token);
+    });
+    private Task NextAsync() => ExecuteAsync(async () => result = operation == "query_documents"
+        ? await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor }, cancellation.Token)
+        : operation == "read"
+        ? await Client.ReadContentAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, MaxCharacters = maxCharacters }, cancellation.Token)
+        : await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, Limit = limit }, cancellation.Token));
+    private Task ReadMatchAsync(KnowledgeRegexMatch match)
+    {
+        snapshotId = result!.SnapshotId!; selectedDocument = match.DocumentId; selectedRange = match.ReadRange; operation = "read";
+        result = null;
+        return RunAsync();
+    }
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = false;
+        try { await action(); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception) { error = true; }
+        finally { busy = false; }
+    }
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
+}

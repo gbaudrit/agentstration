@@ -9,6 +9,7 @@
         <button type="button" @onclick="ZoomIn" aria-label="@Localizer["ZoomIn"]">+</button>
         <button type="button" @onclick="Center">@Localizer["Fit"]</button>
     </div>
+    @if (previewProblem is not null) { <div class="flow-connection-feedback" role="status">@previewProblem</div> }
     <CascadingValue Value="diagram" IsFixed="true">
         <CascadingValue Value="nodeInteractions" IsFixed="true">
             <DiagramCanvas />
@@ -51,6 +52,8 @@
     [Parameter] public bool ShowAllErrorTransitions { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepChanged { get; set; }
     [Parameter] public EventCallback<string> StepSettingsRequested { get; set; }
+    [Parameter] public Func<string, string, Task>? InspectPortAsync { get; set; }
+    [Parameter] public Func<string, string, string>? DescribePort { get; set; }
     [Parameter] public EventCallback<string?> SelectedTransitionChanged { get; set; }
     [Parameter] public EventCallback<MoveStepCommand> StepMoved { get; set; }
     [Parameter] public EventCallback<string> StepRemoved { get; set; }
@@ -60,8 +63,14 @@
 
     protected override void OnInitialized()
     {
-        nodeInteractions = new(RequestStepSettingsAsync);
+        nodeInteractions = new(RequestStepSettingsAsync, (step, port) => InspectPortAsync?.Invoke(step, port) ?? Task.CompletedTask,
+            (step, port) => DescribePort?.Invoke(step, port) ?? port, step => DescribeResource?.Invoke(step));
         diagram.RegisterComponent<FlowDiagramNode, FlowNodeWidget>();
+        diagram.PointerEnter += PreviewEnter;
+        diagram.PointerLeave += PreviewLeave;
+        diagram.PointerMove += RefreshPreview;
+        diagram.PointerUp += PreviewEnd;
+        diagram.KeyDown += PreviewKeyDown;
         diagram.ContainerChanged += OnContainerChanged;
         diagram.ZoomChanged += OnZoomChanged;
         diagram.SelectionChanged += OnSelectionChanged;
@@ -162,6 +171,7 @@
 
     private void Rebuild()
     {
+        ClearPreview(); hoveredPort = null;
         rebuilding = true;
         foreach (var node in diagram.Nodes.OfType<FlowDiagramNode>())
         {
@@ -190,6 +200,7 @@
             AttachExistingLink(link);
             diagram.Links.Add(link);
         }
+        RefreshCompatibility();
         rebuilding = false;
     }
 
@@ -342,6 +353,12 @@
 
     public async ValueTask DisposeAsync()
     {
+        diagram.PointerEnter -= PreviewEnter;
+        diagram.PointerLeave -= PreviewLeave;
+        diagram.PointerMove -= RefreshPreview;
+        diagram.PointerUp -= PreviewEnd;
+        diagram.KeyDown -= PreviewKeyDown;
+        ClearPreview();
         diagram.ContainerChanged -= OnContainerChanged;
         diagram.ZoomChanged -= OnZoomChanged;
         diagram.SelectionChanged -= OnSelectionChanged;

@@ -30,7 +30,13 @@ public sealed record FlowRunCausalityNode(
     DateTimeOffset? CompletedAt,
     string? ErrorCode,
     IReadOnlyList<FlowRunAgentExecution> AgentExecutions,
-    IReadOnlyList<FlowRunToolCall> ToolCalls);
+    IReadOnlyList<FlowRunToolCall> ToolCalls)
+{
+    public FlowProcessRunOrigin? ProcessOrigin { get; init; }
+    public FlowFailureOrigin? ErrorOrigin { get; init; }
+    public string? ActiveStepName { get; init; }
+    public IReadOnlyDictionary<string, FlowProcessAdmission> Processes { get; init; } = new Dictionary<string, FlowProcessAdmission>();
+}
 
 public sealed record FlowRunAgentExecution(
     string StepName,

@@ -14,8 +14,8 @@ internal static class KnowledgeProjectionEndpoints
     public static void Map(RouteGroupBuilder sources, RouteGroupBuilder projections)
     {
         sources.MapPost("/{name}/projections", StartAsync)
-            .WithSummary("Project acquired Data Source artifacts into a Knowledge Snapshot")
-            .Produces<KnowledgeProjectionResource>(StatusCodes.Status201Created)
+            .WithSummary("Project exact Data Source acquisitions into an immutable Knowledge Snapshot")
+            .Produces<KnowledgeProjectionResource>(StatusCodes.Status202Accepted)
             .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         sources.MapGet("/{name}/projections", ListAsync)
             .WithSummary("List Knowledge projection history")
@@ -36,10 +36,10 @@ internal static class KnowledgeProjectionEndpoints
         KnowledgeProjectionService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
         {
-            var stored = await service.StartAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken);
+            var stored = await service.AdmitAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body, cancellationToken);
             response.Headers.Location = Location(stored.Value);
             response.Headers.ETag = stored.ETag;
-            return Results.Json(stored.Value, statusCode: StatusCodes.Status201Created);
+            return Results.Json(stored.Value, statusCode: StatusCodes.Status202Accepted);
         });
 
     private static Task<IResult> ListAsync(
@@ -73,7 +73,9 @@ internal static class KnowledgeProjectionEndpoints
             var status = exception.Code switch
             {
                 "knowledge_projection_not_found" or "knowledge_projection_source_not_found" => 404,
-                "knowledge_projection_activation_conflict" => 409,
+                "knowledge_projection_activation_conflict" or "knowledge_projection_idempotency_conflict" => 409,
+                "knowledge_projection_capacity" => 429,
+                "knowledge_projection_publication_pending" => 503,
                 _ => 422
             };
             return Problem(exception.Code, "Invalid Knowledge projection", status, exception.Message);

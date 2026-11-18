@@ -1,3 +1,4 @@
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
@@ -20,6 +21,11 @@ public sealed record SecretView(SecretResource Resource, SecretValueStatus Value
 public sealed record VaultView(VaultResource Resource, string Status);
 public sealed record SecretUsage(string Kind, string Name, string DisplayName);
 
+public interface ISecretUsageProvider
+{
+    Task<IReadOnlyList<SecretUsage>> GetUsagesAsync(ScopedResourceAddress secret, CancellationToken cancellationToken);
+}
+
 public sealed class SecretManagementService(
     IResourceStore store,
     IResourceReferenceResolver references,
@@ -28,7 +34,8 @@ public sealed class SecretManagementService(
     IRequestContextScopeFactory requestContexts,
     DescendantResourceUseAuthorizer useAuthorizer,
     IResourceAccessPolicyService accessPolicies,
-    IEnumerable<ISecretVaultProvider> providers) : ISecretResolver, ISecretAccessAuthorizer
+    IEnumerable<ISecretVaultProvider> providers,
+    IEnumerable<ISecretUsageProvider>? usageProviders = null) : ISecretResolver, ISecretAccessAuthorizer
 {
     public async Task<IReadOnlyList<StoredResource<VaultResource>>> ListVaultsAsync(CancellationToken cancellationToken)
     {
@@ -324,6 +331,17 @@ public sealed class SecretManagementService(
                     && string.Equals(binding.Secret.Address.Name, name, StringComparison.Ordinal)))
                 usages.Add(new(profile.Value.Kind, profile.Value.Name, profile.Value.Definition.DisplayName));
         }
+        foreach (var service in await store.ListAllAsync<ConnectedServiceResource>(
+            ConnectedServiceResourceKinds.ConnectedService, cancellationToken))
+        {
+            if (service.Value.Definition.Bindings.Any(binding =>
+                    binding.Kind == ConnectedServiceBindingKind.Secret
+                    && binding.Secret is { } reference
+                    && reference.ScopeRef == scopeRef
+                    && reference.Address.Namespace == ResourceNamespace.Default
+                    && string.Equals(reference.Address.Name, name, StringComparison.Ordinal)))
+                usages.Add(new(service.Value.Kind, service.Value.Name, service.Value.Definition.DisplayName));
+        }
         foreach (var registration in await store.ListAllAsync<ExtensionRegistrationResource>(ExtensionKinds.ExtensionRegistration, cancellationToken))
         {
             var credential = registration.Value.Definition.Credential;
@@ -354,6 +372,9 @@ public sealed class SecretManagementService(
                     usages.Add(new(registration.Value.Kind, registration.Value.Name, registration.Value.Definition.DisplayName));
             }
         }
+        foreach (var provider in usageProviders ?? [])
+            usages.AddRange(await provider.GetUsagesAsync(ScopedResourceAddress.Create(scopeRef,
+                ResourceNamespace.Default, SecretResourceKinds.Secret, name), cancellationToken));
         return usages;
     }
 

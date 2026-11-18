@@ -1,0 +1,4 @@
+.form-section { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; box-sizing: border-box; }
+label { min-width: 0; }
+select { width: 100%; min-width: 0; max-width: 100%; }
+h2, p, small { overflow-wrap: anywhere; }

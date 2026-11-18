@@ -175,14 +175,30 @@ public sealed class RuntimeWorkerAssignmentService(
 
     public async Task<RuntimeAssignmentHeartbeat> HeartbeatAsync(RuntimeAssignmentOwnershipProof proof, CancellationToken cancellationToken)
     {
-        var now = timeProvider.GetUtcNow();
-        var renewed = await assignments.RenewAsync(proof, Digest(proof.OwnershipToken), now, now.Add(options.LeaseDuration), cancellationToken);
+        var renewed = await RetryAssignmentMutationAsync(() =>
+        {
+            var observed = timeProvider.GetUtcNow();
+            return assignments.RenewAsync(proof, Digest(proof.OwnershipToken), observed, observed.Add(options.LeaseDuration), cancellationToken);
+        }, cancellationToken);
         var cancellationRequested = renewed.Value.CancellationRequestedAt is not null;
         var attempt = renewed.Value.CurrentAttempt
             ?? throw new InvalidOperationException("A renewed assignment has no current attempt.");
         leaseGuards.Renew(proof, attempt.LeaseExpiresAt, cancellationRequested);
         return new RuntimeAssignmentHeartbeat(renewed.Value, cancellationRequested);
     }
+
+    private static async Task<T> RetryAssignmentMutationAsync<T>(Func<Task<T>> mutate, CancellationToken token)
+    {
+        for (var retry = 0; ; retry++)
+        {
+            token.ThrowIfCancellationRequested();
+            try { return await mutate(); }
+            catch (RuntimeRunConcurrencyException) when (retry < 32) { await Task.Yield(); }
+        }
+    }
+
+    private static Task RetryAssignmentMutationAsync(Func<Task> mutate, CancellationToken token) =>
+        RetryAssignmentMutationAsync(async () => { await mutate(); return true; }, token);
 
     public Task<RuntimeAssignmentAuthorization> AuthorizeAsync(
         RuntimeAssignmentOwnershipProof proof,
@@ -222,7 +238,7 @@ public sealed class RuntimeWorkerAssignmentService(
         ArgumentException.ThrowIfNullOrWhiteSpace(stepType);
         ArgumentOutOfRangeException.ThrowIfNegative(definitionPosition);
         var now = timeProvider.GetUtcNow();
-        return assignments.OpenStepExecutionAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentStepExecution
+        return RetryAssignmentMutationAsync(() => assignments.OpenStepExecutionAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentStepExecution
         {
             CommandId = commandId,
             Id = Guid.NewGuid(),
@@ -234,7 +250,7 @@ public sealed class RuntimeWorkerAssignmentService(
             StepType = stepType,
             DefinitionPosition = definitionPosition,
             OpenedAt = now
-        }, now, cancellationToken);
+        }, timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
     }
 
     public Task<RuntimeAssignmentTurn> OpenTurnAsync(
@@ -255,7 +271,7 @@ public sealed class RuntimeWorkerAssignmentService(
         if (commandId == Guid.Empty) throw new ArgumentException("The command identity must not be empty.", nameof(commandId));
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         var now = timeProvider.GetUtcNow();
-        return assignments.OpenTurnAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentTurn
+        return RetryAssignmentMutationAsync(() => assignments.OpenTurnAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentTurn
         {
             CommandId = commandId,
             Id = Guid.NewGuid(),
@@ -265,15 +281,15 @@ public sealed class RuntimeWorkerAssignmentService(
             StepExecutionId = stepExecutionId,
             ParticipantId = participantId,
             OpenedAt = now
-        }, now, cancellationToken);
+        }, timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
     }
 
     public Task RegisterChildFlowAsync(RuntimeAssignmentOwnershipProof proof, string childFlowRunId,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(childFlowRunId);
-        return assignments.RegisterChildFlowAsync(proof, Digest(proof.OwnershipToken), childFlowRunId,
-            timeProvider.GetUtcNow(), cancellationToken);
+        return RetryAssignmentMutationAsync(() => assignments.RegisterChildFlowAsync(proof, Digest(proof.OwnershipToken), childFlowRunId,
+            timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
     }
 
     public async Task<RuntimeAssignmentEventAppendResult> AppendEventsAsync(
@@ -285,8 +301,8 @@ public sealed class RuntimeWorkerAssignmentService(
             || value.Payload?.GetRawText().Length > MaximumEventPayloadLength))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
                 "Event kinds are limited to 128 characters and individual payloads to 2 MiB.");
-        var result = await assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
-            timeProvider.GetUtcNow(), cancellationToken);
+        var result = await RetryAssignmentMutationAsync(() => assignments.AppendEventsAsync(proof, Digest(proof.OwnershipToken), events,
+            timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
         var assignment = (await assignments.GetExactAsync(proof.ExecutionScopeRef, proof.AssignmentId, cancellationToken))!.Value;
         await projection.ProjectEventsAsync(assignment, events, cancellationToken);
         return result;
@@ -307,8 +323,8 @@ public sealed class RuntimeWorkerAssignmentService(
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
                 "A checkpoint payload cannot exceed 1 MiB.");
         var now = timeProvider.GetUtcNow();
-        return assignments.StoreCheckpointAsync(proof, Digest(proof.OwnershipToken),
-            new RuntimeAssignmentCheckpoint(checkpointId, schemaVersion, compatibilityKey, payload.Clone(), now), now, cancellationToken);
+        return RetryAssignmentMutationAsync(() => assignments.StoreCheckpointAsync(proof, Digest(proof.OwnershipToken),
+            new RuntimeAssignmentCheckpoint(checkpointId, schemaVersion, compatibilityKey, payload.Clone(), now), timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
     }
 
     public Task<RuntimeAssignmentCheckpoint?> GetCheckpointAsync(
@@ -349,7 +365,7 @@ public sealed class RuntimeWorkerAssignmentService(
         RuntimeAssignmentTerminalCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken);
+        var result = await RetryAssignmentMutationAsync(() => assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
         leaseGuards.Revoke(proof.WorkspaceId, proof.AssignmentId);
         await projection.ProjectTerminalAsync(result, cancellationToken);
         return result;

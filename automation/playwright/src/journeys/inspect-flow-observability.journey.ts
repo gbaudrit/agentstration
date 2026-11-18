@@ -29,6 +29,7 @@ export const inspectFlowObservability: Journey<InspectFlowObservabilityInput> = 
   await observability.open(context.consoleUrl, '/flow-runs', 'runs');
   await observability.openFirstFlowRun();
   await expect(context.pages.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
+  await observability.inspectCausalOutputs();
   await context.checkpoint({ name: Checkpoints.flowObservability.globalRun, page: context.pages.page, target: context.pages.page.getByTestId(TestIds.flowObservability.runDetails) });
   await observability.createAgentRun(context.consoleUrl, 'dotnet-expert', 'Return a deterministic Agent Run for browser observability.');
   await observability.open(context.consoleUrl, '/agent-runs', 'agentRuns');

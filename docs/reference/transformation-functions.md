@@ -1,0 +1,70 @@
+# Native transformation functions
+
+Transformation functions are reusable scoped resources. The initial execution kind is native .NET code. Scripts, remote engines and custom DLL loading are not implemented.
+
+The platform automatically provisions the standard native FunctionKind and six TransformationFunctions at Instance scope during startup, including when file Bootstrap is disabled. They are marked `builtIn`, managed by Core (`functions.native`), and read-only in the Console. No file profile or manual Bootstrap action is required. Tenants and their descendant Workspaces inherit Discover/Use grants; the catalogue is not copied into each Workspace. Startup reconciliation preserves resource identities and immutable versions and refuses to adopt a user resource at a reserved builtin identity.
+
+Inspect the catalogue under `/function-kinds` and `/transformation-functions`. Standard function resource names use the established `-builtin` suffix, for example `json-select-builtin` and `artifact-explode-builtin`; implementation identifiers remain `json.select` and `artifact.explode`. Additional user-defined functions can select a registered implementation/version through the resource API, Console or generic Bootstrap handlers. Published versions cannot be rewritten; add a version and explicitly select it in consumers. Disabling a user-managed function or kind blocks further invocations under current authorization.
+
+| Implementation | Business input | Output |
+| --- | --- | --- |
+| `json.select` | `{value, path}` | Value selected by RFC 6901 JSON Pointer |
+| `json.project` | `{value, properties:[{name,path}]}` | Object with the selected/renamed properties |
+| `collection.filter` | `{value:[...], path, equals}` | Elements whose selected value equals the given JSON value |
+| `collection.distinct` | `{value:[...], path}` | First element for each semantically equal selected JSON value |
+| `artifact.explode` | `{value:{artifacts:[...]}, path, mode?, itemSchema?, maximumOutputs?}` | Manifest of independently publishable JSON items |
+| `json.explode` | `{value, path, itemSchema}` | One logical Artifact with an ordered collection of validated object records |
+
+The empty Pointer selects the root. The `path` property is required, but its value may be `""`; the form distinguishes a missing property from an explicitly empty string and provides **Use empty text** for that value. Escape `/` as `~1` and `~` as `~0`. Missing properties, invalid array indices and malformed escapes fail; there is no original-value fallback. Filter and distinct preserve order. Functions have a 1 MiB JSON invocation/result limit; individual functions and consumers may impose smaller bounds.
+
+Each function has an optional resource `description`, editable for user declarations. The standard descriptions are reconciled automatically at Instance scope and shown in English or French after selection in source sequences and the ordinary Transform inspector. Descriptions are presentation metadata: editing one does not change an accepted function version or implementation contract.
+
+## Calling a function
+
+The ordinary **Transform** step offers a function selector and an input mapping. The mapping supplies its one business argument, for example:
+
+```json
+{"value":"${transition.output}","path":"/results"}
+```
+
+In source sequences, use **Add a function** alongside the existing Flow action. Select the function/version and fill its parameter form. The preceding value supplies `value`; literal parameters such as `path` cannot replace it. Function and Flow entries can be mixed, reordered and saved. Knowledge's **Transformations before publication** (`postAggregate`) and individual Data Source bindings use this same editor. No wrapper Flow needs to be created.
+
+## Exploding acquired content
+
+For acquired JSON `{ "results": [{"id":"a"},{"id":"b"}] }`, select `json.explode` with `path` `/results` and the exact `itemSchema` to keep one logical Artifact with two records. Configure it in Data Source transformations, on a Knowledge binding, or before publication. Document Storage publishes two independently queryable rows; built-in local Storage writes two physical JSON files. Limits are 100 object records and 64 KiB of canonical JSON per Artifact; empty arrays, scalar members, schema mismatches and exceeded bounds fail without truncation.
+
+Without `json.explode`, JSON publication wraps the complete acquired root object as one record, retaining its root contract. A Knowledge `json.explode` applies its path to the objects in that collection. Bare arrays or scalar transformation results require an explicit object-record projection before JSON storage. The acquired root contract remains separate from the final item contract.
+
+Use `artifact.explode` when the intended result is several independent Artifacts. Its `arrayItems` mode expands an array; `objectValues` expands object values in ordinal key order. If the Data Source already applies `json.explode`, its logical content is the record array. Knowledge `artifact.explode` with `{"path":"","mode":"arrayItems"}` creates an independent Artifact for each existing record. These two functions deliberately have different cardinality semantics.
+
+Shared Schema selection addresses the schema definition, separately from content selection. For an envelope with a `results` array, `/properties/results` selects the array schema and `/properties/results/items` selects an item schema; neither path transforms the payload. `json.explode` requires `itemSchema`; `artifact.explode` accepts it optionally. Both use the existing inline or shared SchemaBinding editor. Shared bindings retain parent UID/version/hash, selected path and selected-definition hash on the record contract. The logical Artifact has a derived `array` contract with that schema in `items`, without falsely attaching item identity to the whole array. Inline bindings do not claim a published Schema identity.
+
+Omit `itemSchema` to explode JSON without a declared business structure; technical content/path/size/output bounds still apply. Declare it to validate each item's content. The acquisition/envelope schema is not copied onto items. Outputs retain parent identity/digest, path, key and transformation evidence. Empty collections, duplicate object keys, invalid paths, mismatching schemas and output limits fail explicitly. At most 100 output Artifacts are publishable to Knowledge, each at most 64 KiB; a function invocation also bounds aggregate output content to 512 KiB. A larger source still has to satisfy its acquisition and read limits.
+
+Inside **For each Artifact**, a content-processing branch can pass `{"value":{"content":"${input.content}"},"path":"/results"}` to the same function. Return its manifest to the bottom result connector. The owner validates and prepares all children before registering them; it does not first capture another durable Artifact containing the complete batch. An explicit output contract applies to each expanded child. Retained input Artifacts remain unchanged.
+
+Knowledge binding transformations run after a retained acquisition is stored, and before Snapshot output publication. Direct input and expanded inline outputs remain transient until final Snapshot publication. Expiry, cancellation or restart never silently reacquires direct input or falls back to storage. Failed publication preserves the active Snapshot and its historical references.
+
+## Schema arguments are resolved before execution
+
+Schema-aware native parameters declare `"x-agentstration-schema-binding": true` in their input-schema property. This is implementation contract metadata, available in the catalogue and reused by the editors and compiler. It does not add a function kind or couple the native SDK to the Schema library.
+
+In a Source sequence, configure `parameters.itemSchema`, for example:
+
+```json
+{"path":"","itemSchema":{"reference":{"name":"alerts-envelope","version":"1.0.0","scopeRef":"/instance","namespace":"default","schemaPath":"/properties/results/items"}}}
+```
+
+The inline alternative is `{"inline":{"format":"json-schema","content":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}}`. With no published compatible Schema, inline and no-schema operation remain available. An explicitly selected missing, inaccessible, unsupported or ambiguous binding rejects the save/publication instead of disabling validation.
+
+For an ordinary Transform, use its schema-parameter editor, stored separately under `functionSchemas.itemSchema`; the runtime `mapping` supplies only data and ordinary arguments. Schema selection is static, not computed from previous step output. Source save and Flow publication resolve the exact parent under the consumer's permissions and validation profile and retain a server-owned snapshot per call. Published Flows also list these snapshots in `schemaBindings`. A new Schema publication does not alter existing calls. Source receipts and Flow Run snapshots carry the selected schema through admission and recovery without another catalogue lookup. Native handlers receive the resolved inline definition; shared provenance is supplied only through the trusted host context. Workers cannot provide or override that evidence.
+
+The reseeded initial catalogue provisions one `1.0.0` version per standard native function and FunctionKind. `artifact.explode` includes optional SchemaBinding item parameters in that initial contract. The standard DataSource/Knowledge orchestration and transformation-sequence Flows also start at `1.0.0`. This unreleased change requires a reseed of the development installation; no intermediate contract versions or raw inline-schema compatibility implementation are retained. Later user publications remain immutable. No business Schema resource is implicitly created or published.
+
+## Explicit iteration
+
+**For each** receives a mapped JSON array and invokes the connected process branch for each element. Each child receives the element directly; results preserve input order, including with bounded concurrency. An empty collection returns `[]`. Item/result schemas and maximum count/concurrency can be configured. Explicit API-authored text/batch partitioning is owned by this step rather than Transform.
+
+**For each Artifact** accepts a reference manifest and supports bounded content mode or scoped progressive access. Both steps expose bottom **Process** and **Processing result** connectors plus ordinary completed/error continuations. Their branches may contain Agents, Tools, functions and child Flows. Execution uses the existing causal implicit child runs.
+
+See [ADR-0233](../decisions/0233-native-function-catalogue-and-explicit-iteration.md) and [Artifact processing](artifact-transformations.md).

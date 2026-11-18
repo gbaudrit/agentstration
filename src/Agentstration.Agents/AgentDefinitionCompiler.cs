@@ -82,7 +82,9 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             agent.InputSchema,
             agent.OutputSchema
         };
-        var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(canonical))).ToLowerInvariant();
+        var canonicalBytes = JsonSerializer.SerializeToUtf8Bytes(canonical);
+        if (agent.OutputContract is not null) canonicalBytes = [.. canonicalBytes, .. JsonSerializer.SerializeToUtf8Bytes(agent.OutputContract)];
+        var hash = Convert.ToHexString(SHA256.HashData(canonicalBytes)).ToLowerInvariant();
 
         return new ResolvedAgentDefinition
         {
@@ -107,7 +109,8 @@ public sealed class AgentDefinitionCompiler : IAgentDefinitionCompiler
             Handler = agent.Handler,
             DefinitionHash = hash,
             InputSchema = agent.InputSchema?.Clone(),
-            OutputSchema = agent.OutputSchema?.Clone()
+            OutputSchema = (agent.OutputSchema ?? (agent.OutputContract is { Mode: Agentstration.Schemas.DataContractMode.Fixed } ? agent.OutputContract.Schema : null))?.Clone(),
+            OutputContract = agent.OutputContract
         };
     }
 

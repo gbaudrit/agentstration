@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+</Project>

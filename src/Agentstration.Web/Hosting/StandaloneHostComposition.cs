@@ -123,8 +123,17 @@ internal static class StandaloneHostCompositionExtensions
         builder.Services.AddAgentstration(new AgentstrationCompositionOptions
         {
             DataDirectory = dataDirectory,
+            LocalStorageRootDirectory = builder.Configuration[Agentstration.Infrastructure.Storage.LocalStorageOptions.ConfigurationKey],
             Ai = aiOptions,
             Storage = storageOptions,
+            StorageContent = builder.Configuration.GetSection(Agentstration.Storage.StorageContentOptions.SectionName)
+                .Get<Agentstration.Storage.StorageContentOptions>() ?? new(),
+            DataSourceContent = builder.Configuration.GetSection(Agentstration.DataSources.DataSourceContentOptions.SectionName)
+                .Get<Agentstration.DataSources.DataSourceContentOptions>() ?? new(),
+            FunctionContent = builder.Configuration.GetSection(Agentstration.Functions.FunctionContentOptions.SectionName)
+                .Get<Agentstration.Functions.FunctionContentOptions>() ?? new(),
+            FlowContent = builder.Configuration.GetSection(Agentstration.Flows.Application.FlowContentOptions.SectionName)
+                .Get<Agentstration.Flows.Application.FlowContentOptions>() ?? new(),
             ControlPlaneConnectionString = controlPlaneConnectionString,
             WorkPlaneConnectionString = workPlaneConnectionString,
             FlowConnectionString = flowConnectionString,

@@ -27,3 +27,6 @@
 .access-details p { color: var(--muted); font-size: var(--font-size-sm); }
 @media (max-width: 960px) { .access-grant-heading { display: none; } .access-grant { grid-template-columns: 1fr; align-items: stretch; } .access-grant > button { justify-self: start; } }
 @media (max-width: 620px) { .access-identity-grid, .access-governance-grid { grid-template-columns: 1fr; } }
+
+.access-evaluation { display: grid; gap: var(--space-3); min-width: 0; }
+.access-evaluation .resource-details dd, .access-current-policy li { overflow-wrap: anywhere; }

@@ -6,18 +6,18 @@
 
 <PageTitle>@T("DataSources") · Agentstration</PageTitle>
 <PageHeader Title="@T("DataSources")" Description="@T("DataSourcesHelp")" TestId="resource-data-sources">
-    <Actions><a class="button-primary" href="/data-sources/new">@T("Create")</a><a class="button-secondary" href="/data-source-profiles">@T("Profiles")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
+    <Actions><a class="button-primary" href="/data-sources/new?composition=dataset">@T("Create")</a><a class="button-secondary" href="/data-source-profiles">@T("Profiles")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
 </PageHeader>
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (error is not null) { <ErrorState Message="@error" /> }
-else if (items.Count == 0) { <EmptyState Title="@T("DataSources")" Message="@T("EmptySources")"><a class="button-primary" href="/data-sources/new">@T("Create")</a></EmptyState> }
+else if (items.Count == 0) { <EmptyState Title="@T("DataSources")" Message="@T("EmptySources")"><a class="button-primary" href="/data-sources/new?composition=dataset">@T("Create")</a></EmptyState> }
 else
 {
-    <CollectionView TItem="DataSourceResource" Items="items" InformationLabels="@(new string[] { T("Profile") })" IdentityLabel="@T("Name")" StateLabel="@T("State")">
+    <CollectionView TItem="DataSourceResource" Items="items" InformationLabels="@(new string[] { T("DatasetStorageOrProfile") })" IdentityLabel="@T("Name")" StateLabel="@T("State")">
         <Identity Context="item">
 <CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="item">
-            <CollectionValue Label="@T("Profile")"><code>@item.Definition.Profile.Name</code></CollectionValue>
+            <CollectionValue Label="@T("DatasetStorageOrProfile")"><code>@(item.Definition.Dataset is { Storage: null } ? T("DirectInput") : item.Definition.Dataset?.Storage?.Storage.Name ?? item.Definition.Profile?.Name)</code></CollectionValue>
         </Information>
         <Actions Context="item">
 <CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a class="text-button" href="@Url(item)">@T("Open")</a></CollectionActions></Actions>

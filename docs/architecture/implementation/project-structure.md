@@ -39,3 +39,10 @@ docs/
 ```
 
 See [Architecture: current implementation](current-state.md#solution-tree) for the complete project-by-project inventory.
+
+## Storage resource family
+
+`Agentstration.Storage.Contracts`, `Agentstration.Storage` and
+`Agentstration.Storage.Api` own selectable Storages and governed immutable types.
+See [the Storage vertical](storage-vertical.md) for project dependencies and
+composition. Provider adapters belong to Infrastructure and FR #1040.

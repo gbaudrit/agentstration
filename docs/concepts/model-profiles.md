@@ -4,4 +4,8 @@ A Model Profile expresses portable inference intent—such as generation, reason
 
 Profiles remain structurally distinct from Runtime Profiles: model intent and runtime behavior (sessions, tool invocation, or streaming) evolve through different resources.
 
+Generic reasoning settings apply to both chat and streaming, including execution through an AWP Worker. With Ollama, `Disabled` sends native `think: false`; `Automatic` leaves `think` unset so the provider keeps its defaults. `Enabled` sends `think: true`, or `"low"`, `"medium"`, or `"high"` when that effort is selected. Effort levels require a compatible Ollama model; `Minimal` has no native Ollama equivalent and retains boolean enablement. Effort is ignored when reasoning is disabled or automatic.
+
+An explicit native `think` value in the Model Profile's versioned Ollama options takes precedence over generic reasoning, including a conflicting `Disabled` setting. Remove that native value to let the generic mode control thinking. Other native settings, such as `contextSize`, apply independently.
+
 An AWP Worker rejects an Agent execution that ends without final text, including after successful Tool calls. When the last model response reports `finishReason: length`, the failure code is `model_output_token_limit`; review the output token budget and reasoning settings. Other empty final responses fail with `model_empty_response`. The failure propagates to a direct Runtime Run or the Agent step of a Flow, where an explicit error transition may handle it. The worker retains the finish reason and content counts in diagnostics without logging model content. Intermediate Tool calls remain valid, and nonempty partial responses are preserved.

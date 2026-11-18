@@ -113,4 +113,12 @@
 <data name="SaveBeforeApply"><value>Enregistrez vos modifications avant d’appliquer la configuration.</value></data>
 <data name="YamlFormInvalid"><value>Le formulaire contient des valeurs incomplètes ou invalides. Ce YAML reste en lecture seule et conserve la dernière définition valide. Corrigez les champs dans Définition pour le modifier ou l’enregistrer.</value></data>
 <data name="YamlNeedsValidForm"><value>Complétez les champs invalides dans Définition avant d’ouvrir le YAML.</value></data>
-<data name="InspectTool" xml:space="preserve"><value>Consulter</value></data></root>
+<data name="InspectTool" xml:space="preserve"><value>Consulter</value></data>
+  <data name="OutputInstructionHelp" xml:space="preserve"><value>Le schéma de sortie déclaré est ajouté aux instructions système de l’invocation et la réponse est validée. Sans schéma fixe, la résolution dynamique doit être sélectionnée explicitement.</value></data>
+  <data name="OutputResolution" xml:space="preserve"><value>Résolution du contrat de sortie</value></data>
+  <data name="OutputResolution.Absent" xml:space="preserve"><value>Non déclaré ; accepter l’attente de l’invocation parente</value></data>
+  <data name="OutputResolution.Input" xml:space="preserve"><value>Dynamique : hériter du contrat de la donnée d’entrée</value></data>
+  <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamique : utiliser l’attente de sortie du parent</value></data>
+  <data name="OutputMediaType" xml:space="preserve"><value>Type MIME de sortie (facultatif)</value></data>
+  <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixe : schéma ou type MIME déclaré</value></data>
+</root>

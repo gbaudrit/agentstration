@@ -40,7 +40,7 @@ public sealed partial class SharedFormAdoptionTests
                 || NativeControlOwners.Contains(relative)) continue;
             foreach (Match control in NativeControls().Matches(File.ReadAllText(file)))
             {
-                if (SpecializedNativeControl().IsMatch(control.Value)) continue;
+                if (SpecializedNativeControl().IsMatch(control.Value) || IsSpecializedEditorControl(relative, control.Value)) continue;
                 if (file.EndsWith(".cshtml", StringComparison.Ordinal)
                     && (control.Value.Contains("clear-label=", StringComparison.Ordinal)
                         || control.Value.Contains("asp-for=\"Input.RememberMe\"", StringComparison.Ordinal))) continue;
@@ -48,6 +48,29 @@ public sealed partial class SharedFormAdoptionTests
             }
         }
         Assert.IsEmpty(violations, "Ordinary form fields must share labels, validation and in-field clearing.\n" + string.Join('\n', violations));
+    }
+
+    private static bool IsSpecializedEditorControl(string path, string control)
+    {
+        // This listbox owns its keyboard, active descendant and free-expression
+        // behavior; replacing its input with InputBase would split that protocol.
+        if (path == "src/Agentstration.Web.FlowDesigner/Components/FlowDataMappingEditor.razor"
+            && control.StartsWith("<input ", StringComparison.Ordinal)
+            && control.Contains("role=\"combobox\"", StringComparison.Ordinal)
+            && control.Contains("aria-autocomplete=\"list\"", StringComparison.Ordinal)) return true;
+        // An explicit empty-string commit differs from no literal. InputBase
+        // suppresses equal empty values; this field retains its explicit clear action.
+        if (path == "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor"
+            && control.StartsWith("<input id=\"@literalId\"", StringComparison.Ordinal)
+            && control.Contains("@onchange=\"LiteralChangedAsync\"", StringComparison.Ordinal)) return true;
+        // Read-only YAML viewers expose the complete document for selection and
+        // copying; they are not editable form fields and must never show clearing.
+        return path is "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor"
+                or "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor"
+                or "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor"
+            && control.StartsWith("<textarea ", StringComparison.Ordinal)
+            && control.Contains(" readonly ", StringComparison.Ordinal)
+            && control.Contains("aria-label=", StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"<(?:input|textarea|select|InputText(?:Area)?|InputNumber|InputSelect|InputCheckbox)\b[^>]*>", RegexOptions.CultureInvariant)]

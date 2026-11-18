@@ -2,6 +2,8 @@ import { inspectCollections, type InspectCollectionsInput } from './inspect-coll
 import { exerciseSharedForm, type ExerciseSharedFormInput } from './exercise-shared-form.journey.js';
 import { exerciseFormAdapter, type ExerciseFormAdapterInput } from './exercise-form-adapter.journey.js';
 import { exerciseFormWorkflow, type ExerciseFormWorkflowInput } from './exercise-form-workflow.journey.js';
+import { exerciseSourceComposition } from './exercise-source-composition.journey.js';
+import { exerciseSourcePolicies } from './exercise-source-policies.journey.js';
 import { exerciseOrganizationStructure, type ExerciseOrganizationStructureInput } from './exercise-organization-structure.journey.js';
 import { inspectAcquisitionFailure } from './inspect-acquisition-failure.journey.js';
 import { administerGovernedToolSets } from './administer-governed-toolsets.journey.js';
@@ -90,6 +92,8 @@ export const journeys: Readonly<Record<string, Journey<Record<string, unknown>>>
   'inspect-runtime-worker-observability': (context, input) => inspectRuntimeWorkerObservability(context, input as unknown as InspectRuntimeWorkerObservabilityInput),
   'inspect-agent-instance-observability': (context, input) => inspectAgentInstanceObservability(context, input as unknown as InspectAgentInstanceObservabilityInput),
   'inspect-acquisition-failure': (context, input) => inspectAcquisitionFailure(context, input),
+  'exercise-source-composition': (context, input) => exerciseSourceComposition(context, input),
+  'exercise-source-policies': (context, input) => exerciseSourcePolicies(context, input),
   'administer-data-sources': (context, input) => administerDataSources(context, input),
   'project-knowledge-sources': (context, input) => projectKnowledgeSources(context, input),
   'exercise-schema-driven-sources': (context, input) => exerciseSchemaDrivenSources(context, input as unknown as ExerciseSchemaDrivenSourcesInput),

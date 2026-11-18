@@ -282,3 +282,40 @@ See [the form coverage report](../../docs/ux/couverture-formulaires/README.md) f
 locale/theme/viewport matrix, isolated fixtures and limits. `formContract` in the application
 catalog is independent of complete business-journey coverage. The alternate Console BFF login
 reuses the unit-tested static adapter; the browser fixture launches the canonical host.
+### Source content policies and configurable Flow sequences
+
+`source-policies.spec.ts` adds the focused deltas from #1116 and #1118 on top of
+source-lifecycle coverage. `exercise-source-policies` saves/reopens direct and
+retained input policies, advances acquisition and Snapshot freshness independently,
+forces a failed refresh, checks explicit age-bounded fallback, and observes history
+retirement while the active Snapshot survives. `exercise-source-composition` edits
+a typed point in the Designer, verifies fixed anonymization and empty identity,
+reorders two parameterized children, rejects an incompatible selection without
+losing the draft, and checks independent input/global sequences and failed output.
+Both journeys have en-US/fr-FR desktop and mobile test cases and catalog entries.
+
+The composition journey includes a 20,000-character retained synthetic dataset and
+explicit standard Knowledge orchestration with an empty `postAggregate` sequence.
+It exercises projection envelopes larger than the separate saved-parameter budget.
+It also creates a typed transformation from the Definition, verifies that Enter
+does not save pending source edits, publishes it in a separate Designer tab,
+refreshes candidates, saves the binding and successfully projects its output.
+The `source-transformation-draft-created` checkpoint captures the creation state.
+
+The isolated `SourcePolicyHost` fixture exposes a loopback-only control endpoint
+protected by a random per-campaign key. It advances only lifecycle/local Storage
+clocks; worker registration and runtime assignment clocks remain real. Its write
+failure is synthetic and does not contact an external provider. Fixture control
+routes exist only in the automation executable, never the product host. Build the
+Release solution before a browser campaign and set
+`AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true` to freeze build outputs.
+
+```bash
+npm exec tsc -- --noEmit
+AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm exec playwright -- test source-policies.spec.ts
+```
+
+The maintainer explicitly requested this coverage in a child branch above the
+implementation PR #1131 before merge. This is a sequencing exception to the usual
+UX-validation gate, not approval of the implemented UX. #1116/#1118 and the draft
+PRs stay open pending review and merge.

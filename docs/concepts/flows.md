@@ -17,3 +17,22 @@ The Console renders manual execution input from the schema of the selected immut
 The browser editor accepts schemas up to 64 KiB, values up to 64 KiB, eight levels of nesting, 128 generated fields, and 100 rendered collection items. A missing or free-form schema, a non-object root, or an unsupported semantic construct such as `$ref`, `oneOf`, `anyOf`, `allOf`, conditionals, schema-valued `additionalProperties`, tuple arrays, or an unknown format uses the raw JSON fallback for the complete value. The fallback still requires a bounded JSON object. Switching published versions preserves the current value, reports incompatibilities against the newly selected schema, and never resets input implicitly. Client-side feedback does not replace authoritative validation by the Flow API.
 
 See [Flow definitions](../flow.md) and the [Flow execution architecture](../architecture/flow-execution.md).
+
+## Processing regions and work units
+
+A step can expose a private `process` region. Its executor chooses the work units;
+each unit runs the complete connected chain as a child Flow Run of one immutable,
+derived definition. Authors connect ordinary Agents, Tools and named Flows directly,
+then return the result to the owning step. No extra Flow publication is needed.
+
+Artifact transformation creates one unit per Artifact. An ordinary Transform can
+optionally partition an array into batches or text into bounded fragments. The
+Designer configuration selects that mode, unit size and maximum parallelism. A
+Transform returns unit results in input order as an array; an Artifact transformation
+returns its Artifact manifest after preparation and finalization.
+
+Process runs appear under their owning step in Causality. Their source Flow/version
+remains visible separately. History defaults to Flow invocations and historical runs;
+its execution-kind filter also exposes process units or all executions. Each unit has
+its own scoped run link, output inspection, status and original-failure link. Unknown
+historical origins are not inferred from names or inherited Artifact access.

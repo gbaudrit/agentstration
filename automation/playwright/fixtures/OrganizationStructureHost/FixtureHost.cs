@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -21,7 +22,8 @@ internal static class FixtureHost
         await using var factory = new StructureFactory();
         var address = new Uri(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
             ?? throw new InvalidOperationException("The browser fixture requires ASPNETCORE_URLS."));
-        factory.UseKestrel(address.Port);
+        // Configure before Build; UseKestrel(port) mutates addresses after the minimal app can start.
+        factory.UseKestrel(options => options.Listen(IPAddress.Loopback, address.Port));
         factory.StartServer();
         var lifetime = factory.Services.GetRequiredService<IHostApplicationLifetime>();
         using var services = factory.Services.CreateScope();

@@ -37,4 +37,11 @@
   <data name="Trigger.Flow"><value>Flow</value></data>
   <data name="Trigger.Schedule"><value>Schedule</value></data>
   <data name="Trigger.Event"><value>Event</value></data>
+  <data name="ProcessRun" xml:space="preserve"><value>Process of {0} — Unit {1}</value></data>
+  <data name="SourceFlow" xml:space="preserve"><value>Source Flow</value></data>
+  <data name="ExecutionKind" xml:space="preserve"><value>Execution kind</value></data>
+  <data name="NamedRuns" xml:space="preserve"><value>Flow invocations and history</value></data>
+  <data name="ProcessRuns" xml:space="preserve"><value>Process units</value></data>
+  <data name="AllRunKinds" xml:space="preserve"><value>All executions</value></data>
+  <data name="InvalidExecutionScope" xml:space="preserve"><value>The execution scope is invalid.</value></data>
 </root>

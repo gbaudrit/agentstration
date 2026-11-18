@@ -55,7 +55,12 @@ test('all-form inventory has explicit field or family regression ownership @smok
   const inventory = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'docs/ux/formulaires-tous-ecrans/inventory.json'), 'utf8')) as { screens: { path: string }[] };
   expect(formAdoptionCoverage.map(value => value.source).sort()).toEqual(inventory.screens.map(value => value.path).sort());
   for (const form of formAdoptionCoverage) {
-    expect(form.specifications.length).toBeGreaterThan(0);
+    if (form.kind === 'pending') {
+      expect(form.trackingIssue).toBe(1122);
+      expect(form.specifications).toEqual([]);
+    } else {
+      expect(form.specifications.length).toBeGreaterThan(0);
+    }
     for (const specification of form.specifications) expect(fs.existsSync(path.join(automationRoot, specification))).toBe(true);
     const surfaces = applicationSurfaces.filter(surface => surface.source === form.source);
     if (form.kind === 'server-adapter') {

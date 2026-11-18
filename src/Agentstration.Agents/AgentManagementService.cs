@@ -650,12 +650,23 @@ public sealed class AgentManagementService(
         }
         ValidateSchema(definition.InputSchema, definition.InputSchemaBinding, "input");
         ValidateSchema(definition.OutputSchema, definition.OutputSchemaBinding, "output");
+        if (definition.OutputContract is { } contract)
+        {
+            try { Agentstration.Schemas.DataContracts.ValidateDefinition(contract, "agent-output"); }
+            catch (Agentstration.Schemas.DataContractException exception)
+            { throw new AgentDefinitionValidationException(exception.Code, exception.Message); }
+            if ((definition.OutputSchema is not null || definition.OutputSchemaBinding is not null) && contract.Mode is Agentstration.Schemas.DataContractMode.Dynamic or Agentstration.Schemas.DataContractMode.Absent)
+                throw new AgentDefinitionValidationException("agent_output_contract_conflict", "An explicit output schema cannot be combined with dynamic output.");
+        }
     }
 
     private static void ValidateSchema(JsonElement? schema, SchemaBinding? binding, string direction)
     {
         if (schema is { ValueKind: not JsonValueKind.Object })
             throw new AgentDefinitionValidationException($"agent_{direction}_schema_invalid", $"The Agent {direction} schema must be a JSON object.");
+        try { _ = Agentstration.Schemas.DataContracts.Declared(schema, "agent-" + direction); }
+        catch (Agentstration.Schemas.DataContractException exception)
+        { throw new AgentDefinitionValidationException($"agent_{direction}_schema_invalid", exception.Message); }
         if (binding is { Inline: null, Reference: null } or { Inline: not null, Reference: not null })
             throw new AgentDefinitionValidationException("schema_binding_invalid", $"The Agent {direction} contract must select exactly one Schema binding form.");
     }

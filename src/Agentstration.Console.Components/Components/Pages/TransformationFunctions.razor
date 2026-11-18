@@ -1,0 +1,81 @@
+@page "/transformation-functions"
+@page "/function-kinds"
+@implements IDisposable
+@using Agentstration.Functions.Contracts
+@inject ITransformationFunctionsClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="transformation-functions">
+    <Actions><button type="button" class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button>
+    @if (Context.HasPermission("resources/write")) { <a class="button-primary" href="@ScopedUri("/transformation-functions/new")">@T("Create")</a> }</Actions>
+</PageHeader>
+@if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else
+{
+    <section class="panel form-section">
+        <h2>@T("Kinds")</h2>
+        <CollectionView TItem="FunctionKindResource" Items="kinds" IdentityLabel="@T("Kinds")" InformationLabels="@(new[] { T("Version") })" IsExpanded="@(kind => expandedKinds.Contains(KindKey(kind)))">
+            <Identity Context="kind"><CollectionIdentity DisplayName="@kind.Definition.DisplayName" Namespace="@kind.Namespace.Value" Name="@kind.Name" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="kind.ScopeRef" IconOnly /><StatusBadge Text="@T(kind.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(kind.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@kind.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(kind.ScopeRef, Services))" IconOnly /></IconBadges><Badges>@if (kind.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <small>@T("BuiltIn")</small> }</Badges></CollectionIdentity></Identity>
+            <Information Context="kind"><CollectionValue Label="@T("Version")">@string.Join(", ", kind.Definition.Versions.Select(value => value.Version))</CollectionValue></Information>
+            <Actions Context="kind"><button type="button" class="button-secondary" aria-expanded="@(expandedKinds.Contains(KindKey(kind)).ToString().ToLowerInvariant())" @onclick="() => ToggleKindDetails(kind)">@T("Details")</button>
+                @if (!kind.Governance.IsManaged && ResourceOwnershipContext.CanManage(kind.ScopeRef, Services) && Context.HasPermission("resources/write"))
+                { <button type="button" class="button-secondary" disabled="@loading" @onclick="() => ToggleKindAsync(kind)">@T(kind.Definition.Enabled ? "Disable" : "Enable")</button> }
+            </Actions>
+            <Details Context="kind"><ul class="collection-specialized">@foreach (var descriptor in kind.Definition.Versions)
+                { <li><CollectionIdentity DisplayName="@descriptor.Version" Name="@descriptor.Version" IconName="cube"><Badges><code>@descriptor.Executor</code></Badges></CollectionIdentity><SchemaDocumentEditor Value="descriptor.DefinitionSchema" ReadOnly="true" /></li> }</ul></Details>
+        </CollectionView>
+    </section>
+    <section class="panel form-section">
+        <h2>@T("Functions")</h2>
+        @if (items.Count == 0) { <p>@T("Empty")</p> }
+        <CollectionView TItem="TransformationFunctionResource" Items="items" IdentityLabel="@T("Functions")" InformationLabels="@(new[] { T("Version"), T("FunctionDescription") })" RowTestId="transformation-function-row">
+            <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="cube"><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges><Badges>@if (item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <small>@T("BuiltIn")</small> }</Badges></CollectionIdentity></Identity>
+            <Information Context="item"><CollectionValue Label="@T("Version")">@string.Join(", ", item.Definition.Versions.Select(value => value.Version))</CollectionValue><CollectionValue Label="@T("FunctionDescription")"><FunctionDescription Description="@item.Definition.Description" ImplementationId="@ImplementationId(item)" BuiltIn="@(item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn)" /></CollectionValue></Information>
+        </CollectionView>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<TransformationFunctionResource> items = [];
+    private IReadOnlyList<FunctionKindResource> kinds = [];
+    private bool loading;
+    private Exception? error;
+    private string T(string key) => Localizer[key];
+    private static string? ImplementationId(TransformationFunctionResource resource) => resource.Definition.Versions.LastOrDefault()?.Configuration is { ValueKind: JsonValueKind.Object } configuration
+        && configuration.TryGetProperty("implementation", out var implementation) && implementation.TryGetProperty("id", out var id)
+        && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+    private readonly HashSet<string> expandedKinds = [];
+    private static string KindKey(FunctionKindResource kind) => $"{kind.ScopeRef}|{kind.Namespace}|{kind.Name}";
+    private void ToggleKindDetails(FunctionKindResource kind) { if (!expandedKinds.Add(KindKey(kind))) expandedKinds.Remove(KindKey(kind)); }
+    private ResourceScopeRef? Owner => ResourceOwnershipContext.TryGetCurrent(Services);
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { items = await Client.ListAsync(Owner, cancellation.Token); kinds = await Client.ListKindsAsync(Owner, cancellation.Token); }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { loading = false; }
+    }
+    private async Task ToggleKindAsync(FunctionKindResource kind)
+    {
+        loading = true; error = null;
+        try
+        {
+            var snapshot = await Client.GetKindAsync(new(kind.Name, "", kind.ScopeRef, kind.Namespace), cancellation.Token);
+            await Client.SaveKindAsync(snapshot.Value with { Definition = snapshot.Value.Definition with { Enabled = !snapshot.Value.Definition.Enabled } }, snapshot.ETag, cancellation.Token);
+            await LoadAsync();
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
+        finally { loading = false; }
+    }
+    private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
+    private string Url(TransformationFunctionResource resource) => ScopedUri("/transformation-functions/" + Uri.EscapeDataString(resource.Name)
+        + "?scopeRef=" + Uri.EscapeDataString(resource.ScopeRef!.Value.Value) + "&namespace=" + Uri.EscapeDataString(resource.Namespace.Value));
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+}

@@ -28,7 +28,7 @@ public interface IAepSourceProvidersClient
     AepSourceProviderClient CreateSourceProvider(string providerId);
 }
 
-public sealed class AepClient(
+public sealed partial class AepClient(
     HttpClient httpClient,
     IAepAccessTokenProvider? accessTokenProvider = null,
     AepTransportSecurityOptions? transportOptions = null,
@@ -243,15 +243,31 @@ public sealed class AepClient(
         }
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body, CancellationToken cancellationToken,
+        long? maximumResponseBytes = null)
     {
         using var request = new HttpRequestMessage(method, ResolveProtocolUri(path));
         if (body is not null) request.Content = JsonContent.Create(body, options: AepProtocol.JsonOptions);
         await ApplyAccessTokenAsync(request, cancellationToken);
         HttpResponseMessage response;
-        try { response = await httpClient.SendAsync(request, cancellationToken); }
+        try { response = await httpClient.SendAsync(request, maximumResponseBytes.HasValue ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead, cancellationToken); }
         catch (HttpRequestException exception) { throw new AepProtocolException("extension_unreachable", "The AEP extension is unreachable.", innerException: exception); }
-        await EnsureSuccessAsync(response, cancellationToken);
+        try
+        {
+            if (maximumResponseBytes is { } limit)
+                await response.Content.LoadIntoBufferAsync(limit, cancellationToken);
+            await EnsureSuccessAsync(response, cancellationToken);
+        }
+        catch (HttpRequestException exception) when (maximumResponseBytes.HasValue)
+        {
+            response.Dispose();
+            throw new AepProtocolException("response_too_large", "The AEP response exceeded its configured size limit.", innerException: exception);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
         return response;
     }
 

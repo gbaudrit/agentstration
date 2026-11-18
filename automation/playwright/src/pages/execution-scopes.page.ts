@@ -229,6 +229,8 @@ export class ExecutionScopesPage {
       }, { timeout: 90_000 }).toBe('agent_model_profile_unavailable');
 
       const error = this.runError;
+      await expect(error).not.toContainText('agent_model_profile_unavailable');
+      await error.getByRole('button', { name: ExpectedTextByLocale['en-US'].flowDiagnostics.showErrorDetails, exact: true }).click();
       await expect(error).toContainText('agent_model_profile_unavailable');
       await expect(error).toContainText(ExpectedTextByLocale['en-US'].flowDiagnostics.modelProfileUnavailable);
       await expect(error).toContainText(fixture.modelProfileName);
@@ -238,6 +240,8 @@ export class ExecutionScopesPage {
       await this.page.request.get(`${consoleUrl}/_culture?culture=fr-FR&returnUrl=%2F`);
       await this.open(this.page.url(), TestIds.flowObservability.runDetails);
       const localizedError = this.runError;
+      await expect(localizedError).not.toContainText('agent_model_profile_unavailable');
+      await localizedError.getByRole('button', { name: ExpectedTextByLocale['fr-FR'].flowDiagnostics.showErrorDetails, exact: true }).click();
       await expect(localizedError).toContainText('agent_model_profile_unavailable');
       await expect(localizedError).toContainText(ExpectedTextByLocale['fr-FR'].flowDiagnostics.modelProfileUnavailable);
       await expect(localizedError).toContainText(fixture.modelProfileName);

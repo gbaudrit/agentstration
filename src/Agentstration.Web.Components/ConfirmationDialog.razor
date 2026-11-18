@@ -5,7 +5,7 @@
     <ModalFrame IsOpen="true" TitleId="@titleId" OnClose="CancelAsync" Role="alertdialog">
         <div data-testid="@TestId">
             <h2 id="@titleId">@(Title ?? Localizer["ConfirmTitle"])</h2><p>@(Message ?? Localizer["ConfirmMessage"])</p>
-            <FormActions Class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["Cancel"]</button><button type="button" class="button-danger" @onclick="ConfirmAsync" data-testid="@(TestId is null ? null : $"{TestId}-confirm")">@(ConfirmLabel ?? Localizer["Confirm"])</button></FormActions>
+            <FormActions Class="dialog-actions"><button type="button" class="button-secondary" @onclick="CancelAsync">@(CancelLabel ?? Localizer["Cancel"])</button><button type="button" class="button-danger" @onclick="ConfirmAsync" data-testid="@(TestId is null ? null : $"{TestId}-confirm")">@(ConfirmLabel ?? Localizer["Confirm"])</button></FormActions>
         </div>
     </ModalFrame>
 }
@@ -14,6 +14,7 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Message { get; set; }
+    [Parameter] public string? CancelLabel { get; set; }
     [Parameter] public string? ConfirmLabel { get; set; }
     [Parameter] public string? TestId { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }

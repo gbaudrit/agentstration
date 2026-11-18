@@ -4,6 +4,8 @@
 @inject IKnowledgeSourcesClient Client
 @inject IDataSourcesClient DataSources
 @inject IFlowApiClient Flows
+@inject IServiceProvider Services
+@using Agentstration.Storage.Contracts
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
 
@@ -19,38 +21,76 @@
 else
 {
     @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
-    <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section">
+    <EditForm Model="this" OnValidSubmit="RequestSaveAsync" FormName="knowledge-source-editor" class="panel form-section">
+        <fieldset class="resource-definition-fields" disabled="@(busy || !interactive)" data-testid="knowledge-source-definition-fields" data-interactive="@(interactive ? "true" : "false")">
+        @if (!IsNew) { <FormActions><button class="button-secondary" type="submit" disabled="@((enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))" data-testid="knowledge-rebind-dependencies" @onclick="() => rebindRequested = true">@T("RebindDependencies")</button></FormActions> }
         <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="knowledge-source-display-name" TechnicalNameTestId="knowledge-source-name" />
             @if (IsNew)
             {
                 <FormField Label="@T("Namespace")"><ClearableText @bind-Value="sourceNamespace" maxlength="128" /></FormField>
             }
-            <FormField Label="@T("SourceDescription")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
+            <FormField Label="@T("SourceDescription")" Optional="true" Class="form-span-2"><ClearableText Multiline @bind-Value="description" maxlength="2000" /></FormField>
             <label class="knowledge-choice form-span-2" data-testid="knowledge-source-editor-enabled-option"><FormCheckbox @bind-Value="enabled" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("ProjectionEnabledHelp")</small></span></label>
+            @if (HasNativeDatasetInput && savedOutput is null && string.IsNullOrEmpty(outputStorageKey)) { <p class="form-alert form-alert-info form-span-2" role="status">@T("NativeDatasetDraftHelp")</p> }
+            <FormField Label="@T("OutputStorage")" Help="@T("OutputStorageHelp")" Class="form-span-2"><ClearableSelect TValue="string" Value="@outputStorageKey" ValueExpression="@(() => outputStorageKey)" ValueChanged="value => { outputStorageKey = value; outputCollectionUid = Guid.Empty; }" data-testid="knowledge-output-storage">
+                <option value="">@T("ArtifactOutputDefault")</option>
+                @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef</option> }
+                @if (savedOutput is not null && !storages.Any(value => StorageKey(value) == outputStorageKey)) { <option value="@outputStorageKey">@T("PinnedOutputStorage")</option> }
+            </ClearableSelect></FormField>
+            @if (SelectedOutputStorage is { } structuredStorage && (RequiresOutputCollection || structuredStorage.Definition.Collections.Count > 0))
+            {
+                <FormField Label="@T("StructuredOutputCollection")" Help="@T("StructuredOutputHelp")" Class="form-span-2"><ClearableSelect TValue="Guid" AllowClear="false" @bind-Value="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T(RequiresOutputCollection ? "StructuredOutputSelect" : "StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(CompatibleOutputCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
+                @if (!OutputCollectionValid)
+                {
+                    <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="knowledge-output-collection-required">@T("StructuredOutputRequired") <a href="@(StorageLinks.Details(structuredStorage) + "&view=definition")">@T("ConfigureOutputStorage")</a></p>
+                }
+            }
+            @if (!RequiresOutputCollection && outputCollectionUid == Guid.Empty)
+            {
+                <FormField Label="@T("OutputPrefix")" Help="@T("OutputPrefixHelp")" Class="form-span-2"><ClearableText UpdateOnInput="false" @bind-Value="outputPrefix" data-testid="knowledge-output-prefix" /></FormField>
+            }
             <FormField Label="@T("ProjectionFlow")" Required="true"><ClearableSelect TValue="string" @bind-Value="projectionFlowKey" required data-testid="knowledge-source-projection-flow"><option value="">@T("SelectProjectionFlow")</option>@foreach (var flow in projectionFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
-            <FormField Label="@T("RetrievalFlow")" Required="true"><ClearableSelect TValue="string" @bind-Value="retrievalFlowKey" required data-testid="knowledge-source-retrieval-flow"><option value="">@T("SelectRetrievalFlow")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
+            <FormField Label="@T("NativeLegacyRetrieval")" Help="@T("NativeLegacyRetrievalHelp")"><ClearableSelect TValue="string" @bind-Value="retrievalFlowKey" data-testid="knowledge-source-retrieval-flow"><option value="">@T("NativeNoRetrieval")</option>@foreach (var flow in retrievalFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
+            <div class="form-span-2" data-testid="knowledge-automatic-parameters"><span>@T("NativeAutomaticParameters")</span><JsonSchemaInputEditor Schema="AutomaticParametersSchema" Value="automaticParameters" ValueChanged="value => automaticParameters = value" ValidationChanged="state => automaticParametersValid = state.IsValid" Disabled="busy" /><small>@T("NativeAutomaticParametersHelp")</small></div>
+            <div class="form-span-2"><SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="projectionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
+                @if (lifecycleEnabled) { <label class="knowledge-choice"><FormCheckbox @bind-Value="allowExpiredFallback" data-testid="knowledge-expired-fallback" /><span>@T("AllowExpiredFallback")</span></label> }
+            </div>
+            <div class="form-span-2"><SourceFlowCompositionEditor Boundary="projection" StandardPoint="postAggregate" @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="busy" /></div>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
                 <div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><button class="button-secondary" type="button" @onclick="AddBinding">@T("AddDataSource")</button></div>
                 @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
                 @foreach (var binding in bindings)
                 {
                     <div class="form-grid knowledge-binding-card" data-testid="knowledge-source-binding">
-                        <FormField Label="@T("BindingName")"><ClearableText @bind-Value="binding.Name" maxlength="128" /></FormField>
+                        <FormField Label="@T("BindingName")"><ClearableText UpdateOnInput="false" @bind-Value="binding.Name" maxlength="128" /></FormField>
+                        <FormField Label="@T("ContributionDescription")" Help="@T("ContributionDescriptionHelp")"><ClearableText Multiline @bind-Value="binding.Description" placeholder="@InheritedDescription(binding)" maxlength="2000" rows="2" /></FormField>
                         <FormField Label="@T("DataSource")" Required="true"><ClearableSelect TValue="string" Value="@binding.DataSourceKey" ValueExpression="@(() => binding.DataSourceKey)" ValueChanged="value => ChangeDataSourceAsync(binding, new ChangeEventArgs { Value = value })" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</ClearableSelect></FormField>
                         @if (TargetOptions(binding).Count > 0) { <FormField Label="@T("AcquisitionTarget")" Required="true"><ClearableSelect TValue="string" @bind-Value="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</ClearableSelect></FormField> }
                         <FormField Label="@T("TransformationFlowOptional")"><ClearableSelect TValue="string" @bind-Value="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
+                        <div class="form-span-2"><FlowSequenceEditor Title="@T("BindingTransformations")" @bind-Value="binding.Transformations" TemplateFlow="TransformationSequence" ReadOnly="@(busy || !string.IsNullOrEmpty(binding.TransformationFlowKey))" /></div>
                         <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
-                        <FormField Label="@T("MaximumAge")" Help="@T("MaximumAgeHelp")"><ClearableText Type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind-Value="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /></FormField>
+                        <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.AllowStaleOnRefreshFailure" disabled="@IsDirectBinding(binding)" data-testid="knowledge-binding-fallback" /><span>@T("AllowInputFallback")</span></label>
+                        @if (binding.AllowStaleOnRefreshFailure) { <FormField Label="@T("InputFallbackAge")" Help="@T("InputFallbackAgeHelp")"><ClearableText UpdateOnInput="false" @bind-Value="binding.MaximumFallbackAgeText" placeholder="hh:mm:ss" data-testid="knowledge-binding-fallback-age" /></FormField> }
+                        @if (!FallbackValid(binding)) { <p class="form-alert form-alert-danger" role="alert">@T("FallbackInvalid")</p> }
+                        @if (HasInputLifecycle(binding)) { <p class="form-span-2">@T("DataSourceOwnsFreshness")</p> }
+                        else
+                        {
+                        <label class="knowledge-choice"><FormCheckbox @bind-Value="binding.RefreshIfNecessary" data-testid="knowledge-binding-refresh" /><span>@T("RefreshIfNecessary")</span></label>
+                        <FormField Label="@T("MaximumAge")" Help="@T("MaximumAgeHelp")"><ClearableText UpdateOnInput="false" type="text" inputmode="numeric" placeholder="hh:mm:ss" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" title="@T("MaximumAgeFormat")" @bind-Value="binding.MaximumAgeText" data-testid="knowledge-source-binding-maximum-age" /></FormField>
+                        }
                         <div class="form-span-2 knowledge-transformation-configuration" data-testid="knowledge-source-transformation-configuration"><span>@T("TransformationConfiguration")</span><JsonSchemaInputEditor Schema="TransformationConfigurationSchema(binding)" Value="binding.Configuration" ValueChanged="value => binding.Configuration = value" ValidationChanged="state => binding.ConfigurationValid = state.IsValid" Disabled="busy" /><small>@T("TransformationConfigurationHelp")</small></div>
-                        <div class="form-actions form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></div>
+                        <FormActions Class="form-span-2"><button class="text-button" type="button" @onclick="() => RemoveBinding(binding)">@T("Remove")</button></FormActions>
                     </div>
                 }
             </section>
         </FormGrid>
-        <FormActions><button class="button-primary" type="submit" data-testid="knowledge-source-save" disabled="@(busy || bindings.Any(value => !value.ConfigurationValid))">@(busy ? T("Saving") : T("Save"))</button></FormActions>
+        <FormActions><button class="button-primary" type="submit" data-testid="knowledge-source-save" @onclick="() => rebindRequested = false" disabled="@(busy || !interactive || (enabled && !automaticParametersValid) || !LifecycleValid || !OutputCollectionValid || bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value)))">@(busy ? T("Saving") : T("Save"))</button></FormActions>
+        </fieldset>
     </EditForm>
 }
+
+<ConfirmationDialog IsOpen="confirmRebind" Title="@T("RebindDependencies")" Message="@T("RebindDependenciesHelp")" ConfirmLabel="@T("ConfirmRebindDependencies")" CancelLabel="@T("Cancel")" OnConfirm="ConfirmRebindAsync" OnCancel="() => confirmRebind = false" TestId="knowledge-rebind-confirmation" />
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -59,17 +99,51 @@ else
     [Parameter] public EventCallback<KnowledgeSourceResource> Saved { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
+    private IReadOnlyList<StorageResource> storages = [];
+    private IReadOnlyList<StorageTypeResource> storageTypes = [];
+    private KnowledgeOutputStorage? savedOutput;
+    private string outputStorageKey = string.Empty, outputPrefix = string.Empty;
+    private static string StorageKey(StorageResource value) => $"{value.Uid}:{value.Generation}:{StorageDigests.Binding(value.Definition)}";
+    private Guid outputCollectionUid;
+    private StorageResource? SelectedOutputStorage => storages.FirstOrDefault(s => StorageKey(s) == outputStorageKey);
+    private bool RequiresOutputCollection => SelectedOutputStorage?.Definition.Type is { } type && storageTypes
+        .FirstOrDefault(t => t.Uid == type.TypeUid)?.Definition.Versions
+        .FirstOrDefault(v => v.Version == type.Version) is { Documents: not null, Capabilities.Write: false };
+    private static bool CompatibleOutputCollection(StorageDocumentCollection c) => c.Enabled && c.Policy.Get && c.Policy.Query && c.Policy.Publish;
+    private bool OutputCollectionValid => SelectedOutputStorage is null && savedOutput is not null
+        && outputCollectionUid == savedOutput.DocumentCollectionUid.GetValueOrDefault() || (outputCollectionUid == Guid.Empty ? !RequiresOutputCollection
+        : SelectedOutputStorage?.Definition.Collections.Any(c => c.Uid == outputCollectionUid && CompatibleOutputCollection(c)) == true);
+    private KnowledgeOutputStorage? OutputSelection()
+    {
+        if (string.IsNullOrEmpty(outputStorageKey)) return null;
+        if (savedOutput is not null && outputStorageKey == $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}")
+            return savedOutput with { Rule = savedOutput.Rule with { Prefix = outputPrefix }, DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
+        var selected = storages.Single(value => StorageKey(value) == outputStorageKey);
+        return new(new(new(selected.ScopeRef!.Value, selected.Namespace, selected.Kind, selected.Name), selected.Uid,
+            selected.Generation, StorageDigests.Binding(selected.Definition)), new(Write: true, Prefix: outputPrefix)) { DocumentCollectionUid = outputCollectionUid == Guid.Empty ? null : outputCollectionUid };
+    }
     private readonly Dictionary<string, IReadOnlyList<DataSourceAcquisitionTargetView>> acquisitionTargets = new(StringComparer.Ordinal);
     private IReadOnlyList<FlowOption> projectionFlows = [], retrievalFlows = [], transformationFlows = [];
     private readonly List<BindingModel> bindings = [];
     private string technicalName = string.Empty, sourceNamespace = "default", displayName = string.Empty,
         description = string.Empty, projectionFlowKey = string.Empty, retrievalFlowKey = string.Empty;
     private string? etag, message;
-    private bool enabled, busy, loading = true;
+    private JsonElement automaticParameters = JsonSerializer.SerializeToElement(new { });
+    private bool automaticParametersValid = true;
+    private static readonly FlowCallReference TransformationSequence = new("content-transformation-sequence-builtin", FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: ResourceScopeRef.Instance);
+    private JsonElement? AutomaticParametersSchema => JsonSchemaInputSchema.ObjectProperty(projectionFlows.FirstOrDefault(value => value.Key == projectionFlowKey)?.InputSchema, "parameters");
+    private bool enabled, busy, interactive, rebindDependencies, rebindRequested, confirmRebind, loading = true;
+    private bool HasNativeDatasetInput => bindings.Any(binding => dataSources.Any(source => source.Definition.Dataset is not null && DataSourceKey(source) == binding.DataSourceKey));
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private ResourceNamespace ExistingNamespace => ResourceNamespace.Parse(Namespace);
     private string DetailsUrl => ExistingNamespace.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(Name!)}" : $"/knowledge-sources/{Uri.EscapeDataString(Name!)}?namespace={Uri.EscapeDataString(ExistingNamespace.Value)}";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -81,6 +155,14 @@ else
             var flowsTask = LoadFlowsAsync();
             await Task.WhenAll(dataSourcesTask, flowsTask);
             dataSources = await dataSourcesTask;
+            if (Services.GetService(typeof(IStoragesClient)) is IStoragesClient storageClient
+                && ResourceOwnershipContext.TryGetCurrent(Services) is { } owner)
+            {
+                var storagesTask = storageClient.GetStoragesAsync(owner, cancellation.Token);
+                var typesTask = storageClient.GetTypesAsync(owner, cancellation.Token);
+                await Task.WhenAll(storagesTask, typesTask);
+                storages = await storagesTask; storageTypes = await typesTask;
+            }
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ExistingNamespace, Name!, cancellation.Token);
@@ -89,6 +171,19 @@ else
                 displayName = snapshot.Value.Definition.DisplayName;
                 description = snapshot.Value.Definition.Description ?? string.Empty;
                 enabled = snapshot.Value.Definition.Enabled;
+                lifecycleEnabled = snapshot.Value.Definition.Lifecycle is not null;
+                projectionTtl = LifecycleDuration.Format(snapshot.Value.Definition.Lifecycle?.TimeToLive);
+                keepHistory = snapshot.Value.Definition.Lifecycle?.KeepHistory == true;
+                historyRetention = LifecycleDuration.Format(snapshot.Value.Definition.Lifecycle?.HistoryRetention);
+                allowExpiredFallback = snapshot.Value.Definition.Lifecycle?.AllowExpiredOnRefreshFailure == true;
+                orchestration = snapshot.Value.Definition.Orchestration;
+                compositionPoints = snapshot.Value.Definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                if (snapshot.Value.Definition.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["postAggregate"] = snapshot.Value.Definition.Transformations };
+                automaticParameters = snapshot.Value.Definition.ProjectionParameters.Clone();
+                savedOutput = snapshot.Value.Definition.Output;
+                outputCollectionUid = savedOutput?.DocumentCollectionUid ?? Guid.Empty;
+                outputStorageKey = savedOutput is null ? string.Empty : $"{savedOutput.Storage.StorageUid}:{savedOutput.Storage.Generation}:{savedOutput.Storage.BindingDigest}";
+                outputPrefix = savedOutput?.Rule.Prefix ?? string.Empty;
                 projectionFlowKey = TargetKey(snapshot.Value.Definition.ProjectionFlow, snapshot.Value.Namespace);
                 retrievalFlowKey = TargetKey(snapshot.Value.Definition.RetrievalFlow, snapshot.Value.Namespace);
                 bindings.Clear();
@@ -99,7 +194,7 @@ else
             else
             {
                 projectionFlowKey = projectionFlows.FirstOrDefault(value => value.Name == "knowledge-projection-builtin")?.Key ?? string.Empty;
-                retrievalFlowKey = retrievalFlows.FirstOrDefault(value => value.Name == "knowledge-retrieval-builtin")?.Key ?? string.Empty;
+                retrievalFlowKey = string.Empty;
                 AddBinding();
             }
         }
@@ -107,9 +202,42 @@ else
         finally { loading = false; }
     }
 
+    private Task RequestSaveAsync()
+    {
+        if (!rebindRequested) return SaveAsync();
+        rebindRequested = false;
+        if (!busy && interactive && (!enabled || automaticParametersValid)
+            && LifecycleValid && !bindings.Any(value => !value.ConfigurationValid || value.TargetsLoadFailed || !FallbackValid(value))) confirmRebind = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmRebindAsync()
+    {
+        confirmRebind = false;
+        rebindDependencies = true;
+        try { await SaveAsync(); }
+        finally { rebindDependencies = false; }
+    }
+
+    private bool lifecycleEnabled, keepHistory, allowExpiredFallback;
+    private string projectionTtl = string.Empty, historyRetention = string.Empty;
+    private bool LifecycleValid => !lifecycleEnabled || LifecycleDuration.TryParse(projectionTtl, out _)
+        && (!keepHistory || LifecycleDuration.TryParse(historyRetention, out var retention) && retention is not null);
+    private KnowledgeProjectionPolicy? LifecycleSelection()
+    {
+        if (!lifecycleEnabled) return null;
+        _ = LifecycleDuration.TryParse(projectionTtl, out var ttl); _ = LifecycleDuration.TryParse(historyRetention, out var retention);
+        return new() { TimeToLive = ttl, KeepHistory = keepHistory, HistoryRetention = keepHistory ? retention : null, AllowExpiredOnRefreshFailure = allowExpiredFallback };
+    }
+    private bool HasInputLifecycle(BindingModel binding) => dataSources.Any(source => DataSourceKey(source) == binding.DataSourceKey && source.Definition.Dataset?.Lifecycle is not null);
+    private bool IsDirectBinding(BindingModel binding) => dataSources.Any(source => DataSourceKey(source) == binding.DataSourceKey && source.Definition.Dataset is { Storage: null });
+    private static bool FallbackValid(BindingModel binding) => !binding.AllowStaleOnRefreshFailure
+        || LifecycleDuration.TryParse(binding.MaximumFallbackAgeText, out var maximum) && maximum is not null;
+    private FlowCallReference? orchestration;
+    private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     private async Task SaveAsync()
     {
-        if (busy) return;
+        if (busy || !interactive || !LifecycleValid || !OutputCollectionValid || (enabled && !automaticParametersValid) || bindings.Any(value => value.TargetsLoadFailed || !FallbackValid(value))) return;
         busy = true;
         message = null;
         try
@@ -121,14 +249,18 @@ else
                 Enabled = enabled,
                 DataSources = bindings.Select(ToBinding).ToArray(),
                 ProjectionFlow = FlowTarget(projectionFlowKey),
-                RetrievalFlow = FlowTarget(retrievalFlowKey)
+                ProjectionParameters = automaticParameters.Clone(),
+                RetrievalFlow = FlowTarget(retrievalFlowKey),
+                Lifecycle = LifecycleSelection(), Orchestration = orchestration, Compositions = compositionPoints,
+                Output = OutputSelection()
             };
             var saved = IsNew
                 ? await Client.CreateAsync(new CreateKnowledgeSourceRequest(technicalName.Trim(), properties, sourceNamespace.Trim()), cancellation.Token)
-                : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties), etag!, cancellation.Token);
+                : await Client.UpdateAsync(ExistingNamespace, Name!, new PutKnowledgeSourceRequest(properties, rebindDependencies), etag!, cancellation.Token);
             if (Embedded)
             {
                 etag = saved.ETag;
+                rebindDependencies = false;
                 await Saved.InvokeAsync(saved.Value);
             }
             else
@@ -136,6 +268,17 @@ else
                 var ns = saved.Value.Namespace;
                 Navigation.NavigateTo(ns.IsDefault ? $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}" : $"/knowledge-sources/{Uri.EscapeDataString(saved.Value.Name)}?namespace={Uri.EscapeDataString(ns.Value)}");
             }
+        }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_fallback_invalid", StringComparison.Ordinal) == true)
+        { message = T("FallbackInvalid"); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_lifecycle_invalid", StringComparison.Ordinal) == true)
+        { message = T("LifecycleInvalid"); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType?.Contains("/storage_", StringComparison.Ordinal) == true
+            || exception.ProblemType?.Contains("/knowledge_output_", StringComparison.Ordinal) == true)
+        { message = T("OutputStorageInvalid"); }
+        catch (AgentstrationApiException exception) when (exception.ProblemType == "https://agentstration.dev/problems/knowledge_projection_dataset_input_unsupported")
+        {
+            message = T("NativeDatasetProjectionUnavailable");
         }
         catch (System.Text.Json.JsonException exception)
         {
@@ -162,6 +305,7 @@ else
         retrievalFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Retrieval).ToArray();
         transformationFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.ArtifactTransformation).ToArray();
     }
+    private string? InheritedDescription(BindingModel binding) => dataSources.FirstOrDefault(source => DataSourceKey(source) == binding.DataSourceKey)?.Definition.Description;
     private void AddBinding() => bindings.Add(new() { Name = $"input-{bindings.Count + 1}" });
     private void RemoveBinding(BindingModel binding) => bindings.Remove(binding);
     private KnowledgeDataSourceBinding ToBinding(BindingModel value)
@@ -172,8 +316,10 @@ else
         return new() { Name = value.Name.Trim(), DataSource = dataSource,
             AcquisitionTarget = string.IsNullOrWhiteSpace(value.AcquisitionTargetName) ? null
                 : new(value.AcquisitionTargetName, TargetOptions(value).Single(target => target.Target.Name == value.AcquisitionTargetName).Target.ScopeRef, dataSource.Namespace),
-            TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
-            MaximumAge = ParseMaximumAge(value.MaximumAgeText) };
+            Transformations = value.Transformations,
+            Description = value.Description, TransformationFlow = FlowTarget(value.TransformationFlowKey), Configuration = value.Configuration.Clone(), Required = value.Required,
+            MaximumAge = ParseMaximumAge(value.MaximumAgeText), RefreshIfNecessary = value.RefreshIfNecessary,
+            AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAge = value.AllowStaleOnRefreshFailure ? ParseMaximumAge(value.MaximumFallbackAgeText) : null };
     }
     private TimeSpan? ParseMaximumAge(string value)
     {
@@ -209,13 +355,22 @@ else
         return new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]));
     }
     private async Task ChangeDataSourceAsync(BindingModel binding, ChangeEventArgs args)
-    { binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; await LoadTargetsAsync(binding); }
+    { message = null; binding.DataSourceKey = args.Value?.ToString() ?? string.Empty; binding.AcquisitionTargetName = string.Empty; if (IsDirectBinding(binding)) { binding.AllowStaleOnRefreshFailure = false; binding.MaximumFallbackAgeText = string.Empty; } await LoadTargetsAsync(binding); }
     private async Task LoadTargetsAsync(BindingModel binding)
     {
+        binding.TargetsLoadFailed = false;
         if (string.IsNullOrWhiteSpace(binding.DataSourceKey) || acquisitionTargets.ContainsKey(binding.DataSourceKey)) return;
         var parts = binding.DataSourceKey.Split('|', 3);
-        acquisitionTargets[binding.DataSourceKey] = await DataSources.GetAcquisitionTargetsAsync(
-            ResourceNamespace.Parse(parts[1]), parts[2], ResourceScopeRef.Parse(parts[0]), cancellation.Token);
+        try
+        {
+            acquisitionTargets[binding.DataSourceKey] = await DataSources.GetAcquisitionTargetsAsync(
+                ResourceNamespace.Parse(parts[1]), parts[2], ResourceScopeRef.Parse(parts[0]), cancellation.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            binding.TargetsLoadFailed = true;
+            message = T("AcquisitionTargetsLoadFailed");
+        }
     }
     private IReadOnlyList<DataSourceAcquisitionTargetView> TargetOptions(BindingModel binding) =>
         acquisitionTargets.GetValueOrDefault(binding.DataSourceKey, []);
@@ -247,13 +402,19 @@ else
     }
     private sealed class BindingModel
     {
+        public string? Description { get; set; }
         public string Name { get; set; } = string.Empty;
         public string DataSourceKey { get; set; } = string.Empty;
         public string AcquisitionTargetName { get; set; } = string.Empty;
+        public IReadOnlyList<FlowCompositionCall> Transformations { get; set; } = [];
         public string TransformationFlowKey { get; set; } = string.Empty;
         public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
         public bool ConfigurationValid { get; set; } = true;
+        public bool TargetsLoadFailed { get; set; }
         public bool Required { get; set; } = true;
+        public bool RefreshIfNecessary { get; set; }
+        public bool AllowStaleOnRefreshFailure { get; set; }
+        public string MaximumFallbackAgeText { get; set; } = string.Empty;
         public string MaximumAgeText { get; set; } = string.Empty;
         public static BindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
         {
@@ -262,8 +423,12 @@ else
                 : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
             AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
             TransformationFlowKey = transformationFlowKey,
+            Transformations = value.Transformations,
+            Description = value.Description,
             Configuration = value.Configuration.Clone(),
             Required = value.Required,
+            RefreshIfNecessary = value.RefreshIfNecessary,
+            AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAgeText = LifecycleDuration.Format(value.MaximumFallbackAge),
             MaximumAgeText = FormatMaximumAge(value.MaximumAge)
         };
     }

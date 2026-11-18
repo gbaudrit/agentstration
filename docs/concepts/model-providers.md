@@ -127,4 +127,6 @@ $env:AGENTSTRATION_LLAMA_CPP_MODEL = "local-gguf"
 dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```
 
-For other Console resource editors, see [the value-binding editor integration guide](../contributing/value-binding-editor.md). The consumer supplies compatible options and owns conversion to its resource contract; the shared component returns an exact reference or typed literal. See [ADR-0192](../decisions/0192-typed-literal-model-provider-bindings.md) for the additive Model Provider literal contract.
+For other Console resource editors, see [the value-binding editor integration guide](../contributing/value-binding-editor.md). The consumer supplies compatible options and owns conversion to its resource contract; the shared component returns an exact reference or typed literal. See [ADR-0194](../decisions/0194-typed-literal-model-provider-bindings.md) for the additive Model Provider literal contract.
+
+Inference transport budgets are independent of Model Profile token limits. See [Inference HTTP timeouts](../getting-started/configuration.md#inference-http-timeouts) for the AEP and Ollama configuration keys, startup validation, Aspire forwarding and cancellation behavior.

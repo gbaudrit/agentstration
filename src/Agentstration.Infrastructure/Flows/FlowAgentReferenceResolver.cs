@@ -60,7 +60,10 @@ public sealed class FlowAgentReferenceResolver(
             Version = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ResourceUid = stored.Value.Uid,
             RevisionUid = revision.Value.Uid,
-            DefinitionHash = revision.Value.DefinitionHash
+            DefinitionHash = revision.Value.DefinitionHash,
+            InputSchema = revision.Value.Definition.InputSchema,
+            OutputSchema = revision.Value.Definition.OutputSchema,
+            OutputContract = revision.Value.Definition.OutputContract
         };
     }
 }

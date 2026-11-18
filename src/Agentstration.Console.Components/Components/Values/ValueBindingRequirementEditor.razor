@@ -20,12 +20,21 @@
         </ChildContent></FormField>
         @if (selection.Kind == ValueBindingSourceKind.Literal && Sources.Contains(selection.Kind))
         {
-            <FormField Label="@T("Binding.LiteralValue")" Required="@Requirement.Required">
+            @if (Requirement.LiteralSchema is { } schema)
+            {
+                <div class="binding-value-editor" data-testid="@(TestIdPrefix + "-binding-literal")">
+                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required"
+                        ValueChanged="SchemaLiteralChangedAsync" ValidationChanged="SchemaValidationChanged" Disabled="Disabled" Compact="true" ValueLabel="@T("Value")" />
+                </div>
+            }
+            else
+            {
+            <FormField Id="@literalId" Label="@T("Binding.LiteralValue")" Required="@Requirement.Required">
                 @if (Requirement.AllowedValues is { Count: > 0 } allowedValues)
                 {
-                    <ClearableSelect TValue="string" Value="@Convert.ToString(literalText, System.Globalization.CultureInfo.InvariantCulture)" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" ValueChanged="changed => LiteralChangedAsync(new ChangeEventArgs { Value = changed })">
-                        <option value="">@T("Binding.SelectValue")</option>
-                        @foreach (var value in allowedValues) { <option value="@DisplayValue(value)">@DisplayValue(value)</option> }
+                    <ClearableSelect TValue="string" AllowClear="false" Value="@(selection.Literal?.GetRawText() ?? string.Empty)" ValueChanged="LiteralAllowedChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")">
+                        <option value="" disabled>@T("Binding.SelectValue")</option>
+                        @foreach (var value in allowedValues) { <option value="@value.GetRawText()">@(value.ValueKind == JsonValueKind.String && value.GetString() == string.Empty ? value.GetRawText() : DisplayValue(value))</option> }
                     </ClearableSelect>
                 }
                 else if (Requirement.ValueType == "boolean")
@@ -36,9 +45,11 @@
                 }
                 else
                 {
-                    <ClearableText UpdateOnInput="false" Value="@literalText" Disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" ValueChanged="changed => LiteralChangedAsync(new ChangeEventArgs { Value = changed })" />
+                    <input id="@literalId" value="@literalText" @onchange="LiteralChangedAsync" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-literal")" />
                 }
             </FormField>
+            <button type="button" class="button-secondary" disabled="@(Disabled || selection.Literal is null && !invalidLiteral)" @onclick="ClearLiteralAsync" data-testid="@(TestIdPrefix + "-binding-literal-clear")">@T("Binding.ClearLiteral")</button>
+            }
         }
         else if (selection.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret)
         {
@@ -54,8 +65,9 @@
             </div>
         }
     </FormGrid>
-    @if (ValidationError is { } message) { <p class="inline-warning" role="alert">@message</p> }
+    @if (ShowValidationMessage && ValidationError is { } message) { <p class="inline-warning" role="alert">@message</p> }
     @if (selection.Kind == ValueBindingSourceKind.Secret) { <p class="inline-info">@T("Binding.SecretValueHidden")</p> }
+    @if (selection.Kind == ValueBindingSourceKind.Omitted && Sources.Contains(selection.Kind)) { <p class="inline-info">@T("Binding.OmittedHelp")</p> }
 </div>
 
 @if (DialogSectionId is { } sectionId)
@@ -86,6 +98,9 @@ else
     private ContextualValueCreationContext? creatorContext;
     private bool creating;
     private bool invalidLiteral;
+    private bool schemaLiteralInvalid;
+    // A native commit event distinguishes an explicit empty string from an unset literal.
+    private readonly string literalId = $"binding-literal-{Guid.NewGuid():N}";
     private string literalText = string.Empty;
     private EditContext? attachedContext;
     private ValidationMessageStore? messages;
@@ -101,6 +116,9 @@ else
         .Concat(createdOption is null || Options.Any(value => value.Address == createdOption.Address && value.Kind == createdOption.Kind) ? [] : new[] { createdOption })
         .Where(value => value.Kind == selection.Kind && Sources.Contains(value.Kind));
     private bool Available => CurrentOptions.Any(value => value.Address == selection.Resource);
+    private bool ShowValidationMessage => selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind)
+        || Requirement.LiteralSchema is null || !schemaLiteralInvalid && selection.Literal is { } literal && Requirement.AllowedValues is { } allowed
+            && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, literal));
     private string? ValidationError => !Sources.Contains(selection.Kind) ? T("Binding.SourceUnavailable")
         : invalidLiteral ? T("Binding.LiteralInvalid")
         : Requirement.Required && !selection.IsConfigured ? T("Binding.RequiredMissing") : null;
@@ -120,10 +138,10 @@ else
             selection = Selection;
             lastParameter = Selection;
             literalText = Selection.Literal is { } value ? DisplayValue(value) : string.Empty;
-            invalidLiteral = false;
+            invalidLiteral = false; schemaLiteralInvalid = false;
             CloseCreator();
         }
-        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { } literal)
+        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { ValueKind: not JsonValueKind.Undefined } literal && Requirement.LiteralSchema is null)
             invalidLiteral = !MatchesType(literal)
                 || Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, literal));
         if (attachedContext != EditContext)
@@ -139,7 +157,7 @@ else
     private async Task SourceChangedAsync(ChangeEventArgs args)
     {
         if (Disabled || !Enum.TryParse<ValueBindingSourceKind>(args.Value?.ToString(), out var kind) || !Sources.Contains(kind)) return;
-        CloseCreator(); literalText = string.Empty; invalidLiteral = false;
+        CloseCreator(); literalText = string.Empty; invalidLiteral = false; schemaLiteralInvalid = false;
         await SelectAsync(new(kind));
     }
 
@@ -152,13 +170,22 @@ else
         if (option is not null) await SelectAsync(new(selection.Kind, option.Address));
     }
 
+    private Task LiteralAllowedChangedAsync(string value)
+    {
+        var literal = Requirement.AllowedValues?.FirstOrDefault(candidate => candidate.GetRawText() == value);
+        return LiteralChangedAsync(new ChangeEventArgs
+        {
+            Value = literal is null || literal.Value.ValueKind == JsonValueKind.Undefined ? value : DisplayValue(literal.Value)
+        });
+    }
     private async Task LiteralChangedAsync(ChangeEventArgs args)
     {
         if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind)) return;
         literalText = args.Value?.ToString() ?? string.Empty;
         JsonElement? value = null;
         invalidLiteral = false;
-        if (literalText.Length > 0)
+        if (literalText.Length > 0 || Requirement.ValueType == "string" &&
+            (Requirement.AllowedValues is null || Requirement.AllowedValues.Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == string.Empty)))
         {
             try
             {
@@ -168,6 +195,29 @@ else
             catch (JsonException) { invalidLiteral = true; }
         }
         await SelectAsync(new(ValueBindingSourceKind.Literal, Literal: invalidLiteral ? null : value));
+    }
+
+    private async Task ClearLiteralAsync()
+    {
+        if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind)) return;
+        literalText = string.Empty; invalidLiteral = false;
+        await SelectAsync(new(ValueBindingSourceKind.Literal));
+    }
+
+    private Task SchemaLiteralChangedAsync(JsonElement value)
+    {
+        if (Disabled || selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind) || Requirement.LiteralSchema is null)
+            return Task.CompletedTask;
+        return SelectAsync(new(ValueBindingSourceKind.Literal, Literal: value.ValueKind == JsonValueKind.Undefined ? null : value.Clone()));
+    }
+
+    private void SchemaValidationChanged(JsonSchemaInputValidationState state)
+    {
+        if (selection.Kind != ValueBindingSourceKind.Literal || !Sources.Contains(selection.Kind) || Requirement.LiteralSchema is null) return;
+        schemaLiteralInvalid = !state.IsValid;
+        invalidLiteral = !state.IsValid && (selection.IsConfigured || state.Issues.Any(issue => issue.Code == "InvalidJson"))
+            || selection.IsConfigured && selection.Literal is { } value && Requirement.AllowedValues is { } allowed && !allowed.Any(candidate => JsonElement.DeepEquals(candidate, value));
+        UpdateValidation();
     }
 
     private bool MatchesType(JsonElement value) => Requirement.ValueType switch
@@ -213,7 +263,7 @@ else
 
     private void CloseCreator() { creating = false; creatorContext = null; }
     private static string TargetValue(ScopedResourceAddress? address) => address is { } value ? $"{value.ScopeRef.Value}|{value.Namespace.Value}|{value.Name}" : string.Empty;
-    private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
+    private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.Undefined ? string.Empty : value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : value.GetRawText();
     private void Validate(object? sender, ValidationRequestedEventArgs args) => UpdateValidation(force: true);
     private void UpdateValidation(bool force = false)
     {

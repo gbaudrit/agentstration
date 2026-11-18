@@ -6,15 +6,31 @@
 <div data-testid="flow-observability-runs">
 <PageHeader Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="/flows">@T("Definitions")</a></Actions></PageHeader>
 <nav class="section-tabs"><a href="/flows">@T("Definitions")</a><a class="active" href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
-<div class="filter-bar"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" /><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<FlowRunStatus>()){<option value="@value">@StatusLabel(value)</option>}</select><select @bind="trigger"><option value="">@T("AllTriggers")</option>@foreach(var value in Enum.GetValues<FlowRunTrigger>()){<option value="@value">@TriggerLabel(value)</option>}</select><input @bind="version" placeholder="@T("Version")" /><input @bind="deployment" placeholder="@T("Deployment")" /></div>
-@if(runs is null){<LoadingState Message="@T("Loading")"/>}else if(Filtered.Count==0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<RunGrid Runs="Filtered" />}
+<div class="filter-bar"><select aria-label="@T("ExecutionKind")" @bind="kind"><option value="flow">@T("NamedRuns")</option><option value="process">@T("ProcessRuns")</option><option value="all">@T("AllRunKinds")</option></select><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" /><select @bind="status"><option value="">@T("AllStatuses")</option>@foreach(var value in Enum.GetValues<FlowRunStatus>()){<option value="@value">@StatusLabel(value)</option>}</select><select @bind="trigger"><option value="">@T("AllTriggers")</option>@foreach(var value in Enum.GetValues<FlowRunTrigger>()){<option value="@value">@TriggerLabel(value)</option>}</select><input @bind="version" placeholder="@T("Version")" /><input @bind="deployment" placeholder="@T("Deployment")" /></div>
+@if (loadError is not null) { <ErrorState Message="@loadError" /> } else if(runs is null){<LoadingState Message="@T("Loading")"/>}else if(Filtered.Count==0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<RunGrid Runs="Filtered" />}
 </div>
 @code {
-    private readonly CancellationTokenSource cancellation=new(); private IReadOnlyList<FlowRun>? runs; private string search="",status="",trigger="",version="",deployment="";
+    private readonly CancellationTokenSource cancellation=new(); private IReadOnlyList<FlowRun>? runs; private string kind="flow",search="",status="",trigger="",version="",deployment="";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StatusLabel(FlowRunStatus value) => Localizer[$"Status.{value}"];
     private string TriggerLabel(FlowRunTrigger value) => Localizer[$"Trigger.{value}"];
-    private IReadOnlyList<FlowRun> Filtered => runs?.Where(run => (string.IsNullOrWhiteSpace(search)||run.Id.Contains(search,StringComparison.OrdinalIgnoreCase)||run.FlowId.Value.Contains(search,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(status)||run.Status.ToString()==status)&&(string.IsNullOrWhiteSpace(trigger)||run.Trigger.ToString()==trigger)&&(string.IsNullOrWhiteSpace(version)||run.FlowVersion.Contains(version,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(deployment)||(run.DeploymentResourceId?.Contains(deployment,StringComparison.OrdinalIgnoreCase)??false))).ToArray() ?? [];
-    protected override async Task OnInitializedAsync()=>runs=await Client.GetFlowRunsAsync(null,cancellation.Token);
-    public void Dispose(){cancellation.Cancel();cancellation.Dispose();}
+    private IReadOnlyList<FlowRun> Filtered => runs?.Where(run => (kind == "all" || (kind == "process" ? run.ProcessOrigin is not null : run.ProcessOrigin is null))&&(string.IsNullOrWhiteSpace(search)||run.Id.Contains(search,StringComparison.OrdinalIgnoreCase)||run.FlowId.Value.Contains(search,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(status)||run.Status.ToString()==status)&&(string.IsNullOrWhiteSpace(trigger)||run.Trigger.ToString()==trigger)&&(string.IsNullOrWhiteSpace(version)||run.FlowVersion.Contains(version,StringComparison.OrdinalIgnoreCase))&&(string.IsNullOrWhiteSpace(deployment)||(run.DeploymentResourceId?.Contains(deployment,StringComparison.OrdinalIgnoreCase)??false))).ToArray() ?? [];
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ExecutionScope { get; set; }
+    private string? loadError;
+    private int loadRevision;
+    protected override async Task OnParametersSetAsync()
+    {
+        var revision = ++loadRevision;
+        loadError = null; runs = null;
+        try
+        {
+            var loaded = string.IsNullOrWhiteSpace(ExecutionScope)
+                ? await Client.GetFlowRunsAsync(null, cancellation.Token)
+                : await Client.GetFlowRunsAsync(null, ResourceScopeRef.Parse(ExecutionScope), cancellation.Token);
+            if (revision == loadRevision) runs = loaded;
+        }
+        catch (AgentstrationApiException exception) { if (revision == loadRevision) loadError = exception.Message; }
+        catch (Exception exception) when (exception is FormatException or ArgumentException) { if (revision == loadRevision) loadError = T("InvalidExecutionScope"); }
+    }
+    public void Dispose(){loadRevision++;cancellation.Cancel();cancellation.Dispose();}
 }

@@ -12,11 +12,11 @@ public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBa
     public async Task<FlowDesignerLoadResult> LoadAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
     {
         var flow = await client.GetFlowAsync(target.Namespace, target.ResourceId, target.ScopeRef, cancellationToken);
-        if (flow.Governance.IsManaged)
+        if (target.PublishedVersion is not null || flow.Governance.IsManaged)
         {
-            if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
+            if (target.PublishedVersion is null && string.IsNullOrWhiteSpace(flow.ActiveVersion))
                 throw new InvalidOperationException($"Pack-managed Flow '{target.Namespace.Value}/{target.ResourceId}' has no active published version.");
-            var version = await client.GetFlowVersionAsync(target.Namespace, target.ResourceId, flow.ActiveVersion, target.ScopeRef, cancellationToken);
+            var version = await client.GetFlowVersionAsync(target.Namespace, target.ResourceId, target.PublishedVersion ?? flow.ActiveVersion!, target.ScopeRef, cancellationToken);
             if (version.Graph is null)
                 throw new InvalidOperationException($"Published version {version.Version} is a legacy Flow version without a Graph and cannot be opened in the Designer.");
             var resource = new FlowDesignerResource(new(target.ResourceId, target.Namespace), flow.Name, version.Description, version.Metadata, version.Graph)
@@ -118,6 +118,7 @@ public sealed class FlowDesignerBackend(IFlowApiClient client) : IFlowDesignerBa
 
     private async Task<ResourceScopeRef?> GetEditableScopeAsync(FlowDesignerTarget target, CancellationToken cancellationToken)
     {
+        if (target.PublishedVersion is not null) throw new InvalidOperationException("Published Flow versions are read-only.");
         if (target.Namespace.IsDefault) return target.ScopeRef;
         var flow = await client.GetFlowAsync(target.Namespace, target.ResourceId, target.ScopeRef, cancellationToken);
         if (flow.Governance.IsManaged)

@@ -16,3 +16,12 @@ public sealed class FlowDiscoveryPolicy(IResourceAccessPolicyService accessPolic
             ResourceAccessAction.Discover,
             cancellationToken)).Allowed;
 }
+
+public sealed class FlowUsePolicy(IResourceAccessPolicyService accessPolicies) : IFlowUsePolicy
+{
+    public async Task ValidateAsync(FlowResource flow, string version, ResourceScopeRef consumer, CancellationToken cancellationToken)
+    {
+        if (!(await accessPolicies.EvaluateAsync(new(flow.Uid, flow.ScopeRef, flow.Id.Namespace, FlowResourceKinds.Flow), consumer, ResourceAccessAction.Use, cancellationToken)).Allowed)
+            throw new FlowValidationException("flow_composition_access_denied", "The exact published Flow does not authorize this consumer.");
+    }
+}

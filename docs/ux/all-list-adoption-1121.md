@@ -1,5 +1,7 @@
 # All-list adoption inventory (#1121)
 
+**Main synchronization (2026-11-18):** The current source inventory includes incoming main `8f164544` (#1181): **88 shared frames + 258 active specialized collections = 346 functional collections**, plus four retained unmounted renderers and **145 audited repeated-item sources**. The 75 new functional collections are recorded explicitly in the manifest. [New-source reconciliation, specialized decisions and coverage limits](sync-main-1174.md) distinguish this update from historical screenshots and test totals. Fresh validation is recorded in PR #1174.
+
 **Approved all-list compact adoption (2026-11-13):** The maintainer’s authorization supersedes the earlier Flow-only boundary. Applicable resource identities now compose the tiny I/T/W owner badge at top-left, state at top-right and independent managed/inherited read-only lock at bottom-right. Namespace folders are omitted; complete qualified copy is adjacent and revealed through desktop hover/focus or continuously on touch. Publication metadata shows the actual publication or an em dash. Family information, direct primary actions, optional secondary menus and existing pagination contracts are retained. [Current presentation and data semantics](flow-compact-1121.md).
 
 The [current evidence gallery](evidence/1121/compact-all/README.md) archives 96 real application screenshots and links all 98 route captures. [Validation provenance](evidence/1121/compact-all/validation.json) records the baseline product commit, 993 Fast / 1,017 Integration passes and both green browser campaigns, plus the exact-owner Workplace follow-up with 994 Fast passes and refreshed captures. Latest delivery checks are recorded in the draft PR.
@@ -35,7 +37,7 @@ Omit `Secondary` when it does not apply. Existing child content without named sl
 
 This is the expanded closure inventory. An implementation is recorded separately from its final verification; source adoption alone is not UX acceptance. The first five-screen evidence remains wave 1 only.
 
-The [machine-readable inventory](https://github.com/gbaudrit/agentstration/blob/feat/1121-resource-collections/docs/ux/collection-surfaces-1121.json) identifies distinct functional surfaces and route aliases. It now records **71 common-frame instances** and **200 active specialized collections**, for **271 active functional collections**. The prior 214-active inventory omitted 57 embedded selectors, histories and diagnostics; those are reconciled below. **Four retained legacy renderers** have no production call site: ConversationPanel, TaskTimeline, ExecutionTimeline and the newly classified SecretReferencePicker. All **114 repeated-item sources** remain audited. These are logical collections, not routes, screens or raw loops. Native select family branches and desktop/mobile variants are grouped when they share one functional dataset and interaction. [Real-application captures and raw observations](evidence/1121/all-lists/README.md) distinguish 45 Console routes from embedded collection instances.
+The [machine-readable inventory](collection-surfaces-1121.json) identifies distinct functional surfaces and route aliases. The 2026-11-13 checkpoint recorded **71 common-frame instances** and **200 active specialized collections**, for **271 active functional collections**; the current main reconciliation is **88 + 258 = 346**. The prior 214-active inventory omitted 57 embedded selectors, histories and diagnostics; those are reconciled below. **Four retained legacy renderers** have no production call site: ConversationPanel, TaskTimeline, ExecutionTimeline and the newly classified SecretReferencePicker. The earlier **114 repeated-item sources** remain audited; the main delta adds 31 audited sources for **145** current audited sources. These are logical collections, not routes, screens or raw loops. Native select family branches and desktop/mobile variants are grouped when they share one functional dataset and interaction. [Real-application captures and raw observations](evidence/1121/all-lists/README.md) distinguish 45 Console routes from embedded collection instances.
 
 ## Common-frame collections
 
@@ -368,3 +370,30 @@ The following source-backed collections were missing from the historical 214-act
 
 
 The [Trigger readiness follow-up](evidence/1121/compact-all/trigger-observations.json) records the later missing-command CI symptom, deterministic permission-race reproduction and correction. Both authorized/denied component cases, all 996 Fast tests, three repetitions of the unchanged maintained Trigger journey and its populated collection case pass. Four new actual screenshots retain exact product source `02190236`. Latest complete delivery checks remain recorded in draft #1123.
+
+## Main delta: shared adapters and specialized collections
+
+The source adoption below is new to #1174. It retains the historical evidence above without assigning those images to new code.
+
+| Source | New shared collection | Actual host routes / aliases |
+| --- | --- | --- |
+| [ToolRelayEditor.razor](../../src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor) | `ToolDefinitionVersionResource` | `/tools/definitions/new`<br />`/tools/definitions/{Name}` |
+| [ToolRelayEditor.razor](../../src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor) | `ToolDefinitionUsage` | `/tools/definitions/new`<br />`/tools/definitions/{Name}` |
+| [KnowledgeSourceDetails.razor](../../src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor) | `KnowledgeToolProposal` | `/knowledge-sources/{Name}` |
+| [ConnectedServiceDetails.razor](../../src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor) | `ConnectedServiceValueBinding` | `/connected-services/{Name}` |
+| [ConnectedServiceDetails.razor](../../src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor) | `ConnectedServiceExportDescriptor` | `/connected-services/{Name}` |
+| [TransformationFunctions.razor](../../src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor) | `FunctionKindResource` | `/transformation-functions`<br />`/function-kinds` |
+| [TransformationFunctions.razor](../../src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor) | `TransformationFunctionResource` | `/transformation-functions`<br />`/function-kinds` |
+| [Storages.razor](../../src/Agentstration.Console.Components/Components/Pages/Storages.razor) | `StorageResource` | `/storages` |
+| [ConnectedServices.razor](../../src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor) | `ConnectedServiceResource` | `/connected-services` |
+| [DataSourceQueries.razor](../../src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor) | `DataSourceQueryToolPublication` | `/data-sources/new`<br />`/data-sources/{Name}` |
+| [DataSourceQueries.razor](../../src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor) | `DataSourceQueryResource` | `/data-sources/new`<br />`/data-sources/{Name}` |
+| [ConnectedServiceDiscoveryPanel.razor](../../src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor) | `ConnectedServiceOperationResource` | `/connected-services/{Name}` |
+| [ConnectedServiceDiscoveryPanel.razor](../../src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor) | `ConnectedServiceOperationDiscoveryResource` | `/connected-services/{Name}` |
+| [FlowRunArtifactDetails.razor](../../src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor) | `RecordRow` | `/artifacts/durable/{Id}` |
+| [StorageTypes.razor](../../src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor) | `StorageTypeResource` | `/storage-types` |
+| [DataSourceDatasetEditor.razor](../../src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor) | `DataSourceAcquisitionResource` | `/data-sources/new`<br />`/data-sources/{Name}` |
+
+| [StorageDetails.razor](../../src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor) | `StorageExportBinding` | `/storages/{Name}` |
+
+The 58 new specialized collections include scoped selectors, immutable type/query/Flow version choices, Storage dependencies and contract evidence, native document reads/search/record lineage, ordered source composition, Flow produced artifacts/process admission/progress, and Designer mapping suggestions. Each functional dataset has its own manifest entry with an explicit adaptation. Fixed tabs, enum/media-type suggestions and schema-generated input controls remain controls, with a recorded source-audit reason. This classification preserves semantic distinctions and does not imply browser acceptance.

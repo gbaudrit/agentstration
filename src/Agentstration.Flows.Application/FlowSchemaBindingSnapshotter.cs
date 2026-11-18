@@ -85,7 +85,7 @@ internal sealed class FlowSchemaBindingSnapshotter(ISchemaBindingResolver resolv
         {
             var snapshot = await resolver.ResolveAsync(path, selected, context, cancellationToken);
             snapshots.Add(path, snapshot);
-            return snapshot.Content.Clone();
+            return Agentstration.Schemas.JsonSchemaSelection.ResolveLocalReferences(snapshot.Content);
         }
         catch (SchemaBindingResolutionException exception)
         {

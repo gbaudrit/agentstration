@@ -32,6 +32,14 @@ internal static class ArtifactEndpoints
         artifacts.MapDelete("/staged/{id}", PurgeAsync).WithSummary("Purge staged Artifact content").Produces(StatusCodes.Status204NoContent).RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
         artifacts.MapGet("/flow-run-artifacts", ListFlowRunArtifactsAsync).WithSummary("List durable FlowRunArtifacts").Produces<IEnumerable<FlowRunArtifactResource>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}", GetFlowRunArtifactAsync).WithSummary("Get a durable FlowRunArtifact").Produces<FlowRunArtifactResource>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapGet("/flow-run-artifacts/{id}/records", (string id, ArtifactRecordService service, CancellationToken ct) => ExecuteAsync(async () =>
+            Results.Ok(await service.GetAsync(FlowRunArtifactId.Parse(id), ct))))
+            .WithSummary("Inspect logical Artifact record membership without reading content").Produces<ArtifactRecordSetView>()
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        artifacts.MapGet("/flow-run-artifacts/{id}/records/{memberId}/content", (string id, string memberId, long? offset, int? length, ArtifactRecordService service, CancellationToken ct) => ExecuteAsync(async () =>
+            Results.Ok(await service.ReadAsync(FlowRunArtifactId.Parse(id), memberId, offset ?? 0, length ?? 65536, ct))))
+            .WithSummary("Read an exact member of a logical Artifact with current content authorization").Produces<ArtifactRecordContent>()
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/flow-run-artifacts/{id}/materializations", StartMaterializationAsync).WithSummary("Materialize durable Artifact content through a Storage Read Flow").Produces<FlowRunArtifactMaterialization>(StatusCodes.Status202Accepted).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}/materializations", ListMaterializationsAsync).WithSummary("List durable Artifact materializations").Produces<IEnumerable<FlowRunArtifactMaterialization>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/flow-run-artifacts/{id}/materializations/{flowRunId}", GetMaterializationAsync).WithSummary("Get durable Artifact materialization status").Produces<FlowRunArtifactMaterialization>().RequireAuthorization(AgentstrationPolicies.CanReadResources);

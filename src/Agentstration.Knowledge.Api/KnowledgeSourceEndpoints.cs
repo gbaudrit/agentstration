@@ -24,6 +24,11 @@ internal static class KnowledgeSourceEndpoints
         sources.MapGet("/{name}/readiness", GetReadinessAsync)
             .WithSummary("Inspect KnowledgeSource readiness")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        sources.MapGet("/{name}/tool-proposal", (string name, string? @namespace, string? scopeRef,
+            KnowledgeSourceToolExposureService service, CancellationToken ct) => ExecuteAsync(async () =>
+                Results.Ok(await service.ProposeAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), ct))))
+            .WithSummary("Inspect current Tool proposals without publishing or reading content")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         sources.MapGet("/{name}/tool-exposure", GetToolExposureAsync)
             .WithSummary("Get a KnowledgeSource Tool exposure")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
@@ -130,8 +135,8 @@ internal static class KnowledgeSourceEndpoints
         {
             var id = new KnowledgeSourceId(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef));
             var stored = id.ScopeRef is { } exact
-                ? await service.PutExactAsync(exact, id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken)
-                : await service.PutAsync(id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken);
+                ? await service.PutExactAsync(exact, id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken, body.RebindDependencies)
+                : await service.PutAsync(id, body.Properties, request.Headers.IfMatch.FirstOrDefault(), cancellationToken, body.RebindDependencies);
             return Resource(stored, response, 200);
         });
 
@@ -156,7 +161,7 @@ internal static class KnowledgeSourceEndpoints
         KnowledgeSourceToolExposureService service,
         CancellationToken cancellationToken) => ExecuteAsync(async () => Resource(
             await service.PublishAsync(new(name, ResourceNamespace.Parse(@namespace), ParseScope(scopeRef)), body.Version,
-                body.RequiresApproval, cancellationToken), response, 201));
+                body.RequiresApproval, cancellationToken, body.ProposalDigest), response, 201));
 
     private static Task<IResult> DeleteAsync(
         string name,
@@ -191,7 +196,7 @@ internal static class KnowledgeSourceEndpoints
         { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
         catch (KnowledgeSourceValidationException exception)
         {
-            var status = exception.Code == "knowledge_source_in_use_by_snapshot" ? 409 : 422;
+            var status = exception.Code is "knowledge_source_in_use_by_snapshot" or "knowledge_tool_proposal_stale" ? 409 : 422;
             return Problem(exception.Code, "Invalid KnowledgeSource", status, exception.Message);
         }
         catch (ToolDefinitionValidationException exception)

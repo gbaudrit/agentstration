@@ -14,6 +14,7 @@ public static class KnowledgeApiModule
         KnowledgeProjectionEndpoints.Map(sources, projections);
         KnowledgeSnapshotEndpoints.Map(sources, endpoints.MapGroup("/api/knowledgesnapshots"));
         KnowledgeRetrievalEndpoints.Map(sources);
+        KnowledgeAccessEndpoints.Map(sources);
         return endpoints;
     }
 }

@@ -113,4 +113,12 @@
 <data name="SaveBeforeApply"><value>Save your changes before applying the configuration.</value></data>
 <data name="YamlFormInvalid"><value>The form contains incomplete or invalid values. This YAML view is read-only and retains the last valid definition. Correct the fields in Definition to edit or save it.</value></data>
 <data name="YamlNeedsValidForm"><value>Complete the invalid fields in Definition before opening the YAML.</value></data>
-<data name="InspectTool" xml:space="preserve"><value>Inspect</value></data></root>
+<data name="InspectTool" xml:space="preserve"><value>Inspect</value></data>
+  <data name="OutputInstructionHelp" xml:space="preserve"><value>A declared output schema is added to system instructions for this invocation and the response is validated. Without a fixed schema, dynamic resolution must be selected explicitly.</value></data>
+  <data name="OutputResolution" xml:space="preserve"><value>Output contract resolution</value></data>
+  <data name="OutputResolution.Absent" xml:space="preserve"><value>Undeclared; accept a parent invocation expectation</value></data>
+  <data name="OutputResolution.Input" xml:space="preserve"><value>Dynamic: inherit the input data contract</value></data>
+  <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamic: use the parent output expectation</value></data>
+  <data name="OutputMediaType" xml:space="preserve"><value>Output MIME type (optional)</value></data>
+  <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixed: declared schema or MIME type</value></data>
+</root>

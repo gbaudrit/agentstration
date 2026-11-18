@@ -9,6 +9,9 @@ var endpointText = builder.Configuration["Ollama:Endpoint"]
     ?? "http://localhost:11434";
 if (!Uri.TryCreate(endpointText, UriKind.Absolute, out var endpoint))
     throw new InvalidOperationException("Ollama:Endpoint must be an absolute URL.");
+var inferenceOptions = builder.Configuration.GetSection(OllamaInferenceOptions.SectionName).Get<OllamaInferenceOptions>() ?? new();
+inferenceOptions.Validate();
+builder.Services.AddSingleton(inferenceOptions);
 builder.Services.AddSingleton(new OllamaExtensionOptions(endpoint));
 builder.Services.AddHttpClient("ollama", client =>
 {
@@ -16,7 +19,13 @@ builder.Services.AddHttpClient("ollama", client =>
     client.Timeout = TimeSpan.FromSeconds(90);
 });
 builder.Services.AddSingleton<OllamaApiClient>(services => new OllamaApiClient(services.GetRequiredService<IHttpClientFactory>().CreateClient("ollama")));
-builder.Services.AddSingleton<IChatClient>(services => services.GetRequiredService<OllamaApiClient>());
+builder.Services.AddHttpClient(OllamaInferenceOptions.HttpClientName, client =>
+{
+    client.BaseAddress = endpoint;
+    client.Timeout = inferenceOptions.Timeout;
+});
+builder.Services.AddSingleton<IChatClient>(services => new OllamaInferenceApiClient(
+    services.GetRequiredService<IHttpClientFactory>().CreateClient(OllamaInferenceOptions.HttpClientName)));
 builder.Services.AddAgentstrationAep(options =>
 {
     options.Extension = new(

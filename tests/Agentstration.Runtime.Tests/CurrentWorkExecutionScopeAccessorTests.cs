@@ -1,6 +1,7 @@
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Resources;
 
 namespace Agentstration.Runtime.Tests;
 
@@ -21,6 +22,8 @@ public sealed class CurrentWorkExecutionScopeAccessorTests
         using var scope = context.PushInstance(OperationalContext);
 
         AssertOperationalScope(accessor.Current);
+        Assert.AreEqual(ResourceScopeRef.Instance, accessor.Current?.LogicalScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Instance, accessor.Current?.AccessScopeRef);
     }
 
     [TestMethod]
@@ -32,6 +35,8 @@ public sealed class CurrentWorkExecutionScopeAccessorTests
         using var scope = context.PushTenantAdministration(OperationalContext);
 
         AssertOperationalScope(accessor.Current);
+        Assert.AreEqual(ResourceScopeRef.Tenant(OperationalContext.TenantId), accessor.Current?.LogicalScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Tenant(OperationalContext.TenantId), accessor.Current?.AccessScopeRef);
     }
 
     [TestMethod]

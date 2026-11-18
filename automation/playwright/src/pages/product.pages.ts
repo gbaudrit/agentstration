@@ -1,4 +1,6 @@
 import { SharedFormsPage } from './shared-forms.page.js';
+import { SourceCompositionPage } from './source-composition.page.js';
+import { SourcePoliciesPage } from './source-policies.page.js';
 import { GovernedKnowledgePage } from './governed-knowledge.page.js';
 import { SourceLifecyclePage } from './source-lifecycle.page.js';
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -45,6 +47,8 @@ import { GovernedExtensionInventoryPage } from './governed-extension-inventory.p
 
 export class ProductPages {
   public readonly sharedForms: SharedFormsPage;
+  public readonly sourceComposition: SourceCompositionPage;
+  public readonly sourcePolicies: SourcePoliciesPage;
   public readonly governedExtensionInventory: GovernedExtensionInventoryPage;
   public readonly governedKnowledge: GovernedKnowledgePage;
   public readonly resourceScopes: ResourceScopesPage;
@@ -89,6 +93,8 @@ export class ProductPages {
 
   public constructor(public readonly page: Page) {
     this.sharedForms = new SharedFormsPage(page);
+    this.sourceComposition = new SourceCompositionPage(page);
+    this.sourcePolicies = new SourcePoliciesPage(page);
     this.governedExtensionInventory = new GovernedExtensionInventoryPage(page);
     this.governedKnowledge = new GovernedKnowledgePage(page);
     this.resourceScopes = new ResourceScopesPage(page);

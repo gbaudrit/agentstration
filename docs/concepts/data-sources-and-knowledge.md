@@ -14,12 +14,12 @@ origin
   -> optional per-binding transformation
   -> Knowledge projection
   -> immutable Snapshot
-  -> search, query, or bounded read
+  -> read, search_regex, or get_status
 ```
 
 ## Acquire once, project many times
 
-A Data Source owns the origin identity, configuration, enabled state, and profile reference. Its Data Source Profile owns the reusable configuration schema, acquisition Flow, governed Tool bindings, limits, and policies. Profiles have editable drafts, immutable published revisions, and one active revision.
+A historical Data Source owns the origin identity, configuration, enabled state, and profile reference. Its Data Source Profile owns the reusable configuration schema, acquisition Flow, governed Tool bindings, limits, and policies. Profiles have editable drafts, immutable published revisions, and one active revision. Native datasets instead pin an Operation, saved parameters and Storage; they do not require a historical Profile.
 
 Data Sources and profiles may be owned at instance, tenant, or Workspace scope. References follow ancestor-only visibility and explicit descendant-use grants: a Workspace may consume an authorized Workspace, tenant, or instance resource, while a tenant resource cannot depend on a Workspace resource. Profile publication resolves dependencies from the profile owner scope and pins the exact Flow version and integrity hash plus Tool and provider identities and generations. The acquisition Flow currently has to share the profile's exact scope because #751 has not yet exposed Flow identities to the shared access-policy overlay; ancestor Flows fail closed instead of inheriting visibility as authorization. The consuming Workspace validates those immutable pins without rebinding names, then records the exact source, active profile revision, limits, policies, and returned Artifact manifest in its isolated acquisition state.
 
@@ -41,7 +41,7 @@ The choice button shows **Promote** for a new target, **Already promoted** (disa
 
 ## Project one or more Data Sources
 
-An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and active profile identity plus the exact projection, retrieval, and optional transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired Artifact references pass through unchanged.
+An Instance-, Tenant-, or Workspace-owned Knowledge Source binds between one and thirty-two visible Data Sources. The definition pins the exact Data Source and its native dataset definition or historical active profile identity plus the exact projection and optional custom retrieval and transformation Flow versions and integrity hashes from its owner scope. Protected ancestor dependencies require explicit descendant-use authorization; ambiguous or stale references fail closed. Each named binding can use its latest successful Workspace acquisition or an explicitly selected successful acquisition. Omitting the transformation Flow is an identity transformation: the acquired content passes through unchanged.
 
 The Knowledge Source invokes one `knowledge.projection/v1` Flow with all prepared inputs. The projection decides which durable, publishable Artifacts become the new Snapshot. Inputs remain provenance unless the projection emits them.
 
@@ -51,13 +51,148 @@ The built-in `knowledge-projection-builtin` Flow performs identity aggregation. 
 
 Every successful projection creates and activates a distinct immutable Snapshot. A failed projection leaves the previous active Snapshot unchanged. Provenance pins the exact Data Source acquisitions, optional transformation Runs, projection Flow and Run, Artifact receipts, storage lineage, and integrity evidence.
 
-## Retrieve only from the selected Snapshot
+## Native datasets and independent Snapshot output
 
-A Knowledge Source also selects a `knowledge.retrieval/v1` Flow. Search, query, and bounded read resolve the active or explicitly selected Snapshot before execution. Every returned item, citation, byte range, and Artifact identifier must belong to that Snapshot.
+JSON storage accepts a collection of object records under one logical Artifact.
+By default the acquired root object is one record, with its root contract. Use
+`json.explode` and an exact item Schema to select `/results` into multiple records
+at Data Source transformations, on a Knowledge binding, or before publication.
+Document Storage writes one independently queryable row per record; built-in local
+Storage writes one physical JSON file per record. The whole Artifact remains a
+single array with a derived collection contract. Its detail page shows membership
+and the row contract without reading the files, and explicitly reads a selected
+record on demand. `artifact.explode` instead creates independent Artifacts.
 
-The built-in `knowledge-retrieval-builtin` Flow provides deterministic local text search, query, and read over filesystem-backed Snapshot Artifacts. Search interleaves bounded matches across the Snapshot artifacts; it is not a model-backed semantic index. Binary interpretation, spreadsheet analysis, semantic search, or answer synthesis requires a different governed retrieval composition and any required Tools.
+A native dataset binding uses its saved acquisition parameters and exact Storage
+revision. Select an **output Storage** on the Knowledge Source to enable native
+projection. Input and output Storages are independent. The output prefix narrows
+the selected Storage envelope; Knowledge does not configure the connection or
+manual export mapping. A disabled native preparation can still be saved before
+an output Storage is selected.
 
-A Knowledge Source may publish source-specific `search`, `query`, and `read` Tools. Their source identity and operation are fixed by the Tool definition, and the existing Tool pipeline and internal MCP provider retain authorization, assignment, execution, and audit ownership.
+The initial retained-publication implementation supports builtin local Storages.
+It stores sealed content separately from mutable ASP objects and never overwrites
+a sealed publication. A provider supporting ordinary object reads and writes is
+not automatically compatible. The bounded initial inline Flow profile supports
+64 KiB per content object, subject to lower Storage limits.
+
+Each binding also selects **Refresh acquisitions if necessary**:
+
+| Refresh | Maximum age | Projection input selection |
+| --- | --- | --- |
+| Off | Empty or zero | Latest compatible success, without an age limit. |
+| Off | Positive | Latest compatible success within that age; otherwise fail. |
+| On | Empty or zero | Acquire for each new projection attempt. |
+| On | Positive | Reuse a recent compatible success, otherwise acquire. |
+
+Successful completion determines age; the exact age boundary is accepted.
+Explicit acquisition selection must match the saved configuration and freshness
+policy. Required failures stop publication; optional failures appear in provenance.
+A failed refresh never falls back to an expired success.
+
+Output content retains its exact Storage revision, rule, key, version and digest.
+Changing or revoking a Storage cannot redirect an old Snapshot. Stale revisions
+are explicitly unavailable; retained bytes are preserved. Keep both control-plane
+data and the configured local content root on persistent storage. Existing
+Artifact-only Snapshots retain their original receipts and read path.
+
+Editing a definition preserves unchanged dependency pins. To adopt revised Data
+Sources or active Flow versions, use **Update dependencies**, review the confirmation, then save. Existing Snapshots retain their original evidence.
+
+Projection requests accept an `idempotencyKey`. Retrying the same configuration
+returns or resumes the same attempt. Cancellation stops the caller's wait; accepted
+work remains resumable. After a restart, recovery uses recorded dependencies and
+authorization, without selecting a newer configuration. Sealing, Snapshot creation,
+activation and completion are distinct steps, with no distributed transaction.
+
+## Native Snapshot access for Agents
+
+Publish the source-specific `read`, `search_regex` and `get_status` relay Tools.
+The source identity is fixed in each immutable ToolDefinition. The ordinary Tool
+pipeline retains assignment, approval, hook, authorization and audit ownership.
+Publication creates a `<source>.access` ToolSet in the selected logical Instance,
+Tenant or Workspace scope; content and read sessions stay in the corresponding
+operational Workspace.
+
+Both reading and regex search may come first. Without `snapshotId` or `cursor`,
+they select the active usable Snapshot or prepare one through the existing
+projection and acquisition pipeline. Refresh restrictions in the table above
+still apply: a binding with refresh disabled cannot silently reacquire. Save
+**Automatic projection parameters** on the Source for implicit preparation.
+A pending result has `state: preparing`, `preparationId` and
+`retryAfterMilliseconds`; retry with that ID and the original request to continue
+the same attempt. Failure preserves the previous active Snapshot.
+
+| Tool | Request | Result |
+| --- | --- | --- |
+| `read` | Optional `snapshotId`, `documentId`, `range`, `maxCharacters`; or `cursor` only with an optional page size | Bounded chunks, exact Snapshot/document identities and `nextCursor` |
+| `search_regex` | `pattern`, optional `ignoreCase`, `snapshotId`, `limit`, `contextCharacters`; or `cursor` with optional limit | Matches with `matchRange`, `readRange`, excerpts and `nextCursor` |
+| `get_status` | Optional `snapshotId` to compare | Active versus latest published Snapshot, comparison flags, recorded input freshness, processing/failure evidence and document formats/sizes |
+
+Optional Snapshot, document and continuation selectors accept `null` as absent.
+For current status, call the relay with `{"request":{}}` or
+`{"request":{"snapshotId":null}}`. A supplied Snapshot ID must be non-empty;
+`""` is not a current-Snapshot shortcut. Invalid Tool arguments return a governed
+HTTP 422 with their schema path. The AWP `errorCode` alias remains readable in
+HTTP diagnostics while generic authentication `code` fields stay redacted.
+
+Initialization version 12 reconciles the native nullable selector contracts.
+Previously published relay versions keep their accepted schemas and pins.
+Republish the Knowledge Tool exposure under a new version, such as `1.0.1`, and
+select that ToolSet version for the Agent to use the updated contract.
+In the Console, open the Knowledge Source's **Tools** tab. The publication form
+remains available after the first publication, shows the current version and
+suggests the next patch version. Edit the proposed version and approval choice,
+then select **Publish a new Tool version**. Existing publications remain available;
+a failed publication keeps the previous exposure visible. Inherited Sources show
+their published Tools without owner-only publication controls.
+
+To read a search hit, pass its result `snapshotId`, match `documentId` and
+`readRange` as the `range` of `read`. Offsets count Unicode scalar characters,
+start inclusive and end exclusive. This is independent of UTF-8 byte offsets and
+UTF-16 string positions. A read or regex cursor pins its original Snapshot, even
+if a new Snapshot becomes active. Continue using only the cursor and page size;
+combining it with a new selection is rejected. An expired or unavailable historical
+selection fails explicitly without switching to another Snapshot.
+
+Cursors are opaque, authenticated, caller/source/scope-bound and valid for one
+hour. Every call rechecks authorization. Durable leases protect in-progress
+Snapshot selections, with 256 conditional slots per Workspace. Reusing a lease
+does not extend expiry. Text reads are limited to 32,768 Unicode characters per
+page and 1 MiB per document. Regex scans are limited to 8 MiB, a 512-character
+pattern, 100 matches per page, a 100 ms engine timeout and 32,768 excerpt characters.
+Regex uses .NET non-backtracking syntax: lookarounds and backreferences are
+unsupported; scalar-splitting matches fail explicitly. Binary formats need an
+explicit transformation into supported UTF-8 text during preparation.
+
+Source consultation, Snapshot history/details and `get_status` read persisted
+metadata only. They do not probe publications, read Artifact bytes, open provider
+sessions or resolve Secrets. Content availability is reported separately as
+`Unknown` (shown as **Not checked**) or metadata-known `Retired`. An active Snapshot
+and a `ready` status do not guarantee current provider health or permission to
+read content. `CheckedAt` dates the metadata evaluation, not a content probe.
+
+Actual reads check the selected Artifact's exact version, current access and
+integrity; unrelated Artifacts are not pre-read. Structured queries validate the
+exact pinned publication before running the query. Failures leave publication
+metadata and the active selection intact. See
+[ADR-0234](../decisions/0234-knowledge-consultation-reads-only-metadata.md).
+
+`get_status` never triggers acquisition or projection. Its freshness evidence
+comes from the active Snapshot's recorded acquisitions; it does not verify remote
+origin changes. The active Snapshot can be older than the latest published one
+when a user intentionally reselects an older publication.
+
+The Console **Consultation** tab uses the same three operations. The editor's
+**Update dependencies** action saves the configuration and adopts changed
+Data Source and Flow dependencies after confirmation. Ordinary saving preserves
+unchanged pins.
+
+An optional custom `knowledge.retrieval/v1` Flow can still serve the historical
+`/search`, `/query` and `/read` REST endpoints. Native endpoints under
+`/api/knowledgesources/{name}/content/` are `read`, `search-regex` and `status`
+(all POST; preparation returns HTTP 202). Native access invokes no retrieval Flow
+and creates no synthetic Flow Run. See [ADR-0210](../decisions/0210-knowledge-exposes-native-snapshot-access-tools.md).
 
 ## Flow contract catalog
 
@@ -75,3 +210,150 @@ Classified Flows use the single Flow-owned `flow.contract` metadata key:
 The contract value is a classification and schema boundary, not a new deployment unit. REST, Console, MCP, and background work delegate to the same family services inside the authoritative Agentstration process.
 
 See [ADR-0164](../decisions/0164-data-sources-own-governed-acquisition.md), [ADR-0166](../decisions/0166-flow-contracts-use-one-flow-owned-metadata-key.md), and [ADR-0167](../decisions/0167-knowledge-sources-project-data-source-artifacts.md).
+
+See [ADR-0207](../decisions/0207-knowledge-publishes-retained-storage-content.md) for publication limits and recovery semantics.
+
+## Artifact identity and Storage materialization
+
+Every successfully produced native acquisition and retained Knowledge output is
+registered as an Artifact. Its materialization identifies the exact Storage
+revision, content key, available version, length and integrity digest; its producer
+identifies the Data Source or Knowledge Source revision, acquisition/projection
+and actual Flow Run. Selecting a Storage does not remove Artifact identity.
+
+Open **Artifacts** to follow the producer and Storage links, then use the existing
+**Content** tab to create a governed local copy for preview or download. Acquisition
+history and Snapshot details also link to these Artifacts. A direct Storage write
+does not invent a source local copy or a Storage Flow Run.
+
+Existing native histories are reconciled in bounded background batches under the
+original caller's current permissions. This only restores missing Artifact metadata
+and acquisition manifests: content, origin executions and immutable Snapshots are
+preserved. Revoked or changed dependencies remain explicitly unavailable.
+
+Artifact identity does not add retention guarantees to a provider. Retained
+Snapshot output still supports the builtin local implementation; Azure/OpenDAL
+requires its own qualified publication adapter. See
+[ADR-0208](../decisions/0208-produced-content-remains-an-artifact-materialized-in-storage.md).
+
+Implementation evidence: [native Knowledge access validation](../architecture/implementation/knowledge-native-access-validation-2026-11-10.md).
+
+The Knowledge Source **Projections** tab polls the existing projection history
+while a projection runs. It shows an indeterminate activity indicator, elapsed
+time and acquisition/preparation/publication phases; once the root Flow exists,
+it also links its execution and reports completed root steps. The history and
+Snapshots refresh after success or failure, without retrying the start request.
+Reloading the page resumes observation of an existing active projection. A
+refresh failure leaves processing in progress and offers an explicit refresh.
+
+## Querying structured acquisition content
+
+For a Data Source backed by structured document Storage, open **Content** and
+choose a successful retained acquisition. Its query panel reads that acquisition's
+immutable publication. The acquired JSON preview remains available. Save the
+query under a display name and technical name to create an independent draft.
+
+Open **Queries** to edit and publish that draft, inspect its versions and execute
+one exact publication or the latest published version. Editing a draft changes no
+published version. Published queries live in Agentstration's configuration store,
+separately from acquired documents. The Query access panel controls sharing with
+descendant scopes; Source and Storage Use remain necessary at execution.
+
+Open **Tools** to find the Data Source's persisted publications after navigation
+or refresh. **Edit** opens the existing Tool definition editor to prepare and
+publish a new Tool version; the published invocation link remains available.
+The generic Query Tool belongs to the shared catalog and is omitted from this
+Data Source-specific list. It accepts the scoped Query reference; its invocation
+JSON is available on the selected Query. A named relay fixes the Query identity and
+optionally its version. Without a version, each initial call uses the most recent
+publication, including when its version number is lower. Publishing a compatible
+filter/order change requires no Tool or Flow republication. An incompatible
+contract fails explicitly instead of falling back; publish a new Tool version to
+adopt it. Acquisition selection is independent: latest successful retained
+acquisition or one fixed acquisition when publishing the relay.
+
+New Query relays hide the internal acquisition UID/pin from their caller schema. The initial call accepts `{}` and selects the latest retained acquisition automatically; platform authorization supplies the execution identity. In the Tool draft, **Hide** / **Masquer** can additionally omit optional inputs such as `request.acquisitionId` or the whole `request` object. Publish a new Tool version and explicitly adopt it to change an existing model-facing contract.
+
+Continue with the returned Query cursor only. The Query version and acquisition
+remain fixed during pagination even after new publications. Current permissions
+are checked on each page; retention and bounded cursor expiry still apply. Results
+record the resolved Query identity/version, digests and acquisition.
+
+Existing direct acquisition Tools are retained and listed as existing direct
+exposures. They still take query JSON at invocation; free-form input uses raw JSON
+editing. They are not rewritten into named queries automatically.
+
+For an acquired object containing `results`, the collection schema must describe
+the whole stored object. Selecting `/properties/results/items` does not split it.
+An OData payload such as `{"$select":"results"}` selects the envelope property;
+`{"$filter":"results/any(r:r/status eq 'EN COURS')"}` selects envelopes containing
+a matching item without filtering items inside the returned array. Per-item
+queries require an explicit transformation before publication.
+
+Storage administration configures collections and their contracts/capabilities;
+its query/Tool-publication block is no longer displayed. Underlying mutable
+document APIs remain available and do not address acquisition publications.
+
+See [ADR-0227](../decisions/0227-data-source-document-tools-select-latest-or-exact-acquisitions.md)
+and [ADR-0228](../decisions/0228-data-source-queries-evolve-independently-from-tool-exposures.md).
+
+## Discover and access Knowledge contributions
+
+A Knowledge Source's **Tools** view separates the proposed access surface from
+its published exposure. **Refresh proposed Tools** calculates the list from saved
+configuration and authorized metadata, without publishing, acquiring, projecting
+or reading content. Inspect each Tool's description and input/output contract,
+and compare added, modified, removed, unchanged or unavailable operations with
+the last publication. An unresolved capability is not a confirmed removal.
+Publication checks the reviewed proposal digest; refresh and review again after
+a relevant configuration or capability change.
+
+Newly published ToolSets include **describe**, recorded status, and eligible
+access Tools for each configured Data Source contribution. Descriptions explain
+business coverage to the Agent. An input inherits its
+Data Source description unless an input-specific override is supplied. Editorial
+changes become visible on the next describe/context preparation without
+republishing Tools. Display-name/description edits keep executable generations
+and dependency pins unchanged; ETags and audit records still track the update.
+Text-readable output supports bounded
+read/regex access; compatible structured output additionally supports the fixed
+query profile/model when its provider implements governed document subsets.
+Discovery is part of the same ToolSet assigned to an Agent. Calling `describe`
+with an empty request lists inputs and their business
+purpose with compact assigned Tool references. Each input exposes its `name`,
+`input` identifier and exact `describeTool`/`describeArguments`. Calling that
+input-level Tool with `{ "request": {} }` retrieves its schemas and detailed
+contracts; its input is fixed and cannot be overridden. Older exposures may use
+the source-wide describe with an exact exposed input identifier or unambiguous
+binding name. `request.snapshotId` selects exact retained Snapshot evidence. The
+system prompt lists assigned discovery Tools, guides the Agent through discovery
+before first data access, and requires consulting every available input before
+synthesis while reporting coverage gaps. Discovery alone is not data consultation.
+It reuses metadata already obtained for the same version/Snapshot. Invocation
+instructions from published contracts remain present if live editorial Source
+metadata is unavailable, without granting any extra access. Discovery does
+not make unassigned
+Tools callable or prove current provider health. Large descriptions fail at an
+explicit bound rather than silently reporting incomplete structure as complete.
+
+Tools access the final projected Knowledge content, not the upstream acquisition
+operations. Read/search/query and aggregate results are constrained to their
+fixed contribution. Two bindings of the same Data Source remain distinct.
+Transformations which produce a merged ensemble without unique input membership
+are represented as derived output; unavailable separation is diagnosed. Document
+inputs may be explicitly transformed into JSON records for a compatible
+structured output; there is no automatic binary document extraction or vector
+search.
+
+Reuse the returned `snapshotId` for subsequent contribution calls when a question
+requires one publication context. Continue with the returned cursor only; the
+relay supplies its fixed contribution/profile automatically. An explicit
+historical reference never switches to the active Snapshot. Discovery retains
+individual acquisition dates, since a composite Snapshot does not imply that its
+inputs were acquired simultaneously.
+
+Existing immutable Tools/ToolSets and Agent/Flow pins are not rewritten. Publish
+and explicitly adopt a new exposure to use contribution-specific access. Older
+native relay contracts which no longer match their platform source fail
+explicitly and require republication; historical Snapshot content remains intact.
+See [ADR-0237](../decisions/0237-knowledge-toolsets-describe-and-restrict-contributions.md).

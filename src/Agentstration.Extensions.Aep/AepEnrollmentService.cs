@@ -49,7 +49,7 @@ public sealed class AepEnrollmentService(
     AepEnrollmentSettingsService enrollmentSettings,
     IEnumerable<IAepEnrollmentAnnouncementProvisioner> announcementProvisioners,
     IEnumerable<IAepEnrollmentResourceProvisioner> resourceProvisioners,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider, ISecretResolver? secretResolver = null)
 {
     public const int MaximumAttempts = 5;
     public static readonly TimeSpan CodeLifetime = TimeSpan.FromSeconds(60);
@@ -627,6 +627,24 @@ public sealed class AepEnrollmentService(
             registrationName);
         var registration = await store.GetExactAsync<ExtensionRegistrationResource>(address, cancellationToken)
             ?? throw new InvalidOperationException("The enrollment registration is unavailable.");
+        if (authenticatedManifest is null && registration.Value.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && resourceProvisioners.Any())
+        {
+            // Assignment has already authorized the target scope. Resolve the existing registration credential
+            // through the Secret boundary, exactly as paired enrollment verifies its authenticated manifest.
+            var credential = registration.Value.Definition.Credential
+                ?? throw new InvalidOperationException("The enrollment credential reference is unavailable.");
+            using var system = RequestScopes().PushSystem();
+            using var resolved = await (secretResolver ?? throw new InvalidOperationException("Secret resolution is unavailable."))
+                .ResolveAsync(new(credential.Resolve(registration.Value.Namespace, SecretResourceKinds.Secret), credential.ScopeRef ?? scopeRef),
+                    new(scopeRef, registration.Value.Address), cancellationToken)
+                ?? throw new InvalidOperationException("The enrollment credential is unavailable.");
+            var bearer = new UTF8Encoding(false, true).GetString(resolved.Value.AccessValue().Span);
+            using var http = httpClients.CreateClient("agentstration-aep");
+            http.BaseAddress = registration.Value.Definition.Endpoint;
+            authenticatedManifest = await new AepClient(http, new StaticAepAccessTokenProvider(bearer), transportOptions,
+                registration.Value.Definition.ExpectedExtensionId).GetManifestAsync(cancellationToken);
+        }
         foreach (var provisioner in resourceProvisioners)
             await provisioner.ProvisionAsync(registration.Value, authenticatedManifest, cancellationToken);
     }

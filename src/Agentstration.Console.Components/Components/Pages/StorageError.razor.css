@@ -1,0 +1,13 @@
+.storage-error {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.storage-error ul {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+}
+
+.storage-error code {
+    overflow-wrap: anywhere;
+}

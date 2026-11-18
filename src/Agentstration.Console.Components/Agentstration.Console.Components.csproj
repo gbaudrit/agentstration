@@ -4,6 +4,7 @@
     <RootNamespace>Agentstration.Web</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Functions.Contracts/Agentstration.Functions.Contracts.csproj" />
     <InternalsVisibleTo Include="Agentstration.Console.Components.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="BlazorMonaco" />
@@ -11,6 +12,8 @@
     <ProjectReference Include="../Agentstration.Agents/Agentstration.Agents.csproj" />
     <ProjectReference Include="../Agentstration.Artifacts.Contracts/Agentstration.Artifacts.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Console.Client/Agentstration.Console.Client.csproj" />
+    <ProjectReference Include="../Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Storage.Contracts/Agentstration.Storage.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.ResourcePlanning.Contracts/Agentstration.ResourcePlanning.Contracts.csproj" />

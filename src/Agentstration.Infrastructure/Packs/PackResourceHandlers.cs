@@ -346,8 +346,9 @@ public sealed class DataSourcePackResourceHandler(
     {
         var value = Parse(resource) with { ScopeRef = TargetScope() };
         DataSourceManagementService.Validate(value);
+        if (value.Definition.Dataset is not null) return;
         var reference = value.Definition.Profile;
-        var ns = reference.Namespace ?? value.Namespace;
+        var ns = reference!.Namespace ?? value.Namespace;
         var planned = allResources.Any(candidate => candidate.Kind == DataSourceResourceKinds.DataSourceProfile
             && string.Equals(candidate.Name, reference.Name, StringComparison.Ordinal));
         if (!planned && await profiles.GetAsync(ns, reference.Name, reference.ScopeRef, cancellationToken) is null)

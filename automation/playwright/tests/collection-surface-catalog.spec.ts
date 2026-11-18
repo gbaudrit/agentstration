@@ -42,7 +42,7 @@ test('new repeated-item sources and shared frames cannot silently escape the inv
       if (!/\.(razor|cshtml)$/.test(file)) continue;
       const source = path.relative(repositoryRoot, file).replaceAll(path.sep, '/');
       const markup = fs.readFileSync(file, 'utf8');
-      if (markup.includes('@foreach')) expect(audited.has(source), source).toBe(true);
+      if (/@for(?:each)?\s*\(/.test(markup)) expect(audited.has(source), source).toBe(true);
       for (const frame of markup.matchAll(/<CollectionView\b[^>]*\bTItem="([^"]+)"/g))
         discoveredFrames.push({ source, itemType: frame[1] });
     }

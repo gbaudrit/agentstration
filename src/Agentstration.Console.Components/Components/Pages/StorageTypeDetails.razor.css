@@ -1,0 +1,5 @@
+code, pre, p, dd { overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; max-height: 30rem; overflow: auto; }
+textarea, select { width: 100%; min-width: 0; }
+dd { min-width: 0; margin-inline-start: 0; }
+@media (max-width: 640px) { .storage-evidence { display: grid; grid-template-columns: minmax(0, 1fr); } }

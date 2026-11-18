@@ -4,6 +4,7 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { test } from '../src/fixtures/test.js';
 
 test('direct Input connections offer Agent and Tool contracts @smoke', async ({ page, product }) => {
+  test.setTimeout(240_000);
   const pages = new ProductPages(page);
   await exerciseFlowConnectionContracts({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });

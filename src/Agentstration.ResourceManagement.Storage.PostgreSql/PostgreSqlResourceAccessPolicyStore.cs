@@ -60,7 +60,7 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
             throw new ResourceConcurrencyException("If-Match cannot update an access policy that does not exist.");
         if (row is not null && row.OwnerScopeRef != policy.Resource.OwnerScopeRef.Value)
             throw new ResourceConcurrencyException("The owner scope of an access policy is immutable.");
-        if (row is not null && ifMatch is not null && !string.Equals(row.ETag, ifMatch, StringComparison.Ordinal))
+        if (row is not null && !string.Equals(row.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current access policy version.");
         var etag = NewETag();
         var now = timeProvider.GetUtcNow();
@@ -102,7 +102,7 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
         var row = await context.ResourceAccessPolicies.SingleOrDefaultAsync(value => value.ResourceUid == resourceUid
             && value.OwnerScopeRef == ownerScopeRef.Value, cancellationToken)
             ?? throw new ResourceAccessPolicyException("policy_not_found", $"Access policy for resource '{resourceUid:D}' was not found.");
-        if (ifMatch is not null && !string.Equals(row.ETag, ifMatch, StringComparison.Ordinal))
+        if (!string.Equals(row.ETag, ifMatch, StringComparison.Ordinal))
             throw new ResourceConcurrencyException("The supplied ETag does not match the current access policy version.");
         context.ResourceAccessPolicies.Remove(row);
         await SaveAsync(context, cancellationToken);

@@ -1,6 +1,6 @@
 {
   "scope": "All current Console and Workplace functional collections; aliases are not counted as separate surfaces. Fixed navigation and form/enum fields are not list screens. Specialized renderers retain domain semantics.",
-  "baseline": "4d93297ddae7fbe9fd57b29dec8a6844027119a5 + maintainer-approved all-list compact rollout; historical captures retain their recorded sources",
+  "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
       "id": "run-grid-flow-run",
@@ -1428,7 +1428,7 @@
     {
       "id": "staged-artifact-details-artifact-lease",
       "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
-      "line": 106,
+      "line": 109,
       "host": "console",
       "routes": [
         "/artifacts/staged/{Id}"
@@ -2398,7 +2398,7 @@
     {
       "id": "tool-definitions-tool-definition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
-      "line": 17,
+      "line": 18,
       "host": "console",
       "routes": [
         "/tools/definitions"
@@ -3497,7 +3497,7 @@
     {
       "id": "data-source-editor-data-source-acquisition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 57,
+      "line": 63,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -3548,7 +3548,7 @@
     {
       "id": "data-source-editor-data-source-discovery-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 125,
+      "line": 131,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -3597,7 +3597,7 @@
     {
       "id": "data-source-editor-data-source-discovery-choice",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 141,
+      "line": 147,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -3646,7 +3646,7 @@
     {
       "id": "data-source-editor-data-source-acquisition-target-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 155,
+      "line": 161,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -3831,7 +3831,7 @@
     {
       "id": "knowledge-source-details-knowledge-data-source-binding-readiness",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 48,
+      "line": 52,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -3880,7 +3880,7 @@
     {
       "id": "knowledge-source-details-knowledge-projection-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 73,
+      "line": 86,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -3931,7 +3931,7 @@
     {
       "id": "knowledge-source-details-knowledge-projection-input-evidence",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 89,
+      "line": 102,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -3982,7 +3982,7 @@
     {
       "id": "knowledge-source-details-knowledge-snapshot-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 115,
+      "line": 128,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4031,7 +4031,7 @@
     {
       "id": "knowledge-source-details-knowledge-snapshot-artifact",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 135,
+      "line": 149,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4082,7 +4082,7 @@
     {
       "id": "knowledge-source-details-knowledge-source-tool-operation-exposure",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 202,
+      "line": 213,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4563,7 +4563,7 @@
     {
       "id": "schema-editor-schema-version-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
-      "line": 96,
+      "line": 100,
       "host": "console",
       "routes": [
         "/schemas/new",
@@ -4922,6 +4922,571 @@
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b02cb614c5e5475b05691d42e094a22f413682b8"
       }
+    },
+    {
+      "id": "tool-relay-editor-tool-definition-version-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionVersionResource",
+      "scope": false,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "SourceToolVersion",
+        "PublishedAt"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "tool-relay-editor-tool-definition-usage",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionUsage",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Version",
+        "RelayVersion"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-tool-proposal",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "line": 183,
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KnowledgeToolProposal",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ProposalChange",
+        "ToolContract"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "connected-service-details-connected-service-value-binding",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "line": 37,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConnectedServiceValueBinding",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceKind",
+        "ValueOrResource"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "connected-service-details-connected-service-export-descriptor",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConnectedServiceExportDescriptor",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ValueType",
+        "Protection",
+        "Format"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "transformation-functions-function-kind-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "line": 22,
+      "host": "console",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "FunctionKindResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Version"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "transformation-functions-transformation-function-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "line": 36,
+      "host": "console",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "TransformationFunctionResource",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Version",
+        "FunctionDescription"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "storages-storage-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "line": 24,
+      "host": "console",
+      "routes": [
+        "/storages"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "StorageResource",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Type"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "connected-services-connected-service-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "line": 22,
+      "host": "console",
+      "routes": [
+        "/connected-services"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConnectedServiceResource",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Type"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "data-source-queries-data-source-query-tool-publication",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "line": 14,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceQueryToolPublication",
+      "scope": true,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Queries.Version",
+        "Queries.QueryVersion",
+        "DatasetContentAcquisition"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "data-source-queries-data-source-query-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "line": 51,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceQueryResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "connected-service-discovery-panel-connected-service-operation-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
+      "line": 29,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConnectedServiceOperationResource",
+      "scope": true,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "Enabled",
+        "Generation"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "connected-service-discovery-panel-connected-service-operation-discovery-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
+      "line": 44,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConnectedServiceOperationDiscoveryResource",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Discovery.Created",
+        "Code"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "flow-run-artifact-details-record-row",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "line": 103,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "RecordRow",
+      "scope": false,
+      "state": false,
+      "actions": true,
+      "informationKeys": [
+        "Size"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "storage-types-storage-type-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
+      "line": 21,
+      "host": "console",
+      "routes": [
+        "/storage-types"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "StorageTypeResource",
+      "scope": true,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "Origin"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "data-source-dataset-editor-data-source-acquisition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "line": 173,
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DataSourceAcquisitionResource",
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "informationKeys": [
+        "DatasetContent",
+        "FlowRun"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174"
+    },
+    {
+      "id": "storage-details-storage-export-binding",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "line": 43,
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "StorageExportBinding",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Export",
+        "ValueType",
+        "Protection"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "The final audit found this previously uncataloged DataGrid and converted it to the existing shared frame; one additional functional dataset is now recorded."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "implementationPR": 1174,
+        "coveragePR": 1132,
+        "domainSemantics": "RequirementId is the actual non-resource identity; show exact export id, value type and protection without owner, state, publication version or invented destination.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      },
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Requirement",
+      "rowTestId": "storage-mapping"
     }
   ],
   "specialized": [
@@ -14205,6 +14770,1449 @@
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "59e1305cf6b5f18cba42d5829053966c99697879"
       }
+    },
+    {
+      "id": "storage-details-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded observed diagnostics retain code, localized explanation and observation time; no fabricated lifecycle or resource route.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Bounded observed diagnostics retain code, localized explanation and observation time; no fabricated lifecycle or resource route.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-details-dependents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dependent resources keep exact permitted destinations and full known identifiers without inventing absent namespaces or owner fields.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Dependent resources keep exact permitted destinations and full known identifiers without inventing absent namespaces or owner fields.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-type-details-dependent-storages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Storage usages retain their actual links and identifiers, without inferred namespaces.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Storage usages retain their actual links and identifiers, without inferred namespaces.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-type-details-immutable-version-choice",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Exact immutable type version selector retains historical versions and availability; this is not draft/publication presentation.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Exact immutable type version selector retains historical versions and availability; this is not draft/publication presentation.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-type-details-requirements",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Version-owned requirements expose actual id, required flag, type, protection and format as contract evidence, not owner markers.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Version-owned requirements expose actual id, required flag, type, protection and format as contract evidence, not owner markers.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-type-evidence-query-profiles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeEvidence.razor",
+      "host": "console",
+      "routes": [
+        "/storages",
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Typed query profile evidence retains exact id/version/encoding within the selected immutable type contract.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Typed query profile evidence retains exact id/version/encoding within the selected immutable type contract.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storages-type-version-evidence",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "host": "console",
+      "routes": [
+        "/storages"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Expandable type/version evidence preserves real immutable contracts and observed availability; expands without selecting or mutating a resource.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Expandable type/version evidence preserves real immutable contracts and observed availability; expands without selecting or mutating a resource.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-documents-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Only enabled document collections are selectable by exact UID; no invented resource namespace or detail link.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Only enabled document collections are selectable by exact UID; no invented resource namespace or detail link.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-documents-published-tools",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Published tool references expose full exact qualified identity and authorized owner scope; their detail URL uses the known resource owner/navigation context. No managed or inherited lock is inferred without governance evidence.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Published tool references expose full exact qualified identity and authorized owner scope; their detail URL uses the known resource owner/navigation context. No managed or inherited lock is inferred without governance evidence.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-editor-type-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "host": "console",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Type/version choices retain exact scoped keys, generation/hash provenance, availability and granted use; unavailable saved pins remain visible.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Type/version choices retain exact scoped keys, generation/hash provenance, availability and granted use; unavailable saved pins remain visible.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-editor-connected-service-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "host": "console",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Connected Service selector preserves exact authorized service identity and generation; no per-row lookup.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Connected Service selector preserves exact authorized service identity and generation; no per-row lookup.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-editor-export-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "host": "console",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Compatible exports remain grouped under their input requirement with exact id/type/protection/format; input contract fields are not owner scopes.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Compatible exports remain grouped under their input requirement with exact id/type/protection/format; input contract fields are not owner scopes.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "tool-relay-source-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Source tools retain exact owner/namespace/name, immutable source versions and unavailable saved pins across creation and edit selectors.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Source tools retain exact owner/namespace/name, immutable source versions and unavailable saved pins across creation and edit selectors.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "tool-relay-source-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Creation selects one immutable source version from the chosen tool; values and independent relay/source version semantics remain unchanged.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Creation selects one immutable source version from the chosen tool; values and independent relay/source version semantics remain unchanged.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-query-publication-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Actual immutable query publications remain selectable in run and tool-publication forms; selected historical versions are not hidden as drafts.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Actual immutable query publications remain selectable in run and tool-publication forms; selected historical versions are not hidden as drafts.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-query-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Query selection keeps exact UID and qualified identity; edit/run commands stay family-owned.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Query selection keeps exact UID and qualified identity; edit/run commands stay family-owned.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-query-retained-acquisition-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Explicit exact-acquisition mode selects only retained acquisition identities; latest/exact mode remains a domain choice.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Explicit exact-acquisition mode selects only retained acquisition identities; latest/exact mode remains a domain choice.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-snapshot-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Snapshot selection preserves real retained snapshot names and the explicit automatic-selection option.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Snapshot selection preserves real retained snapshot names and the explicit automatic-selection option.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-read-chunks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded read chunks retain exact document id, character ranges, content order and real continuation.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Bounded read chunks retain exact document id, character ranges, content order and real continuation.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-regex-matches",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded search matches retain exact document id/ranges, excerpts and direct read-match commands.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Bounded search matches retain exact document id/ranges, excerpts and direct read-match commands.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-record-lineage",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Structured record lineage retains exact document/artifact identities and member ordinal; no invented resource lifecycle.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Structured record lineage retains exact document/artifact identities and member ordinal; no invented resource lifecycle.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-input-freshness",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Input readiness retains binding name, acquisition time and explicit fresh/stale meaning independent of resource ownership.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Input readiness retains binding name, acquisition time and explicit fresh/stale meaning independent of resource ownership.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-content-document-status",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Document availability retains exact document identity, media type and byte count; adapter bounds and cursor expiry stay unchanged.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Document availability retains exact document identity, media type and byte count; adapter bounds and cursor expiry stay unchanged.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-connected-service-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized Connected Services retain exact UID/owner/namespace/name and unavailable saved pins.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Authorized Connected Services retain exact UID/owner/namespace/name and unavailable saved pins.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-operation-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Service-owned operations retain exact operation generation, availability and enablement; no owner context is inferred from a business relationship.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Service-owned operations retain exact operation generation, availability and enablement; no owner context is inferred from a business relationship.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-storage-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Storage choices preserve exact scoped pin and generation alongside explicit direct-input behavior.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Storage choices preserve exact scoped pin and generation alongside explicit direct-input behavior.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-document-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Compatible enabled document collections use real UIDs and retain required collection validation.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Compatible enabled document collections use real UIDs and retain required collection validation.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-acquisition-content-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Retained acquisition selection preserves actual creation time/name and latest selection; no synthetic total or full reload.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Retained acquisition selection preserves actual creation time/name and latest selection; no synthetic total or full reload.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-manifest-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Acquisition manifest members keep exact artifact IDs and existing durable artifact destinations.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Acquisition manifest members keep exact artifact IDs and existing durable artifact destinations.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "transformation-function-kind-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized function kinds retain exact scope/namespace/name and immutable kind versions in native selection.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Authorized function kinds retain exact scope/namespace/name and immutable kind versions in native selection.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "transformation-function-implementation-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native implementation selection preserves exact implementation id/version; protocol identity is not localized or renamed.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Native implementation selection preserves exact implementation id/version; protocol identity is not localized or renamed.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "connected-service-type-variant-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/connected-services/new",
+        "/connected-services/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized type variants retain exact owner/namespace/name, immutable schema digest/version and unavailable constraints; typed input fields keep their specialized binding editor.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Authorized type variants retain exact owner/namespace/name, immutable schema digest/version and unavailable constraints; typed input fields keep their specialized binding editor.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "connected-service-dependent-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Dependent resources retain actual linked identity and permitted context, without inventing missing namespaces or owner scope fields.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Dependent resources retain actual linked identity and permitted context, without inventing missing namespaces or owner scope fields.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "function-kind-version-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "host": "console",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Expanded kind contracts retain immutable versions, executor and schema inspection within the selected actual kind; historical contract versions remain useful evidence.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Expanded kind contracts retain immutable versions, executor and schema inspection within the selected actual kind; historical contract versions remain useful evidence.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-function-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Function candidates retain exact descriptor/reference keys, schema compatibility and required selection semantics.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Function candidates retain exact descriptor/reference keys, schema compatibility and required selection semantics.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-child-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Child Flow candidates preserve exact scope/namespace/id and compatible typed contracts; unavailable saved pins remain represented.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Child Flow candidates preserve exact scope/namespace/id and compatible typed contracts; unavailable saved pins remain represented.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-child-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Immutable child Flow version selection preserves exact versions and full links; these historical dependencies are not list publication metadata.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Immutable child Flow version selection preserves exact versions and full links; these historical dependencies are not list publication metadata.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-ordered-calls",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Ordered Flow/function calls retain schema-bound parameters, direct move/remove/add commands, read-only restrictions and existing 32/200 limits; no fabricated resource identity.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Ordered Flow/function calls retain schema-bound parameters, direct move/remove/add commands, read-only restrictions and existing 32/200 limits; no fabricated resource identity.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-orchestration-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Orchestration candidates retain exact typed Flow references and standard orchestration semantics.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Orchestration candidates retain exact typed Flow references and standard orchestration semantics.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "source-flow-composition-points",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Named declared/orphaned composition points retain ordered nested editors, validation and direct orphan-removal controls.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Named declared/orphaned composition points retain ordered nested editors, validation and direct orphan-removal controls.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "new-tool-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Creation selects the actual scoped Flow and preserves exact namespaced reference and owner context.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Creation selects the actual scoped Flow and preserves exact namespaced reference and owner context.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "new-tool-flow-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Creation pins a real immutable Flow version without guessing a future publication.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Creation pins a real immutable Flow version without guessing a future publication.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-run-produced-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowRunOutput.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Produced artifact cards retain exact artifact ID/copy/navigation, media/size/storage evidence and directly visible Inspect; transient/expired payload behavior remains intact.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Produced artifact cards retain exact artifact ID/copy/navigation, media/size/storage evidence and directly visible Inspect; transient/expired payload behavior remains intact.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-process-ordered-units",
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowProcessSummary.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Process units remain ordered by ordinal with real progress/state, exact child-run links and admission evidence; execution scope is not resource ownership.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Process units remain ordered by ordinal with real progress/state, exact child-run links and admission evidence; execution scope is not resource ownership.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "execution-progress-active-locations",
+      "source": "src/Agentstration.Console.Components/Components/Flows/ExecutionProgress.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Live active Flow/step locations retain aria-live/progress semantics and exact scoped run navigation; no resource publication or owner badge is invented.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Live active Flow/step locations retain aria-live/progress semantics and exact scoped run navigation; no resource publication or owner badge is invented.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-run-owned-processes",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Causal nodes retain their actual process-admission groups, correlated run links and process-unit progress within the causal tree.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Causal nodes retain their actual process-admission groups, correlated run links and process-unit progress within the causal tree.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-run-artifact-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Selected execution artifact contracts remain explicit read-only structured evidence; do not turn schemas into governed resources.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Selected execution artifact contracts remain explicit read-only structured evidence; do not turn schemas into governed resources.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-source-output-storage-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Authorized output Storage choices preserve exact scoped pins and allow only valid source output contracts.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Authorized output Storage choices preserve exact scoped pins and allow only valid source output contracts.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-source-output-document-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Compatible document collection choices retain exact UIDs, required checks and type compatibility.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Compatible document collection choices retain exact UIDs, required checks and type compatibility.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-transform-function-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowTransformInspector.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Exact function descriptor/reference choices retain contract schema parameters and read-only behavior; generated parameter fields are specialized forms.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Exact function descriptor/reference choices retain contract schema parameters and read-only behavior; generated parameter fields are specialized forms.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "flow-data-mapping-variable-options",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDataMappingEditor.razor",
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "The specialized free-expression combobox keeps dynamic variable suggestions, keyboard navigation, Escape, focus and JSON/raw expression modes.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "The specialized free-expression combobox keeps dynamic variable suggestions, keyboard navigation, Escape, focus and JSON/raw expression modes.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-collection-definition-rows",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor",
+      "host": "console",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Ordered editable document collection definitions preserve real UIDs, names, schema/query contracts, direct add/remove commands and existing validation; these are embedded collection forms, not independent owned resources.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Ordered editable document collection definitions preserve real UIDs, names, schema/query contracts, direct add/remove commands and existing validation; these are embedded collection forms, not independent owned resources.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "structured-document-query-profile-choices",
+      "source": "src/Agentstration.Console.Components/Components/StructuredDocumentQueryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Native query profile selection preserves exact id/version/encoding, policy page-size limits and reset/continuation semantics; no publication version or owner is inferred.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Native query profile selection preserves exact id/version/encoding, policy page-size limits and reset/continuation semantics; no publication version or owner is inferred.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionDocuments.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Structured document result pages retain the exact acquisition, typed record envelope and actual next cursor. JSON is the appropriate bounded technical renderer.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Structured document result pages retain the exact acquisition, typed record envelope and actual next cursor. JSON is the appropriate bounded technical renderer.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "storage-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded Storage document query pages retain complete JSON result envelopes and real continuation; the format is domain evidence rather than a governed resource list.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Bounded Storage document query pages retain complete JSON result envelopes and real continuation; the format is domain evidence rather than a governed resource list.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "knowledge-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Structured Knowledge query pages preserve query profile id/version/model digest and complete record envelope; real cursors and expiry remain adapter-owned.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Structured Knowledge query pages preserve query profile id/version/model digest and complete record envelope; real cursors and expiry remain adapter-owned.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "dataset-saved-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Saved query results retain their typed bounded document page and selected immutable query version; no fake total or implicit full loading.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Saved query results retain their typed bounded document page and selected immutable query version; no fake total or implicit full loading.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
+    },
+    {
+      "id": "tool-relay-fixed-input-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "host": "console",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Visible fixed-input binding rows remain specialized ValueBindingRequirementEditor forms with exact input paths, allowed sources, restrictions and validation; row ordering and binding identity stay domain-owned.",
+      "validation": "source-reviewed-current-validation-pending",
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+        "routeEvidence": [],
+        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction."
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "implementationPR": 1174,
+        "domainSemantics": "Visible fixed-input binding rows remain specialized ValueBindingRequirementEditor forms with exact input paths, allowed sources, restrictions and validation; row ordering and binding identity stay domain-owned.",
+        "evidenceStatus": "Fresh validation pending final merged source."
+      }
     }
   ],
   "sourceAudit": [
@@ -14777,18 +16785,178 @@
       "source": "src/Agentstration.Web.Components/Schemas/SchemaPropertyNode.razor",
       "classification": "non-collection-control",
       "reason": "Fixed type options inside the separately inventoried schema property editor."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeEvidence.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed contract/enum/media-type options or localized bounded error details, not independently navigable functional collection resources."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageError.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed contract/enum/media-type options or localized bounded error details, not independently navigable functional collection resources."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Flows/ExecutionProgress.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowRunOutput.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowProcessSummary.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowTransformInspector.razor",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowArtifactTransformInspector.razor",
+      "classification": "non-collection-control",
+      "reason": "Fixed contract/enum/media-type options or localized bounded error details, not independently navigable functional collection resources."
+    },
+    {
+      "source": "src/Agentstration.Web/Pages/Account/Pat.cshtml",
+      "classification": "inventoried",
+      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional indexed-loop dataset explicitly inventoried; count dataset once across shared hosts, not raw loop instances."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StructuredDocumentQueryEditor.razor",
+      "classification": "inventoried",
+      "reason": "Functional indexed-loop dataset explicitly inventoried; count dataset once across shared hosts, not raw loop instances."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourcePageTabs.razor",
+      "classification": "non-collection-control",
+      "reason": "Indexed fixed ResourcePageTab navigation choices retain ARIA/keyboard handling; these are navigation controls, not independently owned functional datasets."
+    },
+    {
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowNodeWidget.razor",
+      "classification": "non-collection-control",
+      "reason": "Indexed output-port controls inside one topology node retain graph connection semantics; the existing topology surface owns the functional graph."
     }
   ],
   "reconciliation": {
-    "date": "2026-11-13",
-    "historicalActiveCollections": 214,
-    "addedActiveCollections": 57,
-    "addedLegacyRenderers": 1,
-    "activeCollections": 271,
-    "sharedFrames": 71,
-    "specializedActive": 200,
+    "date": "2026-11-18",
+    "incomingMain": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a",
+    "previousMain": "cc8e906e1b833e86e365c549ce4c9696376f3407",
+    "previousPromotion": "8b568e3633005062199268e56b76a2e5abb4a20d",
+    "sharedFrames": 88,
+    "specializedActive": 258,
     "unmountedLegacy": 4,
-    "auditedRepeatedItemSources": 114,
+    "activeCollections": 346,
+    "newFunctionalCollections": 75,
+    "auditedRepeatedItemSources": 145,
+    "validation": "Source reconciliation complete; fresh run status belongs to final PR1174 validation and sync-main-1174.md. Historical screenshots retain their original source provenance.",
+    "historicalActiveCollections": 271,
+    "addedActiveCollections": 75,
+    "addedLegacyRenderers": 0,
     "meaning": "Functional collections, including shared embedded selectors/history renderers; not routes, screens, raw foreach loops or route aliases. Fixed navigation, enum options and schema-generated form fields remain controls."
   },
   "compactVerification": {
@@ -14829,5 +16997,34 @@
       "populatedContractPassed": 1,
       "evidence": "evidence/1121/compact-all/trigger-observations.json"
     }
-  }
+  },
+  "mainSynchronization": {
+    "date": "2026-11-18",
+    "incomingMain": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a",
+    "previousMain": "cc8e906e1b833e86e365c549ce4c9696376f3407",
+    "previousPromotion": "8b568e3633005062199268e56b76a2e5abb4a20d",
+    "sharedFrames": 88,
+    "specializedActive": 258,
+    "unmountedLegacy": 4,
+    "activeCollections": 346,
+    "newFunctionalCollections": 75,
+    "auditedRepeatedItemSources": 145,
+    "validation": "Source reconciliation complete; fresh run status belongs to final PR1174 validation and sync-main-1174.md. Historical screenshots retain their original source provenance.",
+    "auditDelta": "27 newly repeated @foreach sources, two incoming indexed-loop sources, and two pre-existing indexed controls newly checked by the stronger guard.",
+    "lastAuditFinding": "StorageDetails export-binding DataGrid was absent from the initial new-surface count. It is now a distinct shared frame included in the current total of346."
+  },
+  "reconciliationHistory": [
+    {
+      "date": "2026-11-13",
+      "historicalActiveCollections": 214,
+      "addedActiveCollections": 57,
+      "addedLegacyRenderers": 1,
+      "activeCollections": 271,
+      "sharedFrames": 71,
+      "specializedActive": 200,
+      "unmountedLegacy": 4,
+      "auditedRepeatedItemSources": 114,
+      "meaning": "Functional collections, including shared embedded selectors/history renderers; not routes, screens, raw foreach loops or route aliases. Fixed navigation, enum options and schema-generated form fields remain controls."
+    }
+  ]
 }

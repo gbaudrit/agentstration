@@ -109,6 +109,39 @@ public sealed class ResourceScopesComponentTests
         Assert.IsEmpty(rendered.FindAll("tr.resource-row a"));
     }
 
+    [TestMethod]
+    public void AddedFamiliesRetainExactNamespaceAndOwnerInScopeInventoryLinks()
+    {
+        var owner = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var space = ResourceNamespace.Parse("team-a");
+        var inventory = new ResourceScopeInventoryResponse(
+        [
+            new(owner, ResourceScopeKind.Tenant, "Team", null, true,
+            [
+                new(Guid.NewGuid(), space, "StorageType", "same-name", DateTimeOffset.UtcNow),
+                new(Guid.NewGuid(), space, "Storage", "same-name", DateTimeOffset.UtcNow),
+                new(Guid.NewGuid(), space, "TransformationFunction", "same-name", DateTimeOffset.UtcNow),
+                new(Guid.NewGuid(), space, "FunctionKind", "same-name", DateTimeOffset.UtcNow)
+            ])
+        ]);
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
+        var rendered = context.Render<ResourceScopes>();
+        var links = rendered.FindAll("a.resource-name-link");
+        Assert.HasCount(3, links);
+        foreach (var link in links)
+        {
+            var href = link.GetAttribute("href");
+            StringAssert.Contains(href, "namespace=team-a");
+            StringAssert.Contains(href, "scopeRef=" + Uri.EscapeDataString(owner.Value));
+            StringAssert.Contains(href, "context=" + Uri.EscapeDataString(owner.Value));
+        }
+        Assert.IsTrue(links.Any(link => link.GetAttribute("href")!.StartsWith("/storage-types/", StringComparison.Ordinal)));
+        Assert.IsTrue(links.Any(link => link.GetAttribute("href")!.StartsWith("/transformation-functions/", StringComparison.Ordinal)));
+        Assert.HasCount(4, rendered.FindAll("tr.resource-row"));
+    }
+
     private sealed class FakeClient(ResourceScopeInventoryResponse inventory) : IResourceScopeInventoryClient
     {
         public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => Task.FromResult(inventory);

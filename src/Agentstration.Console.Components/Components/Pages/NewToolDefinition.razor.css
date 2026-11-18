@@ -1,0 +1,275 @@
+.tool-create-shell {
+    max-width: 1400px;
+    margin-inline: auto;
+}
+
+.tool-create-shell ::deep [hidden] {
+    display: none !important;
+}
+
+.tool-create-progress {
+    display: flex;
+    align-items: center;
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.tool-create-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-create-step strong {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+}
+
+.tool-create-step.is-active,
+.tool-create-step.is-complete {
+    color: var(--text);
+}
+
+.is-active strong,
+.is-complete strong {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.is-complete strong {
+    background: var(--primary);
+    color: var(--primary-contrast, #fff);
+}
+
+.tool-create-progress-line {
+    width: 70px;
+    height: 1px;
+    margin-inline: 12px;
+    background: var(--border);
+}
+
+.tool-create-shell ::deep .panel {
+    padding: 28px;
+    margin-bottom: 24px;
+}
+
+.tool-create-shell ::deep .tool-create-section-header {
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.tool-create-shell ::deep .tool-create-section-header h2 {
+    margin: 0;
+    font-size: 1.12rem;
+}
+
+.tool-create-shell ::deep .tool-create-section-header p:not(.eyebrow) {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.tool-create-shell ::deep .tool-create-section-number {
+    color: var(--primary);
+    font: 700 .72rem var(--font-mono);
+}
+
+.tool-create-identity-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.tool-create-span-all {
+    grid-column: 1 / -1;
+}
+
+.tool-create-shell ::deep .tool-kind-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.tool-kind-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    min-height: 118px;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-2);
+    cursor: pointer;
+}
+
+.tool-kind-card:hover,
+.tool-kind-card:focus-within {
+    border-color: var(--primary);
+}
+
+.tool-kind-card:focus-within {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+}
+
+.tool-kind-card.is-selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.tool-kind-card ::deep input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.tool-kind-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--primary);
+}
+
+.tool-kind-copy {
+    display: grid;
+    gap: 5px;
+}
+
+.tool-kind-copy strong {
+    font-size: .9rem;
+}
+
+.tool-kind-copy small {
+    color: var(--muted);
+    font-size: .73rem;
+    font-weight: 400;
+}
+
+.tool-kind-check {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: transparent;
+}
+
+.is-selected .tool-kind-check {
+    background: var(--primary);
+    color: var(--primary-contrast, #fff);
+}
+
+.tool-kind-check ::deep .ui-icon {
+    width: 13px;
+    height: 13px;
+}
+
+.tool-create-shell ::deep .tool-create-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 18px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: .8rem;
+}
+
+.tool-create-shell ::deep .tool-create-summary > span {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.tool-create-shell ::deep .tool-create-actions {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .16);
+}
+
+.tool-create-shell ::deep .tool-create-actions > span {
+    display: grid;
+    gap: 3px;
+    font-size: .78rem;
+}
+
+.tool-create-shell ::deep .tool-create-actions small {
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.tool-create-shell ::deep .tool-create-actions > div {
+    display: flex;
+    gap: 10px;
+}
+
+@media (max-width: 900px) {
+    .tool-create-identity-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 680px) {
+    .tool-create-shell ::deep .panel {
+        padding: 20px;
+    }
+
+    .tool-create-shell ::deep .tool-kind-grid,
+    .tool-create-identity-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tool-kind-card {
+        min-height: auto;
+        padding: 18px;
+        gap: 12px;
+    }
+
+    .tool-create-shell ::deep .tool-create-actions {
+        position: static;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .tool-create-shell ::deep .tool-create-actions > div {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .tool-create-shell ::deep .tool-create-actions button,
+    .tool-create-shell ::deep .tool-create-actions a {
+        justify-content: center;
+    }
+}

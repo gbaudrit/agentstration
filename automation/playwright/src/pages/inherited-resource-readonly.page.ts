@@ -146,6 +146,7 @@ export class InheritedResourceReadOnlyPage {
   }
 
   public async changeToOwnerScope(): Promise<void> {
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.notice.getByTestId(TestIds.common.switchToOwnerContext).click();
   }
 

@@ -53,7 +53,19 @@ The `SourceProviderExtension` sample demonstrates the native `aep.source-provide
 
 Extensions may also publish `schema-format` contributions through `aep.schema-formats`. A contribution declares format metadata and maps `validateDefinition` and `validateInstance` to MCP operations. These mappings are consumer service operations, not Agent Tool contributions; consumers validate their bounded structured results and decide how providers participate in format resolution.
 
+Extensions may publish immutable `connected-service-type` contributions through `aep.connected-service-types`. Each type declares a preferred version and exact versions containing a JSON configuration schema and digest, typed/protected inputs and typed/protected exports. AEP describes types only: the consuming product owns configured instances, scope, references, lifecycle and Secret resolution. Register descriptors through `AepExtensionOptions.ConnectedServiceTypes`; changing a schema requires a new version.
+
+Protocol-specific operation contracts are separate `connected-service-operation-type` contributions advertised through `aep.connected-service-operation-types`. Register them through `AepExtensionOptions.ConnectedServiceOperationTypes`. A Connected Service type version may bind an exact contributed discovery Flow and the operation-type ids/versions that its bounded discovery manifest is allowed to produce. This lets an OpenAPI extension own OpenAPI service and operation shapes without inheriting the builtin HTTP type or coupling to another extension.
+
 ## Authenticate AEP traffic
+
+Connected Service operation providers can additionally implement the opt-in
+[protected operation discovery contract](docs/connected-service-operation-discovery.md).
+The corresponding [protected acquisition contract](docs/connected-service-operation-acquisition.md)
+lets operation types supply an acquisition Flow declaration and execute read-only
+operations through the same protected boundary.
+It reuses Bound Values and one-use Secret capabilities without sending configured
+product identities or resolved connection values through ordinary Flow inputs.
 
 The client accepts a request-scoped credential provider. It applies the Bearer to each request without changing shared `HttpClient.DefaultRequestHeaders`:
 
@@ -100,3 +112,14 @@ See [the protocol specification](docs/specification/protocol.md) and [compatibil
 ## License
 
 AEP, its .NET SDK, CLI, Inspector and samples are licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution information.
+
+Extensions may advertise `aep.storage-types` version `1.0` through
+`AepExtensionOptions.StorageTypes`. Contributions describe immutable Storage
+implementation versions, typed/protected connection requirements, opaque
+configuration/envelope schemas and digests, actual capabilities/limits, and the
+`asp.content/1` MCP mapping. Requirement-bearing types also advertise bound-value
+support, plus Secret access for secured requirements. The optional
+[`Agentstration.Asp.Aep`](../asp/README.md) adapter owns the bounded authenticated
+binding exchange; it keeps credentials/configuration out of content Tool inputs.
+The [product integration](../docs/reference/storage-execution.md) preserves explicit
+manual bindings and independently authorizes originating users and transport callers.

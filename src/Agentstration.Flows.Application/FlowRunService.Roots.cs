@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 
 namespace Agentstration.Flows.Application;
 
@@ -24,7 +25,12 @@ public sealed record EnsureRootFlowRunCommand(
     string? TriggerMessageId,
     FlowRunScope Scope)
 {
+    public bool TransientPayloads { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool AcceptedCompositionSchemas { get; init; }
+    public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
+    public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 
 public sealed partial class FlowRunService
@@ -42,10 +48,15 @@ public sealed partial class FlowRunService
         }
 
         var resolved = await ResolveVersionAsync(command.Scope.AccessScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
-        ValidateInput(resolved.Graph?.InputSchema, command.Input);
+        var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
+            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved, command.Compositions, command.Scope.AccessScopeRef, cancellationToken, command.AcceptedCompositionSchemas);
+        resolved = composed.Definition;
+        ValidateInput(resolved.Graph?.ResolveInputSchema(), command.Input, command.SecretInputs);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
+            Composition = composed.Receipt,
+            TransientPayloads = command.TransientPayloads,
             WorkspaceId = command.Scope.WorkspaceId,
             Id = command.RunId,
             FlowId = command.FlowId,
@@ -66,6 +77,7 @@ public sealed partial class FlowRunService
             TriggerMessageId = command.TriggerMessageId,
             Scope = command.Scope,
             Input = command.Input.Clone(),
+            SecretInputs = command.SecretInputs.ToArray(),
             CreatedAt = now,
             DefinitionSnapshot = resolved,
             DefinitionHash = resolved.DefinitionHash,
@@ -98,7 +110,9 @@ public sealed partial class FlowRunService
 
     private static void ValidateRootIdentity(FlowRun run, EnsureRootFlowRunCommand command)
     {
-        if (run.Scope != command.Scope
+        if (run.TransientPayloads && !run.TransientPayloadsAvailable)
+            throw new FlowValidationException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
+        if (run.TransientPayloads != command.TransientPayloads || run.Scope != command.Scope
             || run.FlowId != command.FlowId
             || run.RootFlowRunId is not null
             || run.NestingDepth != 0
@@ -116,6 +130,39 @@ public sealed partial class FlowRunService
             || !string.Equals(run.TriggerMessageId, command.TriggerMessageId, StringComparison.Ordinal)
             || !JsonElement.DeepEquals(run.Input, command.Input))
             throw new FlowValidationException("flow_root_identity_conflict", "The root Flow Run identity is already bound to another invocation.");
+
+        var accepted = run.Composition?.Bindings ?? new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
+        foreach (var point in command.Compositions)
+        {
+            if (!accepted.TryGetValue(point.Key, out var calls) || calls.Count != point.Value.Count)
+                throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
+            for (var index = 0; index < calls.Count; index++)
+            {
+                var requested = point.Value[index]; var pinned = calls[index];
+                if (requested.Function is not null || pinned.Function is not null)
+                {
+                    if (requested.Flow is not null || pinned.Flow is not null || requested.Function is not { } requestedFunction || pinned.Function is not { } pinnedFunction
+                        || requestedFunction.Name != pinnedFunction.Name || requestedFunction.Version != pinnedFunction.Version
+                        || requestedFunction.ScopeRef is { } functionScope && functionScope != pinnedFunction.ScopeRef
+                        || requestedFunction.Namespace is { } functionNamespace && functionNamespace != pinnedFunction.Namespace
+                        || requestedFunction.Uid is { } functionUid && functionUid != pinnedFunction.Uid
+                        || requestedFunction.Digest is { } functionDigest && functionDigest != pinnedFunction.Digest)
+                        throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another function composition.");
+                }
+                else if (requested.Flow is not { } requestedFlow || pinned.Flow is not { } pinnedFlow
+                    || requestedFlow.ResourceId != pinnedFlow.ResourceId
+                    || requestedFlow.Namespace is { } ns && ns != pinnedFlow.Namespace
+                    || requestedFlow.ScopeRef is { } scope && scope != pinnedFlow.ScopeRef
+                    || requestedFlow.VersionStrategy == FlowCallVersionStrategy.Exact && requestedFlow.Version != pinnedFlow.Version
+                    || requestedFlow.ResourceUid is { } uid && uid != pinnedFlow.ResourceUid
+                    || requestedFlow.DefinitionHash is { } hash && hash != pinnedFlow.DefinitionHash)
+                    throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
+                if (requested.PassInputDirectly != pinned.PassInputDirectly || !JsonElement.DeepEquals(requested.Parameters, pinned.Parameters))
+                    throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
+            }
+        }
+        if (accepted.Any(point => point.Value.Count > 0 && !command.Compositions.ContainsKey(point.Key)))
+            throw new FlowValidationException("flow_root_composition_conflict", "The root Flow Run already has another composition.");
 
         if (!string.IsNullOrWhiteSpace(command.Version)
             && !string.Equals(run.FlowVersion, command.Version, StringComparison.Ordinal))

@@ -19,3 +19,24 @@
     white-space: normal;
     word-break: break-word;
 }
+
+.artifact-header {
+    min-width: 0;
+}
+
+.artifact-header ::deep .page-header > div {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.artifact-header ::deep h1,
+.artifact-header ::deep p {
+    overflow-wrap: anywhere;
+}
+
+.schema-evidence code { white-space: normal; overflow-wrap: anywhere; }
+
+.artifact-records { min-width: 0; }
+.artifact-records code { white-space: normal; overflow-wrap: anywhere; }
+.artifact-records pre { max-width: 100%; overflow-x: auto; }
+.artifact-records .table-scroll { max-width: 100%; overflow-x: auto; }

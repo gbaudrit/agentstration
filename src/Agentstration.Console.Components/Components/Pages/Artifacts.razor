@@ -38,12 +38,13 @@ else
     @if (durable.Count == 0) { <EmptyState Title="@T("NoDurable")" Message="@T("NoDurableHelp")" /> }
     else
     {
-        <CollectionView TItem="FlowRunArtifactResource" Items="durable" InformationLabels="@(new string[] { T("FlowRun"), T("Step"), T("MediaType"), T("Size"), T("Created") })" RowTestId="durable-artifact-row" IdentityLabel="@T("Artifact")">
+        <CollectionView TItem="FlowRunArtifactResource" Items="durable" InformationLabels="@(new string[] { T("FlowRun"), T("Producer"), T("Storage"), T("MediaType"), T("Size"), T("Created") })" RowTestId="durable-artifact-row" IdentityLabel="@T("Artifact")">
         <Identity Context="item">
 <ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></Identity>
         <Information Context="item">
             <CollectionValue Label="@T("FlowRun")"><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></CollectionValue>
-            <CollectionValue Label="@T("Step")"><code>@item.ProducerFlowStepId</code></CollectionValue>
+            <CollectionValue Label="@T("Producer")">@if (item.ProducerResource is { } producer) { <a class="text-button" href="@ArtifactResourceLinks.Producer(producer)">@producer.Name</a> }<code>@item.ProducerFlowStepId</code></CollectionValue>
+            <CollectionValue Label="@T("Storage")">@if (item.Receipt.Materialization is { } location) { <a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a> }</CollectionValue>
             <CollectionValue Label="@T("MediaType")">@item.Receipt.MediaType</CollectionValue>
             <CollectionValue Label="@T("Size")">@Size(item.Receipt.Length)</CollectionValue>
             <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>

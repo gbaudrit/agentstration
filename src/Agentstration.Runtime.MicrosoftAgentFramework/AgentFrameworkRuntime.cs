@@ -14,7 +14,8 @@ namespace Agentstration.Runtime.MicrosoftAgentFramework;
 public sealed class AgentFrameworkRuntimeFactory(
     IChatClientResolver chatClients,
     ILoggerFactory loggerFactory,
-    GenAiObservabilityOptions observability) : IAgentRuntimeFactory
+    GenAiObservabilityOptions observability,
+    IEnumerable<IRuntimeAgentPresentationEnricher>? presentationEnrichers = null) : IAgentRuntimeFactory
 {
     public const string TelemetrySourceName = "Agentstration.MAF";
 
@@ -28,13 +29,14 @@ public sealed class AgentFrameworkRuntimeFactory(
         ToolExecutionScope? executionScope,
         CancellationToken cancellationToken)
     {
-        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
+        var presented = await PresentationAsync(definition, context, cancellationToken);
+        var tools = presented.Tools
             .Select(tool => MapTool(tool, context.ToolExecution, ToolContext(definition, revisionId, generation, executionScope)))
             .ToList();
         var chatClient = await chatClients.ResolveAsync(definition.ModelProfileNamespace, definition.ModelProfileName, cancellationToken);
         var model = chatClient.GetService(typeof(ModelChatClientMetadata)) as ModelChatClientMetadata;
         var chatOptions = AgentFrameworkChatOptionsMapper.Map(model, null);
-        chatOptions.Instructions = definition.EffectiveInstructions;
+        chatOptions.Instructions = presented.Instructions;
         chatOptions.Tools = tools;
         AIAgent agent = new ChatClientAgent(
             chatClient,
@@ -51,14 +53,14 @@ public sealed class AgentFrameworkRuntimeFactory(
     public async Task<IAgentRuntime> CreateAsync(ExecutableAgentDefinition definition, string revisionId, AgentRuntimeContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var tools = (await context.Tools.ResolveAsync(definition.EffectiveToolNames, cancellationToken))
-            .ToList();
+        var presented = await PresentationAsync(definition, context, cancellationToken);
+        var tools = presented.Tools.ToList();
         return new AgentFrameworkRuntime(
             definition,
             definition.AgentKey,
             revisionId,
             definition.ModelProfileName,
-            definition.EffectiveInstructions,
+            presented.Instructions,
             definition.Description,
             tools,
             context.ToolExecution,
@@ -71,6 +73,13 @@ public sealed class AgentFrameworkRuntimeFactory(
     {
         AIFunction function = new AgentstrationToolFunction(tool, pipeline, template);
         return tool.RequiresApproval ? new ApprovalRequiredAIFunction(function) : function;
+    }
+
+    private async Task<RuntimeAgentPresentation> PresentationAsync(ExecutableAgentDefinition definition, AgentRuntimeContext context, CancellationToken ct)
+    {
+        var resolved = definition.ToolReferences.Count > 0 ? await context.Tools.ResolveAsync(definition.ToolReferences, ct)
+            : await context.Tools.ResolveAsync(definition.EffectiveToolNames, ct);
+        return await RuntimeAgentPresentation.CreateAsync(definition.EffectiveInstructions, resolved, presentationEnrichers, ct);
     }
 
     private static ToolExecutionContext ToolContext(
@@ -89,6 +98,7 @@ public sealed class AgentFrameworkRuntimeFactory(
             PrincipalId = scope?.PrincipalId,
             RunId = scope?.ExecutionId,
             FlowStepId = scope?.FlowStepId,
+            ExposedTools = definition.ToolReferences.Select(t => new Agentstration.Resources.ResourceReference(t.Id[(t.Id.LastIndexOf('/') + 1)..], t.ScopeRef, t.Namespace)).ToArray(),
             AgentId = definition.AgentKey,
             AgentVersion = definition.AgentVersion,
             AgentGeneration = generation ?? scope?.AgentGeneration,

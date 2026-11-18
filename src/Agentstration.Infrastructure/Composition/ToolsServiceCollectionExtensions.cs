@@ -2,6 +2,7 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Bootstrap;
+using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
 using Agentstration.Infrastructure.Tools;
@@ -22,9 +23,20 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ToolManagementService>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentToolProvisioner>();
         services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentBundleProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceOperationTypeProvisioner>();
+        services.AddSingleton<IAepEnrollmentResourceProvisioner, AepEnrollmentConnectedServiceTypeProvisioner>();
         services.AddSingleton<ToolCategoryService>();
         services.AddSingleton<ToolSetService>();
         services.AddSingleton<ToolDefinitionService>();
+        services.AddSingleton<ToolRelayExecutor>();
+        services.AddSingleton(provider => new Lazy<Agentstration.Secrets.Abstractions.ISecretInputResolver>(
+            provider.GetRequiredService<Agentstration.Secrets.Abstractions.ISecretInputResolver>));
+        services.AddSingleton(provider => new Lazy<Agentstration.Identity.ResourceScopeInventoryService>(
+            provider.GetRequiredService<Agentstration.Identity.ResourceScopeInventoryService>));
+        services.AddSingleton<Agentstration.Secrets.Abstractions.ISecretInputResolver, ToolSecretInputResolver>();
+        services.AddSingleton<IToolDefinitionUsageReader, ToolDefinitionUsageReader>();
+        services.AddSingleton<Agentstration.Parameters.IParameterUsageProvider, ToolDefinitionValueUsages>();
+        services.AddSingleton<Agentstration.Secrets.ISecretUsageProvider, ToolDefinitionValueUsages>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());

@@ -1,8 +1,11 @@
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Infrastructure.Assistant;
+using Agentstration.Infrastructure.ConnectedServices;
+using Agentstration.Infrastructure.DataSources;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.ResourcePlanning;
+using Agentstration.Infrastructure.Storage;
 using Agentstration.Infrastructure.Tools;
 using Agentstration.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,13 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<AssistantDocumentationMcpTool>(services);
         AddInternalTool<AssistantDiagnosticsMcpTool>(services);
         AddInternalTool<DateTimeMcpTool>(services);
+        AddInternalTool<Agentstration.Infrastructure.Functions.TransformationInvokeTool>(services);
+        AddInternalTool<ConnectedServiceDiscoveryMcpTool>(services);
+        services.AddSingleton<ConnectedServiceDiscoveryExecutor>();
+        services.AddSingleton<ConnectedServiceBoundValues>();
+        services.AddSingleton<BuiltinHttpOperationExecutor>();
+        AddInternalTool<ConnectedServiceAcquisitionMcpTool>(services);
+        services.AddSingleton<ConnectedServiceAcquisitionExecutor>();
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);
@@ -47,17 +57,46 @@ internal static class InternalToolsServiceCollectionExtensions
         AddInternalTool<StagedArtifactPurgeMcpTool>(services);
         AddInternalTool<ArtifactStorageWriteMcpTool>(services);
         AddInternalTool<ArtifactStorageReadMcpTool>(services);
+        foreach (var operation in Agentstration.Runtime.Abstractions.RuntimeArtifactProcessingTools.Create())
+        {
+            services.AddSingleton<IInternalMcpToolHandler>(provider => new ArtifactProcessingContentTool(operation,
+                provider.GetRequiredService<ArtifactProcessingService>(), provider.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>(),
+                provider.GetRequiredService<Agentstration.Identity.Contracts.ICurrentRequestContext>()));
+            services.AddSingleton<IInternalMcpToolDefinitionProvider>(_ => new ArtifactProcessingToolDefinition(operation));
+        }
         AddInternalTool<DataSourceArtifactImportMcpTool>(services);
         AddInternalTool<WebFetchMcpTool>(services);
         AddInternalTool<RestGetMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalSearchMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalQueryMcpTool>(services);
         AddInternalTool<KnowledgeRetrievalReadMcpTool>(services);
+        AddInternalTool<StorageDocumentGetMcpTool>(services);
+        AddInternalTool<StorageDocumentPutMcpTool>(services);
+        AddInternalTool<StorageDocumentDeleteMcpTool>(services);
+        AddInternalTool<StorageDocumentQueryMcpTool>(services);
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceDocumentQueryDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceDocumentQueryMcpTool>();
+        services.AddSingleton<IInternalMcpToolDefinitionProvider, DataSourceQueryToolDefinitionProvider>();
+        services.AddSingleton<IInternalMcpToolHandler, DataSourceQueryMcpTool>();
+        AddInternalTool<KnowledgeDocumentQueryMcpTool>(services);
+        AddInternalTool<KnowledgeContentReadMcpTool>(services);
+        AddInternalTool<KnowledgeContentRegexMcpTool>(services);
+        AddInternalTool<KnowledgeContentStatusMcpTool>(services);
+        AddInternalTool<KnowledgeDescribeMcpTool>(services);
         services.AddSingleton<IInternalMcpToolHandler>(provider => provider.GetRequiredService<WorkNotificationMcpTool>());
         services.AddSingleton<InternalMcpToolProjectionService>();
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
             () => provider.GetServices<IInternalMcpToolHandler>()));
         return services;
+    }
+
+    private sealed class ArtifactProcessingToolDefinition(Agentstration.Runtime.Abstractions.RuntimeExecutionToolMaterial operation)
+        : IInternalMcpToolDefinitionProvider
+    {
+        public InternalMcpToolDefinition Definition { get; } = new("artifact.processing." + operation.ExternalId,
+            operation.Name, operation.Description, operation.InputSchema, operation.OutputSchema,
+            InitialCategory: new("artifact-processing", "Artifact processing", "Content operations restricted to the current Artifact processing execution."),
+            ExposeThroughMcp: false);
     }
 
     private static void AddInternalTool<TTool>(IServiceCollection services) where TTool : class, IInternalMcpToolHandler

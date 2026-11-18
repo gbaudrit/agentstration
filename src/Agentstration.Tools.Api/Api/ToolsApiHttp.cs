@@ -17,6 +17,9 @@ internal static class ToolsApiHttp
         try { return await action(); }
         catch (AuthorizationDeniedException exception) { return Problem("permission-denied", "Permission denied", 403, exception.Message); }
         catch (ResourceScopeAccessDeniedException exception) { return Problem("resource-scope-access-denied", "Resource scope access denied", 403, exception.Message); }
+        catch (ResourceReferenceOutsideScopeException) { return Problem("tool-source-scope-denied", "Source scope access denied", 403, "The selected Tool source is outside the consumer scope."); }
+        catch (Agentstration.Parameters.ParameterAccessDeniedException) { return Problem("tool-binding-access-denied", "Binding access denied", 403, "A referenced Parameter is outside the authorized scope."); }
+        catch (Agentstration.Secrets.Abstractions.SecretAccessDeniedException) { return Problem("tool-binding-access-denied", "Binding access denied", 403, "A referenced Secret is outside the authorized scope."); }
         catch (ResourceNotFoundException exception) { return Problem("tool-resource-not-found", "Resource not found", 404, exception.Message); }
         catch (ResourceConcurrencyException exception) { return Problem("resource-version-conflict", "Resource version conflict", 409, exception.Message); }
         catch (ToolResourceValidationException exception) { return Problem("tool-resource-invalid", "Invalid tool resource", 422, exception.Message); }
@@ -49,7 +52,7 @@ internal static class ToolsApiHttp
         using var workspace = EnterOperationalWorkspace(ResourceScopeRef.Workspace(current.Current.WorkspaceId), current, scopes);
         if (workspace is null) return [];
         return (await definitions.ListAsync(token)).Select(item => item.Value)
-            .Where(item => item.Definition.Acquisition is not null && item.ScopeRef == ResourceScopeRef.Workspace(current.Current.WorkspaceId))
+            .Where(item => item.Definition is AcquisitionToolDefinitionProperties && item.ScopeRef == ResourceScopeRef.Workspace(current.Current.WorkspaceId))
             .ToArray();
     }
 

@@ -5,7 +5,8 @@
  */
 export interface FormAdoptionCoverage {
   source: string;
-  kind: 'shared-field' | 'family-regression' | 'server-adapter';
+  kind: 'shared-field' | 'family-regression' | 'server-adapter' | 'pending';
+  trackingIssue?: number;
   specifications: readonly string[];
 }
 export const formAdoptionCoverage: readonly FormAdoptionCoverage[] = [
@@ -60,4 +61,15 @@ export const formAdoptionCoverage: readonly FormAdoptionCoverage[] = [
   { source: 'src/Agentstration.Web/Pages/Account/Security.cshtml', kind: 'shared-field', specifications: ['tests/native-forms.spec.ts'] },
   { source: 'src/Agentstration.Web/Pages/Bootstrap.cshtml', kind: 'shared-field', specifications: ['tests/native-bootstrap-forms.spec.ts'] },
   { source: 'src/Agentstration.Web/Pages/Login.cshtml', kind: 'shared-field', specifications: ['tests/native-forms.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor', kind: 'family-regression', specifications: ['tests/connected-storage-collection.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor', kind: 'family-regression', specifications: ['tests/connected-storage-collection.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor', kind: 'family-regression', specifications: ['tests/connected-storage-collection.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor', kind: 'family-regression', specifications: ['tests/connected-storage-collection.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/Storages.razor', kind: 'family-regression', specifications: ['tests/connected-storage-collection.spec.ts'] },
+  { source: 'src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor', kind: 'pending', specifications: [], trackingIssue: 1122 },
 ];

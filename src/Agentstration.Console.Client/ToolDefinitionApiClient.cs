@@ -9,6 +9,12 @@ namespace Agentstration.Web.Console;
 
 public interface IToolDefinitionsClient
 {
+    Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ToolDefinitionVersionResource>>([]);
+    Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ToolDefinitionUsage>>([]);
+    Task<ToolDefinitionVersionResource> PublishAsync(string name, ResourceNamespace @namespace, string version, CancellationToken cancellationToken, string? expectedETag = null) =>
+        throw new NotSupportedException("This client does not publish ToolDefinition versions.");
     Task<IReadOnlyList<ToolDefinitionResource>> GetAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(CreateToolDefinitionRequest request, CancellationToken cancellationToken);
@@ -22,6 +28,17 @@ public interface IToolDefinitionsClient
 
 public sealed class ToolDefinitionsApiClient(HttpClient httpClient) : IToolDefinitionsClient
 {
+    public async Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionVersionResource>>(httpClient, ChildPath(name, @namespace, "versions"), cancellationToken)).Value;
+    public async Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionUsage>>(httpClient, ChildPath(name, @namespace, "usages"), cancellationToken)).Value;
+    public async Task<ToolDefinitionVersionResource> PublishAsync(string name, ResourceNamespace @namespace, string version, CancellationToken cancellationToken, string? expectedETag = null)
+    {
+        using var response = await httpClient.PostAsJsonAsync(ChildPath(name, @namespace, "versions"), new PublishToolDefinitionRequest(version, expectedETag), cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ToolDefinitionVersionResource>(cancellationToken)
+            ?? throw new InvalidOperationException("ToolDefinition publication response is empty.");
+    }
     public async Task<IReadOnlyList<ToolDefinitionResource>> GetAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionResource>>(httpClient, "api/tooldefinitions", cancellationToken)).Value;
 
@@ -36,6 +53,7 @@ public sealed class ToolDefinitionsApiClient(HttpClient httpClient) : IToolDefin
         using var response = await httpClient.PostAsJsonAsync("api/tooldefinitions", request, cancellationToken);
         return await ReadAsync(response, cancellationToken);
     }
+
 
     public async Task<ToolDefinitionResource> CreateFromAcquisitionAsync(ResourceNamespace acquisitionNamespace, string acquisitionId,
         CreateToolDefinitionFromAcquisitionRequest request, CancellationToken cancellationToken)

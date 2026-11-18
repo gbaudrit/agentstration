@@ -1,3 +1,6 @@
 .contextual-binding-target { display: grid; gap: 8px; }
 .contextual-binding-target > label { display: grid; gap: 6px; }
 .contextual-binding-target > button { justify-self: start; }
+.binding-requirement > .form-grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.binding-source { max-width: 28rem; }
+.binding-value-editor { min-width: 0; }

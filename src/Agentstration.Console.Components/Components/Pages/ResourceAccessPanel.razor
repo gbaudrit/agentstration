@@ -28,6 +28,24 @@
             <p>@T("DefaultDenyHelp")</p>
             @if (Governance.IsManaged) { <p>@T("ManagedResourceHelp")</p> }
         </section>
+        @if (EvaluateSavedAccess)
+        {
+            <article class="panel access-evaluation">
+                <h2>@T("Evaluation.Title")</h2><p>@T("Evaluation.Help")</p>
+                <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Value="@evaluationTarget" ValueChanged="value => { evaluationTarget = value; ClearEvaluation(); }" data-testid="resource-access-evaluation-target"><option value="">@T("SelectTarget")</option>@foreach (var target in EvaluationTargets) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
+                <button type="button" class="button-secondary" @onclick="EvaluateAsync" disabled="@(evaluating || string.IsNullOrEmpty(evaluationTarget))" data-testid="resource-access-evaluate">@T("Evaluation.Action")</button>
+                @if (dirty) { <p role="note">@T("Evaluation.Unsaved")</p> }
+                @if (evaluationError) { <p role="alert">@T("Evaluation.Failed")</p> }
+                @if (discoverDecision is not null && useDecision is not null)
+                {
+                    <dl class="resource-details" role="status" data-testid="resource-access-decisions">
+                        <dt>@T("Discover")</dt><dd>@DecisionLabel(discoverDecision)</dd>
+                        <dt>@T("Use")</dt><dd>@DecisionLabel(useDecision)</dd>
+                    </dl>
+                }
+            </article>
+        }
+
         <article class="panel access-grants">
             <div class="panel-header">
                 <div><h2>@T("Permissions")</h2><p>@T("PermissionHelp")</p></div>
@@ -60,7 +78,7 @@
                 <button class="button-secondary" type="button" disabled="@saving" @onclick="ToggleAddition" aria-expanded="@adding.ToString().ToLowerInvariant()" aria-controls="@addId" data-testid="resource-access-open-add">@(adding ? T("CloseAdd") : T("Add"))</button>
                 <div class="access-add" id="@addId" hidden="@(!adding)">
                     <FormField Label="@T("SearchTargets")"><ClearableText Value="@targetSearch" ValueChanged="value => { targetSearch = value; SelectTarget(string.Empty); }" Type="search" Disabled="@saving" data-testid="resource-access-search" /></FormField>
-                    <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Disabled="@saving" Value="@selectedTarget" ValueChanged="SelectTarget" ValueExpression="@(() => selectedTarget)" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" disabled="@saving" Value="@selectedTarget" ValueChanged="SelectTarget" ValueExpression="@(() => selectedTarget)" data-testid="resource-access-target"><option value="">@T("SelectTarget")</option>@foreach (var target in FilteredTargets.Take(50)) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
                     <small>@T("TargetResults", Math.Min(50, FilteredTargets.Count), FilteredTargets.Count)</small>
                     <div class="access-actions">
                         <label><FormCheckbox @bind-Value="addDiscover" disabled="@saving" />@T("Discover")</label>
@@ -78,7 +96,27 @@
 
             @if (invalidTarget) { <p class="error-panel" role="alert" data-testid="resource-access-invalid-target">@T("InvalidTarget")</p> }
             @if (invalidGrant) { <p class="error-panel" role="alert">@T("GrantActionsRequired")</p> }
-            @if (saveError) { <p class="error-panel" role="alert">@T("SaveFailed")</p> }
+            @if (saveError)
+            {
+                <p class="error-panel" role="alert">@T("SaveFailed")</p>
+                <button type="button" class="button-secondary" @onclick="ReviewPolicyAsync" disabled="@saving" data-testid="resource-access-review">@T("ReviewCurrent")</button>
+            }
+            @if (reviewedPolicy)
+            {
+                <section class="access-current-policy" aria-label="@T("CurrentPolicy")">
+                    <h3>@T("CurrentPolicy")</h3><p role="status">@T("ReviewedPolicy")</p>
+                    @if (reviewedGrants.Count == 0) { <p>@T("NoGrants")</p> }
+                    else
+                    {
+                        <ul>
+                            @foreach (var grant in reviewedGrants)
+                            {
+                                <li><code>@grant.TargetScopeRef.Value</code> · @string.Join(", ", grant.Actions.Select(action => T(action.ToString()))) · @T(grant.IncludeDescendants ? "IncludeDescendants" : "ExactTargetOnly")</li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
             @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
             @if (canManage)
             {
@@ -122,6 +160,7 @@
     [Parameter] public long? Generation { get; set; }
     [Parameter] public string? Version { get; set; }
     [Parameter] public ResourceGovernance Governance { get; set; } = ResourceGovernance.User;
+    [Parameter] public bool EvaluateSavedAccess { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
     private readonly List<GrantModel> grants = [];
@@ -140,6 +179,12 @@
     private bool HasPendingGrant => adding && !string.IsNullOrWhiteSpace(selectedTarget);
     private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use)
         || HasPendingGrant && !addDiscover && !addUse;
+    private string evaluationTarget = string.Empty;
+    private bool evaluating, evaluationError;
+    private bool reviewedPolicy;
+    private IReadOnlyList<ResourceAccessGrant> reviewedGrants = [];
+    private ResourceAccessDecision? discoverDecision, useDecision;
+    private IEnumerable<ResourceScopeTargetResponse> EvaluationTargets => targets.Where(value => value.ScopeRef == OwnerScopeRef || IsDescendant(value.ScopeRef, OwnerScopeRef));
     private IReadOnlyList<ResourceScopeTargetResponse> AvailableTargets => targets
         .Where(value => IsDescendant(value.ScopeRef, OwnerScopeRef)
             && grants.All(grant => grant.TargetScopeRef != value.ScopeRef))
@@ -155,7 +200,8 @@
 
     private async Task LoadAsync()
     {
-        loading = true; loadError = saveError = saved = invalidTarget = false; dirty = false; grants.Clear(); ResetAddition();
+        ClearEvaluation();
+        loading = true; loadError = saveError = saved = invalidTarget = reviewedPolicy = false; dirty = false; grants.Clear(); ResetAddition();
         try
         {
             inventory = await Scopes.GetAsync(cancellation.Token);
@@ -239,10 +285,60 @@
         {
             var policy = new ResourceAccessPolicy(identity, grants.Select(value => value.ToGrant()).ToArray());
             var snapshot = await Policies.PutAsync(policy, etag, cancellation.Token);
-            etag = snapshot.ETag; savedGrants = snapshot.Policy.Grants.ToArray(); dirty = false; saved = true;
+            etag = snapshot.ETag; savedGrants = snapshot.Policy.Grants.ToArray(); dirty = false; saved = true; reviewedPolicy = false;
+            ClearEvaluation();
         }
         catch (AgentstrationApiException) { saveError = true; }
         finally { saving = false; }
+    }
+
+    private async Task ReviewPolicyAsync()
+    {
+        if (identity is null || saving || !canManage) return;
+        saving = true;
+        try
+        {
+            var current = await Policies.GetAsync(identity.Uid, cancellation.Token);
+            etag = current?.ETag;
+            reviewedGrants = current?.Policy.Grants ?? [];
+            saveError = false; reviewedPolicy = true;
+            ClearEvaluation();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (AgentstrationApiException) { saveError = true; }
+        finally { saving = false; }
+    }
+
+    private void ClearEvaluation() { discoverDecision = useDecision = null; evaluationError = false; }
+    private async Task EvaluateAsync()
+    {
+        if (identity is null || !ResourceScopeRef.TryParse(evaluationTarget, out var target)
+            || !EvaluationTargets.Any(value => value.ScopeRef == target)) return;
+        evaluating = true; ClearEvaluation();
+        var requestedTarget = evaluationTarget;
+        var requestedEtag = etag;
+        try
+        {
+            var discover = Policies.EvaluateAsync(new(identity, target, ResourceAccessAction.Discover), cancellation.Token);
+            var use = Policies.EvaluateAsync(new(identity, target, ResourceAccessAction.Use), cancellation.Token);
+            await Task.WhenAll(discover, use);
+            if (requestedTarget != evaluationTarget || requestedEtag != etag) return;
+            discoverDecision = await discover; useDecision = await use;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (AgentstrationApiException) { evaluationError = true; }
+        finally { evaluating = false; }
+    }
+    private string DecisionLabel(ResourceAccessDecision decision)
+    {
+        var key = decision.ReasonCode switch
+        {
+            "same_scope" => "SameScope", "exact_grant" => "ExactGrant", "propagated_grant" => "PropagatedGrant",
+            "policy_missing" => "PolicyMissing", "grant_missing" => "GrantMissing",
+            "resource_identity_stale" or "policy_identity_stale" => "Stale",
+            _ => "Unavailable"
+        };
+        return $"{T(decision.Allowed ? "Evaluation.Allowed" : "Evaluation.Denied")} · {T($"Evaluation.{key}")}";
     }
 
     private bool IsDescendant(ResourceScopeRef candidate, ResourceScopeRef owner)

@@ -1,5 +1,7 @@
 # Harmonisation de tous les formulaires — #1127
 
+**Actualisation main du 18 novembre 2026 (#1174)** : l’inventaire courant recense **62 composants routés, 90 patrons de routes et 58 helpers imbriqués** après Connected Services, Storage et transformations. Les 51 adaptateurs précédents restent recensés ; 11 composants routés et 18 helpers rejoignent le périmètre. Les parcours réutilisables des nouveaux formulaires non couverts restent explicitement `pending` sous #1122 ; les tests ciblés des listes et des deux éditeurs Storage/service ne constituent pas une couverture CRUD exhaustive. Voir [la réconciliation](../sync-main-1174.md) et le [manifeste](inventory.json). Les nombres et captures ci-dessous décrivent le checkpoint historique du 13 novembre.
+
 Cette livraison prolonge les pilotes #1090–#1095 et les neuf éditeurs #1124. Elle applique les composants communs aux champs ordinaires des autres familles existantes, y compris les inspecteurs du Designer, les formulaires dynamiques et les pages de compte rendues côté serveur. Les opérations, validations métier et droits restent dans leurs modules propriétaires.
 
 ## Inventaire et méthode

@@ -28,13 +28,19 @@
 @if (ActiveTab == FlowStepSettingsTab.Output)
 {
     <section class="step-contract-section" data-testid="terminal-output-contract">
-        <ContractHeading Direction="Output" Source="@(EffectiveIncomingSchema is null && LegacyOutputSchema is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.SameAsInput"))" />
+        <ContractHeading Direction="Output" Source="@(!Passthrough ? T("ExplicitOutputMapping") : EffectiveIncomingSchema is null && LegacyOutputSchema is not null ? T("ContractSource.LegacyOutput") : T("ContractSource.SameAsInput"))" />
         <div class="output-passthrough" data-testid="output-mapping">
             <span class="output-passthrough-icon" aria-hidden="true"><UiIcon Name="arrow-right" /></span>
-            <span class="output-passthrough-copy"><strong>@T("IncomingTransitionOutput")</strong><small>@T("OutputMappingHelp")</small></span>
+            <span class="output-passthrough-copy"><strong>@T(Passthrough ? "IncomingTransitionOutput" : "ExplicitOutputMapping")</strong><small>@T(Passthrough ? "OutputMappingHelp" : "ExplicitOutputMappingHelp")</small></span>
             <details class="output-passthrough-technical"><summary>@T("TechnicalDetail")</summary><code>@OutputMappingExpression(Step)</code></details>
         </div>
-        @if (EffectiveIncomingSchema is { } incomingSchema)
+        @if (!ReadOnly)
+        {
+            <FlowDataMappingEditor Title="@T("OutputDataTitle")" Description="@T("OutputDataHelp")" TestId="output-value-mapping" Value="Step.OutputMapping" ValueChanged="MappingChangedAsync" Options="MappingOptions" />
+            @if (!Passthrough) { <button type="button" class="button-secondary" data-testid="output-use-transition" @onclick="UseTransitionAsync">@T("UseIncomingTransition")</button> }
+        }
+        else { <p class="muted output-mapping-readonly">@T("PublishedMappingReadOnly")</p> }
+        @if ((Passthrough ? EffectiveIncomingSchema : Step.Schema ?? LegacyOutputSchema) is { } incomingSchema)
         {
             <SchemaDocumentEditor Value="incomingSchema" ReadOnly="true" />
         }
@@ -53,6 +59,10 @@
     [Parameter, EditorRequired] public OutputFlowStepDefinition Step { get; set; } = default!;
     [Parameter] public FlowStepSettingsTab ActiveTab { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public IReadOnlyList<FlowMappingOption> MappingOptions { get; set; } = [];
+    private bool Passthrough => Step.OutputMapping is null or { ValueKind: JsonValueKind.Null } || Step.OutputMapping is { ValueKind: JsonValueKind.String } mapping && mapping.GetString() == "${transition.output}";
+    private Task MappingChangedAsync(JsonElement? value) => ReadOnly ? Task.CompletedTask : UpdateSelectedAsync.InvokeAsync(Step with { OutputMapping = value });
+    private Task UseTransitionAsync() => MappingChangedAsync(JsonSerializer.SerializeToElement("${transition.output}"));
     [Parameter] public JsonElement? EffectiveIncomingSchema { get; set; }
     [Parameter] public JsonElement? LegacyOutputSchema { get; set; }
     [Parameter] public string IncomingContractUnavailableText { get; set; } = string.Empty;
