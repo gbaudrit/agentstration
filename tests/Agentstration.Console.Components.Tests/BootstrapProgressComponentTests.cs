@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Components;
-using Agentstration.Sources.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Sources.Contracts;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
