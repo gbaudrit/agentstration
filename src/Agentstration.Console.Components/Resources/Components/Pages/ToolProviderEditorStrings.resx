@@ -51,4 +51,7 @@
   <data name="ConnectionSucceeded"><value>Connected. Protocol negotiation succeeded. Discovered tools: {0}.</value></data>
   <data name="DiscoverySummary"><value>Discovery: {0} unchanged, {1} new, {2} changed, {3} unavailable.</value></data>
   <data name="Scope"><value>Scope</value></data>
+<data name="IdentityIncomplete"><value>Enter a display name, a valid technical name and an ownership scope.</value></data>
+<data name="ConnectionIncomplete"><value>Complete the connection settings for the selected provider type and transport.</value></data>
+<data name="ToolProvider"><value>Tool provider</value></data>
 </root>

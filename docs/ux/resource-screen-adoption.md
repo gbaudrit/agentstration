@@ -51,7 +51,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ToolDefinitionEditor.razor | `/tools/definitions/{Name}` | Pending review and migration |
 | ToolDetails.razor | `/tools/{Name}` | Pending review and migration |
 | ToolGovernanceAudit.razor | `/tool-governance/{Owner}/{RunId}` | Pending review and migration |
-| ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Pending review and migration |
+| ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Implemented; 8 focused switch/wizard/read-only/navigation cases pass; TypeScript/catalog pass; browser checks pending |
 | ToolSetDetails.razor | `/tools/sets/{Name}` | Pending review and migration |
 | TransformationFunctionEditor.razor | `/transformation-functions/{Name}` | Pending review and migration |
 | TriggerDetails.razor | `/triggers/{Name}` | Pending review and migration |
@@ -66,4 +66,4 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Parameter, Vault and Secret saved configuration add shared frames: **91 shared frames + 258 active specialized collections = 349**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Parameter, Vault, Secret and Tool Provider saved configuration add shared frames: **92 shared frames + 258 active specialized collections = 350**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.

@@ -5,17 +5,71 @@
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> ExtensionLocalizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolProviderEditorStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@(IsNew ? T("AddProvider") : displayName) · Agentstration</PageTitle>
-<PageHeader ScopeRef="selectedScope" Title="@(IsNew ? T("AddProvider") : displayName)" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a>@if (!IsNew && CanMutate) { <button class="button-secondary" @onclick="TestAsync" disabled="@busy"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" @onclick="RefreshAsync" disabled="@busy"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }</Actions></PageHeader>
-
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+<PageTitle>@(IsNew ? T("AddProvider") : provider?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{
+    RenderFragment feedback = @<div>
+        @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="@(failed ? "alert" : "status")">@message</div> }
+        @if (!IsNew && provider?.ScopeRef is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
+        @Ownership
+    </div>;
+}
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
-else
+else if (!IsNew && provider is null) { @feedback }
+else if (IsNew)
 {
-    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
-    @if (!IsNew)
-    {
-        @if (provider?.Definition.Aep?.Extension is { } extension)
+    <PageHeader Title="@T("AddProvider")" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="/tools/providers">@T("Back")</a></Actions></PageHeader>
+    @feedback
+    <EditForm @key="FormContext" EditContext="FormContext" class="resource-form"><DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p><fieldset class="resource-definition-fields" disabled="@busy"><CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" FinishLabel="@T("SaveProvider")" /></fieldset></EditForm>
+}
+else if (provider is not null)
+{
+    <ResourceDetailsTemplate Name="@provider.Definition.DisplayName" ResourceType="@T("ToolProvider")" Domain="tool" IconName="server"
+                             TechnicalName="@provider.Name" Namespace="@provider.Namespace.Value" ScopeRef="provider.ScopeRef"
+                             StatusText="@StatusLabel(provider.Definition.Discovery.Status)" Status="@ProviderStatus(provider.Definition.Discovery.Status)"
+                             Enabled="enabled" EnabledChanged="value => enabled = value" EnabledDisabled="@(!CanMutate || busy)"
+                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{provider.ScopeRef}")" DefaultSection="overview" SelectionChanged="SelectSection" Feedback="@feedback" HasDraft="@IsDirty" TestId="resource-tool-provider-editor">
+        <Actions>@if (CanMutate) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@busy"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" type="button" @onclick="RefreshAsync" disabled="@busy"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }<a class="button-secondary" href="/tools/providers">@T("Back")</a></Actions>
+        <Content>
+            <div hidden="@(section != "overview")" data-testid="provider-overview-panel">
+                <section class="metric-grid"><MetricCard Label="@T("Tools")" Value="@ToolCount(tools.Count)" /><MetricCard Label="@T("LastDiscovery")" Value="@(provider.Definition.Discovery.LastDiscoveryAt?.ToString("g") ?? T("Never"))" /></section>
+                <ResourceIdentitySummary DisplayName="@provider.Definition.DisplayName" TechnicalName="@provider.Name" Namespace="@provider.Namespace.Value"><Scope><ResourceScopeBadge ScopeRef="provider.ScopeRef" /></Scope></ResourceIdentitySummary>
+                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></FormSection>
+            </div>
+            <div hidden="@(!section.StartsWith("definition/", StringComparison.Ordinal))"><EditForm @key="FormContext" EditContext="FormContext" OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmit" id="tool-provider-resource-form" class="resource-form"><DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><fieldset class="resource-definition-fields" disabled="@(!CanMutate || busy)"><div hidden="@(section != "definition/configuration")">@IdentityFields</div><div hidden="@(section != "definition/connection")">@ConnectionFields</div></fieldset></EditForm></div>
+            <div hidden="@(section != "tools")">@Tools</div>
+        </Content>
+        <DraftActions><button type="button" class="button-secondary" disabled="@busy" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="tool-provider-resource-form" class="button-primary" disabled="@busy">@T("SaveProvider")</button></DraftActions>
+    </ResourceDetailsTemplate>
+}
+
+@code {
+    private RenderFragment IdentityFields => @<FormSection Title="@Shared["Identity"]" TestId="provider-identity-editor"><FormGrid>        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
+        <FormField Label="@T("ProviderType")"><ClearableSelect TValue="ToolProviderType" @bind-Value="providerType" disabled="@(!IsNew)"><option value="Mcp">MCP</option><option value="Aep">AEP</option></ClearableSelect></FormField>
+        <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolProvider" Value="selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
+        @if (IsNew) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="value => enabled = value" Disabled="busy" /> }
+</FormGrid></FormSection>;
+    private RenderFragment ConnectionFields => @<FormSection Title="@T("Connection")" Description="@T("ConnectionHelp")" TestId="provider-connection-panel"><div id="connection"><FormGrid>        @if (providerType == ToolProviderType.Aep) { <FormField Label="@T("AepExtensionId")" Required="true" Class="form-span-2"><ClearableText @bind-Value="extensionId" /></FormField> }
+        else { <FormField Label="@T("Transport")"><ClearableSelect TValue="McpToolProviderTransport" @bind-Value="transport"><option value="Stdio">STDIO</option><option value="StreamableHttp">Streamable HTTP</option></ClearableSelect></FormField>
+            @if (transport == McpToolProviderTransport.Stdio) { <FormField Label="@T("Command")" Required="true"><ClearableText @bind-Value="command" placeholder="npx" /></FormField><FormField Label="@T("Arguments")" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="arguments" rows="4"></ClearableText></FormField><FormField Label="@T("WorkingDirectory")"><ClearableText @bind-Value="workingDirectory" /></FormField><FormField Label="@T("EnvironmentReferences")" Help="@T("EnvironmentReferencesHelp")"><ClearableText Multiline="true" @bind-Value="environmentReferences" rows="4" placeholder="TOKEN=Secrets:Mcp:Token"></ClearableText></FormField> }
+            else { <FormField Label="@T("Endpoint")" Required="true" Class="form-span-2"><ClearableText @bind-Value="endpoint" placeholder="https://server.example/mcp" /></FormField> }
+        }
+</FormGrid></div></FormSection>;
+    private RenderFragment Tools => @<div>    @if (!IsNew) { <section class="panel tool-provider-section" id="tools" data-testid="provider-tools-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="wrench" /></span><div><p class="eyebrow">@T("ToolsEyebrow")</p><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div></div>
+        @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
+        else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
+        <Identity Context="tool">
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="tool">
+            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
+        </Information>
+        <Actions Context="tool">
+<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><ResourceActivationToggle Enabled="tool.Definition.Enabled" EnabledChanged="value => EnableAsync(tool, value)" Disabled="@(!CanMutate || busy || tool.Governance.IsManaged)" /><a class="text-button" href="@ToolUrl(tool)">@T("Inspect")</a></CollectionActions></Actions>
+    </CollectionView> }
+    </section> }</div>;
+    private RenderFragment Ownership => @<div>        @if (provider?.Definition.Aep?.Extension is { } extension)
         {
             <section class="provider-ownership-banner">
                 <span class="provider-ownership-icon" aria-hidden="true"><UiIcon Name="shield" /></span>
@@ -28,53 +82,9 @@ else
                 </div>
             </section>
         }
-        <ResourceTabs Label="@T("SectionsLabel")"><button type="button" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview" data-testid="provider-overview-tab">@T("Overview")</button><button type="button" class="@(activeTab == ProviderTab.Tools ? "active" : null)" @onclick="() => activeTab = ProviderTab.Tools" data-testid="provider-tools-tab">@T("Tools")<span class="provider-tab-count">@tools.Count</span></button><button type="button" class="@(activeTab == ProviderTab.Connection ? "active" : null)" @onclick="() => activeTab = ProviderTab.Connection" data-testid="provider-connection-tab">@T("Connection")</button></ResourceTabs>
-    }
+</div>;
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@Shared["Identity"]</dt><dd>@displayName<br /><code>@name</code></dd><dt>@T("ProviderType")</dt><dd>@providerType</dd><dt>@T("Connection")</dt><dd>@(providerType == ToolProviderType.Aep ? extensionId : transport == McpToolProviderTransport.Stdio ? command : endpoint)</dd><dt>@T("Enabled")</dt><dd>@BooleanLabel(enabled)</dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd></dl></ChildContent></FormSection>;
 
-    @if (IsNew || activeTab == ProviderTab.Overview)
-    {
-    <fieldset class="resource-definition-fields" disabled="@(!CanMutate)">
-    <section class="panel form-section tool-provider-section" id="overview" data-testid="provider-overview-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="server" /></span><div><p class="eyebrow">@T("OverviewEyebrow")</p><h2>@T("Overview")</h2><p>@T("OverviewHelp")</p></div></div>@if (!IsNew) { <StatusBadge Text="@StatusLabel(provider?.Definition.Discovery.Status)" Status="@ProviderStatus(provider?.Definition.Discovery.Status)" /> }</div><div class="form-grid tool-provider-form-grid">
-        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" />
-        <FormField Label="@T("ProviderType")"><ClearableSelect TValue="ToolProviderType" @bind-Value="providerType" disabled="@(!IsNew)"><option value="Mcp">MCP</option><option value="Aep">AEP</option></ClearableSelect></FormField>
-        <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-        <label class="provider-enabled-toggle form-span-2"><FormCheckbox @bind-Value="enabled" /><span class="provider-toggle-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
-        @if (!IsNew) { <div class="provider-observation form-span-2"><div><span class="provider-observation-icon"><UiIcon Name="activity" /></span><span><small>@T("Status")</small><strong>@StatusLabel(provider?.Definition.Discovery.Status)</strong></span></div><div><span class="provider-observation-icon"><UiIcon Name="clock" /></span><span><small>@T("LastDiscovery")</small><strong>@(provider?.Definition.Discovery.LastDiscoveryAt?.ToString("g") ?? T("Never"))</strong></span></div></div> }
-    </div></section></fieldset>
-    }
-
-    @if (IsNew || activeTab == ProviderTab.Connection)
-    {
-    <fieldset class="resource-definition-fields" disabled="@(!CanMutate)">
-    <section class="panel form-section tool-provider-section" id="connection" data-testid="provider-connection-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="settings" /></span><div><p class="eyebrow">@T("ConnectionEyebrow")</p><h2>@T("Connection")</h2><p>@T("ConnectionHelp")</p></div></div></div><div class="form-grid tool-provider-form-grid">
-        @if (providerType == ToolProviderType.Aep) { <FormField Label="@T("AepExtensionId")" Class="form-span-2"><ClearableText @bind-Value="extensionId" /></FormField> }
-        else { <FormField Label="@T("Transport")"><ClearableSelect TValue="McpToolProviderTransport" @bind-Value="transport"><option value="Stdio">STDIO</option><option value="StreamableHttp">Streamable HTTP</option></ClearableSelect></FormField>
-            @if (transport == McpToolProviderTransport.Stdio) { <FormField Label="@T("Command")"><ClearableText @bind-Value="command" placeholder="npx" /></FormField><FormField Label="@T("Arguments")" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="arguments" rows="4"></ClearableText></FormField><FormField Label="@T("WorkingDirectory")"><ClearableText @bind-Value="workingDirectory" /></FormField><FormField Label="@T("EnvironmentReferences")" Help="@T("EnvironmentReferencesHelp")"><ClearableText Multiline="true" @bind-Value="environmentReferences" rows="4" placeholder="TOKEN=Secrets:Mcp:Token"></ClearableText></FormField> }
-            else { <FormField Label="@T("Endpoint")" Class="form-span-2"><ClearableText @bind-Value="endpoint" placeholder="https://server.example/mcp" /></FormField> }
-        }
-    </div></section></fieldset>
-    }
-
-    @if (CanMutate && (IsNew || activeTab != ProviderTab.Tools))
-    {
-        <div class="form-actions tool-provider-actions"><button class="button-primary" @onclick="SaveAsync" disabled="@busy"><UiIcon Name="check" />@(busy ? T("Saving") : T("SaveProvider"))</button></div>
-    }
-
-    @if (!IsNew && activeTab == ProviderTab.Tools) { <section class="panel tool-provider-section" id="tools" data-testid="provider-tools-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="wrench" /></span><div><p class="eyebrow">@T("ToolsEyebrow")</p><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div></div>
-        @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
-        else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
-        <Identity Context="tool">
-<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="tool">
-            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
-        </Information>
-        <Actions Context="tool">
-<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><label><FormCheckbox Value="@tool.Definition.Enabled" disabled="@(!CanMutate || tool.Governance.IsManaged)" ValueChanged="changed => EnableAsync(tool, (bool)(new ChangeEventArgs { Value = changed }).Value!)" />@T("Enabled")</label><a class="text-button" href="@ToolUrl(tool)">@T("Inspect")</a></CollectionActions></Actions>
-    </CollectionView> }
-    </section> }
-}
-
-@code {
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
@@ -86,13 +96,109 @@ else
     private bool IsNew => string.IsNullOrWhiteSpace(Name); private bool loading = true, busy, failed; private string? message, etag; private ToolProviderResource? provider; private IReadOnlyList<ToolResource> tools = [];
     private ResourceScopeRef? selectedScope;
     private bool CanMutate => IsNew || provider?.Governance.IsManaged == false
-        && ResourceOwnershipContext.CanManage(provider.ScopeRef ?? ResourceScopeRef.Instance, Services);
+        && ResourceOwnershipContext.CanManage(provider.ScopeRef, Services);
     private string ExtensionUrl(ResourceReference extension) => $"/extensions/{Uri.EscapeDataString(extension.Name)}?namespace={Uri.EscapeDataString((extension.Namespace ?? provider!.Namespace).Value)}&scopeRef={Uri.EscapeDataString((extension.ScopeRef ?? provider!.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((extension.ScopeRef ?? provider!.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
     private static string ToolUrl(ToolResource tool) => $"/tools/{Uri.EscapeDataString(tool.Name)}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString((tool.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((tool.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
     private string name = "", displayName = "", extensionId = "", command = "", arguments = "", workingDirectory = "", endpoint = "", environmentReferences = ""; private ResourceNamespace extensionNamespace = ResourceNamespace.Default; private bool enabled = true; private ToolProviderType providerType = ToolProviderType.Mcp; private McpToolProviderTransport transport = McpToolProviderTransport.Stdio;
+    private bool invalidInput;
+    private EditContext? editContext;
+    private EditContext FormContext => editContext ??= new(this);
+    private void InvalidSubmit(EditContext context)
+    {
+        section = context.GetValidationMessages(new FieldIdentifier(this, nameof(providerType))).Any() ? "definition/configuration" : "definition/connection";
+        Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + section);
+    }
+    private string section = "overview";
+    private string? loadedKey;
+    private long loadVersion;
+    private string savedFingerprint = string.Empty;
+    private string Fingerprint => JsonSerializer.Serialize(new { name, displayName, enabled, providerType, extensionId, extensionNamespace, transport, command, arguments, workingDirectory, endpoint, environmentReferences, selectedScope });
+    private bool IsDirty => !loading && CanMutate && (Fingerprint != savedFingerprint || invalidInput);
+    private bool IdentityComplete
+    {
+        get
+        {
+            if (selectedScope is null || string.IsNullOrWhiteSpace(displayName)) return false;
+            try { _ = ResourceAddress.Create(ResourceNamespace.Default, ToolResourceKinds.ToolProvider, name); return true; }
+            catch (ArgumentException) { return false; }
+        }
+    }
+    private bool ConnectionComplete
+    {
+        get
+        {
+            try
+            {
+                _ = Pairs(environmentReferences);
+                return providerType == ToolProviderType.Aep ? !string.IsNullOrWhiteSpace(extensionId)
+                    : transport == McpToolProviderTransport.Stdio ? !string.IsNullOrWhiteSpace(command) : Uri.TryCreate(endpoint, UriKind.Absolute, out _);
+            }
+            catch (ArgumentException) { return false; }
+        }
+    }
+    private void ScopeChanged(ResourceScopeRef? value)
+    {
+        var initializing = IsNew && selectedScope is null && Fingerprint == savedFingerprint;
+        selectedScope = value; if (initializing) savedFingerprint = Fingerprint;
+    }
+    private void SelectSection(string? path) => section = path ?? "overview";
+    private IReadOnlyList<ResourceNavigationItem> Sections =>
+    [
+        new("overview", Shared["Overview"], "home"),
+        new("definition", Shared["Definition"], "settings") { Navigable = false, Visible = CanMutate },
+        new("definition/configuration", Shared["Configuration"], "forms") { Visible = CanMutate },
+        new("definition/connection", T("Connection"), "plug") { Visible = CanMutate },
+        new("tools", T("Tools"), "tool")
+    ];
+    private IReadOnlyList<CreationWizardStep> Steps =>
+    [
+        new("identity", Shared["Identity"], IdentityFields) { IsComplete = IdentityComplete },
+        new("connection", T("Connection"), ConnectionFields) { IsComplete = ConnectionComplete },
+        new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && ConnectionComplete }
+    ];
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        if (!FormContext.Validate() || !IdentityComplete || !ConnectionComplete)
+        {
+            finish.ReturnToStepId = !IdentityComplete ? "identity" : "connection";
+            failed = true; message = T(!IdentityComplete ? "IdentityIncomplete" : "ConnectionIncomplete"); return;
+        }
+        await SaveAsync();
+    }
+    private void Discard()
+    {
+        if (busy || provider is null) return;
+        From(provider); editContext = null; invalidInput = false; savedFingerprint = Fingerprint; failed = false; message = null;
+    }
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration
+    {
+        get
+        {
+            if (provider is null) return [];
+            var definition = provider.Definition;
+            var rows = new List<ConfigurationEntry> { new(T("ProviderType"), definition.ProviderType.ToString()), new(T("Enabled"), BooleanLabel(definition.Enabled)) };
+            if (definition.Mcp is { } mcp)
+            {
+                rows.Add(new(T("Transport"), mcp.Transport.ToString()));
+                if (mcp.Transport == McpToolProviderTransport.StreamableHttp) rows.Add(new(T("Endpoint"), mcp.Endpoint?.ToString() ?? Shared["NotProvided"]));
+                else
+                {
+                    rows.Add(new(T("Command"), mcp.Command ?? Shared["NotProvided"]));
+                    rows.Add(new(T("Arguments"), string.Join("\n", mcp.Arguments ?? [])));
+                    rows.Add(new(T("WorkingDirectory"), mcp.WorkingDirectory ?? Shared["NotProvided"]));
+                    rows.Add(new(T("EnvironmentReferences"), string.Join("\n", (mcp.EnvironmentReferences ?? new Dictionary<string, string>()).Select(pair => $"{pair.Key}={pair.Value}"))));
+                }
+            }
+            if (definition.Aep is { } aep) rows.Add(new(T("AepExtensionId"), $"{aep.Extension.Namespace ?? provider.Namespace}/{aep.Extension.Name}"));
+            return rows;
+        }
+    }
     protected override async Task OnParametersSetAsync()
     {
-        loading = true;
+        var key = $"{Name}|{NamespaceValue}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return;
+        loadedKey = key; editContext = null; invalidInput = false; var version = ++loadVersion; loading = true; failed = false; message = null; provider = null; tools = []; section = "overview";
         try
         {
             if (!IsNew)
@@ -100,22 +206,60 @@ else
                 var snapshot = ScopeRefValue is { Length: > 0 }
                     ? await Client.GetProviderAsync(ResourceScopeRef.Parse(ScopeRefValue), ResourceNamespace.Parse(NamespaceValue), Name!, default)
                     : await Client.GetProviderAsync(Name!, default);
-                provider = snapshot.Value; selectedScope = provider.ScopeRef; etag = snapshot.ETag; From(provider);
-                tools = selectedScope is { } scope ? await Client.GetToolsAsync(scope, provider.Name) : await Client.GetToolsAsync(provider.Name);
-                tools = tools.Where(tool => tool.ScopeRef == provider.ScopeRef && tool.Namespace == provider.Namespace).ToArray();
+                var rows = await LoadToolsAsync(snapshot.Value);
+                if (version != loadVersion) return;
+                provider = snapshot.Value; selectedScope = provider.ScopeRef; etag = snapshot.ETag; From(provider); tools = rows;
             }
         }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { loading = false; }
+        catch (Exception exception) { if (version == loadVersion) { failed = true; message = exception.Message; loadedKey = null; } }
+        finally { if (version == loadVersion) { loading = false; savedFingerprint = Fingerprint; } }
+    }
+    private async Task<IReadOnlyList<ToolResource>> LoadToolsAsync(ToolProviderResource value)
+    {
+        var rows = value.ScopeRef is { } scope ? await Client.GetToolsAsync(scope, value.Name) : await Client.GetToolsAsync(value.Name);
+        return rows.Where(tool => tool.ScopeRef == value.ScopeRef && tool.Namespace == value.Namespace).ToArray();
     }
     private void From(ToolProviderResource value) { name=value.Name; displayName=value.Definition.DisplayName; enabled=value.Definition.Enabled; providerType=value.Definition.ProviderType; extensionId=value.Definition.Aep?.Extension.Name??""; extensionNamespace=value.Definition.Aep?.Extension.Namespace??value.Namespace; transport=value.Definition.Mcp?.Transport??McpToolProviderTransport.Stdio; command=value.Definition.Mcp?.Command??""; arguments=string.Join(Environment.NewLine,value.Definition.Mcp?.Arguments??[]); workingDirectory=value.Definition.Mcp?.WorkingDirectory??""; endpoint=value.Definition.Mcp?.Endpoint?.ToString()??""; environmentReferences=string.Join(Environment.NewLine,(value.Definition.Mcp?.EnvironmentReferences??new Dictionary<string,string>()).Select(x=>$"{x.Key}={x.Value}")); }
     private ToolProviderProperties Properties() => new() { DisplayName=displayName, ProviderType=providerType, Enabled=enabled, Aep=providerType==ToolProviderType.Aep?new AepToolProviderConfiguration{Extension=new ResourceReference(extensionId,selectedScope,extensionNamespace)}:null, Mcp=providerType==ToolProviderType.Mcp?new McpToolProviderConfiguration{Transport=transport,Command=Null(command),Arguments=Lines(arguments),WorkingDirectory=Null(workingDirectory),Endpoint=Uri.TryCreate(endpoint,UriKind.Absolute,out var uri)?uri:null,EnvironmentReferences=Pairs(environmentReferences)}:null };
-    private async Task SaveAsync() { busy=true; failed=false; message=null; try { if(IsNew){var saved=await Client.CreateProviderAsync(new(name,Properties(),selectedScope),default); Navigation.NavigateTo($"/tools/providers/{Uri.EscapeDataString(saved.Value.Name)}");}else{var saved=await Client.UpdateProviderAsync(Name!,new(Properties()),etag!,default);provider=saved.Value;selectedScope=provider.ScopeRef;etag=saved.ETag;tools=await Client.GetToolsAsync(provider.Name);message=provider.Definition.Discovery.Status=="connected"?T("SavedAndRefreshed"):T("SavedWithStatus",StatusLabel(provider.Definition.Discovery.Status));}}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;} }
-    private async Task TestAsync(){busy=true;try{var result=await Client.TestAsync(Name!,default);failed=false;message=T("ConnectionSucceeded",ToolCount(result.ToolCount));}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
-    private async Task RefreshAsync(){busy=true;try{var diff=await Client.RefreshAsync(Name!,default);tools=await Client.GetToolsAsync(Name!);failed=false;message=T("DiscoverySummary",diff.Unchanged,diff.New,diff.Changed,diff.Unavailable);}catch(Exception ex){failed=true;message=ex.Message;}finally{busy=false;}}
-    private async Task EnableAsync(ToolResource tool,bool value){await Client.SetEnabledAsync(tool.Name,value,null,default);tools=await Client.GetToolsAsync(Name!);}
+    private async Task SaveAsync()
+    {
+        if (!CanMutate || busy) return;
+        if (!IdentityComplete || !ConnectionComplete)
+        {
+            failed = true; message = T(!IdentityComplete ? "IdentityIncomplete" : "ConnectionIncomplete");
+            if (!IsNew) { section = !IdentityComplete ? "definition/configuration" : "definition/connection"; Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + section); }
+            return;
+        }
+        busy = true; failed = false; message = null;
+        try
+        {
+            if (IsNew)
+            {
+                var saved = await Client.CreateProviderAsync(new(name, Properties(), selectedScope), default);
+                savedFingerprint = Fingerprint;
+                Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/tools/providers", saved.Value.Name, saved.Value.Namespace, saved.Value.ScopeRef));
+            }
+            else
+            {
+                var saved = await Client.UpdateProviderAsync(Name!, new(Properties()), etag!, default);
+                provider = saved.Value; selectedScope = provider.ScopeRef; etag = saved.ETag; From(provider); editContext = null; invalidInput = false; savedFingerprint = Fingerprint;
+                tools = await LoadToolsAsync(provider);
+                message = provider.Definition.Discovery.Status == "connected" ? T("SavedAndRefreshed") : T("SavedWithStatus", StatusLabel(provider.Definition.Discovery.Status));
+            }
+        }
+        catch (Exception ex) { failed = true; message = ex.Message; }
+        finally { busy = false; }
+    }
+    private async Task TestAsync() { if (!CanMutate || busy) return; busy = true; try { var result = await Client.TestAsync(Name!, default); failed = false; message = T("ConnectionSucceeded", ToolCount(result.ToolCount)); } catch (Exception ex) { failed = true; message = ex.Message; } finally { busy = false; } }
+    private async Task RefreshAsync() { if (!CanMutate || busy || provider is null) return; busy = true; try { var diff = await Client.RefreshAsync(Name!, default); tools = await LoadToolsAsync(provider); failed = false; message = T("DiscoverySummary", diff.Unchanged, diff.New, diff.Changed, diff.Unavailable); } catch (Exception ex) { failed = true; message = ex.Message; } finally { busy = false; } }
+    private async Task EnableAsync(ToolResource tool, bool value)
+    {
+        if (!CanMutate || busy || tool.Governance.IsManaged || provider is null) return;
+        busy = true;
+        try { await Client.SetEnabledAsync(tool.Namespace, tool.Name, value, null, default); tools = await LoadToolsAsync(provider); }
+        catch (Exception ex) { failed = true; message = ex.Message; }
+        finally { busy = false; }
+    }
     private static string? Null(string value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim(); private static string[] Lines(string value)=>value.Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries); private static IReadOnlyDictionary<string,string> Pairs(string value)=>Lines(value).Select(line=>line.Split('=',2)).Where(x=>x.Length==2).ToDictionary(x=>x[0].Trim(),x=>x[1].Trim(),StringComparer.Ordinal);
     private static UiStatus ProviderStatus(string? status) => status switch { "connected" => UiStatus.Success, "error" => UiStatus.Danger, _ => UiStatus.Neutral };
-    private ProviderTab activeTab;
-    private enum ProviderTab { Overview, Tools, Connection }
 }

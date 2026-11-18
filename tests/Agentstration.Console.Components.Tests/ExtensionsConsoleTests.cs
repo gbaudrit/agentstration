@@ -581,13 +581,17 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IToolsClient>(client);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo("/tools/providers/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance");
+        var navigationModule = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        navigationModule.Mode = JSRuntimeMode.Loose;
+        navigationModule.Setup<string>("navigate", _ => true).SetResult(context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri + "#overview");
         var rendered = context.Render<Agentstration.Web.Components.Pages.ToolProviderEditor>(parameters =>
             parameters.Add(value => value.Name, "crawl4ai"));
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(ResourceScopeRef.Instance, client.RequestedProviderScope);
             Assert.AreEqual(managed, rendered.Find("fieldset").HasAttribute("disabled"));
-            Assert.AreEqual(managed ? 0 : 1, rendered.FindAll(".tool-provider-actions button").Count);
+            Assert.AreEqual(managed, rendered.Find(".resource-header input[role=switch]").HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll(".unsaved-changes-bar"));
             Assert.IsNotNull(rendered.Find("a[href='/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
         });
     }
