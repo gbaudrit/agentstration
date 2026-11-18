@@ -58,6 +58,10 @@ Paths in this table are relative to `src/Agentstration.Web.Components/` unless s
 | Draft actions | Template's `UnsavedChangesBar.razor`; use `FormActions.razor` for section-specific commands. `UnsavedNavigationGuard.razor` and `FormDraftMonitor.razor` retain protection/invalid input tracking. |
 | Dialogues | `ConfirmationDialog.razor`, `ModalFrame.razor`; reuse their focus behavior. |
 
+For resources with activation, use the template header switch and keep its existing confirmation/write/save behavior in the adapter. Prefer switch presentation for binary options; retain checkboxes for multi-selection. Do not convert three-state execution policies to booleans.
+
+Lazy-mount the Access panel on its first visit, then keep it mounted in a hidden pane across section changes. Pass the saved `ResourceUid` and feed `DraftChanged` into the owning screen’s leave guard. The template draft bar remains for definition changes; policy Save/Discard stays in the Access panel. Managed definitions remain read-only while independently authorized access administration remains available. With an exact UID, generation-only refreshes retain pending policy edits and update their metadata; a mismatched inventory UID cannot select a different resource’s policy.
+
 Overview order is **relevant indicators → Identity → Configuration → family-specific panels**. Present saved values, even when a form draft exists. Summarize all applicable saved configuration, including declared references and structured settings. Never resolve or display Secret contents. Avoid disabled forms as a read-only summary.
 
 Definition order is **Identity → Configuration → family-specific panels**. Where both exist, value bindings precede type-specific options. Preserve specialized editors. Show field errors once, beside their field; retain genuine cross-field/transport failures in feedback. Avoid redundant information banners and technical contract panels without an actionable user need.
