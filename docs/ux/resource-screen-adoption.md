@@ -56,7 +56,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | TransformationFunctionEditor.razor | `/transformation-functions/{Name}` | Pending review and migration |
 | TriggerDetails.razor | `/triggers/{Name}` | Pending review and migration |
 | TriggerEditor.razor | `/triggers/new`, `/triggers/{Name}/edit` | Pending review and migration |
-| VaultEditor.razor | `/vaults/new`, `/vaults/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/vaults/README.md). Full final validation remains pending. |
+| VaultEditor.razor | `/vaults/new`, `/vaults/{Name}` | Layout/wizard browser checks pass at `70897500`; access-draft/managed follow-up passes the 31-case grant/access regression selection; fresh browser checks for that follow-up remain pending. [Real captures](evidence/resource-screen-adoption/vaults/README.md). Full final validation remains pending. |
 
 ## Embedded and delegated editors
 

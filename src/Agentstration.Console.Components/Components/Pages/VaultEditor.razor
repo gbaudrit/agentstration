@@ -7,7 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+<UnsavedNavigationGuard IsDirty="@(HasDraft || policyDirty)" HasUnsavedChanges="@(() => HasDraft || policyDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
 <PageTitle>@(IsNew ? T("CreateVault") : $"{Name} · {T("Vault")}") · Agentstration</PageTitle>
 @{
     RenderFragment feedback = @<div>
@@ -52,7 +52,7 @@ else if (resource is not null)
                 </EditForm>
             </div>
             <div hidden="@(section != "master-key")">@MasterKey</div>
-            @if (section == "access" && CanManage && resource.ScopeRef is { } ownerScope) { <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@SecretResourceKinds.Vault" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" /> }
+            @if (accessVisited && CanManageAccess && resource.ScopeRef is { } ownerScope) { <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="resource.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@SecretResourceKinds.Vault" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" /></div> }
         </Content>
         <DraftActions><button type="button" class="button-secondary" disabled="@busy" @onclick="DiscardAsync">@T("Discard")</button><button type="submit" form="vault-resource-form" class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></DraftActions>
     </ResourceDetailsTemplate>
@@ -83,7 +83,7 @@ else if (resource is not null)
     private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
     private Exception? error;
     private bool busy, confirmDelete, confirmInitialize, dirty, interactive, loading;
-    private bool invalidInput;
+    private bool invalidInput, policyDirty, accessVisited;
     private string section = "overview";
     private string? loadedKey;
     private long loadVersion;
@@ -96,7 +96,7 @@ else if (resource is not null)
         new("definition/configuration", Shared["Configuration"], "forms") { Visible = CanManage },
         new("definition/grants", Shared["Access"], "key") { Visible = CanManage },
         new("master-key", T("MasterKey"), "key"),
-        new("access", T("Access"), "shield-check") { Visible = CanManage }
+        new("access", T("Access"), "shield-check") { Visible = CanManageAccess }
     ];
     private IReadOnlyList<CreationWizardStep> Steps =>
     [
@@ -104,7 +104,7 @@ else if (resource is not null)
         new("grants", Shared["Access"], Grants) { IsComplete = true },
         new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete }
     ];
-    private void SelectSection(string? path) => section = path ?? "overview";
+    private void SelectSection(string? path) { section = path ?? "overview"; if (section == "access" && CanManageAccess) accessVisited = true; }
     private void InvalidSubmit(EditContext _) { section = "definition/configuration"; Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + section); }
     private async Task FinishAsync(CreationWizardFinish finish)
     {
@@ -114,6 +114,7 @@ else if (resource is not null)
     private sealed record ConfigurationEntry(string Label, string Value);
     private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
         [new(T("Provider"), T($"Provider.{resource.Definition.ProviderType}")), new(Shared["Access"], resource.Definition.UsePolicy.Grants.Count == 0 ? Shared["NotProvided"] : string.Join("\n", resource.Definition.UsePolicy.Grants.Select(g => g.ScopeRef.Value)))];
+    private bool CanManageAccess => resource is not null && resource.ScopeRef is not null && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
     private bool CanManage => IsNew || resource is not null && !resource.Governance.IsManaged && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
@@ -140,7 +141,7 @@ else if (resource is not null)
     {
         var key = $"{Name}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
         if (loadedKey == key) return;
-        loadedKey = key; var version = ++loadVersion; loading = true; error = null; resource = null; section = "overview";
+        loadedKey = key; var version = ++loadVersion; loading = true; error = null; policyDirty = accessVisited = false; resource = null; section = "overview";
         try
         {
             var targets = await Client.GetScopeTargetsAsync(SecretResourceKinds.Vault, cancellation.Token);

@@ -314,6 +314,71 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, client.SecretMetadataSaves);
     }
 
+    [TestMethod]
+    public async Task VaultAccessDraftSurvivesMetadataSaveAndRemainsGuarded()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid()); var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var client = new StubSecretsClient(tenant, workspace); var policies = new AccessPolicies();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new AccessScopes(client, tenant, workspace));
+        context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureVaultNavigation(context);
+        var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=vault-display-name]").Change("Updated vault");
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        var panel = cut.FindComponent<ResourceAccessPanel>().Instance;
+        cut.Find("[data-testid=resource-access-target]").Change(workspace.Value);
+        cut.Find("[data-testid=resource-access-add]").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        await cut.Find("#vault-resource-form").SubmitAsync();
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        Assert.AreSame(panel, cut.FindComponent<ResourceAccessPanel>().Instance);
+        Assert.HasCount(1, cut.FindAll("[data-testid=resource-access-grant]"));
+        Assert.IsNull(policies.Saved);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.AreEqual(workspace, policies.Saved!.Grants.Single().TargetScopeRef);
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    public void ManagedVaultKeepsDefinitionReadOnlyAndOwnerAccessAvailable()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<ISecretsClient>(new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid())) { ManagedVault = true });
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureVaultNavigation(context);
+        var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
+        Assert.IsTrue(cut.Find("fieldset").HasAttribute("disabled"));
+        Assert.HasCount(1, cut.FindAll("a[data-resource-section=access]"));
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+    }
+
+    private sealed class AccessPolicies : IResourceAccessPolicyClient
+    {
+        public ResourceAccessPolicy? Saved { get; private set; }
+        public Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken) => Task.FromResult(new ResourceAccessDecision(false, ResourceAccessDecisionReasons.GrantMissing));
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid uid, CancellationToken token) => Task.FromResult<ResourceAccessPolicySnapshot?>(null);
+        public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken token) => Task.FromResult(new ResourceAccessPolicySnapshot(Saved = policy, "\"policy\""));
+    }
+    private sealed class AccessScopes(StubSecretsClient client, ResourceScopeRef tenant, ResourceScopeRef workspace) : IResourceScopeInventoryClient
+    {
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken token) => Task.FromResult(new ResourceScopeInventoryResponse([
+            new(tenant, ResourceScopeKind.Tenant, "Tenant", ResourceScopeRef.Instance, true, [new(client.Saved.Uid, ResourceNamespace.Default, SecretResourceKinds.Vault, "shared", DateTimeOffset.UnixEpoch), new(client.SavedSecret.Uid, ResourceNamespace.Default, SecretResourceKinds.Secret, "credential", DateTimeOffset.UnixEpoch)]),
+            new(workspace, ResourceScopeKind.Workspace, "Workspace", tenant, true, [])]));
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(tenant, ResourceScopeKind.Tenant, "Tenant", true), new(workspace, ResourceScopeKind.Workspace, "Workspace", true)]);
+    }
+
     private static void ConfigureSecretNavigation(BunitContext context)
     {
         var uri = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
@@ -339,12 +404,15 @@ public sealed class VaultGrantPersistenceTests
     private sealed class StubSecretsClient(ResourceScopeRef tenant, ResourceScopeRef workspace) : ISecretsClient
     {
         public bool ValueConfigured { get; init; }
+        public bool ManagedVault { get; init; }
         public int SecretMetadataSaves { get; private set; }
         public int ValueWrites { get; private set; }
         public int ValueDeletes { get; private set; }
         public ResourceScopeRef? LastVaultConsumerScope { get; private set; }
         public VaultResource Saved { get; private set; } = new()
         {
+            Uid = Guid.NewGuid(),
+            Generation = 2,
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SecretResourceKinds.Vault,
             Metadata = new() { Name = "shared" },
@@ -353,6 +421,8 @@ public sealed class VaultGrantPersistenceTests
         };
         public SecretResource SavedSecret { get; private set; } = new()
         {
+            Uid = Guid.NewGuid(),
+            Generation = 2,
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = SecretResourceKinds.Secret,
             Metadata = new() { Name = "credential" },
@@ -371,14 +441,14 @@ public sealed class VaultGrantPersistenceTests
             return Task.FromResult(new ResourceSnapshot<VaultResource>(Saved, "\"created\""));
         }
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>
-            Task.FromResult(new ResourceSnapshot<VaultResponse>(new(Saved, "available"), "\"1\""));
+            Task.FromResult(new ResourceSnapshot<VaultResponse>(new(ManagedVault ? Saved with { Governance = ResourceGovernance.Core("vault") } : Saved, "available"), "\"1\""));
         public Task<ResourceSnapshot<VaultResource>> UpdateVaultAsync(string name, ResourceScopeRef scopeRef, PutVaultRequest request, string etag, CancellationToken token)
         {
-            Saved = Saved with { Definition = request.Properties };
+            Saved = Saved with { Definition = request.Properties, Generation = Saved.Generation + 1 };
             return Task.FromResult(new ResourceSnapshot<VaultResource>(Saved, "\"2\""));
         }
 
-        public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<VaultResponse>>([new(Saved, "available")]);
+        public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<VaultResponse>>([new(ManagedVault ? Saved with { Governance = ResourceGovernance.Core("vault") } : Saved, "available")]);
         public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(ResourceScopeRef consumerScopeRef, CancellationToken token)
         {
             LastVaultConsumerScope = consumerScopeRef;
