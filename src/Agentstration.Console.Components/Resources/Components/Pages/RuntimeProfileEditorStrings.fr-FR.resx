@@ -51,4 +51,5 @@
   <data name="ProfileUsedError"><value>Ce profil est utilisé par {0}.</value></data>
   <data name="Definition"><value>Définition</value></data>
   <data name="Access"><value>Accès</value></data>
+<data name="OptionsInvalid"><value>Les options d’exécution doivent former un objet JSON.</value></data>
 </root>

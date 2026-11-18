@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { fillAndCommit } from './controls.js';
 
 export interface ModelAdministrationDefinition {
@@ -40,8 +41,10 @@ export class ModelAdministrationPage {
     await this.waitForInteractive(TestIds.modelAdministration.runtimeForm);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.runtimeName), definition.runtimeName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName), definition.runtimeDisplayName);
+    await this.page.locator('[data-wizard-step=review]').click();
     await this.page.getByTestId(TestIds.modelAdministration.runtimeSave).click();
     await this.page.waitForURL(url => url.pathname === `/runtimeprofiles/${definition.runtimeName}`);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.runtimeForm);
     return this.page.getByTestId(TestIds.resourceAdministration.runtimeProfileEditor);
   }
@@ -99,6 +102,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateRuntimeDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.runtimeSave),
@@ -122,6 +126,7 @@ export class ModelAdministrationPage {
 
   public async openRuntime(consoleUrl: string, name: string): Promise<void> {
     await this.open(consoleUrl, `/runtimeprofiles/${name}`, TestIds.resourceAdministration.runtimeProfileEditor);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.runtimeForm);
   }
 
@@ -217,6 +222,7 @@ export class ModelAdministrationPage {
     if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Model administration route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
   }
 

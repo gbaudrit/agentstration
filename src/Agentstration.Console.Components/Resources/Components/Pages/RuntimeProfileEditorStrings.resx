@@ -51,4 +51,5 @@
   <data name="ProfileUsedError"><value>This profile is used by {0}.</value></data>
   <data name="Definition"><value>Definition</value></data>
   <data name="Access"><value>Access</value></data>
+<data name="OptionsInvalid"><value>Runtime options must be a JSON object.</value></data>
 </root>

@@ -33,7 +33,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | PackProjectDetails.razor | `/pack-projects/{ProjectId:guid}` | Pending review and migration |
 | ParameterEditor.razor | `/parameters/new`, `/parameters/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/parameters/README.md). Full final validation remains pending. |
 | ResourcePlanDetails.razor | `/resource-plans/{Id:guid}` | Pending review and migration |
-| RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Pending review and migration |
+| RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Implemented; 10 profile cases and 15 shared access-panel cases pass; TypeScript/catalog pass; browser page object maintained; browser checks pending |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
 | SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
@@ -66,4 +66,8 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Parameter, Vault, Secret and Tool Provider saved configuration add shared frames: **92 shared frames + 258 active specialized collections = 350**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Parameter, Vault, Secret, Tool Provider and Runtime Profile saved configuration add shared frames: **93 shared frames + 258 active specialized collections = 351**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+
+## Final acceptance still required
+
+Final verification includes exact resource/owner/context coordinates and homonyms, inherited and managed read-only behavior, draft retention across fragments and browser history, long identities, localized state semantics, keyboard/focus/Escape, touch disclosures, both themes, desktop/mobile bounds, current loading/pagination contracts and existing commands/ETags. Binary settings use switch presentation; multi-selection retains checkboxes. Unsupported publication or activation capabilities must not be invented.

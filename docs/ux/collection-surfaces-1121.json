@@ -5649,6 +5649,39 @@
         "domainSemantics": "Settings retain transport semantics and are not resource identities. Actual tool members retain their own identity, state, managed/read-only status and activation commands.",
         "evidenceStatus": "Focused and browser validation pending this screen commit."
       }
+    },
+    {
+      "id": "runtime-profile-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/runtimeprofiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/model-administration.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved runtime type, execution modes and structured adapter options. Existing deployment usages and access policies retain family semantics."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Runtime options and execution settings are configuration values, without invented publication versions, owners or resource commands.",
+        "evidenceStatus": "Focused and browser validation pending this screen commit."
+      }
     }
   ],
   "specialized": [
