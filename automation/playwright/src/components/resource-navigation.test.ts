@@ -81,3 +81,17 @@ test('selecting the current destination does not add duplicate history', () => {
   Object.assign(globalThis, { window: { location: { href: current }, Blazor: { navigateTo: () => assert.fail('duplicate navigation') } } });
   assert.equal(module.navigate(current, false), current);
 });
+test('query identity matches ASP.NET key casing/grouping without changing coordinate values', () => {
+  for (const suffix of ['VIEW=old&tAb=ignored', 'opaque=a&other=x&Opaque=b&VIEW=old']) {
+    let current = new URL('https://example.test/agents/a?scopeRef=Owner&context=%2Finstance&' + suffix + '#yaml');
+    const retained = suffix.startsWith('opaque') ? '&opaque=a&opaque=b&other=x' : '';
+    const target = 'https://example.test/agents/a?scopeRef=Owner&context=%2Finstance' + retained + '#overview';
+    Object.assign(globalThis, { window: {
+      location: { get href() { return current.href; } },
+      history: { state: {}, replaceState: (_state: unknown, _title: string, value: string) => { current = new URL(value); } },
+      Blazor: { navigateTo: (value: string) => { current = new URL(value); } }
+    } });
+    assert.equal(module.navigate(target, true), target);
+    assert.equal(module.navigate(target.replace('scopeRef=Owner', 'scopeRef=owner'), false), target);
+  }
+});

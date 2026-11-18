@@ -2,8 +2,17 @@
 export function navigate(location, replace, historyEntryState) {
     const current = new URL(window.location.href), target = new URL(location, current);
     const identity = url => {
-        const query = new URLSearchParams(url.search);
-        query.delete('view'); query.delete('tab');
+        // Match ASP.NET query parsing: key comparison/grouping ignores case;
+        // resource, owner and context VALUES remain exact and ordered per key.
+        const groups = new Map();
+        for (const [name, value] of url.searchParams) {
+            const key = name.toLowerCase();
+            if (key === 'view' || key === 'tab') continue;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(value);
+        }
+        const query = new URLSearchParams();
+        for (const [key, values] of groups) for (const value of values) query.append(key, value);
         return url.origin + url.pathname + '?' + query.toString();
     };
     if (identity(current) !== identity(target)) return current.href;
