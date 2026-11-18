@@ -103,6 +103,10 @@ public sealed class StorageComponentTests
             StringAssert.Contains(href, Uri.EscapeDataString(Scope.Value));
             StringAssert.Contains(href, "namespace=evidence");
             Assert.HasCount(2, page.FindAll("[data-testid=storage-type-evidence]"));
+            var typeIdentity = page.Find("[data-testid=storage-type-evidence] summary");
+            Assert.AreEqual(StorageTypeLinks.Details(Type()), typeIdentity.QuerySelector(".resource-name-link")!.GetAttribute("href"));
+            Assert.AreEqual("default/remote", typeIdentity.QuerySelector(".copyable-value code")!.GetAttribute("title"));
+            Assert.IsNotNull(typeIdentity.QuerySelector(".resource-owner-icon"));
             StringAssert.Contains(page.Markup, "No content operations advertised");
             StringAssert.Contains(page.Markup, "storage-provider");
             Assert.DoesNotContain("DO-NOT-DISPLAY", page.Markup, StringComparison.Ordinal);

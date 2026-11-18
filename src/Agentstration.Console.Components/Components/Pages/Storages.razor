@@ -35,7 +35,10 @@ else
         {
             @foreach (var version in type.Definition.Versions)
             {
-                <details data-testid="storage-type-evidence"><summary>@type.Definition.DisplayName · @type.Namespace/@type.Name · @version.Version · @T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")</summary><StorageTypeEvidence Choice="new(type, version)" /></details>
+                <details data-testid="storage-type-evidence"><summary><span class="collection-identity storage-type-catalog-identity">
+                    <span class="collection-family-icon"><ResourceIcon IconName="database" /><span class="collection-icon-badges"><ResourceScopeBadge ScopeRef="type.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")" Status="@AvailabilityStatus(type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable)" IconOnly /><ManagedResourceBadge IsManaged="@type.Governance.IsManaged" IsReadOnly="@(type.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></span></span>
+                    <span class="collection-identity-text"><span class="collection-name-heading"><a class="resource-name-link" href="@StorageTypeLinks.Details(type)" title="@type.Definition.DisplayName">@type.Definition.DisplayName</a></span><span class="collection-qualified-name"><CopyableValue Value="@($"{type.Namespace}/{type.Name}")" /></span><span class="collection-identity-versions"><CollectionVersion Label="@T("Version")" Value="@version.Version" /></span></span>
+                </span></summary><StorageTypeEvidence Choice="new(type, version)" /></details>
             }
         }
     </section>

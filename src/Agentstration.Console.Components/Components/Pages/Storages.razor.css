@@ -1,2 +1,4 @@
 summary { overflow-wrap: anywhere; cursor: pointer; padding-block: .75rem; }
 .toolbar { flex-wrap: wrap; }
+
+.storage-type-catalog-identity { display: inline-flex; max-width: calc(100% - 1.5rem); vertical-align: middle; }
