@@ -24,7 +24,7 @@ public sealed class CreationWizardTests
         Assert.Contains(next, cut.Find("[data-testid=creation-wizard-next]").TextContent);
         await cut.Find("input").InputAsync("my draft");
         var instance = cut.FindComponent<WizardProbe>().Instance;
-        await cut.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        await cut.Find("[data-testid=creation-wizard-next-top]").ClickAsync();
         Assert.AreEqual("configuration", cut.Instance.CurrentStepId);
         Assert.IsTrue(cut.Find("[data-step-id=identity]").HasAttribute("hidden"));
         Assert.HasCount(1, cut.FindAll("[aria-current=step]"));
@@ -65,8 +65,10 @@ public sealed class CreationWizardTests
             .Add(c => c.OnFinish, (CreationWizardFinish _) => finishes++));
         await cut.InvokeAsync(cut.Instance.FinishAsync);
         Assert.AreEqual(0, finishes);
-        var moving = cut.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        var moving = cut.Find("[data-testid=creation-wizard-next-top]").ClickAsync();
         cut.WaitForAssertion(() => Assert.AreEqual(1, validations));
+        Assert.IsTrue(cut.Find("[data-testid=creation-wizard-next-top]").HasAttribute("disabled"));
+        Assert.IsTrue(cut.Find("[data-testid=creation-wizard-next]").HasAttribute("disabled"));
         await cut.InvokeAsync(cut.Instance.ContinueAsync);
         Assert.AreEqual(1, validations);
         pending.SetResult();
@@ -91,6 +93,7 @@ public sealed class CreationWizardTests
         await cut.InvokeAsync(cut.Instance.FinishAsync);
         Assert.AreEqual(0, finishes);
         Assert.IsTrue(cut.Find("[data-testid=creation-wizard-finish]").HasAttribute("disabled"));
+        Assert.IsTrue(cut.Find("[data-testid=creation-wizard-finish-top]").HasAttribute("disabled"));
     }
 
     [TestMethod]

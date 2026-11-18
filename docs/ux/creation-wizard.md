@@ -27,7 +27,7 @@ The callback receives `CreationWizardStepChange.From` and `.To`; setting `Cancel
 
 Visible steps remain mounted while inactive and use native `hidden` content panes. Ordinary Back/Continue navigation preserves both the page model and stateful child editors. Steps removed by a visibility condition are unmounted; the caller still owns their model. This is in-page state, without persisted checkpoints or automatic saving.
 
-The shell provides localized controls, an ordered progress list with one `aria-current="step"`, responsive navigation and focus transfer to the newly active content region. It uses ordinary navigation buttons, with completion supplied by the screen rather than inferred from a visit. All commands are type button; submitting the enclosing Data Source form advances its current step and cannot create before review.
+The shell provides localized controls, an ordered progress list with one `aria-current="step"`, responsive navigation and focus transfer to the newly active content region. It uses ordinary navigation buttons, with completion supplied by the screen rather than inferred from a visit. The same navigation controls render just below the step banner and at the bottom, from one shared fragment. Both locations share handlers, busy/disabled state and final validation; distinct registered test IDs avoid ambiguous targets. Only the footer position announcement is live. All commands are type button; submitting the enclosing Data Source form advances its current step and cannot create before review.
 
 ## Data Source pilot
 

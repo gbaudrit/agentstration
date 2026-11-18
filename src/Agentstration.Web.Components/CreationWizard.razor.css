@@ -1,5 +1,5 @@
 .creation-wizard { min-width: 0; }
-.creation-wizard-progress { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: .5rem; padding: 0; margin: 0 0 1.5rem; list-style: none; }
+.creation-wizard-progress { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: .5rem; padding: 0; margin: 0 0 .75rem; list-style: none; }
 .creation-wizard-progress li { min-width: 0; }
 .creation-wizard-step { width: 100%; min-height: 2.75rem; display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) 1rem; align-items: center; gap: .5rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--muted); }
 .creation-wizard-step.is-current { background: var(--primary-soft); border-color: var(--primary); color: var(--text); }
@@ -12,7 +12,8 @@
 .creation-wizard-content { min-width: 0; }
 .creation-wizard-content[hidden] { display: none; }
 .creation-wizard-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; padding: 1.25rem 0; border-top: 1px solid var(--border); }
-.creation-wizard-actions > div { display: flex; gap: .75rem; }
+.creation-wizard-actions-top { justify-content: flex-end; margin: 0 0 1rem; padding: 0; border: 0; }
+.creation-wizard-actions > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; max-width: 100%; }
 .creation-wizard-position { color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
 .creation-wizard-content:focus-visible { outline: 2px solid var(--primary); outline-offset: .3rem; }
 @media (max-width: 640px) {
@@ -23,5 +24,6 @@
     .creation-wizard-state, .creation-wizard-state ::deep svg { width: .75rem; height: .75rem; }
     .creation-wizard-incomplete { width: .7rem; height: .7rem; font-size: .6rem; }
     .creation-wizard-actions { align-items: stretch; }
-    .creation-wizard-actions > div { margin-left: auto; }
+    .creation-wizard-actions-top { justify-content: flex-end; margin: 0 0 1rem; padding: 0; border: 0; }
+.creation-wizard-actions > div { margin-left: auto; }
 }

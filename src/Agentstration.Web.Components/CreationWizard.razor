@@ -22,6 +22,7 @@
             }
         </ol>
     </nav>
+    <div class="creation-wizard-actions creation-wizard-actions-top">@NavigationButtons(true)</div>
     @foreach (var step in visibleSteps)
     {
         <section @key="step.Id" @ref="panes[step.Id]" tabindex="-1" class="creation-wizard-content" hidden="@(step.Id != CurrentStepId)"
@@ -31,20 +32,7 @@
     }
     <footer class="creation-wizard-actions">
         <span class="creation-wizard-position" aria-live="polite">@Localizer["Position", currentIndex + 1, visibleSteps.Count, CurrentStep?.Title ?? string.Empty]</span>
-        <div>
-            @if (currentIndex > 0)
-            {
-                <button type="button" class="button-secondary" disabled="@Locked" data-testid="creation-wizard-previous" @onclick="PreviousAsync">@Localizer["Previous"]</button>
-            }
-            @if (currentIndex < visibleSteps.Count - 1)
-            {
-                <button type="button" class="button-primary" disabled="@Locked" data-testid="creation-wizard-next" @onclick="ContinueAsync">@Localizer["Continue"]</button>
-            }
-            else if (CurrentStep is not null)
-            {
-                <button type="button" class="button-primary" disabled="@(Locked || !CanFinish)" data-testid="@FinishTestId" @onclick="FinishAsync">@(Busy ? Localizer["Working"] : FinishLabel ?? Localizer["Finish"].Value)</button>
-            }
-        </div>
+        @NavigationButtons(false)
     </footer>
 </div>
 
@@ -58,6 +46,21 @@
     [Parameter] public string? FinishLabel { get; set; }
     [Parameter] public string? TestId { get; set; }
     [Parameter] public string FinishTestId { get; set; } = "creation-wizard-finish";
+
+    private RenderFragment NavigationButtons(bool top) => @<div role="group" aria-label="@Localizer[top ? "TopNavigation" : "BottomNavigation"]">
+            @if (currentIndex > 0)
+            {
+                <button type="button" class="button-secondary" disabled="@Locked" data-testid="@(top ? "creation-wizard-previous-top" : "creation-wizard-previous")" @onclick="PreviousAsync">@Localizer["Previous"]</button>
+            }
+            @if (currentIndex < visibleSteps.Count - 1)
+            {
+                <button type="button" class="button-primary" disabled="@Locked" data-testid="@(top ? "creation-wizard-next-top" : "creation-wizard-next")" @onclick="ContinueAsync">@Localizer["Continue"]</button>
+            }
+            else if (CurrentStep is not null)
+            {
+                <button type="button" class="button-primary" disabled="@(Locked || !CanFinish)" data-testid="@(top ? "creation-wizard-finish-top" : FinishTestId)" @onclick="FinishAsync">@(Busy ? Localizer["Working"] : FinishLabel ?? Localizer["Finish"].Value)</button>
+            }
+        </div>;
 
     private readonly string id = $"creation-wizard-{Guid.NewGuid():N}";
     private IReadOnlyList<CreationWizardStep> visibleSteps = [];

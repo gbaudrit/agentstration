@@ -2,6 +2,7 @@ export const TestIds = {
   creationWizard: {
     source: 'data-source-creation-wizard', namespace: 'dataset-namespace', review: 'data-source-creation-review',
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
+    nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
   connectedStorageCollections: {
     storageRow: 'storage-row', storageName: 'storage-name-link',

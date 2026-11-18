@@ -11,4 +11,6 @@
   <data name="Working" xml:space="preserve"><value>Création…</value></data>
   <data name="Complete" xml:space="preserve"><value>Complète</value></data>
   <data name="Incomplete" xml:space="preserve"><value>À compléter</value></data>
+  <data name="TopNavigation" xml:space="preserve"><value>Navigation entre les étapes en haut</value></data>
+  <data name="BottomNavigation" xml:space="preserve"><value>Navigation entre les étapes en bas</value></data>
 </root>
