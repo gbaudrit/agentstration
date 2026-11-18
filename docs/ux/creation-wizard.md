@@ -1,5 +1,7 @@
 # Configurable creation Wizard
 
+Feature request: [#1225](https://github.com/gbaudrit/agentstration/issues/1225).
+
 Baseline: main `efbf247a` after #1174. The maintainer requested implementation of the approved Data Source mockup on a new branch, with the feature issue recorded at delivery.
 
 `CreationWizard` is a shared presentation component in Agentstration.Web.Components. A screen supplies an ordered `IReadOnlyList<CreationWizardStep>`: stable ID, localized title, RenderFragment content and optional visibility. The screen supplies its step-change validation and final command. The shell has no resource client, domain model, authorization lookup or loading API.
@@ -44,4 +46,4 @@ The collection inventory classifies the shell's configured progress/content iter
 
 ## Validation and evidence
 
-Current command results and real application captures are recorded at delivery. Generated mockups in the conversation describe the proposal; they are not implementation evidence. No earlier #1174 green run is claimed as validation of this branch.
+The Release build completed with zero warnings/errors and all 1,569 Fast tests passed. Both real Source freshness campaigns passed: EN/dark desktop keyboard and FR/light touch mobile. The [evidence archive](evidence/creation-wizard/README.md) records all six steps, 18 unedited images, exact source/image digests and reproducible capture inputs. The PR records the full Integration and CI results at delivery. Generated mockups in the conversation describe the proposal; they are not implementation evidence. No earlier #1174 green run is claimed as validation of this branch.
