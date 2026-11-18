@@ -304,8 +304,10 @@ public sealed class BootstrapProfileManagementService(
             var context = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
             using var operationScope = PushTargetScope(context);
             var preview = await bootstrap.PreviewAsync(selection, cancellationToken);
-            if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal) || !preview.CanApply)
-                throw new DeclarativeBootstrapException("The Bootstrap preview changed or is invalid. Preview the application again.");
+            if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
+                throw new DeclarativeBootstrapException("The bootstrap catalog or target changed after preview. Preview the application again.");
+            if (!preview.CanApply)
+                throw new DeclarativeBootstrapException("The bootstrap preview contains invalid resources and cannot be applied.");
             var application = await CreateApplicationAsync(preview, actorPrincipalId, cancellationToken);
             return await ExecuteApplicationAsync(application, selection, cancellationToken);
         }
