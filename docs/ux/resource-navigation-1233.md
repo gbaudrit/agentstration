@@ -32,7 +32,7 @@ The screen places YAML last as an independent primary entry when viewing YAML is
 
 ## Fragment-only URL contract
 
-Paths use one or two lowercase ASCII kebab-case segments, each at most 64 characters; examples: `#overview`, `#definition/tools`, `#yaml`. Percent-encoded aliases, translated IDs, empty segments, uppercase, whitespace and deeper paths are invalid. Section links target the current canonical resource path and preserve namespace, ownership and administrative-context query values. Obsolete `view`/`tab` selectors are removed from generated links and never interpreted.
+Paths use one or two lowercase ASCII kebab-case segments, each at most 64 characters; examples: `#overview`, `#definition/tools`, `#yaml`. Percent-encoded aliases, translated IDs, empty segments, uppercase, whitespace and deeper paths are invalid. Section links target the current canonical resource path and preserve namespace, ownership and administrative-context query values. Obsolete `view`/`tab` selectors are removed from generated links and never interpreted. Query-key identity comparison/grouping follows ASP.NET case-insensitive parsing; resource, owner and context values remain exact.
 
 An absent fragment uses `DefaultPath` if allowed, otherwise the first visible/enabled navigable entry. Unknown, malformed, hidden, removed or disabled destinations use that same fallback and a generic localized notice, with no hidden destination echoed. Group destinations/defaults and invalid fragments are canonicalized with history replacement; explicit section navigation creates history entries. No allowed destination yields `CurrentPath == null`, a localized empty state and no protected view selection.
 

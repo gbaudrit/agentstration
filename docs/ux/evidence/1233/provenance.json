@@ -1,20 +1,20 @@
 {
-  "sourceCommit": "6f33d294a0475633869a53429175af053ab0b17f",
+  "sourceCommit": "0d566e0cc54aa44325aa374a1690aea322943d77",
   "baseCommit": "52c4b1dae9b0bcf98088669250934be7000542e9",
-  "capturedAtUtc": "2026-11-18T16:03:26.401365+00:00",
+  "capturedAtUtc": "2026-11-18T16:27:12.686686+00:00",
   "browser": "Chromium 154.0.8037.57 built on Debian GNU/Linux 13 (trixie)",
   "kind": "real isolated Razor component host; no production Agent/layout adoption",
   "sources": {
     "src/Agentstration.Web.Components/ResourceNavigation.razor": "a9f1554d541098b4aa1249e444d57a857590dcaf555c2f171a0c86aab1591659",
     "src/Agentstration.Web.Components/ResourceNavigation.razor.css": "d6248979605bbefe2b9371d10e61ae7d10f384d2bc231c0ce659c94d23fb0b8a",
-    "src/Agentstration.Web.Components/wwwroot/resource-navigation.js": "035e6350e5673d48811158198da3eb3c04ec1a7a6767ffac377aa41ba7a6f1e4"
+    "src/Agentstration.Web.Components/wwwroot/resource-navigation.js": "799a11fa2aed9e335b403040162e9f8e06fa0433bc50650bfe5213bbdbf730d9"
   },
   "screenshots": {
     "en-US-light-component.png": "0e8bf453cce5dd1340054dd1a5135332e6ab56a1bba5ecb29918ea4736fcc399",
     "fr-FR-dark-drawer.png": "ecdcfe225cee8e62ac07583d1b193c05375155e431310974d674b83faee089f5",
     "fr-FR-light-component.png": "ec34bfd9c39f73940a54303f6512fcb49e33e9304920c760b07425f1c1801f0f",
     "en-US-dark-component.png": "f2ada23cab3e4277923a96c346090a9f9da8cd14158148e53dcc196410bfb5fb",
-    "fr-FR-dark-component.png": "ec505f66e88955211a5b78a7ff337788c7f2d0dc1cd6a5c863d0135043b990a0",
+    "fr-FR-dark-component.png": "7649ed908ba654dead4ae258a474ff6063b61b3a7c9b0c2841b635e83e0a976b",
     "en-US-light-drawer.png": "1058e64ed0bbe5d699deaab76c2ad08c8f71bdb5f9bb8ad1f8e86d8654896c4d"
   }
 }

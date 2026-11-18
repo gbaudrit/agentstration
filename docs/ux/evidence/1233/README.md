@@ -2,7 +2,7 @@
 
 These are screenshots of the real shared Razor component running in a temporary, isolated Interactive Server host. The specimen is explicitly labelled and contains no Agent data. Its surrounding grid is test-host composition, not the deferred production resource-detail layout or an Agent pilot.
 
-Product sources: commit `6f33d294a0475633869a53429175af053ab0b17f`, based on main `52c4b1dae9b0bcf98088669250934be7000542e9`. Source/image SHA-256 values and Chromium version are recorded in [provenance.json](provenance.json).
+Product sources: commit `0d566e0cc54aa44325aa374a1690aea322943d77`, based on main `52c4b1dae9b0bcf98088669250934be7000542e9`. Source/image SHA-256 values and Chromium version are recorded in [provenance.json](provenance.json).
 
 | Variant | Component | Drawer |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ Product sources: commit `6f33d294a0475633869a53429175af053ab0b17f`, based on mai
 | English, light, touch 390×844 | [Capture](en-US-light-component.png) | [Capture](en-US-light-drawer.png) |
 | French, dark, touch 390×844 | [Capture](fr-FR-dark-component.png) | [Capture](fr-FR-dark-drawer.png) |
 
-[smoke-results.json](smoke-results.json) records four passing variants. The executed script checks direct subsection links with obsolete selectors ignored/removed, reload/new-tab restoration, unsaved form and invalid YAML retention through generated navigation and guarded Back/Forward, programmatic fragment changes through the public Blazor API, unchanged resource/context coordinates, hidden-section fallback, long labels and no horizontal document overflow. Mobile checks use real touch activation, selection/outside/Escape dismissal, focus containment/return and responsive focus transfer. It also asserts theme token application and no console/page errors.
+[smoke-results.json](smoke-results.json) records four passing variants. The executed script checks direct subsection links with obsolete selectors ignored/removed, reload/new-tab restoration, unsaved form and invalid YAML retention through generated navigation and guarded Back/Forward, programmatic fragment changes through the public Blazor API, unchanged resource/context coordinates, hidden-section fallback, long labels and no horizontal document overflow. Mixed-case obsolete selector names and repeated query keys follow ASP.NET parsing without changing resource/context values. Mobile checks use real touch activation, selection/outside/Escape dismissal, focus containment/return and responsive focus transfer. It also asserts theme token application and no console/page errors.
 
 ## Known failing integration probe
 
