@@ -1519,6 +1519,14 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                // These fixtures belong to the test root and are compiled into
+                // separate processes for the three resource-family test modules.
+                if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
+                        or "../ApiResourceTestFixtures/ResourceServiceFixture.cs"
+                        or "../ApiResourceTestFixtures/AwpTestWorker.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
+                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
+
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
                 var relativePath = Path.GetRelativePath(projectDirectory, sourcePath);
@@ -1542,6 +1550,8 @@ public sealed class DependencyTests
                      "Agentstration.Api.Flows.Tests",
                      "Agentstration.Api.Execution.Tests",
                      "Agentstration.Api.Resources.Tests",
+                     "Agentstration.Api.DataSources.Tests",
+                     "Agentstration.Api.Artifacts.Tests",
                      "Agentstration.Console.Client.Tests",
                      "Agentstration.Console.Components.Tests",
                      "Agentstration.Console.Web.Tests",

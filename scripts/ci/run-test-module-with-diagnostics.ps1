@@ -118,7 +118,8 @@ $moduleName = [System.IO.Path]::GetFileNameWithoutExtension($resolvedAssembly)
 $failureReasons = @(
     if ($process.ExitCode -ne 0) { 'test-process-exit' }
     if ($testReportStatus -ne 'available') { "test-report-$testReportStatus" }
-    if ($testCount -lt $MinimumExpectedTests) { 'test-count-below-minimum' }
+    # MTP exit code 9 also covers a shortfall after excluding skipped cases.
+    if ($process.ExitCode -eq 9 -or $testCount -lt $MinimumExpectedTests) { 'test-count-below-minimum' }
     if ($failedTestCount -gt 0) { 'test-failures' }
     if ($FailureWorkingSetMiB -gt 0 -and $workingSetMiB -ge $FailureWorkingSetMiB) { 'working-set-budget-exceeded' }
 )

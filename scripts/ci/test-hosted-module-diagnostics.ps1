@@ -20,12 +20,12 @@ if (mode != "missing")
 {
     File.WriteAllText(report, mode == "invalid" ? "<invalid" : mode == "no-counters" ? "<TestRun />" :
         mode == "invalid-counters" ? "<TestRun><Counters total=\"2\" failed=\"0\" /></TestRun>" :
-        $"<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><ResultSummary><Counters total=\"2\" passed=\"{(mode == "failed" ? 1 : 2)}\" failed=\"{(mode == "failed" ? 1 : 0)}\" /></ResultSummary></TestRun>");
+        $"<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><ResultSummary><Counters total=\"2\" passed=\"{(mode is "failed" or "skipped-minimum" ? 1 : 2)}\" failed=\"{(mode == "failed" ? 1 : 0)}\" /></ResultSummary></TestRun>");
 }
 Console.WriteLine("PRIVATE_TEST_OUTPUT_SENTINEL");
 Console.Error.WriteLine("PRIVATE_TEST_ERROR_SENTINEL");
 Thread.Sleep(400);
-return mode == "exit" ? 7 : 0;
+return mode == "exit" ? 7 : mode == "skipped-minimum" ? 9 : 0;
 '@ | Set-Content (Join-Path $temp 'Program.cs')
     $assemblyRoot = Join-Path $temp 'tests'
     $output = Join-Path $assemblyRoot 'Fixture/bin/Release/net10.0'
@@ -62,6 +62,8 @@ return mode == "exit" ? 7 : 0;
     Require ($result.failedTestCount -eq 1) 'Failed test counter was lost.'
     $result = Run-Case 'exit' @('test-process-exit')
     Require ($result.exitCode -eq 7) 'Process exit code was lost.'
+    $result = Run-Case 'skipped-minimum' @('test-process-exit', 'test-count-below-minimum')
+    Require ($result.testCount -eq 2 -and $result.passedTestCount -eq 1) 'Skipped cases hid the runner minimum shortfall.'
     $null = Run-Case 'passed' @('test-count-below-minimum') -Minimum 3
     $null = Run-Case 'missing' @('test-report-missing', 'test-count-below-minimum')
     $null = Run-Case 'invalid' @('test-report-invalid', 'test-count-below-minimum')
