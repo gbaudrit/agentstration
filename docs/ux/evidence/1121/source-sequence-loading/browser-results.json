@@ -1,0 +1,82 @@
+{
+  "sourceCommit": "2650622978d74f3852691aef2a1825f0b06cb3ba",
+  "executionSource": "The campaign used the unchanged Release build11 working tree before commit publication. The product component and maintained journey sources match the recorded commit; Git blob IDs and content hashes are recorded below.",
+  "tooling": {
+    "playwright": "1.63.0",
+    "browser": "System Chromium 154.0.8037.57 (Debian 13)",
+    "configuration": "Release",
+    "noBuild": true,
+    "workers": 1
+  },
+  "coverage": "English then French share the same host within each desktop/mobile project, retaining the earlier published transformation for the French case.",
+  "stats": {
+    "startTime": "2026-11-18T08:23:55.670Z",
+    "duration": 357601.622,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "Source Flow composition en-US @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 69221,
+      "retry": 0,
+      "startTime": "2026-11-18T08:23:57.182Z"
+    },
+    {
+      "title": "Source Flow composition fr-FR @smoke",
+      "project": "desktop-chromium",
+      "status": "passed",
+      "durationMs": 73027,
+      "retry": 0,
+      "startTime": "2026-11-18T08:25:26.320Z"
+    },
+    {
+      "title": "Source Flow composition en-US on mobile @smoke @responsive",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 98122,
+      "retry": 0,
+      "startTime": "2026-11-18T08:26:41.517Z"
+    },
+    {
+      "title": "Source Flow composition fr-FR on mobile @smoke @responsive",
+      "project": "mobile-chromium",
+      "status": "passed",
+      "durationMs": 63594,
+      "retry": 0,
+      "startTime": "2026-11-18T08:28:49.161Z"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "gitBlob": "bb994c58bf07e97a95d6fe3a4169b2753ca1454a",
+      "sha256GitContent": "a85eef81a1a999256f800f06639db26aa28f9c23754880dca27ea930f1132643"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "gitBlob": "6421a45336070aef88a4b38a797117a822cef73b",
+      "sha256GitContent": "4e839a0eac81e6e8603eb1fdb857c0f9f2e52808ef0f0d564682aabb281a7448"
+    },
+    {
+      "path": "automation/playwright/src/pages/source-composition.page.ts",
+      "gitBlob": "107fa2be80f7f53377f07d6525b0ebfc2bb50b84",
+      "sha256GitContent": "b517f9918f23dd7032517acff7e17bc126d4b78241e85109898f8e4e8b55d60e"
+    },
+    {
+      "path": "automation/playwright/tests/source-policies.spec.ts",
+      "gitBlob": "afac4c8ed6d2c9f0da6567c6b3c3ef442cf96e9b",
+      "sha256GitContent": "c1540d616d137a0447237ac10b7dd415ecbfe71afb43e79893890ffb1d1d1980"
+    },
+    {
+      "path": "automation/playwright/src/fixtures/product-hosts.ts",
+      "gitBlob": "c31b7fea0ba2b2066a2b77dd660dfeb3d4fbe130",
+      "sha256GitContent": "380f55d1c02103d302a869b7ad8e567429c719afba97e529ae5f8db3a66b0109"
+    }
+  ],
+  "ciIncidentAttribution": "The exact earlier CI failure remains unattributed; controlled component regressions establish the in-flight Add defect independently."
+}

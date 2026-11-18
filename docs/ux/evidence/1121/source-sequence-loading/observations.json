@@ -17,6 +17,21 @@
       "path": "component-console.txt",
       "bytes": 452,
       "sha256": "a7d43ab2a4e8f11a2899719666737e2d13997e53bc95338c432e56be7fe1319b"
+    },
+    {
+      "path": "browser-results.json",
+      "bytes": 3190,
+      "sha256": "0ffa17dd9cafbcfd0fab53d611b8e931de368d87462e0b9bce30020401c966f1"
+    },
+    {
+      "path": "browser-report.raw.json",
+      "bytes": 7588,
+      "sha256": "350cd54ad044853ed20161c3877f7d388a81a61c0292a2a0bf3a503d021a9f68"
+    },
+    {
+      "path": "browser-log.txt",
+      "bytes": 882,
+      "sha256": "31edf3f177d36b13f90ea3f7d097e7e0e639e7b67c60b2a6f6c9519c6a02be42"
     }
   ],
   "rawTranscriptArchive": {
@@ -24,5 +39,6 @@
     "uncompressedSha256": "5df91761bab3740ef2a6fcbcb69ed11b7f5cc1b7df70e036148fccbb4fb9e2c0",
     "archiveSha256": "2548ba75c2738f55b2b9d5b583b61818861f9562bd22251e36c022c6c6999bb0"
   },
-  "readableTranscriptNormalization": "Trailing whitespace only; all diagnostic text and test results retained. Original bytes are preserved in the gzip archive."
+  "readableTranscriptNormalization": "Trailing whitespace only; all diagnostic text and test results retained. Original bytes are preserved in the gzip archive.",
+  "browserSourceCommit": "2650622978d74f3852691aef2a1825f0b06cb3ba"
 }

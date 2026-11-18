@@ -1,6 +1,6 @@
 # Main synchronization and new-surface adoption — #1174
 
-Baseline: previous main `cc8e906e1b833e86e365c549ce4c9696376f3407`; incoming main `8f1645446d7ae9082ed2d00bd28cce98ebaa023a` (#1181). The existing promotion head was `8b568e3633005062199268e56b76a2e5abb4a20d`. Main is merged into the dedicated PR branch without rewriting either history. The old coverage draft #1132 remains its own preserved delivery; this synchronization belongs to #1174.
+Baseline: previous main `cc8e906e1b833e86e365c549ce4c9696376f3407`; incoming main `8f1645446d7ae9082ed2d00bd28cce98ebaa023a` (#1181). The existing promotion head was `8b568e3633005062199268e56b76a2e5abb4a20d`. Main is merged into the dedicated PR branch without rewriting either history. The maintainer merged coverage PR #1132 into the UX integration branch (`2c18b47f`); its `f80a1758` content was already an ancestor of this promotion. All subsequent corrections stay in #1174. No child-branch retarget or duplicate coverage delivery is needed.
 
 The approved all-list contract applies to new Connected Service, Storage, Storage Type and transformation-function inventories, their embedded details, source datasets, query/tool projections and Flow outputs. Specialized editors, ordered composition, causal trees and execution progress retain their domain interaction. Generations, installed type versions, immutable query versions and execution attempts are not publication versions.
 
@@ -89,7 +89,7 @@ The scope below audits every added/changed Razor source in the incoming delta, i
 
 - The machine-readable [collection inventory](collection-surfaces-1121.json) records functional datasets, scope/action applicability and specialized adaptation. The [form inventory](formulaires-tous-ecrans/inventory.json) distinguishes routed adapters from embedded helpers.
 - Existing route coverage is retained. Source policy/composition journeys are attached to their real host routes as additional assertions; embedded components are never assigned invented page routes. The catalog contains one entry per actual source/route pair, including the new Tool creation route and both function catalog aliases.
-- Before new adoption checks, Playwright enumerates 511 cases: 218 desktop, 217 mobile and 76 locale cases. This is enumeration, not a successful browser campaign. The incoming main adds 28 cases to the previous 483; old cases are retained.
+- Playwright enumerates 513 cases: 219 desktop, 218 mobile and 76 locale cases. This is enumeration, not a successful browser campaign. Existing cases are retained; new populated collection checks add one desktop and one mobile case to the synchronized 511-case catalog.
 - New routed form field coverage is explicitly pending under #1122 until its assertions are implemented. Source adoption, local smoke and existing family tests do not automatically claim a complete reusable journey. The existing deferred-scenario and authorized stacked-draft exceptions remain applicable.
 - Historical screenshots and test totals elsewhere retain their original source commits. They are not proof of the new main synchronization. Current build, offline lanes, desktop/mobile captures and CI results must be recorded by the final delivery.
 
@@ -153,11 +153,11 @@ The maintained shared-form case and schema-contract creation flow open `/tools/d
 ## Current local validation
 
 The Release solution builds with zero warnings and errors. The full required Fast
-lane passes 1,554 tests; Integration passes 1,537 with 28 environment-dependent
+lane passes 1,556 tests; Integration passes 1,537 with 28 environment-dependent
 optional checks skipped. TypeScript, six JavaScript lifecycle checks, five port
-fixture tests and seven catalog checks pass. The format gate passes on the 365
-changed C#/Razor sources before the final two-field guard correction; current-head
-CI remains the final format and browser authority.
+fixture tests and seven catalog checks pass. The format gate passes on all 366
+changed C#/Razor sources, including the two Source sequence regressions.
+Current-head CI remains the final full-browser authority.
 
 Two populated collection variants pass against product source `2c6a1adf`: English
 desktop/dark and French mobile/light with real touch. The [capture gallery](evidence/1121/main-sync-1181/README.md)
@@ -178,8 +178,23 @@ opening the designer. Verification waits for the completed result panel before
 checking the unchanged zero/one issue counts. Three local repetitions pass after
 the correction; no test timeout, retry or expected count is relaxed.
 
+Eight Flow Inspector variants additionally pass in English/French, light/dark,
+on desktop/mobile after updating both consumers of the corrected transition ID.
+No priority, clearing or issue-count assertion is relaxed.
+
+The Source sequence handlers now reject queued Add commands while catalogs are
+loading or the editor is read-only. Two controlled component regressions fail
+before the correction and pass afterwards; all 712 Console component tests pass.
+The browser waits for the requested refresh to complete using the local loading
+revision, without changing persisted revisions, row counts, retries or timeouts.
+All four Source composition cases pass with English then French sharing each
+desktop/mobile host. [Source loading evidence](evidence/1121/source-sequence-loading/README.md)
+distinguishes the reproduced handler defect from the original CI incident, whose
+exact server cause was not established.
+
 The historical CI working-set failure on API Resources is tracked separately by
-#1219. Its diagnostic change preserves the 2,432 MiB failure ceiling and does not
-claim a memory reduction. The maintainer requested keeping that work separate;
+#1219. Its updated revision `52305495` splits the unchanged inventory across bounded
+test processes and preserves the 2,432 MiB failure ceiling. Its validation and
+merge remain separate. The maintainer requested keeping that work separate;
 no experimental memory-fixture correction is included in this UX promotion.
 CI is not declared globally green while that gate remains failed.
