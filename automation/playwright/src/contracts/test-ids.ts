@@ -1,4 +1,8 @@
 export const TestIds = {
+  creationWizard: {
+    source: 'data-source-creation-wizard', namespace: 'dataset-namespace', review: 'data-source-creation-review',
+    next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
+  },
   connectedStorageCollections: {
     storageRow: 'storage-row', storageName: 'storage-name-link',
     storageTypeRow: 'storage-type-row', storageTypeName: 'storage-type-name-link',

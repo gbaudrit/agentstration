@@ -1,0 +1,130 @@
+@implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<CreationWizardStrings> Localizer
+
+<div class="creation-wizard" data-testid="@TestId" aria-busy="@Locked.ToString().ToLowerInvariant()">
+    <nav aria-label="@Localizer["Progress"]">
+        <ol class="creation-wizard-progress">
+            @for (var index = 0; index < visibleSteps.Count; index++)
+            {
+                var step = visibleSteps[index];
+                var position = index;
+                <li @key="step.Id">
+                    <button id="@(id + "-" + step.Id)" type="button" class="creation-wizard-step @(position == currentIndex ? "is-current" : null)"
+                            aria-current="@(position == currentIndex ? "step" : null)" disabled="@(Locked || position > furthestIndex)"
+                            aria-label="@Localizer["StepLabel", position + 1, visibleSteps.Count, step.Title]"
+                            @onclick="() => GoToStepAsync(step.Id)">
+                        <span class="creation-wizard-number" aria-hidden="true">@if (position < currentIndex) { <UiIcon Name="check" /> } else { @(position + 1) }</span>
+                        <span class="creation-wizard-title">@step.Title</span>
+                    </button>
+                </li>
+            }
+        </ol>
+    </nav>
+    @foreach (var step in visibleSteps)
+    {
+        <section @key="step.Id" @ref="panes[step.Id]" tabindex="-1" class="creation-wizard-content" hidden="@(step.Id != CurrentStepId)"
+                 aria-labelledby="@(id + "-" + step.Id)" data-step-id="@step.Id">
+            @step.Content
+        </section>
+    }
+    <footer class="creation-wizard-actions">
+        <span class="creation-wizard-position" aria-live="polite">@Localizer["Position", currentIndex + 1, visibleSteps.Count, CurrentStep?.Title ?? string.Empty]</span>
+        <div>
+            @if (currentIndex > 0)
+            {
+                <button type="button" class="button-secondary" disabled="@Locked" data-testid="creation-wizard-previous" @onclick="PreviousAsync">@Localizer["Previous"]</button>
+            }
+            @if (currentIndex < visibleSteps.Count - 1)
+            {
+                <button type="button" class="button-primary" disabled="@Locked" data-testid="creation-wizard-next" @onclick="ContinueAsync">@Localizer["Continue"]</button>
+            }
+            else if (CurrentStep is not null)
+            {
+                <button type="button" class="button-primary" disabled="@(Locked || !CanFinish)" data-testid="@FinishTestId" @onclick="FinishAsync">@(Busy ? Localizer["Working"] : FinishLabel ?? Localizer["Finish"].Value)</button>
+            }
+        </div>
+    </footer>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CreationWizardStep> Steps { get; set; } = [];
+    [Parameter] public EventCallback<CreationWizardStepChange> OnStepChanging { get; set; }
+    [Parameter] public EventCallback OnFinish { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool CanFinish { get; set; } = true;
+    [Parameter] public string? FinishLabel { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public string FinishTestId { get; set; } = "creation-wizard-finish";
+
+    private readonly string id = $"creation-wizard-{Guid.NewGuid():N}";
+    private IReadOnlyList<CreationWizardStep> visibleSteps = [];
+    private readonly HashSet<string> visited = new(StringComparer.Ordinal);
+    private int currentIndex, furthestIndex;
+    private bool transitioning, focusPending, disposed;
+    private readonly Dictionary<string, ElementReference> panes = new(StringComparer.Ordinal);
+    private bool Locked => disposed || Busy || Disabled || transitioning;
+    private CreationWizardStep? CurrentStep => visibleSteps.ElementAtOrDefault(currentIndex);
+    public string? CurrentStepId => CurrentStep?.Id;
+
+    protected override void OnParametersSet()
+    {
+        var previous = CurrentStepId;
+        visibleSteps = Steps.Where(step => step.Visible).ToArray();
+        if (visibleSteps.Count == 0) throw new ArgumentException("A wizard requires at least one visible step.", nameof(Steps));
+        if (visibleSteps.Any(step => string.IsNullOrWhiteSpace(step.Id)) || visibleSteps.Select(step => step.Id).Distinct(StringComparer.Ordinal).Count() != visibleSteps.Count)
+            throw new ArgumentException("Wizard steps require distinct, non-empty identifiers.", nameof(Steps));
+        currentIndex = Math.Max(0, visibleSteps.ToList().FindIndex(step => step.Id == previous));
+        var firstUnvisited = visibleSteps.ToList().FindIndex(step => !visited.Contains(step.Id));
+        if (firstUnvisited >= 0 && firstUnvisited < currentIndex) currentIndex = firstUnvisited;
+        if (previous is not null && previous != CurrentStepId) focusPending = true;
+        if (CurrentStep is { } current) visited.Add(current.Id);
+        furthestIndex = visibleSteps.TakeWhile(step => visited.Contains(step.Id)).Count() - 1;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (disposed || !focusPending) return;
+        focusPending = false;
+        await panes[CurrentStep!.Id].FocusAsync();
+    }
+
+    public Task ContinueAsync() => currentIndex < visibleSteps.Count - 1 ? ChangeAsync(currentIndex + 1) : Task.CompletedTask;
+    private Task PreviousAsync() => currentIndex > 0 ? ChangeAsync(currentIndex - 1) : Task.CompletedTask;
+    public Task GoToStepAsync(string stepId)
+    {
+        var index = visibleSteps.ToList().FindIndex(step => step.Id == stepId);
+        return index >= 0 && index <= furthestIndex ? ChangeAsync(index) : Task.CompletedTask;
+    }
+
+    private async Task ChangeAsync(int index)
+    {
+        if (Locked || index == currentIndex || CurrentStep is not { } current) return;
+        transitioning = true;
+        try
+        {
+            var target = visibleSteps[index].Id;
+            var change = new CreationWizardStepChange(current.Id, target);
+            await OnStepChanging.InvokeAsync(change);
+            if (disposed || change.Cancel || Busy || Disabled || CurrentStepId != current.Id) return;
+            var targetIndex = visibleSteps.ToList().FindIndex(step => step.Id == target);
+            if (targetIndex < 0) return;
+            currentIndex = targetIndex;
+            visited.Add(target);
+            furthestIndex = Math.Max(furthestIndex, currentIndex);
+            focusPending = true;
+        }
+        finally { transitioning = false; }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => disposed = true;
+
+    public async Task FinishAsync()
+    {
+        if (Locked || !CanFinish || CurrentStep is null || currentIndex != visibleSteps.Count - 1) return;
+        transitioning = true;
+        try { await OnFinish.InvokeAsync(); }
+        finally { transitioning = false; }
+    }
+}

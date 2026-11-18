@@ -10,14 +10,14 @@ export class SourcePoliciesPage {
   public get history(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
   public get definition(): Locator { return this.page.getByTestId(TestIds.sourcePolicies.knowledgeDefinitionFields); }
 
-  public async exerciseLifecycle(base: string, control: SourcePolicyTestControl, locale: SupportedTestLocale): Promise<void> {
+  public async exerciseLifecycle(base: string, control: SourcePolicyTestControl, locale: SupportedTestLocale, onCreationStep?: (step: string) => Promise<void>): Promise<void> {
     this.page.setDefaultTimeout(15_000);
     const fixtures = new SourcePolicyFixtures(this.page, base);
     const fixture = await fixtures.prepare();
     const direct = `direct-${fixture.suffix}`; const stored = `stored-${fixture.suffix}`; const knowledge = `knowledge-${fixture.suffix}`;
     const text = SourcePolicyTextByLocale[locale];
     await control.change({});
-    await this.createDirect(base, fixture, direct, text.ttl);
+    await this.createDirect(base, fixture, direct, text.ttl, locale, onCreationStep);
     await fixtures.source(fixture, stored, {});
     await this.openDataset(base, stored);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
@@ -98,32 +98,88 @@ export class SourcePoliciesPage {
     await control.change({});
   }
 
-  private async createDirect(base: string, fixture: SourcePolicyFixture, name: string, ttlLabel: string): Promise<void> {
+  private async createDirect(base: string, fixture: SourcePolicyFixture, name: string, ttlLabel: string, locale: SupportedTestLocale, onStep?: (step: string) => Promise<void>): Promise<void> {
     await this.page.goto(`${base}/data-sources/new?composition=dataset&context=%2Finstance`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const text = SourcePolicyTextByLocale[locale];
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).fill(name);
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceName)).toHaveValue(name);
+    await onStep?.('identity');
+    await this.wizardNext('acquisition');
     await this.page.getByTestId(TestIds.sourcePolicies.service).selectOption(fixture.service.uid);
     await this.page.getByTestId(TestIds.sourcePolicies.operation).selectOption(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
     await this.page.locator('[data-schema-path="$.dataset"] input').fill('synthetic-direct');
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.page.keyboard.press('Tab');
+    await onStep?.('acquisition');
+    await this.wizardNext('storage');
+    await this.wizardNext('storage');
+    await expect(this.page.getByRole('alert').filter({ hasText: text.wizardStorageRequired })).toBeVisible();
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.direct).check();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.lifecycle)).toContainText(ttlLabel);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('01:00:00');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.wizardNext('storage');
+    await expect(this.page.getByRole('alert').filter({ hasText: text.datasetStorageRequired })).toBeVisible();
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).fill('');
     await this.page.getByTestId(TestIds.sourcePolicies.ttl).blur();
     await this.page.getByTestId(TestIds.sourcePolicies.history).check();
     await this.page.getByTestId(TestIds.sourcePolicies.retention).fill('24:00:00');
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.wizardNext('storage');
+    await this.assertNotCreated(base, name);
     await this.page.getByTestId(TestIds.sourcePolicies.history).uncheck();
-    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
+    await this.wizardNext('treatments');
+    await this.activate(this.page.getByTestId(TestIds.creationWizard.previous));
+    await this.assertWizardStep('storage');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
+    await onStep?.('storage');
+    await this.wizardNext('treatments');
+    await onStep?.('treatments');
+    await this.wizardNext('contracts');
+    await onStep?.('contracts');
+    await this.wizardNext('review');
+    await expect(this.page.getByTestId(TestIds.creationWizard.review)).toContainText(`default/${name}`);
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();
+    await this.assertNotCreated(base, name);
+    await onStep?.('review');
+    await this.activate(this.page.getByRole('button', { name: text.wizardEditAcquisition, exact: true }));
+    await this.assertWizardStep('acquisition');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.operation)).toHaveValue(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
+    await expect(this.page.locator('[data-schema-path="$.dataset"] input')).toHaveValue('synthetic-direct');
+    await this.wizardNext('storage');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
+    await this.wizardNext('treatments');
+    await this.wizardNext('contracts');
+    await this.wizardNext('review');
+    await this.activate(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave));
     await expect(this.page).toHaveURL(new RegExp(`/data-sources/${name}\\?`));
     await this.openDataset(base, name);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
     await expect(this.page.getByTestId(TestIds.sourcePolicies.storage)).toHaveValue('');
+  }
+
+  private async activate(button: Locator): Promise<void> {
+    if (await this.page.evaluate(() => navigator.maxTouchPoints > 0)) await button.tap();
+    else { await button.focus(); await button.press('Enter'); }
+  }
+  private async wizardNext(expected: string): Promise<void> {
+    const previous = await this.page.getByTestId(TestIds.creationWizard.source).locator('[data-step-id]:not([hidden])').getAttribute('data-step-id');
+    await this.activate(this.page.getByTestId(TestIds.creationWizard.next));
+    await this.assertWizardStep(expected);
+    if (previous !== expected) await expect.poll(() => this.page.evaluate(() => document.activeElement?.getAttribute('data-step-id'))).toBe(expected);
+  }
+  private async assertWizardStep(expected: string): Promise<void> {
+    const active = this.page.getByTestId(TestIds.creationWizard.source).locator('[data-step-id]:not([hidden])');
+    await expect(active).toHaveAttribute('data-step-id', expected);
+    await expect(this.page.getByTestId(TestIds.creationWizard.source).locator('[aria-current="step"]')).toHaveCount(1);
+    await this.assertResponsive();
+  }
+  private async assertNotCreated(base: string, name: string): Promise<void> {
+    const response = await this.page.request.get(`${base}/api/datasources/${name}?scopeRef=%2Finstance`);
+    expect(response.status()).toBe(404);
   }
 
   public async openDataset(base: string, name: string): Promise<void> {

@@ -243,4 +243,31 @@
   <data name="Queries.Done" xml:space="preserve"><value>Enregistrement effectué.</value></data>
   <data name="Queries.Generic" xml:space="preserve"><value>Exécuteur générique de Query</value></data>
   <data name="Queries.Reference" xml:space="preserve"><value>JSON d’appel du Tool générique</value></data>
+  <data name="WizardIdentity" xml:space="preserve"><value>Identité</value></data>
+  <data name="WizardAcquisition" xml:space="preserve"><value>Acquisition</value></data>
+  <data name="WizardStorage" xml:space="preserve"><value>Stockage</value></data>
+  <data name="WizardTreatments" xml:space="preserve"><value>Traitements</value></data>
+  <data name="WizardContracts" xml:space="preserve"><value>Contrats</value></data>
+  <data name="WizardReview" xml:space="preserve"><value>Vérification</value></data>
+  <data name="WizardCreate" xml:space="preserve"><value>Créer la source</value></data>
+  <data name="WizardReviewTitle" xml:space="preserve"><value>Vérifier avant de créer</value></data>
+  <data name="WizardReviewHelp" xml:space="preserve"><value>Vérifiez la configuration. La création de la source ne lance pas d’acquisition.</value></data>
+  <data name="WizardEdit" xml:space="preserve"><value>Modifier</value></data>
+  <data name="WizardIdentityRequired" xml:space="preserve"><value>Renseignez le nom d’affichage, le nom technique, un espace de noms valide et le périmètre propriétaire.</value></data>
+  <data name="WizardAcquisitionRequired" xml:space="preserve"><value>Sélectionnez un service connecté et une opération d’acquisition exacte.</value></data>
+  <data name="WizardStorageRequired" xml:space="preserve"><value>Sélectionnez un Storage ou autorisez explicitement l’acquisition directe.</value></data>
+  <data name="WizardLifecycleInvalid" xml:space="preserve"><value>Vérifiez les durées de fraîcheur et d’historique et leurs exigences de Storage.</value></data>
+  <data name="WizardInlineContract" xml:space="preserve"><value>Contrat intégré</value></data>
+  <data name="WizardNoContract" xml:space="preserve"><value>Non configuré</value></data>
+  <data name="WizardStandardOrchestration" xml:space="preserve"><value>Orchestration standard</value></data>
+  <data name="WizardLifecycleOff" xml:space="preserve"><value>Fraîcheur et conservation non configurées</value></data>
+  <data name="WizardNoExpiry" xml:space="preserve"><value>Sans expiration automatique</value></data>
+  <data name="WizardNoHistory" xml:space="preserve"><value>Versions précédentes réussies non conservées</value></data>
+  <data name="WizardEditIdentity" xml:space="preserve"><value>Modifier : identité</value></data>
+  <data name="WizardEditAcquisition" xml:space="preserve"><value>Modifier : acquisition</value></data>
+  <data name="WizardEditStorage" xml:space="preserve"><value>Modifier : stockage</value></data>
+  <data name="WizardEditTreatments" xml:space="preserve"><value>Modifier : traitements</value></data>
+  <data name="WizardEditContracts" xml:space="preserve"><value>Modifier : contrats</value></data>
+  <data name="WizardTransformationCount" xml:space="preserve"><value>{0} transformation(s), dans l’ordre configuré</value></data>
+  <data name="WizardFormInvalid" xml:space="preserve"><value>Corrigez les champs invalides avant de créer la source de données.</value></data>
 </root>

@@ -1,0 +1,21 @@
+.creation-wizard { min-width: 0; }
+.creation-wizard-progress { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: .5rem; padding: 0; margin: 0 0 1.5rem; list-style: none; }
+.creation-wizard-progress li { min-width: 0; }
+.creation-wizard-step { width: 100%; min-height: 2.75rem; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .6rem .5rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--muted); }
+.creation-wizard-step.is-current { background: var(--primary-soft); border-color: var(--primary); color: var(--text); }
+.creation-wizard-number { display: inline-flex; justify-content: center; align-items: center; width: 1.5rem; height: 1.5rem; flex-shrink: 0; border-radius: 50%; background: var(--primary-soft); color: var(--text); font-size: .8rem; }
+.creation-wizard-number ::deep svg { width: 1rem; height: 1rem; }
+.creation-wizard-title { overflow-wrap: anywhere; font-size: .85rem; }
+.creation-wizard-content { min-width: 0; }
+.creation-wizard-content[hidden] { display: none; }
+.creation-wizard-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; padding: 1.25rem 0; border-top: 1px solid var(--border); }
+.creation-wizard-actions > div { display: flex; gap: .75rem; }
+.creation-wizard-position { color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
+.creation-wizard-content:focus-visible { outline: 2px solid var(--primary); outline-offset: .3rem; }
+@media (max-width: 640px) {
+    .creation-wizard-progress { gap: .35rem; grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(2.75rem, 1fr)); }
+    .creation-wizard-title { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .creation-wizard-step { padding: .5rem .2rem; }
+    .creation-wizard-actions { align-items: stretch; }
+    .creation-wizard-actions > div { margin-left: auto; }
+}

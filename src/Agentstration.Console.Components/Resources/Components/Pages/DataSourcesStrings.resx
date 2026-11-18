@@ -243,4 +243,31 @@
   <data name="Queries.Done" xml:space="preserve"><value>Saved successfully.</value></data>
   <data name="Queries.Generic" xml:space="preserve"><value>Generic Query executor</value></data>
   <data name="Queries.Reference" xml:space="preserve"><value>Generic Tool invocation JSON</value></data>
+  <data name="WizardIdentity" xml:space="preserve"><value>Identity</value></data>
+  <data name="WizardAcquisition" xml:space="preserve"><value>Acquisition</value></data>
+  <data name="WizardStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="WizardTreatments" xml:space="preserve"><value>Processing</value></data>
+  <data name="WizardContracts" xml:space="preserve"><value>Contracts</value></data>
+  <data name="WizardReview" xml:space="preserve"><value>Review</value></data>
+  <data name="WizardCreate" xml:space="preserve"><value>Create the Data Source</value></data>
+  <data name="WizardReviewTitle" xml:space="preserve"><value>Review before creating</value></data>
+  <data name="WizardReviewHelp" xml:space="preserve"><value>Review the configuration. Creating the Data Source does not start an acquisition.</value></data>
+  <data name="WizardEdit" xml:space="preserve"><value>Edit</value></data>
+  <data name="WizardIdentityRequired" xml:space="preserve"><value>Enter a display name, technical name, valid namespace and owner scope.</value></data>
+  <data name="WizardAcquisitionRequired" xml:space="preserve"><value>Select a Connected Service and an exact acquisition operation.</value></data>
+  <data name="WizardStorageRequired" xml:space="preserve"><value>Select a Storage or explicitly allow direct acquisition.</value></data>
+  <data name="WizardLifecycleInvalid" xml:space="preserve"><value>Check the freshness and history durations and their Storage requirements.</value></data>
+  <data name="WizardInlineContract" xml:space="preserve"><value>Inline contract</value></data>
+  <data name="WizardNoContract" xml:space="preserve"><value>Not configured</value></data>
+  <data name="WizardStandardOrchestration" xml:space="preserve"><value>Standard orchestration</value></data>
+  <data name="WizardLifecycleOff" xml:space="preserve"><value>Freshness and retention not configured</value></data>
+  <data name="WizardNoExpiry" xml:space="preserve"><value>No automatic expiry</value></data>
+  <data name="WizardNoHistory" xml:space="preserve"><value>Previous successful versions are not retained</value></data>
+  <data name="WizardEditIdentity" xml:space="preserve"><value>Edit identity</value></data>
+  <data name="WizardEditAcquisition" xml:space="preserve"><value>Edit acquisition</value></data>
+  <data name="WizardEditStorage" xml:space="preserve"><value>Edit storage</value></data>
+  <data name="WizardEditTreatments" xml:space="preserve"><value>Edit processing</value></data>
+  <data name="WizardEditContracts" xml:space="preserve"><value>Edit contracts</value></data>
+  <data name="WizardTransformationCount" xml:space="preserve"><value>{0} transformation(s), in configured order</value></data>
+  <data name="WizardFormInvalid" xml:space="preserve"><value>Correct the invalid fields before creating the Data Source.</value></data>
 </root>
