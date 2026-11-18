@@ -66,7 +66,17 @@ public sealed partial class ConnectedServiceApiTests
         using var staleRequest = new HttpRequestMessage(HttpMethod.Post, prefix.Replace("?", "/deactivate?", StringComparison.Ordinal));
         staleRequest.Headers.TryAddWithoutValidation("If-Match", "\"stale\"");
         using var stale = await client.SendAsync(staleRequest);
-        Assert.AreEqual(HttpStatusCode.PreconditionFailed, stale.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
+        using var staleProblem = JsonDocument.Parse(await stale.Content.ReadAsStringAsync());
+        Assert.AreEqual("Resource version conflict", staleProblem.RootElement.GetProperty("title").GetString());
+        Assert.AreEqual("The supplied ETag does not match the current resource version.", staleProblem.RootElement.GetProperty("detail").GetString());
+        using var afterRejectedWrites = await client.GetAsync(prefix);
+        Assert.AreEqual(HttpStatusCode.OK, afterRejectedWrites.StatusCode);
+        Assert.AreEqual(etag, afterRejectedWrites.Headers.ETag);
+        var unchanged = (await afterRejectedWrites.Content.ReadFromJsonAsync<ConnectedServiceResource>())!;
+        Assert.AreEqual(namespaced.Uid, unchanged.Uid);
+        Assert.AreEqual(namespaced.Generation, unchanged.Generation);
+        Assert.IsTrue(unchanged.Definition.Enabled);
 
         using var update = new HttpRequestMessage(HttpMethod.Put, prefix) { Content = JsonContent.Create(new PutConnectedServiceRequest(properties with { DisplayName = "Updated exact service" })) };
         update.Headers.IfMatch.Add(etag);

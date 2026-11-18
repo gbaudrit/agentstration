@@ -11,7 +11,7 @@ export const SharedFormCases = [
   { id: 'source-provider', path: '/sourceproviders/new', source: 'SourceProviderDetails.razor' },
   { id: 'tool-provider', path: '/tools/providers/new', source: 'ToolProviderEditor.razor' },
   { id: 'tool-category', path: '/tools/categories/new', source: 'ToolCategoryEditor.razor' },
-  { id: 'tool-definition', path: '/tools/definitions/new', source: 'ToolDefinitionEditor.razor' },
+  { id: 'tool-definition', path: '/tools/definitions/new', source: 'NewToolDefinition.razor' },
   { id: 'data-source', path: '/data-sources/new', source: 'DataSourceEditor.razor' },
   { id: 'data-source-profile', path: '/data-source-profiles/new', source: 'DataSourceProfileEditor.razor' },
   { id: 'knowledge-source', path: '/knowledge-sources/new', source: 'KnowledgeSourceEditor.razor' },

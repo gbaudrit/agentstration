@@ -131,7 +131,7 @@ The repeat-source guard now scans indexed `@for` loops as well as `@foreach`. Th
 
 ## Current source/catalog checks
 
-TypeScript and all seven application/form/collection catalog checks pass after reconciliation. The indexed-loop guard is stronger than the old foreach-only check. Current route ownership includes five focused list/editor adapters mapped to `connected-storage-collection.spec.ts`; the remaining six newly routed field adapters stay explicitly pending under #1122. No browser success is inferred from enumeration or catalog checks.
+TypeScript and all seven application/form/collection catalog checks pass after reconciliation. The indexed-loop guard is stronger than the old foreach-only check. Current route ownership includes five focused list/editor adapters mapped to `connected-storage-collection.spec.ts`; six routed field adapters stay explicitly pending under #1122, including the retained definition editor whose former creation route is now a different component. No browser success is inferred from enumeration or catalog checks.
 
 The final source audit additionally found the StorageDetails export-binding `DataGrid`, absent from the initial delta count. It now uses `CollectionView<StorageExportBinding>` with real RequirementId identity and Export/ValueType/Protection information, without owner, state, actions or an invented resource link. Including this newly reconciled dataset brings the total to **346**.
 
@@ -145,3 +145,7 @@ labels and explicit reset actions. Read-only Storage/Service YAML textareas rema
 selectable document viewers with accessible labels; they never expose clearing.
 The architecture guard recognizes only these exact adapters and control shapes;
 ordinary editable inputs in the same files still require the shared components.
+
+## Tool creation/editor coverage split
+
+The maintained shared-form case and schema-contract creation flow open `/tools/definitions/new`, now owned by `NewToolDefinition.razor`. Their mapping belongs to that creator. `ToolDefinitionEditor.razor` owns only `/tools/definitions/{Name}` and receives no inherited browser field claim from the creation case. Its field coverage is explicitly pending under #1122; the total remains six pending routed adapters (five added adapters and this retained editor). The creator route is partial rather than complete CRUD coverage. Case assertions and test counts are unchanged.

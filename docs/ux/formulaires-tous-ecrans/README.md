@@ -158,3 +158,7 @@ Le contrôle visuel a également conduit à faire suivre l’apparence sélectio
 
 
 Les créateurs contextuels Paramètre et Secret réutilisent aussi `ModalFrame` pour le focus, Échap et le retour au déclencheur. L’ouverture de la modale est sérialisée pendant son chargement asynchrone : un nouveau rendu du contenu ne remplace pas son enregistrement de restauration du focus. Un test avec un enregistrement JavaScript volontairement retardé couvre ce cas.
+
+## Séparation création/édition des définitions d’outils (#1174)
+
+Le parcours de champs communs ouvre `/tools/definitions/new`, désormais rendu par `NewToolDefinition.razor`. Cette preuve est attribuée au créateur. L’éditeur conservé `ToolDefinitionEditor.razor` ne porte plus que `/tools/definitions/{Name}` et sa couverture de champs au navigateur reste explicitement en attente sous #1122. Les six adaptateurs routés en attente comprennent donc cinq nouveaux adaptateurs et cet éditeur ; le parcours de création ne prétend pas les couvrir deux fois.

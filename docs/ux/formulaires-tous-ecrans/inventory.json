@@ -299,7 +299,9 @@
       "routes": [
         "/tools/definitions/{Name}"
       ],
-      "family": "resource editors"
+      "family": "resource editors",
+      "coverage": "pending",
+      "trackingIssue": 1122
     },
     {
       "path": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
@@ -417,8 +419,8 @@
         "/tools/definitions/new"
       ],
       "family": "Connected Services / Storage / transformation delta",
-      "coverage": "pending",
-      "trackingIssue": 1122
+      "coverage": "maintained-shared-field",
+      "specification": "tests/shared-forms.spec.ts"
     },
     {
       "path": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
@@ -646,12 +648,13 @@
     "previousMain": "cc8e906e1b833e86e365c549ce4c9696376f3407",
     "meaning": "Routed field adapters and embedded form helpers. Pending denotes new reusable field coverage, independently of source adoption, local smoke, route checks and existing family regressions.",
     "pendingScreens": [
+      "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
       "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
       "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
       "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
       "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor",
       "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor"
-    ]
+    ],
+    "toolRouteSplit": "The maintained shared-form case opens NewToolDefinition at /tools/definitions/new. ToolDefinitionEditor now owns only /tools/definitions/{Name}; its browser field coverage remains explicitly pending instead of inheriting the creator evidence."
   }
 }
