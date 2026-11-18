@@ -44,7 +44,8 @@ export class AgentEditorPage {
   public async openTools(): Promise<void> {
     if (!await this.form.isVisible()) await this.openEdit();
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
-    await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
+    if (await this.page.getByTestId("agent-sections").count()) await this.selectSection("definition/tools");
+    else await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
     await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.agentEditor.toolConfiguration).waitFor({ state: 'visible' });
   }
@@ -58,6 +59,7 @@ export class AgentEditorPage {
   public async configureBehavior(agent: Pick<AgentDefinition, 'instructions' | 'modelProfile' | 'runtimeProfile'>): Promise<void> {
     await this.selectModelProfile(agent.modelProfile);
     await selectFirstAvailable(this.page.getByTestId(TestIds.agentEditor.runtimeProfile), agent.runtimeProfile, 'Runtime profile');
+    if (await this.page.getByTestId("agent-sections").count()) await this.openEdit();
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.instructions), agent.instructions);
   }
 
@@ -81,26 +83,36 @@ export class AgentEditorPage {
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
+  public async selectSection(path: string): Promise<void> {
+    const navigation = this.page.getByTestId('agent-sections');
+    await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
+    let menu = navigation.locator('.resource-navigation-rail');
+    if (!await menu.isVisible()) {
+      await this.page.locator('.resource-header .resource-navigation-trigger').click();
+      menu = navigation.locator('dialog');
+      await expect(menu).toBeVisible();
+    }
+    const link = menu.locator(`a[data-resource-section="${path}"]`);
+    if (!await link.isVisible() && path.includes('/')) await menu.locator('.resource-navigation-row button[aria-controls]').first().click();
+    await link.click();
+    await expect(this.page).toHaveURL(url => url.hash === '#' + path);
+    await expect(navigation.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`)).toHaveAttribute('aria-current', 'page');
+    await expect(navigation.locator('dialog')).toHaveCount(0);
+  }
+
   public async openOverview(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.agentEditor.overviewTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
-    }).toPass();
+    await this.selectSection('overview');
+    await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
   }
 
   public async openEdit(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.agentEditor.editTab);
-    await expect(tab).toBeVisible();
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(this.form).toBeVisible();
-    }).toPass();
+    await this.selectSection('definition/configuration');
+    await expect(this.form).toBeVisible();
+    await expect(this.identitySection).toBeVisible();
   }
 
   public async selectModelProfile(selection: ProfileSelection): Promise<void> {
+    if (await this.page.getByTestId("agent-sections").count()) await this.selectSection("definition/model-execution");
     const candidates = typeof selection === 'string' ? [selection] : [...selection];
     const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();

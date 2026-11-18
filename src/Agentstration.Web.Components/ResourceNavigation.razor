@@ -6,7 +6,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceNavigationStrings> Localizer
 
 <div class="resource-navigation" @ref="root" data-testid="@TestId" data-navigation-ready="@ready.ToString().ToLowerInvariant()">
-    <button type="button" class="button-secondary resource-navigation-trigger" aria-haspopup="dialog" aria-expanded="@drawerOpen.ToString().ToLowerInvariant()" @onclick="OpenDrawer"><TablerIcon Name="menu-2" /> @Localizer["Sections"]</button>
+    @if (ExternalTriggerId is null) { <ResourceNavigationTrigger IsOpen="drawerOpen" OnOpen="OpenDrawerAsync" /> }
     <nav class="resource-navigation-rail" aria-label="@LabelText">@Entries("rail")</nav>
     @if (unavailable && CurrentPath is not null) { <p role="status" class="resource-navigation-feedback">@Localizer["Unavailable"]</p> }
     @if (CurrentPath is null) { <p role="status">@Localizer["Empty"]</p> }
@@ -22,14 +22,18 @@
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? TestId { get; set; }
     [Parameter] public EventCallback<string?> SelectionChanged { get; set; }
+    [Parameter] public string? ExternalTriggerId { get; set; }
+    [Parameter] public EventCallback<bool> DrawerOpenChanged { get; set; }
+    [Parameter] public bool ExpandGroupsInitially { get; set; }
     public string? CurrentPath { get; private set; }
 
     private readonly string id = $"resource-navigation-{Guid.NewGuid():N}";
     private readonly HashSet<string> expanded = new(StringComparer.Ordinal);
+    private readonly HashSet<string> initializedGroups = new(StringComparer.Ordinal);
     private Dictionary<string, ResourceNavigationItem> entries = new(StringComparer.Ordinal);
     private string identity = string.Empty;
     private string? canonicalPending, correctedTarget, observedLocation;
-    private bool disposed, initializing, ready, notifyPending = true, unavailable, drawerOpen, focusRail, focusTrigger;
+    private bool disposed, initializing, ready, notifyPending = true, unavailable, drawerOpen, focusRail, focusTrigger, drawerChanged;
     private ElementReference root;
     private IJSObjectReference? module, registration;
     private DotNetObjectReference<ResourceNavigation>? reference;
@@ -87,6 +91,8 @@
             var parent = Parent(item.Path);
             if (parent is not null && (!entries.ContainsKey(parent) || !item.Navigable) || !item.Navigable && !Items.Any(child => Parent(child.Path) == item.Path))
                 throw new ArgumentException("Only a primary item with children can be grouping-only; children require a primary parent.", nameof(Items));
+            if (Items.Any(child => Parent(child.Path) == item.Path) && initializedGroups.Add(item.Path) && ExpandGroupsInitially)
+                expanded.Add(item.Path);
         }
         if (DefaultPath is not null && (!entries.TryGetValue(DefaultPath, out var configured) || !configured.Navigable))
             throw new ArgumentException("The configured default must name a navigable item.", nameof(DefaultPath));
@@ -97,7 +103,7 @@
     private bool IsVisible(string path) => entries.TryGetValue(path, out var item) && item.Visible && (Parent(path) is not { } parent || entries[parent].Visible) && (item.Navigable || Items.Any(child => Parent(child.Path) == path && child.Visible));
     private bool IsEnabled(string path) => entries.TryGetValue(path, out var item) && item.Enabled && (Parent(path) is not { } parent || entries[parent].Enabled);
     private bool CanSelect(string path) => entries.TryGetValue(path, out var item) && item.Navigable && IsVisible(path) && IsEnabled(path);
-    private static string BaseUri(string location)
+    internal static string BaseUri(string location)
     {
         var uri = new Uri(location);
         var query = QueryHelpers.ParseQuery(uri.Query);
@@ -121,15 +127,16 @@
         correctedTarget = null;
         if (selected != CurrentPath)
         {
-            CurrentPath = selected; notifyPending = true; drawerOpen = false;
+            CurrentPath = selected; notifyPending = true; SetDrawerOpen(false);
             if (selected is not null && Parent(selected) is { } parent) expanded.Add(parent);
         }
         canonicalPending = selected is not null && location != Link(selected) ? Link(selected) : null;
     }
     private void LocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(() => { if (!disposed) { ApplyLocation(args.Location); StateHasChanged(); } });
     private void Toggle(string path) { if (IsEnabled(path) && !expanded.Remove(path)) expanded.Add(path); }
-    private void OpenDrawer() => drawerOpen = true;
-    private void CloseDrawer() => drawerOpen = false;
+    private void SetDrawerOpen(bool value) { if (drawerOpen == value) return; drawerOpen = value; drawerChanged = true; }
+    public Task OpenDrawerAsync() => InvokeAsync(() => { SetDrawerOpen(true); StateHasChanged(); });
+    private void CloseDrawer() => SetDrawerOpen(false);
 
     [JSInvokable]
     public async Task NavigateSection(string path)
@@ -139,7 +146,16 @@
         var actual = await module.InvokeAsync<string>("navigate", Link(path), false, Navigation.HistoryEntryState);
         if (disposed) return;
         ApplyLocation(actual);
-        if (CurrentPath == path) drawerOpen = false;
+        if (CurrentPath == path) SetDrawerOpen(false);
+        await InvokeAsync(StateHasChanged);
+    }
+    [JSInvokable]
+    public async Task NavigateLocation(string location)
+    {
+        if (disposed || module is null || BaseUri(Navigation.Uri) != identity || BaseUri(location) != identity) return;
+        var actual = await module.InvokeAsync<string>("navigate", location, false, Navigation.HistoryEntryState);
+        if (disposed) return;
+        ApplyLocation(actual);
         await InvokeAsync(StateHasChanged);
     }
     [JSInvokable]
@@ -150,7 +166,7 @@
         if (disposed) return;
         focusRail |= desktop && drawerOpen;
         focusTrigger |= !desktop && railFocused;
-        if (desktop) drawerOpen = false;
+        if (desktop) SetDrawerOpen(false);
         StateHasChanged();
     });
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -164,7 +180,9 @@
                 var imported = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/resource-navigation.js");
                 if (disposed) { await imported.DisposeAsync(); return; }
                 module = imported; reference = DotNetObjectReference.Create(this);
-                var observed = await module.InvokeAsync<IJSObjectReference>("observe", root, reference);
+                var observed = ExternalTriggerId is null
+                    ? await module.InvokeAsync<IJSObjectReference>("observe", root, reference)
+                    : await module.InvokeAsync<IJSObjectReference>("observe", root, reference, ExternalTriggerId);
                 if (disposed) { if (observed is not null) { await observed.InvokeVoidAsync("dispose"); await observed.DisposeAsync(); } return; }
                 registration = observed;
                 var location = await module.InvokeAsync<string?>("currentLocation");
@@ -177,6 +195,7 @@
             finally { initializing = false; if (disposed) reference?.Dispose(); }
         }
         if (disposed || !ready || BaseUri(Navigation.Uri) != identity) return;
+        if (drawerChanged) { drawerChanged = false; await DrawerOpenChanged.InvokeAsync(drawerOpen); }
         if (notifyPending) { notifyPending = false; await SelectionChanged.InvokeAsync(CurrentPath); }
         if (disposed || BaseUri(Navigation.Uri) != identity) return;
         if (canonicalPending is { } canonical)

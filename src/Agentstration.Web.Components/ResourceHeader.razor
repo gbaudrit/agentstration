@@ -22,7 +22,7 @@
             }
         </div>
     </div>
-    @if (Enabled is not null || Actions is not null || PrimaryActions is not null || MoreActions is not null) { <div class="page-actions">@if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="EnabledTestId" /> }<ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
+    @if (Enabled is not null || Actions is not null || PrimaryActions is not null || MoreActions is not null || NavigationActions is not null) { <div class="page-actions">@NavigationActions@if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="EnabledTestId" /> }<ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">@Actions</ResourceActionBar></div> }
 </header>
 
 @code {
@@ -40,6 +40,7 @@
     [Parameter] public RenderFragment? IconContent { get; set; }
     [Parameter] public RenderFragment? PrimaryActions { get; set; }
     [Parameter] public RenderFragment? MoreActions { get; set; }
+    [Parameter] public RenderFragment? NavigationActions { get; set; }
     [Parameter] public string? IconName { get; set; }
     [Parameter] public string? TechnicalName { get; set; }
     [Parameter] public string? Namespace { get; set; }

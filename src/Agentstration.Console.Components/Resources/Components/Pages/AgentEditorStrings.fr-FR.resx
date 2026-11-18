@@ -121,4 +121,11 @@
   <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamique : utiliser l’attente de sortie du parent</value></data>
   <data name="OutputMediaType" xml:space="preserve"><value>Type MIME de sortie (facultatif)</value></data>
   <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixe : schéma ou type MIME déclaré</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="ConfigurationEntry" xml:space="preserve"><value>Réglage</value></data>
+  <data name="ConfigurationValue" xml:space="preserve"><value>Valeur ou ressource</value></data>
+  <data name="Behaviors" xml:space="preserve"><value>Comportements</value></data>
+  <data name="Middleware" xml:space="preserve"><value>Intergiciels</value></data>
+  <data name="ContextProviders" xml:space="preserve"><value>Fournisseurs de contexte</value></data>
+  <data name="ModelAndExecution" xml:space="preserve"><value>Modèle et exécution</value></data>
 </root>

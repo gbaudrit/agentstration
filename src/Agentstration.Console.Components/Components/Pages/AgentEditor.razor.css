@@ -1,3 +1,8 @@
+.agent-feedback { display: contents; }
+.agent-feedback:empty { display: none; }
+.required-fields-note { margin: 0; color: var(--muted); font-size: var(--font-size-xs); }
+.required-fields-note > span { color: var(--form-error-color); }
+
 .agent-yaml-field {
     display: grid;
     min-width: 0;

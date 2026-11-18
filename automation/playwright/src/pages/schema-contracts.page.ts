@@ -100,7 +100,7 @@ export class SchemaContractsPage {
     await this.open(`${consoleUrl}/agents/${encodeURIComponent(fixtures.agentName)}?namespace=default`, TestIds.agentEditor.overview);
     await new AgentEditorPage(this.page).openEdit();
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.schemaContracts.agentTab).click();
+    await new AgentEditorPage(this.page).selectSection('definition/contracts');
     await expect(this.page.getByTestId(TestIds.schemaContracts.agentSection)).toBeVisible();
     const input = this.page.getByTestId(TestIds.schemaContracts.agentInput);
     await expect(input.getByTestId(`${TestIds.schemaContracts.agentInput}-mode-shared`)).toHaveClass(/active/);

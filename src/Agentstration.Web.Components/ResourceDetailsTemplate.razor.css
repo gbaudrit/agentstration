@@ -1,0 +1,49 @@
+.resource-details-template {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: var(--form-section-gap);
+}
+
+.resource-details-template ::deep .resource-header { margin-bottom: 0; }
+.resource-details-body,
+.resource-details-main,
+.resource-details-content,
+.resource-details-feedback,
+.resource-details-state { min-width: 0; }
+
+.resource-details-body,
+.resource-details-main,
+.resource-details-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--form-section-gap);
+}
+
+.resource-details-feedback { display: contents; }
+.resource-details-content ::deep .resource-form,
+.resource-details-content ::deep .resource-editor-view { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.resource-details-content ::deep .form-section { min-width: 0; }
+
+.resource-details-with-navigation {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);
+    align-items: start;
+    column-gap: var(--space-6);
+}
+
+.resource-details-navigation { min-width: 0; grid-column: 2; grid-row: 1; position: sticky; top: calc(var(--topbar-height) + var(--space-4)); }
+.resource-details-main { grid-column: 1; grid-row: 1; }
+.resource-details-main ::deep .unsaved-changes-bar { margin-top: 0; }
+.resource-details-main:has(> .unsaved-changes-bar) { padding-bottom: var(--space-4); }
+
+.resource-details-content ::deep .resource-configuration-summary .data-grid { table-layout: fixed; min-width: 0; }
+.resource-details-content ::deep .resource-configuration-summary .data-grid th:first-child { width: 30%; }
+.resource-details-content ::deep .resource-configuration-summary .data-grid th:last-child { width: 70%; }
+.resource-details-content ::deep .configuration-key { overflow-wrap: anywhere; }
+.resource-details-content ::deep .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }
+
+@media (max-width: 899px) {
+    .resource-details-with-navigation { grid-template-columns: minmax(0, 1fr); }
+    .resource-details-navigation { grid-column: 1; grid-row: 2; position: static; }
+}

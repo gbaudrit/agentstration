@@ -121,4 +121,11 @@
   <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamic: use the parent output expectation</value></data>
   <data name="OutputMediaType" xml:space="preserve"><value>Output MIME type (optional)</value></data>
   <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixed: declared schema or MIME type</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="ConfigurationEntry" xml:space="preserve"><value>Setting</value></data>
+  <data name="ConfigurationValue" xml:space="preserve"><value>Value or resource</value></data>
+  <data name="Behaviors" xml:space="preserve"><value>Behaviors</value></data>
+  <data name="Middleware" xml:space="preserve"><value>Middleware</value></data>
+  <data name="ContextProviders" xml:space="preserve"><value>Context providers</value></data>
+  <data name="ModelAndExecution" xml:space="preserve"><value>Model and execution</value></data>
 </root>

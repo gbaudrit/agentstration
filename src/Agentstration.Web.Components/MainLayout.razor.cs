@@ -215,7 +215,7 @@ public partial class MainLayout
             commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
             contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
             if (ContextState.Current is { } context)
-                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef, NavigationManager.HistoryEntryState);
             themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
             navigationTooltipModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/navigation-tooltips.js");
             Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
@@ -392,7 +392,7 @@ public partial class MainLayout
             await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             if (contextModule is not null && ContextState.Current is { } context && !ContextState.IsLoading
                 && ContextState.Error is null && string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal))
-                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef, NavigationManager.HistoryEntryState);
         }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }

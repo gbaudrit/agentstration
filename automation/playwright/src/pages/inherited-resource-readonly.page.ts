@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { fillAndCommit } from './controls.js';
+import { AgentEditorPage } from './agent-editor.page.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExpectedText } from '../locales/expected-text.js';
 import type { ExecutionScopeFixture } from './execution-scopes.page.js';
@@ -106,7 +107,7 @@ export class InheritedResourceReadOnlyPage {
     if (typeof ownerScope === 'string') expect(context).toBe(ownerScope);
     else expect(context).toMatch(ownerScope);
 
-    const tabs = this.page.locator('.resource-tabs').first();
+    const tabs = await this.page.getByTestId('agent-sections').count() ? this.page.locator('.resource-details-content') : this.page.locator('.resource-tabs').first();
     await expect(tabs).toBeVisible();
     expect(await this.notice.evaluate((notice, tabsElement) =>
       Boolean(notice.compareDocumentPosition(tabsElement) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -116,7 +117,7 @@ export class InheritedResourceReadOnlyPage {
   public async assertAgentReadOnly(): Promise<void> {
     await expect(this.page.getByTestId(TestIds.agentEditor.identitySection).locator('input').first()).toBeDisabled();
     await expect(this.page.getByTestId(TestIds.agentEditor.saveDraft)).toHaveCount(0);
-    await expect(this.page.getByTestId(TestIds.agentEditor.accessTab)).toHaveCount(0);
+    await expect(this.page.locator('[data-resource-section=access]')).toHaveCount(0);
   }
 
   public async assertModelProfileReadOnly(): Promise<void> {
@@ -130,15 +131,15 @@ export class InheritedResourceReadOnlyPage {
   public async assertAgentManageable(ownerScope: string): Promise<void> {
     await this.expectContext(ownerScope);
     await expect(this.notice).toHaveCount(0);
-    await this.page.getByTestId(TestIds.agentEditor.editTab).or(this.page.getByTestId(TestIds.modelAdministration.profileEditTab)).click();
+    await new AgentEditorPage(this.page).openEdit();
     await expect(this.page.getByTestId(TestIds.agentEditor.identitySection).locator('input').first()).toBeEnabled();
-    await expect(this.page.getByTestId(TestIds.agentEditor.accessTab)).toBeVisible();
+    await expect(this.page.locator('[data-resource-section=access]')).toHaveCount(1);
   }
 
   public async assertModelProfileManageable(): Promise<void> {
     await this.expectContext('/instance');
     await expect(this.notice).toHaveCount(0);
-    await this.page.getByTestId(TestIds.agentEditor.editTab).or(this.page.getByTestId(TestIds.modelAdministration.profileEditTab)).click();
+    await this.page.getByTestId(TestIds.modelAdministration.profileEditTab).click();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toBeVisible();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDelete)).toBeVisible();
@@ -229,12 +230,12 @@ export class InheritedResourceReadOnlyPage {
     target.searchParams.set('context', contextScope);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     expect(response?.status(), target.toString()).toBe(200);
-    const editId = marker === TestIds.agentEditor.form
-      ? TestIds.agentEditor.editTab : TestIds.modelAdministration.profileEditTab;
-    await expect(async () => {
-      await this.page.getByTestId(editId).click();
-      await expect(this.page.getByTestId(editId)).toHaveAttribute('aria-selected', 'true');
-    }).toPass();
+    if (marker === TestIds.agentEditor.form) await new AgentEditorPage(this.page).openEdit();
+    else {
+      const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+    }
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await this.expectContext(contextScope);
   }

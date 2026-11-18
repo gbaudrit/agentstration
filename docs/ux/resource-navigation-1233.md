@@ -1,10 +1,10 @@
 # Resource navigation component (#1233)
 
-This increment starts from main `52c4b1da` and delivers the navigation component first, as requested by the maintainer. The resource-detail layout, Agent pilot, family migrations and reusable scenario #1234 remain subsequent work. No production route is migrated by this PR. Existing flat `ResourcePageTabs` and `ResourceTabs` consumers are unchanged.
+PR #1237 delivered the component-first increment from main `52c4b1da`. The #1235 follow-up integrates it through `ResourceDetailsTemplate` on the editable/scoped Agent route `/agents/{Name}`. Other family migrations and the reusable scenario #1234 remain separate work; their validation/merge gates remain in force.
 
 ## Configuration and ownership
 
-`ResourceNavigation` renders a desktop menu and a mobile Sections button/right-hand drawer. It does not render the resource header, content, action bar or page grid. The future layout places its desktop menu in the right-hand column. The caller owns resource loading, permissions, models, drafts, commands and view rendering.
+`ResourceNavigation` renders a desktop menu and a mobile Sections button/right-hand drawer. It does not render the resource header, content, action bar or page grid. `ResourceDetailsTemplate` places its desktop menu in a sticky right-hand column and the shared `ResourceNavigationTrigger` in its header. `ExternalTriggerId`, `DrawerOpenChanged` and `OpenDrawerAsync()` reuse the same drawer and focus return; omitting the external trigger keeps standalone component use unchanged. `ExpandGroupsInitially` opens new groups once without overriding subsequent user collapse choices. The caller owns resource loading, permissions, models, drafts, commands and view rendering.
 
 ```razor
 <ResourceNavigation @key="ResourceIdentity" Items="Sections" DefaultPath="overview"
@@ -50,10 +50,10 @@ Desktop uses native navigation links, `aria-current`, labeled expansion controls
 
 Component tests cover URL resolution, permissions, grouping, locale labels, retained owner state and late interop disposal. JS tests cover modified clicks, public fragment-history writes/entry observation, duplicate suppression, responsive focus notifications and disposal. Real browser checks use an isolated temporary component host, explicitly labeled as a specimen with no Agent data; those captures are not evidence of a production Agent layout. The new reusable Agent journey #1234 remains blocked until the layout/pilot is implemented, explicitly UX-validated and merged. Existing regressions and required functional lanes still run in this component PR.
 
-## Integration limitation to resolve with the layout/pilot
+## Pilot integration follow-up (#1235)
 
-An isolated host with the existing `UnsavedNavigationGuard` exposed a Blazor/native-history interaction: directly assigning `window.location.hash` while a dirty editor is protected can strand traversal or cause a document reload. The same native mutation without the guard works, and component-generated navigation using the public Blazor API plus guarded Back/Forward passes with both drafts retained. This increment does not modify the shared leave guard or claim the combined native-hash case is fixed. The failing reproducer and observed result are retained with the evidence. Resolve and revalidate that combination on the actual pilot before marking the full #1233 draft/hash acceptance criterion complete. The component PR and its captures do not authorize starting #1234.
+The component-first evidence below records the original native-hash/guard failure. The Agent integration cancels native hash pushes before commit through the browser Navigation API and sends them through the same public Blazor navigation path as menu links. Traversals remain owned by Blazor and the existing leave guard. External trigger focus, optional state and disposal retain the same component contract.
 
-External programmatic fragment writes are observed through the browser Navigation API when available; component-owned links apply their resolved selection directly and do not depend on that optional observer. Validate the supported browser matrix on the pilot.
+Default Console context normalization now also uses the public Blazor API, preserving application history state, instead of silently replacing browser history. Agent's exact resource/context key retains its navigation instance across fragments and replaces it when initial context coordinates become explicit. Initial resource loading is not a draft; preferred-culture redirects preserve the fragment.
 
-Real isolated-host captures, reproducible sources and the known failing native-history probe are in [evidence/1233](evidence/1233/README.md).
+The component observes public Navigation API events where supported. Standard component links apply their resolved selection directly; they do not require that optional observer. The pilot's browser smoke and native-hash probes cover the installed Edge/Chromium desktop/mobile environment. The original isolated-host captures and failing probe remain historical evidence at [evidence/1233](evidence/1233/README.md); they must not be mistaken for the follow-up result. New reusable scenario #1234 still waits for maintainer UX validation and merge.

@@ -131,7 +131,7 @@ public static class CultureNavigation
             return false;
 
         var current = new Uri(navigation.Uri);
-        var returnUrl = current.PathAndQuery;
+        var returnUrl = current.PathAndQuery + current.Fragment;
         navigation.NavigateTo(
             $"/_culture?culture={Uri.EscapeDataString(language)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
             forceLoad: true);
