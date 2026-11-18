@@ -1,3 +1,27 @@
+// Only section history belongs here. Resource/context navigation remains owned by Blazor.
+export function navigate(location, replace) {
+    const current = new URL(window.location.href), target = new URL(location, current);
+    const identity = url => {
+        const query = new URLSearchParams(url.search);
+        query.delete('view'); query.delete('tab');
+        return url.origin + url.pathname + '?' + query.toString();
+    };
+    if (identity(current) !== identity(target)) return current.href;
+    if (replace) {
+        window.history.replaceState(window.history.state, '', target.href);
+        window.dispatchEvent(new Event('hashchange'));
+    } else {
+        if (current.search !== target.search) {
+            current.search = target.search;
+            window.history.replaceState(window.history.state, '', current.href);
+        }
+        // Native hash navigation produces the expected history/hash events even
+        // when Blazor optimizes same-document fragment navigation.
+        window.location.hash = target.hash;
+    }
+    return window.location.href;
+}
+
 export function currentLocation() { return window.location.href; }
 
 export function observe(root, reference) {
@@ -25,7 +49,7 @@ export function observe(root, reference) {
     return {
         focusRail() {
             const rail = root.querySelector('.resource-navigation-rail');
-            const selected = [...(rail?.querySelectorAll('a[aria-current=page], .active-branch button, a[href], button:not(:disabled)') ?? [])].find(element => element.getClientRects().length);
+            const selected = [...(rail?.querySelectorAll('a[aria-current=page]') ?? []), ...(rail?.querySelectorAll('.active-branch button:not(:disabled), a[href], button:not(:disabled)') ?? [])].find(element => element.getClientRects().length);
             selected?.focus();
         },
         focusTrigger() { root.querySelector('.resource-navigation-trigger')?.focus(); },

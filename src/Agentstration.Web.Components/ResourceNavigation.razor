@@ -132,13 +132,15 @@
     private void CloseDrawer() => drawerOpen = false;
 
     [JSInvokable]
-    public Task NavigateSection(string path)
+    public async Task NavigateSection(string path)
     {
-        if (disposed || BaseUri(Navigation.Uri) != identity || !CanSelect(path)) return Task.CompletedTask;
+        if (disposed || module is null || BaseUri(Navigation.Uri) != identity || !CanSelect(path)) return;
         unavailable = false;
-        if (Navigation.Uri != Link(path)) Navigation.NavigateTo(Link(path));
+        var actual = await module.InvokeAsync<string>("navigate", Link(path), false);
+        if (disposed) return;
+        ApplyLocation(actual);
         if (CurrentPath == path) drawerOpen = false;
-        return InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
     [JSInvokable]
     public Task ObserveLocation(string location) => InvokeAsync(() => { if (!disposed) { ApplyLocation(location); StateHasChanged(); } });
@@ -180,7 +182,10 @@
         if (canonicalPending is { } canonical)
         {
             canonicalPending = null; correctedTarget = canonical;
-            Navigation.NavigateTo(canonical, replace: true);
+            var actual = await module!.InvokeAsync<string>("navigate", canonical, true);
+            if (disposed) return;
+            ApplyLocation(actual);
+            StateHasChanged();
         }
         if (registration is not null && (focusRail || focusTrigger))
         {

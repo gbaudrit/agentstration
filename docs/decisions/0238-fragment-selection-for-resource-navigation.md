@@ -13,7 +13,7 @@ The maintainer selected a configurable two-level resource-local menu and explici
 - New `ResourceNavigation` consumers use stable `#primary` or `#primary/child` paths with lowercase ASCII kebab-case IDs. Labels are localized independently.
 - Resource identity remains in its canonical route and namespace/owner/context query parameters. A section transition carries no resource command or context change.
 - The caller supplies visible/enabled entries and the authorized default; invalid or unavailable destinations resolve to an allowed entry without exposing hidden labels. Normalization replaces the current history entry, while explicit selection participates in Back/Forward.
-- Navigation observes native hash/history changes and uses existing Blazor navigation and modal/focus infrastructure. It does not persist or reload resource drafts.
+- Navigation observes native hash/history changes and uses native hash history for same-resource sections plus existing Blazor resource navigation and modal/focus infrastructure. Blazor can optimize fragment-only navigation without a .NET location notification; the component therefore observes native hash/history events explicitly. It does not persist or reload resource drafts.
 - Existing tab consumers remain unchanged until explicit family adoption. No universal resource schema, loader or business model is introduced.
 
 ## Consequences

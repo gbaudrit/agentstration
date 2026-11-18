@@ -46,3 +46,20 @@ test('disposal removes every listener and stale callbacks do not reach a dispose
   assert.equal(e.calls.length, 0); assert.equal(e.rootListeners.size + e.windowListeners.size + e.mediaListeners.size, 0);
   assert.equal(module.observe(null, {}), undefined);
 });
+test('native section history preserves Blazor state and cannot rewrite another resource/context', () => {
+  let current = new URL('https://example.test/agents/a?namespace=demo&context=%2Finstance&view=old#overview');
+  const state = { _index: 4, application: 'preserved' }; const replacements: unknown[] = [];
+  const location = { get href() { return current.href; }, set hash(value: string) { current.hash = value; } };
+  Object.assign(globalThis, { window: { location, history: { state, replaceState: (value: unknown, title: string, url: string) => { assert.equal(value, state); replacements.push(url); current = new URL(url); } }, dispatchEvent: () => true } });
+  const destination = 'https://example.test/agents/a?namespace=demo&context=%2Finstance#definition/tools';
+  assert.equal(module.navigate(destination, false), destination);
+  assert.equal(replacements.length, 1);
+  assert.equal(module.navigate('https://example.test/agents/a?context=%2Ftenants%2Fother#yaml', false), destination);
+  assert.equal(module.navigate('https://example.test/agents/b?namespace=demo&context=%2Finstance#yaml', true), destination);
+});
+test('normalization replaces the current entry and emits a location observation', () => {
+  let current = 'https://example.test/agents/a#invalid'; let events = 0;
+  Object.assign(globalThis, { window: { location: { get href() { return current; } }, history: { state: {}, replaceState: (_state: unknown, _title: string, value: string) => { current = value; } }, dispatchEvent: () => { events++; } } });
+  assert.equal(module.navigate('https://example.test/agents/a#overview', true), 'https://example.test/agents/a#overview');
+  assert.equal(events, 1);
+});

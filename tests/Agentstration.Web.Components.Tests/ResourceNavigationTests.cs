@@ -50,7 +50,7 @@ public sealed class ResourceNavigationTests
         cut.WaitForAssertion(() => Assert.AreEqual("overview", cut.Instance.CurrentPath));
         Assert.DoesNotContain("Confidential section", cut.Markup);
         Assert.AreEqual("This section is unavailable. Showing an available section.", cut.Find(".resource-navigation-feedback").TextContent);
-        var uri = new Uri(context.Services.GetRequiredService<NavigationManager>().Uri);
+        var uri = new Uri((string)context.JSInterop.Invocations.Last(call => call.Identifier == "navigate").Arguments[0]!);
         Assert.AreEqual("#overview", uri.Fragment);
         Assert.Contains("scopeRef=%2Ftenants%2Fowner", uri.Query);
         Assert.Contains("context=%2Finstance", uri.Query);
@@ -206,7 +206,12 @@ public sealed class ResourceNavigationTests
         if (runtime is not null) context.Services.AddSingleton(runtime);
         var nav = context.Services.GetRequiredService<NavigationManager>();
         nav.NavigateTo("http://localhost/agents/example?scopeRef=%2Ftenants%2Fowner&context=%2Finstance&namespace=demo&view=legacy&tab=ignored" + fragment);
-        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "definition/tools", "yaml" })
+        {
+            var target = "http://localhost/agents/example?scopeRef=%2Ftenants%2Fowner&context=%2Finstance&namespace=demo#" + path;
+            module.Setup<string>("navigate", invocation => Equals(invocation.Arguments[0], target)).SetResult(target);
+        }
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js");
         return context;
     }
