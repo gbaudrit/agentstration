@@ -1,0 +1,33 @@
+{
+  "kind": "isolated component host, not Agent adoption",
+  "results": [
+    {
+      "culture": "en-US",
+      "theme": "dark",
+      "mobile": false,
+      "status": "passed",
+      "url": "http://127.0.0.1:53133/navigation?namespace=demo&scopeRef=%2Ftenants%2Fowner&context=%2Finstance&culture=en-US&theme=dark#overview"
+    },
+    {
+      "culture": "fr-FR",
+      "theme": "light",
+      "mobile": false,
+      "status": "passed",
+      "url": "http://127.0.0.1:53133/navigation?namespace=demo&scopeRef=%2Ftenants%2Fowner&context=%2Finstance&culture=fr-FR&theme=light#overview"
+    },
+    {
+      "culture": "en-US",
+      "theme": "light",
+      "mobile": true,
+      "status": "passed",
+      "url": "http://127.0.0.1:53133/navigation?namespace=demo&scopeRef=%2Ftenants%2Fowner&context=%2Finstance&culture=en-US&theme=light#overview"
+    },
+    {
+      "culture": "fr-FR",
+      "theme": "dark",
+      "mobile": true,
+      "status": "passed",
+      "url": "http://127.0.0.1:53133/navigation?namespace=demo&scopeRef=%2Ftenants%2Fowner&context=%2Finstance&culture=fr-FR&theme=dark#overview"
+    }
+  ]
+}

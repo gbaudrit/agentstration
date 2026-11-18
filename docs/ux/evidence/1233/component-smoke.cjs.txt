@@ -1,0 +1,50 @@
+const { chromium, expect } = require('/workspace/agentstration-1233/automation/playwright/node_modules/@playwright/test');
+const fs=require('fs/promises');
+let browser;
+(async()=>{
+ browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+ const evidence='/workspace/agentstration-1233/docs/ux/evidence/1233';await fs.mkdir(evidence,{recursive:true});const results=[];
+ for(const [culture,theme,mobile] of [['en-US','dark',false],['fr-FR','light',false],['en-US','light',true],['fr-FR','dark',true]]){
+  const french=culture==='fr-FR';
+  const ctx=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},hasTouch:mobile,isMobile:mobile,locale:culture});
+  const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+  const base=`http://127.0.0.1:53133/navigation?namespace=demo&scopeRef=%2Ftenants%2Fowner&context=%2Finstance&culture=${culture}&theme=${theme}`;
+  await page.goto(base+'&view=yaml&tab=unused#definition/tools');
+  const root=page.locator('.resource-navigation');await expect(root).toHaveAttribute('data-navigation-ready','true');
+  await expect(page.locator('#selected')).toHaveText('definition/tools');await expect(page).toHaveURL(/#definition\/tools$/);
+  expect(new URL(page.url()).searchParams.has('view')).toBe(false);
+  await page.reload();await expect(root).toHaveAttribute('data-navigation-ready','true');await expect(page.locator('#selected')).toHaveText('definition/tools');
+  const activate=async path=>{
+   if(mobile){await page.locator('.resource-navigation-trigger').tap();await expect(page.locator('dialog')).toBeVisible();await page.locator(`dialog a[data-resource-section="${path}"]`).tap();await expect(page.locator('dialog')).toHaveCount(0);}
+   else{const a=page.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`);await a.focus();await a.press('Enter');}
+   await expect(page.locator('#selected')).toHaveText(path);
+  };
+  await page.getByRole('textbox',{name:french?'Brouillon formulaire':'Form draft',exact:true}).fill('unsaved form');
+  await activate('yaml');await page.getByRole('textbox',{name:french?'Brouillon YAML':'YAML draft',exact:true}).fill('invalid: [ YAML draft');
+  await page.goBack();await expect(page.locator('#selected')).toHaveText('definition/tools');await expect(page).toHaveURL(/#definition\/tools$/);await expect(page.getByRole('textbox',{name:french?'Brouillon formulaire':'Form draft',exact:true})).toHaveValue('unsaved form');
+  await page.goForward();await expect(page.locator('#selected')).toHaveText('yaml');await expect(page).toHaveURL(/#yaml$/);await expect(page.getByRole('textbox',{name:french?'Brouillon YAML':'YAML draft',exact:true})).toHaveValue('invalid: [ YAML draft');
+  const tab=await ctx.newPage();await tab.goto(page.url());await expect(tab.locator('.resource-navigation')).toHaveAttribute('data-navigation-ready','true');await expect(tab.locator('#selected')).toHaveText('yaml');await tab.close();
+  await page.evaluate(()=>Blazor.navigateTo(location.href.split('#')[0]+'#definition/tools'));await expect(page.locator('#selected')).toHaveText('definition/tools');
+  await expect(page.locator('#initializations')).toHaveText('1');
+  expect(await page.locator('.fixture-root').evaluate(e=>getComputedStyle(e).getPropertyValue('--color-surface').trim())).toBe(theme==='dark'?'#111c2b':'#fff');
+  await page.screenshot({path:`${evidence}/${culture}-${theme}-component.png`,fullPage:true});
+  if(mobile){
+   const trigger=page.locator('.resource-navigation-trigger');await trigger.tap();const dialog=page.locator('dialog');await expect(dialog).toBeVisible();
+   await dialog.getByRole('button',{name:french?'Fermer les sections':'Close sections',exact:true}).focus();await page.keyboard.press('Shift+Tab');expect(await page.evaluate(()=>!!document.activeElement.closest('dialog'))).toBe(true);
+   await page.screenshot({path:`${evidence}/${culture}-${theme}-drawer.png`,fullPage:true});
+   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
+   await trigger.tap();await expect(dialog).toBeVisible();await page.touchscreen.tap(3,200);await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
+   await trigger.tap();await expect(dialog).toBeVisible();await page.setViewportSize({width:1440,height:1000});await expect(dialog).toHaveCount(0);
+   await expect(page.locator('.resource-navigation-rail a[aria-current=page]')).toBeFocused();
+   await page.setViewportSize({width:390,height:844});await expect(trigger).toBeFocused();
+   await expect(page.getByRole('textbox',{name:french?'Brouillon formulaire':'Form draft',exact:true})).toHaveValue('unsaved form');
+  }
+  await page.evaluate(()=>Blazor.navigateTo(location.href.split('#')[0]+'#definition/secret'));await expect(page.locator('#selected')).toHaveText('overview');
+  await expect(root.locator('.resource-navigation-feedback')).toBeVisible();await expect(page).toHaveURL(/#overview$/);
+  expect(await root.textContent()).not.toContain('Confidential hidden label');
+  const url=new URL(page.url());expect(url.searchParams.get('context')).toBe('/instance');expect(url.searchParams.get('scopeRef')).toBe('/tenants/owner');expect(url.searchParams.get('namespace')).toBe('demo');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(errors).toEqual([]);
+  results.push({culture,theme,mobile,status:'passed',url:page.url()});await ctx.close();
+ }
+ await browser.close();await fs.writeFile(evidence+'/smoke-results.json',JSON.stringify({kind:'isolated component host, not Agent adoption',results},null,2)+'\n');console.log(JSON.stringify(results));
+})().catch(async e=>{console.error(e);await browser?.close();process.exitCode=1});

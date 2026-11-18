@@ -1,0 +1,16 @@
+{
+  "scope": "direct native hash assignment followed by Back with retained drafts",
+  "results": [
+    {
+      "guard": false,
+      "status": "passed"
+    },
+    {
+      "guard": true,
+      "status": "failed",
+      "assertion": "expect(locator).toHaveText(expected) failed\n\nLocator:  locator('#selected')\nExpected: \"yaml\"\nReceived: \"definition/tools\"\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toHaveText\" locator('#selected') with timeout 5000ms\n  - waiting for locator('#selected')\n    14 × locator resolved to <p id=\"selected\">definition/tools</p>\n       - unexpected value \"definition/tools\"\n",
+      "url": "http://127.0.0.1:53133/navigation?guard=true#definition/tools",
+      "selected": "definition/tools"
+    }
+  ]
+}
