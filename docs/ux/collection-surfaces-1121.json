@@ -5623,12 +5623,12 @@
     {
       "id": "storage-types-storage-type-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
-      "line": 21,
+      "line": 9,
       "host": "console",
       "routes": [
         "/storage-types"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StorageTypeResource",
       "scope": true,
       "state": true,
@@ -5659,7 +5659,17 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Type",
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "One bounded family API page using scopeRef/skip/take; nextLink indicates HasMore only and is never followed. Unknown total; previous/next and 20/50/100 sizes; no global search/filter capability claimed. Existing fetch-all client method remains for unrelated consumers but this screen does not call it.",
+        "identity": "Exact qualified type links preserve context, preferred contract version and applicable availability/scope/governance markers retained.",
+        "states": "Retained successful rows and pager facts on failed page or refresh; retry requested page; removed terminal page falls back once to page one; context replacement and stale response protection.",
+        "actions": "Existing authorized create and Storages navigation retained.",
+        "validation": "StorageTypeCollectionTests plus maintained existing list regressions; real API desktop/mobile smoke; list-layout-adoption.md records limits."
+      }
     },
     {
       "id": "data-source-dataset-editor-data-source-acquisition-resource",

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Agentstration.Api.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Web.Components.Pages;
@@ -25,8 +26,8 @@ public sealed class StorageTypeComponentTests
         page.WaitForElement("[data-testid=storage-type-name-link]");
         Assert.AreEqual(StorageTypeLinks.Details(client.Resource), page.Find("[data-testid=storage-type-name-link]").GetAttribute("href"));
         Assert.AreEqual(Scope, client.ListScope);
-        page.Find("input[type=search]").Input("does-not-exist");
-        Assert.IsEmpty(page.FindAll("[data-testid=storage-type-row]"));
+        Assert.IsEmpty(page.FindAll("input[type=search], [data-filter-key]"));
+        Assert.HasCount(1, page.FindAll("[data-testid=storage-type-row]"));
     }
 
     [TestMethod]
@@ -349,6 +350,7 @@ public sealed class StorageTypeComponentTests
         public CreateStorageTypeRequest? Created { get; private set; }
         public PutStorageTypeRequest? Updated { get; private set; }
         public PublishStorageTypeVersionRequest? Published { get; private set; }
+        public Task<PagedResponse<StorageTypeResource>> GetTypesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) { ListScope = scope; return Task.FromResult(new PagedResponse<StorageTypeResource>([Resource], null)); }
         public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) { ListScope = scope; return Task.FromResult<IReadOnlyList<StorageTypeResource>>([Resource]); }
         public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) { ResourceReads++; return Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag)); }
         public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
