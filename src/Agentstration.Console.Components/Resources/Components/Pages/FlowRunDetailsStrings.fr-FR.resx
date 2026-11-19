@@ -319,4 +319,6 @@
   <data name="ProcessActiveStep" xml:space="preserve"><value>Étape en cours</value></data>
   <data name="ToolStatus.Governed" xml:space="preserve"><value>Gouvernance évaluée</value></data>
   <data name="ToolStatus.Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="RunIdentifier"><value>Identifiant d’exécution</value></data>
+  <data name="IdentityMismatch"><value>La réponse ne correspond pas à l’exécution et au périmètre demandés.</value></data>
 </root>

@@ -139,7 +139,6 @@ export const TestIds = {
     details: 'runtime-worker-details',
     assignments: 'runtime-worker-assignments',
     assignmentRow: 'runtime-worker-assignment-row',
-    flowRunWorkerTab: 'flow-run-worker-tab',
     placement: 'runtime-placement',
     placementWorker: 'runtime-placement-worker',
     placementAttempt: 'runtime-placement-attempt',

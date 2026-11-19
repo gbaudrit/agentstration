@@ -67,7 +67,7 @@ export class FlowObservabilityPage {
   }
 
   public async inspectCausalOutputs(): Promise<void> {
-    await this.page.getByRole('tab', { name: 'Causality', exact: true }).click();
+    await selectResourceSection(this.page, 'causality');
     const tree = this.page.locator('.causality-tree');
     await expect(tree.locator('.causality-node').first()).toBeVisible();
     const link = tree.locator('.causality-meta a[href^="/flow-runs/"]').first();
@@ -79,7 +79,7 @@ export class FlowObservabilityPage {
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await link.click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
-    await this.page.getByRole('tab', { name: 'Summary', exact: true }).click();
+    await selectResourceSection(this.page, 'overview');
     await expect(this.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
   }
 

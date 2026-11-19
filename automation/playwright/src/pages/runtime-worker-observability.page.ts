@@ -139,8 +139,7 @@ export class RuntimeWorkerObservabilityPage {
 
   public async openFlowRunPlacement(consoleUrl: string, runId: string, workerId: string): Promise<void> {
     await this.open(`${consoleUrl}/flow-runs/${encodeURIComponent(runId)}`, TestIds.flowObservability.runDetails);
-    const workerTab = this.page.getByTestId(TestIds.runtimeWorkerObservability.flowRunWorkerTab);
-    await this.activateTab(workerTab);
+    await selectResourceSection(this.page, 'worker');
     await this.expectCurrentPlacement(workerId, 'Succeeded', undefined, runId);
   }
 

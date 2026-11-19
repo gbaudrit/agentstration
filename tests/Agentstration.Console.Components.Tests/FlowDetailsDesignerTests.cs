@@ -34,7 +34,7 @@ public sealed partial class FlowDetailsDesignerTests
     public void ArtifactJsonErrorsExplainTheCorrectSideAndRemedy(string language, string code, string explanation)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspace = WorkspaceId.New();
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
@@ -71,10 +71,10 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
         foreach (var tab in new[] { "Causality", "Activity", "RawEvents" })
         {
-            rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings[tab].Value).Click();
+            SelectFlowSection(context, tab == "RawEvents" ? "raw-events" : tab.ToLowerInvariant());
             Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error']"));
         }
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Summary"].Value).Click();
+        SelectFlowSection(context, "overview");
         Assert.HasCount(1, rendered.FindAll("[data-testid='flow-run-error']"));
         Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
     }
@@ -166,8 +166,8 @@ public sealed partial class FlowDetailsDesignerTests
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
 
-        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] code").TextContent);
-        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] code").TextContent);
+        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope]").TextContent);
+        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope]").TextContent);
     }
 
     [TestMethod]
@@ -592,7 +592,7 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.Contains(run.Id, ownerHref);
         Assert.Contains("step=notify", ownerHref);
         Assert.DoesNotContain("run.Id", ownerHref);
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Causality"].Value).Click();
+        SelectFlowSection(context, "causality");
 
         rendered.WaitForAssertion(() =>
         {
@@ -730,7 +730,7 @@ public sealed partial class FlowDetailsDesignerTests
         StringAssert.Contains(summary.TextContent, "25");
         StringAssert.Contains(summary.TextContent, "35");
         StringAssert.Contains(summary.TextContent, strings["UsageCoverage.Partial"].Value);
-        Assert.IsTrue(rendered.Find("#flow-run-tab-summary").ClassList.Contains("active"));
+        Assert.AreEqual("overview", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
     }
 
     [TestMethod]
@@ -769,7 +769,7 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
 
         Assert.IsEmpty(rendered.FindAll("[data-testid=runtime-placement]"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Worker").Click();
+        SelectFlowSection(context, "worker");
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=runtime-placement]").TextContent, "Worker assignment");
@@ -854,13 +854,19 @@ public sealed partial class FlowDetailsDesignerTests
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) => run is not null && run.Id == runId
-            ? Task.FromResult(run)
-            : throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found");
+        public int RunReadCount { get; private set; }
+        public Func<string, Task<FlowRun>>? RunLoader { get; init; }
+        public IReadOnlyList<InputRequest> PendingInputs { get; init; } = [];
+        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken)
+        {
+            RunReadCount++;
+            return RunLoader?.Invoke(runId) ?? (run is not null && run.Id == runId ? Task.FromResult(run)
+                : throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found"));
+        }
         public Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) => causality is not null
             ? Task.FromResult(causality)
             : throw new NotSupportedException();
-        public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => Task.FromResult(PendingInputs);
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FlowRunEvent>>([]);
