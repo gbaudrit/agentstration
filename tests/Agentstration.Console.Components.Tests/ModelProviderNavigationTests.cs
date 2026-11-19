@@ -15,6 +15,7 @@ using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -27,15 +28,35 @@ public sealed partial class ModelProviderNavigationTests
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
 
     [TestMethod]
-    public void ProviderOverviewRendersWhileExtensionMetadataIsStillPending()
+    public void UnavailableExtensionMetadataDoesNotEraseSavedProviderBindings()
     {
         using var culture = new TestCultureScope("en-US");
+        ExtensionResponse extension = new(
+            RegistrationName: "ollama-extension", RegistrationNamespace: ProviderNamespace.Value,
+            Endpoint: new Uri("http://localhost:5260"), Status: "unavailable", Extension: null,
+            Contributions: [], OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual");
+        using var context = CreateContext(out var providers, [extension]);
+        providers.InitialBindings = [ModelProviderValueBinding.FromLiteral("endpoint", JsonSerializer.SerializeToElement("http://saved-ollama:11434"))];
+        var rendered = context.Render<ModelProviderDetails>(parameters => parameters.Add(value => value.Name, "ollama-local"));
+        rendered.WaitForElement("[data-testid='model-provider-refresh']");
+        rendered.Find("#model-provider-configuration-tab").Click();
+        var editor = (ModelProviderEditorModel)rendered.FindComponent<EditForm>().Instance.Model!;
+        Assert.AreEqual("http://saved-ollama:11434", editor.ToPutRequest().Properties.ValueBindings.Single().Literal!.Value.GetString());
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Model discovery completed")]
+    [DataRow("fr-FR", "Découverte des modèles terminée")]
+    public void ProviderOverviewRendersWhileExtensionMetadataIsStillPending(string cultureName, string discoveryLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
         using var context = CreateContext(out _, []);
         var extensionsClient = (StubExtensionsClient)context.Services.GetRequiredService<IExtensionsClient>();
         extensionsClient.Pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var rendered = context.Render<ModelProviderDetails>(parameters => parameters.Add(value => value.Name, "ollama-local"));
         rendered.WaitForElement("[data-testid='model-provider-refresh']");
         Assert.IsFalse(extensionsClient.Pending.Task.IsCompleted);
+        Assert.AreEqual(discoveryLabel, rendered.Find("[data-testid='model-discovery-state']").TextContent.Trim());
         Assert.IsNotNull(rendered.Find("[data-testid='model-provider-delete']"));
     }
 
@@ -230,14 +251,16 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    public void NewProviderDisplaysCanonicalRequirementTypeAndFormat()
+    [DataRow("available")]
+    [DataRow("incompatible")]
+    public void NewProviderDisplaysCanonicalRequirementTypeAndFormat(string extensionStatus)
     {
         using var culture = new TestCultureScope("fr-FR");
         ExtensionResponse extension = new(
             RegistrationName: "typed-extension",
             RegistrationNamespace: ResourceNamespace.DefaultValue,
             Endpoint: new Uri("http://localhost:5000"),
-            Status: "available",
+            Status: extensionStatus,
             Extension: new ExtensionIdentityResponse("typed.extension", "Typed extension", "1.0.0", null),
             Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
             OptionSets: [],
@@ -635,6 +658,7 @@ public sealed partial class ModelProviderNavigationTests
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
         public CreateModelProviderRequest? CreatedRequest { get; private set; }
+        public IReadOnlyList<ModelProviderValueBinding> InitialBindings { get; set; } = [];
         private TaskCompletionSource<ModelProviderUsagesResponse>? usagesCompletion;
 
         public void DelayUsages() =>
@@ -717,7 +741,7 @@ public sealed partial class ModelProviderNavigationTests
         public Task DeleteModelProviderAsync(string providerName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        private static ModelProviderResource ProviderResource(string name) => new()
+        private ModelProviderResource ProviderResource(string name) => new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProvider,
@@ -727,7 +751,8 @@ public sealed partial class ModelProviderNavigationTests
             {
                 DisplayName = "Local Ollama",
                 Extension = new ResourceReference("ollama-extension", @namespace: ProviderNamespace),
-                ContributionId = "ollama"
+                ContributionId = "ollama",
+                ValueBindings = InitialBindings
             }
         };
     }

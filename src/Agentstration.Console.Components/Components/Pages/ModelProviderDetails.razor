@@ -247,7 +247,7 @@ else
     private async Task DeleteAsync() { if (!CanManage || model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
     private void SyncBindings()
     {
-        if (model is null || SelectedExtension is null) return;
+        if (model is null || SelectedExtension is null || (SelectedExtension.Status != "available" && Requirements.Count == 0)) return;
         var existing = model.ValueBindings.ToDictionary(value => value.RequirementId, StringComparer.Ordinal);
         model.ValueBindings = Requirements.Select(requirement =>
         {
