@@ -21,13 +21,17 @@ public sealed partial class ApiClientTests
             var response = new HttpResponseMessage(HttpStatusCode.OK);
             response.Content = request.Method == HttpMethod.Put ? JsonContent.Create(new ToolProviderResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, ScopeRef = scope,
-                Metadata = new() { Name = "same", Namespace = ns }, Definition = new() { DisplayName = "Saved", ProviderType = ToolProviderType.Mcp }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
+                ScopeRef = scope,
+                Metadata = new() { Name = "same", Namespace = ns },
+                Definition = new() { DisplayName = "Saved", ProviderType = ToolProviderType.Mcp }
             }) : request.RequestUri!.AbsolutePath.EndsWith("/test", StringComparison.Ordinal)
                 ? JsonContent.Create(new ToolConnectionTestResponse("connected", 0, new Dictionary<string, bool>(), new Dictionary<string, string>()))
                 : JsonContent.Create(new ToolDiscoveryDiffResponse(0, 0, 0, 0, 0));
             response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"updated\""); return response;
-        })) { BaseAddress = new("http://localhost/") };
+        }))
+        { BaseAddress = new("http://localhost/") };
         var client = new ToolsApiClient(http);
         _ = await client.UpdateProviderAsync(scope, ns, "same", new(new() { DisplayName = "Saved", ProviderType = ToolProviderType.Mcp }), "\"original\"", default);
         _ = await client.TestAsync(scope, ns, "same", default);

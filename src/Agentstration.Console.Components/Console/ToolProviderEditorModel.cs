@@ -56,23 +56,36 @@ public sealed class ToolProviderEditorModel
     }
     public ToolProviderProperties Properties() => new()
     {
-        DisplayName = DisplayName, ProviderType = ProviderType, Enabled = Enabled,
+        DisplayName = DisplayName,
+        ProviderType = ProviderType,
+        Enabled = Enabled,
         Aep = ProviderType == ToolProviderType.Aep ? new AepToolProviderConfiguration { Extension = new ResourceReference(ExtensionId, ExtensionScopeRef, ExtensionNamespace) } : null,
         Mcp = ProviderType == ToolProviderType.Mcp ? new McpToolProviderConfiguration
         {
-            Transport = Transport, Command = Null(Command), Arguments = Lines(Arguments), WorkingDirectory = Null(WorkingDirectory),
-            Endpoint = Uri.TryCreate(Endpoint, UriKind.Absolute, out var uri) ? uri : null, EnvironmentReferences = Pairs(EnvironmentReferences)
+            Transport = Transport,
+            Command = Null(Command),
+            Arguments = Lines(Arguments),
+            WorkingDirectory = Null(WorkingDirectory),
+            Endpoint = Uri.TryCreate(Endpoint, UriKind.Absolute, out var uri) ? uri : null,
+            EnvironmentReferences = Pairs(EnvironmentReferences)
         } : null
     };
     public static ToolProviderEditorModel From(ToolProviderResource value) => new()
     {
-        Name = value.Name, Namespace = value.Namespace.Value, DisplayName = value.Definition.DisplayName, ScopeRef = value.ScopeRef,
+        Name = value.Name,
+        Namespace = value.Namespace.Value,
+        DisplayName = value.Definition.DisplayName,
+        ScopeRef = value.ScopeRef,
         Tags = string.Join(Environment.NewLine, value.Metadata.Tags.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}")),
-        Enabled = value.Definition.Enabled, ProviderType = value.Definition.ProviderType,
-        ExtensionId = value.Definition.Aep?.Extension.Name ?? string.Empty, ExtensionNamespace = value.Definition.Aep?.Extension.Namespace,
+        Enabled = value.Definition.Enabled,
+        ProviderType = value.Definition.ProviderType,
+        ExtensionId = value.Definition.Aep?.Extension.Name ?? string.Empty,
+        ExtensionNamespace = value.Definition.Aep?.Extension.Namespace,
         ExtensionScopeRef = value.Definition.Aep?.Extension.ScopeRef,
-        Transport = value.Definition.Mcp?.Transport ?? McpToolProviderTransport.Stdio, Command = value.Definition.Mcp?.Command ?? string.Empty,
-        Arguments = string.Join(Environment.NewLine, value.Definition.Mcp?.Arguments ?? []), WorkingDirectory = value.Definition.Mcp?.WorkingDirectory ?? string.Empty,
+        Transport = value.Definition.Mcp?.Transport ?? McpToolProviderTransport.Stdio,
+        Command = value.Definition.Mcp?.Command ?? string.Empty,
+        Arguments = string.Join(Environment.NewLine, value.Definition.Mcp?.Arguments ?? []),
+        WorkingDirectory = value.Definition.Mcp?.WorkingDirectory ?? string.Empty,
         Endpoint = value.Definition.Mcp?.Endpoint?.ToString() ?? string.Empty,
         EnvironmentReferences = string.Join(Environment.NewLine, (value.Definition.Mcp?.EnvironmentReferences ?? new Dictionary<string, string>()).Select(p => $"{p.Key}={p.Value}"))
     };

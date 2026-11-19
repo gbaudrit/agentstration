@@ -41,7 +41,9 @@ public sealed class ToolCategoryEditorModel
     }
     public ToolCategoryProperties Properties(IReadOnlyList<ResourceReference> references) => new()
     {
-        DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(), Tools = references
+        DisplayName = DisplayName.Trim(),
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+        Tools = references
     };
     public static ToolCategoryEditorModel From(ToolCategoryResource resource) => new()
     {
