@@ -7048,7 +7048,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 postcss-normalize-whitespace@7.0.1 — "MIT"
 
-postcss-selector-parser@7.1.1 — "MIT"
+postcss-selector-parser@7.1.6 — "MIT"
 
 postcss-value-parser@4.2.0 — "MIT"
 Copyright (c) Bogdan Chadkin <trysound@yandex.ru>

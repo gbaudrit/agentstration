@@ -21,5 +21,8 @@
     "test": "node --import tsx --test model.test.ts render-queue.test.ts deployment-model.test.ts",
     "prebuild": "node generate-resource-icons.mjs",
     "pretest": "node generate-resource-icons.mjs"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
   }
 }
