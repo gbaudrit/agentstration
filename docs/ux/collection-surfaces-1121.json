@@ -2777,17 +2777,17 @@
     {
       "id": "vaults-vault-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
-      "line": 15,
+      "line": 10,
       "host": "console",
       "routes": [
         "/vaults"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "VaultResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Provider",
         "Location"
@@ -2855,6 +2855,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "1e1777af7e35ac53cf7b8d95dd088afd8b611188"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized VaultResponse array; local name search, identity status filter, provider column filter and additional exact owner-scope filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained compatible refresh rows/view with stable query; interactivity, stale-response, context-replacement and denied-read guards.",
+        "security": "Only Vault metadata/status is requested. No Secret values or vault-initialization command is introduced. Existing provider/local location and scope/status/governance presentation retained.",
+        "actions": "Legitimate Secrets/Vaults destinations and exact name/scope links retain context; redundant Manage-only action removed; creation requires resources/write.",
+        "validation": "VaultCollectionTests plus real deterministic desktop/mobile metadata-only API smoke; evidence and inventory limits in list-layout-adoption.md."
       }
     },
     {

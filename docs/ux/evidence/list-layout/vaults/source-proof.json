@@ -1,0 +1,14 @@
+{
+  "baseCommit": "8963786b271f4b42bc27d1fbe1afee1c768148f3",
+  "route": "/vaults",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Vaults.razor": "57e290e52a2cc096e8850c319dc47a05808530b8",
+    "src/Agentstration.Console.Components/Components/Pages/Vaults.razor.cs": "f01fe8c91fc737b01c32a6ce033d87d7a763e06d",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}
