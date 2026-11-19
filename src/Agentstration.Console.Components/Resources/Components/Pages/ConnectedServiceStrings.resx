@@ -160,4 +160,6 @@
   <data name="NoMatches.Message" xml:space="preserve"><value>Try another search or clear the filters to see all connected services.</value></data>
   <data name="ClearFilters" xml:space="preserve"><value>Clear filters</value></data>
   <data name="ServiceType" xml:space="preserve"><value>Service type</value></data>
+<data name="CompleteConfiguration"><value>Complete the required configuration before creating the Connected Service.</value></data>
+<data name="IdentityMismatch"><value>The returned Connected Service does not match the requested identity.</value></data>
 </root>

@@ -111,7 +111,7 @@ public sealed class ConnectedServiceComponentTests
             Assert.AreEqual(workspace, credential.CreationContext.ScopeRef);
         });
         rendered.Find("input[role=switch]").Change(false);
-        Assert.IsFalse(((ConnectedServiceEditorModel)rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance.Model!).Enabled);
+        Assert.IsFalse(((ConnectedServiceEditorModel)rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance.EditContext!.Model).Enabled);
     }
 
     [TestMethod]
@@ -264,6 +264,64 @@ public sealed class ConnectedServiceComponentTests
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".page-header input[role=switch]").HasAttribute("disabled")));
     }
 
+    [TestMethod]
+    public void CreationWizardAllowsIncompleteNavigationRetainsItsFormAndCreatesOnlyAtFinish()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var original = TypeCatalog();
+        var type = original with { Definition = original.Definition with { Versions = [original.Definition.Versions[0] with { Inputs = [] }] } };
+        var client = new EditorClient(type, scope);
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(client);
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        var rendered = context.Render<ConnectedServiceEditorPage>();
+        var form = rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        Assert.AreEqual("false", rendered.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        rendered.Find("[data-testid=creation-wizard-next]").Click();
+        Assert.AreEqual("step", rendered.Find("[data-wizard-step=configuration]").GetAttribute("aria-current"));
+        rendered.Find("[data-wizard-step=review]").Click();
+        rendered.Find("[data-testid=connected-service-save]").Click();
+        Assert.AreEqual("step", rendered.Find("[data-wizard-step=identity]").GetAttribute("aria-current"));
+        Assert.IsNull(client.Created);
+        rendered.Find("[data-testid=connected-service-display-name]").Change("Wizard service");
+        rendered.Find("[data-testid=connected-service-name]").Change("wizard-service");
+        rendered.Find("[data-wizard-step=configuration]").Click();
+        rendered.Find("[data-wizard-step=identity]").Click();
+        Assert.AreSame(form, rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("Wizard service", rendered.Find("[data-testid=connected-service-display-name]").GetAttribute("value"));
+        rendered.Find("[data-wizard-step=review]").Click();
+        rendered.Find("[data-testid=connected-service-save]").Click();
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.Created));
+        Assert.IsNotNull(client.Created);
+        Assert.AreEqual(scope, client.Created.ScopeRef);
+        Assert.AreEqual(type.Uid, client.Created.Properties.Type.TypeUid);
+        Assert.AreEqual(type.ScopeRef, client.Created.Properties.Type.Type.ScopeRef);
+        Assert.AreEqual("1.0.0", client.Created.Properties.Type.Version);
+        Assert.IsTrue(context.Services.GetRequiredService<NavigationManager>().Uri.Contains("/connected-services/wizard-service?", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void StandaloneEditRouteUsesTheCanonicalDetailsConfigurationAndExactCoordinates()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(null));
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo("/connected-services/service/edit?scopeRef=%2Finstance&namespace=shared");
+        context.Render<ConnectedServiceEditorPage>(p => p.Add(c => c.Name, "service"));
+        var uri = new Uri(nav.Uri);
+        Assert.AreEqual("/connected-services/service", uri.AbsolutePath);
+        Assert.AreEqual("#definition/configuration", uri.Fragment);
+        StringAssert.Contains(uri.Query, "namespace=shared");
+        StringAssert.Contains(uri.Query, "scopeRef=%2Finstance");
+    }
+
     private sealed class NavigationScope(ResourceScopeRef scope) : IConsoleNavigationContext
     {
         public string? ScopeRef => scope.Value;
@@ -368,7 +426,12 @@ public sealed class ConnectedServiceComponentTests
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(workspace, workspace.Kind, "Workspace", true)]);
         public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ConnectedServiceResource>> CreateConnectedServiceAsync(CreateConnectedServiceRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public CreateConnectedServiceRequest? Created { get; private set; }
+        public Task<ResourceSnapshot<ConnectedServiceResource>> CreateConnectedServiceAsync(CreateConnectedServiceRequest request, CancellationToken cancellationToken)
+        {
+            Created = request;
+            return Task.FromResult(new ResourceSnapshot<ConnectedServiceResource>(Resource(workspace, type) with { Metadata = new() { Name = request.Name }, Definition = request.Properties }, "\"created-etag\""));
+        }
         public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
