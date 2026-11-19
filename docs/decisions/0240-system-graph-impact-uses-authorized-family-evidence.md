@@ -1,4 +1,4 @@
-# ADR-0239: SystemGraph impact uses authorized family evidence
+# ADR-0240: SystemGraph impact uses authorized family evidence
 
 ## Status
 
@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-[#1197](https://github.com/gbaudrit/agentstration/issues/1197) extends ADR-0238.
+[#1197](https://github.com/gbaudrit/agentstration/issues/1197) extends ADR-0239.
 The maintainer authorized stacked implementation on the #1196 branch. Families
 retain different UID/generation/publication evidence; Query selection has its own
 accepted semantics in ADR-0228. Name joins and generic version sorting are unsafe.
@@ -54,7 +54,7 @@ matrix with no resource-specific diagnostics or inventory counts.
 Limitations include legacy references without UIDs, opaque settings, native Entry
 identity integration and #1189 proposal refresh. None is fabricated. Missing
 evidence, partial authorization, cycles or truncation cannot certify no impact or
-safe reconciliation. GloballyComplete remains false. ADR-0238 repeated-read/cursor
+safe reconciliation. GloballyComplete remains false. ADR-0239 repeated-read/cursor
 rules remain; no persistent index, cross-store transaction or historical backfill
 is introduced. Existing ADR/DAT scope drift stays recorded.
 

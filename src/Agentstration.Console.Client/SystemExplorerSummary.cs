@@ -16,7 +16,7 @@ public sealed record SystemExplorerSummary(SystemGraphPage Graph, IReadOnlyList<
 /// <summary>A presentation of already authorized metadata; never computes permissions or execution material.</summary>
 public static class SystemExplorerSummaries
 {
-    public static SystemExplorerSummary Create(SystemGraphPage observation, SystemGraphPage window, string? root)
+    public static SystemExplorerSummary Create(SystemGraphPage observation, SystemGraphPage window, string? root, bool restrictAgentAccess = true)
     {
         var all = observation.Nodes.ToDictionary(node => node.Id, StringComparer.Ordinal);
         var visible = new Dictionary<string, SystemGraphNode>(StringComparer.Ordinal);
@@ -84,7 +84,7 @@ public static class SystemExplorerSummaries
                 }
             }
         }
-        if (root is not null && all.TryGetValue(root, out var rootNode) && rootNode.Identity.Kind is "Agent" or "AgentRevision"
+        if (restrictAgentAccess && root is not null && all.TryGetValue(root, out var rootNode) && rootNode.Identity.Kind is "Agent" or "AgentRevision"
             && representatives.TryGetValue(root, out var rootId) && visible.ContainsKey(rootId))
         {
             var reachable = new HashSet<string>(StringComparer.Ordinal) { rootId }; var queue = new Queue<string>(); queue.Enqueue(rootId);

@@ -1,4 +1,4 @@
-# ADR-0243: System Explorer streams provisional authorized observations
+# ADR-0244: System Explorer streams provisional authorized observations
 
 ## Status
 
@@ -36,6 +36,16 @@ every node by namespace. Missing and invisible roots remain indistinguishable.
 Out-of-order edges are revisited within the bounded authorized working set; cycles
 terminate and reaching a depth bound is reported as truncation. The strict
 `/api/system-graph` root query retains its direct-neighbour contract.
+
+Optional `direction=dependencies` or `direction=usages` focuses a rooted stream on
+outgoing or incoming references, retaining stored arrow directions. Focused modes
+exclude lifecycle publication, logical membership and deployment-configuration
+edges rather than expanding an exact publication through its parent into sibling
+publications. Default `context` retains the behavior above. All directions share
+the existing authorization and invalidation rules. The reusable Console
+`ResourceRelations` component consumes this port separately from inventory and
+authoring, and applies visual depth after summary contraction. Adoption in
+resource screens remains a later integration step.
 
 The application rechecks context before delivery and affected nodes, binding
 owners and relation endpoints before each data batch. Discover-only metadata is
@@ -105,3 +115,7 @@ filtering, limits, native SQLite deletion, idle eviction, progressive localized
 rendering, stale-context rejection and renderer coalescing/disposal. Desktop/mobile
 implementation smoke remains required. Reusable journey #1201 stays deferred until
 explicit maintainer UX validation and merged owning UX PRs.
+
+Focused traversal does not expand through a non-root ToolSet. Selected-member
+`toolset-access` evidence connects Agents to Tools; ordinary membership cannot
+create access to an unselected Tool or an unrelated ToolSet consumer.

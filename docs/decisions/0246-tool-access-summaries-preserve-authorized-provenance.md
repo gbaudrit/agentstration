@@ -1,4 +1,4 @@
-# ADR-0245: Tool access summaries preserve authorized provenance
+# ADR-0246: Tool access summaries preserve authorized provenance
 
 ## Status
 

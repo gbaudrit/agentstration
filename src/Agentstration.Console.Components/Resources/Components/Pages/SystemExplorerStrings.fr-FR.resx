@@ -240,4 +240,32 @@
   <data name="SummaryPathHelp" xml:space="preserve"><value>Ces chemins décrivent les références reçues et les membres de ToolSet sélectionnés. Une origine historique non précisée reste inconnue ; les références seules n’attestent ni l’exécution ni le placement sur un Worker.</value></data>
   <data name="SummaryExactEvidence" xml:space="preserve"><value>Preuves exactes reçues</value></data>
   <data name="SummaryToolDefinitions" xml:space="preserve"><value>Provenance ToolDefinition</value></data>
+  <data name="ResourceRelations" xml:space="preserve"><value>Relations de cette ressource</value></data>
+  <data name="RelationsDirection" xml:space="preserve"><value>Sens des relations</value></data>
+  <data name="RelationsDependencies" xml:space="preserve"><value>Dépendances</value></data>
+  <data name="RelationsUsages" xml:space="preserve"><value>Utilisations</value></data>
+  <data name="RelationsDepth" xml:space="preserve"><value>Niveaux affichés</value></data>
+  <data name="RelationsExpand" xml:space="preserve"><value>Déplier un niveau</value></data>
+  <data name="RelationsOpenExplorer" xml:space="preserve"><value>Ouvrir dans System Explorer</value></data>
+  <data name="RelationsDependenciesHelp" xml:space="preserve"><value>Les ressources référencées par cette ressource, directement ou indirectement.</value></data>
+  <data name="RelationsUsagesHelp" xml:space="preserve"><value>Les ressources qui référencent cette ressource, directement ou indirectement.</value></data>
+  <data name="RelationsList" xml:space="preserve"><value>Liste accessible des ressources</value></data>
+  <data name="RelationsRoot" xml:space="preserve"><value>Ressource consultée</value></data>
+  <data name="RelationsSelection" xml:space="preserve"><value>Ressource sélectionnée</value></data>
+  <data name="RelationsRecenter" xml:space="preserve"><value>Centrer sur cette ressource</value></data>
+  <data name="RelationsTechnicalDetails" xml:space="preserve"><value>Métadonnées exactes reçues</value></data>
+  <data name="RelationsWindowLimit" xml:space="preserve"><value>Le diagramme est limité à {0} ressources. Réduisez la profondeur ou centrez la vue sur une ressource voisine pour continuer.</value></data>
+  <data name="RelationsEmpty" xml:space="preserve"><value>Aucune relation visible dans le périmètre observé.</value></data>
+  <data name="RelationsPartial" xml:space="preserve"><value>Observation partielle · Ressources autorisées uniquement. Les relations absentes ou non prises en charge restent inconnues.</value></data>
+  <data name="RelationsArrows" xml:space="preserve"><value>Les flèches vont de la ressource utilisatrice vers sa dépendance.</value></data>
+  <data name="RelationsUnavailable" xml:space="preserve"><value>Les relations sont indisponibles dans le contexte actuel. Actualisez pour réessayer.</value></data>
+  <data name="RelationsDiagramFailed" xml:space="preserve"><value>Le diagramme est indisponible. Utilisez la liste des ressources ci-dessous.</value></data>
+  <data name="RelationsTruncated" xml:space="preserve"><value>Une limite d’exploration a été atteinte ; d’autres relations visibles peuvent exister.</value></data>
+  <data name="RelationsViewport" xml:space="preserve"><value>Cadrage du diagramme</value></data>
+  <data name="RelationsZoomIn" xml:space="preserve"><value>Agrandir</value></data>
+  <data name="RelationsZoomOut" xml:space="preserve"><value>Réduire</value></data>
+  <data name="RelationsFit" xml:space="preserve"><value>Ajuster le diagramme à la vue</value></data>
+  <data name="RelationsResetFocus" xml:space="preserve"><value>Revenir à la ressource de la fiche</value></data>
+  <data name="RelationsC4" xml:space="preserve"><value>Vue C4</value></data>
+  <data name="RelationsErrorTitle" xml:space="preserve"><value>Relations indisponibles</value></data>
 </root>

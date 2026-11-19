@@ -31,6 +31,14 @@ The adapter tests cover mapping, hostile names, layout, semantic immutability,
 unknown endpoints and size/duplicate rejection. Real browser smoke additionally
 checks selection, text escaping, no external requests and disposal.
 
+Resource-focused mode keeps native rectangles and adds per-kind Tabler icons from
+the product sprite. `pretest`/`prebuild` extract selected symbols into
+`resource-icons.generated.ts`; no external icon request is needed. The Tabler
+license is included in notices. Focused views highlight the root and use
+left-to-right layout. Host theme updates need no relayout; localized viewport
+controls use native XYFlow. These decorations never change semantic identities or
+invent container/deployment boundaries.
+
 Progressive arrivals reuse the current React/Graphviz mount. One active layout and
 one latest pending request bound work; intermediate pending requests are coalesced.
 The previously rendered graph remains until another layout commits. Disposal makes

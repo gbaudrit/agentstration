@@ -160,15 +160,17 @@ NDJSON exploration; strict observation/cursor contracts remain separate.
 `Systems` owns logical grouping commands and its contributor, composed as a singleton
 with the resource store, scope operations and current authorization. `Systems.Api`
 maps its scoped command surface. Console hosts register `SystemExplorerApiClient`;
-the optional `Web.SystemExplorer` island has no application authority.
+the optional `Web.SystemExplorer` island has no application authority. Both hosts
+also expose the scoped `ISystemGraphStreamClient` alias of that same client for
+`ResourceRelations`; actor context and authenticated HTTP delegation are retained.
 There is no graph database or hosted collector.
-See [Semantic SystemGraph](../data/system-graph.md) and ADR-0238/0239/0240.
+See [Semantic SystemGraph](../data/system-graph.md) and ADR-0239/0240/0241.
 
 `AddAgentstrationSystemGraph` also composes one `IReconciliationPreviewService`
 owned by `Reconciliation`. It uses only neutral graph/authorization ports and has
 no mutation, family lifecycle or persistence dependency. `Reconciliation.Api`
 maps preview/revalidation; both Console hosts register `ReconciliationApiClient`.
-ADR-0241 records this read-only boundary and the remaining execution prerequisites.
+ADR-0242 records this read-only boundary and the remaining execution prerequisites.
 
 SystemOperations adds singleton read-model, current-authorization and family-evidence
 ports in the same composition entry point. Its core depends only on neutral
@@ -177,7 +179,7 @@ adapters. SystemOperations.Api owns its HTTP endpoint, bounded private SignalR h
 and subscription quotas. Both Console hosts register SystemOperationsClient using
 their existing authenticated realtime configurator. The standalone host registers
 the optional bounded-dimension meter/activity source. No collector, operational
-database or new hosted worker is introduced. See ADR-0242.
+database or new hosted worker is introduced. See ADR-0243.
 
 
 SystemFlowBindingReader is a singleton Infrastructure adapter composed with the

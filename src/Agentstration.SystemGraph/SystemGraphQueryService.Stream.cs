@@ -10,7 +10,8 @@ public sealed partial class SystemGraphQueryService
         [EnumeratorCancellation] CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (query.MaximumNodes is < 1 or > MaximumNodes || query.MaximumDepth is < 1 or > 32 || query.Root?.Length > 512)
+        if (query.MaximumNodes is < 1 or > MaximumNodes || query.MaximumDepth is < 1 or > 32 || query.Root?.Length > 512
+            || !Enum.IsDefined(query.Direction) || query.Direction != SystemGraphDirection.Context && string.IsNullOrWhiteSpace(query.Root))
             throw new SystemGraphException("system_graph_query_invalid");
         if (families.Length == 0 || families.Select(family => family.Family).Distinct(StringComparer.Ordinal).Count() != families.Length)
             throw new SystemGraphException("system_graph_unavailable");
@@ -117,6 +118,15 @@ public sealed partial class SystemGraphQueryService
         {
             if (!emitted.Contains(id)) pendingNodes.TryAdd(id, nodes[id]);
         }
+        bool ExcludedFromFocus(SystemGraphRelation edge)
+        {
+            if (query.Direction == SystemGraphDirection.Context) return false;
+            if (edge.Kind is "publication" or "system-membership" or "deployment-configuration") return true;
+            var from = query.Direction == SystemGraphDirection.Usages ? edge.Target : edge.Source;
+            // A selected-member access edge is the evidence connecting an Agent to a Tool.
+            // Traversing through arbitrary ToolSet membership would invent unselected access.
+            return from != query.Root && nodes[from].Identity.Kind == "ToolSet";
+        }
         bool QueueEdge(SystemGraphRelation edge)
         {
             var expanded = false;
@@ -125,14 +135,17 @@ public sealed partial class SystemGraphQueryService
                 if (!nodes.TryGetValue(root, out var rootNode) || query.Namespace is { } ns && rootNode.Identity.Namespace != ns) return false;
                 related.Add(root);
                 depths.TryAdd(root, 0);
-                // Retain direct consumers of the root, but do not expand through them into
-                // unrelated consumers of shared dependencies. Dependency traversal is outgoing.
-                if (edge.Target == root) related.Add(edge.Source);
-                if (depths.TryGetValue(edge.Source, out var depth) && depth < query.MaximumDepth
-                    && (!depths.TryGetValue(edge.Target, out var previous) || previous > depth + 1))
+                // Focused views follow one direction. Lifecycle publications and logical
+                // membership are not usage/dependency grants; exact publication roots stay exact.
+                if (ExcludedFromFocus(edge)) return false;
+                if (query.Direction == SystemGraphDirection.Context && edge.Target == root) related.Add(edge.Source);
+                var from = query.Direction == SystemGraphDirection.Usages ? edge.Target : edge.Source;
+                var to = query.Direction == SystemGraphDirection.Usages ? edge.Source : edge.Target;
+                if (depths.TryGetValue(from, out var depth) && depth < query.MaximumDepth
+                    && (!depths.TryGetValue(to, out var previous) || previous > depth + 1))
                 {
-                    depths[edge.Target] = depth + 1;
-                    related.Add(edge.Target);
+                    depths[to] = depth + 1;
+                    related.Add(to);
                     expanded = true;
                 }
                 if (!related.Contains(edge.Source) || !related.Contains(edge.Target)) return expanded;
@@ -242,8 +255,13 @@ public sealed partial class SystemGraphQueryService
             }
             if (!expanded) break;
         }
-        if (query.Root is not null && edges.Keys.Any(edge => depths.TryGetValue(edge.Source, out var depth)
-            && depth >= query.MaximumDepth && !depths.ContainsKey(edge.Target))) truncated = true;
+        if (query.Root is not null && edges.Keys.Any(edge =>
+        {
+            if (ExcludedFromFocus(edge)) return false;
+            var from = query.Direction == SystemGraphDirection.Usages ? edge.Target : edge.Source;
+            var to = query.Direction == SystemGraphDirection.Usages ? edge.Source : edge.Target;
+            return depths.TryGetValue(from, out var depth) && depth >= query.MaximumDepth && !depths.ContainsKey(to);
+        })) truncated = true;
         if (pendingNodes.Count > 0 || pendingEdges.Count > 0) yield return await Flush();
         foreach (var id in emitted) { ct.ThrowIfCancellationRequested(); await Verify(id); }
         foreach (var edge in emittedEdges)

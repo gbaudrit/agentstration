@@ -7,7 +7,7 @@ using Agentstration.SystemGraph.Contracts;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class SystemGraphStreamTests
+public sealed partial class SystemGraphStreamTests
 {
     private static readonly ResourceScopeRef Owner = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111"));
     private static SystemGraphNode Node(string name)

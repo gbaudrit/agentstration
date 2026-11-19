@@ -11,4 +11,5 @@ for(const root of [...new Set(roots)].sort()){
  }
  text+='\n';
 }
+text+='Tabler icons — selected symbols from the product bundle\n'+fs.readFileSync('../../Agentstration.Web.Components/wwwroot/tabler/LICENSE.txt','utf8')+'\n';
 fs.writeFileSync('THIRD_PARTY_NOTICES.txt',text);

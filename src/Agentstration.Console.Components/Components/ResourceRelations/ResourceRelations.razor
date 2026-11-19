@@ -1,0 +1,79 @@
+@namespace Agentstration.Web.Components.ResourceRelations
+@using Agentstration.SystemGraph.Contracts
+@using Agentstration.Web.SystemExplorer
+@using Agentstration.Web.Components.Pages
+@using Microsoft.Extensions.Localization
+@implements IDisposable
+@inject ISystemGraphStreamClient Client
+@inject IStringLocalizer<SystemExplorerStrings> Localizer
+
+<section class="resource-relations" aria-label="@T("ResourceRelations")" aria-busy="@loading.ToString().ToLowerInvariant()">
+    <div class="relations-toolbar">
+        <h2>@T("ResourceRelations") <span class="relations-root">@T("RelationsC4")</span></h2>
+        <div role="group" aria-label="@T("RelationsDirection")" class="relations-modes">
+            <button type="button" class="@(direction == SystemGraphDirection.Dependencies ? "button-primary" : "button-secondary")" aria-pressed="@((direction == SystemGraphDirection.Dependencies).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Dependencies)">@T("RelationsDependencies")</button>
+            <button type="button" class="@(direction == SystemGraphDirection.Usages ? "button-primary" : "button-secondary")" aria-pressed="@((direction == SystemGraphDirection.Usages).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Usages)">@T("RelationsUsages")</button>
+        </div>
+        <FormField Label="@T("RelationsDepth")">
+            <ClearableSelect TValue="int" AllowClear="false" Value="depth" ValueChanged="ChangeDepth">
+                @for (var level = 1; level <= ResourceRelationsPresentation.MaximumDepth; level++) { <option value="@level">@level</option> }
+            </ClearableSelect>
+        </FormField>
+        <button type="button" class="button-secondary" disabled="@(view?.CanExpand != true)" @onclick="Expand">@T("RelationsExpand")</button>
+        <button type="button" class="button-secondary" @onclick="RefreshAsync">@T("Refresh")</button>
+        @if (focusRoot != Root) { <button type="button" class="button-secondary" @onclick="ResetFocusAsync">@T("RelationsResetFocus")</button> }
+        @if (OpenExplorer.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenExplorer.InvokeAsync(new(Context, focusNamespace, focusRoot, direction, depth))">@T("RelationsOpenExplorer")</button> }
+    </div>
+    <p class="muted">@T(direction == SystemGraphDirection.Usages ? "RelationsUsagesHelp" : "RelationsDependenciesHelp")</p>
+    @if (failed) { <ErrorState Title="@T("RelationsErrorTitle")" Message="@T("RelationsUnavailable")" /> }
+    else if (loading && observation is null) { <LoadingState Message="@T("Loading")" /> }
+    else if (view?.Summary.Graph.Nodes.Count is > 0)
+    {
+        <div class="relations-layout">
+            <div class="relations-content">
+                <label class="relations-diagram-toggle"><input type="checkbox" @bind="showDiagram" /> @T("Diagram")</label>
+                @if (showDiagram && !diagramFailed)
+                {
+                    <SystemGraphDiagram @key="diagramKey" Page="view.Summary.Graph" Label="@T("DiagramLabel")" RelationshipLabels="relationshipLabels" Options="diagramOptions" OverlayNotes="rootNote" ViewportLabels="viewportLabels" Selected="SelectNodeAsync" LinkSelected="SelectLink" Failed="() => diagramFailed = true" />
+                }
+                @if (diagramFailed) { <p role="status">@T("RelationsDiagramFailed")</p> }
+                <details open="@(!showDiagram || diagramFailed)">
+                    <summary>@T("RelationsList")</summary>
+                    <ul class="relations-list">
+                        @foreach (var node in view.Summary.Graph.Nodes)
+                        {
+                            <li @key="node.Id"><button type="button" class="button-link" @onclick="() => SelectNodeAsync(node.Id)">@Name(node)</button> · @node.Identity.Kind
+                                @if (node.Id == focusRoot) { <span class="relations-root">@T("RelationsRoot")</span> }
+                            </li>
+                        }
+                    </ul>
+                </details>
+            </div>
+            @if (selected is not null)
+            {
+                <aside class="relations-inspector" aria-label="@T("RelationsSelection")">
+                    <h3>@Name(selected)</h3><p>@selected.Identity.Kind</p>
+                    <dl><dt>@T("Namespace")</dt><dd>@selected.Identity.Namespace.Value</dd><dt>@T("Owner")</dt><dd>@selected.Identity.OwnerScope.Value</dd></dl>
+                    <code>@selected.Id</code>
+                    @if (selected.Evidence?.Publication is { } publication) { <p>@T("Published"): @publication</p> }
+                    @if (selected.Evidence?.Generation is { } generation) { <p>@T(selected.State == "definition" ? "CurrentGeneration" : "RecordedGenerations"): @generation</p> }
+                    @if (selected.Id != focusRoot) { <button type="button" class="button-secondary" @onclick="RecenterAsync">@T("RelationsRecenter")</button> }
+                    @if (OpenResource.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenResource.InvokeAsync(selected)">@T("OpenDetails")</button> }
+                    <details><summary>@T("RelationsTechnicalDetails")</summary><pre>@Serialize(view.Summary.RepresentedNodes[selected.Id])</pre></details>
+                </aside>
+            }
+        </div>
+        @if (selectedLink is not null)
+        {
+            <details open class="relations-link" aria-label="@T("SummaryLinkDetails")">
+                <summary>@relationshipLabels[selectedLink.Id]</summary>
+                <p>@T("SummaryToolDefinitions")</p><pre>@Serialize(selectedLink)</pre>
+            </details>
+        }
+        @if (!loading && view.Summary.Graph.Nodes.Count == 1) { <p role="status">@T("RelationsEmpty")</p> }
+        @if (view.Limited) { <p role="status">@Localizer["RelationsWindowLimit", ResourceRelationsPresentation.NodeLimit]</p> }
+    }
+    else if (!loading) { <EmptyState Title="@T("RelationsEmpty")" Message="@T("RelationsPartial")" /> }
+    <p class="muted" role="status">@T("RelationsPartial") @if (loading) { @T("Loading") } @if (truncated) { @T("RelationsTruncated") }</p>
+    <p class="muted">@T("RelationsArrows")</p>
+</section>

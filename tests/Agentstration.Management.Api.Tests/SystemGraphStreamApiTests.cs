@@ -63,6 +63,19 @@ public sealed class SystemGraphStreamApiTests : ModelManagementApiTestBase
             Assert.DoesNotContain(first.Value.Uid.ToString(), JsonSerializer.Serialize(tail), StringComparison.Ordinal);
             using var invalid = await client.GetAsync("/api/system-graph/stream?maximumNodes=0", lifetime.Token);
             Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+            foreach (var query in new[] { "direction=usages", "direction=invalid&root=root", "direction=99&root=root" })
+            {
+                using var invalidDirection = await client.GetAsync("/api/system-graph/stream?" + query, lifetime.Token);
+                Assert.AreEqual(HttpStatusCode.BadRequest, invalidDirection.StatusCode);
+            }
+            foreach (var direction in new[] { "context", "dependencies", "usages", "Usages" })
+            {
+                using var focused = await client.GetAsync("/api/system-graph/stream?direction=" + direction + "&root=missing", lifetime.Token);
+                Assert.AreEqual(HttpStatusCode.OK, focused.StatusCode);
+                var emptyFrames = (await focused.Content.ReadAsStringAsync(lifetime.Token)).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => JsonSerializer.Deserialize<SystemGraphStreamFrame>(line, JsonSerializerOptions.Web)!).ToArray();
+                Assert.AreEqual("complete", emptyFrames[^1].Kind); Assert.IsEmpty(emptyFrames.SelectMany(frame => frame.Nodes));
+            }
         }
         finally { source.Release.TrySetResult(); await lifetime.CancelAsync(); }
     }

@@ -1,4 +1,4 @@
-# ADR-0244: Agent deployments record exact durable assignments
+# ADR-0245: Agent deployments record exact durable assignments
 
 ## Status
 

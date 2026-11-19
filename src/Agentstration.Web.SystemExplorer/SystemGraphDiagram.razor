@@ -5,11 +5,20 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 <div @ref="element" style="height: min(65vh, 640px); min-height: 320px; width:100%" role="region" aria-label="@Label"></div>
+@if (ViewportLabels is not null)
+{
+    <div role="group" aria-label="@ViewportLabels["controls"]" style="display:flex;gap:.5rem;margin:.5rem 0">
+        <button type="button" class="button-secondary" aria-label="@ViewportLabels["in"]" @onclick='() => ChangeViewportAsync("in")'>+</button>
+        <button type="button" class="button-secondary" aria-label="@ViewportLabels["out"]" @onclick='() => ChangeViewportAsync("out")'>−</button>
+        <button type="button" class="button-secondary" @onclick='() => ChangeViewportAsync("fit")'>@ViewportLabels["fit"]</button>
+    </div>
+}
 @code {
     [Parameter, EditorRequired] public SystemGraphPage Page { get; set; } = default!;
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> RelationshipLabels { get; set; } = new Dictionary<string, string>();
     [Parameter] public IReadOnlyDictionary<string, string>? OverlayNotes { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? ViewportLabels { get; set; }
     [Parameter] public SystemGraphDiagramOptions? Options { get; set; }
     [Parameter] public EventCallback<string> LinkSelected { get; set; }
     [Parameter] public EventCallback<string> Selected { get; set; }
@@ -39,6 +48,14 @@
         catch (JSDisconnectedException) { }
         catch (ObjectDisposedException) when (disposed) { }
         catch (JSException) { if (!disposed) await Failed.InvokeAsync(); }
+    }
+    private async Task ChangeViewportAsync(string action)
+    {
+        if (disposed || module is null) return;
+        try { await module.InvokeVoidAsync("viewport", element, action); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { if (!disposed) await Failed.InvokeAsync(); }
+        catch (ObjectDisposedException) when (disposed) { }
     }
     [JSInvokable] public Task SelectNode(string id) => !disposed && Page.Nodes.Any(node => node.Id == id) ? Selected.InvokeAsync(id) : Task.CompletedTask;
     [JSInvokable] public Task SelectLink(string id) => !disposed && Page.Relations.Any(edge => edge.Kind == id && id.StartsWith("summary:", StringComparison.Ordinal)) ? LinkSelected.InvokeAsync(id) : Task.CompletedTask;

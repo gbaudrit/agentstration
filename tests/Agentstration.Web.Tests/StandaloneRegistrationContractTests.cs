@@ -15,6 +15,7 @@ using Agentstration.Secrets.Abstractions;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.SystemGraph.Contracts;
 using Agentstration.Tools;
+using Agentstration.Web.Console;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -68,6 +69,7 @@ public sealed class StandaloneRegistrationContractTests
             AssertSingleDescriptor<IModelProfileReferenceValidator>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IChatClientResolver>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IFlowRunEventSink>(services, ServiceLifetime.Singleton);
+            AssertSingleDescriptor<ISystemGraphStreamClient>(services, ServiceLifetime.Scoped);
             AssertSingleDescriptor<TimeProvider>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<GenAiObservabilityOptions>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<GenAiHttpPayloadCaptureHandler>(services, ServiceLifetime.Transient);
@@ -91,6 +93,7 @@ public sealed class StandaloneRegistrationContractTests
             AssertStorageProvider<IFlowRepository>();
             AssertStorageProvider<IRuntimeRunStore>();
             using var scope = provider.CreateScope();
+            Assert.AreSame<object>(scope.ServiceProvider.GetRequiredService<ISystemExplorerClient>(), scope.ServiceProvider.GetRequiredService<ISystemGraphStreamClient>());
             var identity = scope.ServiceProvider.GetRequiredService<LocalIdentityDbContext>();
             Assert.AreEqual(storageProvider == "PostgreSql" ? "Npgsql.EntityFrameworkCore.PostgreSQL" : "Microsoft.EntityFrameworkCore.Sqlite",
                 identity.Database.ProviderName);

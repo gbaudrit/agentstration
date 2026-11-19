@@ -240,4 +240,32 @@
   <data name="SummaryPathHelp" xml:space="preserve"><value>These paths describe received references and selected ToolSet members. An unspecified legacy origin remains unknown; references alone do not establish execution or Worker placement.</value></data>
   <data name="SummaryExactEvidence" xml:space="preserve"><value>Exact received evidence</value></data>
   <data name="SummaryToolDefinitions" xml:space="preserve"><value>ToolDefinition provenance</value></data>
+  <data name="ResourceRelations" xml:space="preserve"><value>Resource relationships</value></data>
+  <data name="RelationsDirection" xml:space="preserve"><value>Relationship direction</value></data>
+  <data name="RelationsDependencies" xml:space="preserve"><value>Dependencies</value></data>
+  <data name="RelationsUsages" xml:space="preserve"><value>Uses of this resource</value></data>
+  <data name="RelationsDepth" xml:space="preserve"><value>Displayed levels</value></data>
+  <data name="RelationsExpand" xml:space="preserve"><value>Expand one level</value></data>
+  <data name="RelationsOpenExplorer" xml:space="preserve"><value>Open in System Explorer</value></data>
+  <data name="RelationsDependenciesHelp" xml:space="preserve"><value>Resources referenced by this resource, directly or indirectly.</value></data>
+  <data name="RelationsUsagesHelp" xml:space="preserve"><value>Resources that reference this resource, directly or indirectly.</value></data>
+  <data name="RelationsList" xml:space="preserve"><value>Accessible resource list</value></data>
+  <data name="RelationsRoot" xml:space="preserve"><value>Resource in focus</value></data>
+  <data name="RelationsSelection" xml:space="preserve"><value>Selected resource</value></data>
+  <data name="RelationsRecenter" xml:space="preserve"><value>Center on this resource</value></data>
+  <data name="RelationsTechnicalDetails" xml:space="preserve"><value>Exact received metadata</value></data>
+  <data name="RelationsWindowLimit" xml:space="preserve"><value>The diagram is limited to {0} resources. Reduce the depth or center on a neighbor to continue.</value></data>
+  <data name="RelationsEmpty" xml:space="preserve"><value>No relationships are visible in the observed scope.</value></data>
+  <data name="RelationsPartial" xml:space="preserve"><value>Partial observation · Authorized resources only. Missing or unsupported relationships remain unknown.</value></data>
+  <data name="RelationsArrows" xml:space="preserve"><value>Arrows point from a referencing resource to its dependency.</value></data>
+  <data name="RelationsUnavailable" xml:space="preserve"><value>Relationships are unavailable in the current context. Refresh to try again.</value></data>
+  <data name="RelationsDiagramFailed" xml:space="preserve"><value>The diagram is unavailable. Use the resource list below.</value></data>
+  <data name="RelationsTruncated" xml:space="preserve"><value>An exploration limit was reached; additional visible relationships may exist.</value></data>
+  <data name="RelationsViewport" xml:space="preserve"><value>Diagram viewport</value></data>
+  <data name="RelationsZoomIn" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="RelationsZoomOut" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="RelationsFit" xml:space="preserve"><value>Fit diagram to view</value></data>
+  <data name="RelationsResetFocus" xml:space="preserve"><value>Return to the page resource</value></data>
+  <data name="RelationsC4" xml:space="preserve"><value>C4 view</value></data>
+  <data name="RelationsErrorTitle" xml:space="preserve"><value>Relationships unavailable</value></data>
 </root>

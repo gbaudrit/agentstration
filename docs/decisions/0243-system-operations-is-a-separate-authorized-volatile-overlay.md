@@ -1,4 +1,4 @@
-# ADR-0242: System operations is a separate authorized volatile overlay
+# ADR-0243: System operations is a separate authorized volatile overlay
 
 ## Status
 

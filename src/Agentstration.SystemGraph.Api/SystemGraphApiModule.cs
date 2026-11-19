@@ -20,7 +20,7 @@ public static class SystemGraphApiModule
             .RequireAuthorization(AgentstrationPolicies.CanReadResources)
             .Produces<SystemGraphStreamFrame>(contentType: "application/x-ndjson")
             .WithSummary("Stream bounded authorized provisional SystemGraph observations")
-            .WithDescription("Finite newline-delimited JSON batches for progressive exploration. A root follows authorized outgoing dependencies across namespaces, with maximumDepth from 1 to 32 (default 16), plus direct consumers of the root. Namespace filters the inventory or the root itself. Not an atomic snapshot or a reconciliation read set. Errors clear the observation; no resume cursor is issued.");
+            .WithDescription("Finite newline-delimited JSON batches for progressive exploration. A root follows authorized outgoing dependencies across namespaces, with maximumDepth from 1 to 32 (default 16), plus direct consumers of the root. Optional direction=dependencies or direction=usages requires an exact root and follows outgoing or incoming relations respectively, excluding lifecycle publication/membership edges. Original edge directions and authorization are preserved. Namespace filters the inventory or the root itself. Not an atomic snapshot or a reconciliation read set. Errors clear the observation; no resume cursor is issued.");
         endpoints.MapGet("/api/system-graph/impact", ImpactAsync)
             .RequireAuthorization(AgentstrationPolicies.CanReadResources)
             .Produces<SystemGraphImpactResult>()
@@ -39,14 +39,21 @@ public static class SystemGraphApiModule
         return endpoints;
     }
 
-    private static async Task<IResult> StreamAsync(string? @namespace, string? root, int? maximumNodes, int? maximumDepth,
+    private static async Task<IResult> StreamAsync(string? @namespace, string? root, int? maximumNodes, int? maximumDepth, string? direction,
         ISystemGraphStreamService service, HttpResponse response, CancellationToken ct)
     {
         response.Headers.CacheControl = "no-store";
         try
         {
             ResourceNamespace? ns = @namespace is null ? null : ResourceNamespace.Parse(@namespace);
-            await using var frames = service.ReadStreamAsync(new(ns, root, maximumNodes ?? 10000, maximumDepth ?? 16), ct).GetAsyncEnumerator(ct);
+            var traversal = direction?.ToLowerInvariant() switch
+            {
+                null or "context" => SystemGraphDirection.Context,
+                "dependencies" => SystemGraphDirection.Dependencies,
+                "usages" => SystemGraphDirection.Usages,
+                _ => throw new SystemGraphException("system_graph_query_invalid")
+            };
+            await using var frames = service.ReadStreamAsync(new(ns, root, maximumNodes ?? 10000, maximumDepth ?? 16, traversal), ct).GetAsyncEnumerator(ct);
             // Initial authorization and validation precede the first response byte.
             if (!await frames.MoveNextAsync()) return Results.Empty;
             response.ContentType = "application/x-ndjson; charset=utf-8";

@@ -37,17 +37,8 @@ public partial class SystemExplorer
         summary = next; summaryLabels = labels;
         if (selectedLink is not null) selectedLink = summary.Links.FirstOrDefault(link => link.Id == selectedLink.Id);
     }
-    private string LinkTitle(SystemExplorerLink link)
-    {
-        var sets = link.Paths.Where(path => path.Kind == "toolset" && path.Via is not null).Select(path => path.Via!).DistinctBy(node => node.Id).ToArray();
-        var titles = new List<string>();
-        if (link.Paths.Any(path => path.Kind == "direct")) titles.Add(T("SummaryDirectAccess"));
-        if (sets.Length == 1) titles.Add(Localizer["SummaryViaToolSet", NodeDisplayName(sets[0]), sets[0].Evidence?.Publication ?? ""]);
-        else if (sets.Length > 1) titles.Add(Localizer["SummaryViaToolSets", sets.Length]);
-        if (titles.Count > 0) return string.Join(" · ", titles);
-        if (link.Paths.Any(path => path.Kind == "definition-path")) return T("SummaryDefinitionPath");
-        return string.Join(" · ", link.Paths.SelectMany(path => path.Steps).Select(edge => RelationKind(edge.Kind)).Distinct(StringComparer.Ordinal));
-    }
+    private string LinkTitle(SystemExplorerLink link) =>
+        Agentstration.Web.Components.ResourceRelations.SystemExplorerLinkLabels.Title(link, Localizer, NodeDisplayName);
     private void ChangeTechnical(ChangeEventArgs args)
     {
         technicalDiagram = args.Value is true; selectedLink = null; diagramFailed = false;

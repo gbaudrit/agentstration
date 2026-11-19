@@ -2,7 +2,21 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildModel,rendererId,GraphPage} from './model';
 import {layoutLikeC4Model,GraphvizWasmAdapter} from '@likec4/layouts';
+import {resourceIcon} from './resource-icons';
 const node=(id:string,name='same-name')=>({id,identity:{kind:'Agent',name},state:'draft'});
+test('resource focus uses local product icons and native rectangles without changing identities or arrow direction',async()=>{
+ const input:GraphPage={nodes:[node('agent'),{...node('data'),identity:{kind:'DataSource',name:'Data'}}],relations:[{source:'agent',target:'data',kind:'exact-dependency'}]};
+ const before=JSON.stringify(input);const result=buildModel(input,{}, {},{mode:'resource',root:'data'});
+ const view=result.model.view('topology').$view;
+ assert.equal(view.autoLayout.direction,'LR');
+ for(const item of view.nodes){assert.equal(item.shape,'rectangle');assert.match(item.icon??'',/^data:image\/svg\+xml,/);}
+ assert.notEqual(view.nodes.find(n=>n.id===rendererId('data'))?.color,view.nodes.find(n=>n.id===rendererId('agent'))?.color);
+ assert.notEqual(resourceIcon('Agent'),resourceIcon('Tool'));assert.notEqual(resourceIcon('KnowledgeSource'),resourceIcon('DataSource'));
+ assert.equal(resourceIcon('__proto__'),resourceIcon('unknown-kind'));
+ assert.equal(JSON.stringify(input),before);
+ const graphviz=new GraphvizWasmAdapter();
+ try{const layout=await layoutLikeC4Model(result.model,{graphviz});assert.equal(layout.view('topology').$view.edges.length,1);}finally{graphviz.dispose();}
+});
 test('canonical identities remain collision-free for homonyms, unicode, punctuation and hostile renderer expressions',()=>{
  const ids=['resource:one','resource:two','a.b','a_b','é','e\u0301','__proto__','a\"; resource attacker'];
  assert.equal(new Set(ids.map(rendererId)).size,ids.length);

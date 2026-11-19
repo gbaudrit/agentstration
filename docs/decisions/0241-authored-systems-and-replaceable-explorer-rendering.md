@@ -1,4 +1,4 @@
-# ADR-0240: Authored systems and replaceable Explorer rendering
+# ADR-0241: Authored systems and replaceable Explorer rendering
 
 ## Status
 
@@ -7,7 +7,7 @@ Proposed
 ## Context
 
 [#1198](https://github.com/gbaudrit/agentstration/issues/1198) adds Console exploration
-to ADR-0238/0239. A grouping needs a durable source owner; the rebuildable graph
+to ADR-0239/0240. A grouping needs a durable source owner; the rebuildable graph
 and a visual library cannot become authoring or authorization authorities.
 
 ## Decision

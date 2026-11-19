@@ -1,4 +1,4 @@
-# ADR-0241: Reconciliation preview reviews selected authorized evidence
+# ADR-0242: Reconciliation preview reviews selected authorized evidence
 
 ## Status
 

@@ -11,6 +11,27 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
+    public async Task FocusedStreamCarriesActorExactRootAndBoundedTraversalOptions()
+    {
+        var actor = ResourceScopeRef.Workspace(Guid.NewGuid()); var epoch = Guid.NewGuid();
+        using var handler = new StubHandler(request =>
+        {
+            var query = request.RequestUri!.Query;
+            Assert.Contains("root=publication%3Auid%3A1%2F2", query);
+            Assert.Contains("namespace=shared", query); Assert.Contains("direction=usages", query);
+            Assert.Contains("maximumDepth=32", query); Assert.Contains("maximumNodes=500", query);
+            Assert.AreEqual(actor.Value, request.Headers.GetValues("X-Agentstration-Context").Single());
+            var frame = new SystemGraphStreamFrame(epoch, 1, "start", DateTimeOffset.UnixEpoch, [], [], []);
+            return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(frame, JsonSerializerOptions.Web) + "\n") };
+        });
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        ISystemGraphStreamClient client = new SystemExplorerApiClient(http);
+        var frames = new List<SystemGraphStreamFrame>();
+        await foreach (var frame in client.StreamAsync(actor, new(new("shared"), "publication:uid:1/2", 500, 32, SystemGraphDirection.Usages), default)) frames.Add(frame);
+        Assert.HasCount(1, frames);
+    }
+
+    [TestMethod]
     public async Task GraphFramesAreReadableBeforeTheBodyEndsAndCallerCancellationClosesTheStream()
     {
         var actor = ResourceScopeRef.Workspace(Guid.NewGuid()); var epoch = Guid.NewGuid();

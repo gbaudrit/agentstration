@@ -1,0 +1,15 @@
+.resource-relations { min-width:0; max-width:100%; }
+.relations-toolbar, .relations-modes { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
+.relations-toolbar h2 { flex:1 1 100%; margin:0 0 .5rem; }
+.relations-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(14rem, 18rem); gap:1rem; margin:1rem 0; }
+.relations-content, .relations-inspector { min-width:0; }
+.relations-inspector { padding:1rem; border:1px solid var(--border); border-radius:.5rem; background:var(--surface); overflow-wrap:anywhere; }
+.relations-inspector button { margin:.4rem .3rem .4rem 0; }
+.relations-root { margin-inline-start:.5rem; color:var(--primary); }
+.relations-list { padding-inline-start:1.25rem; }
+.relations-list li { margin:.5rem 0; overflow-wrap:anywhere; }
+.relations-diagram-toggle { display:block; margin:.75rem 0; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:22rem; overflow:auto; }
+code, dd { overflow-wrap:anywhere; }
+dd { margin:0 0 .5rem; }
+@media (max-width: 850px) { .relations-layout { grid-template-columns:minmax(0, 1fr); } }

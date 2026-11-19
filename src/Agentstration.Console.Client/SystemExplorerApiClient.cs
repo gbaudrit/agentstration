@@ -9,6 +9,11 @@ using Agentstration.Systems.Contracts;
 
 namespace Agentstration.Web.Console;
 
+public interface ISystemGraphStreamClient
+{
+    IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, SystemGraphStreamQuery query, CancellationToken ct);
+}
+
 public interface ISystemExplorerClient
 {
     Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) => Task.FromResult<AgentDefinitionCatalog?>(null);
@@ -34,7 +39,7 @@ public interface ISystemExplorerClient
     Task DeleteAsync(ResourceScopeRef context, SystemView value, CancellationToken ct);
 }
 
-public sealed class SystemExplorerApiClient(HttpClient http, TimeProvider? timeProvider = null) : ISystemExplorerClient
+public sealed class SystemExplorerApiClient(HttpClient http, TimeProvider? timeProvider = null) : ISystemExplorerClient, ISystemGraphStreamClient
 {
     public Task<AgentDefinitionCatalog?> DefinitionsAsync(ResourceScopeRef context, Guid uid, CancellationToken ct) =>
         ApiResponse.ReadAsync<AgentDefinitionCatalog?>(http, "api/agent-definition-catalog?uid=" + uid.ToString("D"), context, ct);
@@ -49,11 +54,18 @@ public sealed class SystemExplorerApiClient(HttpClient http, TimeProvider? timeP
     }
     public Task<SystemOperationalSnapshot> ObservedDeploymentAsync(ResourceScopeRef context, ResourceNamespace ns, string root, CancellationToken ct) =>
         ApiResponse.ReadAsync<SystemOperationalSnapshot>(http, "api/system-operations?namespace=" + Escape(ns.Value) + "&root=" + Escape(root), context, ct);
-    public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root,
+    public IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, ResourceNamespace ns, string? root, CancellationToken ct) =>
+        StreamAsync(context, new SystemGraphStreamQuery(ns, root), ct);
+
+    public async IAsyncEnumerable<SystemGraphStreamFrame> StreamAsync(ResourceScopeRef context, SystemGraphStreamQuery query,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        using var request = Request(HttpMethod.Get, "api/system-graph/stream?namespace=" + Escape(ns.Value)
-            + (root is null ? "" : "&root=" + Escape(root)), context, null, null);
+        var path = "api/system-graph/stream?maximumNodes=" + query.MaximumNodes.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "&maximumDepth=" + query.MaximumDepth.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "&direction=" + query.Direction.ToString().ToLowerInvariant()
+            + (query.Namespace is null ? "" : "&namespace=" + Escape(query.Namespace.Value.Value))
+            + (query.Root is null ? "" : "&root=" + Escape(query.Root));
+        using var request = Request(HttpMethod.Get, path, context, null, null);
         request.Headers.Accept.ParseAdd("application/x-ndjson");
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         await ApiResponse.EnsureSuccessAsync(response, ct);

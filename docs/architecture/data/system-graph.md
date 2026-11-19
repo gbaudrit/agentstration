@@ -2,7 +2,7 @@
 
 SystemGraph is the read-only cross-family metadata projection introduced by
 [#1196](https://github.com/gbaudrit/agentstration/issues/1196).
-[ADR-0238](../../decisions/0238-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
+[ADR-0239](../../decisions/0239-system-graph-is-an-authorized-rebuildable-semantic-projection.md)
 records authority, identities, contributors, authorization and consistency.
 Families retain ownership of definitions, publications, grants and lifecycle.
 
@@ -78,7 +78,7 @@ Query Tool extraction shares invocation publication selection: exact stays exact
 latest means publication time, including a lower semantic version published later.
 Compatible filter/order changes need no Tool/Flow republication. Incompatible
 latest fails contract comparison without older fallback. Query bodies and literal
-values are omitted. [ADR-0239](../../decisions/0239-system-graph-impact-uses-authorized-family-evidence.md)
+values are omitted. [ADR-0240](../../decisions/0240-system-graph-impact-uses-authorized-family-evidence.md)
 records these rules.
 
 ## Multiple versions
@@ -182,8 +182,8 @@ Unchanged windows and heartbeat frames do not relayout. Disposal prevents a late
 old-context layout from committing. The adapter remains capped at 100 nodes and
 20 seconds. Local assets/shadow-root styles isolate the renderer; no graphical
 field or persisted layout enters the semantic model. Node is a build dependency.
-[ADR-0240](../../decisions/0240-authored-systems-and-replaceable-explorer-rendering.md)
-and [ADR-0243](../../decisions/0243-system-explorer-streams-provisional-authorized-observations.md)
+[ADR-0241](../../decisions/0241-authored-systems-and-replaceable-explorer-rendering.md)
+and [ADR-0244](../../decisions/0244-system-explorer-streams-provisional-authorized-observations.md)
 record authority, progressive delivery and limits. New reusable UX scenario #1201
 remains deferred until explicit UX validation and merged owning UX PRs; existing
 regressions and implementation smoke remain required now.
@@ -204,7 +204,7 @@ ordered review and revalidation. Its fingerprint covers relevant identity, pin,
 current authoring ETag, relation and choice evidence; unrelated changes do not by
 themselves stale the review. During construction, a final impact observation and
 context check detect concurrent changes. Neighbor-slice hashes are not compared to
-whole-observation hashes. See [ADR-0241](../../decisions/0241-reconciliation-preview-reviews-selected-authorized-evidence.md).
+whole-observation hashes. See [ADR-0242](../../decisions/0242-reconciliation-preview-reviews-selected-authorized-evidence.md).
 Durable selective execution and receipts remain an explicit remaining part of #1199;
 no generic ChangeSet or renderer command substitutes for them. Deferred scenario
 #1202 retains its maintainer-validation and merge gates.
@@ -239,7 +239,7 @@ dimensions are bounded family/coverage, never resource/run/worker IDs.
 Runtime/Flow can retain physical Workspace and explicit logical Instance/Tenant
 coordinates separately. Both are displayed; definition owner remains distinct.
 The accepted ADR-0180 exact-scope drift is recorded without inferring new scope
-or rewriting history. See [ADR-0242](../../decisions/0242-system-operations-is-a-separate-authorized-volatile-overlay.md).
+or rewriting history. See [ADR-0243](../../decisions/0243-system-operations-is-a-separate-authorized-volatile-overlay.md).
 Scenario #1203 retains its explicit UX validation and merge gates.
 
 
@@ -263,7 +263,7 @@ resolver. Consumer Flow state, observed turns and direct-run metrics are separat
 At most 100 binding associations and eight groups per binding are shown; flags
 report truncation. The panel offers scoped Flow/step drill-down in both locales.
 Neither these associations nor their live updates enter semantic graph JSON or
-publication/impact closure. See ADR-0242.
+publication/impact closure. See ADR-0243.
 
 ### Definition photos and Agent deployment views
 
@@ -284,7 +284,7 @@ existing Worker-details permission. Runs without deployment/configuration UIDs
 remain unattributed. Observation time, bounded sample coverage and unknown physical
 infrastructure/pool membership are visible. Saving an assignment does not route
 work, change adoption policy or establish placement. See
-[ADR-0244](../../decisions/0244-agent-deployments-record-exact-durable-assignments.md).
+[ADR-0245](../../decisions/0245-agent-deployments-record-exact-durable-assignments.md).
 
 An Agent's published `AgentRevision` records are listed in the **Definition**
 perspective. Publishing/preparing a revision does not create an environment/target
@@ -319,4 +319,15 @@ Agent revisions. Unknown legacy origins remain unknown.
 The summary contracts typed ToolDefinition paths with their original steps retained
 for inspection. It changes no executable closure or resource. A ToolSet is an access
 grouping; C4 container boundaries require actual execution units. See
-[ADR-0245](../../decisions/0245-tool-access-summaries-preserve-authorized-provenance.md).
+[ADR-0246](../../decisions/0246-tool-access-summaries-preserve-authorized-provenance.md).
+
+### Resource-centered component
+
+`ResourceRelations` prepares later resource-screen adoption using the same LikeC4
+adapter and authorized stream, with outgoing dependencies or incoming usages.
+Generation grouping, selected ToolSet provenance and exact publication identities
+are preserved. Visual depth is applied after summary contraction within an
+80-node window. Actor context stays independent of resource ownership while
+recentering across namespaces. Local icons, root emphasis, theme and viewport
+remain renderer concerns. No resource screen is automatically changed. See the
+[integration contract](../../reference/resource-relations.md).
