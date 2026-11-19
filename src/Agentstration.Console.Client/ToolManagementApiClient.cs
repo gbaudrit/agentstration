@@ -15,6 +15,12 @@ public interface IToolsClient
         throw new NotSupportedException("Exact-scope Tool Provider reads are not implemented by this client.");
     Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? UpdateProviderAsync(name, request, etag, cancellationToken) : throw new NotSupportedException("Namespaced Tool Provider updates are not implemented by this client.");
+    Task<ToolConnectionTestResponse> TestAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? TestAsync(name, cancellationToken) : throw new NotSupportedException("Namespaced Tool Provider tests are not implemented by this client.");
+    Task<ToolDiscoveryDiffResponse> RefreshAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? RefreshAsync(name, cancellationToken) : throw new NotSupportedException("Namespaced Tool Provider discovery is not implemented by this client.");
     Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken);
     Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken);
     Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default);
@@ -45,6 +51,26 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
     public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => ReadProviderAsync(HttpMethod.Get, ProviderPath(name), null, null, cancellationToken);
     public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => ReadProviderAsync(HttpMethod.Post, "api/toolproviders", JsonContent.Create(request), null, cancellationToken);
     public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => ReadProviderAsync(HttpMethod.Put, ProviderPath(name), JsonContent.Create(request), etag, cancellationToken);
+
+    public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) =>
+        ReadProviderAsync(HttpMethod.Put, ProviderPath(name) + ProviderCoordinates(scopeRef, @namespace), JsonContent.Create(request), etag, cancellationToken);
+
+    public async Task<ToolConnectionTestResponse> TestAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(ProviderChildPath(name, "test") + ProviderCoordinates(scopeRef, @namespace), null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<ToolConnectionTestResponse>(cancellationToken))!;
+    }
+
+    public async Task<ToolDiscoveryDiffResponse> RefreshAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(ProviderChildPath(name, "refresh") + ProviderCoordinates(scopeRef, @namespace), null, cancellationToken);
+        await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<ToolDiscoveryDiffResponse>(cancellationToken))!;
+    }
+
+    private static string ProviderCoordinates(ResourceScopeRef scopeRef, ResourceNamespace @namespace) =>
+        $"?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
 
     public async Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken)
     {

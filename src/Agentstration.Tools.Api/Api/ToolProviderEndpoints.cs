@@ -63,32 +63,38 @@ internal static class ToolProviderEndpoints
             return ToolsApiHttp.ResourceResult(stored, response, 201);
         });
 
-    private static Task<IResult> PutProviderAsync(string providerName, PutToolProviderRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> PutProviderAsync(string providerName, string? scopeRef, string? resourceNamespace, PutToolProviderRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            var existing = await service.GetProviderAsync(ToolManagementService.ToolProviderId(providerName), cancellationToken)
-                ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
+            var existing = await FindProviderAsync(providerName, scopeRef, resourceNamespace, service, cancellationToken);
             var stored = await service.PutProviderAsync(existing.Value with { Definition = body.Properties }, ToolsApiHttp.IfMatch(request), false, cancellationToken);
-            try { _ = await service.RefreshDiscoveryAsync(stored.Value.Metadata.Name, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
-            stored = await service.GetProviderAsync(stored.Value.Metadata.Name, cancellationToken) ?? stored;
+            // Discovery retains its best-effort contract, using the same saved coordinates.
+            try { _ = await service.RefreshDiscoveryExactAsync(stored.Value.ScopeRef!.Value, stored.Value.Name, stored.Value.Namespace, cancellationToken); } catch (Exception exception) when (exception is not OperationCanceledException) { }
+            stored = await service.GetProviderExactAsync(stored.Value.ScopeRef!.Value, stored.Value.Name, stored.Value.Namespace, cancellationToken) ?? stored;
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
 
-    private static Task<IResult> TestAsync(string providerName, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> TestAsync(string providerName, string? scopeRef, string? resourceNamespace, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            var id = ToolManagementService.ToolProviderId(providerName);
-            var stored = await service.GetProviderAsync(id, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, providerName));
+            var stored = await FindProviderAsync(providerName, scopeRef, resourceNamespace, service, cancellationToken);
             var result = await service.TestConnectionAsync(stored.Value, cancellationToken);
             return Results.Ok(new ToolConnectionTestResponse("connected", result.Tools.Count, result.Capabilities, result.ServerMetadata));
         });
 
-    private static Task<IResult> RefreshAsync(string providerName, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> RefreshAsync(string providerName, string? scopeRef, string? resourceNamespace, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            var diff = await service.RefreshDiscoveryAsync(ToolManagementService.ToolProviderId(providerName), cancellationToken);
+            var stored = await FindProviderAsync(providerName, scopeRef, resourceNamespace, service, cancellationToken);
+            var diff = await service.RefreshDiscoveryExactAsync(stored.Value.ScopeRef!.Value, stored.Value.Name, stored.Value.Namespace, cancellationToken);
             return Results.Ok(new ToolDiscoveryDiffResponse(diff.New, diff.Changed, diff.Unchanged, diff.Unavailable, diff.Total));
         });
+
+    private static async Task<StoredResource<ToolProviderResource>> FindProviderAsync(string name, string? scopeRef, string? resourceNamespace, ToolManagementService service, CancellationToken token) =>
+        await (string.IsNullOrWhiteSpace(scopeRef)
+            ? service.GetProviderAsync(name, ResourceNamespace.Parse(resourceNamespace), token)
+            : service.GetProviderExactAsync(ResourceScopeRef.Parse(scopeRef), name, ResourceNamespace.Parse(resourceNamespace), token))
+        ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolProvider, name, ResourceNamespace.Parse(resourceNamespace)));
 
     private static Task<IResult> ListProviderToolsAsync(string providerName, string? scopeRef, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>

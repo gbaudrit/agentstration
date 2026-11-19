@@ -61,7 +61,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `ToolDefinitionEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolGovernanceAudit.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
-| `ToolProviderEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `ToolProviderEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `ToolSetDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TransformationFunctionEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TriggerDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
@@ -134,3 +134,10 @@ No implementation or test result on the requested foundation is inferred from th
 - Refresh retains invalid metadata and membership changes made while its request is in flight; explicit discard adopts the refreshed family catalog/member bundle and ETag. Deletion invalidates the removed snapshot before leaving, releasing the combined guard. Scope validation remains inside the common field, including unavailable targets.
 - All 49 focused cases, both final Category desktop/touch probes and both maintained Agent regression cases pass. [Real captures, geometry and exact hashes](evidence/resource-screen-foundation/tool-categories/README.md).
 - Protected Agent product files remain unchanged. Shared empty feedback no longer creates a phantom gap. Deferred UX follow-up remains open/blocked; CI failures are not handled.
+
+### ToolProviderEditor
+
+- Standard Console template and retained common form/state/presentations, actual discovery metrics above saved Identity/labels, provider-type AdditionalPanels enrichment, Identity then connection Configuration, tools, independently authorized Access and final saved YAML. Creation retains its wizard and its actual API capabilities.
+- Existing model rules/parsers, exact/relative extension references, header activation draft semantics, command restrictions and ETags are preserved. Qualified provider writes/tests/discovery now retain the loaded namespace/owner instead of relying on an unqualified name. Refresh buffers newer definitions until explicit discard and preserves invalid/in-flight edits; identity/access changes clear private rendered content.
+- 14 component cases, one client case, one API homonym/concurrency case, TypeScript, both final desktop/touch probes and both maintained governed-inventory cases pass. [Real captures, exact hashes and validation chronology](evidence/resource-screen-foundation/tool-providers/README.md).
+- Protected Agent product files remain unchanged. No shared presentation component change; no CI failure is handled. Seven adapters now have a new-foundation migration; the other 43 non-Agent route-owning components still require review/migration.
