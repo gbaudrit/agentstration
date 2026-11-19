@@ -11,10 +11,13 @@ using Agentstration.Triggers;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Flows;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Tests;
 
@@ -132,6 +135,31 @@ public sealed class NewFlowWizardTests
         await rendered.InvokeAsync(() => wizard.Instance.GoToStepAsync("review"));
         await rendered.InvokeAsync(wizard.Instance.FinishAsync);
         rendered.WaitForAssertion(() => Assert.AreEqual("recoverable-team", handler.Created?.Name));
+    }
+
+    [TestMethod]
+    public async Task PrerenderDoesNotExposeEnabledCreationCommands()
+    {
+        using var handler = new Handler(); using var context = Context(handler);
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<NewFlow>()).ToHtmlString());
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        Assert.IsTrue(document.QuerySelector("form > fieldset")!.HasAttribute("disabled"));
+        Assert.IsTrue(document.QuerySelectorAll(".creation-wizard-progress button, .creation-wizard-actions button").All(button => button.HasAttribute("disabled")));
+        Assert.AreEqual(0, handler.Writes);
+    }
+
+    [TestMethod]
+    public async Task AReaderCannotCreateEvenWhenTheSelectedScopeExists()
+    {
+        using var handler = new Handler(); using var context = Context(handler);
+        context.WithResourceListContext(new() { Permissions = new HashSet<string> { "resources/read" } });
+        var cut = context.Render<NewFlow>();
+        Assert.IsTrue(cut.Find("form > fieldset").HasAttribute("disabled"));
+        Assert.IsTrue(cut.FindComponent<CreationWizard>().Instance.Disabled);
+        await cut.InvokeAsync(cut.FindComponent<CreationWizard>().Instance.FinishAsync);
+        Assert.AreEqual(0, handler.Writes);
+        Assert.IsNotNull(cut.FindComponent<ResourceReadOnlyNotice>());
     }
 
     private static readonly ResourceScopeRef Owner = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));

@@ -9,12 +9,13 @@
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageHeader ScopeRef="selectedScope" Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)">@T("Cancel")</a></Actions></PageHeader>
+@if (!CanCreate && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current is not null) { <ResourceReadOnlyNotice Reason="ResourceReadOnlyReason.InsufficientPermissions" /> }
 <EditForm EditContext="formContext" OnSubmit="SubmitAsync" class="resource-form" data-testid="flow-create-form" data-interactive="@interactive.ToString().ToLowerInvariant()" novalidate>
     <FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
     <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
     @if (error is not null) { <p class="error-panel" role="alert">@error</p> }
-    <fieldset class="resource-definition-fields" disabled="@submitting">
-        <CreationWizard @ref="wizard" Steps="Steps" Busy="submitting" OnFinish="FinishAsync" FinishLabel="@T(model.Kind == "Workflow" ? "CreateDraft" : "CreateOrchestration")" FinishTestId="flow-create" />
+    <fieldset class="resource-definition-fields" disabled="@(submitting || !interactive || !CanCreate)">
+        <CreationWizard @ref="wizard" Steps="Steps" Busy="submitting" Disabled="@(!interactive || !CanCreate)" OnFinish="FinishAsync" FinishLabel="@T(model.Kind == "Workflow" ? "CreateDraft" : "CreateOrchestration")" FinishTestId="flow-create" />
     </fieldset>
 </EditForm>
 
@@ -70,6 +71,7 @@
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string Fingerprint => JsonSerializer.Serialize(new { model, orchestration });
     private bool IsDirty => !created && (invalidInput || baseline is not null && Fingerprint != baseline || scopeInitialized && selectedScope != initialScope);
+    private bool CanCreate => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.HasPermission("resources/write");
     private bool NameValid => !string.IsNullOrWhiteSpace(model.Name) && model.Name.Length <= 128 && char.IsLetterOrDigit(model.Name[0]) && model.Name.All(character => char.IsLetterOrDigit(character) || character is '-' or '_');
     private bool IdentityComplete => NameValid && !string.IsNullOrWhiteSpace(model.DisplayName) && model.DisplayName.Length <= 200 && selectedScope is not null && model.Kind is "Workflow" or "Orchestration";
     private IReadOnlyList<CreationWizardStep> Steps => [
@@ -97,6 +99,7 @@
         model.DisplayName = T("DefaultDisplayName"); model.Description = T("DefaultDescription");
         formContext = new(model); messages = new(formContext); formContext.OnFieldChanged += FieldChanged;
         baseline = Fingerprint;
+        if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context) await context.EnsureLoadedAsync(cancellation.Token);
         await LoadAgentsAsync();
     }
     private async Task LoadAgentsAsync()
@@ -115,6 +118,7 @@
     private Task SubmitAsync() => wizard is null ? Task.CompletedTask : wizard.CurrentStepId == "review" ? wizard.FinishAsync() : wizard.ContinueAsync();
     private async Task FinishAsync(CreationWizardFinish finish)
     {
+        if (!interactive || !CanCreate || submitting) return;
         messages.Clear(); error = null; scopeError = selectedScope is null; configurationError = !ConfigurationComplete;
         if (!NameValid) messages.Add(new FieldIdentifier(model, nameof(model.Name)), T("Validation.Name"));
         if (string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName.Length > 200) messages.Add(new FieldIdentifier(model, nameof(model.DisplayName)), T("Validation.DisplayName"));
@@ -126,7 +130,7 @@
     }
     private async Task CreateAsync()
     {
-        if (submitting || selectedScope is not { } ownerScope) return;
+        if (submitting || !interactive || !CanCreate || selectedScope is not { } ownerScope) return;
         try
         {
             submitting = true; error = null;
