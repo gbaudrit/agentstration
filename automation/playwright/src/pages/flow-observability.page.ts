@@ -13,6 +13,7 @@ export class FlowObservabilityPage {
   public async open(consoleUrl: string, path: string, marker: FlowObservabilityMarker): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Flow observability route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(TestIds.flowObservability[marker]).waitFor({ state: 'visible' });
   }
 

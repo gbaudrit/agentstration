@@ -272,7 +272,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/runs/${encodeURIComponent(evidence.runtimeRunId)}?scopeRef=${encodeURIComponent(evidence.scopeRef)}`,
       TestIds.flowObservability.agentRunner,
     );
-    await expect(this.agentDefinitionScope).toContainText('Instance');
+    await selectResourceSection(this.page, 'execution/details');
+    await expect(this.agentRunDefinitionScope).toContainText('Instance');
   }
 
   public async openFlowRun(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
