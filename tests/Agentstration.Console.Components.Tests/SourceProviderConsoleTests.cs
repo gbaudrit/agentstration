@@ -220,6 +220,17 @@ public sealed class SourceProviderConsoleTests
         Assert.AreEqual(0, client.Writes);
     }
 
+    [TestMethod]
+    public async Task ConfirmedSourceProviderDeletionReleasesItsPendingPolicyDraft()
+    {
+        var client = new StubSourceProvidersClient(); using var context = Context(client, false);
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.Deletes);
+        Assert.AreEqual("/sourceproviders", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
     private sealed class NavigationContext(ResourceScopeRef scope) : IConsoleNavigationContext
     {
         public string? ScopeRef => scope.Value;
@@ -266,6 +277,7 @@ public sealed class SourceProviderConsoleTests
             Definition = new() { DisplayName = "Git Source Provider", Extension = new("git-extension", ResourceScopeRef.Instance, ResourceNamespace.Default), ContributionId = "git" }
         };
         public int Writes { get; private set; }
+        public int Deletes { get; private set; }
         public int Reads { get; private set; }
         public string? LastEtag { get; private set; }
         public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) { Reads++; return Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<SourceProviderResource>(Managed ? Saved with { Governance = ResourceGovernance.Core("source-provider") } : Saved, "\"initial\"")); }
@@ -279,7 +291,7 @@ public sealed class SourceProviderConsoleTests
             Writes++; LastEtag = etag; Saved = Saved with { Definition = request.Properties, Generation = Saved.Generation + 1 };
             return Task.FromResult(new ResourceSnapshot<SourceProviderResource>(Saved, "\"updated\""));
         }
-        public Task DeleteSourceProviderAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteSourceProviderAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken) { Deletes++; return Task.CompletedTask; }
         public Task<SourceProviderStatusResponse> GetStatusAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(new SourceProviderStatusResponse(name, "available", DateTimeOffset.UnixEpoch, null));
         public Task<SourceProviderUsagesResponse> GetUsagesAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => Task.FromResult(new SourceProviderUsagesResponse([], 0));
     }

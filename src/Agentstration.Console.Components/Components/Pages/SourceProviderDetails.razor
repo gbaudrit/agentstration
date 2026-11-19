@@ -189,6 +189,7 @@ else
     private string StatusLabel(string? value) => Localizer[$"Status.{value?.ToLowerInvariant() switch { "available" => "Available", "disabled" => "Disabled", "unavailable" => "Unavailable", "incompatible" => "Incompatible", _ => "Unknown" }}"];
     protected override void OnAfterRender(bool firstRender)
     {
+        if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; }
         if (firstRender) interactive = true;
         var capture = baselinePending;
         if (capture) { baselinePending = false; baseline = Fingerprint; }
@@ -343,11 +344,12 @@ else
         finally { if (version == loadVersion) busy = false; }
     }
     private void RequestDelete() { if (!CanManage || busy || refreshing) return; if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("UsedWarning", UsageCount(usages.Count)), Guid.NewGuid().ToString("N")); }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
         if (!CanManage || busy || refreshing || resource is not { ScopeRef: { } owner } current || etag is null) return;
         var version = loadVersion; confirmDelete = false; busy = true;
-        try { await Client.DeleteSourceProviderAsync(owner, current.Namespace, current.Name, etag, cancellation.Token); if (version != loadVersion) return; baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        try { await Client.DeleteSourceProviderAsync(owner, current.Namespace, current.Name, etag, cancellation.Token); if (version != loadVersion) return; Clear(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
         catch (Exception exception) { if (version == loadVersion) error = exception; }
         finally { if (version == loadVersion) busy = false; }
     }

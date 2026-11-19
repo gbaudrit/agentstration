@@ -24,3 +24,7 @@ Verification:
 | Retained concurrent refresh | [Capture](source-provider-retained-refresh-desktop-en.png) | [Capture](source-provider-retained-refresh-mobile-fr.png) |
 | Observed capability | [Capture](source-provider-capability-desktop-en.png) | [Capture](source-provider-capability-mobile-fr.png) |
 | Saved YAML | [Capture](source-provider-yaml-desktop-en.png) | [Capture](source-provider-yaml-mobile-fr.png) |
+
+## Confirmed-deletion follow-up
+
+Source Provider invalidates the deleted snapshot and drafts before its post-render return to the exact collection path. [Focused regression and actual desktop/touch evidence](../deletion-followup/README.md).
