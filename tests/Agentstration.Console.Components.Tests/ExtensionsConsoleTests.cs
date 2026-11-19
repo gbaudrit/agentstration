@@ -9,6 +9,7 @@ using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
@@ -572,7 +573,7 @@ public sealed class ExtensionsConsoleTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public void ExactScopedToolProviderKeepsManagedContentReadOnlyAndOrdinaryContentEditable(bool managed)
+    public async Task ExactScopedToolProviderKeepsManagedContentReadOnlyAndOrdinaryContentEditable(bool managed)
     {
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
@@ -583,16 +584,30 @@ public sealed class ExtensionsConsoleTests
             .NavigateTo("/tools/providers/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance");
         var navigationModule = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
         navigationModule.Mode = JSRuntimeMode.Loose;
-        navigationModule.Setup<string>("navigate", _ => true).SetResult(context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri + "#overview");
+        var providerUri = context.Services.GetRequiredService<NavigationManager>().Uri;
+        foreach (var section in new[] { "overview", "definition/identity" })
+        {
+            navigationModule.Setup<string>("navigate", invocation => invocation.Arguments[0] is string target
+                && target.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(providerUri + "#" + section);
+        }
         var rendered = context.Render<Agentstration.Web.Components.Pages.ToolProviderEditor>(parameters =>
             parameters.Add(value => value.Name, "crawl4ai"));
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(ResourceScopeRef.Instance, client.RequestedProviderScope);
-            Assert.AreEqual(managed, rendered.Find("fieldset").HasAttribute("disabled"));
             Assert.AreEqual(managed, rendered.Find(".resource-header input[role=switch]").HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll(".resource-form"));
             Assert.IsEmpty(rendered.FindAll(".unsaved-changes-bar"));
             Assert.IsNotNull(rendered.Find("a[href='/extensions/crawl4ai?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
+        });
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(managed, rendered.Find("#tool-provider-resource-form > fieldset").HasAttribute("disabled"));
+            var identity = rendered.Find("[data-definition-section='definition/identity']");
+            Assert.IsFalse(identity.HasAttribute("hidden"));
+            Assert.AreEqual(managed, identity.HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll(".unsaved-changes-bar"));
         });
     }
 
