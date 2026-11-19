@@ -318,12 +318,16 @@ export class SourceLifecyclePage {
     expect(profile.activeVersion).toBe('1.0.0');
   }
 
+  private get profileRevisionRows(): Locator {
+    return this.page.locator('.resource-details-main tbody > tr:visible, .resource-details-main .collection-card:visible');
+  }
+
   private async inspectProfileYaml(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     await this.open(consoleUrl, `/data-source-profiles/${this.fixture.profile}`, TestIds.sourceLifecycle.profileEditor);
     await selectResourceSection(this.page, 'yaml');
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveValue(new RegExp(this.fixture.acquisitionFlow));
     await selectResourceSection(this.page, 'revisions');
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' })).toHaveCount(1);
+    await expect(this.profileRevisionRows.filter({ hasText: '1.0.0' })).toHaveCount(1);
   }
 
   private async createSourceInConsole(consoleUrl: string, name: string, index: number, text: ExpectedText['sourceLifecycle']): Promise<void> {
@@ -357,13 +361,13 @@ export class SourceLifecyclePage {
     await selectResourceSection(this.page, 'revisions');
     await this.page.getByTestId(TestIds.sourceLifecycle.profilePublishVersion).fill('1.1.0');
     await this.page.getByRole('button', { name: text.publish, exact: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' })).toBeVisible();
+    await expect(this.profileRevisionRows.filter({ hasText: '1.1.0' })).toBeVisible();
     // Explicit activation and rollback exercise the revision controls as well.
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true })).toBeAttached();
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
+    await revealCollectionAction(this.profileRevisionRows.filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.profileRevisionRows.filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
+    await expect(this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true })).toBeAttached();
+    await revealCollectionAction(this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
     await expect.poll(async () => (await this.read<ResourceWire & { activeVersion: string }>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).activeVersion).toBe('1.1.0');
   }
 
