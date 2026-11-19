@@ -154,6 +154,16 @@ public sealed class ParameterResourceScreenTests
         Assert.AreEqual(0, client.Writes);
     }
 
+    [TestMethod]
+    public async Task ConfirmedParameterDeletionReleasesItsPendingPolicyDraft()
+    {
+        var client = new Client(); using var context = Context(client, false);
+        var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.Deletes);
+        Assert.AreEqual("/parameters", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
     private static BunitContext Context(Client client, bool create)
     {
         var context = new BunitContext();
@@ -177,6 +187,7 @@ public sealed class ParameterResourceScreenTests
     {
         public ParameterResource Current { get; set; } = new()
         {
+            Uid = Guid.NewGuid(),
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ParameterResourceKinds.Parameter,
             Metadata = new() { Name = "saved" },
@@ -187,6 +198,7 @@ public sealed class ParameterResourceScreenTests
         public bool CanWrite { get; set; } = true;
         public int Reads { get; private set; }
         public int Writes { get; private set; }
+        public int Deletes { get; private set; }
         public string? LastEtag { get; private set; }
         public Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ParameterResource>>([Current]);
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", CanWrite)]);
@@ -203,6 +215,6 @@ public sealed class ParameterResourceScreenTests
             Writes++; LastEtag = etag; Current = Current with { Definition = request.Properties };
             return Task.FromResult(new ResourceSnapshot<ParameterResource>(Current, "\"updated\""));
         }
-        public Task DeleteParameterAsync(string name, ResourceScopeRef scope, string etag, CancellationToken token) => Task.CompletedTask;
+        public Task DeleteParameterAsync(string name, ResourceScopeRef scope, string etag, CancellationToken token) { Assert.AreEqual(ResourceScopeRef.Instance, scope); Assert.AreEqual("\"initial\"", etag); Deletes++; return Task.CompletedTask; }
     }
 }

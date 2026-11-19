@@ -179,6 +179,7 @@ else
         if (busy || refreshing || savedResource is null) return;
         ApplySnapshot(new(newerResource ?? savedResource, newerEtag ?? etag!));
     }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } }
     protected override Task OnParametersSetAsync()
     {
         var key = $"{Name}|{ScopeRefValue}|{NavigationScope}";
@@ -293,11 +294,12 @@ else
         finally { if (version == loadVersion) busy = false; }
     }
     private void RequestDelete() { if (!CanManage || busy || refreshing) return; if (usageCount > 0) error = new AgentstrationApiException(T("InUse", usageCount), Guid.NewGuid().ToString("N")); else confirmDelete = true; }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
         if (!CanManage || busy || refreshing || savedResource is not { ScopeRef: { } owner } current) return;
         var version = loadVersion; confirmDelete = false;
-        try { await Client.DeleteParameterAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        try { await Client.DeleteParameterAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; ClearResource(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
         catch (Exception exception) { if (version == loadVersion) error = exception; }
     }
     private string ResourceUrl(ParameterResource resource) => ResourceOwnershipContext.Resource(Services, "/parameters", resource.Name, resource.Namespace, resource.ScopeRef);

@@ -24,3 +24,7 @@ Verification:
 | Saved YAML export | [Capture](parameter-yaml-desktop-en.png) | [Capture](parameter-yaml-mobile-fr.png) |
 
 Initial transient attempts failed in the temporary ES-module configuration and in an uppercase fixture name rejected by the unchanged Parameter API. The final probes use explicit ES-module configuration and valid lowercase prerequisites. Assertions and timeouts were retained. New reusable UX scenarios remain deferred under #1234/#1236; this change maintains existing journeys and uses transient local probes. CI failures are left to the maintainer's parallel PR #1238 work.
+
+## Confirmed-deletion follow-up
+
+Parameter invalidates the deleted snapshot and drafts before its post-render return to the exact collection path. [Focused regression and actual desktop/touch evidence](../deletion-followup/README.md).
