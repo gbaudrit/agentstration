@@ -164,7 +164,7 @@ else
         {
             var saved = await Client.GetAsync(new(current.Name, "", owner, current.Namespace), cancellation.Token); if (request != loadVersion) return;
             if (saved.Value.Uid != current.Uid || saved.Value.Address != current.Address || saved.Value.ScopeRef != owner) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
-            if (HasDraft) newer = saved;
+            if (HasDraft) newer = saved.ETag != etag || saved.Value.Generation != current.Generation ? saved : null;
             else Apply(saved);
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }

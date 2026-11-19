@@ -53,6 +53,7 @@ public sealed class TransformationFunctionEditorTests
         client.Resource = client.Resource with { Generation = 2, Definition = client.Resource.Definition with { DisplayName = "Saved newer" } }; client.Etag = "\"newer\"";
         await Select(cut, "overview"); await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
         Assert.AreSame(originalContext, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
+        Assert.HasCount(1, cut.FindAll(".resource-details-feedback .form-alert-warning"));
         Assert.AreEqual("\"initial\"", cut.Find("form").GetAttribute("data-resource-etag"));
         Assert.Contains("Function fixture", cut.Find(".resource-identity-summary").TextContent);
         await Select(cut, "definition/identity"); Assert.AreEqual("", cut.Find("[data-testid=function-display-name]").GetAttribute("value"));
@@ -107,6 +108,7 @@ public sealed class TransformationFunctionEditorTests
         await cut.InvokeAsync(() => access.Parameters.Get(p => p.DraftChanged).InvokeAsync(true));
         await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
         Assert.AreSame(access, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance); Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsEmpty(cut.FindAll(".resource-details-feedback .form-alert-warning"), "An unchanged saved snapshot must not claim that a newer definition exists.");
         await Select(cut, "definition/identity"); Assert.AreSame(form.EditContext, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
         Assert.AreEqual("", cut.Find("[data-testid=label-value]").GetAttribute("value")); Assert.IsTrue(form.EditContext.GetValidationMessages().Any()); Assert.AreEqual(0, client.Writes);
     }
