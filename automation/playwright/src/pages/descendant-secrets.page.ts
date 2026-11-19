@@ -145,7 +145,7 @@ export class DescendantSecretsPage {
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
     if (await target.isVisible()) return;
     if (await this.page.locator('.creation-wizard').count()) await this.page.locator('[data-wizard-step=grants]').click();
-    else await selectResourceSection(this.page, new URL(this.page.url()).pathname.startsWith('/vaults/') ? 'definition/configuration' : 'definition/grants');
+    else await selectResourceSection(this.page, new URL(this.page.url()).pathname.startsWith('/vaults/') ? 'definition/configuration' : 'definition/use-policy');
     await target.waitFor({ state: 'visible' });
   }
 

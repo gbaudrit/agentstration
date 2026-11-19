@@ -88,3 +88,5 @@ Verification completed for this pause point:
 The repository-wide `npm run test:smoke` campaign has not been run for this pause point; remote CI is not a verified result. The targeted results above do not constitute full acceptance of every migrated or pending surface. No PR is created or made ready, and no issue is closed.
 
 The new-foundation Vault pass and its justified capability limits are recorded in the [Vault verification report](evidence/resource-screen-foundation/vaults/README.md). Earlier adoption counts remain historical.
+
+The new-foundation Secret pass, independent write-only draft contract and local evidence are recorded in the [Secret verification report](evidence/resource-screen-foundation/secrets/README.md).

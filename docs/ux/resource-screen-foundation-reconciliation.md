@@ -46,7 +46,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `RuntimeProfileEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `RuntimeWorkerDetails.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
 | `SchemaEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
-| `SecretEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `SecretEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `SourceProviderDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `SourceRegistries.razor` | Previously remaining | Mixed collection/detail; keep collection template and inspect detail adapter | No |
 | `Sources.razor` | Previously remaining | Mixed collection/detail; keep collection template and inspect detail adapter | No |
@@ -102,3 +102,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Refresh preserves invalid drafts and original ETags, buffers newer snapshots for explicit discard, and clears private content on changed identity or lost access. Initialization retains its existing command/health distinction and confirmation; the key-file path warning wraps on mobile.
 - 57 targeted cases, TypeScript, both final Vault desktop/touch probes, the maintained descendant-grants journey and both maintained Agent regression cases pass. [Real captures and exact source hashes](evidence/resource-screen-foundation/vaults/README.md).
 - Protected Agent product files remain unchanged. Synchronization occurs before and after the screen commit; CI failures are not handled.
+
+### SecretEditor
+
+- Standard Console template, actual value-status metric above saved Identity/labels, retained definition form with shared state/presentations, Identity before Configuration, family descendant-use section, independent Access and final saved metadata YAML. Creation retains its wizard and name/key derivation.
+- Refresh preserves invalid metadata, its EditContext and original ETag; explicit discard adopts a newer snapshot. Write-only replacement remains an independent draft/command and survives metadata save/discard and refresh. The adapter's single combined guard protects it without displaying the metadata save bar. Replacement identity/lost access clears private pending content.
+- Namespace stays immutable; labels are read-only because the existing family API has no metadata mutation contract. Actual saved references preserve namespace/owner/context; no value retrieval/export or activation capability is introduced.
+- TypeScript, both Secret desktop/touch probes, the maintained descendant-grants journey and both Agent regression cases pass. [Real captures, source hashes and focused checks](evidence/resource-screen-foundation/secrets/README.md).
+- Agent product files remain unchanged. One screen commit, synchronized before and after; CI failures remain outside this work.
