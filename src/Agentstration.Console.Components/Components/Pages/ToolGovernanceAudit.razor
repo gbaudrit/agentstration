@@ -129,7 +129,7 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DecisionLabel(ToolExecutionHookEvaluationKind value) => Localizer[$"Decision.{value}"];
     private string SourceLabel(ToolExecutionHookSource value) => Localizer[$"Source.{value}"];
-    private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? T("FlowRun") : T("RuntimeRun");
+    private string OwnerLabel => ownerKind switch { ToolExecutionOwnerKind.FlowRun => T("FlowRun"), ToolExecutionOwnerKind.RuntimeRun => T("RuntimeRun"), _ => T("UnknownOwner") };
     private ResourceScopeRef? ScopeRef => string.IsNullOrWhiteSpace(RequestedScopeRef)
         ? null
         : ResourceScopeRef.Parse(RequestedScopeRef);

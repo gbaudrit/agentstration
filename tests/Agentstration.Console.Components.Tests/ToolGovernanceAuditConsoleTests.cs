@@ -154,6 +154,19 @@ public sealed class ToolGovernanceAuditConsoleTests
             runId == "first-run" ? first : Task.FromResult(AuditPage(runId));
     }
 
+    [TestMethod]
+    public void UnsupportedOwnerDoesNotQueryOrMasqueradeAsARuntimeExecution()
+    {
+        using var context = AuditContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeAuditClient();
+        context.Services.AddSingleton<IToolGovernanceAuditClient>(client);
+        var rendered = context.Render<ToolGovernanceAudit>(p => p.Add(value => value.Owner, "unsupported").Add(value => value.RunId, "run-unknown"));
+        var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<ToolGovernanceAuditStrings>>();
+        rendered.WaitForAssertion(() => Assert.AreEqual(strings["UnknownOwner"].Value, rendered.Find(".resource-identity-summary dd").TextContent));
+        Assert.AreEqual(0, client.ReadCount);
+    }
+
     private static BunitContext AuditContext()
     {
         var context = new BunitContext().WithCollectionPresentation();
