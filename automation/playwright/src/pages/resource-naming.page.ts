@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import { selectResourceSection } from './resource-sections.js';
 
 export class ResourceNamingPage {
   public constructor(private readonly page: Page) {}
@@ -37,6 +38,7 @@ export class ResourceNamingPage {
   public async openParameter(consoleUrl: string): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}/parameters/new`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`New parameter page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(TestIds.parameterEditor.form).waitFor({ state: 'visible' });
   }
 
@@ -61,11 +63,14 @@ export class ResourceNamingPage {
 
   public async saveParameter(technicalName: string, value = '6'): Promise<string> {
     await fillAndCommit(this.page.getByTestId(TestIds.parameterEditor.technicalName), technicalName);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await fillAndCommit(this.page.getByTestId(TestIds.parameterEditor.value), value);
+    await this.page.locator('[data-wizard-step=review]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/parameters/${encodeURIComponent(technicalName)}`),
       this.page.getByTestId(TestIds.parameterEditor.save).click(),
     ]);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.page.getByTestId(TestIds.parameterEditor.form).waitFor({ state: 'visible' });
     return this.page.url();
   }
@@ -73,6 +78,8 @@ export class ResourceNamingPage {
   public async reopenParameter(url: string, expectedTechnicalName: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Parameter edit route returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.page.getByTestId(TestIds.parameterEditor.form).waitFor({ state: 'visible' });
     await expect(this.page.getByTestId(TestIds.parameterEditor.technicalName)).toHaveValue(expectedTechnicalName);
     await expect(this.page.getByTestId(TestIds.parameterEditor.technicalName)).toBeDisabled();
@@ -84,10 +91,12 @@ export class ResourceNamingPage {
 
   public async prepareDuplicateParameter(technicalName: string): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.parameterEditor.technicalName), technicalName);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await fillAndCommit(this.page.getByTestId(TestIds.parameterEditor.value), '7');
   }
 
   public async saveDuplicateParameter(): Promise<void> {
+    await this.page.locator('[data-wizard-step=review]').click();
     await this.page.getByTestId(TestIds.parameterEditor.save).click();
     await this.page.locator('.form-alert-danger[role="alert"]').waitFor({ state: 'visible' });
   }
