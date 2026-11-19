@@ -1,8 +1,8 @@
 # Authoring resource detail screens
 
-This chapter implements the resource-screen composition part of [#1235](https://github.com/gbaudrit/agentstration/issues/1235). It applies to persisted resources. Collection pages and creation flows remain separate; retain `CreationWizard` where already adopted. Do not change the global Console/Workplace layout to implement a resource screen.
+This chapter implements the resource-screen composition part of [#1235](https://github.com/gbaudrit/agentstration/issues/1235). It applies to persisted resources. Collection pages and creation flows remain separate. Resource creation uses `CreationWizard`; the screen owns its stages, field fragments, validation and commands. Do not change the global Console/Workplace layout to implement a resource screen.
 
-The first adopter is `src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor`, route `/agents/{Name}` with optional `namespace`, exact owner `scopeRef` and administrative `context`. Creation at `/agents/new` keeps its existing composition. Pack-managed Agents retain their separate read-only route and capability rules.
+The first adopter is `src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor`, route `/agents/{Name}` with optional `namespace`, exact owner `scopeRef` and administrative `context`. Creation at `/agents/new` uses the shared wizard with the existing standard identity fields, model/runtime pickers, Tools and contract editors. Pack-managed Agents retain their separate read-only route and capability rules.
 
 ## Required structure
 
