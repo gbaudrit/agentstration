@@ -21,6 +21,16 @@
     gap: var(--form-section-gap);
 }
 
+/* Family sections retain their own mounted wrapper across fragment changes. */
+.resource-details-content ::deep > div:not([hidden]),
+.resource-details-content ::deep .resource-overview:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-width: 0;
+    gap: var(--form-section-gap);
+}
+
 .resource-details-feedback { display: contents; }
 .resource-details-content ::deep .resource-form,
 .resource-details-content ::deep .resource-editor-view { min-width: 0; grid-template-columns: minmax(0, 1fr); }

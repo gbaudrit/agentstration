@@ -99,6 +99,8 @@ The real Agent pilot supplies the following composition (see the complete execut
 </ResourceDetailsTemplate>
 ```
 
+The template applies the shared section gap inside its immediate visible `div` section wrappers and nested `.resource-overview` composition. Keep these wrappers intact when retaining section content; native `hidden` still controls visibility.
+
 Keep visited forms mounted with `hidden`; retain their `EditContext`, invalid parser input, labels and schema/editor state across section changes and responsive transitions. Only replace the model/context after a successful save, explicit discard or resource reload. Ignore superseded asynchronous load completions before applying snapshots or resetting section/draft state; Agent demonstrates a load-version check. Fragment-only transitions must not reload the saved resource. External submit buttons target the real `EditForm` by its stable HTML `id`; they must still run its validation. Do not call a save directly to bypass an invalid hidden form.
 
 Agent's overview reads `savedResource`, not the draft. Its dirty action surface remains available in Overview after visiting Definition, and Discard restores the saved snapshot. YAML retains its apply command and invalid-form guard; saved-resource YAML Save/Discard uses the same draft-action region, with the family-owned YAML handlers. The template has no API client and never determines whether saving succeeded.
