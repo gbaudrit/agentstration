@@ -231,7 +231,7 @@ else
         @if (visited.Contains(RunTab.Worker))
         {
         <div hidden="@(activeTab != RunTab.Worker)">
-            <RuntimePlacementSummary TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@(run.RootFlowRunId ?? run.Id)" ScopeRef="@run.ExecutionScopeRef" />
+            <RuntimePlacementSummary Active="@(activeTab == RunTab.Worker)" TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@(run.RootFlowRunId ?? run.Id)" ScopeRef="@run.ExecutionScopeRef" />
                 </div>
         }
         @foreach (var timelineTab in AvailableTabs.Where(value => (value is RunTab.Activity or RunTab.Handoffs or RunTab.RawEvents) && visited.Contains(value)))
