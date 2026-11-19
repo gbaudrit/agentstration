@@ -36,7 +36,7 @@ else
                 <FormField Label="@T("CurrentDefinitionVersion")" Required><Validation><ValidationMessage For="() => model.Version" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.Version" data-testid="flow-definition-version" /></ChildContent></FormField>
             </FormSection>
         </fieldset>
-        <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@(IsReadOnly || saving || ExternalBusy)" Changed="DefinitionChanged" />
+        <OrchestrationDefinitionEditor Model="model" Agents="agents" OwnerNamespace="FlowResourceNamespace" OwnerScope="selectedScope" IsReadOnly="@(IsReadOnly || saving || ExternalBusy)" Changed="DefinitionChanged" />
         @if (error is not null) { <p class="error-panel orchestration-message" role="alert">@error</p> }
         @if (message is not null) { <p class="success-panel orchestration-message" role="status" data-testid="flow-status-message" data-published-version="@lastPublishedVersion">@message</p> }
         @if (!IsReadOnly)

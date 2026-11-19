@@ -1,29 +1,53 @@
 {
-  "base": "a882485257d88c3aedfa539fece527790b2d8b85",
+  "base": "8e5b71d25dcd69954133b586ff0ad3e3a1ddbdbd",
   "sourceHashes": {
-    "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor": "4e29e8323408a06bf0cd728b1fdbd6ade5609659345a3973a83c86b7b91afb9f",
-    "tests/Agentstration.Console.Components.Tests/NewFlowWizardTests.cs": "52d9b407b75f438a205dcfebea68f57a612bd4095ccb02068c5316c6176b4243"
+    "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor": "b9ecc1142736780c5a629d3b97148660823293a5fc374842cdeb14b5f20464d4",
+    "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor.css": "b3ee053d5bb5c87f9670b7c8c0d04fce02d118ec2dfaeb50f98c2aae017560f5",
+    "src/Agentstration.Console.Components/Components/Flows/OrchestrationPreview.razor": "f178280696f0a857f779a256a757cd4d435808faa36e02def127cec406acd0f5",
+    "src/Agentstration.Console.Components/Components/Pages/FlowOrchestrationEditor.razor": "79dd9bc05263028898cae8f97f76c69b96c9fa711e90d2a6f95caec859ee40b7",
+    "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor": "5c33ddec3e1aafbdfe6da25b5352bff39aff6d3084ac532b0682139c5fc0e643",
+    "src/Agentstration.Console.Components/Console/OrchestrationEditorModel.cs": "6f09a2001ca935382604d731231d256c918e83720d603ef9b97dc021ecc24102",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/FlowOrchestrationEditorStrings.fr-FR.resx": "80b688c78251de31dfb0fcd735e5cfe3ad89c0b2d3b6a8eda83a7094d5fafbb0",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/FlowOrchestrationEditorStrings.resx": "e526c351b5876e1c26312f90dc1f20ad2a051e7851728bb2dfbebad268ad37aa",
+    "tests/Agentstration.Console.Components.Tests/OrchestrationConsoleComponentTests.cs": "d9748a5354216810f154478d00ef665763bfb23e9a145347e37bfcce01cd525e",
+    "tests/Agentstration.Console.Components.Tests/OrchestrationEditorModelTests.cs": "d20dabbad491d1866b3c8b2f4e81448741848f071adbf8caffcd5b5a23808937"
   },
   "hostHashes": {
-    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
-    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3",
-    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
-    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
-    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3",
-    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3"
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "b07f66dc71903a673c5bcdb283add5b762589aaf7af517c73a0f2178aa6bcaaf",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "a3d61b0f59d980c9272668c34fd0ad6c670d7b30d8602c26037c1a2c8a34177e",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "b07f66dc71903a673c5bcdb283add5b762589aaf7af517c73a0f2178aa6bcaaf",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "b07f66dc71903a673c5bcdb283add5b762589aaf7af517c73a0f2178aa6bcaaf",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "a3d61b0f59d980c9272668c34fd0ad6c670d7b30d8602c26037c1a2c8a34177e",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "a3d61b0f59d980c9272668c34fd0ad6c670d7b30d8602c26037c1a2c8a34177e"
   },
   "phases": [
     {
       "name": "handoff-regression",
       "exitCode": 0,
-      "seconds": 102.5
+      "seconds": 139.7
     },
     {
-      "name": "new-flow",
+      "name": "orchestration",
       "exitCode": 0,
-      "seconds": 109.4
+      "seconds": 148.9
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 202.3
     }
   ],
   "completed": true,
-  "running": []
+  "running": [],
+  "focusedTests": 25,
+  "protectedAgentHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "typeScript": "npm exec tsc -- --noEmit: exit 0",
+  "synchronization": "Includes the parallel Tool Set and Tool Definition list migrations (8c3683ec, 8e5b71d2); no shared Agent product source changed."
 }

@@ -1,3 +1,4 @@
+using Agentstration.Resources;
 using Agentstration.Flows;
 using Agentstration.Web.Components.Flows;
 using Agentstration.Web.Console;
@@ -144,6 +145,123 @@ public sealed class OrchestrationConsoleComponentTests
         var filteredAgent = rendered.FindAll(".agent-option");
         Assert.HasCount(1, filteredAgent);
         StringAssert.Contains(filteredAgent[0].TextContent, "Agent Beta");
+    }
+
+    [TestMethod]
+    public void HomonymousParticipantsKeepTheirSelectedNamespaceAndOwner()
+    {
+        using var context = CreateContext();
+        var model = new OrchestrationEditorModel();
+        var agents = new[]
+        {
+            new AgentSummary("same-name", "Team A assistant", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue)
+                { Namespace = ResourceNamespace.Parse("team-a"), ScopeRef = ResourceScopeRef.Parse("/instance") },
+            new AgentSummary("same-name", "Team B assistant", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue)
+                { Namespace = ResourceNamespace.Parse("team-b"), ScopeRef = ResourceScopeRef.Parse("/instance") }
+        };
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters
+            .Add(component => component.Model, model).Add(component => component.Agents, agents));
+
+        rendered.FindAll("[data-testid=flow-participant]")[1].Change(true);
+
+        Assert.HasCount(1, rendered.FindAll(".agent-option.is-selected"));
+        var selected = model.CreatePreviewDefinition().Participants.Single();
+        Assert.AreEqual(agents[1].Namespace, selected.Namespace);
+        Assert.AreEqual(agents[1].ScopeRef, selected.ScopeRef);
+        Assert.IsTrue(rendered.FindAll("[data-testid=flow-participant]")[0].HasAttribute("disabled"));
+        StringAssert.Contains(rendered.FindAll(".agent-option")[0].TextContent, "team-a/same-name");
+        StringAssert.Contains(rendered.FindAll(".agent-option")[1].TextContent, "team-b/same-name");
+    }
+
+    [TestMethod]
+    public void MagenticManagerAndPreviewResolveTheChosenHomonymWithoutReplacingItsPinnedReference()
+    {
+        using var context = CreateContext();
+        var owner = ResourceScopeRef.Parse("/instance");
+        var model = new OrchestrationEditorModel { Strategy = FlowOrchestrationStrategy.Magentic };
+        model.ParticipantIds.AddRange(["worker-a", "worker-b"]);
+        var pinned = new FlowTargetReference(FlowTargetKind.Agent, "manager", "2.0.0", ResourceNamespace.Parse("team-b"), owner, Guid.NewGuid(), Guid.NewGuid(), "saved-hash");
+        model.SelectManager(pinned);
+        var agents = new[]
+        {
+            new AgentSummary("manager", "Team A manager", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue)
+                { Namespace = ResourceNamespace.Parse("team-a"), ScopeRef = owner },
+            new AgentSummary("manager", "Team B manager", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue)
+                { Namespace = ResourceNamespace.Parse("team-b"), ScopeRef = owner }
+        };
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters
+            .Add(component => component.Model, model).Add(component => component.Agents, agents));
+        Assert.AreEqual("/instance|team-b|manager", rendered.Find(".strategy-options select").GetAttribute("value"));
+        Assert.AreSame(pinned, ((MagenticOrchestrationPattern)model.CreateDefinition().Pattern).Manager);
+        rendered.FindAll(".topology-node").Single(node => node.GetAttribute("aria-label")!.StartsWith("manager", StringComparison.Ordinal)).Click();
+        StringAssert.Contains(rendered.Find(".orchestration-node-details").TextContent, "team-b/manager");
+
+        rendered.Find(".strategy-options select").Change("/instance|team-a|manager");
+
+        var changed = ((MagenticOrchestrationPattern)model.CreateDefinition().Pattern).Manager;
+        Assert.AreEqual(agents[0].Namespace, changed.Namespace);
+        Assert.AreEqual(owner, changed.ScopeRef);
+        Assert.IsNull(changed.Version);
+        StringAssert.Contains(rendered.Find(".orchestration-node-details").TextContent, "team-a/manager");
+    }
+
+    [TestMethod]
+    public void SwitchingToMagenticBeforeChoosingItsManagerKeepsTheEditorUsable()
+    {
+        using var context = CreateContext();
+        var model = new OrchestrationEditorModel();
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters.Add(component => component.Model, model));
+
+        rendered.Find("[data-testid=flow-strategy]").Change("Magentic");
+
+        Assert.AreEqual(FlowOrchestrationStrategy.Magentic, model.Strategy);
+        Assert.IsNotNull(rendered.Find(".strategy-options select"));
+        Assert.HasCount(0, rendered.FindAll(".topology-canvas"));
+        Assert.Throws<InvalidOperationException>(() => model.CreateDefinition());
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void AnUnchangedRelativeReferenceCanInspectItsUniqueInheritedAgentWithoutBeingRewritten(bool recordedOwner)
+    {
+        using var context = CreateContext();
+        var model = new OrchestrationEditorModel();
+        model.ParticipantIds.Add("inherited");
+        var agents = new[] { new AgentSummary("inherited", "Inherited assistant", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue)
+            { ScopeRef = recordedOwner ? ResourceScopeRef.Instance : null } };
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters
+            .Add(component => component.Model, model).Add(component => component.Agents, agents)
+            .Add(component => component.OwnerScope, ResourceScopeRef.Workspace(Guid.NewGuid())));
+
+        Assert.IsTrue(rendered.Find("[data-testid=flow-participant]").HasAttribute("checked"));
+        StringAssert.Contains(rendered.Find(".participant-order").TextContent, "Inherited assistant");
+        var saved = model.CreatePreviewDefinition().Participants.Single();
+        Assert.IsNull(saved.Namespace);
+        Assert.IsNull(saved.ScopeRef);
+    }
+
+    [TestMethod]
+    public void AnUnresolvedRelativeParticipantDoesNotSelectAnotherWorkspaceAndCanBeExplicitlyReplaced()
+    {
+        using var context = CreateContext();
+        var model = new OrchestrationEditorModel();
+        model.ParticipantIds.Add("same-name");
+        var other = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var agents = new[] { new AgentSummary("same-name", "Another workspace assistant", "assistant", "1", "Ready", [], "local", DateTimeOffset.MinValue) { ScopeRef = other } };
+        var rendered = context.Render<OrchestrationDefinitionEditor>(parameters => parameters
+            .Add(component => component.Model, model).Add(component => component.Agents, agents)
+            .Add(component => component.OwnerScope, ResourceScopeRef.Workspace(Guid.NewGuid())));
+        Assert.HasCount(0, rendered.FindAll(".agent-option.is-selected"));
+        Assert.IsTrue(rendered.Find("[data-testid=flow-participant]").HasAttribute("disabled"));
+        Assert.IsNull(model.CreatePreviewDefinition().Participants.Single().ScopeRef);
+
+        rendered.Find(".participant-order .button-danger").Click();
+        Assert.IsEmpty(model.ParticipantIds);
+        Assert.IsFalse(rendered.Find("[data-testid=flow-participant]").HasAttribute("disabled"));
+        rendered.Find("[data-testid=flow-participant]").Change(true);
+
+        Assert.AreEqual(other, model.CreatePreviewDefinition().Participants.Single().ScopeRef);
     }
 
     private static BunitContext CreateContext()

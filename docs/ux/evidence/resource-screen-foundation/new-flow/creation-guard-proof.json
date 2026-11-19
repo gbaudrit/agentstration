@@ -1,0 +1,29 @@
+{
+  "base": "a882485257d88c3aedfa539fece527790b2d8b85",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor": "4e29e8323408a06bf0cd728b1fdbd6ade5609659345a3973a83c86b7b91afb9f",
+    "tests/Agentstration.Console.Components.Tests/NewFlowWizardTests.cs": "52d9b407b75f438a205dcfebea68f57a612bd4095ccb02068c5316c6176b4243"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "ecc6d68df1ae8b0832a9ed2fa7c550cd66de35c2f4555df6f0082bde08100f66",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "255149acd435b199708a425f046258789687a9c0e6128fd4087b4559bd00bee3"
+  },
+  "phases": [
+    {
+      "name": "handoff-regression",
+      "exitCode": 0,
+      "seconds": 102.5
+    },
+    {
+      "name": "new-flow",
+      "exitCode": 0,
+      "seconds": 109.4
+    }
+  ],
+  "completed": true,
+  "running": []
+}

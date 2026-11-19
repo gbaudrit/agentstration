@@ -43,10 +43,10 @@
             </InputRadioGroup>
         </FormSection></div>
         <div hidden="@(model.Kind != "Orchestration")" data-testid="flow-orchestration-configuration">
-            <FormSection Title="@T("ConfigurationTitle")" Description="@T("ConfigurationHelp")"><FormField Label="@T("Enabled")" Help="@T("EnabledHelp")"><FormCheckbox @bind-Value="orchestration.Enabled" role="switch" data-testid="flow-enabled" /></FormField></FormSection>
+            <FormSection Title="@T("ConfigurationTitle")" Description="@T("ConfigurationHelp")"><ResourceActivationToggle @bind-Enabled="orchestration.Enabled" TestId="flow-enabled" /><p class="form-help">@T("EnabledHelp")</p></FormSection>
             @if (agentsLoading) { <LoadingState Message="@T("LoadingAgents")" /> }
             else if (agentsError is not null) { <ErrorState Title="@Shared["Unavailable"]" Message="@agentsError" /><button type="button" class="button-secondary" @onclick="LoadAgentsAsync">@T("Retry")</button> }
-            else { <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" Changed="DefinitionChanged" IsReadOnly="submitting" /> }
+            else { <OrchestrationDefinitionEditor Model="orchestration" Agents="agents" OwnerScope="selectedScope" Changed="DefinitionChanged" IsReadOnly="submitting" /> }
             @if (configurationError) { <p class="validation-message" role="alert">@T("Validation.Configuration")</p> }
         </div>
     </div>;

@@ -87,4 +87,6 @@
 <data name="Validation.Version" xml:space="preserve"><value>Saisissez une version sémantique de définition valide.</value></data>
 <data name="Validation.Configuration" xml:space="preserve"><value>Vérifiez les participants, les routes et les limites de l’orchestration avant d’enregistrer.</value></data>
 <data name="Validation.PublishVersion" xml:space="preserve"><value>Saisissez la version à publier.</value></data>
+  <data name="ParticipantNameAlreadySelected" xml:space="preserve"><value>Un autre Agent portant ce nom technique est déjà sélectionné. Retirez-le avant de choisir cet Agent.</value></data>
+  <data name="RemoveParticipant" xml:space="preserve"><value>Retirer le participant {0}</value></data>
 </root>
