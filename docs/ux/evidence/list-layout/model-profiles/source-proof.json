@@ -1,0 +1,16 @@
+{
+  "baseCommit": "5362910273cedf17fbf366e379282d6fbbc36030",
+  "route": "/modelprofiles",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor": "f738bd6810d865c0e9183f924197f1d0816f9954",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor.cs": "fe22102a14c63271e949e4dd55f10a8fc8e541a1",
+    "src/Agentstration.Models.Api/Api/ModelProfileEndpoints.cs": "8894fc3bcd44c2e25498528dca30fe2d68702865",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png",
+    "delete-confirm-desktop-en.png"
+  ]
+}

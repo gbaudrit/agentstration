@@ -44,6 +44,7 @@ public sealed class ModelProfileCollectionStatusTests
         using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost") };
         context.Services.AddSingleton<IModelProfilesClient>(new ModelProfilesApiClient(http));
         context.Services.AddSingleton<IModelProvidersClient>(new ModelProvidersApiClient(http));
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
         var strings = context.Services.GetRequiredService<IStringLocalizer<ModelProfilesStrings>>();
         cut.WaitForAssertion(() =>
@@ -55,15 +56,15 @@ public sealed class ModelProfileCollectionStatusTests
                 Assert.AreEqual(strings[$"Status.{cases[index].Item2}"].Value, statuses[index].QuerySelector("button")!.GetAttribute("aria-label"));
                 StringAssert.Contains(statuses[index].ClassName!, $"status-{cases[index].Item3.ToString().ToLowerInvariant()}");
             }
-            Assert.AreEqual(2, handler.Calls, "Rendering states must not resolve a resource or scope per row.");
+            Assert.AreEqual(1, handler.Calls, "Rendering states must not resolve a resource or scope per row.");
         });
-        cut.FindAll("select")[1].Change("available");
+        cut.Find("[data-filter-key=status] select").Change("Available");
         cut.WaitForAssertion(() => Assert.HasCount(2, cut.FindAll("tbody tr")));
-        cut.FindAll("select")[1].Change(string.Empty);
+        cut.Find("[data-filter-key=status] select").Change(string.Empty);
         cut.Find("input[type='search']").Input("profile-0");
         cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("tbody tr")));
         cut.Find("input[type='search']").Input("no-such-profile");
-        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll(".resource-collection")));
+        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll(".resource-name-link")));
         cut.Find("input[type='search']").Input(string.Empty);
         cut.WaitForAssertion(() => Assert.HasCount(cases.Length, cut.FindAll("tbody tr")));
     }

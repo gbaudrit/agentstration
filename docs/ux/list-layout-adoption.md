@@ -29,6 +29,7 @@ Each screen is completed, checked, committed and published before the next start
 | Workers | Existing complete authorized global Worker array; name/UUID search, presence/enrollment and capability filters, advanced session/software-version filters; exact totals and local 20/50/100 pages. API PlatformAdmin policy remains authoritative. | Template adopted; exact Worker/context links and all existing technical/presence/load facts retained. Open-only menu and obsolete local responsive CSS removed; capacity and active load displayed separately; material wording EN/FR localized. Six new cases and existing inventory regression pass. Release Web/Workplace builds, full targeted format and real enrolled-Worker desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/runtime-workers/README.md) distinguish one-Worker browser evidence from multi-page component checks. Two catalog assertions pass; known global equality issue not rerun. Full lanes and #1242 remain deferred. |
 | Agent Runs | Existing bounded Runtime Run API now read through a family execution-summary page adapter preserving nextLink. Exact scope/skip/top; unknown total, previous/next and 20/50/100 sizes. No page-local filters or fetch-all. | Template adopted; start/duration/outcome and status retained, exact execution-scope/navigation links added, Open-only menu removed. Failed pages retain successful facts and retry the requested page; an empty terminal window retains Previous. Six EN/FR cases pass. Release Web/Workplace builds, targeted full format and real 25-completed-Run desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/agent-runs/README.md). Two catalog assertions pass; known global equality issue not rerun. Full lanes and #1242 remain deferred. |
 | Agent Instances | Existing exact-scope observed array examines at most 500 assignments; no endpoint continuation or global query contract. No search, filters, total or local paging; shared loaded count and EN/FR bounded-snapshot/observed-empty wording. | Template adopted on both aliases, retaining exact Run scope, context-aware Agent/Worker links and all technical facts in four shared information declarations. No Agent ownership inferred from execution scope; Open-only menu removed. Five new cases plus existing rendering regression, warning-free Web/Workplace builds, full targeted format, TypeScript and existing desktop/mobile concurrency/cleanup/Worker-loss/authorization journeys pass. Real active-instance desktop/mobile captures: [evidence and source proof](evidence/list-layout/agent-instances/README.md). Two catalog assertions pass; known global equality issue not rerun. Full lanes and #1242 remain deferred. |
+| Model Profiles | Existing complete authorized ValueResponse; one unfiltered catalog request. Existing search, canonical status/provider-name filters, advanced model/known-usage filters and namespace/exact-scope filters; exact totals and local 20/50/100 pages. Provider choices use the authorized summaries. | Template adopted; qualified links, status tones and existing profile facts retained. Creation permission-gated; exact-owner unmanaged Delete keeps usage checks, confirmation, latest scoped ETag and conflict links. Context changes cancel stale commands; successful deletion is removed before refreshing retained data. Ten new plus two existing EN/FR cases pass. Warning-free Web/Workplace builds, full targeted format and populated desktop/mobile API smoke including cancellation and actual disposable-profile deletion pass; [captures and source proof](evidence/list-layout/model-profiles/README.md). Two catalog assertions pass; known global equality issue not rerun. Full lanes and #1242 remain deferred. |
 
 ## Remaining top-level Console list adapters
 
@@ -37,40 +38,40 @@ This source inventory identifies concrete top-level list adapters still outside 
 | Source | Routes / aliases | Batch status |
 | --- | --- | --- |
 | `AgentRuns.razor` | `/agent-runs` | Adopted |
-| `Agents.razor` | `/agents` | Outside this batch; page composition remaining |
-| `Artifacts.razor` | `/artifacts` | Outside this batch; page composition remaining |
-| `BootstrapProfiles.razor` | `/settings/bootstrap` | Outside this batch; page composition remaining |
+| `Agents.razor` | `/agents` | Remaining; requires individual contract review |
+| `Artifacts.razor` | `/artifacts` | Remaining; requires individual contract review |
+| `BootstrapProfiles.razor` | `/settings/bootstrap` | Remaining; requires individual contract review |
 | `ConnectedServices.razor` | `/connected-services` | Protected pilot |
 | `DataSourceProfiles.razor` | `/data-source-profiles` | Adopted in this batch |
 | `DataSources.razor` | `/data-sources` | Adopted |
 | `Deployments.razor` | `/agent-instances`, `/deployments` | Adopted |
-| `Extensions.razor` | `/extensions` | Outside this batch; page composition remaining |
+| `Extensions.razor` | `/extensions` | Remaining; requires individual contract review |
 | `Flows.razor` | `/flows` | Protected pilot |
-| `KnowledgeSources.razor` | `/knowledge-sources` | Outside this batch; page composition remaining |
-| `ModelProfiles.razor` | `/modelprofiles` | Outside this batch; page composition remaining |
+| `KnowledgeSources.razor` | `/knowledge-sources` | Remaining; requires individual contract review |
+| `ModelProfiles.razor` | `/modelprofiles` | Adopted |
 | `ModelProviders.razor` | `/modelproviders` | Adopted |
-| `OrganizationAccess.razor` | `/settings/organization/access` | Outside this batch; page composition remaining |
-| `OrganizationMembers.razor` | `/settings/organization/members` | Outside this batch; page composition remaining |
-| `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Outside this batch; page composition remaining |
-| `Packs.razor` | `/packs` | Outside this batch; page composition remaining |
+| `OrganizationAccess.razor` | `/settings/organization/access` | Remaining; requires individual contract review |
+| `OrganizationMembers.razor` | `/settings/organization/members` | Remaining; requires individual contract review |
+| `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Remaining; requires individual contract review |
+| `Packs.razor` | `/packs` | Remaining; requires individual contract review |
 | `Parameters.razor` | `/parameters` | Adopted |
-| `ResourcePlans.razor` | `/resource-plans` | Outside this batch; page composition remaining |
-| `ResourceScopes.razor` | `/settings/resource-scopes` | Outside this batch; page composition remaining |
+| `ResourcePlans.razor` | `/resource-plans` | Remaining; requires individual contract review |
+| `ResourceScopes.razor` | `/settings/resource-scopes` | Remaining; requires individual contract review |
 | `RuntimeProfiles.razor` | `/runtimeprofiles` | Adopted in this batch |
 | `RuntimeWorkers.razor` | `/settings/runtime-workers` | Adopted |
 | `Schemas.razor` | `/schemas` | Adopted |
 | `Secrets.razor` | `/secrets` | Adopted |
-| `Settings.razor` | `/settings` | Outside this batch; page composition remaining |
+| `Settings.razor` | `/settings` | Remaining; requires individual contract review |
 | `SourceProviders.razor` | `/sourceproviders` | Adopted |
-| `SourceRegistries.razor` | `/settings/source-registries` | Outside this batch; page composition remaining |
-| `Sources.razor` | `/settings/sources` | Outside this batch; page composition remaining |
+| `SourceRegistries.razor` | `/settings/source-registries` | Remaining; requires individual contract review |
+| `Sources.razor` | `/settings/sources` | Remaining; requires individual contract review |
 | `StorageTypes.razor` | `/storage-types` | Adopted |
 | `Storages.razor` | `/storages` | Adopted |
 | `ToolCategories.razor` | `/tools/categories` | Adopted in this continuation |
 | `ToolDefinitions.razor` | `/tools/definitions` | Adopted in this continuation |
 | `ToolProviders.razor` | `/tools/providers` | Adopted in this continuation |
 | `ToolSets.razor` | `/tools/sets` | Adopted in this continuation |
-| `Tools.razor` | `/tools` | Outside this batch; page composition remaining |
-| `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Outside this batch; page composition remaining |
-| `Triggers.razor` | `/triggers` | Outside this batch; page composition remaining |
+| `Tools.razor` | `/tools` | Remaining; requires individual contract review |
+| `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Remaining; requires individual contract review |
+| `Triggers.razor` | `/triggers` | Remaining; requires individual contract review |
 | `Vaults.razor` | `/vaults` | Adopted |

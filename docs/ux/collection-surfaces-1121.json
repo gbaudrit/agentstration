@@ -3709,14 +3709,14 @@
     {
       "id": "model-profiles-model-profile-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
-      "line": 35,
+      "line": 11,
       "host": "console",
       "routes": [
         "/modelprofiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ModelProfileSummaryResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Profile",
       "scope": true,
       "state": true,
       "actions": true,
@@ -3788,6 +3788,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "e4feda69f678c71f4501e90f221fd6c072680fb2"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse from ModelProfileManagementService.ListAsync/store.ListAllAsync. One unfiltered load; local existing name/provider/model search, canonical status, provider-name choice, advanced model/known usage-count filters and namespace/exact-scope filters. Exact totals and local 20/50/100 pages. No provider catalog load or per-row resolution is introduced.",
+        "identity": "Exact qualified profile links, status tones including neutral future states, provider/model/nullable usage facts and scope/governance badges retained. Options derive from authorized profile summaries.",
+        "actions": "Create requires resources/write. Only exact-owner, unmanaged profiles with resources/read and resources/delete have Delete commands; Open-only menu link removed. Existing usage check, confirmation, latest scoped snapshot ETag, conflict usages and notification retained.",
+        "states": "Compatible refresh/view, stable query, successful shrink clamping, stale/context-replaced read guards, denied-read clearing and operation cancellation/context checks. A confirmed successful deletion is removed from the retained snapshot before refresh. Operation feedback is localized and never displays raw transport errors.",
+        "validation": "ModelProfileListTests plus maintained EN/FR ModelProfileCollectionStatusTests, populated deterministic desktop/mobile API smoke and actual disposable-profile confirmation/deletion. Evidence/limits in list-layout-adoption.md."
       }
     },
     {
