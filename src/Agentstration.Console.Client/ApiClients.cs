@@ -49,6 +49,7 @@ public interface IAgentRunnerManagementClient
 
 public interface IRuntimeApiClient
 {
+    Task<ExecutionSummaryPage> GetExecutionsPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken);
     Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken);
     Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken);

@@ -494,17 +494,17 @@
     {
       "id": "agent-runs-execution-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor",
-      "line": 8,
+      "line": 9,
       "host": "console",
       "routes": [
         "/agent-runs"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ExecutionSummary",
       "identityLabel": "Run",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Agent",
         "Started",
@@ -574,6 +574,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "f00a1635645daf8fd3a95df50c5b2050c14b41ab"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "New family client page adapter preserves the existing RuntimeRunPageResponse continuation with one exact-scope skip/top request and existing execution-summary projection. Unknown total, previous/next and 20/50/100 sizes. No search/filter contract fabricated for loaded pages and no fetch-all loop.",
+        "identity": "Existing Run/Agent/start/duration/outcome and status retained. Run name links explicitly retain exact execution scope and navigation context. Open-only menu removed.",
+        "states": "Compatible refresh/view and successful pager facts retained on failure; retry actual requested page. Empty terminal continuation keeps Previous and empty-page wording, not empty-catalog wording. Context/stale response and runs/read guards.",
+        "validation": "AgentRunCollectionTests plus populated deterministic real-run desktop/mobile API smoke; list-layout-adoption.md records evidence and limits."
       }
     },
     {
