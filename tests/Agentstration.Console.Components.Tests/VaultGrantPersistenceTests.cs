@@ -553,6 +553,23 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual("/vaults", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
     }
 
+    [TestMethod]
+    public async Task ConfirmedSecretDeletionClearsItsWriteOnlyAndPolicyDrafts()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid()); var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
+        using var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources"); context.Services.AddSingleton<ISecretsClient>(client);
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/secrets/credential?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureSecretNavigation(context); var cut = context.Render<SecretEditor>(p => p.Add(c => c.Name, "credential"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("value"));
+        cut.Find(".secret-value-panel .button-primary").Click(); cut.Find("input[type=password]").Input("public-pending-deletion-fixture");
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.SecretDeletes); Assert.AreEqual(0, client.ValueWrites);
+        Assert.DoesNotContain("public-pending-deletion-fixture", cut.Markup);
+        Assert.AreEqual("/secrets", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
     private static void ConfigureSecretNavigation(BunitContext context)
     {
         var uri = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
@@ -587,6 +604,7 @@ public sealed class VaultGrantPersistenceTests
         public int SecretMetadataSaves { get; private set; }
         public int ValueWrites { get; private set; }
         public int VaultDeletes { get; private set; }
+        public int SecretDeletes { get; private set; }
         public int ValueDeletes { get; private set; }
         public ResourceScopeRef? LastVaultConsumerScope { get; private set; }
         public VaultResource Saved { get; private set; } = new()
@@ -659,7 +677,7 @@ public sealed class VaultGrantPersistenceTests
         public Task SetSecretValueAsync(string name, ResourceScopeRef scopeRef, string value, CancellationToken token) { ValueWrites++; return Task.CompletedTask; }
         public Task DeleteSecretValueAsync(string name, CancellationToken token) { ValueDeletes++; return Task.CompletedTask; }
         public Task DeleteSecretValueAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) { ValueDeletes++; return Task.CompletedTask; }
-        public Task DeleteSecretAsync(string name, string etag, CancellationToken token) => throw new NotSupportedException();
+        public Task DeleteSecretAsync(string name, string etag, CancellationToken token) { SecretDeletes++; return Task.CompletedTask; }
         public Task<SecretUsagesResponse> GetSecretUsagesAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<SecretUsagesResponse> GetSecretUsagesAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>
             Task.FromResult(new SecretUsagesResponse([], 0));

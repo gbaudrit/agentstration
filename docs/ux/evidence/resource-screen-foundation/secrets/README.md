@@ -21,3 +21,7 @@ Verification:
 | Retained concurrent refresh | [Capture](secret-retained-refresh-desktop-en.png) | [Capture](secret-retained-refresh-mobile-fr.png) |
 | Independent write-only draft | [Capture](secret-write-only-draft-desktop-en.png) | [Capture](secret-write-only-draft-mobile-fr.png) |
 | Saved YAML | [Capture](secret-yaml-desktop-en.png) | [Capture](secret-yaml-mobile-fr.png) |
+
+## Confirmed-deletion follow-up
+
+Secret invalidates the deleted snapshot and drafts before its post-render return to the exact collection path. [Focused regression and actual desktop/touch evidence](../deletion-followup/README.md).
