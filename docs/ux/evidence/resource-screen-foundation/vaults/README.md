@@ -23,3 +23,7 @@ Verification:
 | Invalid Identity | [Capture](vault-invalid-identity-desktop-en.png) | [Capture](vault-invalid-identity-mobile-fr.png) |
 | Initialized master key | [Capture](vault-initialized-desktop-en.png) | [Capture](vault-initialized-mobile-fr.png) |
 | Saved YAML | [Capture](vault-yaml-desktop-en.png) | [Capture](vault-yaml-mobile-fr.png) |
+
+## Confirmed-deletion follow-up
+
+Vault invalidates the deleted snapshot and drafts before its post-render return to the exact collection path. [Focused regression and actual desktop/touch evidence](../deletion-followup/README.md).

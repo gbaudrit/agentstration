@@ -125,7 +125,7 @@ else
         if (!FormContext.Validate() || selectedScope is null) { finish.ReturnToStepId = "identity"; definitionForm?.RequestValidationFocus(); return; }
         await SaveAsync();
     }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
     private void Apply(VaultResource value, string version)
     {
         resource = value; model = VaultEditorModel.From(value); selectedScope = value.ScopeRef; etag = version;
@@ -238,11 +238,12 @@ else
         catch (Exception exception) { if (version == loadVersion) error = exception; }
         finally { if (version == loadVersion) busy = false; }
     }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
         if (!CanManage || busy || refreshing || resource is not { ScopeRef: { } owner } current) return;
         var version = loadVersion; confirmDelete = false;
-        try { await Client.DeleteVaultAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        try { await Client.DeleteVaultAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; Clear(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
         catch (Exception exception) { if (version == loadVersion) error = exception; }
     }
     private string ResourceUrl(VaultResource value) => ResourceOwnershipContext.Resource(Services, "/vaults", value.Name, value.Namespace, value.ScopeRef);

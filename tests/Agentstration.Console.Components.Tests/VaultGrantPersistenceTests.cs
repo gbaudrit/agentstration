@@ -539,6 +539,20 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, client.ValueWrites); Assert.AreEqual(0, client.ValueDeletes);
     }
 
+    [TestMethod]
+    public async Task ConfirmedVaultDeletionReleasesItsPendingPolicyDraft()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid()); var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
+        using var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources"); context.Services.AddSingleton<ISecretsClient>(client);
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureVaultNavigation(context); var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.VaultDeletes);
+        Assert.AreEqual("/vaults", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
     private static void ConfigureSecretNavigation(BunitContext context)
     {
         var uri = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
@@ -572,6 +586,7 @@ public sealed class VaultGrantPersistenceTests
         public bool ManagedSecret { get; init; }
         public int SecretMetadataSaves { get; private set; }
         public int ValueWrites { get; private set; }
+        public int VaultDeletes { get; private set; }
         public int ValueDeletes { get; private set; }
         public ResourceScopeRef? LastVaultConsumerScope { get; private set; }
         public VaultResource Saved { get; private set; } = new()
@@ -622,7 +637,7 @@ public sealed class VaultGrantPersistenceTests
         }
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> UpdateVaultAsync(string name, PutVaultRequest request, string etag, CancellationToken token) => throw new NotSupportedException();
-        public Task DeleteVaultAsync(string name, string etag, CancellationToken token) => throw new NotSupportedException();
+        public Task DeleteVaultAsync(string name, string etag, CancellationToken token) { VaultDeletes++; return Task.CompletedTask; }
         public Task<VaultInitializationResponse> InitializeVaultAsync(string name, CancellationToken token) => throw new NotSupportedException();
         public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken token) => throw new NotSupportedException();
         public Task<ResourceSnapshot<SecretResponse>> GetSecretAsync(string name, CancellationToken token) => throw new NotSupportedException();
