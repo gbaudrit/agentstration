@@ -6,17 +6,15 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
 
 <PageTitle>@T("WorkerDetails") · Agentstration</PageTitle>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (details is not null)
-{
-    <ResourceDetailsTemplate Name="@details.Worker.DisplayName" ResourceType="@T("WorkerDetails")" Domain="runtime" IconName="server"
-                             Description="@T("DetailsDescription")" StatusText="@T($"Presence.{details.Worker.Presence}")" Status="@PresenceStatus(details.Worker.Presence)"
-                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection" TestId="runtime-worker-details">
-        <Metadata><CopyableValue Value="@details.Worker.WorkerId.ToString("D")" /></Metadata>
+    <ResourceDetailsTemplate Name="@(details?.Worker.DisplayName ?? T("WorkerDetails"))" ResourceType="@T("WorkerDetails")" Domain="runtime" IconName="server"
+                             Description="@T("DetailsDescription")" StatusText="@(details is null ? null : T($"Presence.{details.Worker.Presence}"))" Status="@(details is null ? UiStatus.Neutral : PresenceStatus(details.Worker.Presence))"
+                             Sections="Sections" ResourceIdentity="@(loadedKey ?? WorkerId.ToString("D"))" DefaultSection="overview" SectionState="sectionState" SelectionChanged="SelectSection"
+                             LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" SectionTestIdPrefix="runtime-worker" TestId="runtime-worker-details">
+        <Metadata>@if (details is not null) { <CopyableValue Value="@details.Worker.WorkerId.ToString("D")" /> }</Metadata>
         <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/settings/runtime-workers", Services)">@T("BackToWorkers")</a></Actions>
         <Content>
-        <div class="worker-overview" data-worker-section="overview" hidden="@(section != "overview")">
+        @if (details is not null) {
+        <div class="worker-overview" data-worker-section="overview" hidden="@(!sectionState.Is("overview"))">
             <section class="metric-grid worker-metrics">
                 <MetricCard Label="@T("Presence")" Value="@T($"Presence.{details.Worker.Presence}")" Detail="@T($"Enrollment.{details.Worker.EnrollmentState}")" Status="@PresenceStatus(details.Worker.Presence)" />
                 <MetricCard Label="@T("Capacity")" Value="@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")" Detail="@T("ActiveAssignments", details.Worker.ActiveAssignments)" Status="@(details.Worker.ActiveAssignments > 0 ? UiStatus.Info : UiStatus.Neutral)" />
@@ -30,7 +28,7 @@ else if (details is not null)
                 <dl class="details-list"><dt>@T("Version")</dt><dd><span>@SoftwareVersion(details.Worker.SoftwareVersion)</span>@if (SoftwareBuild(details.Worker.SoftwareVersion) is { } build) { <small class="worker-build" title="@details.Worker.SoftwareVersion">+@build</small> }</dd><dt>@T("Protocol")</dt><dd>@details.Worker.ProtocolVersion</dd><dt>@T("Capacity")</dt><dd>@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")</dd><dt>@T("Capabilities")</dt><dd>@(details.Worker.Capabilities.Count == 0 ? "—" : string.Join(", ", details.Worker.Capabilities.Select(FormatCapability)))</dd></dl>
             </FormSection>
         </div>
-        <div data-worker-section="assignments" hidden="@(section != "assignments")">
+        <div data-worker-section="assignments" hidden="@(!sectionState.Is("assignments"))">
             <article class="panel worker-assignments" data-testid="runtime-worker-assignments">
                 <div class="panel-header"><div><h2>@T("Assignments")</h2><p>@T("AssignmentsDescription")</p></div><span class="worker-count">@details.RecentAssignments.Count</span></div>
                 @if (details.RecentAssignments.Count == 0) { <div class="worker-empty"><p>@T("NoAssignments")</p></div> }
@@ -52,55 +50,78 @@ else if (details is not null)
                     </div>
                     @foreach (var assignment in details.RecentAssignments.Where(item => item.Attempts.Count > 0))
                     {
-                        <details class="worker-attempts"><summary>@T("RunAttempts", assignment.RunId, assignment.Attempts.Count)</summary><ol class="operations-list">@foreach (var attempt in assignment.Attempts.OrderByDescending(item => item.AcquiredAt)) { <li><span>@T($"AttemptState.{attempt.State}") · @attempt.AcquiredAt.LocalDateTime.ToString("g")</span><small>@T("AttemptDetails", attempt.WorkerSessionId, attempt.LastHeartbeatAt.LocalDateTime.ToString("g"), attempt.LeaseExpiresAt.LocalDateTime.ToString("g"), attempt.FencingGeneration, attempt.ErrorCode ?? "—")</small></li> }</ol></details>
+                        <details @key="assignment.AssignmentId" class="worker-attempts"><summary>@T("RunAttempts", assignment.RunId, assignment.Attempts.Count)</summary><ol class="operations-list">@foreach (var attempt in assignment.Attempts.OrderByDescending(item => item.AcquiredAt)) { <li><span>@T($"AttemptState.{attempt.State}") · @attempt.AcquiredAt.LocalDateTime.ToString("g")</span><small>@T("AttemptDetails", attempt.WorkerSessionId, attempt.LastHeartbeatAt.LocalDateTime.ToString("g"), attempt.LeaseExpiresAt.LocalDateTime.ToString("g"), attempt.FencingGeneration, attempt.ErrorCode ?? "—")</small></li> }</ol></details>
                     }
                 }
             </article>
         </div>
+        }
         </Content>
     </ResourceDetailsTemplate>
-}
 
 @code {
     [Parameter] public Guid WorkerId { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private RuntimeWorkerDetailsResponse? details;
-    private string section = "overview";
-    private void SelectSection(string? value) => section = value ?? "overview";
-    private string? loadedKey, error;
-    private bool loading = true;
+    private readonly ResourceSectionState sectionState = new();
+    private string? loadedKey;
+    private void SelectSection(string? path) => sectionState.Select(path ?? "overview");
+    private bool loading;
     private long loadVersion;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("assignments", T("Assignments"), "list-check")];
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
         var key = $"{WorkerId}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (loadedKey == key) return;
-        loadedKey = key; var request = ++loadVersion;
-        loading = true; error = null; details = null; section = "overview";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; sectionState.Reset(key); return LoadAsync(refresh: false);
+    }
+    private Task RetryAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: details is not null);
+    private Task RefreshAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: true);
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var requestedWorker = WorkerId;
+        loading = true;
+        if (!refresh) details = null;
+        loadState = new(refresh && details is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = details is not null };
         try
         {
-            var saved = await Client.GetRuntimeWorkerAsync(WorkerId, cancellation.Token);
+            var saved = await Client.GetRuntimeWorkerAsync(requestedWorker, cancellation.Token);
             if (request != loadVersion) return;
-            if (saved.Worker.WorkerId != WorkerId) throw new InvalidOperationException(T("IdentityMismatch"));
-            details = saved;
+            if (saved.Worker.WorkerId != requestedWorker)
+            {
+                details = null; loadState = new(ResourceLoadStatus.Failed) { Message = T("IdentityMismatch") }; return;
+            }
+            details = saved; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) { error = exception.Message; loadedKey = null; } }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) details = null;
+            loadState = new(status) { HasContent = details is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
         finally { if (request == loadVersion) loading = false; }
     }
     private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) => $"{capability.RuntimeKind} {capability.CapabilityVersion}";
     private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
     private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
     private static UiStatus PresenceStatus(RuntimeWorkerPresenceState presence) => PlatformDashboardService.ToStatus(presence.ToString());
-    private static string RunUrl(RuntimeAssignmentPlacementResponse item)
+    private string RunUrl(RuntimeAssignmentPlacementResponse item)
     {
         var path = item.TargetKind == nameof(RuntimeAssignmentTargetKind.FlowRun)
             ? $"/flow-runs/{Uri.EscapeDataString(item.RunId)}"
             : $"/runs/{Uri.EscapeDataString(item.RunId)}";
-        return item.ExecutionScopeRef is { } scopeRef
+        return ResourceOwnershipContext.PreserveNavigation(item.ExecutionScopeRef is { } scopeRef
             ? $"{path}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}"
-            : path;
+            : path, Services);
     }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

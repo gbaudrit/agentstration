@@ -1,6 +1,10 @@
+using System.Net;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -121,7 +125,8 @@ public sealed class RuntimeObservabilityConsoleTests
         using var context = CreateContext(new RuntimeClient { Details = new(worker, []) });
         var rendered = context.Render<RuntimeWorkerDetails>(parameters => parameters.Add(component => component.WorkerId, Guid.NewGuid()));
         StringAssert.Contains(rendered.Markup, "does not match the requested identity");
-        Assert.AreEqual(0, rendered.FindAll("[data-testid=runtime-worker-details]").Count);
+        Assert.HasCount(1, rendered.FindAll("[data-testid=runtime-worker-details]"));
+        Assert.IsEmpty(rendered.FindAll("[data-worker-section], .resource-details-navigation"));
         Assert.IsFalse(rendered.Markup.Contains("Another worker", StringComparison.Ordinal));
     }
 
@@ -149,6 +154,91 @@ public sealed class RuntimeObservabilityConsoleTests
         Assert.AreEqual("3", cut.FindAll(".runtime-attempt-card dd").Last().TextContent.Trim());
     }
 
+    [TestMethod]
+    [DataRow(HttpStatusCode.Forbidden, false)]
+    [DataRow(HttpStatusCode.NotFound, false)]
+    [DataRow(HttpStatusCode.ServiceUnavailable, true)]
+    public async Task WorkerRefreshUsesSharedStatesAndKeepsOnlyRecoverableContent(HttpStatusCode status, bool retain)
+    {
+        var worker = Worker(Guid.NewGuid(), "Authorized worker fixture");
+        var client = new RuntimeClient { Details = new(worker, []) };
+        using var context = WorkerContext(client, worker.WorkerId);
+        var cut = context.Render<RuntimeWorkerDetails>(p => p.Add(c => c.WorkerId, worker.WorkerId));
+        var state = cut.FindComponent<ResourceDetailsTemplate>().Instance.SectionState;
+        client.ReadError = new AgentstrationApiException("fixture", "worker-fixture", status);
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreEqual(retain, cut.FindAll("[data-worker-section=overview]").Count > 0);
+        Assert.AreSame(state, cut.FindComponent<ResourceDetailsTemplate>().Instance.SectionState);
+        if (retain)
+        {
+            Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+            client.ReadError = null;
+            await cut.Find("[data-testid=runtime-worker-retry]").ClickAsync(new());
+            Assert.AreEqual(ResourceLoadStatus.Ready, cut.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+            Assert.AreEqual(3, client.WorkerReads);
+        }
+        else Assert.DoesNotContain("Authorized worker fixture", cut.Markup);
+    }
+
+    [TestMethod]
+    public async Task WorkerLoadCanRetryWithoutNavigatingOrInventingAnOwner()
+    {
+        var worker = Worker(Guid.NewGuid(), "Worker retry fixture");
+        var client = new RuntimeClient { Details = new(worker, []), ReadError = new AgentstrationApiException("fixture", "worker-fixture", HttpStatusCode.ServiceUnavailable) };
+        using var context = WorkerContext(client, worker.WorkerId);
+        var cut = context.Render<RuntimeWorkerDetails>(p => p.Add(c => c.WorkerId, worker.WorkerId));
+        Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsEmpty(cut.FindAll(".resource-details-navigation, [data-worker-section], .resource-header [role=switch]"));
+        client.ReadError = null; await cut.Find("[data-testid=runtime-worker-retry]").ClickAsync(new());
+        Assert.Contains("Worker retry fixture", cut.Find(".resource-header").TextContent);
+        Assert.IsEmpty(cut.FindAll(".resource-header .resource-scope-badge"));
+    }
+
+    [TestMethod]
+    public async Task ADelayedWorkerCannotReplaceTheCurrentlyRequestedIdentity()
+    {
+        var firstWorker = Worker(Guid.NewGuid(), "Old worker fixture"); var current = Worker(Guid.NewGuid(), "Current worker fixture");
+        var pending = new TaskCompletionSource<RuntimeWorkerDetailsResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new RuntimeClient { Details = new(current, []), PendingRead = pending.Task };
+        using var context = WorkerContext(client, firstWorker.WorkerId);
+        var cut = context.Render<RuntimeWorkerDetails>(p => p.Add(c => c.WorkerId, firstWorker.WorkerId));
+        client.PendingRead = null;
+        cut.Render(p => p.Add(c => c.WorkerId, current.WorkerId));
+        await cut.InvokeAsync(() => pending.SetResult(new(firstWorker, [])));
+        cut.WaitForAssertion(() => Assert.Contains("Current worker fixture", cut.Find(".resource-header").TextContent));
+        Assert.DoesNotContain("Old worker fixture", cut.Markup);
+    }
+
+    [TestMethod]
+    public void AssignmentLinksKeepExecutionScopeSeparateFromTheNavigationContext()
+    {
+        var worker = Worker(Guid.NewGuid(), "Worker fixture"); var executionScope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var assignment = new RuntimeAssignmentPlacementResponse(Guid.NewGuid(), nameof(RuntimeAssignmentTargetKind.RuntimeRun), "run-fixture", "Succeeded", "microsoft-agent-framework", "1.0", "1.0", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, [], executionScope);
+        using var context = WorkerContext(new RuntimeClient { Details = new(worker, [assignment]) }, worker.WorkerId);
+        var cut = context.Render<RuntimeWorkerDetails>(p => p.Add(c => c.WorkerId, worker.WorkerId));
+        var link = cut.Find("[data-worker-section=assignments] .worker-run-link").GetAttribute("href")!;
+        Assert.Contains("scopeRef=" + Uri.EscapeDataString(executionScope.Value), link);
+        Assert.Contains("context=%2Finstance", link);
+    }
+
+    private static RuntimeWorkerSummaryResponse Worker(Guid id, string name) => new(id, name, "1.0", "Active", RuntimeWorkerPresenceState.Unknown, null, null, null, 0, null, null, []);
+    private static BunitContext WorkerContext(RuntimeClient client, Guid id)
+    {
+        var context = CreateContext(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new WorkerNavigation());
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo($"/settings/runtime-workers/{id:D}");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js"); module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri + "#overview");
+        module.Setup<string>("navigate", _ => true).SetResult(navigation.Uri + "#overview");
+        return context;
+    }
+    private sealed class WorkerNavigation : IConsoleNavigationContext
+    {
+        public string? ScopeRef => "/instance";
+        public string AddToUri(string uri) => uri + (uri.Contains('?', StringComparison.Ordinal) ? "&" : "?") + "context=%2Finstance";
+    }
+
     private static BunitContext CreateContext(IRuntimeApiClient client)
     {
         var context = new BunitContext().WithCollectionPresentation();
@@ -162,7 +252,9 @@ public sealed class RuntimeObservabilityConsoleTests
     {
         public IReadOnlyList<AgentInstanceResponse> Instances { get; init; } = [];
         public IReadOnlyList<RuntimeWorkerSummaryResponse> Workers { get; init; } = [];
-        public RuntimeWorkerDetailsResponse? Details { get; init; }
+        public RuntimeWorkerDetailsResponse? Details { get; set; }
+        public Exception? ReadError { get; set; }
+        public Task<RuntimeWorkerDetailsResponse>? PendingRead { get; set; }
         public RuntimeAssignmentPlacementResponse? Placement { get; init; }
         public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) => Task.FromResult(Instances);
         public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) => Task.FromResult(Workers);
@@ -170,7 +262,8 @@ public sealed class RuntimeObservabilityConsoleTests
         public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken)
         {
             WorkerReads++;
-            return Task.FromResult(Details ?? throw new InvalidOperationException("Worker details were not configured."));
+            if (ReadError is { } error) return Task.FromException<RuntimeWorkerDetailsResponse>(error);
+            return PendingRead ?? Task.FromResult(Details ?? throw new InvalidOperationException("Worker details were not configured."));
         }
         public Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) => Task.FromResult(Placement);
         public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
