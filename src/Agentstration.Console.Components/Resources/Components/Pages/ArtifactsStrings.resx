@@ -62,4 +62,5 @@
   <data name="RecordOrdinal" xml:space="preserve"><value>Record</value></data>
   <data name="ReadRecord" xml:space="preserve"><value>Read record</value></data>
   <data name="RecordReadFailed" xml:space="preserve"><value>The record could not be read or verified. Its metadata remains available.</value></data>
+  <data name="MetadataYamlHelp" xml:space="preserve"><value>Read-only Artifact metadata and provenance identifiers. Inspect Content and Storage for their separate evidence.</value></data>
 </root>

@@ -358,6 +358,8 @@ export const TestIds = {
     stagedContentStatus: 'staged-artifact-content-status',
     stagedContent: 'staged-artifact-content',
     durableDetails: 'durable-artifact-details',
+    durableIdentityEditor: 'durable-artifact-identity-editor',
+    durableRefresh: 'durable-artifact-refresh',
     durableContentPanel: 'durable-artifact-content-panel',
     durableMaterialize: 'durable-artifact-materialize',
     durableOpenMaterialized: 'durable-artifact-open-materialized',

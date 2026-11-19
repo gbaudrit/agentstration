@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ArtifactAdministrationComponentTests
+public sealed partial class ArtifactAdministrationComponentTests
 {
     [TestMethod]
     public void ArtifactIdentityCopiesTheCompleteIdentifierOutsideTheNavigationLink()
@@ -555,6 +555,8 @@ public sealed class ArtifactAdministrationComponentTests
         public int RecordReadCount { get; private set; }
         public string? SelectedRecord { get; private set; }
         public bool RejectRecordRead { get; set; }
+        public Exception? DurableReadError { get; set; }
+        public TaskCompletionSource<FlowRunArtifactResource?>? NextDurableRead { get; set; }
 
         public Task<ArtifactRecordContent> ReadRecordAsync(FlowRunArtifactId id, string memberId, CancellationToken cancellationToken = default)
         {
@@ -605,6 +607,8 @@ public sealed class ArtifactAdministrationComponentTests
         public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default)
         {
             DurableReadCount++;
+            if (NextDurableRead is { } pending) { NextDurableRead = null; return pending.Task; }
+            if (DurableReadError is { } error) return Task.FromException<FlowRunArtifactResource?>(error);
             return Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
         }
 
