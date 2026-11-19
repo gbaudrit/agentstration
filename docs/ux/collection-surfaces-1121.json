@@ -4035,18 +4035,20 @@
     {
       "id": "organization-security-audit-agentstration-security-contracts-security-audit-event",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
-      "line": 25,
+      "line": 9,
       "host": "console",
       "routes": [
         "/settings/organization/security-audit"
       ],
-      "renderer": "CollectionView",
-      "itemType": "Agentstration.Security.Contracts.SecurityAuditEvent",
+      "renderer": "ResourceCollectionTemplate",
+      "itemType": "SecurityAuditEvent",
       "identityLabel": "Action",
       "scope": true,
       "state": true,
       "actions": false,
       "informationKeys": [
+        "Scope",
+        "Outcome",
         "Time",
         "Actor",
         "Target",
@@ -4115,6 +4117,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ba2bc21188b7c1c36e65a7fe412e8e24fc6974a5"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing one-request latest-event snapshot, limit 200 with no continuation/query/total contract. No search, filters, pager or global count; localized bounded-snapshot help and shared loaded count. API PlatformAdmin policy remains authoritative, with no invented resources/read gate.",
+        "identity": "Localized action plus exact action/reason codes; audit Workspace/Tenant/Instance context remains an event fact, not resource ownership. Time, outcome, full copyable actor/target/correlation IDs retained; no invented resource destination. Unknown actions/outcomes use localized neutral fallbacks.",
+        "states": "Compatible refresh retains events; error/retry, forbidden clearing, cancellation and late-response protection. Every context/role notification clears privileged cached events before API reauthorization.",
+        "actions": "Existing Organization navigation retained; only refresh/view controls added by the template. No identity/security mutation or content read.",
+        "validation": "SecurityAuditCollectionTests plus existing Organization localization regression; deterministic desktop/mobile source evidence recorded in ledger."
       }
     },
     {

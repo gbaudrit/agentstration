@@ -175,4 +175,7 @@
 <data name="Member.Refresh" xml:space="preserve"><value>Refresh</value></data>
 <data name="PrincipalKind.Human" xml:space="preserve"><value>Person</value></data>
 <data name="PrincipalKind.Workload" xml:space="preserve"><value>Workload</value></data>
+  <data name="SecurityAudit.SnapshotHelp"><value>Shows the latest available security events (up to 200). Older events are not included.</value></data>
+  <data name="AuditAction.Unknown"><value>Recorded action</value></data>
+  <data name="AuditOutcome.Unknown"><value>Unknown</value></data>
 </root>

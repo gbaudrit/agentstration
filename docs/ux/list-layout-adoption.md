@@ -41,6 +41,8 @@ Each screen is completed, checked, committed and published before the next start
 
 | Artifacts | Existing complete authorized durable and local-copy Workspace arrays, loaded atomically. Separate name/ID search and displayed metadata filters, exact totals and 20/50/100 local pages; no content/readiness/materialization request added by the list. | Both legitimate collection sections adopt the template with independent queries, context-qualified links, exact IDs, producer/storage metadata, availability explanations and localized producer/byte labels. Open-only menus removed; resources/read plus artifacts/inspect required. Five new plus four maintained cases, warning-free Web/Workplace builds, full targeted format, two catalog assertions, both existing governed-content journeys and real 25-durable/25-local-copy desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/artifacts/README.md). Final fixture includes the local Worker; native Storage links are covered by existing component cases, not inferred from legacy receipts. Full lanes and #1242 remain deferred. |
 
+| Security audit | Existing privileged latest-200 snapshot without continuation, filters or global total. No local search, filters or pager; explicit EN/FR window limit and shared loaded count. API PlatformAdmin policy remains authoritative. | Template adopted with existing Organization navigation, action/reason codes, audit context, outcome/time and full copyable actor/target/correlation. Unknown labels/outcomes have localized neutral fallbacks; every role/context notification clears cached events before API reauthorization. Five new plus existing localization cases, warning-free Web build, full targeted format, two catalog assertions and real 200-event desktop/mobile metadata smoke pass; [captures and source proof](evidence/list-layout/security-audit/README.md). Role-denial/revocation behavior is covered by component cases; no identity mutation was used for browser preparation. Full lanes and #1242 remain deferred. |
+
 ## Remaining top-level Console list adapters
 
 This source inventory identifies concrete top-level list adapters still outside the new page composition. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
@@ -62,7 +64,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `ModelProviders.razor` | `/modelproviders` | Adopted |
 | `OrganizationAccess.razor` | `/settings/organization/access` | Remaining; requires individual contract review |
 | `OrganizationMembers.razor` | `/settings/organization/members` | Remaining; requires individual contract review |
-| `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Remaining; requires individual contract review |
+| `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Adopted |
 | `Packs.razor` | `/packs` | Remaining; requires individual contract review |
 | `Parameters.razor` | `/parameters` | Adopted |
 | `ResourcePlans.razor` | `/resource-plans` | Adopted |
