@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { fillAndCommit } from './controls.js';
 
 export class FoundrySecretBindingPage {
@@ -25,6 +26,7 @@ export class FoundrySecretBindingPage {
     await fillAndCommit(this.page.getByTestId('model-provider-display-name'), displayName);
     await selectMatchingOption(this.page.getByTestId('model-provider-extension'), 'foundry-extension');
     await selectMatchingOption(this.page.getByTestId('model-provider-contribution'), 'microsoft-foundry');
+    await this.page.locator('[data-wizard-step=configuration]').click();
   }
 
   public async createParameter(requirementId: string, value: string): Promise<void> {
@@ -67,6 +69,8 @@ export class FoundrySecretBindingPage {
   }
 
   public async saveProvider(name: string): Promise<void> {
+    const review = this.page.locator('[data-wizard-step=review]');
+    if (await review.isVisible()) await review.click();
     await this.page.getByTestId('model-provider-save').click();
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${name}`);
     await this.openConfiguration();
@@ -80,7 +84,8 @@ export class FoundrySecretBindingPage {
     );
     if (!response?.ok()) throw new Error(`Secret route returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.resourceAdministration.secretEditor).waitFor({ state: 'visible' });
-    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
+    await selectResourceSection(this.page, 'value');
+    await expect(this.page.locator('.secret-value-panel')).toBeVisible();
   }
 
   public async openProvider(consoleUrl: string, name: string): Promise<void> {
@@ -94,10 +99,7 @@ export class FoundrySecretBindingPage {
   }
 
   private async openConfiguration(): Promise<void> {
-    const tab = this.page.locator('[data-testid="model-provider-configuration-tab"][data-interactive="true"]');
-    await tab.waitFor({ state: 'visible' });
-    await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true');
+    await selectResourceSection(this.page, 'definition/configuration');
   }
 
   private async contextualUrl(url: string): Promise<string> {
@@ -110,7 +112,7 @@ export class FoundrySecretBindingPage {
   }
 
   public async deleteSecretValue(): Promise<void> {
-    const section = this.page.locator('.resource-section').filter({ hasText: /Secret Value|Valeur du secret/i }).last();
+    const section = this.page.locator('.secret-value-panel');
     await section.getByRole('button', { name: /Delete value|Supprimer la valeur/i }).click();
     const dialog = this.page.getByRole('alertdialog');
     await dialog.waitFor({ state: 'visible' });

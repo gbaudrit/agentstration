@@ -76,4 +76,8 @@
 <data name="ConfigurationValues"><value>Valeurs de configuration</value></data><data name="ValueBindings"><value>Liaisons de valeurs</value></data><data name="ValueBindingsHelp"><value>Liez chaque exigence AEP à une valeur directe, un paramètre ou un secret. Les valeurs sont revérifiées par le serveur à l’enregistrement et à l’utilisation.</value></data>
   <data name="Input"><value>Entrées</value></data>
   <data name="Output"><value>Sorties</value></data>
+  <data name="SpecificationOverrides" xml:space="preserve"><value>Surcharges des spécifications des modèles</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version enregistrée plus récente est disponible. Abandonnez votre brouillon pour la charger.</value></data>
+  <data name="ObservationUnavailable" xml:space="preserve"><value>Le catalogue des modèles disponibles n’a pas pu être chargé. Actualisez pour réessayer.</value></data>
+  <data name="UsagesUnavailable" xml:space="preserve"><value>Les utilisations par les profils de modèle n’ont pas pu être vérifiées. Actualisez avant de supprimer ce fournisseur.</value></data>
 </root>

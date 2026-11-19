@@ -1,0 +1,108 @@
+{
+  "testedBase": "5362910273cedf17fbf366e379282d6fbbc36030",
+  "finalSourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "58067e0b61156471aca0419e28fa91c9cfcb188f725af17b7519d7e11d65e09e",
+    "automation/playwright/src/pages/foundry-secret-binding.page.ts": "b82f8f2c95e8604e34d763ef6b188f33c22448b47dda696e98b5d835d6f09c03",
+    "automation/playwright/src/pages/model-administration.page.ts": "7a4cca1e83aa723712960862dceefeac775063e242ab19af328d75cd230a6726",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor": "1b03c4fa8a3d3361dc1136af6b185e070221bf96c7f58bd3402bf5d3f50d369e",
+    "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor": "a10f1e2f9495abdd17d02c5522b22e919b9078c1d62674afe99c80b430672c0a",
+    "src/Agentstration.Console.Components/Console/ModelProviderEditorModel.cs": "a7fea0e25705eac58c825b9ad9cc56857bc3fb0d2b2a59ca51023f2269e55f3a",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelProviderDetailsStrings.fr-FR.resx": "c5854a230a41abfd8175e074081f1d29189e3deda7d4cd0bf92495908da03e4e",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelProviderDetailsStrings.resx": "535dadfb6defd8c7f5a73d6c8afad19e4065deb174ed4d814b0a3f25ed3a5d18",
+    "src/Agentstration.Models.Api/Api/ModelProviderEndpoints.cs": "dd95af835afacca37524bb102e065510c454352e4135c368f2c37127fecd1b2d",
+    "src/Agentstration.Models.Application/ModelManagementServices.cs": "7f106c311dbf9e75004df37961bd9df870a27e23dc5bbdb5e8468831d879d337",
+    "src/Agentstration.Models.Application/ModelProviderManagementService.cs": "884e18309ad38033d51c7214b18a77d5fd50798e75060221198e0cd509fc002c",
+    "src/Agentstration.Models.Contracts/ModelManagementContracts.cs": "aa480ff703295d8fc167ada623c3e8ff34fd822d3947b71edd50193da9c68ea7",
+    "tests/Agentstration.Console.Components.Tests/ModelProviderNavigationTests.Foundation.cs": "f1cc10a5e0b291d04e888684a76ece5b7fe009612e739853407dc22d26cdef92",
+    "tests/Agentstration.Console.Components.Tests/ModelProviderNavigationTests.cs": "1c654a17be6003d6435d0f76c7d2bc97116d0d6c52d540266cafdb17dbfc3dc7",
+    "tests/Agentstration.Console.Components.Tests/ParameterEditorModelTests.cs": "72e81c87aa9b36fd1ab92dad55b6a4b88b726479e47259a798be4d81687d8e63",
+    "tests/Agentstration.Management.Api.Tests/ModelProviderApiTests.cs": "8f71ed680e4a1c748c5f2fe1d7e0bd30ff43c685825691cee0d325e2d9171cec"
+  },
+  "finalHostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "b347d7d3e11246f2f2624ffa1076074e0d8d634f949afe4efebd56530a44a3b6",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "b347d7d3e11246f2f2624ffa1076074e0d8d634f949afe4efebd56530a44a3b6",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "b347d7d3e11246f2f2624ffa1076074e0d8d634f949afe4efebd56530a44a3b6",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c"
+  },
+  "protectedAgentHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "finalBrowserPhases": [
+    {
+      "name": "foundry-regression",
+      "exitCode": 0,
+      "seconds": 73.0
+    },
+    {
+      "name": "model-provider",
+      "exitCode": 0,
+      "seconds": 98.4
+    }
+  ],
+  "initialSourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "58067e0b61156471aca0419e28fa91c9cfcb188f725af17b7519d7e11d65e09e",
+    "automation/playwright/src/pages/foundry-secret-binding.page.ts": "774eeb9ad9088c1b214be0561e8a239a7e753c3e9f4290a01f5c1ea60ffe4e1a",
+    "automation/playwright/src/pages/model-administration.page.ts": "7a4cca1e83aa723712960862dceefeac775063e242ab19af328d75cd230a6726",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor": "656aa07fd7c5e329fb657b97ed9aea2d6322f23d9311424781adc8cae1f3ba4d",
+    "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor": "a10f1e2f9495abdd17d02c5522b22e919b9078c1d62674afe99c80b430672c0a",
+    "src/Agentstration.Console.Components/Console/ModelProviderEditorModel.cs": "a7fea0e25705eac58c825b9ad9cc56857bc3fb0d2b2a59ca51023f2269e55f3a",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelProviderDetailsStrings.fr-FR.resx": "c5854a230a41abfd8175e074081f1d29189e3deda7d4cd0bf92495908da03e4e",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelProviderDetailsStrings.resx": "535dadfb6defd8c7f5a73d6c8afad19e4065deb174ed4d814b0a3f25ed3a5d18",
+    "src/Agentstration.Models.Api/Api/ModelProviderEndpoints.cs": "dd95af835afacca37524bb102e065510c454352e4135c368f2c37127fecd1b2d",
+    "src/Agentstration.Models.Application/ModelManagementServices.cs": "7f106c311dbf9e75004df37961bd9df870a27e23dc5bbdb5e8468831d879d337",
+    "src/Agentstration.Models.Application/ModelProviderManagementService.cs": "884e18309ad38033d51c7214b18a77d5fd50798e75060221198e0cd509fc002c",
+    "src/Agentstration.Models.Contracts/ModelManagementContracts.cs": "aa480ff703295d8fc167ada623c3e8ff34fd822d3947b71edd50193da9c68ea7",
+    "tests/Agentstration.Console.Components.Tests/ModelProviderNavigationTests.Foundation.cs": "4ffb15db197849d733cdced97413e61b429ea63255b36a374c75d6e2c5b88c55",
+    "tests/Agentstration.Console.Components.Tests/ModelProviderNavigationTests.cs": "1c654a17be6003d6435d0f76c7d2bc97116d0d6c52d540266cafdb17dbfc3dc7",
+    "tests/Agentstration.Console.Components.Tests/ParameterEditorModelTests.cs": "72e81c87aa9b36fd1ab92dad55b6a4b88b726479e47259a798be4d81687d8e63",
+    "tests/Agentstration.Management.Api.Tests/ModelProviderApiTests.cs": "8f71ed680e4a1c748c5f2fe1d7e0bd30ff43c685825691cee0d325e2d9171cec"
+  },
+  "initialHostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "a1db4ba1edf5d24a08b5ccf3112e53c4a51396fe0a3cca04129468f42bb63e19",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "a1db4ba1edf5d24a08b5ccf3112e53c4a51396fe0a3cca04129468f42bb63e19",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "a1db4ba1edf5d24a08b5ccf3112e53c4a51396fe0a3cca04129468f42bb63e19",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "cfc8ac35cc4a7e94ffcb31dec191292eab0724915ae6d2e4390a2cdd04e4f05f",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "566cfabb943cc10c0a6375a697a97df9db00ca9fcac7ef2abd84ec462d1c3e4c"
+  },
+  "initialSuccessfulRegressionCases": {
+    "create-agent.spec.ts": 2,
+    "model-administration.spec.ts": 1,
+    "model-provider-access.spec.ts": 2
+  },
+  "filesChangedAfterThoseRegressions": [
+    "automation/playwright/src/pages/foundry-secret-binding.page.ts",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+    "tests/Agentstration.Console.Components.Tests/ModelProviderNavigationTests.Foundation.cs"
+  ],
+  "scope": "The only product follow-up after the successful initial regressions changes Model Provider wizard completeness indicators. The shared value-binding editor and protected Agent sources are unchanged. Final family desktop/touch probes and the repaired Foundry regression pass after that follow-up. Initial failed probes used an undefined temporary locator; initial Foundry used an obsolete Secret panel selector. No assertion or timeout was weakened.",
+  "componentTests": {
+    "passed": 126,
+    "filter": "ModelProviderNavigationTests | ParameterEditorModelTests | AgentResourceTemplateTests"
+  },
+  "apiTests": {
+    "passed": 1,
+    "filter": "ModelProviderApiTests.ProviderValidationAndDeletionProtectionReturnProblemDetails"
+  },
+  "typescript": "passed",
+  "ci": "not inspected or remediated",
+  "fullSolutionSuites": "not run; user requested focused validation",
+  "parallelIntegrationBeforeCommit": [
+    "62a491ca",
+    "6857117b"
+  ],
+  "commitParentAfterIntegration": "6857117bb119b8f24b78e66c278e710c63eb3620"
+}

@@ -17,7 +17,11 @@ public sealed record ModelProfileUsage(
 {
     public bool IsManaged { get; init; }
 }
-public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
+public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName)
+{
+    public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 public sealed record ModelProfileResolution(
     ModelProfileResource Profile,
     ModelProviderConfiguration? Provider,

@@ -79,7 +79,7 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
             var @namespace = ModelsApiHttp.Namespace(resourceNamespace);
             _ = await service.GetAsync(@namespace, providerName, cancellationToken) ?? throw new ModelProviderResourceNotFoundException(providerName);
             var usages = await service.GetUsagesAsync(@namespace, ModelProviderManagementService.ModelProviderId(providerName), cancellationToken);
-            var values = usages.Select(value => new ModelProviderUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName)).ToArray();
+            var values = usages.Select(value => new ModelProviderUsageResponse(value.Kind, value.Name, value.Name, value.DisplayName) { Namespace = value.Namespace, ScopeRef = value.ScopeRef }).ToArray();
             return Results.Ok(new ModelProviderUsagesResponse(values, values.Length));
         });
 }

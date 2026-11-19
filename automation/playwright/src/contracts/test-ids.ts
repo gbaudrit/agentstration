@@ -411,8 +411,9 @@ export const TestIds = {
   },
   modelAdministration: {
     providerForm: 'model-provider-form',
-    providerConfigurationTab: 'model-provider-configuration-tab',
-    providerAccessTab: 'model-provider-access-tab',
+    providerWizard: 'model-provider-creation-wizard',
+    providerIdentity: 'model-provider-identity-editor',
+    providerResourceRefresh: 'model-provider-details-refresh',
     providerName: 'model-provider-name',
     providerDisplayName: 'model-provider-display-name',
     providerExtension: 'model-provider-extension',

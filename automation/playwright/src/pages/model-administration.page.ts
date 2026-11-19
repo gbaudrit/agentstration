@@ -23,6 +23,7 @@ export class ModelAdministrationPage {
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.providerExtension), 'ollama-extension');
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.providerContribution));
     await expect(this.page.getByTestId(TestIds.modelAdministration.providerName)).toHaveValue(definition.providerName);
+    await this.page.locator('[data-wizard-step=review]').click();
     await this.page.getByTestId(TestIds.modelAdministration.providerSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
@@ -62,6 +63,7 @@ export class ModelAdministrationPage {
 
   public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
+    await selectResourceSection(this.page, 'models');
     const modelLink = this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first();
     // This context must exist in the rendered URL before Blazor intercepts clicks.
     await expect(modelLink).toHaveAttribute('href', /[?&]context=%2Finstance/);
@@ -93,6 +95,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateProviderDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.providerDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.providerSave),
@@ -145,14 +148,7 @@ export class ModelAdministrationPage {
       `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProviderEditor,
     );
-    await this.page.locator(
-      `[data-testid="${TestIds.modelAdministration.providerConfigurationTab}"][data-interactive="true"]`,
-    ).waitFor({ state: 'visible' });
-    const tab = this.page.getByTestId(TestIds.modelAdministration.providerAccessTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-    }).toPass();
+    await selectResourceSection(this.page, 'access');
     await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
   }
 
@@ -200,13 +196,7 @@ export class ModelAdministrationPage {
   }
 
   private async openProviderConfiguration(): Promise<void> {
-    const configurationTab = this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab);
-    const form = this.page.getByTestId(TestIds.modelAdministration.providerForm);
-    await expect(async () => {
-      await configurationTab.click();
-      await expect(configurationTab).toHaveAttribute('aria-selected', 'true');
-      await expect(form).toBeVisible();
-    }).toPass();
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.providerForm);
   }
 
