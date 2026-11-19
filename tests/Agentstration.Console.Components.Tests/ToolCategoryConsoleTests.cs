@@ -282,7 +282,7 @@ public sealed class ToolCategoryConsoleTests
         await cut.Find("[role=alertdialog] .button-danger").ClickAsync(new());
         Assert.AreEqual(1, client.Deletes);
         Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
-        Assert.Contains("/tools/categories", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.AreEqual("/tools/categories", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
         Assert.IsEmpty(cut.FindAll(".resource-form, .unsaved-changes-bar"));
     }
 

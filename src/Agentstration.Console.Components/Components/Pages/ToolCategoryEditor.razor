@@ -177,7 +177,7 @@ else
         new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete }
     ];
     private void ShowSection(string path) { if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
     private void NewContext()
     {
         if (formContext is not null) formContext.OnFieldChanged -= FieldChanged;
@@ -341,6 +341,7 @@ else
         else ApplySnapshot(category, etag!, savedMembers);
         message = null;
     }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
         if (!CanManage || busy || refreshing || category is null) return;
@@ -350,7 +351,7 @@ else
             await Categories.DeleteCategoryAsync(category.Namespace, category.Name, etag!, cancellation.Token);
             if (request != loadVersion) return;
             Clear(); message = null; loadState = new(ResourceLoadStatus.NotFound);
-            await InvokeAsync(StateHasChanged); Navigation.NavigateTo(BackUrl);
+            returnAfterDelete = BackUrl;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { if (request == loadVersion) { failed = true; message = exception.Message; } }

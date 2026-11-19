@@ -26,3 +26,7 @@ Verification:
 | Member selection draft | [Capture](category-member-draft-desktop-en.png) | [Capture](category-member-draft-mobile-fr.png) |
 | Retained concurrent refresh | [Capture](category-retained-refresh-desktop-en.png) | [Capture](category-retained-refresh-mobile-fr.png) |
 | Saved YAML | [Capture](category-yaml-desktop-en.png) | [Capture](category-yaml-mobile-fr.png) |
+
+## Confirmed-deletion follow-up
+
+Tool Category invalidates the deleted snapshot and drafts before its post-render return to the exact collection path. [Focused regression and actual desktop/touch evidence](../deletion-followup/README.md).
