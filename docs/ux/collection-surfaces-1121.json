@@ -3137,17 +3137,17 @@
     {
       "id": "parameters-parameter-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
-      "line": 18,
+      "line": 10,
       "host": "console",
       "routes": [
         "/parameters"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ParameterResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "ValueType",
         "Value"
@@ -3213,6 +3213,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "300cca481a9299bc30a4bbe56d9f44cde317e6cb"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Parameter array. Technical/display-name search, typed value column filter, advanced visible-value text filter and additional exact ownership-scope filter; exact totals and local 20/50/100 pages. No namespace navigation or filter is invented for the current name/scope API.",
+        "values": "Preserves visible typed nonsecret values and the existing readable-configuration/Secret guidance. No Secret values are requested.",
+        "states": "Stable query and retained rows/view on compatible refresh; stale-response, context-replacement, read-denial and interactivity guards.",
+        "actions": "Existing exact name/scope destinations retained with navigation context; Manage-only row actions removed; creation requires resources/write.",
+        "validation": "ParameterCollectionTests plus the maintained visible-value/exact-scope regression, executable desktop/mobile smoke and inventory limits in list-layout-adoption.md."
       }
     },
     {
