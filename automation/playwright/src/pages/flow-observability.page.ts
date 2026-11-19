@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import { selectResourceSection } from './resource-sections.js';
 
 type FlowObservabilityMarker = keyof Pick<typeof TestIds.flowObservability,
   'flows' | 'flowDetails' | 'designer' | 'runs' | 'runDetails' | 'agentRunner' |
@@ -112,9 +113,12 @@ export class FlowObservabilityPage {
     await link.waitFor({ state: 'visible' });
     const href = await link.getAttribute('href');
     if (!href) throw new Error(`Task '${taskId}' does not expose a Flow Run link.`);
-    const runId = decodeURIComponent(href.split('/').at(-1)!);
+    const runId = decodeURIComponent(new URL(href, this.page.url()).pathname.split('/').at(-1)!);
     await link.click();
     await this.page.getByTestId(TestIds.flowObservability.taskRunDetails).waitFor({ state: 'visible' });
+    await expect(this.page.locator('[data-task-run-section=overview]')).toContainText(runId);
+    await selectResourceSection(this.page, 'execution');
+    await expect(this.page.locator('[data-task-run-section=execution] .topology-shell')).toBeVisible();
     return runId;
   }
 

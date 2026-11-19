@@ -1,6 +1,8 @@
 @page "/tasks/{TaskId:guid}/flowruns/{RunId}"
 @implements IDisposable
 @inject IWorkApiClient Client
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TaskFlowRunDetailsStrings> Localizer
 
 <PageTitle>@(run is null ? T("Title") : run.Id) · Agentstration</PageTitle>
@@ -19,9 +21,11 @@ else if (run is null)
 }
 else
 {
-    <PageHeader Title="@T("Title")" Description="@run.Id">
-        <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-secondary" href="/tasks/@TaskId">@T("BackToTask")</a></Actions>
-    </PageHeader>
+    <ResourceDetailsTemplate Name="@run.Id" ResourceType="@T("Title")" Domain="flow" IconName="sitemap" StatusText="@Label("Status", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())"
+                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection">
+        <Actions><button class="button-secondary" disabled="@loading" @onclick="LoadAsync">@T("Refresh")</button><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId:D}", Services)">@T("BackToTask")</a></Actions>
+        <Content>
+        <div data-task-run-section="overview" hidden="@(section != "overview")">
     <section class="run-summary">
         <div><span class="field-label">@T("Status")</span><StatusBadge Text="@Label("Status", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
         <div><span class="field-label">@T("FlowVersion")</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
@@ -29,10 +33,25 @@ else
         <div><span class="field-label">@T("TriggerStartedBy")</span><strong>@Label("Trigger", run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
         <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
     </section>
+            <FormSection Title="@Shared["Identity"]"><dl class="resource-details">
+                <dt>@T("RunId")</dt><dd><CopyableValue Value="@run.Id" /></dd>
+                <dt>@T("Task")</dt><dd><a href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId:D}", Services)">@TaskId</a></dd>
+                <dt>@T("CorrelationId")</dt><dd><CopyableValue Value="@(run.CorrelationId ?? "—")" /></dd>
+                <dt>@T("ExecutionScope")</dt><dd><code>@run.ExecutionScopeRef</code></dd>
+            </dl></FormSection>
+            <FormSection Title="@Shared["Configuration"]"><dl class="resource-details">
+                <dt>@T("FlowVersion")</dt><dd>@run.FlowId.Value · @run.FlowVersion</dd>
+                <dt>@T("DefinitionState")</dt><dd>@Label("DefinitionState", run.DefinitionState)</dd>
+                <dt>@T("TriggerStartedBy")</dt><dd>@Label("Trigger", run.Trigger) · @(run.StartedBy ?? "—")</dd>
+            </dl></FormSection>
+        </div>
     @if (run.Error is not null)
     {
         <article class="panel run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
     }
+    @if (executionVisited)
+    {
+    <div data-task-run-section="execution" hidden="@(section != "execution")">
     <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
         <div>
             <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
@@ -53,6 +72,10 @@ else
         </article>
         }
     </section>
+    </div>
+    }
+        </Content>
+    </ResourceDetailsTemplate>
 }
 
 </div>
@@ -63,15 +86,35 @@ else
     private FlowRun? run;
     private FlowStepRun? selected;
     private bool unavailable, notFound;
-    private bool inspectorVisible;
+    private bool inspectorVisible, executionVisited, loading;
+    private string section = "overview";
+    private string? loadedKey;
+    private long loadVersion;
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("execution", T("FlowTopology"), "sitemap")];
+    private void SelectSection(string? value) { section = value ?? "overview"; executionVisited |= section == "execution"; }
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(run);
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{TaskId}|{RunId}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return;
+        loadedKey = key; run = null; selected = null; section = "overview"; executionVisited = inspectorVisible = false;
+        await LoadAsync();
+    }
     private async Task LoadAsync()
     {
-        unavailable = false; notFound = false;
-        try { run = await Client.GetTaskFlowRunAsync(TaskId, RunId, lifetime.Token); selected = run.Steps.FirstOrDefault(value => value.StepName == selected?.StepName) ?? run.Steps.FirstOrDefault(); }
-        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { notFound = true; run = null; }
-        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException) { unavailable = true; run = null; }
+        var request = ++loadVersion;
+        loading = true; unavailable = false; notFound = false;
+        try
+        {
+            var saved = await Client.GetTaskFlowRunAsync(TaskId, RunId, lifetime.Token);
+            if (request != loadVersion) return;
+            if (saved.Id != RunId) { notFound = true; run = null; return; }
+            run = saved; selected = run.Steps.FirstOrDefault(value => value.StepName == selected?.StepName) ?? run.Steps.FirstOrDefault();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { if (request == loadVersion) { notFound = true; run = null; } }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException) { if (request == loadVersion) { unavailable = true; run = null; } }
+        finally { if (request == loadVersion) loading = false; }
     }
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
     private void SetInspectorVisible(bool value) => inspectorVisible = value;
