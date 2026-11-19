@@ -1667,17 +1667,17 @@
     {
       "id": "data-sources-data-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
-      "line": 16,
+      "line": 10,
       "host": "console",
       "routes": [
         "/data-sources"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "DataSourceResource",
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Profile"
       ],
@@ -1744,6 +1744,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b31088d4db1f0070368edc16ef4a6005e65f7051"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized DataSourceResource array. Name search, enabled identity filter, advanced displayed Storage/profile/direct-input text filter, namespace and exact scope filters; exact filtered total and 20/50/100 local pages.",
+        "identity": "Exact namespace/name/owner/context links and scope/status/governance markers retained. Existing DirectInput, dataset Storage and legacy Profile semantics preserved.",
+        "states": "Retained compatible refresh/view, stable query, interactivity, stale response/context replacement and denied-read guards.",
+        "actions": "Original dataset-composition creation destination permission-gated, Profiles destination retained, redundant Open-only menu removed.",
+        "validation": "DataSourceCollectionTests and real metadata-only desktop/mobile API smoke; list-layout-adoption.md records evidence and limits."
       }
     },
     {
