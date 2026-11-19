@@ -66,13 +66,16 @@ public sealed partial class ApiClientTests
                         ? JsonContent.Create(new ValueResponse<ToolDefinitionUsage>([]))
                         : JsonContent.Create(new ToolDefinitionResource
                         {
-                            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-                            Metadata = new() { Name = "same-name", Namespace = ns }, ScopeRef = owner,
+                            ApiVersion = ResourceApiVersions.CoreV1,
+                            Kind = ToolResourceKinds.ToolDefinition,
+                            Metadata = new() { Name = "same-name", Namespace = ns },
+                            ScopeRef = owner,
                             Definition = new FlowToolDefinitionProperties { DisplayName = "Exact owner", InputSchema = JsonSerializer.SerializeToElement(new { type = "object" }), Flow = new() { Name = "source" } }
                         })
             };
             response.Headers.ETag = new("\"exact\""); return response;
-        })) { BaseAddress = new("http://localhost/") };
+        }))
+        { BaseAddress = new("http://localhost/") };
         var client = new ToolDefinitionsApiClient(http);
         var snapshot = await client.GetAsync(owner, "same-name", ns, default);
         _ = await client.GetVersionsAsync(owner, "same-name", ns, default);

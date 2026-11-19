@@ -164,8 +164,12 @@ public sealed class SourceProviderConsoleTests
                 : []);
         public SourceProviderResource Saved { get; private set; } = new()
         {
-            Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = SourceResourceKinds.SourceProvider,
-            Metadata = new() { Name = "git-local" }, ScopeRef = ResourceScopeRef.Instance, Generation = 1,
+            Uid = Guid.NewGuid(),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SourceResourceKinds.SourceProvider,
+            Metadata = new() { Name = "git-local" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Generation = 1,
             Definition = new() { DisplayName = "Git Source Provider", Extension = new("git-extension", ResourceScopeRef.Instance, ResourceNamespace.Default), ContributionId = "git" }
         };
         public int Writes { get; private set; }

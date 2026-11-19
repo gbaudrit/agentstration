@@ -114,8 +114,18 @@ public sealed partial class FlowDetailsDesignerTests
     {
         var workspace = new WorkspaceId(Guid.Parse("11111111-1111-1111-1111-111111111111"));
         var flow = new FlowId("recorded-definition", new("team"));
-        return new FlowRun { Id = id, WorkspaceId = workspace, FlowId = flow, FlowVersion = "1.0.0", DefinitionScopeRef = ResourceScopeRef.Instance, Status = FlowRunStatus.Succeeded,
-            Scope = FlowRunScope.Workspace(Guid.NewGuid(), workspace, Guid.NewGuid()), Input = JsonSerializer.SerializeToElement(new { fixture = true }), CreatedAt = FlowClientStub.Now,
-            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, flow, "1.0.0", null, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a")), new Dictionary<string, string>(), FlowClientStub.Now) };
+        return new FlowRun
+        {
+            Id = id,
+            WorkspaceId = workspace,
+            FlowId = flow,
+            FlowVersion = "1.0.0",
+            DefinitionScopeRef = ResourceScopeRef.Instance,
+            Status = FlowRunStatus.Succeeded,
+            Scope = FlowRunScope.Workspace(Guid.NewGuid(), workspace, Guid.NewGuid()),
+            Input = JsonSerializer.SerializeToElement(new { fixture = true }),
+            CreatedAt = FlowClientStub.Now,
+            DefinitionSnapshot = new FlowVersion(ResourceScopeRef.Instance, flow, "1.0.0", null, new DirectFlowDefinition(new(FlowTargetKind.Agent, "agent-a")), new Dictionary<string, string>(), FlowClientStub.Now)
+        };
     }
 }

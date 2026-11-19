@@ -109,8 +109,12 @@ public sealed class ConsoleResourceDetailsTemplateTests
 
     private static AgentResource Example() => new()
     {
-        Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent,
-        ScopeRef = ResourceScopeRef.Instance, Metadata = new() { Name = "example" }, Generation = 1,
+        Uid = Guid.NewGuid(),
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = AgentResourceKinds.Agent,
+        ScopeRef = ResourceScopeRef.Instance,
+        Metadata = new() { Name = "example" },
+        Generation = 1,
         Definition = new() { DisplayName = "Example", Instructions = "Example instructions", ModelProfile = new("default", ResourceScopeRef.Instance) }
     };
 

@@ -864,7 +864,8 @@ public sealed partial class ApiClientTests
         {
             requested = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync(new(namespaceValue), "concierge", owner, default);
         var expectedPath = namespaceValue == "default" ? "/api/agents/concierge/model" : $"/api/namespaces/{namespaceValue}/agents/concierge/model";
         Assert.AreEqual(expectedPath + "?scopeRef=" + Uri.EscapeDataString(owner.Value), requested!.PathAndQuery);

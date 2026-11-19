@@ -278,7 +278,8 @@ public sealed class NamespacedAgentDetailsTests
             var resource = new AgentResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
-                Uid = Uid, ScopeRef = Scope,
+                Uid = Uid,
+                ScopeRef = Scope,
                 Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata
                 {

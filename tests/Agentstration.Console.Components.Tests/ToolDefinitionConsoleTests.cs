@@ -128,14 +128,17 @@ public sealed class ToolDefinitionConsoleTests
         using var culture = new TestCultureScope("en-US");
         var resource = SavedDefinition();
         var original = (FlowToolDefinitionProperties)resource.Definition;
-        resource = resource with { Definition = original with
+        resource = resource with
         {
-            InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }),
-            FixedArguments = JsonSerializer.SerializeToElement(new { query = "fixed query" }),
-            InputSchemaBinding = sharedSchema
+            Definition = original with
+            {
+                InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }),
+                FixedArguments = JsonSerializer.SerializeToElement(new { query = "fixed query" }),
+                InputSchemaBinding = sharedSchema
                 ? new() { Reference = new() { Name = "public-contract", Version = "1.0.0", ScopeRef = resource.ScopeRef, Namespace = resource.Namespace } }
                 : new() { Inline = new() { Format = "json-schema", Content = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } }) } }
-        } };
+            }
+        };
         var client = new DefinitionClient { Resource = resource };
         using var context = SavedContext(client);
         var cut = context.Render<ToolDefinitionEditor>(p => p.Add(c => c.Name, resource.Name));
@@ -215,12 +218,15 @@ public sealed class ToolDefinitionConsoleTests
 
     private static ToolDefinitionResource SavedDefinition() => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition,
-        Metadata = new() { Name = "notification.send" }, Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ToolResourceKinds.ToolDefinition,
+        Metadata = new() { Name = "notification.send" },
+        Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
         ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111")),
         Definition = new FlowToolDefinitionProperties
         {
-            DisplayName = "Saved Tool", InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { query = new { type = "string" } } }),
+            DisplayName = "Saved Tool",
+            InputSchema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { query = new { type = "string" } } }),
             Flow = new() { Name = "contract-flow", UseActiveVersion = true }
         }
     };

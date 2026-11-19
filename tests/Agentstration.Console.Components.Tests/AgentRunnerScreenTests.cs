@@ -152,8 +152,16 @@ public sealed class AgentRunnerScreenTests
     private sealed class Handler : HttpMessageHandler
     {
         private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-        public AgentResource Agent { get; } = new() { Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent, Metadata = new() { Name = "runner", Namespace = new("team") }, ScopeRef = Owner, Generation = 7,
-            Definition = new() { DisplayName = "Fixture Agent", Description = "Current definition", Instructions = "Respond deterministically", ModelProfile = new("current-profile", Owner), RuntimeProfile = new("maf-builtin", Owner) } };
+        public AgentResource Agent { get; } = new()
+        {
+            Uid = Guid.NewGuid(),
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = AgentResourceKinds.Agent,
+            Metadata = new() { Name = "runner", Namespace = new("team") },
+            ScopeRef = Owner,
+            Generation = 7,
+            Definition = new() { DisplayName = "Fixture Agent", Description = "Current definition", Instructions = "Respond deterministically", ModelProfile = new("current-profile", Owner), RuntimeProfile = new("maf-builtin", Owner) }
+        };
         public RuntimeRun Stored => Run("recorded", new("runner", 2) { Namespace = new("team"), ScopeRef = Owner, ResourceUid = Agent.Uid });
         public CreateRuntimeRunRequest? Created { get; private set; }
         public int AgentReads { get; private set; }
@@ -176,8 +184,14 @@ public sealed class AgentRunnerScreenTests
             if (path.Contains("/agents/", StringComparison.Ordinal)) { AgentReads++; var name = path.Split('/').Last(); return AgentLoader is not null ? await AgentLoader(name) : Reply(Agent with { Metadata = Agent.Metadata with { Name = name } }); }
             throw new InvalidOperationException("Unexpected fixture request: " + request.Method + " " + request.RequestUri);
         }
-        private static RuntimeRun Run(string id, RuntimeAgentReference reference) => new() { Id = id, Name = id, WorkspaceId = new(Execution.TargetId!.Value), Scope = RuntimeRunScope.Workspace(Guid.NewGuid(), new(Execution.TargetId.Value), Guid.NewGuid()),
+        private static RuntimeRun Run(string id, RuntimeAgentReference reference) => new()
+        {
+            Id = id,
+            Name = id,
+            WorkspaceId = new(Execution.TargetId!.Value),
+            Scope = RuntimeRunScope.Workspace(Guid.NewGuid(), new(Execution.TargetId.Value), Guid.NewGuid()),
             Properties = new() { Agent = reference, Input = new() { Messages = [new(RuntimeMessageRole.User, "Recorded request")] }, Execution = new(), Origin = RuntimeRunOrigin.Console, Initiator = "Fixture actor" },
-            Status = new() { State = RuntimeRunState.Succeeded, CreatedAt = DateTimeOffset.UnixEpoch, Response = "Recorded response", ModelProfile = "recorded-profile", ModelProvider = "recorded-provider", ResolvedModel = "recorded-model" } };
+            Status = new() { State = RuntimeRunState.Succeeded, CreatedAt = DateTimeOffset.UnixEpoch, Response = "Recorded response", ModelProfile = "recorded-profile", ModelProvider = "recorded-provider", ResolvedModel = "recorded-model" }
+        };
     }
 }

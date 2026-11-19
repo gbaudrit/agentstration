@@ -86,9 +86,17 @@ public sealed class TaskFlowRunDetailsTests
             var workspace = WorkspaceId.New();
             var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
             var now = new DateTimeOffset(2026, 11, 19, 12, 0, 0, TimeSpan.Zero);
-            return new() { Id = "task-flow-run", FlowId = new("task-flow"), FlowVersion = "1.0.0", Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
-                Input = JsonSerializer.SerializeToElement(new { request = "kept-input" }), CreatedAt = now, Status = FlowRunStatus.Succeeded,
-                DefinitionSnapshot = new(ResourceScopeRef.Instance, new("task-flow"), "1.0.0", null, definition, new Dictionary<string, string>(), now) };
+            return new()
+            {
+                Id = "task-flow-run",
+                FlowId = new("task-flow"),
+                FlowVersion = "1.0.0",
+                Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
+                Input = JsonSerializer.SerializeToElement(new { request = "kept-input" }),
+                CreatedAt = now,
+                Status = FlowRunStatus.Succeeded,
+                DefinitionSnapshot = new(ResourceScopeRef.Instance, new("task-flow"), "1.0.0", null, definition, new Dictionary<string, string>(), now)
+            };
         }
     }
 }

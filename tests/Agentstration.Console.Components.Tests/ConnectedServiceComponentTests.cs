@@ -124,10 +124,14 @@ public sealed class ConnectedServiceComponentTests
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
         var type = TypeCatalog();
         var original = Resource(workspace, type);
-        var resource = original with { Definition = original.Definition with {
-            Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/api/explore/v2.1/swagger.json" }, retries = 3 }),
-            Bindings = [new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement("https://example.test/" + new string('a', 200)) }]
-        } };
+        var resource = original with
+        {
+            Definition = original.Definition with
+            {
+                Options = JsonSerializer.SerializeToElement(new { candidatePaths = new[] { "/api/explore/v2.1/swagger.json" }, retries = 3 }),
+                Bindings = [new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement("https://example.test/" + new string('a', 200)) }]
+            }
+        };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(resource, type, workspace));
         context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
