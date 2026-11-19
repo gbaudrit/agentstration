@@ -152,6 +152,17 @@ public sealed class DataSourceProfileScreenTests
         Assert.AreEqual(original, cut.Find("[data-testid=profile-yaml]").GetAttribute("value"));
     }
 
+    [TestMethod]
+    public void PublishedSummaryUsesTheActivePublicationRatherThanTheWorkingVersion()
+    {
+        var client = new Client();
+        client.Saved = client.Saved with { ActiveVersion = "1.2.3", Definition = client.Saved.Definition with { Version = "3.0.0" } };
+        using var context = Context(client);
+        var cut = context.Render<DataSourceProfileEditor>(p => p.Add(c => c.Name, "profile"));
+        Assert.Contains("1.2.3", cut.Find(".resource-configuration-summary").TextContent);
+        Assert.DoesNotContain("3.0.0", cut.Find(".resource-configuration-summary").TextContent);
+    }
+
     private static BunitContext Context(Client client, bool create = false)
     {
         var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -178,7 +189,7 @@ public sealed class DataSourceProfileScreenTests
     {
         public DataSourceFlowTarget InitialFlow { get; } = new() { Name = "acquire", Namespace = new("special"), Version = "2.3.4", UseActiveVersion = false };
         public DataSourceFlowTarget InitialDiscovery { get; } = new() { Name = "discover", ScopeRef = ResourceScopeRef.Instance, Version = "1.2.3", UseActiveVersion = false };
-        public DataSourceProfileResource Saved { get; private set; }
+        public DataSourceProfileResource Saved { get; set; }
         public Client() => Saved = new() { Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceProfile, Metadata = new() { Name = "profile" }, ScopeRef = ResourceScopeRef.Instance, Definition = new() { DisplayName = "Saved profile", AcquisitionFlow = InitialFlow, DiscoveryFlow = InitialDiscovery } };
         public bool FailPublication { get; init; }
         public int Reads { get; private set; }

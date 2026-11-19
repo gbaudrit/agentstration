@@ -12,7 +12,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ConnectedServiceEditor.razor | `/connected-services/new`, `/connected-services/{Name}/edit` | Pending review and migration |
 | ConsoleEntryInteraction.razor | `/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}` | Pending review and migration |
 | DataSourceEditor.razor | `/data-sources/new`, `/data-sources/{Name}` | Pending review and migration |
-| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Implemented; 16 profile/managed-family component cases pass, including exact pinned references, invalid JSON retention, header activation and publication-retry routing; TypeScript/catalog pass; existing lifecycle/inventory journeys maintained; browser checks pending |
+| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Implemented; 17 profile/managed-family component cases pass, including exact pinned references, invalid JSON retention, header activation and publication-retry routing; TypeScript/catalog pass; existing lifecycle/inventory journeys maintained; browser checks pending |
 | EntryEditor.razor | `/entries/{Name}`, `/namespaces/{EntryNamespace}/entries/{Name}` | Pending review and migration |
 | ExtensionDetails.razor | `/extensions/{RegistrationName}`, `/extensions/enrollment/{EnrollmentInstanceId:guid}` | Pending review and migration |
 | FlowDesigner.razor | `/flows/{FlowId}/designer`, `/namespaces/{FlowNamespace}/flows/{FlowId}/designer` | Pending review and migration |

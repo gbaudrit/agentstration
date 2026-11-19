@@ -283,7 +283,7 @@ else if (profile is not null)
     private IReadOnlyList<ConfigurationEntry> SavedConfiguration => profile is null ? [] :
     [
         new(T("State"), T(profile.Definition.Enabled ? "Enabled" : "Disabled")),
-        new(T("PublishedVersion"), profile.PublishedVersion ?? "—"),
+        new(T("PublishedVersion"), profile.ActiveVersion ?? profile.PublishedVersion ?? revisions.OrderByDescending(revision => revision.PublishedAt).FirstOrDefault()?.Version ?? "—"),
         new(T("Flow"), FlowLabel(profile.Definition.AcquisitionFlow)),
         new(T("DiscoveryFlow"), profile.Definition.DiscoveryFlow is { } discovery ? FlowLabel(discovery) : T("None")),
         new(T("Schema"), Json(profile.Definition.ConfigurationSchema)),
