@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Models;
 
-public sealed record ModelProviderView(ModelProviderConfiguration Configuration, ModelProviderHealth Health, IReadOnlyList<DiscoveredModel> Models, DateTimeOffset CheckedAt);
+public sealed record ModelProviderView(ModelProviderConfiguration Configuration, ModelProviderHealth Health, IReadOnlyList<DiscoveredModel> Models, DateTimeOffset CheckedAt, ModelProviderDiscoveryObservation? Discovery = null);
 public sealed record ModelProfileUsage(
     string Kind,
     ResourceNamespace Namespace,

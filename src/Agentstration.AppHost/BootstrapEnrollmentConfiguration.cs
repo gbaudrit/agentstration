@@ -11,6 +11,7 @@ public static class BootstrapEnrollmentConfiguration
         {
             "Agentstration:Bootstrap:PhasedStartupEnabled",
             "Agentstration:Bootstrap:ExtensionDependencyTimeout",
+            "Agentstration:Bootstrap:ModelDependencyTimeout",
             "Agentstration:Bootstrap:InitialApplications",
             "Agentstration:Aep:Enrollment:PairingCodeAllowed",
             "Agentstration:Aep:Enrollment:SharedKeyFileAllowed",

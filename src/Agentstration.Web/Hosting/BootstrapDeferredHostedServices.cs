@@ -10,7 +10,12 @@ internal sealed class BootstrapDeferredHostedServices(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await startup.WaitUntilReadyAsync(stoppingToken);
+        try { await startup.WaitUntilReadyAsync(stoppingToken); }
+        catch (OperationCanceledException) when (startup.Failure is not null && !stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+            return;
+        }
         // Keep original ordering: in particular Quartz's schema initializer must
         // finish before its scheduler starts accepting work.
         foreach (var service in services)
@@ -49,6 +54,7 @@ internal static class BootstrapDeferredHostedServiceRegistration
     internal static void DeferBootstrapWorkers(this IServiceCollection services)
     {
         var workers = services.Where(descriptor => descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationType != typeof(ModelProviderDiscoveryWorker)
             && IsApplicationWorker(descriptor)).ToArray();
         if (workers.Length == 0) return;
         foreach (var worker in workers) services.Remove(worker);

@@ -14,7 +14,8 @@ public sealed record ModelProviderPropertiesResponse(
     string? EndpointDisplayName,
     int ModelCount,
     Uri? Endpoint = null,
-    DateTimeOffset? LastCheckedAt = null);
+    DateTimeOffset? LastCheckedAt = null,
+    ModelProviderDiscoveryObservation? Discovery = null);
 
 public sealed record ModelProviderResponse(
     string Id,
@@ -41,7 +42,7 @@ public sealed record ModelDiscoveryDiffResponse(
     int Reappeared,
     int Total);
 
-public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details);
+public sealed record ModelProviderStatusResponse(string Provider, string Status, DateTimeOffset CheckedAt, string? Details, ModelProviderDiscoveryObservation? Discovery = null);
 public sealed record CreateModelProviderRequest(
     string Name,
     ModelProviderProperties Properties,

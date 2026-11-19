@@ -613,5 +613,42 @@ python3 scripts/bootstrap/test-external-enrollment.py --example ollama
 
 It starts the actual Web and Ollama extension hosts, waits for SharedKeyFile
 enrollment, checks the instance provider, Tenant model and Workspace Agent, then
-restarts both processes with retained identities. It creates configuration only;
-it does not call a live Ollama backend or validate a generated model response.
+restarts both processes with retained identities. It uses a local deterministic Ollama HTTP fixture for model discovery; no live Ollama backend, model weights or inference are required.
+
+
+### Required models and responsive administration
+
+Staged startup queues Model Provider discovery before applying dependent Model Profiles.
+Each Model Profile requires its exact external model identifier, including its tag;
+a different installed model does not satisfy the dependency. Existing create-only
+profiles retain their saved definition and are checked against that definition.
+Only providers needed by the selected profiles consume this wait. Optional providers
+are reconciled independently by the background discovery worker.
+
+`Agentstration:Bootstrap:ModelDependencyTimeout` bounds each required profile's
+wait (default `00:02:00`, allowed one second to thirty minutes). Aspire forwards
+this option. For example:
+
+```json
+{
+  "Agentstration": {
+    "Bootstrap": {
+      "PhasedStartupEnabled": true,
+      "ModelDependencyTimeout": "00:02:00"
+    }
+  }
+}
+```
+
+After topology and enrollment-policy setup, ordinary authenticated administration
+of model providers, profiles and extensions is available while dependencies wait.
+Existing authorization and scope checks remain in force. Health readiness and
+execution routes remain unavailable, and execution workers stay suspended until
+all Bootstrap phases succeed. Provider discovery runs independently of this fence.
+
+If the deadline expires, the diagnostic identifies the profile, provider and exact
+missing model. The staged listener remains available for administrative repair;
+readiness stays false. Correct the saved provider configuration or install the
+required model upstream, inspect its discovery state, then restart the authority
+to retry Bootstrap. No model is substituted or downloaded automatically. Manual
+Bootstrap preview remains read-only and does not wait for upstream discovery.

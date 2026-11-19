@@ -28,7 +28,7 @@ else
         <Information Context="provider">
             <CollectionValue Label="@T("Type")">@provider.Properties.ContributionId</CollectionValue>
             <CollectionValue Label="@T("Management")">@provider.Properties.RegistrationSource</CollectionValue>
-            <CollectionValue Label="@T("Models")">@ModelCount(provider.Properties.ModelCount)</CollectionValue>
+            <CollectionValue Label="@T("Models")">@(provider.Properties.Discovery is { LastSuccessAt: null } ? T("NotDiscovered") : ModelCount(provider.Properties.ModelCount))</CollectionValue>
         </Information>
         <Actions Context="provider"><CollectionActions ResourceName="@($"{provider.Properties.DisplayName} ({provider.Namespace}/{provider.Name}, {provider.ScopeRef})")"><a href="@DetailsUrl(provider)">@T("ViewDetails")</a></CollectionActions></Actions>
     </CollectionView>

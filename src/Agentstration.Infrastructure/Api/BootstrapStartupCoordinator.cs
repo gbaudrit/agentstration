@@ -22,6 +22,7 @@ public sealed class BootstrapStartupCoordinator(
     IOperationalTopologyProvisioner operationalTopology,
     IWorkspacePlatformResourceProvisioner platformResources,
     TimeProvider timeProvider,
+    BootstrapStartupState startup,
     ILogger<BootstrapStartupCoordinator> logger)
 {
     private sealed record InitialApplication(
@@ -55,6 +56,7 @@ public sealed class BootstrapStartupCoordinator(
             await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application.Snapshot, cancellationToken);
         await automaticEnrollment.ActivateAsync(cancellationToken);
 
+        startup.EnableAdministration();
         var selections = new List<BootstrapProfileSelection>();
         foreach (var application in applications)
             selections.Add(await SelectAsync(application, cancellationToken));

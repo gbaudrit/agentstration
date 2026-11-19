@@ -36,6 +36,7 @@ internal static class StandaloneHostServiceCollectionExtensions
         services.AddSingleton(toolExecutionCapture);
         services.AddScoped<DeclarativeBootstrapService>();
         services.AddScoped<BootstrapStartupCoordinator>();
+        services.AddScoped<Agentstration.Infrastructure.Bootstrap.BootstrapModelDependencies>();
         return services;
     }
 
@@ -96,6 +97,7 @@ internal static class StandaloneHostServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationBackgroundWorkers(this IServiceCollection services, bool enabled)
     {
         if (!enabled) return services;
+        services.AddHostedService<ModelProviderDiscoveryWorker>();
         services.AddHostedService<AepAutomaticEnrollmentWorker>();
         services.AddHostedService<LocalWorkExecutionWorker>();
         services.AddHostedService<RuntimeAssignmentLeaseReaper>();

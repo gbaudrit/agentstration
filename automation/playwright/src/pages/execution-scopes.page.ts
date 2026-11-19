@@ -1,3 +1,4 @@
+import { waitForModelDiscovery } from './model-discovery.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { ExpectedTextByLocale } from '../locales/expected-text.js';
@@ -431,7 +432,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/api/modelproviders/${modelProviderName}/models/refresh`,
       { headers: contextHeaders },
     );
-    expect(refreshed.status(), await refreshed.text()).toBe(200);
+    expect(refreshed.status(), await refreshed.text()).toBe(202);
+    await waitForModelDiscovery(this.page, consoleUrl, modelProviderName, contextHeaders);
 
     const profileUrl = `${consoleUrl}/api/modelprofiles/${modelProfileName}?scopeRef=${encodeURIComponent('/instance')}`;
     const currentProfile = await this.page.request.get(profileUrl, { headers: contextHeaders });

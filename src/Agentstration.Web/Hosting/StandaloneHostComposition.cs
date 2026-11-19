@@ -190,7 +190,9 @@ internal static class StandaloneHostCompositionExtensions
             var startup = context.RequestServices.GetRequiredService<BootstrapStartupState>();
             var announcement = HttpMethods.IsPost(context.Request.Method)
                 && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
-            if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement)
+            if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement
+                && !(startup.AdministrationReady && (BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path)
+                    || BootstrapAdministrationAccess.IsLoginOrAsset(context.Request.Path))))
             {
                 await Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
                     extensions: new Dictionary<string, object?> { ["code"] = "bootstrap_initializing" }).ExecuteAsync(context);
@@ -289,6 +291,11 @@ internal static class StandaloneHostCompositionExtensions
         catch (Exception exception)
         {
             startupState.Fail(exception.Message);
+            if (phased && startupState.AdministrationReady && !app.Lifetime.ApplicationStopping.IsCancellationRequested)
+            {
+                app.Logger.LogError("Bootstrap failed. Administration remains available; readiness and execution remain disabled. Correct the configuration and restart to retry.");
+                return;
+            }
             if (app.Lifetime.ApplicationStarted.IsCancellationRequested)
                 await app.StopAsync(CancellationToken.None);
             testingDataDirectoryCleanup?.Dispose();

@@ -279,13 +279,19 @@ Current limitations are deliberate: credentials are not stored on provider resou
 
 ### Model provider and profile APIs
 
-Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and explicit model discovery. Discovery reconciles governed provider-owned `Model` resources; GET requests read the retained inventory without contacting the provider. A provider can retain bounded per-model `specificationOverrides` keyed by exact external model identifier. Provider inventory and Model Profile resolution expose observed, override, and effective model specifications separately. The effective model capability level is intersected with provider, adapter, and runtime support, so an override cannot elevate explicit unsupported support or bypass Tool governance. Model Profile resolution exposes those capability levels and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
+Model providers are durable Management Plane resources with CRUD, ETag concurrency, usage visibility, deletion protection, connectivity testing, and background model discovery. Creation/update queue discovery; refresh and connection-test commands return `202 Accepted`, and clients poll the stored discovery state. Discovery reconciles governed provider-owned `Model` resources; GET requests read the retained inventory without contacting the provider. A provider can retain bounded per-model `specificationOverrides` keyed by exact external model identifier. Provider inventory and Model Profile resolution expose observed, override, and effective model specifications separately. The effective model capability level is intersected with provider, adapter, and runtime support, so an override cannot elevate explicit unsupported support or bypass Tool governance. Model Profile resolution exposes those capability levels and profile-option incompatibilities before execution. Runtime and agent-tool compatibility remains an execution-resolution concern. Aspire starts the AEP extensions and supplies their initial seed URLs, but relies on configured local inference servers and remains outside the provider source of truth:
 
 ```powershell
 Invoke-RestMethod http://localhost:5100/api/modelproviders
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/models/refresh
+# The command returns 202. Wait for its stored observation before using the inventory.
+do {
+    Start-Sleep -Seconds 1
+    $status = Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/status
+} while ($status.discovery.state -in @('queued', 'running'))
+if ($status.discovery.state -ne 'succeeded') { throw $status.discovery.errorCode }
 Invoke-RestMethod http://localhost:5100/api/models
 Invoke-RestMethod -Method Post http://localhost:5100/api/modelproviders/ollama-local/test
 Invoke-RestMethod http://localhost:5100/api/modelproviders/ollama-local/usages

@@ -182,7 +182,8 @@ public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagem
 
 public sealed class ModelProfileBootstrapResourceHandler(
     ModelProfileManagementService service,
-    ModelProviderManagementService providers) : IBootstrapResourceHandler
+    ModelProviderManagementService providers,
+    BootstrapModelDependencies? dependencies = null) : IBootstrapResourceHandler
 {
     public string Kind => ModelResourceKinds.ModelProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
@@ -216,6 +217,8 @@ public sealed class ModelProfileBootstrapResourceHandler(
         BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
     {
+        if (operation.WaitForDependencies && dependencies is not null)
+            await dependencies.WaitAsync(resource, operation, cancellationToken);
         var value = WorkspaceBootstrapResource.Parse<ModelProfileResource>(resource);
         var scopeRef = value.ScopeRef ?? TargetScope(operation);
         value = value with { ScopeRef = scopeRef };

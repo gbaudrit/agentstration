@@ -6,6 +6,8 @@ does not require Docker, a model provider or Internet access. Only fresh tempora
 data and key files are used. Logs remain in the printed temporary directory.
 """
 import argparse
+import http.server
+import threading
 import json
 import os
 import pathlib
@@ -69,6 +71,7 @@ def main():
         "Aep__SharedKeyFile__StateFile": str(root / "extension-instance"),
         "Aep__SharedKeyFile__AllowInsecureHttp": "true",
     }
+    upstream = None
     extension_project = "Agentstration.Extensions.OpenApi"
     if args.example == "ollama":
         extension_project = "Agentstration.Extensions.Ollama"
@@ -85,8 +88,46 @@ def main():
             "Agentstration__Extensions__Agentstration.Extensions.Ollama__EnrollmentMode": "SharedKeyFile",
             "Agentstration__Extensions__Agentstration.Extensions.Ollama__SharedKeyFile__Path": str(key),
         })
-        # Only configuration is bootstrapped. No live model or inference is needed.
-        extension["Ollama__Endpoint"] = "http://127.0.0.1:1"
+        # Exercise discovery through the actual extension, using an offline Ollama fixture.
+        class OllamaFixture(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                pass
+
+            def do_GET(self):
+                if self.path == "/":
+                    payload = b"Ollama is running"
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                elif self.path == "/api/version":
+                    self.reply({"version": "0.6.0"})
+                elif self.path == "/api/tags":
+                    self.reply({"models": [{"name": "qwen3:1.7b", "model": "qwen3:1.7b",
+                        "modified_at": "2026-11-19T00:00:00Z", "size": 1, "digest": "fixture",
+                        "details": {"family": "qwen3", "format": "gguf", "parameter_size": "1.7B"}}]})
+                else:
+                    self.send_error(404)
+
+            def do_POST(self):
+                if self.path != "/api/show":
+                    self.send_error(404)
+                    return
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.reply({"capabilities": ["completion", "tools"],
+                    "model_info": {"qwen3.context_length": 4096}})
+
+            def reply(self, body):
+                payload = json.dumps(body).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        upstream = http.server.ThreadingHTTPServer(("127.0.0.1", 0), OllamaFixture)
+        threading.Thread(target=upstream.serve_forever, daemon=True).start()
+        extension["Ollama__Endpoint"] = f"http://127.0.0.1:{upstream.server_port}"
         del extension["OpenApi__AllowedDomains__0"]
     processes = []
 
@@ -138,7 +179,7 @@ def main():
                     definition = json.loads(payload)["definition"]
                     result[kind + "/" + name] = {k: definition[k] for k in
                         ("instanceId", "targetScopeRef", "registrationName", "state")}
-                elif kind == "ExtensionRegistration" or (name.startswith("bootstrap-") and kind != "InstanceInitialization"):
+                elif kind == "ExtensionRegistration" or (name.startswith("bootstrap-") and kind not in ("InstanceInitialization", "Model", "ModelProviderDiscovery")):
                     result[kind + "/" + name] = (uid, etag)
                 elif args.example == "ollama" and name in ("ollama-chat", "ollama-assistant"):
                     result[kind + "/" + name] = (uid, etag, json.loads(payload)["scopeRef"])
@@ -194,6 +235,9 @@ def main():
         print("PASS restart: installation, assignment and Bootstrap consumers preserved", flush=True)
     finally:
         stop()
+        if upstream is not None:
+            upstream.shutdown()
+            upstream.server_close()
 
 
 if __name__ == "__main__":

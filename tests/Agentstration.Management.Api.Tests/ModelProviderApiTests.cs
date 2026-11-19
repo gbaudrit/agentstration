@@ -89,6 +89,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
                 (await policies.GetAsync(provider.Value.Uid, default))?.ETag, default);
         }
 
+        await ProcessDiscoveryAsync(factory, "ollama-local");
         using var client = factory.CreateClient();
         SelectConsoleContext(client, ResourceScopeRef.Workspace(context.WorkspaceId));
         var status = await client.GetFromJsonAsync<ModelProviderStatusResponse>(
@@ -110,7 +111,8 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         using var models = await client.GetAsync("/api/modelproviders/ollama-local/models");
 
         Assert.AreEqual("aspire", provider.Properties.RegistrationSource);
-        Assert.AreEqual("unavailable", status!.Status);
+        Assert.AreEqual("unknown", status!.Status);
+        Assert.IsNull(status.Discovery!.LastSuccessAt);
         Assert.AreEqual(HttpStatusCode.OK, models.StatusCode);
         var inventory = await models.Content.ReadFromJsonAsync<ValueResponse<AvailableModelResponse>>();
         Assert.AreEqual(0, inventory?.Value.Count);
@@ -144,7 +146,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(0, before?.Value.Count);
         Assert.AreEqual(0, discovery.ListCalls);
 
-        var created = await RefreshAsync(client);
+        var created = await RefreshAsync(factory, client);
         Assert.AreEqual(new ModelDiscoveryDiffResponse(1, 0, 0, 0, 0, 1), created);
         Assert.AreEqual(1, discovery.ListCalls);
 
@@ -160,16 +162,16 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         var providerInventory = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>("/api/modelproviders/ollama-local/models");
         Assert.AreEqual(model.Name, providerInventory!.Value.Single().ResourceName);
 
-        var unchanged = await RefreshAsync(client);
+        var unchanged = await RefreshAsync(factory, client);
         Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 1, 0, 0, 1), unchanged);
 
-        var missing = await RefreshAsync(client);
+        var missing = await RefreshAsync(factory, client);
         Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 0, 1, 0, 0), missing);
         model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
         Assert.AreEqual(ModelObservationState.Missing, model.Definition.Observation.State);
         Assert.AreEqual(8192, model.Definition.Specification.Limits.ContextTokens);
 
-        var reappeared = await RefreshAsync(client);
+        var reappeared = await RefreshAsync(factory, client);
         Assert.AreEqual(new ModelDiscoveryDiffResponse(0, 0, 0, 0, 1, 1), reappeared);
         model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
         Assert.AreEqual(ModelObservationState.Available, model.Definition.Observation.State);
@@ -177,7 +179,8 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(16384, model.Definition.Specification.Limits.ContextTokens);
 
         using var failed = await client.PostAsync("/api/modelproviders/ollama-local/models/refresh", null);
-        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, failed.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Accepted, failed.StatusCode);
+        await ProcessDiscoveryAsync(factory, "ollama-local");
         model = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value.Single();
         Assert.AreEqual(ModelObservationState.Failed, model.Definition.Observation.State);
         Assert.AreEqual("discovery_failed", model.Definition.Observation.ErrorCode);
@@ -216,8 +219,8 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
             ScopeRef: tenant));
         Assert.AreEqual(HttpStatusCode.Created, createdProvider.StatusCode);
 
-        _ = await RefreshAsync(client, "ollama-local");
-        _ = await RefreshAsync(client, "second-provider");
+        _ = await RefreshAsync(factory, client, "ollama-local");
+        _ = await RefreshAsync(factory, client, "second-provider");
         var models = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value;
         Assert.AreEqual(2, models.Count);
         Assert.IsTrue(models.All(value => value.Definition.ExternalId == "same-id"));
@@ -225,7 +228,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(2, models.Select(value => value.Name).Distinct(StringComparer.Ordinal).Count());
 
         discovery.MissingProvider = "ollama-local";
-        _ = await RefreshAsync(client, "ollama-local");
+        _ = await RefreshAsync(factory, client, "ollama-local");
         models = (await client.GetFromJsonAsync<ValueResponse<ModelResource>>("/api/models"))!.Value;
         Assert.AreEqual(ModelObservationState.Missing,
             models.Single(value => value.Definition.Provider.Name == "ollama-local").Definition.Observation.State);
@@ -250,7 +253,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         await using var factory = DiscoveryFactory(discovery);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, ResourceScopeRef.Instance);
-        _ = await RefreshAsync(client);
+        _ = await RefreshAsync(factory, client);
 
         using var providerResponse = await client.GetAsync("/api/modelproviders/ollama-local");
         providerResponse.EnsureSuccessStatusCode();
@@ -298,7 +301,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(ModelFeatureSupport.Unknown,
             observed!.Value.Single(value => value.Definition.ExternalId == "omitted-tools").Definition.Specification.Features.Tools?.Support);
 
-        var discoveryChange = await RefreshAsync(client);
+        var discoveryChange = await RefreshAsync(factory, client);
         Assert.AreEqual(1, discoveryChange.Updated);
         Assert.AreEqual(1, discoveryChange.Unchanged);
         effective = await client.GetFromJsonAsync<ValueResponse<AvailableModelResponse>>(
@@ -509,14 +512,16 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         Assert.AreEqual(HttpStatusCode.Conflict, protectedDelete.StatusCode);
     }
 
-    private static Task<ModelDiscoveryDiffResponse> RefreshAsync(HttpClient client) => RefreshAsync(client, "ollama-local");
+    private static Task<ModelDiscoveryDiffResponse> RefreshAsync(WebApplicationFactory<Program> factory, HttpClient client) => RefreshAsync(factory, client, "ollama-local");
 
-    private static async Task<ModelDiscoveryDiffResponse> RefreshAsync(HttpClient client, string providerName)
+    private static async Task<ModelDiscoveryDiffResponse> RefreshAsync(WebApplicationFactory<Program> factory, HttpClient client, string providerName)
     {
         using var response = await client.PostAsync($"/api/modelproviders/{providerName}/models/refresh", null);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ModelDiscoveryDiffResponse>()
-            ?? throw new InvalidOperationException("The refresh response was empty.");
+        Assert.AreEqual(HttpStatusCode.Accepted, response.StatusCode);
+        await ProcessDiscoveryAsync(factory, providerName);
+        var status = await client.GetFromJsonAsync<ModelProviderStatusResponse>($"/api/modelproviders/{providerName}/status");
+        var result = status!.Discovery!.Result!;
+        return new(result.Created, result.Updated, result.Unchanged, result.Missing, result.Reappeared, result.Total);
     }
 
     private sealed class SequenceModelDiscovery(params Func<IReadOnlyList<DiscoveredModel>>[] observations) : IModelProviderDiscovery
@@ -543,7 +548,7 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         public ValueTask<ModelProviderHealth> GetHealthAsync(
             ModelProviderConfiguration provider,
             CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(context.AccessMode == ControlPlaneAccessMode.Instance
+            ValueTask.FromResult(context.AccessMode is ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.System
                 ? new ModelProviderHealth("available")
                 : new ModelProviderHealth("unavailable", $"Resolved from '{context.AccessMode}' instead of Instance."));
         public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(

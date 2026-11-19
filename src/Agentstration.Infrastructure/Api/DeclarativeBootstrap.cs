@@ -159,7 +159,7 @@ public sealed partial class DeclarativeBootstrapService(
         var resources = new List<BootstrapAppliedResource>();
         foreach (var profile in loaded)
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources);
             foreach (var source in profile.Resources)
             {
                 var resource = source.Resource;
@@ -435,6 +435,7 @@ public sealed class DeclarativeBootstrapOptions
     public List<string> InitialProfiles { get; set; } = [];
     public bool PhasedStartupEnabled { get; set; }
     public TimeSpan ExtensionDependencyTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    public TimeSpan ModelDependencyTimeout { get; set; } = TimeSpan.FromMinutes(2);
     public List<BootstrapInitialApplication> InitialApplications { get; set; } = [];
 }
 
