@@ -218,7 +218,7 @@ else
     private DataSourceAcquisitionResource? toolAcquisition;
     private IReadOnlyList<ToolDefinitionResource> acquisitionTools = [];
     private string AcquisitionToolUrl(ToolDefinitionResource tool) =>
-        $"/tools/{Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(tool.Name))}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}&view=execution";
+        $"/tools/{Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(tool.Name))}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}#execution";
     private ConsoleContextSnapshot? ConsoleContext => Services.GetService<ConsoleContextState>()?.Current;
     private bool CanCreateAcquisitionTool(DataSourceAcquisitionResource item) =>
         item.State == DataSourceAcquisitionState.Succeeded

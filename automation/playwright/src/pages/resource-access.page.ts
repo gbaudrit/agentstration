@@ -102,11 +102,7 @@ export class ResourceAccessPage {
       await this.page.getByTestId(TestIds.resourceAdministration.toolDetails).waitFor({ state: 'visible' });
     }).toPass({ timeout: 30_000 });
     await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
-    const accessTab = this.page.getByTestId('tool-access-tab');
-    await expect(async () => {
-      await accessTab.click();
-      expect(await accessTab.getAttribute('aria-selected')).toBe('true');
-    }).toPass({ timeout: 15_000 });
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
     await expect(this.panel).toHaveAttribute('data-resource-managed', 'true');
     await expect(this.panel).toHaveAttribute('data-resource-origin', 'Extension');

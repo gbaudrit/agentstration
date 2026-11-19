@@ -5815,6 +5815,41 @@
         "evidenceStatus": "Source adopted; current browser validation pending."
       },
       "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "line": 25,
+      "host": "console",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/tool-execution.spec.ts",
+          "tests/resource-access.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Tool configuration is separate from the retained execution input and access policy editors. Fresh browser validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Read-only saved provider identity, external identity, activation, approval and availability preserve Tool semantics. Execution simulation and results retain their specialized renderers.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
     }
   ],
   "specialized": [

@@ -141,8 +141,8 @@ public sealed class DataSourceEditorTests
             new CreateToolDefinitionFromAcquisitionRequest("catalogue-mobilite", "Catalogue mobilité", "results"), handler.Request));
         Assert.AreEqual("/api/tooldefinitions/from-acquisition/acquisition-1?namespace=default", handler.Path);
         var scope = Uri.EscapeDataString(Scope.Value);
-        Assert.AreEqual($"/tools/agentstration.catalogue-mobilite?namespace=default&scopeRef={scope}&context={scope}&view=execution",
-            new Uri(navigation.Uri).PathAndQuery);
+        Assert.AreEqual($"/tools/agentstration.catalogue-mobilite?namespace=default&scopeRef={scope}&context={scope}#execution",
+            new Uri(navigation.Uri).PathAndQuery + new Uri(navigation.Uri).Fragment);
     }
 
     [TestMethod]

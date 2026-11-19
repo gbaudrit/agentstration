@@ -1,4 +1,5 @@
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
+import { selectResourceSection } from './resource-sections.js';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExpectedText } from '../locales/expected-text.js';
 
@@ -46,15 +47,13 @@ export class ToolExecutionPage {
   }
 
   public async openExecution(): Promise<void> {
-    await expect(async () => {
-      await this.page.getByTestId(TestIds.toolExecution.executionTab).click();
-      await expect(this.runner).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'execution');
+    await expect(this.runner).toBeVisible();
   }
 
   public async assertLocalized(expected: ExpectedText['toolExecution']): Promise<void> {
-    await expect(this.page.getByTestId(TestIds.toolExecution.overviewTab)).toHaveText(expected.overview);
-    await expect(this.page.getByTestId(TestIds.toolExecution.executionTab)).toHaveText(expected.execution);
+    await expect(this.page.locator('.resource-navigation-rail a[data-resource-section="overview"]')).toHaveText(expected.overview);
+    await expect(this.page.locator('.resource-navigation-rail a[data-resource-section="execution"]')).toHaveText(expected.execution);
     await this.openExecution();
     await expect(this.runner.getByRole('heading', { name: expected.runTool })).toBeVisible();
     await expect(this.runner.getByRole('heading', { name: expected.input })).toBeVisible();

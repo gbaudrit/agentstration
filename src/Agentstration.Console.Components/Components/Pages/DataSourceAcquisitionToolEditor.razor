@@ -93,7 +93,7 @@
             var scope = Uri.EscapeDataString((created.ScopeRef ?? ContextScope).Value);
             var context = Uri.EscapeDataString(ContextScope.Value);
             var toolName = Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(created.Name));
-            Navigation.NavigateTo($"/tools/{toolName}?namespace={Uri.EscapeDataString(created.Namespace.Value)}&scopeRef={scope}&context={context}&view=execution");
+            Navigation.NavigateTo($"/tools/{toolName}?namespace={Uri.EscapeDataString(created.Namespace.Value)}&scopeRef={scope}&context={context}#execution");
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)

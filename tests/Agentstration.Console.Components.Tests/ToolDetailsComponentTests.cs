@@ -3,6 +3,8 @@ using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.JsonSchema;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -31,6 +33,10 @@ public sealed class ToolDetailsComponentTests
 
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
 
+        Assert.Contains("Create notification", rendered.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("create-notification", rendered.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("provider", rendered.Find(".resource-configuration-summary").TextContent);
+        Assert.IsNotNull(rendered.Find(".resource-header input[role=switch]"));
         Assert.AreEqual("What this tool does", rendered.Find("#tool-capability-heading").TextContent);
         StringAssert.Contains(rendered.Find(".tool-capability").TextContent, "Create one durable notification.");
         Assert.AreEqual("Inputs", rendered.Find("#tool-input-heading").TextContent);
@@ -99,10 +105,10 @@ public sealed class ToolDetailsComponentTests
             """);
         var workspace = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
         var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
-        navigation.NavigateTo($"/tools/acquisition-tool?scopeRef={Uri.EscapeDataString(workspace.Value)}&context=%2Finstance&view=execution");
+        navigation.NavigateTo($"/tools/acquisition-tool?scopeRef={Uri.EscapeDataString(workspace.Value)}&context=%2Finstance#execution");
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "acquisition-tool"));
 
-        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected")));
+        rendered.WaitForAssertion(() => Assert.AreEqual("execution", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath));
         rendered.Find("[data-testid='tool-run-submit']").Click();
 
         var artifact = rendered.WaitForElement("[data-testid='tool-run-open-artifact']");
@@ -113,7 +119,7 @@ public sealed class ToolDetailsComponentTests
     }
 
     [TestMethod]
-    public void ExecutionTabReusesSchemaEditorAndSimulatesByDefault()
+    public async Task ExecutionTabReusesSchemaEditorAndSimulatesByDefault()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext(new ToolSchema
@@ -123,10 +129,10 @@ public sealed class ToolDetailsComponentTests
         var client = context.Services.GetRequiredService<ToolClient>();
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
 
-        Assert.AreEqual("true", rendered.Find("#tool-overview-tab").GetAttribute("aria-selected"));
-        rendered.Find("#tool-execution-tab").Click();
+        Assert.AreEqual("overview", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("execution"));
 
-        Assert.AreEqual("true", rendered.Find("#tool-execution-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual("execution", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
         Assert.IsNotNull(rendered.Find("[data-testid='schema-input-editor']"));
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-simulate-mode']").ClassName, "selected");
         var dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
@@ -142,6 +148,11 @@ public sealed class ToolDetailsComponentTests
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-result']").TextContent, "Provider invokedYes");
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-output']").TextContent, "dryRun");
 
+        var schemaEditor = rendered.FindComponent<JsonSchemaInputEditor>().Instance;
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("execution"));
+        Assert.AreSame(schemaEditor, rendered.FindComponent<JsonSchemaInputEditor>().Instance);
+        Assert.IsNotNull(rendered.Find("[data-testid='tool-run-result']"));
         rendered.Find("[data-testid='tool-run-execute-mode']").Click();
         dryRun = rendered.Find("[data-schema-path='$.dryRun'] input");
         Assert.IsFalse(dryRun.HasAttribute("checked"));
@@ -150,7 +161,7 @@ public sealed class ToolDetailsComponentTests
     }
 
     [TestMethod]
-    public void RealExecutionPutsToolOutputBeforeTechnicalDetails()
+    public async Task RealExecutionPutsToolOutputBeforeTechnicalDetails()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext(new ToolSchema
@@ -160,7 +171,7 @@ public sealed class ToolDetailsComponentTests
         var client = context.Services.GetRequiredService<ToolClient>();
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
 
-        rendered.Find("#tool-execution-tab").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("execution"));
         rendered.Find("[data-testid='tool-run-execute-mode']").Click();
         rendered.Find("[data-testid='tool-run-submit']").Click();
 
@@ -171,7 +182,7 @@ public sealed class ToolDetailsComponentTests
     }
 
     [TestMethod]
-    public void SimulationIsDisabledWhenDryRunIsNotDeclared()
+    public async Task SimulationIsDisabledWhenDryRunIsNotDeclared()
     {
         using var culture = new CultureScope("en-US");
         using var context = CreateContext(new ToolSchema
@@ -180,21 +191,41 @@ public sealed class ToolDetailsComponentTests
         });
         var rendered = context.Render<ToolDetails>(parameters => parameters.Add(page => page.Name, "create-notification"));
 
-        rendered.Find("#tool-execution-tab").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("execution"));
 
         Assert.IsTrue(rendered.Find("[data-testid='tool-run-simulate-mode']").HasAttribute("disabled"));
         StringAssert.Contains(rendered.Find("[data-testid='tool-run-execute-mode']").ClassName, "selected");
         StringAssert.Contains(rendered.Find(".tool-run-mode-unavailable").TextContent, "does not declare a boolean dryRun");
     }
 
+    [TestMethod]
+    public void HeaderActivationPreservesTheEtagAndRefreshesSavedConfiguration()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) });
+        var client = context.Services.GetRequiredService<ToolClient>();
+        var cut = context.Render<ToolDetails>(p => p.Add(c => c.Name, "create-notification"));
+        cut.Find(".resource-header input[role=switch]").Change(false);
+        cut.WaitForAssertion(() => Assert.AreEqual(false, client.EnabledRequest));
+        Assert.AreEqual("\"etag\"", client.LastEtag);
+        Assert.IsFalse(cut.Find(".resource-header input[role=switch]").HasAttribute("checked"));
+        Assert.Contains("No", cut.Find(".resource-configuration-summary").TextContent);
+    }
+
     private static BunitContext CreateContext(ToolSchema schema, string? description = "Create one durable notification.")
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "execution", "access" })
+            module.Setup<string>("navigate", c => c.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/#" + path);
         var client = new ToolClient(new ToolResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = "Tool",
+            Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+            ScopeRef = ResourceScopeRef.Instance,
             Metadata = new ResourceMetadata { Name = "create-notification" },
             Definition = new ToolResourceProperties
             {
@@ -218,15 +249,23 @@ public sealed class ToolDetailsComponentTests
 
     private sealed class ToolClient(ToolResource tool) : IToolsClient
     {
+        public string? LastEtag { get; private set; }
+        public bool? EnabledRequest { get; private set; }
         public List<RunToolRequest> RunRequests { get; } = [];
         public ResourceScopeRef? ExecutionScope { get; private set; }
         public JsonElement? ExecutionOutput { get; set; }
 
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ToolResource>(tool, "\"etag\""));
+            Task.FromResult(new ResourceSnapshot<ToolResource>(tool with { Metadata = tool.Metadata with { Name = name } }, "\"etag\""));
 
-        public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ToolResource>(tool with { Definition = tool.Definition with { Enabled = enabled } }, "\"etag-2\""));
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            Task.FromResult(new ResourceSnapshot<ToolResource>(tool with { Metadata = tool.Metadata with { Name = name, Namespace = @namespace }, ScopeRef = scopeRef }, "\"etag\""));
+
+        public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken)
+        {
+            LastEtag = etag; EnabledRequest = enabled;
+            return Task.FromResult(new ResourceSnapshot<ToolResource>(tool with { Definition = tool.Definition with { Enabled = enabled } }, "\"etag-2\""));
+        }
 
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
