@@ -76,7 +76,12 @@ export class ResourceNamingPage {
   }
 
   public async reopenParameter(url: string, expectedTechnicalName: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const target = new URL(url);
+    const current = new URL(this.page.url());
+    target.hash = ''; current.hash = '';
+    const response = current.href === target.href
+      ? await this.page.reload({ waitUntil: 'domcontentloaded' })
+      : await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Parameter edit route returned HTTP ${response?.status() ?? 'no response'}.`);
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await selectResourceSection(this.page, 'definition/configuration');
