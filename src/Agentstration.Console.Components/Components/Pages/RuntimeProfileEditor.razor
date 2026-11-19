@@ -276,7 +276,7 @@ else
             var snapshot = wasNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
                 : await Client.UpdateRuntimeProfileAsync(current!.Namespace, current.Name, model.ToPutRequest(), etag!, cancellation.Token);
             if (version != loadVersion) return;
-            if (snapshot.Value.Name != (wasNew ? model.Name : current!.Name) || snapshot.Value.ScopeRef != selectedScope || snapshot.Value.Namespace.Value != model.Namespace || !wasNew && snapshot.Value.Uid != current!.Uid)
+            if (snapshot.Value.Name != (wasNew ? model.Name : current!.Name) || snapshot.Value.ScopeRef != selectedScope || snapshot.Value.Namespace != ResourceNamespace.Parse(model.Namespace) || !wasNew && snapshot.Value.Uid != current!.Uid)
                 throw new InvalidOperationException(T("ResourceIdentityMismatch"));
             Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
             if (wasNew) { baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(ResourceUrl(snapshot.Value)); }

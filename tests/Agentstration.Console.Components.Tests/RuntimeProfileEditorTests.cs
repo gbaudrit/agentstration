@@ -72,7 +72,7 @@ public sealed class RuntimeProfileEditorTests
         cut.Find("[data-testid=runtime-profile-display-name]").Change("My runtime");
         cut.Find("[data-testid=runtime-profile-name]").Change("my-runtime");
         Assert.IsTrue(cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceEditable);
-        await cut.InvokeAsync(() => cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceChanged.InvokeAsync("custom-runtime"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceChanged.InvokeAsync("  Custom-Runtime  "));
         await cut.InvokeAsync(() => cut.FindComponent<ResourceScopeFormField>().Instance.ValueChanged.InvokeAsync(ResourceScopeRef.Instance));
         await cut.InvokeAsync(() => wizard.GoToStepAsync("options"));
         cut.Find("textarea.form-code-editor").Change("{");

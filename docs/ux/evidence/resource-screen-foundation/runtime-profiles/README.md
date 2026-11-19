@@ -20,3 +20,5 @@ Verification:
 | Invalid JSON options | [Capture](runtime-invalid-options-desktop-en.png) | [Capture](runtime-invalid-options-mobile-fr.png) |
 | Retained concurrent refresh | [Capture](runtime-retained-refresh-desktop-en.png) | [Capture](runtime-retained-refresh-mobile-fr.png) |
 | Saved YAML | [Capture](runtime-yaml-desktop-en.png) | [Capture](runtime-yaml-mobile-fr.png) |
+
+A focused follow-up preserves the domain normalization of creation namespaces: spaces and uppercase input are compared using `ResourceNamespace.Parse` after a successful write. All 12 Runtime Profile cases pass with the strengthened mixed-case/padded namespace fixture. This is a result-check correction; it does not alter namespace rules or the visual layout. The original capture source hashes above precede this one-line follow-up.
