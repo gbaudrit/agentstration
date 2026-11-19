@@ -3,6 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { ConnectedStorageCollectionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 import { CollectionContractPage } from './collection-contract.page.js';
+import { selectResourceSection } from './resource-sections.js';
 
 interface Descriptor { version: string; schemaDigest: string; contractDigest: string }
 interface TypeResource { metadata: { name: string; namespace: string }; scopeRef: string; uid: string; definition: { versions: Descriptor[] } }
@@ -116,14 +117,14 @@ export class ConnectedStorageCollectionPage {
     await expect(activation).toBeChecked();
     await this.cancelConfirmation(activation, locale);
     await expect(activation).toBeChecked();
-    for (const tab of [TestIds.connectedStorageCollections.serviceOverview, TestIds.connectedStorageCollections.serviceDiscovery, TestIds.connectedStorageCollections.serviceAccess, TestIds.connectedStorageCollections.serviceYaml]) {
-      await this.page.getByTestId(tab).click();
+    for (const section of ['overview', 'discovery', 'access', 'yaml']) {
+      await selectResourceSection(this.page, section);
       await expect(activation).toBeVisible();
       await expect(activation).toBeChecked();
       await this.assertNoOverflow();
     }
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.serviceYamlViewer).locator('textarea[readonly]')).toBeVisible();
-    await this.page.getByTestId(TestIds.connectedStorageCollections.serviceDefinition).click();
+    await selectResourceSection(this.page, 'definition/configuration');
     const field = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDisplayName);
     await expect(field).toBeVisible();
     await this.clearAndRestore(field, await field.inputValue());

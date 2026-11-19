@@ -633,7 +633,7 @@ else
         catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetActionFailed"); }
         finally { busy = false; }
     }
-    private string ServiceDiscoveryUrl(ConnectedServiceResource service) => $"/connected-services/{Uri.EscapeDataString(service.Name)}?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}&view=discovery&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? service.ScopeRef.Value.Value)}";
+    private string ServiceDiscoveryUrl(ConnectedServiceResource service) => $"/connected-services/{Uri.EscapeDataString(service.Name)}?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? service.ScopeRef.Value.Value)}#discovery";
     private static string FlowUrl(DataSourceAcquisitionResource item) => $"/flow-runs/{Uri.EscapeDataString(item.FlowRunId)}?scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.LogicalScopeRef?.Value ?? item.ScopeRef.Value.Value)}";
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

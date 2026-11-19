@@ -117,7 +117,7 @@ public sealed class ConnectedServiceComponentTests
     [TestMethod]
     [DataRow("en-US", "Manage the service configuration and review its availability.")]
     [DataRow("fr-FR", "Gérez la configuration du service et consultez sa disponibilité.")]
-    public void DetailsUseResourceTabsEmbedDefinitionAndDoNotExposeAnEditAction(string locale, string description)
+    public void DetailsUseResourceNavigationEmbedDefinitionAndDoNotExposeAnEditAction(string locale, string description)
     {
         using var culture = new TestCultureScope(locale);
         using var context = new BunitContext().WithCollectionPresentation();
@@ -135,14 +135,16 @@ public sealed class ConnectedServiceComponentTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
             $"/connected-services/{resource.Name}?scopeRef={Uri.EscapeDataString(workspace.Value)}");
 
+        ConfigureNavigation(context);
         var rendered = context.Render<ConnectedServiceDetailsPage>(parameters => parameters
             .Add(component => component.Name, resource.Name));
 
         rendered.WaitForAssertion(() =>
         {
-            StringAssert.Contains(rendered.Find(".page-header").TextContent, description);
-            Assert.HasCount(5, rendered.FindAll(".resource-tabs button"));
-            Assert.AreEqual(workspace.Value, rendered.Find(".page-header .resource-owner-scope").GetAttribute("data-scope-ref"));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(description));
+            StringAssert.Contains(rendered.Find(".resource-header").TextContent, resource.Definition.DisplayName);
+            Assert.HasCount(5, rendered.FindAll(".resource-navigation-rail a[data-resource-section]"));
+            Assert.AreEqual(workspace.Value, rendered.Find(".resource-header .resource-owner-scope").GetAttribute("data-scope-ref"));
             Assert.HasCount(3, rendered.FindAll(".metric-card"));
             Assert.HasCount(1, rendered.FindAll(".resource-overview .resource-identity-summary"));
             Assert.IsEmpty(rendered.FindAll(".resource-overview .schema-input-editor"));
@@ -152,22 +154,22 @@ public sealed class ConnectedServiceComponentTests
             Assert.HasCount(3, rendered.FindAll(".connected-service-configuration-summary tbody tr"));
             StringAssert.Contains(rendered.Find(".connected-service-configuration-summary").TextContent, "/api/explore/v2.1/swagger.json");
             StringAssert.Contains(rendered.Find(".connected-service-configuration-summary").TextContent, new string('a', 200));
-            Assert.HasCount(1, rendered.FindAll(".page-header input[role=switch]"));
-            Assert.IsEmpty(rendered.FindAll(".page-header .button-danger"));
+            Assert.HasCount(1, rendered.FindAll(".resource-header input[role=switch]"));
+            Assert.IsEmpty(rendered.FindAll(".resource-header .button-danger"));
             Assert.DoesNotContain("Saved configuration and observed availability", rendered.Markup,
                 StringComparison.Ordinal);
         });
 
-        rendered.Find("[data-testid='connected-service-definition-tab']").Click();
+        SelectSection(context, "definition/configuration");
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-form']"));
             Assert.IsEmpty(rendered.FindAll(".form-alert-danger"));
             Assert.HasCount(3, rendered.FindComponents<ValueBindingRequirementEditor>());
-            Assert.HasCount(1, rendered.FindAll(".page-header input[role=switch]"));
+            Assert.HasCount(1, rendered.FindAll(".resource-header input[role=switch]"));
         });
 
-        rendered.Find("[data-testid='connected-service-yaml-tab']").Click();
+        SelectSection(context, "yaml");
         rendered.WaitForAssertion(() => StringAssert.Contains(
             rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").GetAttribute("value") ?? rendered.Find("[data-testid='connected-service-yaml-viewer'] textarea").TextContent,
             "apiVersion"));
@@ -220,33 +222,44 @@ public sealed class ConnectedServiceComponentTests
         context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
         context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/connected-services/{resource.Name}?scopeRef={Uri.EscapeDataString(workspace.Value)}");
+        ConfigureNavigation(context);
         var rendered = context.Render<ConnectedServiceDetailsPage>(p => p.Add(v => v.Name, resource.Name));
-        rendered.Find("[data-testid=connected-service-definition-tab]").Click();
+        SelectSection(context, "definition/configuration");
         rendered.Find("[data-testid=connected-service-display-name]").Change("Unsaved name");
-        rendered.Find("[data-testid=connected-service-yaml-tab]").Click();
-        rendered.Find(".page-header input[role=switch]").Change(false);
+        SelectSection(context, "yaml");
+        rendered.Find(".resource-header input[role=switch]").Change(false);
         await rendered.InvokeAsync(() => rendered.FindComponents<ConfirmationDialog>().Single(v => v.Instance.IsOpen).Instance.OnCancel.InvokeAsync());
         Assert.AreEqual(0, client.Deactivations);
-        Assert.IsTrue(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
-        rendered.Find(".page-header input[role=switch]").Change(false);
+        Assert.IsTrue(rendered.Find(".resource-header input[role=switch]").HasAttribute("checked"));
+        rendered.Find(".resource-header input[role=switch]").Change(false);
         await rendered.InvokeAsync(() => rendered.FindComponents<ConfirmationDialog>().Single(v => v.Instance.IsOpen).Instance.OnConfirm.InvokeAsync());
         Assert.AreEqual(1, client.Deactivations);
-        Assert.IsFalse(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
+        Assert.IsFalse(rendered.Find(".resource-header input[role=switch]").HasAttribute("checked"));
         client.FailUpdate = true;
-        rendered.Find(".page-header input[role=switch]").Change(true);
+        rendered.Find(".resource-header input[role=switch]").Change(true);
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll(".form-alert-danger")));
-        Assert.IsFalse(rendered.Find(".page-header input[role=switch]").HasAttribute("checked"));
+        Assert.IsFalse(rendered.Find(".resource-header input[role=switch]").HasAttribute("checked"));
         client.FailUpdate = false;
-        rendered.Find(".page-header input[role=switch]").Change(true);
+        rendered.Find(".resource-header input[role=switch]").Change(true);
         rendered.WaitForAssertion(() => Assert.IsTrue(client.Current.Definition.Enabled));
         Assert.AreEqual("Redis", client.Current.Definition.DisplayName, "Activation must not save other draft fields.");
-        rendered.Find("[data-testid=connected-service-definition-tab]").Click();
+        SelectSection(context, "definition/configuration");
         Assert.AreEqual("Unsaved name", rendered.Find("[data-testid=connected-service-display-name]").GetAttribute("value"));
         rendered.Find("form").Submit();
         rendered.WaitForAssertion(() => Assert.AreEqual("Unsaved name", client.Current.Definition.DisplayName));
         Assert.AreEqual("etag-2", client.LastEtag);
         Assert.AreEqual(workspace, client.LastScope);
         Assert.IsTrue(client.Current.Definition.Enabled);
+        var editor = rendered.FindComponent<ConnectedServiceEditorPage>().Instance;
+        rendered.Find("[data-testid=connected-service-display-name]").Change("Discard this name");
+        SelectSection(context, "overview");
+        StringAssert.Contains(rendered.Find(".resource-identity-summary").TextContent, "Unsaved name");
+        Assert.DoesNotContain("Discard this name", rendered.Find(".resource-identity-summary").TextContent);
+        rendered.Find(".unsaved-changes-bar button[type=button]").Click();
+        SelectSection(context, "definition/configuration");
+        Assert.AreSame(editor, rendered.FindComponent<ConnectedServiceEditorPage>().Instance);
+        Assert.AreEqual("Unsaved name", rendered.Find("[data-testid=connected-service-display-name]").GetAttribute("value"));
+        Assert.HasCount(0, rendered.FindAll(".unsaved-changes-bar"));
     }
 
     [TestMethod]
@@ -260,8 +273,12 @@ public sealed class ConnectedServiceComponentTests
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationScope(workspace));
         context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(resource, type, workspace));
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/connected-services/{resource.Name}?scopeRef=%2Finstance");
+        ConfigureNavigation(context);
         var rendered = context.Render<ConnectedServiceDetailsPage>(p => p.Add(v => v.Name, resource.Name));
-        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".page-header input[role=switch]").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".resource-header input[role=switch]").HasAttribute("disabled")));
+        Assert.HasCount(0, rendered.FindAll("[data-resource-section=\"definition/configuration\"]"));
+        Assert.HasCount(0, rendered.FindAll("[data-resource-section=access]"));
+        StringAssert.Contains(rendered.Find(".resource-identity-summary").InnerHtml, "data-scope-ref=\"/instance\"");
     }
 
     [TestMethod]
@@ -320,6 +337,19 @@ public sealed class ConnectedServiceComponentTests
         Assert.AreEqual("#definition/configuration", uri.Fragment);
         StringAssert.Contains(uri.Query, "namespace=shared");
         StringAssert.Contains(uri.Query, "scopeRef=%2Finstance");
+    }
+
+    private static void ConfigureNavigation(BunitContext context)
+    {
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri.Split('#')[0] + "#overview");
+    }
+    private static void SelectSection(BunitContext context, string path)
+    {
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#" + path);
     }
 
     private sealed class NavigationScope(ResourceScopeRef scope) : IConsoleNavigationContext
