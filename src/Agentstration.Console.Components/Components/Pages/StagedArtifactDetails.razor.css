@@ -85,7 +85,7 @@
 .artifact-overview-metrics ::deep .metric-card:last-child strong {
     font-size: clamp(.98rem, 1.25vw, 1.25rem);
     letter-spacing: -.025em;
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .artifact-details-grid code {
