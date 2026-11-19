@@ -1,10 +1,13 @@
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 
 namespace Agentstration.Web.Tests;
 
@@ -12,15 +15,17 @@ namespace Agentstration.Web.Tests;
 public sealed class ToolCategoryConsoleTests
 {
     [TestMethod]
-    public void EditorShowsProviderProvenanceMissingMembersAndSafeDeleteExplanation()
+    public async Task EditorShowsProviderProvenanceMissingMembersAndSafeDeleteExplanation()
     {
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(new ToolsClient());
         context.Services.AddSingleton<IToolCategoriesClient>(new CategoriesClient());
 
+        ConfigureNavigation(context);
         var rendered = context.Render<ToolCategoryEditor>(parameters => parameters.Add(component => component.Name, "operations"));
 
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/members"));
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid='category-members']").TextContent, "Operations MCP");
@@ -38,17 +43,19 @@ public sealed class ToolCategoryConsoleTests
         });
 
         rendered.Find("button.button-danger").Click();
-        var deleteExplanation = rendered.Find("[role='dialog']").TextContent;
+        var deleteExplanation = rendered.Find("[role='alertdialog']").TextContent;
         Assert.IsTrue(deleteExplanation.Contains("ne seront pas modifiés", StringComparison.Ordinal)
             || deleteExplanation.Contains("will not be changed", StringComparison.Ordinal));
     }
 
     [TestMethod]
-    public void ProviderAndToolHomonymsKeepSeparateGroupsLinksAndSelectionIds()
+    public async Task ProviderAndToolHomonymsKeepSeparateGroupsLinksAndSelectionIds()
     {
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        context.Services.AddSingleton<IToolCategoriesClient>(new CategoriesClient());
+        var categories = new CategoriesClient();
+        categories.Resource = categories.Resource with { Definition = categories.Resource.Definition with { Tools = [] } };
+        context.Services.AddSingleton<IToolCategoriesClient>(categories);
         var firstScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var secondScope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
         var spaces = new[] { ResourceNamespace.Parse("team-a"), ResourceNamespace.Parse("team-b") };
@@ -68,7 +75,9 @@ public sealed class ToolCategoryConsoleTests
             Definition = ToolsClient.Tool.Definition with { Provider = new("same-provider", scope, spaces[index]) }
         }).ToArray();
         context.Services.AddSingleton<IToolsClient>(new ToolsClient(tools, providers));
+        ConfigureNavigation(context);
         var cut = context.Render<ToolCategoryEditor>(parameters => parameters.Add(value => value.Name, "operations"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/members"));
         var groups = cut.FindAll(".tool-category-provider[data-provider]");
         Assert.HasCount(2, groups);
         var inputs = groups.Select(group => group.QuerySelector(".tool-category-member input")!.Id).ToArray();
@@ -82,12 +91,151 @@ public sealed class ToolCategoryConsoleTests
         }
     }
 
+    [TestMethod]
+    public async Task RenamingPreservesRelativeAndMissingReferencesWithTheOriginalEtag()
+    {
+        var client = new CategoriesClient();
+        var relative = new ResourceReference("operations.run");
+        var missing = new ResourceReference("removed.tool", @namespace: new ResourceNamespace("shared"));
+        client.Resource = client.Resource with { Definition = client.Resource.Definition with { Tools = [relative, missing] } };
+        using var context = Context(client);
+        var cut = context.Render<ToolCategoryEditor>(p => p.Add(c => c.Name, "operations"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        var nav = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => nav.NavigateSection("definition/members"));
+        var operation = cut.FindAll(".tool-category-member").Single(row => row.TextContent.Contains("Run operation", StringComparison.Ordinal));
+        Assert.IsTrue(operation.QuerySelector("input")!.HasAttribute("checked"));
+        await cut.InvokeAsync(() => nav.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=category-display-name]").Input("Renamed category");
+        await cut.InvokeAsync(() => nav.NavigateSection("overview"));
+        Assert.DoesNotContain("Renamed category", cut.Find(".resource-identity-summary").TextContent);
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        await cut.Find("#category-resource-form").SubmitAsync();
+        Assert.IsNotNull(client.Updated);
+        CollectionAssert.AreEqual(new[] { relative, missing }, client.Updated.Properties.Tools.ToArray());
+        Assert.AreEqual("\"etag\"", client.LastEtag);
+        Assert.AreEqual(1, client.Reads);
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+    }
+
+    [TestMethod]
+    public async Task ResolvedSavedMemberOutsideTheBoundedCatalogRemainsVisibleAndSelected()
+    {
+        var client = new CategoriesClient(); using var context = Context(client, emptyCatalog: true);
+        var cut = context.Render<ToolCategoryEditor>(p => p.Add(c => c.Name, "operations"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/members"));
+        var operation = cut.FindAll(".tool-category-member").Single(row => row.TextContent.Contains("Run operation", StringComparison.Ordinal));
+        Assert.IsTrue(operation.QuerySelector("input")!.HasAttribute("checked"));
+        await cut.Find("#category-resource-form").SubmitAsync();
+        Assert.IsNotNull(client.Updated);
+        CollectionAssert.AreEqual(client.Resource.Definition.Tools.ToArray(), client.Updated.Properties.Tools.ToArray());
+        Assert.AreEqual(1, client.Reads);
+    }
+
+    [TestMethod]
+    public async Task MemberSelectionStaysACheckboxAndDiscardRestoresTheSavedMembership()
+    {
+        var client = new CategoriesClient(); using var context = Context(client);
+        var cut = context.Render<ToolCategoryEditor>(p => p.Add(c => c.Name, "operations"));
+        var nav = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => nav.NavigateSection("definition/members"));
+        var operation = cut.FindAll(".tool-category-member").Single(row => row.TextContent.Contains("Run operation", StringComparison.Ordinal));
+        operation.QuerySelector("input")!.Change(false);
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsEmpty(cut.FindAll("[role=switch]"));
+        await cut.InvokeAsync(() => nav.NavigateSection("overview"));
+        cut.Find(".unsaved-changes-bar .button-secondary").Click();
+        await cut.InvokeAsync(() => nav.NavigateSection("definition/members"));
+        Assert.IsTrue(cut.FindAll(".tool-category-member").Single(row => row.TextContent.Contains("Run operation", StringComparison.Ordinal)).QuerySelector("input")!.HasAttribute("checked"));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsNull(client.Updated);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Create category")]
+    [DataRow("fr-FR", "Créer une catégorie")]
+    public async Task CreationAllowsIncompleteStepsAndKeepsItsExactNamespaceAndScope(string locale, string category)
+    {
+        using var culture = new TestCultureScope(locale);
+        var client = new CategoriesClient(); using var context = Context(client, create: true);
+        var cut = context.Render<ToolCategoryEditor>();
+        var wizard = cut.FindComponent<CreationWizard>().Instance;
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("identity", wizard.CurrentStepId);
+        Assert.IsNull(client.Created);
+        Assert.Contains(category, cut.Find("h1").TextContent);
+        cut.Find("[data-testid=category-display-name]").Input("New category");
+        cut.Find("[data-testid=category-name]").Input("new-category");
+        cut.Find("[data-testid=category-namespace]").Change("team-a");
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceScopeFormField>().Instance.ValueChanged.InvokeAsync(client.Resource.ScopeRef));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.IsNotNull(client.Created);
+        Assert.AreEqual("team-a", client.Created.Namespace);
+        Assert.AreEqual(client.Resource.ScopeRef, client.Created.ScopeRef);
+        Assert.Contains("namespace=team-a", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.Contains("scopeRef=%2Fworkspaces%2Faaaaaaaa", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
+    public void AResponseFromAnotherOwnerCannotReplaceTheRequestedCategory()
+    {
+        var client = new CategoriesClient(); using var context = Context(client, query: "?scopeRef=%2Fworkspaces%2Fbbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var cut = context.Render<ToolCategoryEditor>(p => p.Add(c => c.Name, "operations"));
+        Assert.IsEmpty(cut.FindComponents<ResourceDetailsTemplate>());
+        Assert.IsNotNull(cut.FindComponent<ErrorState>());
+        Assert.IsEmpty(cut.FindAll("button.button-danger, button[type=submit]"));
+        Assert.IsNull(client.Updated);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ReadOnlyCategoryContextsHaveNoDefinitionMutationCommands(bool managed)
+    {
+        var client = new CategoriesClient();
+        if (managed) client.Resource = client.Resource with { Governance = ResourceGovernance.Pack("fixture", "fixture/category", "1.0.0") };
+        using var context = Context(client, current: managed ? client.Resource.ScopeRef : ResourceScopeRef.Workspace(Guid.NewGuid()));
+        var cut = context.Render<ToolCategoryEditor>(p => p.Add(c => c.Name, "operations"));
+        Assert.IsNotNull(cut.Find(".resource-identity-summary"));
+        Assert.IsEmpty(cut.FindAll("a[data-resource-section^='definition/'], button.button-danger, .unsaved-changes-bar"));
+        Assert.IsTrue(cut.Find("#category-resource-form fieldset").HasAttribute("disabled"));
+    }
+
+    private sealed class OwnerContext(ResourceScopeRef owner) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => owner.Value;
+        public string AddToUri(string uri) => uri;
+    }
+    private static BunitContext Context(CategoriesClient client, bool create = false, string query = "", ResourceScopeRef? current = null, bool emptyCatalog = false)
+    {
+        var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IToolsClient>(new ToolsClient(emptyCatalog ? [] : null));
+        context.Services.AddSingleton<IToolCategoriesClient>(client);
+        if (current is { } scope) context.Services.AddSingleton<IConsoleNavigationContext>(new OwnerContext(scope));
+        ConfigureNavigation(context, "http://localhost/tools/categories/" + (create ? "new" : "operations") + query);
+        return context;
+    }
+    private static void ConfigureNavigation(BunitContext context, string? uri = null)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        if (uri is not null) nav.NavigateTo(uri);
+        var current = nav.Uri.Split('#')[0];
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "definition/configuration", "definition/members" })
+            module.Setup<string>("navigate", c => c.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(current + "#" + path);
+    }
+
     private sealed class CategoriesClient : IToolCategoriesClient
     {
         private static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         private static readonly ToolCategoryResource Category = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
+            Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
             Kind = ToolResourceKinds.ToolCategory,
             Metadata = new ResourceMetadata { Name = "operations" },
             ScopeRef = Scope,
@@ -97,11 +245,25 @@ public sealed class ToolCategoryConsoleTests
                 Tools = [new("operations.run", Scope), new("removed.tool", Scope)]
             }
         };
-        public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<ToolCategoryResource>(Category, "\"etag\""));
-        public Task<IReadOnlyList<ToolCategoryMember>> GetMembersAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryMember>>([new(Category.Definition.Tools[0], ToolsClient.Tool, "available"), new(Category.Definition.Tools[1], null, "missing")]);
-        public Task<IReadOnlyList<ToolCategoryResource>> GetCategoriesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryResource>>([Category]);
-        public Task<ResourceSnapshot<ToolCategoryResource>> CreateCategoryAsync(CreateToolCategoryRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ToolCategoryResource>> UpdateCategoryAsync(string name, PutToolCategoryRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public ToolCategoryResource Resource { get; set; } = Category;
+        public PutToolCategoryRequest? Updated { get; private set; }
+        public CreateToolCategoryRequest? Created { get; private set; }
+        public string? LastEtag { get; private set; }
+        public int Reads { get; private set; }
+        public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(string name, CancellationToken cancellationToken = default) { Reads++; return Task.FromResult(new ResourceSnapshot<ToolCategoryResource>(Resource, "\"etag\"")); }
+        public Task<IReadOnlyList<ToolCategoryMember>> GetMembersAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryMember>>(Resource.Definition.Tools.Select(reference => new ToolCategoryMember(reference, reference.Name == "operations.run" ? ToolsClient.Tool : null, reference.Name == "operations.run" ? "available" : "missing")).ToArray());
+        public Task<IReadOnlyList<ToolCategoryResource>> GetCategoriesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryResource>>([Resource]);
+        public Task<ResourceSnapshot<ToolCategoryResource>> CreateCategoryAsync(CreateToolCategoryRequest request, CancellationToken cancellationToken = default)
+        {
+            Created = request;
+            Resource = Resource with { Metadata = new() { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) }, ScopeRef = request.ScopeRef, Definition = request.Properties };
+            return Task.FromResult(new ResourceSnapshot<ToolCategoryResource>(Resource, "\"created\""));
+        }
+        public Task<ResourceSnapshot<ToolCategoryResource>> UpdateCategoryAsync(string name, PutToolCategoryRequest request, string etag, CancellationToken cancellationToken = default)
+        {
+            Updated = request; LastEtag = etag; Resource = Resource with { Definition = request.Properties, Generation = Resource.Generation + 1 };
+            return Task.FromResult(new ResourceSnapshot<ToolCategoryResource>(Resource, "\"updated\""));
+        }
         public Task DeleteCategoryAsync(string name, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

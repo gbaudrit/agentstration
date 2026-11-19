@@ -5781,6 +5781,40 @@
         "evidenceStatus": "Source adopted; current browser validation pending."
       },
       "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-category-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "line": 33,
+      "host": "console",
+      "routes": [
+        "/tools/categories/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved declarations remain separate from the retained provider-grouped membership editor. Current browser validation is pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved setting/value summary preserves the exact relative or explicit Tool references. Its settings are not resource identities. Member multi-selection stays in its specialized picker.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
     }
   ],
   "specialized": [

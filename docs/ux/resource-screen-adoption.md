@@ -47,7 +47,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | StorageTypeEditor.razor | `/storage-types/new`, `/storage-types/{Name}/edit`, `/storage-types/{Name}/versions/new` | Pending review and migration |
 | TaskDetails.razor | `/tasks/{TaskId:guid}` | Pending review and migration |
 | TaskFlowRunDetails.razor | `/tasks/{TaskId:guid}/flowruns/{RunId}` | Pending review and migration |
-| ToolCategoryEditor.razor | `/tools/categories/new`, `/tools/categories/{Name}` | Pending review and migration |
+| ToolCategoryEditor.razor | `/tools/categories/new`, `/tools/categories/{Name}` | Implemented: 3-step wizard/template, saved Identity and exact declarations, retained provider-grouped picker, original ETags and owner-response verification. 10 component cases and source/catalog checks pass; browser and final full validation pending |
 | ToolDefinitionEditor.razor | `/tools/definitions/{Name}` | Pending review and migration |
 | ToolDetails.razor | `/tools/{Name}` | Pending review and migration |
 | ToolGovernanceAudit.razor | `/tool-governance/{Owner}/{RunId}` | Pending review and migration |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Saved configuration summaries add shared frames: **96 shared frames + 258 active specialized collections = 354**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **97 shared frames + 258 active specialized collections = 355**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 
