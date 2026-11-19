@@ -5,8 +5,11 @@ export async function selectResourceSection(page: Page, path: string): Promise<v
   const navigation = page.locator('.resource-details-navigation .resource-navigation');
   await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
   let menu = navigation.locator('.resource-navigation-rail');
+  const trigger = page.locator('.resource-header .resource-navigation-trigger');
+  // JS registration can finish before the navigation has a visible layout.
+  await expect(menu.or(trigger).filter({ visible: true }).first()).toBeVisible();
   if (!await menu.isVisible()) {
-    await page.locator('.resource-header .resource-navigation-trigger').click();
+    await trigger.click();
     menu = navigation.locator('dialog');
     await expect(menu).toBeVisible();
   }
