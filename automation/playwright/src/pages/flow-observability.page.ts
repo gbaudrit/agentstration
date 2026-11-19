@@ -86,10 +86,8 @@ export class FlowObservabilityPage {
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
     const openRun = this.page.getByTestId(TestIds.flowObservability.runOpen);
-    await expect(async () => {
-      await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
-      await expect(openRun).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'runs');
+    await expect(openRun).toBeVisible();
     await openRun.click();
     const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
     await expect(dialog).toBeVisible();

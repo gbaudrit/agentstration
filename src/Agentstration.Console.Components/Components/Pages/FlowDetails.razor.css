@@ -16,3 +16,10 @@
     .flow-overview-preview { padding: var(--space-4); }
     .flow-overview-preview ::deep .topology-shell { height: 540px; }
 }
+
+.flow-run-modal-host ::deep dialog.run-dialog {
+    width: min(1000px, calc(100vw - 2rem));
+    max-width: 1000px;
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+}

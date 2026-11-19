@@ -78,9 +78,11 @@ else if (flow is not null)
 }
 </div>
 <ConfirmationDialog IsOpen="confirmRefresh" Title="@Shared["LeaveTitle"]" Message="@Shared["LeaveMessage"]" ConfirmLabel="@Shared["Discard"]" OnConfirm="LoadAsync" OnCancel="() => confirmRefresh = false" />
+<div class="flow-run-modal-host">
 <ModalFrame IsOpen="showRun" TitleId="run-flow-title" OnClose="() => showRun = false" Class="run-dialog">
     <section data-testid="flow-run-dialog"><h2 id="run-flow-title">@T("RunFlow")</h2><FormField Label="@T("PublishedVersion")"><ClearableSelect TValue="string" Value="runVersion" ValueChanged="ChangeRunVersion" AllowClear="false">@foreach (var version in versions) { <option value="@version.Version">@version.Version</option> }</ClearableSelect></FormField><div class="flow-run-input"><h3>@T("FlowInput")</h3><p class="muted">@T("FlowInputHelp")</p><JsonSchemaInputEditor Schema="SelectedRunVersion?.Graph?.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="submitting" /></div>@if (error is not null) { <p class="error-panel" role="alert">@error</p> }<FormActions Class="dialog-actions"><button class="button-secondary" type="button" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" type="button" disabled="@(submitting || !runInputValid || !CanExecute || SelectedRunVersion is null)" data-testid="flow-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></FormActions></section>
 </ModalFrame>
+</div>
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
