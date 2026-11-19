@@ -92,3 +92,5 @@ The new-foundation Vault pass and its justified capability limits are recorded i
 The new-foundation Secret pass, independent write-only draft contract and local evidence are recorded in the [Secret verification report](evidence/resource-screen-foundation/secrets/README.md).
 
 The new-foundation Runtime Profile pass and retained namespace/JSON/ETag behavior are recorded in the [Runtime Profile verification report](evidence/resource-screen-foundation/runtime-profiles/README.md).
+
+The new-foundation Source Provider pass, exact ownership/reference handling and focused evidence are recorded in the [Source Provider verification report](evidence/resource-screen-foundation/source-providers/README.md). Deferred composition follow-up #1236 includes the transverse matrix while retaining its validation/merge gate.

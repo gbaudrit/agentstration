@@ -1,0 +1,41 @@
+{
+  "base": "7a944ffe32594b9d2ad4b31d4cd0d90a34f60495",
+  "sourceHashes": {
+    "docs/ux/component-contracts.md": "a40e0bbc62aa414dc5c03b82ed99d35a7bf583a498535616db9070df31d23cbe",
+    "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor": "67125a47e90c5dcea9e87c5a88dae8074c5374b6e9a5bcca699f8be2dad812b5",
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "ff03e2066df8ff77f95fd3058e24e61cee8d1b774dd989076172ee306a892f19",
+    "src/Agentstration.Console.Components/Console/SourceProviderEditorModel.cs": "2f9f37070bb6b36a4d8ed85f5fc512ff35097d09df78cef6a9caddc20c32fb89",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SourceProviderDetailsStrings.fr-FR.resx": "bb8c9dbba55777960c36faa45c18f101ec8ca050adebf5494e0b83e158328aa7",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SourceProviderDetailsStrings.resx": "bab665188c0b6dd909535d23fbc80328e8dc2660dd479dfd9944f144a803cbb7",
+    "tests/Agentstration.Console.Components.Tests/SourceProviderConsoleTests.cs": "f04620603ea121dfe4f38477dbb0a424d63ad74e223a662dbb17d84f57d54735"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "a6527e785a602fde69b6629973083b1a8f63d556d7eecc098b0799340d15a15c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "a6527e785a602fde69b6629973083b1a8f63d556d7eecc098b0799340d15a15c"
+  },
+  "phases": [
+    {
+      "name": "source-provider",
+      "exitCode": 1,
+      "seconds": 103.8
+    },
+    {
+      "name": "runtime-normalized",
+      "exitCode": 0,
+      "seconds": 79.0
+    },
+    {
+      "name": "distribution-regression",
+      "exitCode": 0,
+      "seconds": 33.4
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 114.5
+    }
+  ],
+  "completed": true,
+  "running": null,
+  "validationScope": "Runtime Profile normalized-namespace follow-up and shared Agent regression. The first Source Provider probe had an unrelated preparation failure recorded in its report."
+}

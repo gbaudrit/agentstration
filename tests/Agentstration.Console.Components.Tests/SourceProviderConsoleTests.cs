@@ -89,6 +89,7 @@ public sealed class SourceProviderConsoleTests
         Assert.AreEqual(0, client.Writes);
         cut.Find("[data-testid=source-provider-display-name]").Change("New Git provider");
         cut.Find("[data-testid=source-provider-name]").Change("new-git");
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceChanged.InvokeAsync(" Custom-Sources "));
         await cut.InvokeAsync(() => cut.FindComponent<ResourceScopeFormField>().Instance.ValueChanged.InvokeAsync(ResourceScopeRef.Instance));
         await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
         await cut.InvokeAsync(wizard.FinishAsync);
@@ -100,6 +101,7 @@ public sealed class SourceProviderConsoleTests
         Assert.AreEqual(ResourceScopeRef.Instance, client.Saved.Definition.Extension.ScopeRef);
         Assert.AreEqual("git-extension", client.Saved.Definition.Extension.Name);
         Assert.AreEqual("git", client.Saved.Definition.ContributionId);
+        Assert.AreEqual("custom-sources", client.Saved.Namespace.Value);
         Assert.Contains("/sourceproviders/new-git", context.Services.GetRequiredService<NavigationManager>().Uri);
         Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
     }
@@ -115,8 +117,8 @@ public sealed class SourceProviderConsoleTests
         var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
         Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
         cut.Find("[data-testid=source-provider-display-name]").Change("Draft provider");
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
         Assert.Contains("Git Source Provider", cut.Find(".resource-identity-summary").TextContent);
@@ -128,7 +130,7 @@ public sealed class SourceProviderConsoleTests
         Assert.AreEqual("\"initial\"", client.LastEtag);
         Assert.AreEqual("Draft provider", client.Saved.Definition.DisplayName);
         Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         cut.Find("[data-testid=source-provider-display-name]").Change("Not saved");
         await cut.InvokeAsync(() => navigation.NavigateSection("connection"));
         cut.Find(".unsaved-changes-bar .button-secondary").Click();
@@ -136,7 +138,95 @@ public sealed class SourceProviderConsoleTests
         Assert.AreEqual(1, client.Writes);
     }
 
-    private static BunitContext Context(StubSourceProvidersClient client, bool create)
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RefreshPreservesInvalidIdentityAndTheOriginalEtagUntilDiscard(bool discard)
+    {
+        var client = new StubSourceProvidersClient(); using var context = Context(client, false);
+        var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        cut.Find("[data-testid=source-provider-display-name]").Change("");
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.Find("#source-provider-resource-form").SubmitAsync();
+        Assert.AreEqual("definition/identity", navigation.CurrentPath);
+        var newer = client.Saved with { Generation = 3, Definition = client.Saved.Definition with { DisplayName = "New server provider" } };
+        client.Loader = () => Task.FromResult(new ResourceSnapshot<SourceProviderResource>(newer, "\"external\""));
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("", cut.Find("[data-testid=source-provider-display-name]").GetAttribute("value"));
+        Assert.HasCount(1, cut.FindAll(".validation-message"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.Contains("Git Source Provider", cut.Find(".resource-identity-summary").TextContent);
+        if (discard) cut.Find(".unsaved-changes-bar .button-secondary").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        Assert.AreEqual(discard ? "New server provider" : "", cut.Find("[data-testid=source-provider-display-name]").GetAttribute("value"));
+        cut.Find("[data-testid=source-provider-display-name]").Change("Saved provider");
+        await cut.Find("#source-provider-resource-form").SubmitAsync();
+        Assert.AreEqual(discard ? "\"external\"" : "\"initial\"", client.LastEtag);
+        Assert.AreEqual("git-extension", client.Saved.Definition.Extension.Name);
+        Assert.AreEqual(ResourceScopeRef.Instance, client.Saved.Definition.Extension.ScopeRef);
+        Assert.AreEqual(ResourceNamespace.Default, client.Saved.Definition.Extension.Namespace);
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionState, cut.FindComponent<ResourceDefinitionForm>().Instance.SectionState);
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionPresentations, cut.FindComponent<ResourceDefinitionForm>().Instance.Sections);
+    }
+
+    [TestMethod]
+    public void ALinkWithoutAnOwnerDoesNotSelectAnInstanceResourceImplicitly()
+    {
+        var client = new StubSourceProvidersClient(); using var context = Context(client, false);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/sourceproviders/git-local");
+        var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
+        Assert.AreEqual(0, client.Reads);
+        Assert.IsNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsEmpty(cut.FindAll(".resource-form, .resource-identity-summary"));
+    }
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(true, true)]
+    public async Task ManagedAndInheritedDefinitionsRetainIndependentAccess(bool managed, bool inherited)
+    {
+        var client = new StubSourceProvidersClient { Managed = managed };
+        using var context = Context(client, false, inherited ? ResourceScopeRef.Tenant(Guid.NewGuid()) : ResourceScopeRef.Instance);
+        var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.AreEqual(managed || inherited, cut.FindComponent<ResourceDefinitionForm>().Instance.ReadOnly);
+        Assert.AreEqual(inherited ? 0 : 1, cut.FindAll("a[data-resource-section=access]").Count);
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        if (managed || inherited) await cut.Find("#source-provider-resource-form").SubmitAsync();
+        Assert.AreEqual(0, client.Writes);
+    }
+
+    [TestMethod]
+    public async Task AReplacedProviderClearsItsPendingPrivateIdentity()
+    {
+        var client = new StubSourceProvidersClient(); using var context = Context(client, false);
+        var cut = context.Render<SourceProviderDetails>(p => p.Add(c => c.Name, "git-local"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        cut.Find("[data-testid=source-provider-display-name]").Change("private pending provider");
+        client.Loader = () => Task.FromResult(new ResourceSnapshot<SourceProviderResource>(client.Saved with { Uid = Guid.NewGuid() }, "\"replaced\""));
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreEqual(ResourceLoadStatus.NotFound, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsEmpty(cut.FindAll(".resource-form, .unsaved-changes-bar"));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.DoesNotContain("private pending provider", cut.Markup);
+        Assert.AreEqual(0, client.Writes);
+    }
+
+    private sealed class NavigationContext(ResourceScopeRef scope) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scope.Value;
+        public string AddToUri(string uri) => uri;
+    }
+
+    private static BunitContext Context(StubSourceProvidersClient client, bool create, ResourceScopeRef? contextScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -145,10 +235,11 @@ public sealed class SourceProviderConsoleTests
         context.Services.AddSingleton<IExtensionsClient>(new StubExtensionsClient());
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new StubScopeInventoryClient());
         context.Services.AddSingleton(new NotificationState());
+        if (contextScope is { } scope) context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(scope));
         var uri = create ? "http://localhost/sourceproviders/new" : "http://localhost/sourceproviders/git-local?scopeRef=%2Finstance";
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(uri);
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var section in new[] { "overview", "definition/configuration", "definition/extension", "connection", "usages" })
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "connection", "usages", "access", "yaml" })
         {
             var target = uri + "#" + section;
             module.Setup<string>("navigate", i => i.Arguments[0] is string value && value.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(target);
@@ -162,6 +253,8 @@ public sealed class SourceProviderConsoleTests
             Task.FromResult<IReadOnlyList<SourceProviderSummaryResponse>>(includeProvider
                 ? [new("provider-id", "git-local", "Git Source Provider", "git-extension", "default", "git", "available", null, ScopeRef: ResourceScopeRef.Instance)]
                 : []);
+        public Func<Task<ResourceSnapshot<SourceProviderResource>>>? Loader { get; set; }
+        public bool Managed { get; set; }
         public SourceProviderResource Saved { get; private set; } = new()
         {
             Uid = Guid.NewGuid(),
@@ -175,7 +268,7 @@ public sealed class SourceProviderConsoleTests
         public int Writes { get; private set; }
         public int Reads { get; private set; }
         public string? LastEtag { get; private set; }
-        public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) { Reads++; return Task.FromResult(new ResourceSnapshot<SourceProviderResource>(Saved, "\"initial\"")); }
+        public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) { Reads++; return Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<SourceProviderResource>(Managed ? Saved with { Governance = ResourceGovernance.Core("source-provider") } : Saved, "\"initial\"")); }
         public Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken)
         {
             Writes++; Saved = Saved with { Metadata = new() { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) }, ScopeRef = request.ScopeRef, Definition = request.Properties };

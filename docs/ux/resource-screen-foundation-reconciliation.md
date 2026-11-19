@@ -47,7 +47,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `RuntimeWorkerDetails.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
 | `SchemaEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `SecretEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
-| `SourceProviderDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `SourceProviderDetails.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `SourceRegistries.razor` | Previously remaining | Mixed collection/detail; keep collection template and inspect detail adapter | No |
 | `Sources.razor` | Previously remaining | Mixed collection/detail; keep collection template and inspect detail adapter | No |
 | `StagedArtifactDetails.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
@@ -118,3 +118,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Specialized JSON parser/store, enum bindings, notifications, usage-dependent deletion and ETags remain intact. Refresh retains invalid JSON/messages and original ETag until explicit discard; identity replacement/access loss clears private content.
 - All 46 focused cases, TypeScript, both desktop/touch Runtime Profile probes, the maintained model-administration lifecycle and both maintained Agent regression cases pass. [Real captures and exact source hashes](evidence/resource-screen-foundation/runtime-profiles/README.md).
 - Protected Agent product files remain unchanged. Synchronization precedes/follows the screen commit; CI failures remain outside this work.
+
+### SourceProviderDetails
+
+- Standard Console template, actual observed-capability metric above saved Identity/labels, retained common form/state/presentations, Identity before Configuration, existing observed capability/usages, independently authorized Access and final saved YAML. Creation retains its wizard, suggestions and safe return handling.
+- Exact extension owner/namespace/name key, saved-contribution fallback, namespace normalization/deferred binding, family eligibility, deletion restrictions and ETags are retained. Description/labels stay read-only because their writes are unsupported. No activation or YAML mutation capability is introduced.
+- Refresh preserves invalid drafts/messages and original ETags until explicit discard; replacement/access loss clears private content. A missing persisted owner now produces common failed-load feedback rather than assuming Instance; generated links already carry the exact owner.
+- All 48 focused cases, TypeScript, both final Source Provider desktop/touch probes, the maintained local Git creation case, both Runtime Profile normalized-namespace probes and both maintained Agent regression cases pass. [Real captures and exact hashes](evidence/resource-screen-foundation/source-providers/README.md).
+- Protected Agent product files remain unchanged. #1236 records the transverse deferred composition scope and stays open/blocked. One screen commit with synchronization before/after; CI failures are not handled.

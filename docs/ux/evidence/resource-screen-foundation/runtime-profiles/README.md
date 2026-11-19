@@ -22,3 +22,5 @@ Verification:
 | Saved YAML | [Capture](runtime-yaml-desktop-en.png) | [Capture](runtime-yaml-mobile-fr.png) |
 
 A focused follow-up preserves the domain normalization of creation namespaces: spaces and uppercase input are compared using `ResourceNamespace.Parse` after a successful write. All 12 Runtime Profile cases pass with the strengthened mixed-case/padded namespace fixture. This is a result-check correction; it does not alter namespace rules or the visual layout. The original capture source hashes above precede this one-line follow-up.
+
+The normalized-namespace follow-up now also passes both desktop English/dark and French/light genuine-touch probes using padded/mixed-case creation input. The captures above have been refreshed from that campaign. [Exact follow-up source/actual-host hashes and per-phase results](normalized-followup-proof.json); the Source Provider report explains the unrelated initial preparation failure in that campaign. Both Agent regression cases pass on the same host.
