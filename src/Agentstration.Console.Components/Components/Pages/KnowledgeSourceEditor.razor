@@ -43,7 +43,7 @@ else
                 <FormField Label="@T("StructuredOutputCollection")" Help="@T("StructuredOutputHelp")" Class="form-span-2"><ClearableSelect TValue="Guid" AllowClear="false" @bind-Value="outputCollectionUid" data-testid="knowledge-output-collection"><option value="@Guid.Empty">@T(RequiresOutputCollection ? "StructuredOutputSelect" : "StructuredOutputNone")</option>@foreach (var collection in structuredStorage.Definition.Collections.Where(CompatibleOutputCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
                 @if (!OutputCollectionValid)
                 {
-                    <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="knowledge-output-collection-required">@T("StructuredOutputRequired") <a href="@(StorageLinks.Details(structuredStorage) + "&view=definition")">@T("ConfigureOutputStorage")</a></p>
+                    <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="knowledge-output-collection-required">@T("StructuredOutputRequired") <a href="@(StorageLinks.Details(structuredStorage) + "#definition/configuration")">@T("ConfigureOutputStorage")</a></p>
                 }
             }
             @if (!RequiresOutputCollection && outputCollectionUid == Guid.Empty)

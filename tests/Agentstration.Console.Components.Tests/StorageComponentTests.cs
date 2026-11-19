@@ -123,9 +123,9 @@ public sealed class StorageComponentTests
         list.WaitForElement("[data-testid=storage-row]");
         Assert.IsEmpty(list.FindAll("[data-testid=storage-create]"));
         Navigate(context, Resource());
-        var detail = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
+        var detail = RenderDetails(context);
         detail.WaitForElement("[data-testid=storage-mapping]");
-        Assert.IsEmpty(detail.FindAll("[data-testid=storage-deactivate], [data-testid=storage-reconcile], [data-testid=storage-access-tab]"));
+        Assert.IsEmpty(detail.FindAll("[data-testid=storage-reconcile], [data-resource-section=access]"));
     }
 
     [TestMethod]
@@ -244,17 +244,17 @@ public sealed class StorageComponentTests
     }
 
     [TestMethod]
-    public void DetailUsesCanonicalTabsAndYamlContainsReferencesWithoutConnectionValues()
+    public void DetailUsesResourceNavigationAndYamlContainsReferencesWithoutConnectionValues()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new()); Navigate(context, Resource());
-        var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = RenderDetails(context);
         page.WaitForElement("[data-testid=storage-mapping]");
-        Assert.HasCount(4, page.FindAll("[role=tab]"));
+        Assert.HasCount(4, page.FindAll(".resource-navigation-rail [data-resource-section]"));
         StringAssert.Contains(page.Markup, "evidence/documents");
         StringAssert.Contains(page.Markup, ServiceUid.ToString());
         Assert.IsEmpty(page.FindAll("a[href*='/edit']"));
-        page.Find("[data-testid=storage-yaml-tab]").Click();
+        SelectSection(context, "yaml");
         StringAssert.Contains(page.Find("[data-testid=storage-yaml]").TextContent, "apiVersion:");
         Assert.DoesNotContain("DO-NOT-DISPLAY", page.Markup, StringComparison.Ordinal);
     }
@@ -265,8 +265,8 @@ public sealed class StorageComponentTests
         using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("PRIVATE", "correlation", HttpStatusCode.Conflict, "storage_in_use") };
         using var context = Setup(client); Navigate(context, Resource());
-        var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
-        page.WaitForElement("[data-testid=storage-deactivate]").Click();
+        var page = RenderDetails(context);
+        page.WaitForElement("[data-testid=storage-enabled]").Change(false);
         Assert.AreEqual(0, client.Deactivations);
         page.Find("[data-testid=storage-deactivate-confirmation-confirm]").Click();
         page.WaitForAssertion(() => StringAssert.Contains(page.Find("[data-testid=storage-error]").TextContent, "Dependencies prevent"));
@@ -280,7 +280,7 @@ public sealed class StorageComponentTests
         using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client); Navigate(context, Resource());
-        var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = RenderDetails(context);
         page.WaitForElement("[data-testid=storage-reconcile]").Click();
         Assert.AreEqual(0, client.Reconciles);
         page.Find("[data-testid=storage-reconcile-confirmation-confirm]").Click();
@@ -430,7 +430,7 @@ public sealed class StorageComponentTests
         var client = new StorageClient { Usages = usages };
         using var context = Setup(client);
         Navigate(context, Resource());
-        var page = context.Render<StorageDetails>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = RenderDetails(context);
         page.WaitForAssertion(() => Assert.HasCount(2, page.FindAll(".resource-links li")));
         var rows = page.FindAll(".resource-links li");
         for (var index = 0; index < rows.Count; index++)
@@ -490,6 +490,55 @@ public sealed class StorageComponentTests
         StringAssert.Contains(uri.Query, "scopeRef=" + Uri.EscapeDataString(Scope.Value));
     }
 
+    [TestMethod]
+    public void HeaderActivationRetainsTheDefinitionDraftAndUsesTheReturnedEtagForItsSave()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StorageClient();
+        using var context = Setup(client); Navigate(context, Resource());
+        var page = RenderDetails(context);
+        SelectSection(context, "definition/configuration");
+        var editor = page.FindComponent<StorageEditor>().Instance;
+        var form = page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        page.Find("[data-testid=storage-display-name]").Change("Pending storage title");
+        SelectSection(context, "overview");
+        page.Find("[data-testid=storage-enabled]").Change(false);
+        page.Find("[data-testid=storage-deactivate-confirmation-confirm]").Click();
+        page.WaitForAssertion(() => Assert.IsFalse(client.Current.Definition.Enabled));
+        Assert.AreEqual("\"revision-4\"", client.LastEtag);
+        Assert.AreEqual(Resource().Definition.DisplayName, client.Current.Definition.DisplayName);
+        SelectSection(context, "definition/configuration");
+        Assert.AreSame(editor, page.FindComponent<StorageEditor>().Instance);
+        Assert.AreSame(form, page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("Pending storage title", page.Find("[data-testid=storage-display-name]").GetAttribute("value"));
+        page.Find("form").Submit();
+        page.WaitForAssertion(() => Assert.AreEqual("Pending storage title", client.Current.Definition.DisplayName));
+        Assert.AreEqual("\"revision-5\"", client.LastEtag);
+        Assert.HasCount(2, client.Current.Definition.Bindings);
+        Assert.IsFalse(client.Current.Definition.Enabled);
+    }
+
+    [TestMethod]
+    public async Task RefreshRequiresExplicitDiscardBeforeReplacingADefinitionDraft()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StorageClient();
+        using var context = Setup(client); Navigate(context, Resource());
+        var page = RenderDetails(context);
+        SelectSection(context, "definition/configuration");
+        var editor = page.FindComponent<StorageEditor>().Instance;
+        page.Find("[data-testid=storage-display-name]").Change("Preserve pending title");
+        page.FindAll(".resource-header button").Single(button => button.TextContent.Trim() == "Refresh").Click();
+        Assert.AreEqual(1, client.ResourceReads);
+        await page.InvokeAsync(() => page.FindComponents<ConfirmationDialog>().Single(dialog => dialog.Instance.IsOpen).Instance.OnCancel.InvokeAsync());
+        Assert.AreEqual("Preserve pending title", page.Find("[data-testid=storage-display-name]").GetAttribute("value"));
+        page.FindAll(".resource-header button").Single(button => button.TextContent.Trim() == "Refresh").Click();
+        await page.InvokeAsync(() => page.FindComponents<ConfirmationDialog>().Single(dialog => dialog.Instance.IsOpen).Instance.OnConfirm.InvokeAsync());
+        page.WaitForAssertion(() => Assert.AreNotSame(editor, page.FindComponent<StorageEditor>().Instance));
+        Assert.AreEqual(Resource().Definition.DisplayName, page.Find("[data-testid=storage-display-name]").GetAttribute("value"));
+        Assert.AreEqual(2, client.ResourceReads);
+    }
+
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
@@ -506,6 +555,19 @@ public sealed class StorageComponentTests
         var page = context.Render<StorageEditor>();
         page.WaitForElement("[data-wizard-step=review]").Click();
         return page;
+    }
+    private static IRenderedComponent<StorageDetails> RenderDetails(BunitContext context)
+    {
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult(nav.Uri.Split('#')[0] + "#overview");
+        return context.Render<StorageDetails>(p => p.Add(value => value.Name, "documents"));
+    }
+    private static void SelectSection(BunitContext context, string path)
+    {
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo(nav.Uri.Split('#')[0] + "#" + path);
     }
     private static void Navigate(BunitContext context, StorageResource resource, bool edit = false) => context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageLinks.Details(resource).Replace("?", edit ? "/edit?" : "?", StringComparison.Ordinal));
     private static void SelectType(IRenderedComponent<StorageEditor> page, string name)

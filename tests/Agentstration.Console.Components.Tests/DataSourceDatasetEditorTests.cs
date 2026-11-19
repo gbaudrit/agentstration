@@ -282,7 +282,7 @@ public sealed class DataSourceDatasetEditorTests
         await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Acquired alerts");
         await page.Find("[data-testid=data-source-name]").ChangeAsync("acquired-alerts");
         Assert.IsFalse(ConfigurationComplete(page));
-        Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href*='view=definition']"));
+        Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href$='#definition/configuration']"));
         Assert.IsNull(handler.Created);
         if (!hasCollection) return;
         await page.Find("[data-testid=dataset-document-collection]").ChangeAsync(documents.Collection.ToString());

@@ -80,8 +80,8 @@ export class ConnectedStorageCollectionPage {
     await row.getByTestId(TestIds.connectedStorageCollections.storageName).click();
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.storageDetails)).toBeVisible();
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
-    await this.cancelConfirmation(this.page.getByTestId(TestIds.connectedStorageCollections.storageDeactivate), locale);
-    await this.page.getByTestId(TestIds.connectedStorageCollections.storageDefinition).click();
+    await this.cancelConfirmation(this.page.getByTestId(TestIds.connectedStorageCollections.storageEnabled), locale);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.clearAndRestore(this.page.getByTestId(TestIds.connectedStorageCollections.storageDisplayName), fixture.title);
     await this.assertNoOverflow();
   }

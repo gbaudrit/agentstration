@@ -732,7 +732,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var storageKey = page.Find("[data-testid=knowledge-output-storage] option:last-child").GetAttribute("value");
         await page.Find("[data-testid=knowledge-output-storage]").ChangeAsync(storageKey);
         Assert.IsTrue(page.Find("[data-testid=knowledge-source-save]").HasAttribute("disabled"));
-        Assert.IsNotNull(page.Find("[data-testid=knowledge-output-collection-required] a[href*='view=definition']"));
+        Assert.IsNotNull(page.Find("[data-testid=knowledge-output-collection-required] a[href$='#definition/configuration']"));
         Assert.IsNull(client.CreatedRequest);
         if (!hasCollection) return;
         await page.Find("[data-testid=knowledge-output-collection]").ChangeAsync(documents.Collection.ToString());

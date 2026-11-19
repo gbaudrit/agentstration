@@ -464,7 +464,7 @@ else
                     @if (SelectedStorage is { } documentStorage && (RequiresDocumentCollection || documentStorage.Definition.Collections.Count > 0))
                     {
                         <FormField Label="@T("DatasetDocumentCollection")" Class="form-field-wide" Help="@T("DatasetDocumentHelp")" Required="@RequiresDocumentCollection"><ClearableSelect AllowClear="false" TValue="Guid" @bind-Value="documentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
-                        @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "&view=definition")">@T("DatasetConfigureStorage")</a></p> }
+                        @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "#definition/configuration")">@T("DatasetConfigureStorage")</a></p> }
                     }
                     </div><p class="dataset-note"><UiIcon Name="layers" />@T(allowDirect && string.IsNullOrEmpty(storageKey) ? "DirectPermissionHelp" : "DatasetIsolatedContent")</p></section>
     </div>;
