@@ -1,6 +1,21 @@
 export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
+export const AgentOverviewMetricsByLocale = {
+  'en-US': ['Desired generation', 'Active generation', 'Deployment'],
+  'fr-FR': ['Génération souhaitée', 'Génération active', 'Déploiement'],
+} as const;
+
+export const ResourceSectionTextByLocale = {
+  'en-US': { identity: 'Identity', labels: 'Labels', required: '* Required fields', actions: 'Section actions', applyYaml: 'Apply to form' },
+  'fr-FR': { identity: 'Identité', labels: 'Étiquettes', required: '* Champs obligatoires', actions: 'Actions de la section', applyYaml: 'Appliquer au formulaire' },
+} as const;
+
+export const AgentValidationTextByLocale = {
+  'en-US': { displayNameRequired: 'Display name is required.', instructionsRequired: 'Instructions is required.' },
+  'fr-FR': { displayNameRequired: 'Le champ Nom d’affichage est obligatoire.', instructionsRequired: 'Le champ Instructions est obligatoire.' },
+} as const;
+
 export const GovernedInventoryTextByLocale = {
   'en-US': {
     resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',

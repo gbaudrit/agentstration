@@ -36,11 +36,12 @@ for (const variant of [
 
       await expect(page).toHaveURL(url =>
         url.pathname === `/agents/${fixture.name}` && url.searchParams.has('scopeRef'));
-      await expect(page).toHaveURL(url => url.hash === '#definition/configuration');
+      await expect(page).toHaveURL(url => url.hash === '#definition/identity');
       await expect(page.getByTestId(TestIds.agentEditor.name)).toHaveValue(fixture.name);
       await expect(page.getByTestId(TestIds.agentEditor.name)).toBeDisabled();
       await pages.agentEditor.openOverview();
       await page.evaluate(() => window.scrollTo(0, 0));
+      await pages.agentEditor.expectStandardOverview(variant.locale);
       await expect(page.getByTestId('agent-identity-summary')).toContainText(fixture.displayName);
       await expect(page.getByTestId('agent-configuration-summary')).toContainText(fixture.instructions);
       await expect(page.getByTestId('agent-configuration-summary').locator('input, textarea')).toHaveCount(0);
@@ -74,11 +75,21 @@ for (const variant of [
       await pages.agentEditor.openEdit();
       await page.getByTestId(TestIds.agentEditor.displayName).fill('Discard this draft');
       await page.getByTestId(TestIds.agentEditor.displayName).blur();
+      await pages.agentEditor.prepareIncompleteLabel();
+      await pages.agentEditor.refresh();
+      await pages.agentEditor.expectIncompleteLabel();
+      await expect(page.getByTestId(TestIds.agentEditor.displayName)).toHaveValue('Discard this draft');
       await pages.agentEditor.openOverview();
       await page.getByTestId('agent-discard').click();
       await pages.agentEditor.openEdit();
+      await pages.agentEditor.expectNoLabelDraft();
       await expect(page.getByTestId(TestIds.agentEditor.displayName)).toHaveValue('Template saved from overview');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await pages.agentEditor.expectDeclaredSectionPresentation(variant.locale);
+      await pages.agentEditor.openEdit();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await testInfo.attach('agent-template-identity', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await pages.agentEditor.expectLocalizedInlineValidation(variant.locale);
       await pages.agentEditor.openTools();
       await expect(page.locator('.required-fields-note')).toHaveCount(0);
       await page.evaluate(() => window.scrollTo(0, 0));

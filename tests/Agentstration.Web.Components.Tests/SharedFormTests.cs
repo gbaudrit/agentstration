@@ -59,8 +59,11 @@ public sealed class SharedFormTests
         Assert.AreEqual(string.Empty, model.Name);
         Assert.AreEqual(1, notifications);
         Assert.IsTrue(editContext.GetValidationMessages().Any());
+        Assert.IsTrue(cut.Find("input").ClassList.Contains("invalid"));
         Assert.AreEqual(0, cut.FindAll("button").Count);
         Assert.IsTrue(context.JSInterop.Invocations.Any(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
+        await cut.Find("input").InputAsync("Restored");
+        Assert.IsFalse(cut.Find("input").ClassList.Contains("invalid"));
         await cut.InvokeAsync(validation.Dispose);
     }
 

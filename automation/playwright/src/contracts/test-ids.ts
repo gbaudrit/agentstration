@@ -452,6 +452,8 @@ export const TestIds = {
     submit: 'login-submit',
   },
   agentEditor: {
+    refresh: 'agent-refresh',
+    yamlEditor: 'agent-yaml-editor',
     contextReturn: 'agent-context-return',
     accessTab: 'agent-access-tab',
     form: 'agent-editor-form',
@@ -459,6 +461,8 @@ export const TestIds = {
     editTab: 'agent-edit-tab',
     identitySection: 'agent-identity-section',
     behaviorSection: 'agent-behavior-section',
+      modelSection: 'agent-model-section',
+      runtimeSection: 'agent-runtime-section',
     name: 'agent-name',
     displayName: 'agent-display-name',
     description: 'agent-description',

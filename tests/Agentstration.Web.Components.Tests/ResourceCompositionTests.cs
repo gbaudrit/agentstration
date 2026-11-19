@@ -138,6 +138,12 @@ public sealed class ResourceCompositionTests
             await cut.Find("button").ClickAsync(new());
             Assert.HasCount(1, copy.Invocations);
             Assert.AreEqual("Copied", cut.Find("[role='status']").TextContent);
+            Assert.IsEmpty(cut.FindAll(".labels-summary"), "Legacy consumers can omit labels.");
+            cut.Render(parameters => parameters.Add(value => value.Labels, new Dictionary<string, string>()));
+            Assert.AreEqual("No labels", cut.Find(".labels-summary").TextContent.Trim());
+            cut.Render(parameters => parameters.Add(value => value.Labels, new Dictionary<string, string> { ["environment"] = "local" }));
+            Assert.AreEqual("environment", cut.Find(".labels-summary strong").TextContent);
+            Assert.Contains("local", cut.Find(".resource-identity-summary").TextContent);
         }
         finally
         {

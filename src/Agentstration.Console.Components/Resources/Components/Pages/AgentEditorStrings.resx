@@ -130,5 +130,12 @@
   <data name="ModelAndExecution" xml:space="preserve"><value>Model and execution</value></data>
   <data name="CreationScopeRequired" xml:space="preserve"><value>Select the resource owner scope.</value></data>
   <data name="ScopeImmutable" xml:space="preserve"><value>The owner scope cannot be changed in YAML.</value></data>
-  <data name="CreationConfigurationInvalid" xml:space="preserve"><value>Check the configuration and declared references.</value></data>
+  <data name="CreationIdentityInvalid" xml:space="preserve"><value>Correct the labels in Identity before continuing.</value></data>
+  <data name="DesiredGeneration" xml:space="preserve"><value>Desired generation</value></data>
+  <data name="ActiveGeneration" xml:space="preserve"><value>Active generation</value></data>
+  <data name="NoActiveGeneration" xml:space="preserve"><value>None</value></data>
+  <data name="Deployment" xml:space="preserve"><value>Deployment</value></data>
+  <data name="ApplyPending" xml:space="preserve"><value>Changes to apply</value></data>
+  <data name="DeploymentFailed" xml:space="preserve"><value>Error</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer definition is available. Your draft and its original version are preserved. Discard changes to load the newer definition.</value></data>
 </root>

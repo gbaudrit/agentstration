@@ -157,6 +157,7 @@
     <value>optional</value>
   </data>
   <data name="Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Labels" xml:space="preserve"><value>Labels</value></data>
   <data name="Description" xml:space="preserve"><value>Description</value></data>
   <data name="NotProvided" xml:space="preserve"><value>Not provided</value></data>
   <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
@@ -204,4 +205,36 @@
   <data name="Definition" xml:space="preserve"><value>Definition</value></data>
   <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
   <data name="Verification" xml:space="preserve"><value>Review</value></data>
+  <data name="SectionActions" xml:space="preserve"><value>Section actions</value></data>
+  <data name="Validation.Required" xml:space="preserve"><value>{0} is required.</value></data>
+  <data name="Validation.StringLength" xml:space="preserve"><value>{0} must contain no more than {1} characters.</value></data>
+  <data name="Validation.StringLengthRange" xml:space="preserve"><value>{0} must contain between {1} and {2} characters.</value></data>
+  <data name="Validation.MinLength" xml:space="preserve"><value>{0} must contain at least {1} elements.</value></data>
+  <data name="Validation.MaxLength" xml:space="preserve"><value>{0} must contain no more than {1} elements.</value></data>
+  <data name="Validation.Range" xml:space="preserve"><value>{0} must be between {1} and {2}.</value></data>
+  <data name="Validation.Format" xml:space="preserve"><value>{0} has an invalid format.</value></data>
+  <data name="Validation.Email" xml:space="preserve"><value>{0} must contain a valid email address.</value></data>
+  <data name="Validation.Url" xml:space="preserve"><value>{0} must contain a valid URL.</value></data>
+  <data name="Validation.Phone" xml:space="preserve"><value>{0} must contain a valid phone number.</value></data>
+  <data name="Validation.CreditCard" xml:space="preserve"><value>{0} must contain a valid card number.</value></data>
+  <data name="Validation.Selection" xml:space="preserve"><value>Select a valid value for {0}.</value></data>
+  <data name="Validation.Compare" xml:space="preserve"><value>{0} must match {1}.</value></data>
+  <data name="Validation.Invalid" xml:space="preserve"><value>An invalid value was provided.</value></data>
+  <data name="ResourceLoading" xml:space="preserve"><value>Loading resource…</value></data>
+  <data name="ResourceRefreshing" xml:space="preserve"><value>Refreshing resource…</value></data>
+  <data name="ResourceRefreshFailed" xml:space="preserve"><value>Unable to refresh the resource</value></data>
+  <data name="ResourceLoadFailed" xml:space="preserve"><value>Unable to load resource</value></data>
+  <data name="ResourceLoadFailedMessage" xml:space="preserve"><value>The resource could not be loaded. Try again.</value></data>
+  <data name="ResourceNotFound" xml:space="preserve"><value>Resource not found</value></data>
+  <data name="ResourceNotFoundMessage" xml:space="preserve"><value>This resource is no longer available in the selected context.</value></data>
+  <data name="ResourceForbidden" xml:space="preserve"><value>Access denied</value></data>
+  <data name="ResourceForbiddenMessage" xml:space="preserve"><value>You do not have permission to view this resource in the selected context.</value></data>
+  <data name="RetryResourceLoad" xml:space="preserve"><value>Retry</value></data>
+  <data name="RefreshResource" xml:space="preserve"><value>Refresh</value></data>
+  <data name="ErrorId" xml:space="preserve"><value>Error ID</value></data>
+  <data name="ReadOnlyDefinition" xml:space="preserve"><value>Read-only definition</value></data>
+  <data name="ReadOnlyReason.Unspecified" xml:space="preserve"><value>This definition is available for consultation only.</value></data>
+  <data name="ReadOnlyReason.Inherited" xml:space="preserve"><value>This resource belongs to another scope. Switch to its owner scope to edit its definition.</value></data>
+  <data name="ReadOnlyReason.Managed" xml:space="preserve"><value>This definition is managed by the platform or an installation and cannot be edited here.</value></data>
+  <data name="ReadOnlyReason.InsufficientPermissions" xml:space="preserve"><value>You do not have permission to edit this definition.</value></data>
 </root>

@@ -6,6 +6,11 @@
 }
 
 .resource-details-template ::deep .resource-header { margin-bottom: 0; }
+.required-fields-note { margin: 0; color: var(--muted); font-size: var(--font-size-xs); }
+.required-fields-note > span { color: var(--form-error-color); }
+.resource-details-guidance { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem); column-gap: var(--space-6); }
+.resource-details-guidance .required-fields-note { grid-column: 1; justify-self: end; }
+.resource-details-main ::deep .resource-section-actions { margin: 0; }
 .resource-details-body,
 .resource-details-main,
 .resource-details-content,
@@ -31,10 +36,28 @@
     gap: var(--form-section-gap);
 }
 
+.resource-details-content ::deep .resource-overview[hidden] { display: none; }
+.resource-details-content ::deep .resource-overview-additional {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--form-section-gap);
+    min-width: 0;
+}
+
 .resource-details-feedback { display: contents; }
 .resource-details-content ::deep .resource-form,
 .resource-details-content ::deep .resource-editor-view { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .resource-details-content ::deep .form-section { min-width: 0; }
+
+.resource-overview-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: var(--form-section-gap);
+    min-width: 0;
+}
+
+.resource-overview-metrics ::deep .metric-card { min-width: 0; }
+.resource-overview-metrics ::deep .metric-card strong { overflow-wrap: anywhere; }
 
 .resource-details-with-navigation {
     grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);
@@ -54,6 +77,7 @@
 .resource-details-content ::deep .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }
 
 @media (max-width: 899px) {
+    .resource-details-guidance { grid-template-columns: minmax(0, 1fr); }
     .resource-details-with-navigation { grid-template-columns: minmax(0, 1fr); }
     .resource-details-navigation { grid-column: 1; grid-row: 2; position: static; }
 }

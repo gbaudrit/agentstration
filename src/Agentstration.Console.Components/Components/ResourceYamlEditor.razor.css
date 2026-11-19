@@ -1,0 +1,11 @@
+.resource-yaml-editor { display: grid; min-width: 0; gap: var(--form-section-gap); }
+.resource-yaml-editor ::deep .form-code-editor {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: min(60vh, 640px);
+    max-height: none;
+    overflow: auto;
+    overflow-wrap: normal;
+    resize: vertical;
+    white-space: pre;
+}

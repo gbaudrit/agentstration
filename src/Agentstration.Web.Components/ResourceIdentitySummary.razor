@@ -8,6 +8,7 @@
         <dt>@Shared["Description"]</dt><dd class="resource-text">@(string.IsNullOrWhiteSpace(Description) ? Shared["NotProvided"] : Description)</dd>
         @if (Scope is not null) { <dt>@Shared["Scope"]</dt><dd>@Scope</dd> }
         @if (!string.IsNullOrWhiteSpace(Namespace)) { <dt>@Shared["Namespace"]</dt><dd><code>@Namespace</code></dd> }
+        @if (Labels is not null) { <dt>@Shared["Labels"]</dt><dd><LabelsSummary Values="Labels" /></dd> }
         @AdditionalDetails
     </dl>
 </section>
@@ -16,6 +17,7 @@
     [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? Namespace { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Labels { get; set; }
     [Parameter] public RenderFragment? AdditionalDetails { get; set; }
     [Parameter] public RenderFragment? Scope { get; set; }
     [Parameter] public RenderFragment? Badges { get; set; }

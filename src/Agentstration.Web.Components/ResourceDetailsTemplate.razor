@@ -1,33 +1,91 @@
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 <div class="resource-details-template" data-testid="@TestId">
     <ResourceHeader Name="@Name" ResourceType="@ResourceType" Domain="@Domain" Icon="@Icon" IconName="@IconName"
                     ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
                     Description="@Description" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef"
                     StatusText="@StatusText" Status="Status" Metadata="@Metadata"
-                    Enabled="Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="EnabledDisabled" EnabledTestId="@EnabledTestId"
-                    PrimaryActions="@PrimaryActions" Actions="@Actions" MoreActions="@MoreActions" NavigationActions="@(Sections.Count > 0 ? HeaderNavigation() : null)" />
+                    Enabled="@(BlocksContent ? null : Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(EnabledDisabled || DefinitionReadOnlyReason is not null)" EnabledTestId="@EnabledTestId"
+                    PrimaryActions="@(BlocksContent ? null : PrimaryActions)" Actions="@(BlocksContent ? null : HeaderActions)" MoreActions="@(BlocksContent ? null : MoreActions)" NavigationActions="@(ShowNavigation ? HeaderNavigation() : null)" />
+    @if (LoadState is { BlocksContent: false, Status: ResourceLoadStatus.Refreshing or ResourceLoadStatus.Failed } refreshState)
+    {
+        <ResourceLoadFeedback State="refreshState" OnRetry="OnRetry" RetryTestId="@SectionTestId("retry")" />
+    }
     @if (Feedback is not null) { <div class="resource-details-feedback">@Feedback</div> }
-    <div class="resource-details-body @(Sections.Count == 0 ? null : "resource-details-with-navigation")">
+    @if (!BlocksContent && State is null && CurrentReadOnlyReason is { } readOnlyReason)
+    {
+        <ResourceReadOnlyNotice Reason="readOnlyReason" Message="@(DefinitionReadOnlyReason is null ? ActivePresentation?.ReadOnlyMessage : null)"
+                                Actions="ReadOnlyContextActions" TestId="@(ReadOnlyTestId ?? SectionTestId("readonly"))" />
+    }
+    @if (ShowRequiredFields)
+    {
+        <div class="resource-details-guidance"><span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span></div>
+    }
+    <div class="resource-details-body @(ShowNavigation ? "resource-details-with-navigation" : null)" aria-busy="@((LoadState?.Status is ResourceLoadStatus.Loading or ResourceLoadStatus.Refreshing).ToString().ToLowerInvariant())">
+        <CascadingValue TValue="ResourceReadOnlyReason?" Value="DefinitionReadOnlyReason">
         <div class="resource-details-main">
-            @if (State is not null)
+            @if (BlocksContent)
+            {
+                <div class="resource-details-state"><ResourceLoadFeedback State="@(LoadState!)" OnRetry="OnRetry" RetryTestId="@SectionTestId("retry")" /></div>
+            }
+            else if (State is not null)
             {
                 <div class="resource-details-state">@State</div>
             }
             else
             {
-                <div class="resource-details-content">@Content</div>
-                @if (HasDraft && DraftActions is not null)
+                <div @key="@(UsesStandardSections ? ResourceIdentity : null)" class="resource-details-content" role="@(UsesStandardSections ? "region" : null)"
+                     aria-label="@(UsesStandardSections ? NavigationSections.FirstOrDefault(item => item.Path == SectionState.CurrentPath)?.Label : null)"
+                     tabindex="@(UsesStandardSections ? "-1" : null)" id="@(UsesStandardSections ? SectionTestId("page-panel") : null)">
+                    @if (UsesStandardSections)
+                    {
+                        <div class="resource-overview" hidden="@(SectionState.CurrentPath != "overview")" data-testid="@SectionTestId("overview")">
+                            @if (OverviewMetrics is not null) { <div class="resource-overview-metrics">@OverviewMetrics</div> }
+                            <ResourceIdentitySummary DisplayName="@Name" TechnicalName="@(TechnicalName!)" Namespace="@Namespace" Description="@Description"
+                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" TestId="@SectionTestId("identity-summary")">
+                                <Scope><ResourceScopeBadge ScopeRef="ScopeRef" /></Scope>
+                            </ResourceIdentitySummary>
+                            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")">@OverviewConfiguration</FormSection>
+                            @OverviewContent
+                        </div>
+                        @if (SectionState.HasVisitedDefinition)
+                        {
+                            <div class="resource-details-section" hidden="@(!SectionState.CurrentPath.StartsWith("definition/", StringComparison.Ordinal))">@(DefinitionContent!(SectionState.DefinitionPath))</div>
+                        }
+                        @foreach (var section in AdditionalSections.Where(item => item.Visible && item.Enabled && SectionState.HasVisited(item.Path)))
+                        {
+                            <div @key="section.Path" class="resource-details-section" hidden="@(SectionState.CurrentPath != section.Path)">@(AdditionalContent!(section.Path))</div>
+                        }
+                        @if (SectionState.HasVisited("access") && AccessContent is not null)
+                        {
+                            <div class="resource-details-section" hidden="@(SectionState.CurrentPath != "access")">@AccessContent</div>
+                        }
+                        @if (SectionState.HasVisited("yaml"))
+                        {
+                            <div class="resource-details-section" hidden="@(SectionState.CurrentPath != "yaml")">
+                                <FormSection Title="@(YamlTitle ?? Shared["Yaml"])" Description="@YamlDescription" TestId="@SectionTestId("yaml-editor")">@YamlContent</FormSection>
+                            </div>
+                        }
+                    }
+                    else { @Content }
+                </div>
+                @if (ActiveSectionActions is { } sectionActions)
+                {
+                    <FormActions Class="resource-section-actions" Busy="Busy" role="group" aria-label="@Shared["SectionActions"]">@sectionActions</FormActions>
+                }
+                @if (HasDraft && DraftActions is not null && DefinitionReadOnlyReason is null)
                 {
                     <UnsavedChangesBar IsVisible="true" Actions="@DraftActions" />
                 }
             }
         </div>
-        @if (Sections.Count > 0)
+        </CascadingValue>
+        @if (ShowNavigation)
         {
             <div class="resource-details-navigation">
-                <ResourceNavigation @key="NavigationIdentity" @ref="navigation" Items="Sections" DefaultPath="@DefaultSection" Label="@NavigationLabel"
-                                    SelectionChanged="SelectionChanged" ExternalTriggerId="@triggerId" DrawerOpenChanged="value => drawerOpen = value" TestId="@NavigationTestId" ExpandGroupsInitially="ExpandNavigationGroups" />
+                <ResourceNavigation @key="NavigationIdentity" @ref="navigation" Items="NavigationSections" DefaultPath="@(UsesStandardSections ? "overview" : DefaultSection)" Label="@NavigationLabel"
+                                    SelectionChanged="SelectSectionAsync" ExternalTriggerId="@triggerId" DrawerOpenChanged="value => drawerOpen = value" TestId="@NavigationTestId" ExpandGroupsInitially="ExpandNavigationGroups" />
             </div>
         }
     </div>
@@ -62,16 +120,80 @@
     [Parameter] public string? NavigationLabel { get; set; }
     [Parameter] public string? NavigationTestId { get; set; }
     [Parameter] public EventCallback<string?> SelectionChanged { get; set; }
+    [Parameter] public ResourceSectionState SectionState { get; set; } = new();
+    [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation> SectionPresentations { get; set; } = new Dictionary<string, ResourceSectionPresentation>();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public ResourceReadOnlyReason? DefinitionReadOnlyReason { get; set; }
+    [Parameter] public RenderFragment? ReadOnlyContextActions { get; set; }
+    [Parameter] public string? ReadOnlyTestId { get; set; }
     [Parameter] public bool ExpandNavigationGroups { get; set; } = true;
     [Parameter] public RenderFragment? Feedback { get; set; }
     [Parameter] public RenderFragment? State { get; set; }
-    [Parameter, EditorRequired] public RenderFragment? Content { get; set; }
+    [Parameter] public ResourceLoadState? LoadState { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    // Content/Sections keep existing adopters working while they migrate to the standard regions below.
+    [Parameter] public RenderFragment? Content { get; set; }
+    [Parameter] public RenderFragment? OverviewMetrics { get; set; }
+    [Parameter] public RenderFragment? IdentityDetails { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; } = new Dictionary<string, string>();
+    [Parameter] public RenderFragment? OverviewConfiguration { get; set; }
+    [Parameter] public RenderFragment? OverviewContent { get; set; }
+    [Parameter] public RenderFragment<string>? DefinitionContent { get; set; }
+    [Parameter] public IReadOnlyList<ResourceNavigationItem> DefinitionSections { get; set; } = [];
+    [Parameter] public IReadOnlyList<ResourceNavigationItem> AdditionalSections { get; set; } = [];
+    [Parameter] public RenderFragment<string>? AdditionalContent { get; set; }
+    [Parameter] public RenderFragment? AccessContent { get; set; }
+    [Parameter] public RenderFragment? YamlContent { get; set; }
+    [Parameter] public string? YamlTitle { get; set; }
+    [Parameter] public string? YamlDescription { get; set; }
+    [Parameter] public string? SectionTestIdPrefix { get; set; }
     [Parameter] public bool HasDraft { get; set; }
     [Parameter] public RenderFragment? DraftActions { get; set; }
     [Parameter] public string? TestId { get; set; }
     private readonly string triggerId = $"resource-sections-{Guid.NewGuid():N}";
     private ResourceNavigation? navigation;
     private bool drawerOpen;
+    private bool UsesStandardSections => Content is null;
+    private bool BlocksContent => LoadState?.BlocksContent == true;
+    private bool ShowNavigation => NavigationSections.Count > 0 && !BlocksContent;
+    private RenderFragment? HeaderActions => !OnRefresh.HasDelegate ? Actions : @<text>
+        <button type="button" class="button-secondary" @onclick="OnRefresh" disabled="@(Busy || LoadState?.Status == ResourceLoadStatus.Refreshing)" data-testid="@SectionTestId("refresh")">@Shared["RefreshResource"]</button>
+        @Actions
+    </text>;
+    private ResourceSectionPresentation? ActivePresentation
+    {
+        get
+        {
+            if (!UsesStandardSections || State is not null || BlocksContent || !NavigationSections.Any(item => item.Path == SectionState.CurrentPath && item.Navigable && item.Visible && item.Enabled)) return null;
+            SectionPresentations.TryGetValue(SectionState.CurrentPath, out var presentation);
+            return DefinitionReadOnlyReason is { } reason && (SectionState.CurrentPath.StartsWith("definition/", StringComparison.Ordinal) || SectionState.Is("yaml"))
+                ? (presentation ?? new()) with { ReadOnly = true, ReadOnlyReason = reason } : presentation;
+        }
+    }
+    private ResourceReadOnlyReason? CurrentReadOnlyReason => DefinitionReadOnlyReason
+        ?? (ActivePresentation is { ReadOnly: true } presentation ? presentation.ReadOnlyReason ?? ResourceReadOnlyReason.Unspecified : ActivePresentation?.ReadOnlyReason);
+    private RenderFragment? ActiveSectionActions => ActivePresentation is { } presentation
+        ? presentation.ReadOnly || presentation.ReadOnlyReason is not null ? presentation.ReadOnlyActions : presentation.Actions : null;
+    private bool ShowRequiredFields => ActivePresentation is { HasRequiredFields: true, ReadOnly: false, ReadOnlyReason: null };
+    private string? SectionTestId(string suffix) => SectionTestIdPrefix is null ? null : $"{SectionTestIdPrefix}-{suffix}";
+    private IReadOnlyList<ResourceNavigationItem> NavigationSections => UsesStandardSections
+        ? [new("overview", Shared["Overview"], "home"),
+           new("definition", Shared["Definition"], "settings") { Navigable = false },
+           new("definition/identity", Shared["Identity"], "id"),
+           new("definition/configuration", Shared["Configuration"], "forms"),
+           .. DefinitionSections, .. AdditionalSections,
+           new("access", Shared["Access"], "key") { Visible = AccessContent is not null },
+           new("yaml", Shared["Yaml"], "code")]
+        : Sections;
+    private async Task SelectSectionAsync(string? path)
+    {
+        if (UsesStandardSections && path is not null)
+        {
+            SectionState.Select(path);
+        }
+        await SelectionChanged.InvokeAsync(path);
+    }
     private string NavigationIdentity => $"{ResourceIdentity}|{ResourceNavigation.BaseUri(NavigationManager.Uri)}";
     private RenderFragment HeaderNavigation() => @<ResourceNavigationTrigger Id="@triggerId" IsOpen="drawerOpen" OnOpen="OpenNavigationAsync" />;
     private Task OpenNavigationAsync() => navigation?.OpenDrawerAsync() ?? Task.CompletedTask;
@@ -80,7 +202,23 @@
     public void Dispose() => NavigationManager.LocationChanged -= LocationChanged;
     protected override void OnParametersSet()
     {
-        if (Sections.Count > 0 && string.IsNullOrWhiteSpace(ResourceIdentity))
+        if (UsesStandardSections)
+        {
+            if (!BlocksContent && (OverviewConfiguration is null || DefinitionContent is null || YamlContent is null || string.IsNullOrWhiteSpace(TechnicalName) || ScopeRef is null))
+                throw new ArgumentException("Standard resource sections require saved identity, owner, overview configuration, definition and YAML content.");
+            if (Sections.Count > 0 || DefaultSection is not null)
+                throw new ArgumentException("Standard resource sections own the navigation and default destination.");
+            if (DefinitionSections.Any(item => !item.Path.StartsWith("definition/", StringComparison.Ordinal) || item.Path is "definition/identity" or "definition/configuration" || item.Path.Count(value => value == '/') != 1))
+                throw new ArgumentException("Definition extensions must be unique children of Definition and cannot replace Identity or Configuration.", nameof(DefinitionSections));
+            if (AdditionalSections.Any(item => item.Path.Contains('/') || item.Path is "overview" or "definition" or "access" or "yaml") || AdditionalSections.Count > 0 && AdditionalContent is null)
+                throw new ArgumentException("Additional sections require content and cannot replace standard sections.", nameof(AdditionalSections));
+            if (SectionPresentations.Keys.Any(path => !NavigationSections.Any(item => item.Path == path && item.Navigable)))
+                throw new ArgumentException("Section presentation must name a declared navigable destination.", nameof(SectionPresentations));
+            if (!string.IsNullOrWhiteSpace(ResourceIdentity)) SectionState.Reset(ResourceIdentity);
+        }
+        else if (DefinitionContent is not null || OverviewConfiguration is not null || YamlContent is not null || SectionPresentations.Count > 0)
+            throw new ArgumentException("Use either standard resource regions or legacy content, not both.");
+        if (NavigationSections.Count > 0 && string.IsNullOrWhiteSpace(ResourceIdentity))
             throw new ArgumentException("Resource navigation requires an exact resource/context identity.", nameof(ResourceIdentity));
     }
 }

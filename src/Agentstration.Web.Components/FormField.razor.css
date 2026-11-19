@@ -1,0 +1,5 @@
+.form-field-messages ::deep .validation-message {
+    color: var(--form-error-color);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}

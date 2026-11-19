@@ -1,0 +1,47 @@
+@namespace Agentstration.Web.Components
+@using System.Linq.Expressions
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="resource-editor-view">
+    <FormSection Title="@Shared["Identity"]" TestId="@TestId">
+        <fieldset class="resource-definition-fields" disabled="@ReadOnly">
+            <FormGrid>
+                <ResourceIdentityFields DisplayName="@DisplayName" DisplayNameChanged="DisplayNameChanged" DisplayNameExpression="DisplayNameExpression"
+                                        TechnicalName="@TechnicalName" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="TechnicalNameExpression"
+                                        IsNew="IsNew" DisplayNameTestId="@DisplayNameTestId" TechnicalNameTestId="@TechnicalNameTestId" />
+                <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText Value="@Namespace" ValueExpression="NamespaceExpression" Disabled="true" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
+                <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" />
+                <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
+                <FormField Label="@Shared["Labels"]" Class="form-span-2"><LabelsEditor Value="@Labels" ValueChanged="LabelsChanged" ValueExpression="LabelsExpression" ReadOnly="ReadOnly" /></FormField>
+            </FormGrid>
+        </fieldset>
+    </FormSection>
+    @AdditionalPanels
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string ResourceKind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> DisplayNameChanged { get; set; }
+    [Parameter, EditorRequired] public Expression<Func<string>> DisplayNameExpression { get; set; } = default!;
+    [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> TechnicalNameChanged { get; set; }
+    [Parameter, EditorRequired] public Expression<Func<string>> TechnicalNameExpression { get; set; } = default!;
+    [Parameter, EditorRequired] public string Namespace { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public Expression<Func<string>> NamespaceExpression { get; set; } = default!;
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public EventCallback<ResourceScopeRef?> ScopeRefChanged { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public EventCallback<string?> DescriptionChanged { get; set; }
+    [Parameter, EditorRequired] public Expression<Func<string?>> DescriptionExpression { get; set; } = default!;
+    [Parameter] public string Labels { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> LabelsChanged { get; set; }
+    [Parameter, EditorRequired] public Expression<Func<string>> LabelsExpression { get; set; } = default!;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public RenderFragment? AdditionalPanels { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? DisplayNameTestId { get; set; }
+    [Parameter] public string? TechnicalNameTestId { get; set; }
+    [Parameter] public string? DescriptionTestId { get; set; }
+}

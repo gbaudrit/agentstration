@@ -1,0 +1,122 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject IServiceProvider Services
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Ui
+
+<UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+<ResourceDetailsTemplate Name="@Name" ResourceType="@ResourceType" Domain="@Domain" Icon="@Icon" IconName="@IconName"
+                         ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
+                         TechnicalName="@(Resource?.Name ?? RequestedAddress?.Name)" Namespace="@(Resource?.Namespace.Value ?? RequestedAddress?.Namespace.Value)" ScopeRef="Resource?.ScopeRef" Description="@Description"
+                         StatusText="@StatusText" Status="Status" Metadata="@Metadata" PrimaryActions="@PrimaryActions" Actions="@Actions" MoreActions="@MoreActions"
+                         Enabled="Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="EnabledDisabled" EnabledTestId="@EnabledTestId"
+                         Feedback="@Feedback" State="@State" LoadState="EffectiveLoadState" OnRetry="OnRetry" OnRefresh="OnRefresh" HasDraft="HasDraft" DraftActions="@DraftActions" Busy="Busy"
+                         DefinitionReadOnlyReason="EffectiveReadOnlyReason" ReadOnlyContextActions="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? OwnerContextAction : null)"
+                         ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
+                         ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
+                         DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
+                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityLabels="Resource?.Metadata.Tags" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent"
+                         DefinitionContent="@DefinitionContent" AccessContent="@(CanManageAccess ? AccessPanel : null)" YamlContent="@YamlEditor"
+                         YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
+                         ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
+                         SectionTestIdPrefix="@SectionTestIdPrefix" TestId="@TestId" />
+
+@code {
+    [Parameter, EditorRequired] public Agentstration.Resources.Resource? Resource { get; set; }
+    [Parameter] public ResourceAddress? RequestedAddress { get; set; }
+    [Parameter, EditorRequired] public string ResourceIdentity { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
+    [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public string Icon { get; set; } = "◇";
+    [Parameter] public string? IconName { get; set; }
+    [Parameter] public string? ImageSource { get; set; }
+    [Parameter] public string? DarkImageSource { get; set; }
+    [Parameter] public RenderFragment? IconContent { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public UiStatus Status { get; set; }
+    [Parameter] public RenderFragment? Metadata { get; set; }
+    [Parameter] public RenderFragment? PrimaryActions { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? MoreActions { get; set; }
+    [Parameter] public bool? Enabled { get; set; }
+    [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
+    [Parameter] public bool EnabledDisabled { get; set; }
+    [Parameter] public string? EnabledTestId { get; set; }
+    [Parameter] public RenderFragment? Feedback { get; set; }
+    [Parameter] public RenderFragment? State { get; set; }
+    [Parameter] public ResourceLoadState? LoadState { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public bool HasDraft { get; set; }
+    [Parameter] public ResourceReadOnlyReason? DefinitionReadOnlyReason { get; set; }
+    [Parameter] public RenderFragment? DraftActions { get; set; }
+    [Parameter] public ResourceSectionState SectionState { get; set; } = new();
+    [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation> SectionPresentations { get; set; } = new Dictionary<string, ResourceSectionPresentation>();
+    [Parameter] public EventCallback<string?> SelectionChanged { get; set; }
+    [Parameter] public IReadOnlyList<ResourceNavigationItem> DefinitionSections { get; set; } = [];
+    [Parameter] public IReadOnlyList<ResourceNavigationItem> AdditionalSections { get; set; } = [];
+    [Parameter] public RenderFragment<string>? AdditionalContent { get; set; }
+    [Parameter] public RenderFragment? OverviewMetrics { get; set; }
+    [Parameter] public RenderFragment? IdentityDetails { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? OverviewConfiguration { get; set; }
+    [Parameter] public RenderFragment? OverviewContent { get; set; }
+    [Parameter, EditorRequired] public RenderFragment<string>? DefinitionContent { get; set; }
+    [Parameter] public bool AllowAccess { get; set; } = true;
+    [Parameter] public string? AccessVersion { get; set; }
+    [Parameter] public bool EvaluateSavedAccess { get; set; }
+    [Parameter] public string Yaml { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> YamlChanged { get; set; }
+    [Parameter] public bool YamlReadOnly { get; set; } = true;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? YamlError { get; set; }
+    [Parameter] public string? YamlLabel { get; set; }
+    [Parameter] public string? YamlTitle { get; set; }
+    [Parameter] public string? YamlDescription { get; set; }
+    [Parameter] public RenderFragment? YamlFeedback { get; set; }
+    [Parameter] public bool ExpandNavigationGroups { get; set; } = true;
+    [Parameter] public string? NavigationLabel { get; set; }
+    [Parameter] public string? NavigationTestId { get; set; }
+    [Parameter] public string? SectionTestIdPrefix { get; set; }
+    [Parameter] public string? TestId { get; set; }
+
+    private string? accessIdentity;
+    private bool accessDirty;
+    private string EffectiveIdentity => Resource is null ? $"{ResourceIdentity}|pending" : $"{ResourceIdentity}|{Resource.Uid}|{Resource.ScopeRef}|{Resource.Namespace}|{Resource.Kind}|{Resource.Name}";
+    private ResourceLoadState? EffectiveLoadState => LoadState is null ? null : LoadState with { HasContent = Resource is not null && LoadState.HasContent };
+    private bool CanManageAccess => AllowAccess && Resource is { ScopeRef: not null } && Resource.Uid != Guid.Empty
+        && ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services);
+    private bool HasUnsavedChanges => HasDraft || accessDirty;
+    private ResourceReadOnlyReason? EffectiveReadOnlyReason => Resource is null ? null
+        : Resource.ScopeRef is null ? DefinitionReadOnlyReason ?? ResourceReadOnlyReason.Unspecified
+        : !ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services) ? ResourceReadOnlyReason.Inherited
+        : Resource.Governance.IsManaged ? ResourceReadOnlyReason.Managed : DefinitionReadOnlyReason;
+    private RenderFragment OwnerContextAction => @<a class="button-secondary" href="@Navigation.GetUriWithQueryParameter("context", Resource!.ScopeRef!.Value.Value)" data-testid="switch-to-owner-context">@Ui["InheritedResource.SwitchToOwner"]</a>;
+    private RenderFragment AccessPanel
+    {
+        get
+        {
+            var identity = EffectiveIdentity;
+            var resource = Resource ?? throw new InvalidOperationException("Access requires a saved resource.");
+            return @<ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace"
+                Kind="@resource.Kind" Name="@resource.Name" ResourceUid="resource.Uid" Generation="resource.Generation" Version="@AccessVersion"
+                Governance="resource.Governance" EvaluateSavedAccess="EvaluateSavedAccess" DraftChanged="value => AccessDraftChanged(identity, value)" />;
+        }
+    }
+    private void AccessDraftChanged(string identity, bool value)
+    {
+        if (identity == EffectiveIdentity && CanManageAccess) accessDirty = value;
+    }
+    private RenderFragment YamlEditor => @<ResourceYamlEditor Value="@Yaml" ValueChanged="YamlChanged" ReadOnly="@(YamlReadOnly || EffectiveReadOnlyReason is not null)" Busy="Busy"
+        Error="@YamlError" Label="@YamlLabel" Feedback="@YamlFeedback" />;
+
+    protected override void OnParametersSet()
+    {
+        if (Resource is null && EffectiveLoadState?.BlocksContent != true)
+            throw new InvalidOperationException("A pending resource requires a blocking load state.");
+        var identity = EffectiveIdentity;
+        if (accessIdentity != identity || !CanManageAccess) accessDirty = false;
+        accessIdentity = identity;
+    }
+}

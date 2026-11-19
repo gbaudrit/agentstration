@@ -157,6 +157,7 @@
     <value>facultatif</value>
   </data>
   <data name="Identity" xml:space="preserve"><value>Identité</value></data>
+  <data name="Labels" xml:space="preserve"><value>Étiquettes</value></data>
   <data name="Description" xml:space="preserve"><value>Description</value></data>
   <data name="NotProvided" xml:space="preserve"><value>Non renseignée</value></data>
   <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
@@ -204,4 +205,36 @@
   <data name="Definition" xml:space="preserve"><value>Définition</value></data>
   <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
   <data name="Verification" xml:space="preserve"><value>Vérification</value></data>
+  <data name="SectionActions" xml:space="preserve"><value>Actions de la section</value></data>
+  <data name="Validation.Required" xml:space="preserve"><value>Le champ {0} est obligatoire.</value></data>
+  <data name="Validation.StringLength" xml:space="preserve"><value>Le champ {0} doit contenir au plus {1} caractères.</value></data>
+  <data name="Validation.StringLengthRange" xml:space="preserve"><value>Le champ {0} doit contenir entre {1} et {2} caractères.</value></data>
+  <data name="Validation.MinLength" xml:space="preserve"><value>Le champ {0} doit contenir au moins {1} éléments.</value></data>
+  <data name="Validation.MaxLength" xml:space="preserve"><value>Le champ {0} doit contenir au plus {1} éléments.</value></data>
+  <data name="Validation.Range" xml:space="preserve"><value>Le champ {0} doit être compris entre {1} et {2}.</value></data>
+  <data name="Validation.Format" xml:space="preserve"><value>Le format du champ {0} n’est pas valide.</value></data>
+  <data name="Validation.Email" xml:space="preserve"><value>Le champ {0} doit contenir une adresse e-mail valide.</value></data>
+  <data name="Validation.Url" xml:space="preserve"><value>Le champ {0} doit contenir une URL valide.</value></data>
+  <data name="Validation.Phone" xml:space="preserve"><value>Le champ {0} doit contenir un numéro de téléphone valide.</value></data>
+  <data name="Validation.CreditCard" xml:space="preserve"><value>Le champ {0} doit contenir un numéro de carte valide.</value></data>
+  <data name="Validation.Selection" xml:space="preserve"><value>Sélectionnez une valeur valide pour le champ {0}.</value></data>
+  <data name="Validation.Compare" xml:space="preserve"><value>Le champ {0} doit correspondre au champ {1}.</value></data>
+  <data name="Validation.Invalid" xml:space="preserve"><value>La valeur fournie n’est pas valide.</value></data>
+  <data name="ResourceLoading" xml:space="preserve"><value>Chargement de la ressource…</value></data>
+  <data name="ResourceRefreshing" xml:space="preserve"><value>Actualisation de la ressource…</value></data>
+  <data name="ResourceRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser la ressource</value></data>
+  <data name="ResourceLoadFailed" xml:space="preserve"><value>Impossible de charger la ressource</value></data>
+  <data name="ResourceLoadFailedMessage" xml:space="preserve"><value>La ressource n’a pas pu être chargée. Réessayez.</value></data>
+  <data name="ResourceNotFound" xml:space="preserve"><value>Ressource introuvable</value></data>
+  <data name="ResourceNotFoundMessage" xml:space="preserve"><value>Cette ressource n’est plus disponible dans le contexte sélectionné.</value></data>
+  <data name="ResourceForbidden" xml:space="preserve"><value>Accès refusé</value></data>
+  <data name="ResourceForbiddenMessage" xml:space="preserve"><value>Vous n’avez pas l’autorisation de consulter cette ressource dans le contexte sélectionné.</value></data>
+  <data name="RetryResourceLoad" xml:space="preserve"><value>Réessayer</value></data>
+  <data name="RefreshResource" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="ErrorId" xml:space="preserve"><value>Identifiant d’erreur</value></data>
+  <data name="ReadOnlyDefinition" xml:space="preserve"><value>Définition en lecture seule</value></data>
+  <data name="ReadOnlyReason.Unspecified" xml:space="preserve"><value>Cette définition est disponible uniquement en consultation.</value></data>
+  <data name="ReadOnlyReason.Inherited" xml:space="preserve"><value>Cette ressource appartient à un autre périmètre. Passez dans son périmètre propriétaire pour modifier sa définition.</value></data>
+  <data name="ReadOnlyReason.Managed" xml:space="preserve"><value>Cette définition est gérée par la plateforme ou une installation et ne peut pas être modifiée ici.</value></data>
+  <data name="ReadOnlyReason.InsufficientPermissions" xml:space="preserve"><value>Vous ne disposez pas des droits nécessaires pour modifier cette définition.</value></data>
 </root>
