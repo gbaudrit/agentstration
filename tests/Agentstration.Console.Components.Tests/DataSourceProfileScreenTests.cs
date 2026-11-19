@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class DataSourceProfileScreenTests
+public sealed partial class DataSourceProfileScreenTests
 {
     [TestMethod]
     [DataRow("en-US", "Identity")]
@@ -32,8 +32,8 @@ public sealed class DataSourceProfileScreenTests
         Assert.Contains("special/acquire", cut.Find(".resource-configuration-summary").TextContent);
         Assert.Contains("2.3.4", cut.Find(".resource-configuration-summary").TextContent);
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         var form = cut.FindComponent<EditForm>().Instance;
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
         cut.Find("[data-testid=profile-display-name]").Input("Changed draft");
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
         Assert.DoesNotContain("Changed draft", cut.Find(".resource-identity-summary").TextContent);
@@ -172,7 +172,7 @@ public sealed class DataSourceProfileScreenTests
         var uri = create ? "http://localhost/data-source-profiles/new" : "http://localhost/data-source-profiles/profile?namespace=default&scopeRef=%2Finstance";
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(uri);
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var path in new[] { "overview", "definition/configuration", "definition/acquisition", "definition/contracts", "definition/policies", "revisions", "yaml" })
+        foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "definition/acquisition", "definition/contracts", "definition/policies", "revisions", "access", "yaml" })
             module.Setup<string>("navigate", i => i.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(uri + "#" + path);
         return context;
     }
@@ -192,6 +192,11 @@ public sealed class DataSourceProfileScreenTests
         public DataSourceProfileResource Saved { get; set; }
         public Client() => Saved = new() { Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSourceProfile, Metadata = new() { Name = "profile" }, ScopeRef = ResourceScopeRef.Instance, Definition = new() { DisplayName = "Saved profile", AcquisitionFlow = InitialFlow, DiscoveryFlow = InitialDiscovery } };
         public bool FailPublication { get; init; }
+        public bool LoseReadAfterPublication { get; init; }
+        public string ReadEtag { get; set; } = "initial-etag";
+        public Exception? ReadError { get; set; }
+        public Task<ResourceSnapshot<DataSourceProfileResource>>? PendingRead { get; set; }
+        public int Deletes { get; private set; }
         public int Reads { get; private set; }
         public int Creates { get; private set; }
         public int Updates { get; private set; }
@@ -199,7 +204,7 @@ public sealed class DataSourceProfileScreenTests
         public string? LastEtag { get; private set; }
         public string? PublishedVersion { get; private set; }
         public Task<IReadOnlyList<DataSourceProfileResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileResource>>([Saved]);
-        public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) { Reads++; return Task.FromResult(new ResourceSnapshot<DataSourceProfileResource>(Saved, "initial-etag")); }
+        public Task<ResourceSnapshot<DataSourceProfileResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) { Reads++; return ReadError is { } e ? Task.FromException<ResourceSnapshot<DataSourceProfileResource>>(e) : PendingRead ?? Task.FromResult(new ResourceSnapshot<DataSourceProfileResource>(Saved, ReadEtag)); }
         public Task<IReadOnlyList<DataSourceProfileRevisionResource>> GetRevisionsAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceProfileRevisionResource>>([]);
         public Task<ResourceSnapshot<DataSourceProfileResource>> CreateAsync(CreateDataSourceProfileRequest request, CancellationToken cancellationToken = default)
         {
@@ -214,9 +219,10 @@ public sealed class DataSourceProfileScreenTests
         public Task<ResourceSnapshot<DataSourceProfileRevisionResource>> PublishAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PublishDataSourceProfileRequest request, CancellationToken cancellationToken = default)
         {
             Publications++; PublishedVersion = request.Version;
+            if (LoseReadAfterPublication) ReadError = new AgentstrationApiException("Read access lost", "fixture", HttpStatusCode.Forbidden);
             return FailPublication ? Task.FromException<ResourceSnapshot<DataSourceProfileRevisionResource>>(new HttpRequestException("Publication interrupted")) : Task.FromResult(new ResourceSnapshot<DataSourceProfileRevisionResource>(null!, "revision-etag"));
         }
         public Task<ResourceSnapshot<DataSourceProfileResource>> ActivateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, ActivateDataSourceProfileRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) { Deletes++; LastEtag = etag; ReadError = new AgentstrationApiException("Deleted", "fixture", HttpStatusCode.NotFound); return Task.CompletedTask; }
     }
 }

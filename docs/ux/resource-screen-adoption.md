@@ -108,3 +108,5 @@ Tool governance audit is explicitly reviewed as an execution-event collection, w
 Transformation Function now uses the resource foundation and CreationWizard, preserving native immutable versions: [verification and real evidence](evidence/resource-screen-foundation/transformation-functions/README.md).
 
 Runtime Worker inspection retains its operational contract and adopts the common loading/refresh/retry states: [justification and real evidence](evidence/resource-screen-foundation/runtime-workers/README.md).
+
+Historical Data Source Profile now uses the resource foundation and retained CreationWizard, with draft-safe refresh and unchanged publication contracts: [verification and real captures](evidence/resource-screen-foundation/data-source-profiles/README.md).

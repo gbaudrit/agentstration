@@ -112,13 +112,13 @@ export class GovernedExtensionInventoryPage {
         }
       }
       if (href.includes('/data-source-profiles/')) {
-        await expect(this.page.locator('a[data-resource-section^="definition/"]')).toHaveCount(0);
-        for (const section of ['revisions', 'yaml']) {
+        await expect(this.page.locator('a[data-resource-section^="definition/"]')).toHaveCount(4);
+        for (const section of ['definition/identity', 'definition/configuration', 'definition/contracts', 'definition/policies', 'revisions', 'yaml']) {
           await selectResourceSection(this.page, section);
           await this.assertNoMutation(locale);
         }
         await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveAttribute('readonly', '');
-        await expect(this.page.locator('#profile-resource-form fieldset')).toHaveAttribute('disabled', '');
+        await expect(this.page.locator('#profile-resource-form > fieldset')).toHaveAttribute('disabled', '');
       }
       await this.navigate(new URL(href, consoleUrl).href);
       await this.managed.locator('a').click();
@@ -185,8 +185,8 @@ export class GovernedExtensionInventoryPage {
     await this.navigate(`${consoleUrl}/data-source-profiles/qa-user?${query}`);
     await expect(this.managed).toHaveCount(0);
     await expect(this.page.getByRole('button', { name: text.delete, exact: true })).toBeEnabled();
-    await selectResourceSection(this.page, 'definition/configuration');
-    await expect(this.page.locator('#profile-resource-form fieldset')).not.toHaveAttribute('disabled', '');
+    await selectResourceSection(this.page, 'definition/identity');
+    await expect(this.page.locator('#profile-resource-form > fieldset')).not.toHaveAttribute('disabled', '');
     const displayName = this.page.getByTestId(TestIds.sourceLifecycle.profileDisplayName);
     const savedName = await displayName.inputValue();
     await displayName.fill(savedName + ' editable');

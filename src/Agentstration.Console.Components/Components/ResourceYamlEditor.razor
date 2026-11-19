@@ -6,13 +6,14 @@
     @Feedback
     <FormField Label="@(Label ?? Shared["Yaml"])" Class="resource-yaml-field">
         <ClearableText Multiline="true" class="form-code-editor runner-json" rows="28" Value="@Value" ValueChanged="ChangeAsync"
-                       ReadOnly="@(ReadOnly || !ValueChanged.HasDelegate)" Disabled="Busy" />
+                       ReadOnly="@(ReadOnly || !ValueChanged.HasDelegate)" Disabled="Busy" data-testid="@InputTestId" />
     </FormField>
     @if (Actions is not null) { <FormActions Busy="Busy">@Actions</FormActions> }
 </div>
 
 @code {
     [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? InputTestId { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; } = true;
     [Parameter] public bool Busy { get; set; }

@@ -310,7 +310,7 @@ public sealed class ExtensionManagedResourcePresentationTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance");
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var path in new[] { "overview", "access" })
+        foreach (var path in new[] { "overview", "definition/identity", "access" })
             module.Setup<string>("navigate", i => i.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance#" + path);
         var rendered = context.Render<DataSourceProfileEditor>(parameters => parameters.Add(component => component.Name, "crawl4ai-web"));
         rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll("button.button-danger")));
@@ -327,8 +327,10 @@ public sealed class ExtensionManagedResourcePresentationTests
             Assert.AreEqual(tenant, policies.Saved.Grants.Single().TargetScopeRef);
         });
         await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
-        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.Sections.Any(value => value.Visible && value.Path.StartsWith("definition/", StringComparison.Ordinal)));
-        Assert.IsTrue(rendered.Find("fieldset").HasAttribute("disabled"));
+        Assert.IsNotNull(rendered.Find("a[data-resource-section='definition/identity']"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.IsTrue(rendered.FindComponent<ResourceDefinitionForm>().Instance.ReadOnly);
+        Assert.IsTrue(rendered.Find("form > fieldset").HasAttribute("disabled"));
         Assert.IsEmpty(rendered.FindAll("button[type=submit]"));
     }
 

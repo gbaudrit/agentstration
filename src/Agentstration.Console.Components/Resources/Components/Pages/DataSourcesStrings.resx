@@ -281,4 +281,6 @@
   <data name="ProfileSaveBeforeYaml" xml:space="preserve"><value>Save or discard the definition changes before editing YAML.</value></data>
   <data name="ProfileSaveBeforePublication" xml:space="preserve"><value>Save or discard the definition changes before publishing or activating a version.</value></data>
   <data name="ProfilePublicationPending" xml:space="preserve"><value>The profile was created, but publication was not confirmed. Review its published revisions, then retry publication if needed.</value></data>
+  <data name="ProfileRefreshDraftConflict" xml:space="preserve"><value>The saved profile has changed. Your definition or YAML draft and its original ETag are retained. Discard to load the saved profile.</value></data>
+  <data name="ProfileResourceIdentityMismatch" xml:space="preserve"><value>The returned profile does not match the requested identity.</value></data>
 </root>

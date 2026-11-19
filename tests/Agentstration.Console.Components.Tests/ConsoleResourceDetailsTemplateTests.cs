@@ -89,6 +89,9 @@ public sealed class ConsoleResourceDetailsTemplateTests
         Assert.IsEmpty(cut.FindAll("[data-resource-section=access]"));
         await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("yaml"));
         Assert.IsTrue(cut.Find("textarea").HasAttribute("readonly"));
+        Assert.IsFalse(cut.Find("textarea").HasAttribute("data-testid"));
+        cut.Render(p => p.Add(c => c.YamlInputTestId, "existing-family-yaml-input"));
+        Assert.IsNotNull(cut.Find("textarea[data-testid=existing-family-yaml-input]"));
         string? changed = null;
         cut.Render(p => p.Add(c => c.YamlReadOnly, false).Add(c => c.YamlChanged, value => changed = value));
         cut.Find("textarea").Input("invalid: [yaml");

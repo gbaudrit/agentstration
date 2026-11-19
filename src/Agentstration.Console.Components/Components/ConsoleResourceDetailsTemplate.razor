@@ -67,6 +67,7 @@
     [Parameter] public bool AllowAccess { get; set; } = true;
     [Parameter] public string? AccessVersion { get; set; }
     [Parameter] public bool EvaluateSavedAccess { get; set; }
+    [Parameter] public string? YamlInputTestId { get; set; }
     [Parameter] public string Yaml { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> YamlChanged { get; set; }
     [Parameter] public bool YamlReadOnly { get; set; } = true;
@@ -109,7 +110,7 @@
     {
         if (identity == EffectiveIdentity && CanManageAccess) accessDirty = value;
     }
-    private RenderFragment YamlEditor => @<ResourceYamlEditor Value="@Yaml" ValueChanged="YamlChanged" ReadOnly="@(YamlReadOnly || EffectiveReadOnlyReason is not null)" Busy="Busy"
+    private RenderFragment YamlEditor => @<ResourceYamlEditor InputTestId="@YamlInputTestId" Value="@Yaml" ValueChanged="YamlChanged" ReadOnly="@(YamlReadOnly || EffectiveReadOnlyReason is not null)" Busy="Busy"
         Error="@YamlError" Label="@YamlLabel" Feedback="@YamlFeedback" />;
 
     protected override void OnParametersSet()

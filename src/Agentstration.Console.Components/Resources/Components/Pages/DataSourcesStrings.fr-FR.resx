@@ -281,4 +281,6 @@
   <data name="ProfileSaveBeforeYaml" xml:space="preserve"><value>Enregistrez ou abandonnez les modifications de la définition avant de modifier le YAML.</value></data>
   <data name="ProfileSaveBeforePublication" xml:space="preserve"><value>Enregistrez ou abandonnez les modifications de la définition avant de publier ou d’activer une version.</value></data>
   <data name="ProfilePublicationPending" xml:space="preserve"><value>Le profil a été créé, mais sa publication n’a pas été confirmée. Vérifiez ses révisions publiées, puis relancez la publication si nécessaire.</value></data>
+  <data name="ProfileRefreshDraftConflict" xml:space="preserve"><value>Le profil enregistré a changé. Votre brouillon de définition ou de YAML et son ETag initial sont conservés. Abandonnez les modifications pour charger le profil enregistré.</value></data>
+  <data name="ProfileResourceIdentityMismatch" xml:space="preserve"><value>Le profil retourné ne correspond pas à l’identité demandée.</value></data>
 </root>
