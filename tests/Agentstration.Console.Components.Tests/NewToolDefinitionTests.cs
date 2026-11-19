@@ -14,8 +14,10 @@ using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Tests;
 
@@ -339,6 +341,36 @@ public sealed class NewToolDefinitionTests
         Assert.IsNull(api.Created);
     }
 
+    [TestMethod]
+    public async Task PrerenderKeepsTheWizardAndNativeFormLocked()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<NewToolDefinition>()).ToHtmlString());
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        Assert.IsTrue(document.QuerySelector("form > fieldset")!.HasAttribute("disabled"));
+        Assert.IsTrue(document.QuerySelectorAll(".creation-wizard-progress button, .creation-wizard-actions button").All(button => button.HasAttribute("disabled")));
+        Assert.IsNull(api.Created);
+    }
+
+    [TestMethod]
+    public async Task AReaderCannotCreateWithAValidSelectedScope()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        context.Services.RemoveAll<ConsoleContextState>();
+        context.Services.AddSingleton(new ConsoleContextState(new MutableContextProvider
+        {
+            Snapshot = SnapshotFor(Scope) with { Permissions = new HashSet<string> { "resources/read" } }
+        }));
+        var cut = context.Render<NewToolDefinition>();
+        Assert.IsTrue(cut.WaitForElement("form > fieldset").HasAttribute("disabled"));
+        Assert.IsTrue(cut.FindComponent<CreationWizard>().Instance.Disabled);
+        Assert.IsNotNull(cut.FindComponent<ResourceReadOnlyNotice>());
+        await cut.InvokeAsync(cut.FindComponent<CreationWizard>().Instance.FinishAsync);
+        Assert.IsNull(api.Created);
+        Assert.HasCount(0, api.Requests);
+    }
+
     private static async Task CreateAsync(IRenderedComponent<NewToolDefinition> rendered)
     {
         await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("review"));
@@ -367,7 +399,7 @@ public sealed class NewToolDefinitionTests
 
     internal static ConsoleContextSnapshot SnapshotFor(ResourceScopeRef scope) => new(
         Guid.Empty, "Fixture administrator", scope.Value, scope.Kind switch { ResourceScopeKind.Workspace => ConsoleContextKind.Workspace, ResourceScopeKind.Tenant => ConsoleContextKind.Tenant, _ => ConsoleContextKind.Instance },
-        Guid.Empty, "dev", "Development", scope.TargetId ?? Guid.Empty, "default", "Default workspace", new HashSet<string>(), [], []);
+        Guid.Empty, "dev", "Development", scope.TargetId ?? Guid.Empty, "default", "Default workspace", new HashSet<string> { "resources/read", "resources/write" }, [], []);
 
     private sealed class UnavailableContextProvider : IConsoleContextProvider
     {

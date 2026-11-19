@@ -16,12 +16,13 @@
 @if (!contextLoaded) { <LoadingState Message="@T("LoadingDefinitions")" /> }
 else
 {
+    @if (ContextState.Current is not null && !ContextState.HasPermission("resources/write")) { <ResourceReadOnlyNotice Reason="ResourceReadOnlyReason.InsufficientPermissions" /> }
     @if (error is not null) { <p class="error-panel" role="alert">@error</p> }
     <EditForm Model="identity" OnSubmit="SubmitAsync" class="resource-form">
         <FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
-        <fieldset class="resource-definition-fields" disabled="@saving">
-            <CreationWizard @key="scopeVersion" @ref="wizard" Steps="Steps" Busy="saving" Disabled="@(!CanManage)" OnStepChanging="ChangingStepAsync" OnFinish="FinishAsync" FinishLabel="@T("CreationCreateDraft")" FinishTestId="tool-definition-create-draft" />
+        <fieldset class="resource-definition-fields" disabled="@(saving || !interactive || !CanManage)">
+            <CreationWizard @key="scopeVersion" @ref="wizard" Steps="Steps" Busy="saving" Disabled="@(!interactive || !CanManage)" OnStepChanging="ChangingStepAsync" OnFinish="FinishAsync" FinishLabel="@T("CreationCreateDraft")" FinishTestId="tool-definition-create-draft" />
         </fieldset>
     </EditForm>
     <SectionOutlet SectionId="@relayDialogs" />
@@ -118,6 +119,7 @@ else
     }
     private async Task FinishAsync(CreationWizardFinish finish)
     {
+        if (!interactive || saving || !CanManage) return;
         if (!ValidateIdentity()) { finish.ReturnToStepId = "identity"; return; }
         if (kind == "relay")
         {
@@ -130,7 +132,7 @@ else
         else if (!contractLoaded || loadingFlow || SelectedFlow is null) { await PrepareConfigurationAsync(); finish.ReturnToStepId = "configuration"; }
         else { await CreateFlowAsync(); if (!created) finish.ReturnToStepId = "configuration"; }
     }
-    private bool CanManage => identity.ScopeRef is not null;
+    private bool CanManage => identity.ScopeRef is not null && ContextState.HasPermission("resources/write");
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
 
     protected override async Task OnInitializedAsync()
@@ -140,7 +142,7 @@ else
         ContextState.Changed += ContextChanged;
         await ContextState.EnsureLoadedAsync(cancellation.Token);
         RefreshContext();
-        if (!CanManage) error = ContextState.Error ?? T("CreationScopeRequired");
+        if (identity.ScopeRef is null) error = ContextState.Error ?? T("CreationScopeRequired");
         contextLoaded = true;
     }
 
@@ -175,7 +177,7 @@ else
         flows = []; versions = []; selectedFlow = selectedVersion = "";
         inputSchema = outputSchema = null;
         contractRequest++;
-        error = CanManage ? null : ContextState.Error ?? T("CreationScopeRequired");
+        error = identity.ScopeRef is not null ? null : ContextState.Error ?? T("CreationScopeRequired");
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -197,7 +199,7 @@ else
 
     private async Task PrepareConfigurationAsync()
     {
-        if (!CanManage) return;
+        if (!interactive || !CanManage) return;
         if (kind == "relay") { relayVisited = true; return; }
         if (flowVisited) return;
         flowVisited = true; var request = ++contractRequest; loadingFlow = true;
@@ -256,7 +258,7 @@ else
 
     private async Task CreateFlowAsync()
     {
-        if (saving || loadingFlow || !contractLoaded || !ValidateIdentity() || SelectedFlow is not { } flow) return;
+        if (!interactive || saving || !CanManage || loadingFlow || !contractLoaded || !ValidateIdentity() || SelectedFlow is not { } flow) return;
         saving = true;
         try
         {
