@@ -13,6 +13,7 @@ else if (!Context.HasPermission("resources/read")) { <p role="alert">@T("Error.F
 else
 {
     <StorageError Error="error" />
+    @if (error is not null && resource is null) { <button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button> }
     @if (resource is not null)
     {
         <ResourceDetailsTemplate Name="@resource.Definition.DisplayName" ResourceType="@T("Storage")" Domain="storage" IconName="database" Description="@resource.Definition.Description" TechnicalName="@resource.Name" Namespace="@resource.Namespace.Value" ScopeRef="resource.ScopeRef"

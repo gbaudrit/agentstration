@@ -539,6 +539,22 @@ public sealed class StorageComponentTests
         Assert.AreEqual(2, client.ResourceReads);
     }
 
+    [TestMethod]
+    public void FailedInitialReadKeepsTheRefreshCommandAndRecoversWithoutChangingTheAddress()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StorageClient { FailReads = true };
+        using var context = Setup(client); Navigate(context, Resource());
+        var page = RenderDetails(context);
+        page.WaitForElement("[data-testid=storage-error]");
+        Assert.HasCount(0, page.FindAll("[data-testid=storage-details]"));
+        client.FailReads = false;
+        page.FindAll("button").Single(button => button.TextContent.Trim() == "Refresh").Click();
+        page.WaitForElement("[data-testid=storage-details]");
+        Assert.AreEqual(2, client.ResourceReads);
+        StringAssert.Contains(page.Find(".resource-identity-summary").TextContent, Resource().Name);
+    }
+
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
@@ -613,10 +629,12 @@ public sealed class StorageComponentTests
         }).ToArray());
         public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult<IReadOnlyList<StorageResource>>([Resource()]); }
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Workspace", true)]);
+        public bool FailReads { get; set; }
         public int ResourceReads { get; private set; }
         public Task<ResourceSnapshot<StorageResource>> GetAsync(ScopedResourceAddress address, CancellationToken token)
         {
             ResourceReads++;
+            if (FailReads) return Task.FromException<ResourceSnapshot<StorageResource>>(new HttpRequestException("Offline fixture"));
             return Task.FromResult(new ResourceSnapshot<StorageResource>(Current, $"\"revision-{revision}\""));
         }
         public Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
