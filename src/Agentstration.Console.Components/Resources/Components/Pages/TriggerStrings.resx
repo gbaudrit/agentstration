@@ -59,4 +59,5 @@
   <data name="Error.TargetAmbiguous"><value>More than one visible Flow has this identity. Select an exact Flow scope.</value></data>
   <data name="Error.TargetUseDenied"><value>This context is not authorized to use the selected Flow. Update its access policy before enabling the Trigger.</value></data>
   <data name="Error.TargetStale"><value>The saved Flow identity or published version has changed. Reopen the Trigger and select the Flow again.</value></data>
+<data name="Outcome.Unknown"><value>Unknown</value></data>
 </root>

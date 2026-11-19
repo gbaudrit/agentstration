@@ -59,4 +59,5 @@
   <data name="Error.TargetAmbiguous"><value>Plusieurs Flows visibles ont cette identité. Sélectionnez un périmètre de Flow exact.</value></data>
   <data name="Error.TargetUseDenied"><value>Ce contexte n’est pas autorisé à utiliser le Flow sélectionné. Modifiez sa politique d’accès avant d’activer le déclencheur.</value></data>
   <data name="Error.TargetStale"><value>L’identité du Flow ou sa version publiée a changé. Rouvrez le déclencheur et sélectionnez de nouveau le Flow.</value></data>
+<data name="Outcome.Unknown"><value>Inconnu</value></data>
 </root>

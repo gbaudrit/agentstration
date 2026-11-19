@@ -2734,12 +2734,12 @@
     {
       "id": "triggers-trigger-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
-      "line": 45,
+      "line": 11,
       "host": "console",
       "routes": [
         "/triggers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "TriggerResource",
       "identityLabel": "Trigger",
       "scope": true,
@@ -2814,6 +2814,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "f3a5557f257484e8160271fd089b986cabd9e4d7"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing API returns its complete operational-Workspace array after server-side enumeration. Local name/target search, enabled/schedule/outcome and advanced target/namespace/definition-scope filters; exact totals and local 20/50/100 pages. Existing metrics describe the entire authorized response, independently of filters. No client continuation loop.",
+        "identity": "Qualified Trigger and target Flow links retain logical definition scope and navigation context; the physical operational Workspace is not substituted for definition scope. Existing governance/state badges and chronological sort retained.",
+        "states": "Retained refresh failure, clamped successful shrink, forbidden clearing, cancellation and stale-response rejection. Context key includes user, selected logical scope and operational Workspace.",
+        "actions": "Existing permission-gated creation only; no redundant Open-only menu, enable or execution command added.",
+        "validation": "TriggerCollectionTests; fresh desktop/mobile disabled-metadata API smoke and existing family journey recorded in list-layout-adoption.md."
       }
     },
     {
