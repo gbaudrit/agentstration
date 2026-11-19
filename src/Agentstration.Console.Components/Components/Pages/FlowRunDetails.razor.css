@@ -6,3 +6,13 @@
 .causality-node,.causality-node .panel-header,.causality-details>li,.tool-attempts li { min-width:0; overflow-wrap:anywhere; }
 .causality-node .panel-header ::deep .collection-identity { min-width:0; width:100%; }
 .tool-attempts li { align-items:center; flex-wrap:wrap; }
+
+.flow-run-overview { container-type: inline-size; min-width: 0; margin-bottom: 0; }
+.flow-run-overview-topology { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.flow-run-overview-topology > .step-inspector { min-width: 0; }
+@container (min-width: 850px) {
+    .flow-run-overview-topology:not(.inspector-collapsed) { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+}
+.causality-view, .causality-tree > li, .causality-origin { min-width: 0; max-width: 100%; }
+.causality-origin .details-list { grid-template-columns: minmax(0, 110px) minmax(0, 1fr); }
+.causality-origin code { white-space: normal; overflow-wrap: anywhere; }

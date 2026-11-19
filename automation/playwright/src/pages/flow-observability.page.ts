@@ -13,6 +13,7 @@ export class FlowObservabilityPage {
   public async open(consoleUrl: string, path: string, marker: FlowObservabilityMarker): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Flow observability route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(TestIds.flowObservability[marker]).waitFor({ state: 'visible' });
   }
 
@@ -67,7 +68,7 @@ export class FlowObservabilityPage {
   }
 
   public async inspectCausalOutputs(): Promise<void> {
-    await this.page.getByRole('tab', { name: 'Causality', exact: true }).click();
+    await selectResourceSection(this.page, 'causality');
     const tree = this.page.locator('.causality-tree');
     await expect(tree.locator('.causality-node').first()).toBeVisible();
     const link = tree.locator('.causality-meta a[href^="/flow-runs/"]').first();
@@ -79,17 +80,15 @@ export class FlowObservabilityPage {
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await link.click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
-    await this.page.getByRole('tab', { name: 'Summary', exact: true }).click();
+    await selectResourceSection(this.page, 'overview');
     await expect(this.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
   }
 
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
     const openRun = this.page.getByTestId(TestIds.flowObservability.runOpen);
-    await expect(async () => {
-      await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
-      await expect(openRun).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'runs');
+    await expect(openRun).toBeVisible();
     await openRun.click();
     const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
     await expect(dialog).toBeVisible();

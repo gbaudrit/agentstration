@@ -38,3 +38,8 @@
 @media (max-width: 520px) {
     .runtime-attempt-card .details-list { grid-template-columns: 1fr; gap: .3rem; }
 }
+.runtime-placement-header,
+.runtime-attempt-header { flex-wrap: wrap; }
+.runtime-placement-header > div,
+.runtime-attempt-header > div { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.runtime-attempt-header code { max-width: 100%; }

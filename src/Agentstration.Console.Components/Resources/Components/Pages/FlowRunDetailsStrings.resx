@@ -319,4 +319,6 @@
   <data name="ProcessActiveStep" xml:space="preserve"><value>Current step</value></data>
   <data name="ToolStatus.Governed" xml:space="preserve"><value>Governance evaluated</value></data>
   <data name="ToolStatus.Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="RunIdentifier"><value>Run identifier</value></data>
+  <data name="IdentityMismatch"><value>The response does not match the requested run and execution scope.</value></data>
 </root>

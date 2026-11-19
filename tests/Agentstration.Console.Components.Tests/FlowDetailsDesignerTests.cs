@@ -34,7 +34,7 @@ public sealed partial class FlowDetailsDesignerTests
     public void ArtifactJsonErrorsExplainTheCorrectSideAndRemedy(string language, string code, string explanation)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspace = WorkspaceId.New();
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent"));
@@ -71,10 +71,10 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings>>();
         foreach (var tab in new[] { "Causality", "Activity", "RawEvents" })
         {
-            rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings[tab].Value).Click();
+            SelectFlowSection(context, tab == "RawEvents" ? "raw-events" : tab.ToLowerInvariant());
             Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error']"));
         }
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Summary"].Value).Click();
+        SelectFlowSection(context, "overview");
         Assert.HasCount(1, rendered.FindAll("[data-testid='flow-run-error']"));
         Assert.HasCount(0, rendered.FindAll("[data-testid='flow-run-error'] .contract-failure-body"));
     }
@@ -85,7 +85,7 @@ public sealed partial class FlowDetailsDesignerTests
     [DataRow("/workspaces/11111111-1111-1111-1111-111111111111")]
     public void FlowRunRealtimeConnectionPreservesNavigationContext(string scopeRef)
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("live-flow");
@@ -139,7 +139,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowRunSummaryDistinguishesDefinitionAndExecutionScopes()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("inherited-flow");
@@ -166,8 +166,8 @@ public sealed partial class FlowDetailsDesignerTests
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
 
-        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] code").TextContent);
-        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] code").TextContent);
+        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] .configuration-value").TextContent);
+        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] .configuration-value").TextContent);
     }
 
     [TestMethod]
@@ -180,7 +180,7 @@ public sealed partial class FlowDetailsDesignerTests
     public void FlowRunSummaryExplainsKnownModelFailures(string errorCode, string resourceKey, string cultureName)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("profile-diagnostic");
@@ -224,7 +224,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowRunSummaryKeepsGenericRuntimeFailureMessage()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("generic-runtime-failure");
@@ -263,7 +263,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowRunGridUsesFlowNameAsDetailsLinkAndPreservesExecutionScopeAndStatusMarker()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var definition = new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "reviewer"));
@@ -297,7 +297,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowListKeepsTheClickableNameAndMovesStateIntoCompactIdentity()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub
@@ -328,7 +328,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -336,8 +336,8 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
 
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Runs"].Value).Click();
-        rendered.Find(".toolbar .button-primary").Click();
+        SelectFlowSection(context, "runs");
+        rendered.Find("[data-testid=flow-run-open]").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find("[data-testid='flow-run-submit']").HasAttribute("disabled")));
         rendered.Find("[data-schema-path='$.request'] input").Input("Explain the plan");
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='flow-run-submit']").HasAttribute("disabled")));
@@ -354,7 +354,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void PackManagedNamespacedFlowOrdersDefinitionSecondAndExposesReadOnlyYamlLast()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var inheritedScope = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var client = new FlowClientStub(scopeRef: inheritedScope, managed: true);
@@ -368,23 +368,24 @@ public sealed partial class FlowDetailsDesignerTests
             .Add(component => component.FlowId, "sample")
             .Add(component => component.FlowNamespace, "pack.sample"));
 
-        Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
+        Assert.HasCount(0, rendered.FindAll(".resource-header .flow-header-designer"));
         CollectionAssert.AreEqual(
-            new[] { strings["Tab.Overview"].Value, strings["Tab.Definition"].Value, strings["Tab.Runs"].Value, strings["Tab.Deployments"].Value, strings["Tab.Access"].Value, strings["Tab.YAML"].Value },
-            rendered.FindAll("nav.section-tabs button").Select(button => button.TextContent.Trim()).ToArray());
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+            new[] { "overview", "definition/configuration", "runs", "deployments", "access", "yaml" },
+            rendered.FindAll(".resource-navigation-rail a[data-resource-section]").Select(link => link.GetAttribute("data-resource-section")).ToArray());
+        SelectFlowSection(context, "definition/configuration");
 
         Assert.HasCount(0, rendered.FindAll(".flow-definition-heading a"));
-        StringAssert.Contains(rendered.Find(".flow-definition-heading").TextContent, strings["DefinitionIdentityTitle"].Value);
+        Assert.AreEqual(context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings>>()["Identity"].Value,
+            rendered.Find(".flow-definition-form .form-section h2").TextContent);
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
-        Assert.IsTrue(rendered.Find("[data-testid='flow-definition-display-name']").HasAttribute("disabled"));
+        Assert.IsNotNull(rendered.Find("[data-testid='flow-definition-display-name']").Closest("fieldset[disabled]"));
         Assert.IsTrue(rendered.Find("[data-testid='flow-definition-name']").HasAttribute("readonly"));
         Assert.IsTrue(rendered.Find("[data-testid='flow-definition-namespace']").HasAttribute("readonly"));
         Assert.AreEqual("pack.sample", rendered.Find("[data-testid='flow-definition-namespace']").GetAttribute("value"));
         Assert.HasCount(0, rendered.FindAll(".flow-definition-form button[type=submit]"));
         Assert.AreEqual(0, client.DraftLoadCount);
         Assert.AreEqual(new ResourceNamespace("pack.sample"), client.RequestedNamespace);
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.YAML"].Value).Click();
+        SelectFlowSection(context, "yaml");
         var yaml = rendered.Find("[data-testid='flow-yaml-viewer'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
         Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("entryStep: input", StringComparison.Ordinal));
@@ -393,7 +394,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void WorkspaceDefinitionSavesDraftMetadataWithoutChangingGraphOrTags()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -403,8 +404,8 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
         Assert.AreEqual(
             "/flows/sample/designer?scopeRef=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
-            rendered.Find(".page-header .flow-header-designer").GetAttribute("href"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+            rendered.Find(".resource-header .flow-header-designer").GetAttribute("href"));
+        SelectFlowSection(context, "definition/configuration");
 
         Assert.HasCount(0, rendered.FindAll(".flow-definition-sheet .topology-shell"));
         Assert.AreEqual("Draft Flow", rendered.Find("[data-testid='flow-definition-display-name']").GetAttribute("value"));
@@ -419,13 +420,13 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.AreSame(client.OriginalGraph, client.LastDraftUpdate?.Definition);
         Assert.AreEqual("platform", client.LastDraftUpdate?.Tags?["owner"]);
         Assert.AreEqual("\"etag-1\"", client.LastDraftETag);
-        StringAssert.Contains(rendered.Find("[role=status]").TextContent, strings["DefinitionSaved"].Value);
+        StringAssert.Contains(rendered.Find(".flow-definition-success[role=status]").TextContent, strings["DefinitionSaved"].Value);
     }
 
     [TestMethod]
     public void InstanceFlowIsEditableAndIsNotPresentedAsInheritedReadOnly()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub(scopeRef: ResourceScopeRef.Instance);
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -436,18 +437,19 @@ public sealed partial class FlowDetailsDesignerTests
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "instance-flow"));
 
-        Assert.HasCount(1, rendered.FindAll(".page-header .flow-header-designer"));
+        Assert.HasCount(1, rendered.FindAll(".resource-header .flow-header-designer"));
         Assert.IsFalse(rendered.Markup.Contains(strings["InheritedReadOnlyHelp"].Value, StringComparison.Ordinal));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        SelectFlowSection(context, "definition/configuration");
         Assert.IsFalse(rendered.Find("[data-testid='flow-definition-display-name']").HasAttribute("disabled"));
-        Assert.HasCount(1, rendered.FindAll(".flow-definition-form button[type=submit]"));
+        Assert.IsFalse(rendered.Find(".flow-definition-form fieldset").HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll(".unsaved-changes-bar"));
         Assert.AreEqual(1, client.DraftLoadCount);
     }
 
     [TestMethod]
     public void ExtensionManagedFlowShowsManagementNoticeAndRemainsReadOnly()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(
             scopeRef: ResourceScopeRef.Instance,
@@ -457,13 +459,13 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "crawl4ai-web-acquisition"));
 
         StringAssert.Contains(rendered.Find("[data-testid=extension-managed-resource]").TextContent, "Agentstration.Extensions.Crawl4AI");
-        Assert.HasCount(0, rendered.FindAll(".page-header .flow-header-designer"));
+        Assert.HasCount(0, rendered.FindAll(".resource-header .flow-header-designer"));
     }
 
     [TestMethod]
     public void WorkspaceDefinitionRejectsEmptyDisplayNameWithoutSaving()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub();
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -471,18 +473,18 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        SelectFlowSection(context, "definition/configuration");
         rendered.Find("[data-testid='flow-definition-display-name']").Input("   ");
         rendered.Find("[data-testid='flow-definition-form']").Submit();
 
         Assert.IsNull(client.LastDraftUpdate);
-        StringAssert.Contains(rendered.Find("[role=alert]").TextContent, strings["DefinitionDisplayNameRequired"].Value);
+        StringAssert.Contains(rendered.Find(".validation-message").TextContent, strings["DefinitionDisplayNameRequired"].Value);
     }
 
     [TestMethod]
     public void WorkspaceDefinitionReportsConcurrentDraftChange()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub { SimulateDraftConflict = true };
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -490,18 +492,18 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
 
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Tab.Definition"].Value).Click();
+        SelectFlowSection(context, "definition/configuration");
         rendered.Find("[data-testid='flow-definition-display-name']").Input("Changed elsewhere");
         rendered.Find("[data-testid='flow-definition-form']").Submit();
 
         StringAssert.Contains(rendered.Find("[role=alert]").TextContent, strings["DefinitionSaveConflict"].Value);
-        Assert.HasCount(0, rendered.FindAll("[role=status]"));
+        Assert.HasCount(0, rendered.FindAll(".flow-definition-success[role=status]"));
     }
 
     [TestMethod]
     public void NamespacedOrchestrationPageShowsPublishedDefinitionWithoutSaveOrPublish()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FlowClientStub(orchestration: true, managed: true);
         context.Services.AddSingleton<IFlowApiClient>(client);
@@ -510,7 +512,8 @@ public sealed partial class FlowDetailsDesignerTests
 
         var rendered = context.Render<FlowOrchestrationEditor>(parameters => parameters
             .Add(component => component.FlowId, "review")
-            .Add(component => component.FlowNamespace, "pack.sample"));
+            .Add(component => component.FlowNamespace, "pack.sample")
+            .Add(component => component.Embedded, true));
 
         StringAssert.Contains(rendered.Markup, strings["ReadOnly"].Value);
         StringAssert.Contains(rendered.Markup, strings["PublishedVersion"].Value);
@@ -521,7 +524,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void OrchestrationDefinitionTabEmbedsTheEditableEditorWithoutAnIntermediateLink()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub(orchestration: true));
         context.Services.AddSingleton<IManagementApiClient>(new ManagementClientStub());
@@ -532,18 +535,19 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "review"));
         Assert.HasCount(1, rendered.FindAll(".flow-overview-preview .topology-shell"));
         StringAssert.Contains(rendered.Find(".flow-overview-preview").TextContent, detailsStrings["ExecutionPreview"].Value);
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == detailsStrings["Tab.Definition"].Value).Click();
+        SelectFlowSection(context, "definition/configuration");
 
         Assert.HasCount(1, rendered.FindAll("fieldset.orchestration-configuration"));
         Assert.IsFalse(rendered.FindAll("a, button").Any(element => element.TextContent.Contains(detailsStrings["OpenOrchestrationEditor"].Value, StringComparison.Ordinal)));
-        Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent.Contains(editorStrings["Save"].Value, StringComparison.Ordinal)));
+        Assert.IsFalse(rendered.Find("fieldset.resource-definition-fields").HasAttribute("disabled"));
+        Assert.HasCount(0, rendered.FindAll(".unsaved-changes-bar"));
         Assert.IsTrue(rendered.FindAll("button").Any(button => button.TextContent.Contains(editorStrings["PublishAndActivate"].Value, StringComparison.Ordinal)));
     }
 
     [TestMethod]
     public void FlowRunCausalityTabShowsVersionsAttemptsAndGovernanceDeepLink()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var flowId = new FlowId("news-analysis");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
@@ -588,7 +592,7 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.Contains(run.Id, ownerHref);
         Assert.Contains("step=notify", ownerHref);
         Assert.DoesNotContain("run.Id", ownerHref);
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == strings["Causality"].Value).Click();
+        SelectFlowSection(context, "causality");
 
         rendered.WaitForAssertion(() =>
         {
@@ -613,7 +617,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void MissingFlowRunRendersNotFoundStateInsteadOfThrowing()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub());
         context.Services.AddSingleton<IConsoleRealtimeConnectionConfigurator>(NoOpRealtimeConfigurator.Instance);
@@ -631,7 +635,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowRunTopologyInitiallyFitsTheExecutedWorkflowSnapshot()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("manual-workflow");
@@ -690,7 +694,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowRunSummaryShowsDirectAndInclusiveTokenUsageWithoutSelectingAStep()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("token-summary");
@@ -726,14 +730,14 @@ public sealed partial class FlowDetailsDesignerTests
         StringAssert.Contains(summary.TextContent, "25");
         StringAssert.Contains(summary.TextContent, "35");
         StringAssert.Contains(summary.TextContent, strings["UsageCoverage.Partial"].Value);
-        Assert.IsTrue(rendered.Find("#flow-run-tab-summary").ClassList.Contains("active"));
+        Assert.AreEqual("overview", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
     }
 
     [TestMethod]
     public void FlowRunShowsWorkerPlacementInsideTheWorkerTab()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceId = new WorkspaceId(Guid.NewGuid());
         var flowId = new FlowId("support");
@@ -765,7 +769,7 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
 
         Assert.IsEmpty(rendered.FindAll("[data-testid=runtime-placement]"));
-        rendered.FindAll("nav.section-tabs button").Single(button => button.TextContent.Trim() == "Worker").Click();
+        SelectFlowSection(context, "worker");
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=runtime-placement]").TextContent, "Worker assignment");
@@ -798,6 +802,9 @@ public sealed partial class FlowDetailsDesignerTests
         }
         public ResourceScopeRef ScopeRef => scopeRef;
         public ResourceNamespace RequestedNamespace { get; private set; }
+        public int SnapshotReads { get; private set; }
+        public UpdateFlowRequest? LastDefinitionUpdate { get; private set; }
+        public string? LastDefinitionETag { get; private set; }
         public FlowGraphDefinition OriginalGraph => Graph;
         public UpdateFlowDraftRequest? LastDraftUpdate { get; private set; }
         public string? LastDraftETag { get; private set; }
@@ -831,21 +838,40 @@ public sealed partial class FlowDetailsDesignerTests
             GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken);
         public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(string flowId, CancellationToken cancellationToken) =>
             new(await GetFlowAsync(ResourceNamespace.Default, flowId, cancellationToken), "\"etag-1\"");
+        public async Task<FlowResourceSnapshot> GetFlowSnapshotAsync(ResourceNamespace resourceNamespace, string flowId, ResourceScopeRef owner, CancellationToken cancellationToken)
+        {
+            SnapshotReads++;
+            return new(await GetFlowAsync(resourceNamespace, flowId, cancellationToken), "\"etag-1\"");
+        }
+        public async Task<FlowResourceSnapshot> UpdateFlowAsync(ResourceNamespace resourceNamespace, string flowId, ResourceScopeRef owner, UpdateFlowRequest request, string etag, CancellationToken cancellationToken)
+        {
+            LastDefinitionUpdate = request; LastDefinitionETag = etag;
+            var current = await GetFlowAsync(resourceNamespace, flowId, cancellationToken);
+            return new(current with { Enabled = request.Enabled, Definition = request.Definition, Metadata = request.Metadata!, DisplayName = request.DisplayName, Description = request.Description, Version = request.Version }, "\"activation-etag\"");
+        }
         public Task<FlowResourceSnapshot> CreateFlowAsync(CreateFlowRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowResourceSnapshot> UpdateFlowAsync(string flowId, UpdateFlowRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FlowVersionResponse> CreateFlowVersionAsync(string flowId, CreateFlowVersionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken) => run is not null && run.Id == runId
-            ? Task.FromResult(run)
-            : throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found");
+        public int RunReadCount { get; private set; }
+        public int EventReadCount { get; private set; }
+        public Func<string, Task<IReadOnlyList<FlowRunEvent>>>? RunEventLoader { get; init; }
+        public Func<string, Task<FlowRun>>? RunLoader { get; init; }
+        public IReadOnlyList<InputRequest> PendingInputs { get; init; } = [];
+        public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken)
+        {
+            RunReadCount++;
+            return RunLoader?.Invoke(runId) ?? (run is not null && run.Id == runId ? Task.FromResult(run)
+                : throw new AgentstrationApiException("The Flow Run was not found.", "missing-flow-run", System.Net.HttpStatusCode.NotFound, "flow_run_not_found"));
+        }
         public Task<FlowRunCausalityPageResponse> GetFlowRunCausalityAsync(string runId, CancellationToken cancellationToken) => causality is not null
             ? Task.FromResult(causality)
             : throw new NotSupportedException();
-        public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => Task.FromResult(PendingInputs);
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowRunEvent>>([]);
+        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken)
+        { EventReadCount++; return RunEventLoader?.Invoke(runId) ?? Task.FromResult<IReadOnlyList<FlowRunEvent>>([]); }
         public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
         {
             LastRunRequest = request;
@@ -875,6 +901,7 @@ public sealed partial class FlowDetailsDesignerTests
                 WorkspaceId = new WorkspaceId(Guid.NewGuid()),
                 Id = $"{flowId}-draft",
                 FlowId = new FlowId(flowId),
+                ScopeRef = scopeRef,
                 DisplayName = "Draft Flow",
                 Description = "Existing description",
                 Tags = new Dictionary<string, string> { ["owner"] = "platform" },
@@ -909,6 +936,72 @@ public sealed partial class FlowDetailsDesignerTests
         public Task<FlowDraftResponse> CreateDraftFromVersionAsync(string flowId, string version, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
+    [TestMethod]
+    public void WorkflowMetadataDraftKeepsItsContextAcrossSectionsAndOverviewShowsTheSavedIdentity()
+    {
+        using var context = FlowContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub();
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
+        var rendered = context.Render<FlowDetails>(p => p.Add(value => value.FlowId, "sample"));
+        rendered.WaitForElement(".resource-identity-summary");
+        SelectFlowSection(context, "definition/configuration");
+        rendered.Find("[data-testid=flow-definition-display-name]").Input("Pending identity only");
+        var editContext = rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance.EditContext;
+        SelectFlowSection(context, "overview");
+        Assert.Contains("Sample", rendered.Find(".resource-identity-summary").TextContent);
+        Assert.DoesNotContain("Pending identity only", rendered.Find(".resource-identity-summary").TextContent);
+        Assert.IsNotNull(rendered.Find(".unsaved-changes-bar button[form=flow-definition-form]"));
+        SelectFlowSection(context, "definition/configuration");
+        Assert.AreEqual("Pending identity only", rendered.Find("[data-testid=flow-definition-display-name]").GetAttribute("value"));
+        Assert.AreSame(editContext, rendered.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance.EditContext);
+        Assert.AreEqual(1, client.DraftLoadCount);
+        Assert.AreEqual(1, client.SnapshotReads);
+    }
+
+    [TestMethod]
+    public void HeaderActivationPreservesThePendingWorkflowAndUsesTheDefinitionEtag()
+    {
+        using var context = FlowContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub();
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
+        var rendered = context.Render<FlowDetails>(p => p.Add(value => value.FlowId, "sample"));
+        rendered.WaitForElement("[data-testid=flow-enabled]");
+        SelectFlowSection(context, "definition/configuration");
+        rendered.Find("[data-testid=flow-definition-display-name]").Input("Retained metadata");
+        SelectFlowSection(context, "overview");
+        rendered.Find("[data-testid=flow-enabled]").Change(false);
+        rendered.WaitForAssertion(() => Assert.IsNotNull(client.LastDefinitionUpdate));
+        Assert.IsFalse(client.LastDefinitionUpdate!.Enabled);
+        Assert.AreEqual("\"etag-1\"", client.LastDefinitionETag);
+        Assert.AreEqual(1, client.DraftLoadCount);
+        SelectFlowSection(context, "definition/configuration");
+        Assert.AreEqual("Retained metadata", rendered.Find("[data-testid=flow-definition-display-name]").GetAttribute("value"));
+        rendered.Find("[data-testid=flow-definition-form]").Submit();
+        rendered.WaitForAssertion(() => Assert.AreEqual("Retained metadata", client.LastDraftUpdate?.DisplayName));
+        Assert.AreEqual("\"etag-1\"", client.LastDraftETag);
+        Assert.AreSame(client.OriginalGraph, client.LastDraftUpdate!.Definition);
+    }
+
+    private static BunitContext FlowContext()
+    {
+        var context = new BunitContext().WithCollectionPresentation();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#overview");
+        module.Setup<string>("navigate", _ => true).SetResult("http://localhost/#overview");
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        return context;
+    }
+    private static void SelectFlowSection(BunitContext context, string section)
+    {
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#" + section);
+    }
+
     private static void AddConsoleContext(BunitContext context)
     {
         var tenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -922,7 +1015,7 @@ public sealed partial class FlowDetailsDesignerTests
             workspaceId,
             "default",
             "Default workspace",
-            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal) { "resources/read", "resources/write", "runs/read", "runs/execute" },
             [new(workspaceId, tenantId, "test", "Test tenant", "default", "Default workspace")]);
         context.Services.AddSingleton<IConsoleContextProvider>(new TestConsoleContextProvider(snapshot));
         context.Services.AddScoped<ConsoleContextState>();

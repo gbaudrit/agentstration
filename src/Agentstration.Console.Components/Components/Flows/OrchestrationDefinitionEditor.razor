@@ -58,7 +58,7 @@
                     @switch (Model.Strategy)
                     {
                         case FlowOrchestrationStrategy.Sequential:
-                            <label class="check-option"><FormCheckbox @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
+                            <label class="check-option"><FormCheckbox role="switch" @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
                             break;
                         case FlowOrchestrationStrategy.Concurrent:
                             <p class="strategy-note"><UiIcon Name="activity" />@T("ConcurrentHelp")</p>
@@ -76,7 +76,7 @@
                                     <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")" data-testid="flow-remove-route">×</button>
                                 </div>
                             }
-                            <label class="check-option"><FormCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
+                            <label class="check-option"><FormCheckbox role="switch" @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
                             <FormField Label="@T("MaximumTurns")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumTurnsPerParticipant" data-testid="flow-maximum-turns" /></ChildContent></FormField>
                             <FormField Label="@T("TerminationPhrase")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="Model.TerminationPhrase" data-testid="flow-termination-phrase" /></ChildContent></FormField>
                             break;
@@ -101,6 +101,17 @@
 </div>
 
 @code {
+    [Parameter] public EventCallback Changed { get; set; }
+    private string? reportedDefinition;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = JsonSerializer.Serialize(Model);
+        if (reportedDefinition == current) return;
+        var initialized = reportedDefinition is not null;
+        reportedDefinition = current;
+        if (initialized) await Changed.InvokeAsync();
+    }
+
     [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SelectedCount(int count) => T(count == 1 ? "SelectedCount.One" : "SelectedCount.Many", count);

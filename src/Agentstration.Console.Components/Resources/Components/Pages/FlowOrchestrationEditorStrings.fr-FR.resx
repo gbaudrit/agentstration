@@ -82,4 +82,9 @@
   <data name="ModelProfile"><value>Profil de modèle</value></data>
   <data name="Status"><value>État</value></data>
   <data name="Capabilities"><value>Capacités</value></data>
+<data name="IdentityMismatch" xml:space="preserve"><value>Le Flow renvoyé ne correspond pas à cette ressource.</value></data>
+<data name="Validation.DisplayName" xml:space="preserve"><value>Saisissez un nom d’affichage de 1 à 200 caractères.</value></data>
+<data name="Validation.Version" xml:space="preserve"><value>Saisissez une version sémantique de définition valide.</value></data>
+<data name="Validation.Configuration" xml:space="preserve"><value>Vérifiez les participants, les routes et les limites de l’orchestration avant d’enregistrer.</value></data>
+<data name="Validation.PublishVersion" xml:space="preserve"><value>Saisissez la version à publier.</value></data>
 </root>

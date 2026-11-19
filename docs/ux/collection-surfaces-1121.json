@@ -3,6 +3,112 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
+      "id": "agent-runner-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "line": 62,
+      "host": "console",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/execution-scopes.spec.ts",
+          "tests/flow-observability.spec.ts",
+          "tests/runtime-worker-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Current Agent configuration and generation remain distinct from the recorded generation, model facts and execution options of an existing Runtime Run. Definition owner and execution scope remain separate context.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "flow-run-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "line": 83,
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/flow-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Recorded execution configuration preserves definition and execution scopes as distinct business context, trigger, deployment and caller facts; no resource ownership or mutable publication is inferred.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "flow-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "line": 34,
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/flow-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Flow settings preserve actual kind, enablement and known publication data; definition and metadata remain explicit disclosures. Settings are not resource identities and gain no owner or row actions.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
       "id": "agent-editor-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
       "line": 62,
@@ -4824,16 +4930,18 @@
       "renderer": "CollectionView",
       "itemType": "RuntimeRun",
       "identityLabel": "Run",
-      "scope": true,
+      "scope": false,
       "state": true,
       "actions": false,
       "informationKeys": [
         "Date",
         "Duration",
         "Initiator",
-        "Version",
+        "GenerationLabel",
         "Prompt",
-        "Origin"
+        "Origin",
+        "ExecutionScope",
+        "RecordedAgent"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -4857,7 +4965,7 @@
         "decision": "shared-identity-and-applicable-markers",
         "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
         "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
+        "domainSemantics": "Bounded recent runs match the Agent technical name; recorded qualified Agent reference and execution scope remain explicit business context. Agent generation is not a publication version and execution scope is not resource ownership.",
         "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
         "implementationPR": 1123,
         "coveragePR": 1132,
