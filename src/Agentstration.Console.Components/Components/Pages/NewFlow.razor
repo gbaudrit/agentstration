@@ -21,7 +21,7 @@
 @code {
     private RenderFragment IdentityFields => @<div>
         <FormSection Title="@Shared["Identity"]" Description="@T("IdentityHelp")" TestId="flow-identity-section"><FormGrid>
-            <ResourceIdentityFields @bind-DisplayName="model.DisplayName" TechnicalName="model.Name" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="() => model.Name" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameHelp="@T("DisplayNameHelp")" TechnicalNameHelp="@T("TechnicalNameHelp")" DisplayNameTestId="flow-display-name" TechnicalNameTestId="flow-name" />
+            <ResourceIdentityFields @bind-DisplayName="model.DisplayName" TechnicalName="@model.Name" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="() => model.Name" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameHelp="@T("DisplayNameHelp")" TechnicalNameHelp="@T("TechnicalNameHelp")" DisplayNameTestId="flow-display-name" TechnicalNameTestId="flow-name" />
             <FormField Label="@T("Namespace")"><ClearableText Value="@ResourceNamespace.Default.Value" ReadOnly /></FormField>
             <ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" Value="selectedScope" ValueChanged="ScopeChanged" Disabled="submitting" />
             @if (scopeError) { <p class="validation-message" role="alert">@T("Validation.Scope")</p> }

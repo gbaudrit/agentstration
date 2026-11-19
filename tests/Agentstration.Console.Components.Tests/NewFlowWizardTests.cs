@@ -26,6 +26,7 @@ public sealed class NewFlowWizardTests
     {
         using var handler = new Handler(); using var context = Context(handler); var rendered = context.Render<NewFlow>();
         Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty, "Initial authorized defaults are not a user draft.");
+        Assert.AreEqual("multi-agent-review", rendered.Find("[data-testid=flow-name]").GetAttribute("value"));
         var wizard = rendered.FindComponent<CreationWizard>();
         rendered.Find("[data-testid=flow-display-name]").Input("");
         rendered.Find("[data-testid=flow-name]").Input("");
@@ -53,6 +54,9 @@ public sealed class NewFlowWizardTests
         rendered.Find("[data-testid=flow-participant][data-agent-id=agent-a]").Change(true);
         rendered.Find("[data-testid=flow-participant][data-agent-id=agent-b]").Change(true);
         rendered.Find("[data-testid=flow-enabled]").Change(false);
+        await rendered.InvokeAsync(() => wizard.Instance.GoToStepAsync("identity"));
+        Assert.AreEqual("scoped-review", rendered.Find("[data-testid=flow-name]").GetAttribute("value"));
+        await rendered.InvokeAsync(() => wizard.Instance.GoToStepAsync("configuration"));
         var editor = rendered.FindComponent<OrchestrationDefinitionEditor>().Instance;
         editor.Model.Strategy = FlowOrchestrationStrategy.GroupChat;
         await rendered.InvokeAsync(() => rendered.Render());
