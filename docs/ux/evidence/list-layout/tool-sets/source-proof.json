@@ -1,0 +1,16 @@
+{
+  "baseCommit": "b5bb04fc1cf92c7080ef88cc6599dc51c77cc005",
+  "synchronizedThrough": "b5bb04fc1cf92c7080ef88cc6599dc51c77cc005",
+  "route": "/tools/sets",
+  "host": "Existing GovernedInventoryHost with real Console/API/services/SQLite, deterministic discovery and isolated /tmp/ux-toolsets-fixture data",
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor": "a0b69cb3cfa0c1d24a8375571f53c23fc505cb4a",
+    "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor.cs": "d5da3ab2dbcbf005fdf7a64389c6fa6c49c03693",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  }
+}

@@ -678,17 +678,17 @@
     {
       "id": "tool-sets-tool-set-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/sets"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolSetResource",
       "identityLabel": "ToolSet",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Members",
         "Category"
@@ -759,6 +759,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "2fb39f1c9d0884b973964c593adfb4513ceb225f"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog and latest immutable publication projection. Local name/description search, identity enabled-state filter, category column filter, advanced exact member-count column filter, additional namespace filter; exact totals and local 20/50/100 pages. No extra reads.",
+        "publication": "PublishedVersion only; unpublished drafts display an em dash. Draft version is never substituted.",
+        "navigation": "Legitimate Tool-family destinations and Knowledge Sources action retained with context; exact owner-qualified name links replace redundant Inspect-only actions. No creation workflow invented.",
+        "states": "Retained rows/view and stable query on compatible refresh; superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
+        "validation": "ToolSetCollectionTests; deterministic desktop/mobile fixture smoke and source proof recorded in list-layout-adoption.md."
       }
     },
     {
