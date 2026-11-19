@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExpectedText, SupportedTestLocale } from '../locales/expected-text.js';
@@ -44,6 +45,7 @@ export class GovernedKnowledgePage {
     expect(exposure.operations.some(item => item.route === 'describe')).toBe(true);
     await exposurePanel.getByRole('link', { name: text.openToolSet, exact: true }).click();
     await expect(this.publishedTools).toBeVisible();
+    await selectResourceSection(this.page, 'versions');
     const version = this.page.getByTestId(TestIds.governedKnowledge.toolSetVersion);
     await expect(version).toHaveCount(1);
     this.publishedHash = await version.locator('code').first().innerText();
@@ -52,12 +54,16 @@ export class GovernedKnowledgePage {
       await expect(version).toContainText(operation.tool.name);
       await expect(version).toContainText(`knowledge.${operation.route}`);
     }
-    await expect(this.page.getByText('agentstration.io/category=knowledge-source', { exact: true })).toBeVisible();
-    await expect(this.page.getByText(`agentstration.io/knowledge-source=${knowledge}`, { exact: false })).toBeVisible();
+    await selectResourceSection(this.page, 'overview');
+    const configuration = this.publishedTools.locator('.resource-configuration-summary');
+    await expect(configuration).toBeVisible();
+    await expect(configuration).toContainText('agentstration.io/category=knowledge-source');
+    await expect(configuration).toContainText(`agentstration.io/knowledge-source=${knowledge}`);
     await this.page.goto(`${consoleUrl}/tools/sets?context=${encodeURIComponent(scope)}`);
     await expect(this.page.getByTestId(TestIds.resourceAdministration.toolSets)).toBeVisible();
     await this.page.getByTestId(TestIds.governedKnowledge.toolSetRow).filter({ hasText: exposure.toolSet.name }).locator('.resource-name-link').click();
     await expect(this.publishedTools).toBeVisible();
+    await selectResourceSection(this.page, 'versions');
   }
 
   public async assignSubset(consoleUrl: string, knowledge: string, scope: string, text: ExpectedText['governedKnowledge']): Promise<AgentPinEvidence> {
@@ -165,9 +171,9 @@ export class GovernedKnowledgePage {
     await expect(versions.filter({ has: this.page.getByRole('heading', { level: 3, name: /\b1\.0\.0$/ }) })).not.toContainText(additionalTool);
     const beforeDelete = await (await this.get(consoleUrl, path, scope)).json() as unknown;
     await this.publishedTools.getByRole('button', { name: text.deleteToolSet, exact: true }).click();
-    await this.page.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
     await expect(this.page.getByRole('alert')).toContainText(evidence.toolSetName);
-    await expect(this.page.getByRole('dialog')).toHaveCount(0);
+    await expect(this.page.getByRole('alertdialog')).toHaveCount(0);
     expect(await (await this.get(consoleUrl, path, scope)).json()).toEqual(beforeDelete);
     const blocked = await this.page.request.delete(this.url(consoleUrl, path, scope), {
       headers: { 'X-Agentstration-Context': scope, 'If-Match': updated.headers()['etag']! },
@@ -176,12 +182,13 @@ export class GovernedKnowledgePage {
     expect((await blocked.json() as { type: string }).type).toContain('tool_set_in_use_by_agent');
 
     await this.page.goto(evidence.agentUrl);
+    const editor = new AgentEditorPage(this.page);
+    await editor.openOverview();
     await expect(this.pinnedAssignment).toContainText('1.0.0');
     await expect(this.pinnedAssignment).toContainText(this.publishedHash!);
     await expect(this.pinnedAssignment).toContainText(evidence.selected);
     await expect(this.pinnedAssignment).not.toContainText(additionalTool);
     expect(await (await this.get(consoleUrl, new URL(evidence.revisionUrl).pathname, scope)).json()).toEqual(evidence.revision);
-    const editor = new AgentEditorPage(this.page);
     await editor.openTools();
     const laterCard = this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration)
       .locator('article[data-version="2.0.0"]').filter({ has: this.page.getByRole('heading', { name: evidence.toolSetName, exact: true }) });
@@ -241,7 +248,7 @@ export class GovernedKnowledgePage {
       }), 403);
       await reader.goto(this.toolSetUrl(consoleUrl, `${knowledge}.access`, scope));
       await reader.getByTestId(TestIds.governedKnowledge.toolSetDetails).getByRole('button', { name: text.deleteToolSet, exact: true }).click();
-      await reader.getByRole('dialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
+      await reader.getByRole('alertdialog').getByRole('button', { name: text.confirmToolSetDelete, exact: true }).click();
       await expect(reader.getByRole('alert')).toContainText(/403|Forbidden/i);
       await status(await reader.request.delete(this.url(consoleUrl, `/api/toolsets/${knowledge}.access`, scope)), 403);
       await expect(reader.locator('#blazor-error-ui')).not.toBeVisible();
@@ -264,11 +271,12 @@ export class GovernedKnowledgePage {
     return url.toString();
   }
   private toolSetUrl(consoleUrl: string, name: string, scope: string): string {
-    return `${consoleUrl}/tools/sets/${name}?context=${encodeURIComponent(scope)}`;
+    return `${consoleUrl}/tools/sets/${name}?context=${encodeURIComponent(scope)}&scopeRef=${encodeURIComponent(scope)}&namespace=default#versions`;
   }
   private async openToolSet(consoleUrl: string, name: string, scope: string): Promise<void> {
     await this.page.goto(this.toolSetUrl(consoleUrl, name, scope));
     await expect(this.publishedTools).toBeVisible();
+    await selectResourceSection(this.page, 'versions');
   }
   private async openTools(consoleUrl: string, knowledge: string, scope: string): Promise<void> {
     await this.page.goto(this.toolsUrl(consoleUrl, knowledge, scope));

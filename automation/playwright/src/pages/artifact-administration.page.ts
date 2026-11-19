@@ -105,7 +105,7 @@ export class ArtifactAdministrationPage {
   /** Inspect the exact durable Artifact published in a Knowledge Snapshot. */
   public async exerciseSnapshotArtifact(consoleUrl: string, artifactId: string, text: ExpectedText['governedKnowledge']): Promise<void> {
     await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
-    await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:\\?|$)`));
+    await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:[?#]|$)`));
     await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toHaveCount(0);
     await selectResourceSection(this.page, 'content');
     await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
