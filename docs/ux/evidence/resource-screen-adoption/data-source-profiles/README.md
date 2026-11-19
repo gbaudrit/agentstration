@@ -17,4 +17,3 @@ Creation and publication, saved overview and actual revision list. The maintaine
 ![source-profile-revisions-desktop-en](source-profile-revisions-desktop-en.png)
 
 ![source-profile-revisions-mobile-fr](source-profile-revisions-mobile-fr.png)
-

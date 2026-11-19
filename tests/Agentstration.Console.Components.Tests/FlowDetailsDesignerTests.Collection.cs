@@ -18,6 +18,7 @@ public sealed partial class FlowDetailsDesignerTests
     [DataRow("/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", false, false)]
     public async Task CompactFlowLockMatchesManagedOrInheritedReadOnlyInTableAndCards(string current, string owner, bool managed, bool locked)
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -48,6 +49,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public async Task CompactFlowsKeepExactIdentityAndAlignedVersionSlotsAcrossPagesAndViews()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -93,6 +95,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public async Task FailedFlowPageRetainsPreviousRowsAndRetriesTheFailedRequest()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");

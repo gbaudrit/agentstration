@@ -297,6 +297,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public void FlowListKeepsTheClickableNameAndMovesStateIntoCompactIdentity()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = FlowContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");

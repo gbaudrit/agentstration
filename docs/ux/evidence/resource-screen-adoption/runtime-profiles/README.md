@@ -9,4 +9,3 @@ Runtime creation, saved overview, invalid options retained through section navig
 ![runtime-overview-desktop-en](runtime-overview-desktop-en.png)
 
 ![runtime-overview-mobile-fr](runtime-overview-mobile-fr.png)
-

@@ -15,4 +15,3 @@ The fixture creates and installs a real Pack with explicit, authorized Model and
 ![managed-agent-yaml-desktop-en](managed-agent-yaml-desktop-en.png)
 
 ![managed-agent-yaml-mobile-fr](managed-agent-yaml-mobile-fr.png)
-

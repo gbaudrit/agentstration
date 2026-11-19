@@ -7,4 +7,3 @@ Create a real unpublished Flow-backed ToolDefinition through Identity, Configure
 ![tool-creation-review-desktop-en](tool-creation-review-desktop-en.png)
 
 ![tool-creation-review-mobile-fr](tool-creation-review-mobile-fr.png)
-

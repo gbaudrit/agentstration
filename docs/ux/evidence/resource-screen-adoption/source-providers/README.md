@@ -9,4 +9,3 @@ Creation against the real local Git extension, exact extension/contribution refe
 ![source-provider-overview-desktop-en](source-provider-overview-desktop-en.png)
 
 ![source-provider-overview-mobile-fr](source-provider-overview-mobile-fr.png)
-

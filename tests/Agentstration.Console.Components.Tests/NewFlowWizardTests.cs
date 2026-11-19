@@ -24,6 +24,7 @@ public sealed class NewFlowWizardTests
     [TestMethod]
     public async Task IncompleteStepsAreFreelyReachableAndFinalValidationReturnsToIdentityWithoutWriting()
     {
+        using var culture = new TestCultureScope("en-US");
         using var handler = new Handler(); using var context = Context(handler); var rendered = context.Render<NewFlow>();
         Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty, "Initial authorized defaults are not a user draft.");
         Assert.AreEqual("multi-agent-review", rendered.Find("[data-testid=flow-name]").GetAttribute("value"));
@@ -105,6 +106,7 @@ public sealed class NewFlowWizardTests
     [TestMethod]
     public async Task MissingScopeCannotDefaultToInstance()
     {
+        using var culture = new TestCultureScope("en-US");
         using var handler = new Handler(); using var context = Context(handler, noScope: true); var rendered = context.Render<NewFlow>();
         var wizard = rendered.FindComponent<CreationWizard>();
         await rendered.InvokeAsync(() => wizard.Instance.GoToStepAsync("review"));

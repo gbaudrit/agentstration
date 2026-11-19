@@ -13,4 +13,3 @@ Creation review using the original standard fields, plus the maintained create-a
 ![agent-review-desktop-en](agent-review-desktop-en.png)
 
 ![agent-review-mobile-fr](agent-review-mobile-fr.png)
-

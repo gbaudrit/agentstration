@@ -13,4 +13,3 @@ Real built-in provider overview and discovered Tools, including read-only activa
 ![tool-provider-tools-desktop-en](tool-provider-tools-desktop-en.png)
 
 ![tool-provider-tools-mobile-fr](tool-provider-tools-mobile-fr.png)
-

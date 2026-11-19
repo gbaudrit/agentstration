@@ -11,6 +11,7 @@ public sealed class CollectionPresentationTests
     [TestMethod]
     public async Task ViewSwitchPreservesIdentityAndInformationAndOmitsInapplicableState()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Context();
         RenderFragment<string> identity = item => builder => builder.AddContent(0, item);
         var cut = context.Render<CollectionView<string>>(parameters => parameters
@@ -61,6 +62,7 @@ public sealed class CollectionPresentationTests
     [TestMethod]
     public void StatusIncludesIconTextAndNeutralToneIndependentlyOfGovernance()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Context();
         var status = context.Render<StatusBadge>(parameters => parameters
             .Add(value => value.Text, "Unknown")

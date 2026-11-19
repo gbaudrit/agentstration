@@ -21,6 +21,7 @@ public sealed class SchemaConsoleTests
     [TestMethod]
     public void LibraryShowsScopeNamespaceAndFormatForDrafts()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]));
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Schemas>();

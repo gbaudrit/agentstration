@@ -12,6 +12,7 @@ public sealed class CollectionScopeTests
     [TestMethod]
     public void WorkplaceOwnerNamesRequireTheExactAuthorizedWorkspaceAndFollowContextChanges()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");

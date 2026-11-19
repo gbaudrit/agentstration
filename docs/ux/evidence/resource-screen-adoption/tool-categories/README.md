@@ -15,4 +15,3 @@ Creation with incomplete navigation, exact namespace and owner, retained Tool se
 ![category-review-desktop-en](category-review-desktop-en.png)
 
 ![category-review-mobile-fr](category-review-mobile-fr.png)
-

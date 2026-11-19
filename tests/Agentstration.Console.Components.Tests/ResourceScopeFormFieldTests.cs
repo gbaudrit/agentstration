@@ -13,6 +13,7 @@ public sealed class ResourceScopeFormFieldTests
     [TestMethod]
     public void CompactBadgeKeepsScopeAsInlineMetadata()
     {
+        using var culture = new TestCultureScope("en-US");
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
