@@ -764,17 +764,17 @@
     {
       "id": "tool-providers-tool-provider-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
-      "line": 11,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/providers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolProviderResource",
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Type",
         "Tools",
@@ -843,6 +843,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "47554d80b254a4798ab7b39759c476e41db2a92e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local technical/display-name search; identity-associated discovery-status filter, type/enabled column filters, advanced exact tool-count column filter and additional namespace filter. Exact totals and local 20/50/100 paging; no extra reads.",
+        "navigation": "Legitimate Tool-family destinations and owner-qualified resource links retain context.",
+        "states": "Compatible refresh retains rows and view. Superseded/foreign-context responses are rejected; context replacement and denied access clear caches. Unknown discovery statuses remain neutral.",
+        "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
+        "validation": "ToolProviderCollectionTests; current deterministic desktop/mobile smoke, source proof and limits in list-layout-adoption.md."
       }
     },
     {

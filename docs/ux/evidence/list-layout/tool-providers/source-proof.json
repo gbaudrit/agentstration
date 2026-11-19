@@ -1,0 +1,18 @@
+{
+  "baseCommit": "4d4ecc16a33411c49a7b017f764975eb0ef5ae37",
+  "synchronizedThrough": "c545af2703676b760feabaf0fe62bdec4cfe4e17",
+  "synchronizationNotes": "Incoming c545af27 changes Web test project and YAML layout assertions only; no production input to these captures changed.",
+  "route": "/tools/providers",
+  "host": "Real Development Agentstration.Web, deterministic AI, isolated SQLite, disposable admin/admin fixture",
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor": "8b31319b368f6e02fb3d59eaebd755fccc39084d",
+    "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor.cs": "033feee34fd088ceeaf90eac33aa2e1d59569e80",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolProvidersStrings.resx": "5f59649ff5a9f6f6e6d3a27659ad882dc7aedeb7",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolProvidersStrings.fr-FR.resx": "849ec4b1062f76693a48d13a79ce6493aee9ed0c"
+  }
+}
