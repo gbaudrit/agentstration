@@ -5132,17 +5132,17 @@
     {
       "id": "tools-tool-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
-      "line": 24,
+      "line": 11,
       "host": "console",
       "routes": [
         "/tools"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolResource",
       "identityLabel": "Tool",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Provider",
         "Enabled"
@@ -5210,6 +5210,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "d6cf1529c822db00738620e86b193f489ba288da"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Tools and Providers arrays with one shared optional Extension inventory request. Local existing name/namespace/external-ID/displayed-provider search, availability/enabled and additional namespace/exact-scope filters; exact totals and local 20/50/100 pages. No provenance filter based on optional inventory.",
+        "identity": "Preserve exact Tool navigation including operational Workspace handling and exact Provider/Extension matching by name, namespace and scope. Extension version and recorded origin version remain separately labelled.",
+        "states": "Atomic successful catalog/enrichment replacement, retained failed refresh and successful shrink, authorization clearing, cancellation and stale-context rejection; context includes physical Workspace. Optional inventory errors do not hide primary Tools.",
+        "actions": "Preserve legitimate Tool-family navigation; remove redundant Details-only menu. Obsolete local responsive table CSS removed; meaningful provenance styling retained.",
+        "validation": "ToolCollectionTests plus maintained ToolCatalogTests and ExtensionsConsoleTests.ToolCatalog; desktop/mobile populated governed-fixture smoke recorded in ledger."
       }
     },
     {

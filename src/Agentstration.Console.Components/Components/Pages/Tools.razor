@@ -1,60 +1,55 @@
 @page "/tools"
+@implements IDisposable
 @inject IToolsClient Client
-@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> ExtensionLocalizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tools">
-    <Actions><a class="button-secondary" href="/tools/providers">@T("Providers")</a><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="/tools">@T("Catalog")</a><a href="/tools/sets">@T("ToolSets")</a><a href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <ResourceToolbar Label="@Shared["Filters"]">
-        <SearchBox Value="@search" ValueChanged="SearchChanged" />
-        <FormField Label="@T("Availability")"><ClearableSelect TValue="string" Value="@availability" ValueChanged="AvailabilityChanged" ValueExpression="() => availability"><option value="">@Shared["All"]</option><option value="available">@T("Available")</option><option value="unavailable">@T("Unavailable")</option></ClearableSelect></FormField>
-        <span role="status">@Shared["LoadedResults", tools.Count]</span>
-    </ResourceToolbar>
-    @if (FilteredTools.Count == 0) { <EmptyState Title="@Shared["NoMatches"]" Message="@Shared["NoMatchesHelp"]" /> }
-    <div class="tool-catalog-grid"><CollectionView TItem="ToolResource" Items="PageTools" InformationLabels="@(new string[] { T("Provider"), T("Enabled") })" IdentityLabel="@T("Tool")" StateLabel="@T("Availability")">
-        <Identity Context="tool">
-<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="tool">
-            <CollectionValue Label="@T("Provider")">
-            @if (ManagingExtension(tool) is { } extension)
-            {
-                <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
-            }
-            else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
-            </CollectionValue>
-            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
-        </Information>
-        <Actions Context="tool">
-<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></CollectionActions></Actions>
-    </CollectionView></div>
-    <CollectionPager Page="@(page)" Total="@FilteredTools.Count" HasMore="@(page * 20 < FilteredTools.Count)" PageChanged="value => page = value" />
-}
+<ResourceCollectionTemplate TItem="ToolResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-tools"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Actions><a class="button-secondary" href="@Navigate("/tools/providers")">@T("Providers")</a></Actions>
+    <Navigation><ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs></Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private string search = string.Empty, availability = string.Empty;
-    private int page = 1;
-    private IReadOnlyList<ToolResource> FilteredTools => tools.Where(tool =>
-        (string.IsNullOrWhiteSpace(search) || new[] { tool.Name, tool.Namespace.Value, tool.Definition.DisplayName, tool.Definition.ExternalId, ProviderDisplayName(tool) }.Any(value => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))
-        && (string.IsNullOrEmpty(availability) || (tool.Definition.Discovery?.Available == true) == (availability == "available"))).ToArray();
-    private IReadOnlyList<ToolResource> PageTools => FilteredTools.Skip((page - 1) * 20).Take(20).ToArray();
-    private void SearchChanged(string value) { search = value; page = 1; }
-    private void AvailabilityChanged(string value) { availability = value; page = 1; }
-    private IReadOnlyList<ToolResource> tools = []; private IReadOnlyList<ToolProviderResource> providers = []; private IReadOnlyList<ExtensionInventoryItemResponse> extensions = []; private bool loading = true; private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); page = Math.Clamp(page, 1, Math.Max(1, (FilteredTools.Count + 19) / 20)); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private CollectionColumn<ToolResource> IdentityColumn => new("identity", T("Tool"), tool => @<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench">
+        <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("availability", T("Availability"), CollectionFilterKind.Choice) { Options = [new("available", T("Available")), new("unavailable", T("Unavailable"))] }]
+    };
+    private IReadOnlyList<CollectionColumn<ToolResource>> Columns =>
+    [
+        new("provider", T("Provider"), tool => @<text>@if (ManagingExtension(tool) is { } extension) {
+            <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@ExtensionLocalizer["ExtensionVersion"]: @extension.Version</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div>
+            @if (tool.Governance.Origin.Version is { } originVersion) { <small>@T("OriginVersion"): @originVersion</small> }</div>
+        } else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }</text>),
+        new("enabled", T("Enabled"), tool => @<span>@BooleanLabel(tool.Definition.Enabled)</span>)
+        {
+            Filters = [new("enabled", T("Enabled"), CollectionFilterKind.Choice) { Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))] }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(tool => tool.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        },
+        new("scope", ExtensionLocalizer["Scope"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(tool => tool.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
     private string ProviderDisplayName(ToolResource tool)
     {
         return ManagingExtension(tool)?.DisplayName ?? providers.FirstOrDefault(value =>

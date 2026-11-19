@@ -53,7 +53,8 @@ public sealed class ExtensionsConsoleTests
     public async Task ToolCatalogRefreshKeepsAFilteredPageReadableAfterResourcesAreRemoved()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var tools = new BundleToolsClient
         {
@@ -63,15 +64,15 @@ public sealed class ExtensionsConsoleTests
         var rendered = context.Render<Agentstration.Web.Components.Pages.Tools>();
         rendered.WaitForAssertion(() => Assert.HasCount(20, rendered.FindAll("tbody tr")));
         rendered.Find("input[type='search']").Input("catalog");
-        await rendered.FindAll(".collection-pager button")[1].ClickAsync(new());
+        await rendered.FindAll(".collection-page-number")[1].ClickAsync(new());
         rendered.WaitForAssertion(() => Assert.HasCount(6, rendered.FindAll("tbody tr")));
         tools.Catalog = tools.Catalog.Take(4).ToArray();
-        await rendered.FindAll("header button").Single(button => button.TextContent.Trim() == "Refresh").ClickAsync(new());
+        await rendered.Find("[data-testid=resource-tools-refresh]").ClickAsync(new());
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(4, rendered.FindAll("tbody tr"));
             Assert.AreEqual("catalog", rendered.Find("input[type='search']").GetAttribute("value"));
-            Assert.IsTrue(rendered.Find(".collection-pager button").HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll(".collection-page-number"));
         });
     }
 
@@ -512,8 +513,9 @@ public sealed class ExtensionsConsoleTests
     public void ToolCatalogLinksReadableExtensionWithoutDisplayingPairingIdentity(string cultureName)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new BundleExtensionsClient());
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
@@ -534,7 +536,7 @@ public sealed class ExtensionsConsoleTests
                 Assert.IsNotNull(owner.QuerySelector(".resource-scope-badge"));
             }
             StringAssert.Contains(rendered.Find("a[href*='/tools/paired-crawl4ai.web.crawl']").GetAttribute("href")!, "context=%2Finstance");
-            Assert.IsFalse(rendered.Find(".tool-catalog-grid").TextContent.Contains('→'));
+            Assert.IsFalse(rendered.Find("[data-testid=resource-tools]").TextContent.Contains('→'));
         });
     }
 

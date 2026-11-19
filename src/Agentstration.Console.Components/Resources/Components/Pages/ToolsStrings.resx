@@ -167,4 +167,5 @@
   <data name="PublicationVersionInvalid" xml:space="preserve"><value>Enter a version in major.minor.patch format.</value></data>
   <data name="SchemaReferences" xml:space="preserve"><value>Shared schema references</value></data>
   <data name="InputEnvelope" xml:space="preserve"><value>Input envelope</value></data>
+  <data name="OriginVersion"><value>Origin version</value></data>
 </root>

@@ -33,6 +33,8 @@ Each screen is completed, checked, committed and published before the next start
 
 | Triggers | Existing complete operational-Workspace array; local name/target search, enabled/schedule/outcome and advanced target/namespace/definition-scope filters, exact totals and 20/50/100 pages. Existing metrics describe the complete authorized response. | Template adopted; exact definition-scope Trigger/Flow links, chronological sort, badges and permission-gated creation retained. Six component cases pass, including physical Workspace change under unchanged logical scope. Warning-free Web/Workplace builds, full targeted format, two catalog assertions and real 25-disabled-Trigger desktop/mobile smoke pass. Existing desktop operational Trigger isolation journey passes; [captures and source proof](evidence/list-layout/triggers/README.md). No scheduler execution claimed by the metadata smoke. Full lanes and #1242 remain deferred. |
 
+| Tools | Existing complete authorized Tools/Providers arrays and optional shared Extension inventory. Existing name/namespace/external-ID/displayed-provider search, availability/enabled and additional namespace/exact-scope filters; exact totals and local 20/50/100 pages. No optional-provenance filter. | Template adopted; qualified Tool links including operational Workspace behavior and exact Extension matching retained. Legitimate family navigation and provenance styling preserved; obsolete mobile-table CSS and Details-only menu removed. Extension/origin versions separately labelled. Six new plus four maintained cases, warning-free Web/Workplace/fixture builds, full targeted format, two catalog assertions and real 25-published-relay-Tool desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/tools/README.md). No Tool invocation claimed. Full lanes and #1242 remain deferred. |
+
 ## Remaining top-level Console list adapters
 
 This source inventory identifies concrete top-level list adapters still outside the new page composition. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
@@ -73,7 +75,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `ToolDefinitions.razor` | `/tools/definitions` | Adopted in this continuation |
 | `ToolProviders.razor` | `/tools/providers` | Adopted in this continuation |
 | `ToolSets.razor` | `/tools/sets` | Adopted in this continuation |
-| `Tools.razor` | `/tools` | Remaining; requires individual contract review |
+| `Tools.razor` | `/tools` | Adopted |
 | `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Remaining; requires individual contract review |
 | `Triggers.razor` | `/triggers` | Adopted |
 | `Vaults.razor` | `/vaults` | Adopted |

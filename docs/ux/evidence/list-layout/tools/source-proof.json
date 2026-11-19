@@ -1,0 +1,20 @@
+{
+  "baseCommit": "6857117bb119b8f24b78e66c278e710c63eb3620",
+  "route": "/tools",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Tools.razor": "727f473213e496a0133d312b31a7649fee7200af",
+    "src/Agentstration.Console.Components/Components/Pages/Tools.razor.cs": "50fb011afe1a161c4ceab2afb3ef35c8c56fdfe1",
+    "src/Agentstration.Console.Components/Components/Pages/Tools.razor.css": "5692414c1cd6d204e28f0021f3530b1c5c8747b6",
+    "src/Agentstration.Tools.Api/Api/ToolProviderEndpoints.cs": "201e5515995091498e7a149078ef84772d8265a9",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png",
+    "provenance-desktop-en.png",
+    "provenance-mobile-fr.png"
+  ],
+  "synchronizedWith": "4c51b8a7",
+  "synchronizationReview": "Incoming Model Provider details/wizard/API validation changes do not modify Tools contracts, list adapters or shared collection composition. No additional Tools behavioral rerun justified."
+}
