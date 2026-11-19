@@ -3427,17 +3427,17 @@
     {
       "id": "tool-categories-tool-category-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/categories"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolCategoryResource",
       "identityLabel": "Category",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "DescriptionColumn",
         "Members"
@@ -3503,6 +3503,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ceca225cc6897c7f406fef633db9914685e41550"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local technical/display-name and description search; exact member-count column filter and additional namespace filter; exact totals and local 20/50/100 paging. No extra reads.",
+        "navigation": "Existing legitimate Tool catalog, ToolSets, categories, definitions and providers destinations retained with context.",
+        "states": "Retained results and selected view during refresh; page shrink clamping; request revision guards; Principal/scope replacement and access denial clear cached results.",
+        "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
+        "validation": "ToolCategoryCollectionTests; deterministic desktop/mobile smoke and limits recorded in list-layout-adoption.md."
       }
     },
     {
