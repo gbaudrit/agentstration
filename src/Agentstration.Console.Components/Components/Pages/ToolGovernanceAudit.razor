@@ -223,7 +223,16 @@ else
         catch (Exception exception) when (exception is AgentstrationApiException or ArgumentException)
         {
             if (request != loadVersion) return;
-            if (!append) records.Clear();
+            if (!append || exception is AgentstrationApiException
+                {
+                    StatusCode: System.Net.HttpStatusCode.Unauthorized
+                        or System.Net.HttpStatusCode.Forbidden
+                        or System.Net.HttpStatusCode.NotFound
+                })
+            {
+                records.Clear();
+                nextSequence = null;
+            }
             error = exception.Message;
         }
         finally { if (request == loadVersion) loading = false; }
@@ -247,6 +256,7 @@ else
 
     public void Dispose()
     {
+        loadVersion++;
         cancellation.Cancel();
         cancellation.Dispose();
     }

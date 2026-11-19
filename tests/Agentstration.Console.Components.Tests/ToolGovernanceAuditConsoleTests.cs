@@ -141,6 +141,35 @@ public sealed class ToolGovernanceAuditConsoleTests
         Assert.DoesNotContain("first-run", rendered.Find(".governance-record").TextContent);
     }
 
+    [TestMethod]
+    [DataRow(HttpStatusCode.Unauthorized)]
+    [DataRow(HttpStatusCode.Forbidden)]
+    [DataRow(HttpStatusCode.NotFound)]
+    public void LosingTheAuditDuringContinuationClearsRetainedArgumentsAndCursor(HttpStatusCode status)
+    {
+        using var context = AuditContext(); context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeAuditClient("private retained invocation fixture", nextSequence: 4); context.Services.AddSingleton<IToolGovernanceAuditClient>(client);
+        var cut = context.Render<ToolGovernanceAudit>(p => p.Add(c => c.Owner, "runtime").Add(c => c.RunId, "run-1"));
+        Assert.Contains("private retained invocation fixture", cut.Find(".governance-invocation").TextContent);
+        client.Error = new AgentstrationApiException("Audit unavailable", "fixture", status);
+        cut.Find(".load-more button").Click();
+        Assert.IsEmpty(cut.FindAll(".governance-record, .load-more"));
+        Assert.DoesNotContain("private retained invocation fixture", cut.Markup); Assert.AreEqual(2, client.ReadCount);
+    }
+
+    [TestMethod]
+    public void RecoverableContinuationFailureRetainsRecordsAndRetriesTheRealCursor()
+    {
+        using var context = AuditContext(); context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeAuditClient(nextSequence: 4); context.Services.AddSingleton<IToolGovernanceAuditClient>(client);
+        var cut = context.Render<ToolGovernanceAudit>(p => p.Add(c => c.Owner, "flow").Add(c => c.RunId, "run-1"));
+        client.Error = new AgentstrationApiException("Try again", "fixture", HttpStatusCode.ServiceUnavailable);
+        cut.Find(".load-more button").Click(); Assert.HasCount(1, cut.FindAll(".governance-record"));
+        Assert.AreEqual(4L, client.AfterSequence); Assert.IsNotNull(cut.Find(".load-more button"));
+        client.Error = null; cut.Find(".load-more button").Click();
+        Assert.HasCount(2, cut.FindAll(".governance-record")); Assert.AreEqual(4L, client.AfterSequence); Assert.AreEqual(50, client.Limit);
+    }
+
     private static ToolGovernanceAuditPage AuditPage(string runId) => new([new ToolGovernanceAuditRecord
     {
         OwnerKind = ToolExecutionOwnerKind.FlowRun, RunId = runId, Sequence = 1, Timestamp = DateTimeOffset.UnixEpoch,
@@ -180,6 +209,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     private sealed class FakeAuditClient(string? arguments = null, long? nextSequence = null) : IToolGovernanceAuditClient
     {
         public int ReadCount { get; private set; }
+        public Exception? Error { get; set; }
         public long AfterSequence { get; private set; }
         public int Limit { get; private set; }
         public ToolGovernanceAuditFilters? LastFilters { get; private set; }
@@ -193,6 +223,7 @@ public sealed class ToolGovernanceAuditConsoleTests
             CancellationToken cancellationToken)
         {
             ReadCount++; AfterSequence = afterSequence; Limit = limit; LastFilters = filters;
+            if (Error is { } error) return Task.FromException<ToolGovernanceAuditPage>(error);
             return Task.FromResult(new ToolGovernanceAuditPage(
                 [new ToolGovernanceAuditRecord
                 {

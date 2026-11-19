@@ -102,3 +102,5 @@ The new-foundation Tool Provider pass, retained draft activation, qualified fami
 The new-foundation Tool Set inspection pass, preserved provenance/policy behavior and observed backend deletion-scope limit are recorded in the [Tool Set verification report](evidence/resource-screen-foundation/tool-sets/README.md).
 
 The new-foundation catalog Tool pass, retained execution contract/parser state and independent permissions are recorded in the [Tool verification report](evidence/resource-screen-foundation/tools/README.md).
+
+Tool governance audit is explicitly reviewed as an execution-event collection, with privacy clearing and targeted desktop/touch verification: [contract justification and evidence](evidence/resource-screen-foundation/tool-governance-audit/README.md).
