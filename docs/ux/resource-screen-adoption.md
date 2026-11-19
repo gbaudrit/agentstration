@@ -25,7 +25,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ModelDetails.razor | `/models/{Name}` | Pending review and migration |
 | ModelProfileEditor.razor | `/modelprofiles/new`, `/modelprofiles/{Name}` | Pending review and migration |
 | ModelProviderDetails.razor | `/modelproviders/new`, `/modelproviders/{Name}` | Pending review and migration |
-| NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Implemented; 14 managed-Agent/Pack component cases and source/catalog checks pass, including exact runtime owner, retained policy drafts and original read-only bindings. Fresh browser checks remain pending |
+| NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Implemented; 14 managed-Agent/Pack component cases and source/catalog checks pass, including exact runtime owner, retained policy drafts and original read-only bindings. 2 real desktop/mobile probes pass; [real captures](evidence/resource-screen-adoption/managed-agents/README.md). Final full validation pending |
 | NewFlow.razor | `/flows/new` | Pending review and migration |
 | NewToolDefinition.razor | `/tools/definitions/new` | Pending review and migration |
 | OrganizationMemberDetails.razor | `/settings/organization/members/{UserId:guid}` | Pending review and migration |
