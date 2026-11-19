@@ -2,7 +2,7 @@
 
 ## Status
 
-Open — 2026-11-19
+Prevented — 2026-11-19
 
 ## References
 
@@ -68,5 +68,13 @@ desktop and mobile while readiness is false.
 
 ## Validation
 
-Pending targeted HTTP, browser and repository checks. No completed results are
-claimed at this stage.
+- Full solution restore and Release build passed with no warnings or errors.
+- Both HTTP regression cases passed (pending and failed Bootstrap).
+- Fast functional lane: 1,561 passed, no failures or skips.
+- French desktop (1440px) and mobile (390px) browser checks passed during failed
+  Bootstrap: all stylesheets return HTTP 200, the logo is 218px wide, the card is
+  respectively 440px/390px wide, and neither viewport has horizontal overflow.
+- Local login succeeds while execution routes and readiness remain HTTP 503.
+- Integration functional lane: 1,571 passed, 28 optional skipped, no failures
+  (1,599 total).
+- Changed C# files passed whitespace formatting verification.
