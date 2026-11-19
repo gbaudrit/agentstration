@@ -27,7 +27,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ModelProviderDetails.razor | `/modelproviders/new`, `/modelproviders/{Name}` | Pending review and migration |
 | NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Implemented; 14 managed-Agent/Pack component cases and source/catalog checks pass, including exact runtime owner, retained policy drafts and original read-only bindings. 2 real desktop/mobile probes pass; [real captures](evidence/resource-screen-adoption/managed-agents/README.md). Final full validation pending |
 | NewFlow.razor | `/flows/new` | Pending review and migration |
-| NewToolDefinition.razor | `/tools/definitions/new` | Pending review and migration |
+| NewToolDefinition.razor | `/tools/definitions/new` | Implemented: shared 3-step wizard with unrestricted incomplete navigation, retained family Flow/relay editors, explicit final validation and draft-only creation. Exact-owner source preselection avoids homonyms; binary relay options use switches. 60 Tool creation/definition/relay/detail component cases and source/catalog checks pass; browser and final full validation pending |
 | OrganizationMemberDetails.razor | `/settings/organization/members/{UserId:guid}` | Pending review and migration |
 | PackComposer.razor | `/pack-projects/new` | Pending review and migration |
 | PackProjectDetails.razor | `/pack-projects/{ProjectId:guid}` | Pending review and migration |

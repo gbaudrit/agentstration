@@ -117,7 +117,7 @@ export class SchemaContractsPage {
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).fill('Contract Tool');
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).blur();
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateFlowKind).click();
-    await this.page.getByTestId(TestIds.schemaContracts.toolCreateContinue).click();
+    await this.page.getByTestId(TestIds.creationWizard.next).click();
     const flow = this.page.getByTestId(TestIds.schemaContracts.toolFlow);
     const flowValue = await flow.locator('option').filter({ hasText: `Contract flow ${fixtures.flowName}` }).getAttribute('value');
     if (!flowValue) throw new Error(`The ToolDefinition editor did not list Flow '${fixtures.flowName}'.`);

@@ -198,7 +198,7 @@ else
     {
         get
         {
-            var url = $"/tools/definitions/new?toolKind=relay&source={Uri.EscapeDataString(ToolResourceIdentity.CatalogId(tool!.Namespace, tool.Name))}";
+            var url = $"/tools/definitions/new?toolKind=relay&source={Uri.EscapeDataString(ToolResourceIdentity.CatalogId(tool!.Namespace, tool.Name))}&sourceScopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}";
             return (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(url) ?? url;
         }
     }

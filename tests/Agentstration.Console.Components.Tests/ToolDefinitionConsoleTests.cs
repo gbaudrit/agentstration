@@ -62,7 +62,7 @@ public sealed class ToolDefinitionConsoleTests
         context.Services.AddSingleton(new ConsoleContextState(creationContext));
         var rendered = context.Render<NewToolDefinition>();
         rendered.Find("[data-testid='tool-definition-display-name']").Change("Contract Tool");
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        rendered.Find("[data-testid='creation-wizard-next']").Click();
         rendered.WaitForElement("[data-testid='tool-definition-flow']").Change("/workspaces/11111111-1111-1111-1111-111111111111|default|contract-flow");
 
         rendered.WaitForAssertion(() =>

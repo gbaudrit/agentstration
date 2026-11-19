@@ -336,7 +336,6 @@ export const TestIds = {
     toolCreateForm: 'tool-definition-create',
     toolCreateDisplayName: 'tool-definition-display-name',
     toolCreateFlowKind: 'tool-definition-kind-flow',
-    toolCreateContinue: 'tool-definition-continue',
     agentTab: 'agent-contracts-tab',
     agentSection: 'agent-contracts-section',
     agentInputTab: 'agent-contract-input-tab',

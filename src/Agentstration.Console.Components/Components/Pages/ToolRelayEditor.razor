@@ -72,8 +72,8 @@ else
                 <FormField Label="@T("CreationSourceTool")"><ClearableSelect TValue="string" data-testid="relay-source-tool" Value="@SourceGroup" ValueExpression="@(() => SourceGroup)" ValueChanged="value => SourceGroupChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanManage)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</ClearableSelect></FormField>
                 <FormField Label="@T("SourceToolVersion")"><ClearableSelect TValue="string" data-testid="relay-source" Value="@SelectedKey" ValueExpression="@(() => SelectedKey)" ValueChanged="value => SourceChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanManage || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</ClearableSelect></FormField>
             }
-            <label class="relay-toggle"><FormCheckbox @bind-Value="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
-            <label class="relay-toggle"><FormCheckbox @bind-Value="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
             <FormField Label="@T("TimeoutSeconds")"><ClearableNumber TValue="int" min="1" max="900" @bind-Value="timeout" disabled="@(!CanManage)" /></FormField>
             @if (CreationIdentity is null)
             {
@@ -132,7 +132,7 @@ else
         }
         @if (CreationIdentity is not null)
         {
-            @if (CreationActive)
+            @if (CreationActive && ShowCreationActions)
             {
             <div class="tool-create-actions"><span><strong>@T("CreationReady")</strong><small>@T("CreationDraftHelp")</small></span><div><button type="button" class="button-secondary" data-testid="tool-definition-back" disabled="@busy" @onclick="() => OnBack.InvokeAsync()">@T("CreationBack")</button><button type="button" class="button-primary" data-testid="tool-definition-create-draft" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="CreateDraftAsync">@T(busy ? "CreationCreating" : "CreationCreateDraft")</button></div></div>
             }
@@ -158,6 +158,22 @@ else
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? NamespaceQuery { get; set; }
     [Parameter] public string? Source { get; set; }
+    [Parameter] public ResourceScopeRef? SourceScopeRef { get; set; }
+    [Parameter] public bool ShowCreationActions { get; set; } = true;
+    [Parameter] public EventCallback<bool> CreationCompletenessChanged { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    private bool? reportedComplete, reportedDraft;
+    private string? creationBaseline;
+    public bool CreationComplete => !loading && !busy && CanManage && selected is not null && !HasInvalidBindings && timeout is >= 1 and <= 900;
+    private string CreationFingerprint => JsonSerializer.Serialize(new { selected = SelectedKey, enabled, requiresApproval, timeout, rows = rows.Select(r => new { r.Path, r.Kind, r.Resource, r.Literal }) });
+    public RenderFragment CreationReview => @<dl class="resource-details">
+        <dt>@T("CreationSourceTool")</dt><dd>@if (selected is not null) { <ResourceScopeBadge ScopeRef="selected.ScopeRef" /><code>@selected.Namespace/@selected.Name</code> }</dd>
+        <dt>@T("SourceToolVersion")</dt><dd>@SourceVersion(selected)</dd>
+        <dt>@T("Enabled")</dt><dd>@T(enabled ? "Yes" : "No")</dd>
+        <dt>@T("RequiresApproval")</dt><dd>@T(requiresApproval ? "Yes" : "No")</dd>
+        <dt>@T("TimeoutSeconds")</dt><dd>@timeout</dd>
+        <dt>@T("FixedInputBindings")</dt><dd><pre>@DraftBindings</pre></dd>
+    </dl>;
     [Parameter] public ToolDefinitionCreationIdentity? CreationIdentity { get; set; }
     [Parameter] public bool CreationActive { get; set; } = true;
     [Parameter] public EventCallback OnBack { get; set; }
@@ -189,11 +205,14 @@ else
     private string SelectedKey => selected is null ? "" : ToolKey(selected);
     private string SourceGroup => selected is null ? pendingSourceGroup ?? "" : SourceGroupKey(selected);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        interactive = true;
-        StateHasChanged();
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        if (CreationIdentity is null) return;
+        var complete = CreationComplete;
+        var dirty = !loading && creationBaseline is not null && (CreationFingerprint != creationBaseline || HasInvalidBindings);
+        if (reportedComplete != complete) { reportedComplete = complete; await CreationCompletenessChanged.InvokeAsync(complete); }
+        if (reportedDraft != dirty) { reportedDraft = dirty; await DraftChanged.InvokeAsync(dirty); }
     }
 
     protected override async Task OnInitializedAsync()
@@ -220,7 +239,8 @@ else
             }
             else if (Source is not null)
             {
-                selected = tools.FirstOrDefault(tool => ToolResourceIdentity.CatalogId(tool.Namespace, tool.Name) == Source);
+                var candidates = tools.Where(tool => ToolResourceIdentity.CatalogId(tool.Namespace, tool.Name) == Source && (SourceScopeRef is null || tool.ScopeRef == SourceScopeRef)).ToArray();
+                selected = candidates.Length == 1 ? candidates[0] : null;
                 BuildRows([]);
             }
             if (OwnerScope is { } owner)
@@ -231,7 +251,7 @@ else
             if (selected?.Definition.RequiresApproval == true) requiresApproval = true;
         }
         catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; Preview(); }
+        finally { loading = false; Preview(); creationBaseline = CreationFingerprint; }
     }
 
     private void SourceChanged(ChangeEventArgs args)
