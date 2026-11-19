@@ -71,7 +71,7 @@ export class RuntimeWorkerObservabilityPage {
 
   public workerRow(workerId: string): Locator {
     return this.page.getByTestId(TestIds.runtimeWorkerObservability.workerRow)
-      .filter({ has: this.page.locator(`a[href="/settings/runtime-workers/${workerId}"]`) });
+      .and(this.page.locator(`[data-worker-id="${workerId}"]`));
   }
 
   public async expectPresence(workerId: string, presence: 'Online' | 'Stale' | 'Offline' | 'Unknown'): Promise<string | null> {

@@ -2543,27 +2543,23 @@
     {
       "id": "deployments-agent-instance-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
-      "line": 23,
+      "line": 11,
       "host": "console",
       "routes": [
         "/agent-instances",
         "/deployments"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AgentInstanceResponse",
       "identityLabel": "AgentInstance",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Agent",
         "Run",
-        "Execution",
         "Worker",
-        "RuntimeProfile",
-        "Started",
-        "LastActivity",
-        "Lease"
+        "ExecutionTiming"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "scopeMeaning": "Existing ExecutionScopeRef; no definition-owner lookup.",
@@ -2631,6 +2627,16 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "e86b3944fd8323125f833602b7496d4d570b4e8e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing exact-scope active-instance snapshot. RuntimeObservabilityQueryService examines at most 500 assigned records; the endpoint exposes no skip/filter/continuation contract. No search, filter, total, direct navigation or local pagination is advertised. Shared count explicitly describes loaded resources; localized snapshot guidance and observed-empty wording disclose the bound.",
+        "identity": "Actual instance identity and execution-scope badge; existing exact Run/Flow Run scope links, qualified Agent route, Worker UUID destination and navigation context retained. No Agent ownership is inferred from execution scope. Generation/revision, participants/turns, Worker/session, runtime profile and timing/lease facts preserved.",
+        "states": "Retained compatible snapshot/view; stale/context-replaced responses and runs/read denial guarded. Existing list/empty/row test IDs retained.",
+        "actions": "Redundant Open-only menu removed; no enrollment, creation, deployment or execution command introduced.",
+        "validation": "AgentInstanceCollectionTests and maintained runtime observability regression; real active Worker/Agent instance desktop/mobile smoke. Evidence and 500-assignment observation limit in list-layout-adoption.md.",
+        "columns": "Four shared information declarations group Agent/generation/profile/revision, Run/kind/participant/turns, Worker/session and start/activity/lease timing. No fact is discarded and no local responsive CSS is introduced."
       }
     },
     {

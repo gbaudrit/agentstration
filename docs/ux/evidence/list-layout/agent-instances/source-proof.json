@@ -1,0 +1,22 @@
+{
+  "baseCommit": "a56227b020addca7835711540dd7fcdbf04d462f",
+  "routes": [
+    "/agent-instances",
+    "/deployments"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Deployments.razor": "99f09c36dde906a363ccd257ecd79d3c1398ef53",
+    "src/Agentstration.Console.Components/Components/Pages/Deployments.razor.cs": "ae2023eae82d597c5fca3ad58e1b1346ee3eb770",
+    "src/Agentstration.Infrastructure/Runtime/RuntimeObservabilityQueryService.cs": "e724a0d0541003face4e91c599be0855465dd5b9",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae",
+    "automation/playwright/src/pages/agent-instance-observability.page.ts": "259d6cb235bd02ceebc418dac8f07616532ab490",
+    "automation/playwright/src/pages/runtime-worker-observability.page.ts": "a85b318ca47828a3816666bfdd331277a7d330c1"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png",
+    "empty-desktop-en.png"
+  ],
+  "synchronizedWith": "4b07918189492bb20d380e88b09eb69cf3efc9da"
+}

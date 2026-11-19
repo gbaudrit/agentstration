@@ -1,4 +1,5 @@
 using System.Net;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -31,12 +32,13 @@ public sealed class RuntimeObservabilityConsoleTests
             ]
         });
 
+        context.WithResourceListContext(new() { Permissions = new HashSet<string> { AuthorizationPermissions.RunsRead } });
         var cut = context.Render<Deployments>();
 
         StringAssert.Contains(cut.Markup, "concierge");
         Assert.AreEqual("instance-1", cut.Find(".collection-identity .copyable-value code").TextContent);
-        Assert.AreEqual("Instance", cut.Find(".resource-scope-badge").TextContent);
-        Assert.IsNotNull(cut.Find(".collection-actions-menu"));
+        Assert.AreEqual("I", cut.Find(".resource-owner-icon .disclosure-trigger").TextContent.Trim());
+        Assert.IsEmpty(cut.FindAll(".collection-actions-menu"));
         Assert.AreEqual("/flow-runs/flowrun-1?scopeRef=%2Finstance", cut.Find(".collection-identity a").GetAttribute("href"));
         StringAssert.Contains(cut.Markup, "2 turn(s)");
         StringAssert.Contains(cut.Markup, $"/settings/runtime-workers/{workerId:D}");
