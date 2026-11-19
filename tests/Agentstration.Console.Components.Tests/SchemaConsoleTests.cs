@@ -22,7 +22,7 @@ public sealed class SchemaConsoleTests
     public void LibraryShowsScopeNamespaceAndFormatForDrafts()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)]));
+        using var context = Context(new SchemaClientStub([Schema(SchemaFormatIds.JsonSchema)])).WithResourceListContext();
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Schemas>();
 
@@ -33,7 +33,7 @@ public sealed class SchemaConsoleTests
             StringAssert.Contains(rendered.Markup, SchemaFormatIds.JsonSchema);
             StringAssert.Contains(rendered.Markup, Scope.Value);
             StringAssert.Contains(rendered.Find("[data-testid='schema-details-link']").GetAttribute("href"), "/schemas/contact");
-            Assert.HasCount(4, rendered.FindAll("[data-testid='schema-row'] td"));
+            Assert.HasCount(3, rendered.FindAll("[data-testid='schema-row'] td"));
             Assert.AreEqual("W", rendered.Find(".scope-letter").TextContent);
             Assert.AreEqual("Generation", rendered.Find(".collection-version-label").TextContent);
             Assert.AreEqual("2", rendered.Find(".collection-version code").TextContent);

@@ -4395,17 +4395,17 @@
     {
       "id": "schemas-schema-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
-      "line": 22,
+      "line": 11,
       "host": "console",
       "routes": [
         "/schemas"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SchemaResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Schema",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Format",
         "Dialect"
@@ -4476,6 +4476,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "73c84d39a78c40be6cbeac3e796cbdf1c102d772"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local name search, format column choice, advanced dialect text, exact scope and namespace substring filters. Exact totals and local 20/50/100 pages; existing namespace/name ordering retained.",
+        "identity": "Exact namespace/name/scope links preserve navigation; draft generation and scope/governance badges retained. Format identifiers and dialect URIs remain technical values.",
+        "states": "Retained compatible refresh rows/view, stable query, interactivity, context replacement, late response and denied-read guards.",
+        "actions": "Create requires resources/write; redundant Open-only menu removed.",
+        "validation": "SchemaCollectionTests and maintained SchemaConsoleTests library regression; deterministic populated desktop/mobile API smoke. See list-layout-adoption.md for evidence and limits."
       }
     },
     {
