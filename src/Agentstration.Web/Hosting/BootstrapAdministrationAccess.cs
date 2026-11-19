@@ -14,7 +14,7 @@ internal static class BootstrapAdministrationAccess
             .Any(prefix => path.StartsWithSegments(prefix));
 
     internal static bool IsLoginOrAsset(PathString path) =>
-        path == "/" || (path.Value?.StartsWith("/Agentstration.Web.", StringComparison.Ordinal) == true
+        path == "/" || path == "/auth.css" || path == "/resource-name-fields.js" || (path.Value?.StartsWith("/Agentstration.Web.", StringComparison.Ordinal) == true
             && path.Value.EndsWith(".styles.css", StringComparison.Ordinal)) || new[] { "/account", "/Account", "/auth", "/login", "/logout", "/_framework", "/_content", "/css", "/js", "/images", "/favicon.ico" }
             .Any(prefix => path.StartsWithSegments(prefix));
 }
