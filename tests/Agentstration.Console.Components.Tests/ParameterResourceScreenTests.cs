@@ -51,8 +51,8 @@ public sealed class ParameterResourceScreenTests
         cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll(".resource-identity-summary")));
         Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
         cut.Find("[data-testid=parameter-display-name]").Change("Draft parameter");
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
         Assert.Contains("Saved parameter", cut.Find(".resource-identity-summary").TextContent);
@@ -71,12 +71,95 @@ public sealed class ParameterResourceScreenTests
         Assert.AreEqual(1, client.Writes);
     }
 
+    [TestMethod]
+    public async Task InvalidHiddenIdentityRoutesBackBeforeAnyWriteAndUsesTheSharedState()
+    {
+        var client = new Client(); using var context = Context(client, false);
+        var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        cut.Find("[data-testid=parameter-display-name]").Change("");
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.Find("#parameter-resource-form").SubmitAsync();
+        Assert.AreEqual("definition/identity", navigation.CurrentPath);
+        Assert.AreEqual(0, client.Writes);
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionState, cut.FindComponent<ResourceDefinitionForm>().Instance.SectionState);
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionPresentations, cut.FindComponent<ResourceDefinitionForm>().Instance.Sections);
+        Assert.IsTrue(cut.FindComponent<ResourceIdentityEditor>().Instance.LabelsReadOnly);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RefreshKeepsAnInvalidVisitedDraftAndItsEtagUntilExplicitDiscard(bool discard)
+    {
+        var client = new Client(); using var context = Context(client, false);
+        var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        var pending = new TaskCompletionSource<ResourceSnapshot<ParameterResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.Loader = () => pending.Task;
+        var refresh = cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        cut.WaitForAssertion(() => Assert.AreEqual(ResourceLoadStatus.Refreshing, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status));
+        Assert.IsFalse(cut.Find("[data-testid=parameter-value]").HasAttribute("disabled"));
+        cut.Find("[data-testid=parameter-value-type]").Change(ParameterValueType.WholeNumber.ToString());
+        cut.Find("[data-testid=parameter-value]").Change("not-an-integer");
+        client.Current = client.Current with { Definition = client.Current.Definition with { DisplayName = "New server title" } };
+        await cut.InvokeAsync(() => pending.SetResult(new(client.Current, "\"external\"")));
+        await refresh;
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("not-an-integer", cut.Find("[data-testid=parameter-value]").GetAttribute("value"));
+        await cut.Find("#parameter-resource-form").SubmitAsync();
+        Assert.AreEqual(0, client.Writes);
+        Assert.IsNotNull(cut.Find(".validation-message"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.Contains("Saved parameter", cut.Find(".resource-identity-summary").TextContent);
+        if (discard) cut.Find(".unsaved-changes-bar button[type=button]").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=parameter-value]").Change("5");
+        await cut.Find("#parameter-resource-form").SubmitAsync();
+        Assert.AreEqual(discard ? "\"external\"" : "\"initial\"", client.LastEtag);
+        Assert.AreEqual(discard ? "New server title" : "Saved parameter", client.Current.Definition.DisplayName);
+    }
+
+    [TestMethod]
+    public async Task ConsultationKeepsStandardDefinitionButCannotSubmitWithoutWritePermission()
+    {
+        var client = new Client { CanWrite = false }; using var context = Context(client, false);
+        var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        Assert.IsTrue(cut.FindComponent<ResourceDefinitionForm>().Instance.ReadOnly);
+        Assert.IsNotNull(cut.Find(".resource-readonly-notice"));
+        Assert.IsEmpty(cut.FindAll("[data-testid=parameter-delete]"));
+        await cut.Find("#parameter-resource-form").SubmitAsync();
+        Assert.AreEqual(0, client.Writes);
+    }
+
+    [TestMethod]
+    public async Task RefreshCannotKeepThePrivateDraftWhenTheResourceWasReplaced()
+    {
+        var client = new Client(); using var context = Context(client, false);
+        var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=parameter-value]").Change("private pending value");
+        client.Current = client.Current with { Uid = Guid.NewGuid() };
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreEqual(ResourceLoadStatus.NotFound, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsEmpty(cut.FindAll("[data-testid=parameter-form], .unsaved-changes-bar"));
+        Assert.DoesNotContain("private pending value", cut.Markup);
+        Assert.AreEqual(0, client.Writes);
+    }
+
     private static BunitContext Context(Client client, bool create)
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var section in new[] { "overview", "definition/configuration", "definition/access" })
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "definition/use-policy", "access", "yaml" })
         {
             var target = "http://localhost/parameters/saved?scopeRef=%2Finstance#" + section;
             module.Setup<string>("navigate", i => i.Arguments[0] is string uri && uri.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(target);
@@ -84,13 +167,15 @@ public sealed class ParameterResourceScreenTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IParametersClient>(client);
         context.ComponentFactories.AddStub<DescendantUseGrantEditor>();
+        context.ComponentFactories.AddStub<ResourceScopeFormField>();
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(create ? "/parameters/new" : "/parameters/saved?scopeRef=%2Finstance");
         return context;
     }
 
     private sealed class Client : IParametersClient
     {
-        public ParameterResource Current { get; private set; } = new()
+        public ParameterResource Current { get; set; } = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ParameterResourceKinds.Parameter,
@@ -98,12 +183,14 @@ public sealed class ParameterResourceScreenTests
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new() { DisplayName = "Saved parameter", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("saved value") }
         };
+        public Func<Task<ResourceSnapshot<ParameterResource>>>? Loader { get; set; }
+        public bool CanWrite { get; set; } = true;
         public int Reads { get; private set; }
         public int Writes { get; private set; }
         public string? LastEtag { get; private set; }
         public Task<IReadOnlyList<ParameterResource>> GetParametersAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ParameterResource>>([Current]);
-        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true)]);
-        public Task<ResourceSnapshot<ParameterResource>> GetParameterAsync(string name, ResourceScopeRef scope, CancellationToken token) { Reads++; return Task.FromResult(new ResourceSnapshot<ParameterResource>(Current, "\"initial\"")); }
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", CanWrite)]);
+        public Task<ResourceSnapshot<ParameterResource>> GetParameterAsync(string name, ResourceScopeRef scope, CancellationToken token) { Reads++; return Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<ParameterResource>(Current, "\"initial\"")); }
         public Task<ParameterUsagesResponse> GetParameterUsagesAsync(string name, ResourceScopeRef scope, CancellationToken token) => Task.FromResult(new ParameterUsagesResponse([], 0));
         public Task<ResourceSnapshot<ParameterResource>> CreateParameterAsync(CreateParameterRequest request, CancellationToken token)
         {

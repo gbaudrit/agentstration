@@ -7,118 +7,147 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ParameterStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+@if (IsNew) { <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" /> }
 <PageTitle>@(IsNew ? T("CreateParameter") : $"{Name} · {T("Parameter")}") · Agentstration</PageTitle>
 @{
     RenderFragment feedback = @<div>
-        @if (!IsNew && selectedScope is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
         @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
-        @if (usages.Count > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usages.Count)</div> }
+        @if (newerResource is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+        @if (usageCount > 0) { <div class="form-alert form-alert-warning">@T("Referenced", usageCount)</div> }
     </div>;
+    var presentations = SectionPresentations;
 }
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (!IsNew && savedResource is null) { @feedback }
-else if (IsNew)
+@if (IsNew)
 {
-    <PageHeader Title="@T("CreateParameter")" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions><a class="button-secondary" href="/parameters">@T("Back")</a></Actions></PageHeader>
-    @feedback
-    <EditForm EditContext="FormContext" FormName="parameter-editor" class="resource-form" data-testid="parameter-form">
-        <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
-        <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
-        <fieldset class="resource-definition-fields" disabled="@busy"><CreationWizard @ref="wizard" Steps="Steps" Busy="busy" OnFinish="FinishAsync" FinishLabel="@T("Save")" FinishTestId="parameter-save" /></fieldset>
-    </EditForm>
+    <PageHeader Title="@T("CreateParameter")" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    @if (loading) { <LoadingState Message="@T("Loading")" /> }
+    else
+    {
+        @feedback
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="parameter-resource-form" FormName="parameter-editor"
+                                Busy="busy" InvalidInputChanged="value => invalidInput = value" data-testid="parameter-form">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard @ref="wizard" Steps="Steps" Busy="busy" OnFinish="FinishAsync" FinishLabel="@T("Save")" FinishTestId="parameter-save" />
+        </ResourceDefinitionForm>
+    }
 }
-else if (savedResource is not null)
+else
 {
-    <ResourceDetailsTemplate Name="@savedResource.Definition.DisplayName" ResourceType="@T("Parameter")" Domain="parameter" IconName="settings"
-                             TechnicalName="@savedResource.Name" Namespace="@savedResource.Namespace.Value" ScopeRef="savedResource.ScopeRef" Description="@savedResource.Definition.Description"
-                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection" Feedback="@feedback" HasDraft="@IsDirty" TestId="resource-parameter-editor">
-        <Metadata>@if (section == "definition/configuration") { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
-        <Actions>@if (CanManage) { <button type="button" class="button-danger" @onclick="RequestDelete" disabled="@busy" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="/parameters">@T("Back")</a></Actions>
-        <Content>
-            <div hidden="@(section != "overview")">
-                <ResourceIdentitySummary DisplayName="@savedResource.Definition.DisplayName" TechnicalName="@savedResource.Name" Namespace="@savedResource.Namespace.Value" Description="@savedResource.Definition.Description"><Scope><ResourceScopeBadge ScopeRef="savedResource.ScopeRef" /></Scope></ResourceIdentitySummary>
-                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">
-                    <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })">
-                        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
-                        <Information Context="entry"><CollectionValue Label="@T("Value")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-                    </CollectionView>
-                </FormSection>
-            </div>
-            <div hidden="@(!section.StartsWith("definition/", StringComparison.Ordinal))">
-                <EditForm EditContext="FormContext" OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmit" FormName="parameter-editor" id="parameter-resource-form" class="resource-form" data-testid="parameter-form">
-                    <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
-                    <fieldset class="resource-definition-fields" disabled="@(busy || !CanManage)">
-                        <div hidden="@(section != "definition/configuration")">@IdentityFields @ConfigurationFields</div>
-                        <div hidden="@(section != "definition/access")">@AccessFields</div>
-                    </fieldset>
-                </EditForm>
-            </div>
-            <div hidden="@(section != "usages")">@Usages</div>
-        </Content>
-        <DraftActions><button class="text-button" type="button" disabled="@busy" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="parameter-resource-form" class="button-primary" disabled="@busy" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button></DraftActions>
-    </ResourceDetailsTemplate>
+    <ConsoleResourceDetailsTemplate Resource="savedResource" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, Name!)"
+        Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Parameter")" Domain="parameter" IconName="settings" Description="@savedResource?.Definition.Description"
+        ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" HasDraft="IsDirty"
+        LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" Feedback="feedback" Busy="@(busy || refreshing)"
+        DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
+        DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" Yaml="@SavedYaml" TestId="resource-parameter-editor" SectionTestIdPrefix="parameter">
+        <OverviewMetrics><MetricCard Label="@T("Usages")" Value="@usageCount.ToString(System.Globalization.CultureInfo.CurrentCulture)" /></OverviewMetrics>
+        <OverviewConfiguration>
+            <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })">
+                <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
+                <Information Context="entry"><CollectionValue Label="@T("Value")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+            </CollectionView>
+        </OverviewConfiguration>
+        <DefinitionContent Context="path">
+            <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="parameter-resource-form" FormName="parameter-editor"
+                Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
+                OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-testid="parameter-form" />
+        </DefinitionContent>
+        <AdditionalContent Context="path">@Usages</AdditionalContent>
+        <Actions>@if (CanManage) { <button type="button" class="button-danger" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <DraftActions><button class="text-button" type="button" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="parameter-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteParameter")" Message="@T("DeleteMessage", Name ?? string.Empty)" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    private RenderFragment IdentityFields => @<FormSection Title="@T("Identity")"><ChildContent><FormGrid>
-        <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Parameter" IsNew="@IsNew" DisplayNameTestId="parameter-display-name" TechnicalNameTestId="parameter-name" />
-        <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
-        @if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-    </FormGrid></ChildContent></FormSection>;
-    private RenderFragment ConfigurationFields => @<FormSection Title="@Shared["Configuration"]"><ChildContent>
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@ParameterResourceKinds.Parameter" NamePolicy="ResourceNamePolicy.Parameter"
+        DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
+        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="selectedScope" ScopeRefChanged="value => selectedScope = value"
+        @bind-Description="model.Description" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true"
+        IsNew="IsNew" ReadOnly="@(!CanManage)" DisplayNameTestId="parameter-display-name" TechnicalNameTestId="parameter-name" />;
+    private RenderFragment ConfigurationFields => @<div class="resource-editor-view"><FormSection Title="@Shared["Configuration"]"><ChildContent>
         <div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
         <FormGrid>
         <FormField Required="true" Label="@T("ValueType")"><ChildContent><ClearableSelect @bind-Value="model.ValueType" data-testid="parameter-value-type">@foreach (var type in Enum.GetValues<ParameterValueType>()) { <option value="@type">@T($"ValueType.{type}")</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ValueType" /></Validation></FormField>
         <FormField Required="true" Label="@T("Value")" Class="form-span-2"><ChildContent><ClearableText @bind-Value="model.Value" data-testid="parameter-value" /><small>@T("Value.Help")</small></ChildContent><Validation><ValidationMessage For="() => model.Value" /></Validation></FormField>
         </FormGrid>
-    </ChildContent></FormSection>;
+    </ChildContent></FormSection></div>;
+    private RenderFragment EditDefinitionAction => @<button type="button" class="button-secondary" @onclick="() => ShowSection(ResourceDefinitionForm.FirstInvalidSection(FormContext, SectionPresentations) ?? sectionState.DefinitionPath)">@Shared["Edit"]</button>;
     private RenderFragment AccessFields => @<DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" />;
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details">
         <dt>@T("DisplayName")</dt><dd>@model.DisplayName</dd><dt>@T("Name")</dt><dd>@model.Name</dd><dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd>
         <dt>@T("ValueType")</dt><dd>@T($"ValueType.{model.ValueType}")</dd><dt>@T("Value")</dt><dd class="resource-text">@model.Value</dd>
     </dl></ChildContent></FormSection>;
-    private RenderFragment Usages => @<div>@if (usages.Count > 0) { <FormSection Title="@T("Usages")"><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@usage.Url" IconName="layers" /><CollectionActions ResourceName="@usage.DisplayName"><a href="@usage.Url">@Shared["OpenItem"]</a></CollectionActions></li> }</ul></FormSection> }</div>;
+    private RenderFragment Usages => @<div class="resource-editor-view">@if (usages.Count > 0) { <FormSection Title="@T("Usages")"><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@usage.Url" IconName="layers" /><CollectionActions ResourceName="@usage.DisplayName"><a href="@usage.Url">@Shared["OpenItem"]</a></CollectionActions></li> }</ul></FormSection> }</div>;
+    private RenderFragment DefinitionSection(string path) => path switch
+    {
+        "definition/identity" => IdentityFields,
+        "definition/configuration" => ConfigurationFields,
+        "definition/use-policy" => AccessFields,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
 
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
     private ParameterEditorModel model = new();
-    private ParameterResource? savedResource;
+    private ParameterResource? savedResource, newerResource;
+    private string? etag, newerEtag, loadedKey;
     private EditContext? editContext;
-    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private ValidationMessageStore? valueErrors;
+    private ResourceDefinitionForm? definitionForm;
+    private EditContext FormContext
+    {
+        get
+        {
+            if (editContext is not null && ReferenceEquals(editContext.Model, model)) return editContext;
+            if (editContext is not null) editContext.OnFieldChanged -= FieldChanged;
+            editContext = new(model); valueErrors = new(editContext); editContext.OnFieldChanged += FieldChanged;
+            return editContext;
+        }
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) { valueErrors?.Clear(); editContext?.NotifyValidationStateChanged(); }
     private CreationWizard? wizard;
-    private string section = "overview";
-    private string? loadedKey;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private long loadVersion;
-    private bool loading;
-    private bool CanManage => IsNew || savedResource is not null && !savedResource.Governance.IsManaged && ResourceOwnershipContext.CanManage(selectedScope, Services);
+    private bool loading, refreshing, busy, confirmDelete, invalidInput;
+    private Exception? error;
     private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
     private IReadOnlyList<ParameterUsageResponse> usages = [];
+    private int usageCount;
     private ResourceScopeRef? selectedScope;
-    private string? etag;
-    private bool busy, confirmDelete;
-    private Exception? error;
     private string savedFingerprint = string.Empty;
-    private bool invalidInput;
     private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
-    private bool IsDirty => !loading && CanManage && (Fingerprint != savedFingerprint || invalidInput);
+    private bool IsDirty => !loading && savedFingerprint.Length > 0 && (Fingerprint != savedFingerprint || invalidInput);
+    private bool CanManage => IsNew || savedResource is not null && !savedResource.Governance.IsManaged
+        && ResourceOwnershipContext.CanManage(selectedScope, Services) && scopeTargets.Any(target => target.ScopeRef == selectedScope && target.CanWrite);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private IReadOnlyList<ResourceNavigationItem> Sections =>
-    [
-        new("overview", Shared["Overview"], "home"),
-        new("definition", Shared["Definition"], "settings") { Navigable = false, Visible = CanManage },
-        new("definition/configuration", Shared["Configuration"], "settings") { Visible = CanManage },
-        new("definition/access", Shared["Access"], "key") { Visible = CanManage },
-        new("usages", T("Usages"), "list-check") { Visible = usages.Count > 0 }
-    ];
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value
+        ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/parameters", Services);
+    private string SavedYaml => savedResource is null ? string.Empty : ResourceManifestSerializer.ToYaml(savedResource);
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> SectionPresentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.ValueType), nameof(model.Value)] },
+        ["definition/use-policy"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.UseGrants)] },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("YamlExport"), ReadOnlyActions = CanManage ? EditDefinitionAction : null }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Description)] = T("Description"),
+        [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.Tags)] = Shared["Labels"],
+        [nameof(model.ValueType)] = T("ValueType"), [nameof(model.Value)] = T("Value")
+    };
+    private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/use-policy", T("UsePolicy"), "key")];
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("usages", T("Usages"), "list-check") { Visible = usages.Count > 0 }];
     private IReadOnlyList<CreationWizardStep> Steps =>
     [
         new("identity", T("Identity"), IdentityFields) { IsComplete = IdentityComplete },
         new("configuration", Shared["Configuration"], ConfigurationFields) { IsComplete = ValueComplete },
-        new("access", Shared["Access"], AccessFields) { IsComplete = true },
+        new("access", T("UsePolicy"), AccessFields) { IsComplete = true },
         new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && ValueComplete }
     ];
     private bool IdentityComplete => selectedScope is not null && ValidIdentityField(nameof(model.Name), model.Name) && ValidIdentityField(nameof(model.DisplayName), model.DisplayName);
@@ -127,71 +156,150 @@ else if (savedResource is not null)
     private sealed record ConfigurationEntry(string Label, string Value);
     private IReadOnlyList<ConfigurationEntry> SavedConfiguration => savedResource is null ? [] :
         [new(T("ValueType"), T($"ValueType.{savedResource.Definition.ValueType}")), new(T("Value"), ParameterEditorModel.From(savedResource).Value)];
-    private void SelectSection(string? path) => section = path ?? "overview";
-    private void InvalidSubmit(EditContext _)
-    {
-        section = "definition/configuration";
-        Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + section);
-    }
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
     private async Task FinishAsync(CreationWizardFinish finish)
     {
         if (!FormContext.Validate() || selectedScope is null || !ValueComplete)
         {
             finish.ReturnToStepId = !IdentityComplete ? "identity" : "configuration";
-            if (IdentityComplete && !ValueComplete) error = new ArgumentException(T("Value.Help"));
+            if (IdentityComplete && !ValueComplete) ShowValueError();
+            definitionForm?.RequestValidationFocus();
             return;
         }
         await SaveAsync();
     }
+    private void ShowValueError() { _ = FormContext; valueErrors!.Clear(); valueErrors.Add(new FieldIdentifier(model, nameof(model.Value)), T("Value.Help")); FormContext.NotifyValidationStateChanged(); }
+    private void ApplySnapshot(ResourceSnapshot<ParameterResource> snapshot)
+    {
+        savedResource = snapshot.Value; model = ParameterEditorModel.From(snapshot.Value); selectedScope = snapshot.Value.ScopeRef;
+        etag = snapshot.ETag; newerResource = null; newerEtag = null; invalidInput = false; error = null; savedFingerprint = Fingerprint;
+    }
     private void Discard()
     {
-        if (busy || savedResource is null) return;
-        model = ParameterEditorModel.From(savedResource); selectedScope = savedResource.ScopeRef;
-        invalidInput = false; savedFingerprint = Fingerprint; error = null;
+        if (busy || refreshing || savedResource is null) return;
+        ApplySnapshot(new(newerResource ?? savedResource, newerEtag ?? etag!));
     }
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        var key = $"{Name}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (loadedKey == key) return;
+        var key = $"{Name}|{ScopeRefValue}|{NavigationScope}";
+        if (loadedKey == key) return Task.CompletedTask;
         loadedKey = key;
-        var version = ++loadVersion;
-        loading = true; error = null; savedResource = null; usages = []; section = "overview";
+        return LoadInitialAsync();
+    }
+    private async Task LoadInitialAsync()
+    {
+        var version = ++loadVersion; var addressKey = $"{Name}|{ScopeRefValue}";
+        loading = true; loadState = new(ResourceLoadStatus.Loading); error = null; ClearResource();
         try
         {
+            if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token);
+                if (version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            loadedKey = $"{addressKey}|{NavigationScope}";
             var targets = await Client.GetScopeTargetsAsync(cancellation.Token);
             if (version != loadVersion) return;
             scopeTargets = targets;
-            if (IsNew) { model = new(); selectedScope = scopeTargets.FirstOrDefault(target => target.Kind == ResourceScopeKind.Workspace && target.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(target => target.CanWrite)?.ScopeRef; return; }
+            if (IsNew)
+            {
+                model = new(); selectedScope = scopeTargets.FirstOrDefault(target => target.Kind == ResourceScopeKind.Workspace && target.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(target => target.CanWrite)?.ScopeRef;
+                savedFingerprint = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return;
+            }
             var scope = ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException(T("ScopeRequired")));
             var snapshot = await Client.GetParameterAsync(Name!, scope, cancellation.Token);
-            var references = (await Client.GetParameterUsagesAsync(Name!, scope, cancellation.Token)).Value;
+            var references = await Client.GetParameterUsagesAsync(Name!, scope, cancellation.Token);
             if (version != loadVersion) return;
-            savedResource = snapshot.Value; model = ParameterEditorModel.From(snapshot.Value);
-            selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; usages = references;
+            ValidateSnapshot(snapshot.Value, Name!, scope);
+            ApplySnapshot(snapshot); usages = references.Value; usageCount = references.Count;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception exception) { if (version == loadVersion) { error = exception; loadedKey = null; } }
-        finally { if (version == loadVersion) { savedFingerprint = Fingerprint; invalidInput = false; loading = false; } }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == loadVersion) { ClearResource(); error = IsNew ? exception : null; loadState = LoadFailure(exception); } }
+        finally { if (version == loadVersion) loading = false; }
     }
+    private void ClearResource()
+    {
+        savedResource = newerResource = null; etag = newerEtag = null; selectedScope = null; usages = []; usageCount = 0;
+        model = new(); savedFingerprint = string.Empty; invalidInput = false; confirmDelete = false;
+    }
+    private void ValidateSnapshot(ParameterResource value, string name, ResourceScopeRef owner, Guid? uid = null)
+    {
+        if (value.Name != name || value.ScopeRef != owner || value.Namespace != ResourceNamespace.Default || uid is { } expected && value.Uid != expected)
+            throw new InvalidOperationException(T("IdentityMismatch"));
+    }
+    private Task RetryLoadAsync() => busy || loading || refreshing ? Task.CompletedTask : savedResource is null ? LoadInitialAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (IsNew || savedResource is not { ScopeRef: { } owner } current || loading || refreshing || busy) return;
+        var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetParameterAsync(current.Name, owner, cancellation.Token);
+            if (version != loadVersion) return;
+            if (snapshot.Value.Uid != current.Uid || snapshot.Value.ScopeRef != owner || snapshot.Value.Address != current.Address)
+            {
+                ClearResource(); loadState = new(ResourceLoadStatus.NotFound); return;
+            }
+            var references = await Client.GetParameterUsagesAsync(current.Name, owner, cancellation.Token);
+            if (version != loadVersion) return;
+            ValidateSnapshot(snapshot.Value, current.Name, owner, current.Uid);
+            // Evaluate dirty state after the response: a user can type while refresh is pending.
+            if (IsDirty)
+            {
+                if (!string.Equals(etag, snapshot.ETag, StringComparison.Ordinal)) { newerResource = snapshot.Value; newerEtag = snapshot.ETag; }
+                else savedResource = snapshot.Value;
+            }
+            else ApplySnapshot(snapshot);
+            usages = references.Value; usageCount = references.Count;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (version != loadVersion) return;
+            var failure = LoadFailure(exception);
+            if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearResource();
+            loadState = failure with { HasContent = savedResource is not null };
+        }
+        finally { if (version == loadVersion) refreshing = false; }
+    }
+    private static ResourceLoadState LoadFailure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+        System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+        _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     private async Task SaveAsync()
     {
-        if (!CanManage) return;
+        if (!CanManage || busy || refreshing) return;
         if (selectedScope is null) { error = new ArgumentException(T("ScopeRequired")); return; }
-        if (busy) return;
+        ParameterProperties properties;
+        try { properties = model.Properties(); }
+        catch (ArgumentException) { ShowValueError(); if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; }
+        var version = loadVersion; var current = savedResource; var owner = selectedScope.Value;
         busy = true; error = null;
         try
         {
-            var snapshot = IsNew
-                ? await Client.CreateParameterAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token)
-                : await Client.UpdateParameterAsync(model.Name, selectedScope.Value, new(model.Properties()), etag!, cancellation.Token);
-            savedFingerprint = Fingerprint; invalidInput = false;
-            if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value));
-            else { savedResource = snapshot.Value; model = ParameterEditorModel.From(snapshot.Value); etag = snapshot.ETag; savedFingerprint = Fingerprint; }
+            var snapshot = IsNew ? await Client.CreateParameterAsync(new(model.Name, properties, owner), cancellation.Token)
+                : await Client.UpdateParameterAsync(current!.Name, owner, new(properties), etag!, cancellation.Token);
+            if (version != loadVersion) return;
+            ValidateSnapshot(snapshot.Value, IsNew ? model.Name : current!.Name, owner, current?.Uid);
+            if (IsNew) { savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo(ResourceUrl(snapshot.Value)); }
+            else ApplySnapshot(snapshot);
         }
-        catch (Exception exception) { error = exception; }
-        finally { busy = false; }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+        finally { if (version == loadVersion) busy = false; }
     }
-    private void RequestDelete() { if (!CanManage) return; if (usages.Count > 0) error = new AgentstrationApiException(T("InUse", usages.Count), Guid.NewGuid().ToString("N")); else confirmDelete = true; }
-    private async Task DeleteAsync() { if (!CanManage) return; confirmDelete = false; try { await Client.DeleteParameterAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo("/parameters"); } catch (Exception exception) { error = exception; } }
+    private void RequestDelete() { if (!CanManage || busy || refreshing) return; if (usageCount > 0) error = new AgentstrationApiException(T("InUse", usageCount), Guid.NewGuid().ToString("N")); else confirmDelete = true; }
+    private async Task DeleteAsync()
+    {
+        if (!CanManage || busy || refreshing || savedResource is not { ScopeRef: { } owner } current) return;
+        var version = loadVersion; confirmDelete = false;
+        try { await Client.DeleteParameterAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+    }
     private string ResourceUrl(ParameterResource resource) => ResourceOwnershipContext.Resource(Services, "/parameters", resource.Name, resource.Namespace, resource.ScopeRef);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { ++loadVersion; if (editContext is not null) editContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

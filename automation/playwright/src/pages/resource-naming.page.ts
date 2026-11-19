@@ -70,7 +70,7 @@ export class ResourceNamingPage {
       this.page.waitForURL(url => url.pathname === `/parameters/${encodeURIComponent(technicalName)}`),
       this.page.getByTestId(TestIds.parameterEditor.save).click(),
     ]);
-    await selectResourceSection(this.page, 'definition/configuration');
+    await selectResourceSection(this.page, 'definition/identity');
     await this.page.getByTestId(TestIds.parameterEditor.form).waitFor({ state: 'visible' });
     return this.page.url();
   }
@@ -84,7 +84,7 @@ export class ResourceNamingPage {
       : await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Parameter edit route returned HTTP ${response?.status() ?? 'no response'}.`);
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
-    await selectResourceSection(this.page, 'definition/configuration');
+    await selectResourceSection(this.page, 'definition/identity');
     await this.page.getByTestId(TestIds.parameterEditor.form).waitFor({ state: 'visible' });
     await expect(this.page.getByTestId(TestIds.parameterEditor.technicalName)).toHaveValue(expectedTechnicalName);
     await expect(this.page.getByTestId(TestIds.parameterEditor.technicalName)).toBeDisabled();

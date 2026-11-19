@@ -47,6 +47,26 @@ public sealed class ResourceIdentityEditorTests
         Assert.IsEmpty(cut.FindAll("[data-testid=label-add]"));
     }
 
+    [TestMethod]
+    public void AFamilyWithoutAMetadataWriteContractCanKeepSavedLabelsReadOnlyWhileEditingIdentity()
+    {
+        using var context = new BunitContext(); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.ComponentFactories.AddStub<ResourceScopeFormField>();
+        var model = new ParameterEditorModel { Name = "value", DisplayName = "Value", Tags = "environment=local" };
+        var cut = context.Render<CascadingValue<EditContext>>(p => p.Add(c => c.Value, new EditContext(model))
+            .AddChildContent<ResourceIdentityEditor>(identity => identity
+                .Add(c => c.ResourceKind, "Parameter").Add(c => c.DisplayName, model.DisplayName).Add(c => c.DisplayNameExpression, () => model.DisplayName)
+                .Add(c => c.TechnicalName, model.Name).Add(c => c.TechnicalNameExpression, () => model.Name)
+                .Add(c => c.Namespace, model.Namespace).Add(c => c.NamespaceExpression, () => model.Namespace)
+                .Add(c => c.DescriptionExpression, (Expression<Func<string?>>)(() => model.Description))
+                .Add(c => c.Labels, model.Tags).Add(c => c.LabelsExpression, () => model.Tags).Add(c => c.LabelsReadOnly, true)));
+        Assert.IsTrue(cut.FindComponent<LabelsEditor>().Instance.ReadOnly);
+        Assert.IsEmpty(cut.FindAll("[data-testid=label-add]"));
+        Assert.IsFalse(cut.FindComponent<ResourceIdentityEditor>().Instance.ReadOnly);
+        Assert.IsFalse(cut.Find("fieldset").HasAttribute("disabled"));
+    }
+
     public sealed class ContextProbe : ComponentBase
     {
         [CascadingParameter] public EditContext Context { get; set; } = default!;
