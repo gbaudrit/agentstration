@@ -62,7 +62,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `ToolDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolGovernanceAudit.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
 | `ToolProviderEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
-| `ToolSetDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `ToolSetDetails.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TransformationFunctionEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TriggerDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TriggerEditor.razor` | Previously remaining | Delegated definition/editor; coordinate with owning detail and preserve creation wizard | No |
@@ -141,3 +141,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Existing model rules/parsers, exact/relative extension references, header activation draft semantics, command restrictions and ETags are preserved. Qualified provider writes/tests/discovery now retain the loaded namespace/owner instead of relying on an unqualified name. Refresh buffers newer definitions until explicit discard and preserves invalid/in-flight edits; identity/access changes clear private rendered content.
 - 14 component cases, one client case, one API homonym/concurrency case, TypeScript, both final desktop/touch probes and both maintained governed-inventory cases pass. [Real captures, exact hashes and validation chronology](evidence/resource-screen-foundation/tool-providers/README.md).
 - Protected Agent product files remain unchanged. No shared presentation component change; no CI failure is handled. Seven adapters now have a new-foundation migration; the other 43 non-Agent route-owning components still require review/migration.
+
+### ToolSetDetails
+
+- Standard Console inspection template, actual metrics before saved Identity/labels, one retained locked definition form/state/presentations, Identity then Configuration, immutable publications, independently authorized Access and final saved YAML. No unsupported creation, definition-write or activation command is invented; the collection/API creation paths are preserved.
+- Exact owner/namespace/UID, published member provenance, ETags, confirmations, backend guards and bounded history calls remain intact. Recoverable refresh retains policy drafts/content; lost access or replaced identity clears private content. Full copyable publication hashes fix mobile overflow.
+- 19 targeted component cases and both final desktop/touch probes pass; both maintained governed-inventory cases pass before the final hash-wrapping follow-up. [Real captures, exact hashes and validation limits](evidence/resource-screen-foundation/tool-sets/README.md).
+- Existing ToolSetDeletionGuard rejects Instance/Tenant deletion despite broader family ownership support. The real probe verifies the rejection and retained draft; successful Workspace deletion is covered at the component command contract, not claimed as browser-tested. No backend scope rule or CI failure is handled here.
+- Parallel list-template updates are preserved. After synchronization, 33 Tool Set/Tool Provider component cases, TypeScript and both maintained Agent desktop/touch cases pass; final Tool Set desktop/touch probes pass on the updated shared components. Protected Agent files remain unchanged. Eight adapters now have a new-foundation migration; 42 other non-Agent route-owning components still require their individual review/migration.

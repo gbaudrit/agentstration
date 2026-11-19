@@ -98,3 +98,5 @@ The new-foundation Source Provider pass, exact ownership/reference handling and 
 The new-foundation Tool Category pass, preserved membership/reference contract and focused evidence are recorded in the [Tool Category verification report](evidence/resource-screen-foundation/tool-categories/README.md).
 
 The new-foundation Tool Provider pass, retained draft activation, qualified family commands and real evidence are recorded in the [Tool Provider verification report](evidence/resource-screen-foundation/tool-providers/README.md).
+
+The new-foundation Tool Set inspection pass, preserved provenance/policy behavior and observed backend deletion-scope limit are recorded in the [Tool Set verification report](evidence/resource-screen-foundation/tool-sets/README.md).
