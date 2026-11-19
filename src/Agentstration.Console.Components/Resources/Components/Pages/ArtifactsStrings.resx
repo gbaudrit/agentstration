@@ -63,4 +63,13 @@
   <data name="ReadRecord" xml:space="preserve"><value>Read record</value></data>
   <data name="RecordReadFailed" xml:space="preserve"><value>The record could not be read or verified. Its metadata remains available.</value></data>
   <data name="MetadataYamlHelp" xml:space="preserve"><value>Read-only Artifact metadata and provenance identifiers. Inspect Content and Storage for their separate evidence.</value></data>
+  <data name="SizeBytes"><value>Size (bytes)</value></data>
+  <data name="SizeKilobytes"><value>{0:0.0} KB</value></data>
+  <data name="Status.Unknown"><value>Unknown</value></data>
+  <data name="StatusHelp.Unknown"><value>The state of this local copy is unknown.</value></data>
+  <data name="ProducerKind.FlowRun"><value>Flow Run</value></data>
+  <data name="ProducerKind.RuntimeRun"><value>Runtime Run</value></data>
+  <data name="ProducerKind.Agent"><value>Agent</value></data>
+  <data name="ProducerKind.Tool"><value>Tool</value></data>
+  <data name="ProducerKind.Unknown"><value>Unknown</value></data>
 </root>

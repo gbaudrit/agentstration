@@ -1,5 +1,6 @@
 using System.Text;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Web.Components.State;
@@ -99,6 +100,12 @@ public sealed partial class ArtifactAdministrationComponentTests
         return context;
     }
 
+    private static void AddListContext(BunitContext context)
+    {
+        context.WithResourceListContext(new() { Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ArtifactsInspect } });
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
     private static void SelectSection(BunitContext context, string section)
     {
         var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
@@ -119,6 +126,7 @@ public sealed partial class ArtifactAdministrationComponentTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("produced content");
         var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
         var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "output-storage"),
@@ -265,6 +273,7 @@ public sealed partial class ArtifactAdministrationComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -272,7 +281,7 @@ public sealed partial class ArtifactAdministrationComponentTests
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
         rendered.WaitForElement("[data-testid='durable-artifact-row']");
-        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
+        Assert.IsNotNull(rendered.Find($"a[href^='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
         Assert.AreEqual(client.Durable.ArtifactId.ToString(),
             rendered.Find("[data-testid='durable-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
@@ -297,6 +306,7 @@ public sealed partial class ArtifactAdministrationComponentTests
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("aperçu");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);

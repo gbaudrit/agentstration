@@ -3296,17 +3296,17 @@
     {
       "id": "artifacts-staged-artifact-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 17,
+      "line": 22,
       "host": "console",
       "routes": [
         "/artifacts"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StagedArtifactView",
       "identityLabel": "Artifact",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Producer",
         "Size",
@@ -3375,22 +3375,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "9cab592386c16ca86dedb73c9c1d42f2433123a0"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Workspace metadata arrays loaded together atomically. Separate durable/local-copy queries, exact totals and 20/50/100 local pages; no content, lease or materialization read added. Search actual name/ID; filters use displayed fields only.",
+        "identity": "Durable Artifact and local copy IDs, producer execution/resource references, storage/media/size/time and local availability explanation retained. Context-qualified links preserve existing destinations. Producer kind and byte units localized EN/FR.",
+        "states": "Retained compatible failed refresh across both collections; successful shrink clamps each query; stale user/logical/physical Workspace responses rejected. Both resources/read and artifacts/inspect required; denial clears both catalogs and counts.",
+        "actions": "Existing legitimate durable/local-copy sections retained with independent queries; redundant Open-only row menus removed. Related Knowledge Sources link retains context. No content or retention/mutation command added.",
+        "validation": "ArtifactCollectionTests plus maintained readable identity/storage/French explanation regressions; deterministic desktop/mobile evidence recorded in ledger."
       }
     },
     {
       "id": "artifacts-flow-run-artifact-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 41,
+      "line": 12,
       "host": "console",
       "routes": [
         "/artifacts"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FlowRunArtifactResource",
       "identityLabel": "Artifact",
       "scope": false,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "FlowRun",
         "Step",
@@ -3461,6 +3470,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "9cab592386c16ca86dedb73c9c1d42f2433123a0"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Workspace metadata arrays loaded together atomically. Separate durable/local-copy queries, exact totals and 20/50/100 local pages; no content, lease or materialization read added. Search actual name/ID; filters use displayed fields only.",
+        "identity": "Durable Artifact and local copy IDs, producer execution/resource references, storage/media/size/time and local availability explanation retained. Context-qualified links preserve existing destinations. Producer kind and byte units localized EN/FR.",
+        "states": "Retained compatible failed refresh across both collections; successful shrink clamps each query; stale user/logical/physical Workspace responses rejected. Both resources/read and artifacts/inspect required; denial clears both catalogs and counts.",
+        "actions": "Existing legitimate durable/local-copy sections retained with independent queries; redundant Open-only row menus removed. Related Knowledge Sources link retains context. No content or retention/mutation command added.",
+        "validation": "ArtifactCollectionTests plus maintained readable identity/storage/French explanation regressions; deterministic desktop/mobile evidence recorded in ledger."
       }
     },
     {
