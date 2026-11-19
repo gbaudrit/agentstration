@@ -163,10 +163,10 @@ export class ArtifactAdministrationPage {
     await this.page.reload();
     await expect(remove).toBeEnabled();
     await remove.click();
-    await this.page.getByRole('dialog').getByRole('button', { name: text.cancel, exact: true }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: text.cancel, exact: true }).click();
     expect((await read()).sha256).toBe(original.sha256);
     await remove.click();
-    await this.page.getByRole('dialog').getByRole('button', { name: text.confirmDelete, exact: true }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: text.confirmDelete, exact: true }).click();
     await expect(this.page.getByTestId(TestIds.artifacts.list)).toBeVisible();
     const purged = await read();
     expect(purged.status).toBe(7); // StagedArtifactStatus.Purged
@@ -190,26 +190,13 @@ export class ArtifactAdministrationPage {
   }
 
   private async openStagedContent(): Promise<void> {
-    await this.selectTab(TestIds.artifacts.stagedContentTab, TestIds.artifacts.stagedContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContentPanel)).toBeVisible();
   }
 
   private async openStagedRetention(label: string): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
-      await expect(this.page.getByLabel(label, { exact: true })).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
-  }
-
-  private async selectTab(tabTestId: string, panelTestId: string): Promise<void> {
-    const tab = this.page.getByTestId(tabTestId);
-    const panel = this.page.getByTestId(panelTestId);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
-      await expect(panel).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'retention');
+    await expect(this.page.getByLabel(label, { exact: true })).toBeVisible();
   }
 
   private async createStaged(consoleUrl: string, fileName: string, mediaType: string, content: string): Promise<StagedArtifact> {

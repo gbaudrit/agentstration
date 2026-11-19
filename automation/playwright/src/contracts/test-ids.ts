@@ -212,7 +212,6 @@ export const TestIds = {
     exposure: 'knowledge-source-tool-exposure', toolLink: 'knowledge-tool-link',
     toolSetVersions: 'toolset-versions', toolSetRow: 'toolset-row', toolSetDetails: 'resource-toolset-details', toolSetVersion: 'toolset-version',
     activeAssignments: 'agent-active-toolsets', stagedDelete: 'staged-artifact-delete',
-    stagedRetentionTab: 'staged-artifact-retention-tab',
   },
   sourceLifecycle: {
     runError: 'flow-run-error',
@@ -353,7 +352,6 @@ export const TestIds = {
   artifacts: {
     list: 'resource-artifacts',
     stagedDetails: 'staged-artifact-details',
-    stagedContentTab: 'staged-artifact-content-tab',
     stagedContentPanel: 'staged-artifact-content-panel',
     stagedReadPreview: 'staged-artifact-read-preview',
     stagedReadFull: 'staged-artifact-read-full',
