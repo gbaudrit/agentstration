@@ -55,7 +55,7 @@ else
         <div hidden="@(section != "overview")">
             @if (state.Run is { } saved)
             {
-                <section class="metric-grid"><MetricCard Label="@I("Status")" Value="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /><MetricCard Label="@I("Duration")" Value="@Duration(saved)" Status="UiStatus.Neutral" /></section>
+                <section class="metric-grid runner-metrics"><MetricCard Label="@I("Status")" Value="@I($"RunState.{state.State}")" Status="@PlatformDashboardService.ToStatus(state.State.ToString())" /><MetricCard Label="@I("Duration")" Value="@Duration(saved)" Status="UiStatus.Neutral" /></section>
                 <ResourceIdentitySummary DisplayName="@saved.Name" TechnicalName="@saved.Id"><AdditionalDetails><dt>@T("RecordedAgent")</dt><dd><a href="@BackUrl"><code>@saved.Properties.Agent.Namespace.Value/@saved.Properties.Agent.ResourceId</code></a></dd><dt>@T("DefinitionScope")</dt><dd>@(saved.Properties.Agent.ScopeRef?.Value ?? T("NotRecorded"))</dd><dt>@T("ExecutionScope")</dt><dd><code>@saved.ExecutionScopeRef.Value</code></dd></AdditionalDetails></ResourceIdentitySummary>
             }
             else

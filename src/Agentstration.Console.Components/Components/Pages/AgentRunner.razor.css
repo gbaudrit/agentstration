@@ -1,3 +1,6 @@
+.runner-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.runner-metrics ::deep .metric-card { min-width: 0; }
+.runner-metrics ::deep .metric-card strong { overflow-wrap: anywhere; }
 .runner-inspector { min-width: 0; margin: 0; }
 .runner-tab-content:not([hidden]) { min-width: 0; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
 .runner-details { grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); }
@@ -6,3 +9,4 @@
 .runner-trace li { grid-template-columns: auto minmax(0, 1fr); }
 .runner-trace li span { grid-column: 1 / -1; overflow-wrap: anywhere; }
 @media (max-width: 720px) { .runner-details { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 620px) { .runner-metrics { grid-template-columns: minmax(0, 1fr); } }
