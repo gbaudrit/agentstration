@@ -50,6 +50,7 @@
     [Parameter] public EventCallback OnRetry { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
     [Parameter] public bool HasDraft { get; set; }
+    [Parameter] public bool HasAdditionalDraft { get; set; }
     [Parameter] public ResourceReadOnlyReason? DefinitionReadOnlyReason { get; set; }
     [Parameter] public RenderFragment? DraftActions { get; set; }
     [Parameter] public ResourceSectionState SectionState { get; set; } = new();
@@ -87,7 +88,7 @@
     private ResourceLoadState? EffectiveLoadState => LoadState is null ? null : LoadState with { HasContent = Resource is not null && LoadState.HasContent };
     private bool CanManageAccess => AllowAccess && Resource is { ScopeRef: not null } && Resource.Uid != Guid.Empty
         && ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services);
-    private bool HasUnsavedChanges => HasDraft || accessDirty;
+    private bool HasUnsavedChanges => HasDraft || accessDirty || HasAdditionalDraft;
     private ResourceReadOnlyReason? EffectiveReadOnlyReason => Resource is null ? null
         : Resource.ScopeRef is null ? DefinitionReadOnlyReason ?? ResourceReadOnlyReason.Unspecified
         : !ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services) ? ResourceReadOnlyReason.Inherited

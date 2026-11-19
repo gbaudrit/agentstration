@@ -10,6 +10,8 @@ public sealed class SourceProviderEditorModel
     public string Name { get; set; } = string.Empty;
     [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string DisplayName { get; set; } = string.Empty;
+    public string? Description => null;
+    public string Tags { get; set; } = string.Empty;
     [Required] public string ExtensionId { get; set; } = string.Empty;
     [Required] public string ContributionId { get; set; } = string.Empty;
 
@@ -27,6 +29,7 @@ public sealed class SourceProviderEditorModel
     public static SourceProviderEditorModel FromResource(SourceProviderResource resource) => new()
     {
         Name = resource.Name,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         ExtensionId = ExtensionKey(

@@ -1,0 +1,50 @@
+{
+  "base": "512f7d3fe0ed91b8094640a0c6800b19bc6413e5",
+  "sourceHashes": {
+    "automation/playwright/src/pages/model-administration.page.ts": "4740d8d2111b5cfee5664f92b24df5c065ab2271bed5d6217917f93627689b5c",
+    "docs/ux/component-contracts.md": "8e4fcbbdb45eb691a508f8d4ddbb49503df354ecc20ae72b5a0ba07adc8168a7",
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor": "783e7870306d8b367b726e64bc61814988dd4d2e3303e797f4c2284de5cf22e2",
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "1f69bf20a963f3fce563dbf728cca05da5170b9c0bf3a0af5b8f1c1245ccda7f",
+    "src/Agentstration.Console.Components/Console/RuntimeProfileEditorModel.cs": "4e59979636cc369048e34ff1eb814b97176749dc769b63b1c092f8e7a2627b37",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/RuntimeProfileEditorStrings.fr-FR.resx": "11425b3638ffed5b5c5e771d90aeb997c1b54c350697438c2ea5312a6ea2a676",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/RuntimeProfileEditorStrings.resx": "6801fc4316ed445682a42e5ff9dc1d249e825b49ed96e0107681e4c5ede36dd7",
+    "tests/Agentstration.Console.Components.Tests/RuntimeProfileEditorTests.cs": "e6388c327bce635f5175154fbe0c8be4b314442aed8950f505a8678587006ad9"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "c6ababa6ee5ae89ab1ddde41cc6bacb12edbf5e6c9eeb66739d03897f8812220",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "c6ababa6ee5ae89ab1ddde41cc6bacb12edbf5e6c9eeb66739d03897f8812220"
+  },
+  "phases": [
+    {
+      "name": "runtime",
+      "exitCode": 0,
+      "seconds": 86.7
+    },
+    {
+      "name": "model-administration-regression",
+      "exitCode": 0,
+      "seconds": 56.9
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 108.5
+    }
+  ],
+  "completed": true,
+  "running": null,
+  "agentProtectedHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedDotNet": {
+    "passed": 46,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typescript": "passed"
+}

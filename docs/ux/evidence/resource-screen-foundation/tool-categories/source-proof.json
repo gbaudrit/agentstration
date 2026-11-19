@@ -1,0 +1,61 @@
+{
+  "base": "159d9b82a38ca58ec46a4effaadfb38b6fe0d396",
+  "sourceHashes": {
+    "docs/ux/component-contracts.md": "5295d707f60128f7365f425a6068bf776a150dc6e14c5af642cfd7cb3c7cda00",
+    "docs/ux/evidence/resource-screen-foundation/tool-categories/README.md": "1e44f245556d075c818a700dcb2a91026f9a07217260e0e2d7689e832f8d2459",
+    "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor": "567b2ef7594a63eb0bb24909b3dcfeb0c1106ace03bd404932b5c0ffeb84add6",
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "4c345349a2303c279c3d1074691fe12936085d81b804d8e420c208c421bb3591",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopeFormField.razor": "2ca18b191b35097ea3dd02a0b9be3f5e3fdc4cab2b91ac241fb08027c835b4da",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor": "c13d6dcd357530d0593ae2f12e15251d409af7accf99377e04aaf9836d215fcc",
+    "src/Agentstration.Console.Components/Console/ToolCategoryEditorModel.cs": "0742b35873968e5035e84cf6b1ddb96e01f5fb0713957a4e449210e54d11b325",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolCategoriesStrings.fr-FR.resx": "2d074501d5b9f49ca368640fc309e58a2edaf118c8adddb086f81553f7bdb0cf",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolCategoriesStrings.resx": "a79b347d75522efae2e09e1e67f811f5142825c1728d36e67bde082deb15e306",
+    "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor.css": "e1d56422f1564edec5f4cbfe968381ea6c681fad6f074bdf7018e8a6baeaa122",
+    "tests/Agentstration.Console.Components.Tests/ToolCategoryConsoleTests.cs": "0a8e0e7010016233377d25be946d106d9457dfa480a45d8b7dfde606bdb3b9e9"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "12e18c9f14c341cd6611ce36c2e0eb8525936b862f2aa752c099d876ceee3a0c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "12e18c9f14c341cd6611ce36c2e0eb8525936b862f2aa752c099d876ceee3a0c",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "93e89eb9dea816d62ef76a3b18cd4be0a6949d43577da25736dd133938feab54",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "93e89eb9dea816d62ef76a3b18cd4be0a6949d43577da25736dd133938feab54"
+  },
+  "phases": [
+    {
+      "name": "category",
+      "exitCode": 0,
+      "seconds": 99.2
+    }
+  ],
+  "completed": true,
+  "running": null,
+  "relatedVerification": [
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 102.8
+    }
+  ],
+  "agentProtectedHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedDotNet": {
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0
+  },
+  "initialLocalFindings": "A new focused callback test exposed a retained policy guard after deletion; the family now invalidates the deleted snapshot before leaving. A temporary browser probe incorrectly expected descendant targets for this Workspace-only kind; the final probe asserts their absence and verifies deletion with a reachable definition draft.",
+  "typescript": "No TypeScript source changed; the latest maintained TypeScript check passed before this family. Browser probes compile and execute under the current Playwright configuration.",
+  "agentSharedHashes": {
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "4c345349a2303c279c3d1074691fe12936085d81b804d8e420c208c421bb3591",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopeFormField.razor": "2ca18b191b35097ea3dd02a0b9be3f5e3fdc4cab2b91ac241fb08027c835b4da",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor": "c13d6dcd357530d0593ae2f12e15251d409af7accf99377e04aaf9836d215fcc",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolCategoriesStrings.fr-FR.resx": "2d074501d5b9f49ca368640fc309e58a2edaf118c8adddb086f81553f7bdb0cf",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolCategoriesStrings.resx": "a79b347d75522efae2e09e1e67f811f5142825c1728d36e67bde082deb15e306",
+    "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor.css": "e1d56422f1564edec5f4cbfe968381ea6c681fad6f074bdf7018e8a6baeaa122"
+  }
+}

@@ -1,0 +1,11 @@
+
+Running 2 tests using 1 worker
+
+(node:357464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [desktop-chromium] › ../../../../tmp/resource-screen-foundation-adoption/deletion-followup.spec.ts:5:2 › English desktop › Confirmed family deletion leaves no stale draft guard  (23.9s)
+(node:358017) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 [mobile-chromium] › ../../../../tmp/resource-screen-foundation-adoption/deletion-followup.spec.ts:5:2 › French touch › Confirmed family deletion leaves no stale draft guard @responsive (26.0s)
+
+  2 passed (1.8m)

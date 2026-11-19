@@ -10,4 +10,6 @@
 <data name="NamespaceInvalid"><value>Renseignez un espace de noms valide.</value></data>
 <data name="ScopeRequired"><value>Sélectionnez un périmètre propriétaire.</value></data>
 <data name="ScopeMismatch"><value>Cette catégorie n’est pas disponible dans le périmètre demandé. Sélectionnez son contexte propriétaire puis réessayez.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Des données de ressource ou de catalogue actualisées sont disponibles. Votre brouillon de définition est conservé. Abandonnez-le explicitement pour les charger.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>Ce YAML exporte la ressource enregistrée. Modifiez sa définition pour effectuer des changements.</value></data>
 </root>
