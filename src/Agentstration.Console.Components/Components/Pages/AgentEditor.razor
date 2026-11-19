@@ -14,7 +14,7 @@
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 
-<UnsavedNavigationGuard IsDirty="@isDirty" HasUnsavedChanges="@(() => isDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+<UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" ViewQueryParameters="@(new[] { "view", "tab" })" />
 <PageTitle>@(IsNew ? T("CreateAgent") : Name) · Agentstration</PageTitle>
 
 @if (IsNew)
@@ -57,7 +57,7 @@ else
         <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" RuntimeUrl="@ActiveRuntimeUrl" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
                 <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
         </StateComparison>
-        <ResourceIdentitySummary DisplayName="@savedResource.Definition.DisplayName" TechnicalName="@savedResource.Name" Namespace="@savedResource.Namespace.Value" Description="@savedResource.Definition.Description" TestId="agent-identity-summary" />
+        <ResourceIdentitySummary DisplayName="@savedResource.Definition.DisplayName" TechnicalName="@savedResource.Name" Namespace="@savedResource.Namespace.Value" Description="@savedResource.Definition.Description" TestId="agent-identity-summary"><Scope><ResourceScopeBadge ScopeRef="savedResource.ScopeRef" /></Scope></ResourceIdentitySummary>
         <FormSection Title="@T("Configuration")" Class="resource-configuration-summary" TestId="agent-configuration-summary">
             <CollectionView TItem="ConfigurationEntry" Items="ConfigurationEntries" IdentityLabel="@T("ConfigurationEntry")" InformationLabels="@(new[] { T("ConfigurationValue") })">
                 <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
@@ -84,10 +84,6 @@ else
         <FormSection Title="@T("Tags")"><LabelsSummary Values="@savedResource.Metadata.Tags" /></FormSection>
         </div>
     }
-    else if (CanManage && accessMode && selectedScope is { } ownerScope)
-    {
-        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="AgentResourceNamespace" Kind="@AgentResourceKinds.Agent" Name="@model.Name" Generation="generation" Governance="governance" />
-    }
     else if (sourceMode)
     {
         <FormSection Title="@T("AgentYaml")" Eyebrow="@T("RawResource")" Description="@T("AgentYamlHelp")" TestId="agent-yaml-editor"><ChildContent>
@@ -101,89 +97,32 @@ else
         </ChildContent></FormSection>
 
     }
+    @if (accessVisited && CanManageAccess && selectedScope is { } ownerScope && savedResource is not null)
+    {
+        <div hidden="@(!accessMode)"><ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="savedResource.Namespace" Kind="@AgentResourceKinds.Agent" Name="@savedResource.Name" ResourceUid="savedResource.Uid" Generation="generation" Governance="governance" DraftChanged="value => policyDirty = value" /></div>
+    }
     @if (definitionVisited || toolsVisited || contractsVisited)
     {
     <div class="resource-editor-view" hidden="@(overviewMode || sourceMode || accessMode)">
-    <EditForm @key="model" Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" OnInvalidSubmit="HandleInvalidSubmit" FormName="agent-editor" id="agent-resource-form" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
+    <EditForm @key="model" EditContext="FormContext" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" OnInvalidSubmit="HandleInvalidSubmit" FormName="agent-editor" id="agent-resource-form" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
         <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
         @if (IsNew) { <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p> }
         <fieldset class="resource-definition-fields" disabled="@(!CanManage || saving || HasRawDraft)" data-testid="agent-definition-fields">
 
-        @if (toolsVisited)
+        @if (IsNew)
         {
-            <div class="resource-editor-view" hidden="@(!toolsMode)">
-            <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
-            <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
-            </div>
+            <CreationWizard @ref="creationWizard" Steps="CreationSteps" OnStepChanging="CreationStepChanging" OnFinish="FinishCreationAsync" Busy="saving" FinishLabel="@T("CreateAndDeploy")" FinishTestId="agent-create-and-deploy" />
         }
-        @if (contractsVisited)
+        else
         {
-            <div class="resource-editor-view" hidden="@(!contractsMode)">
-            <FormSection Title="@T("InvocationContracts")" Eyebrow="@T("Contracts")" Description="@T("InvocationContractsHelp")" TestId="agent-contracts-section"><ChildContent>
-                <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
-                    OutputLabel="@T("OutputContract")" TestId="agent-contract">
-                    <InputContent>
-                        <ReusableSchemaBindingEditor Title="@T("InputContract")" TestId="agent-input-schema"
-                            Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
-                    </InputContent>
-                    <OutputContent>
-                        <p class="muted">@T("OutputInstructionHelp")</p>
-                        <FormField Label="@T("OutputResolution")">
-                            <ClearableSelect TValue="string" AllowClear="false" disabled="@(model.OutputSchema is not null || model.OutputSchemaBinding is not null)" Value="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic ? model.OutputContract.Source : model.OutputSchema is not null || model.OutputSchemaBinding is not null || model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Fixed ? "fixed" : "absent")" ValueChanged="value => UpdateOutputResolution(new ChangeEventArgs { Value = value })">
-                                <option value="fixed" disabled>@T("OutputResolution.Fixed")</option>
-                                <option value="absent">@T("OutputResolution.Absent")</option>
-                                <option value="input">@T("OutputResolution.Input")</option>
-                                <option value="parent">@T("OutputResolution.Parent")</option>
-                            </ClearableSelect>
-                        </FormField>
-                        <FormField Label="@T("OutputMediaType")"><ClearableText Disabled="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic)" Value="@model.OutputContract?.MediaType" ValueChanged="value => UpdateOutputMediaType(new ChangeEventArgs { Value = value })" /></FormField>
-                        <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
-                            Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
-                    </OutputContent>
-                </ContractDirectionTabs>
-            </ChildContent></FormSection>
-            </div>
+            @if (toolsVisited) { <div class="resource-editor-view" hidden="@(!toolsMode)">@ToolsFields</div> }
+            @if (contractsVisited) { <div class="resource-editor-view" hidden="@(!contractsMode)">@ContractsFields</div> }
+            @if (definitionVisited)
+            {
+                <div class="resource-editor-view" hidden="@(toolsMode || contractsMode)"><div hidden="@modelMode">@IdentityFields @ConfigurationFields</div><div hidden="@(!modelMode)">@ExecutionFields</div></div>
+            }
         }
-        @if (definitionVisited)
-        {
-        <div class="resource-editor-view" hidden="@(toolsMode || contractsMode)">
-        <div class="resource-editor-view" hidden="@(!IsNew && modelMode)">
-        <FormSection Title="@T("Identity")" TestId="agent-identity-section">
-            <FormGrid>
-                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
-                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
-                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="agent-description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
-            </FormGrid>
-        </FormSection>
-
-        <FormSection Title="@T("Configuration")" TestId="agent-behavior-section">
-            <FormGrid>
-                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
-                <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
-            </FormGrid>
-        </FormSection>
-
-        <FormSection Title="@T("Tags")" TestId="agent-labels-section">
-            <LabelsEditor @bind-Value="model.Tags" />
-        </FormSection>
-        </div>
-        <div class="resource-editor-view" hidden="@(!IsNew && !modelMode)">
-        <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-        </FormSection>
-        <FormSection Title="@T("Execution")" TestId="agent-runtime-section">
-                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
-        </FormSection>
-
-        </div>
-        </div>
-        }
-
         </fieldset>
-        @if (CanManage && IsNew)
-        {
-            <FormActions Busy="@saving"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></FormActions>
-        }
     </EditForm>
     </div>
     }
@@ -191,7 +130,7 @@ else
     if (IsNew)
     {
         @feedback
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <FormActions><button type="button" class="button-secondary" data-testid="agent-source-tab" @onclick="() => { if (sourceMode) ShowDefinition(); else ShowSource(); }">@(sourceMode ? T("Form") : T("Yaml"))</button></FormActions>
 
         @content
     }
@@ -223,6 +162,92 @@ else
 }
 
 @code {
+    private RenderFragment IdentityFields { get { var model = this.model!; return @<div>        <FormSection Title="@T("Identity")" TestId="agent-identity-section">
+            <FormGrid>
+                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
+                <FormField Label="@Shared["Namespace"]"><ClearableText Value="@model.Namespace" Disabled="true" /></FormField>
+                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
+                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="agent-description" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
+            </FormGrid>
+        </FormSection>
+
+</div>; } }
+    private RenderFragment ConfigurationFields { get { var model = this.model!; return @<div>        <FormSection Title="@T("Configuration")" TestId="agent-behavior-section">
+            <FormGrid>
+                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
+            </FormGrid>
+        </FormSection>
+
+        <FormSection Title="@T("Tags")" TestId="agent-labels-section">
+            <LabelsEditor @bind-Value="model.Tags" />
+        </FormSection>
+</div>; } }
+    private RenderFragment ExecutionFields { get { var model = this.model!; return @<div>        <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
+                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /><ValidationMessage For="() => model.ModelProfileName" /></div>
+        </FormSection>
+        <FormSection Title="@T("Execution")" TestId="agent-runtime-section">
+                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
+        </FormSection></div>; } }
+    private RenderFragment ToolsFields { get { return @<div>            <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
+            <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" /></div>; } }
+    private RenderFragment ContractsFields { get { var model = this.model!; return @<div>            <FormSection Title="@T("InvocationContracts")" Eyebrow="@T("Contracts")" Description="@T("InvocationContractsHelp")" TestId="agent-contracts-section"><ChildContent>
+                <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
+                    OutputLabel="@T("OutputContract")" TestId="agent-contract">
+                    <InputContent>
+                        <ReusableSchemaBindingEditor Title="@T("InputContract")" TestId="agent-input-schema"
+                            Binding="model.InputSchemaBinding" LegacySchema="model.InputSchema" ValueChanged="UpdateAgentInputSchemaAsync" />
+                    </InputContent>
+                    <OutputContent>
+                        <p class="muted">@T("OutputInstructionHelp")</p>
+                        <FormField Label="@T("OutputResolution")">
+                            <ClearableSelect TValue="string" AllowClear="false" disabled="@(model.OutputSchema is not null || model.OutputSchemaBinding is not null)" Value="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic ? model.OutputContract.Source : model.OutputSchema is not null || model.OutputSchemaBinding is not null || model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Fixed ? "fixed" : "absent")" ValueChanged="value => UpdateOutputResolution(new ChangeEventArgs { Value = value })">
+                                <option value="fixed" disabled>@T("OutputResolution.Fixed")</option>
+                                <option value="absent">@T("OutputResolution.Absent")</option>
+                                <option value="input">@T("OutputResolution.Input")</option>
+                                <option value="parent">@T("OutputResolution.Parent")</option>
+                            </ClearableSelect>
+                        </FormField>
+                        <FormField Label="@T("OutputMediaType")"><ClearableText Disabled="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic)" Value="@model.OutputContract?.MediaType" ValueChanged="value => UpdateOutputMediaType(new ChangeEventArgs { Value = value })" /></FormField>
+                        <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
+                            Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
+                    </OutputContent>
+                </ContractDirectionTabs>
+            </ChildContent></FormSection></div>; } }
+    private RenderFragment CreationTools => @<div>@if (toolsVisited) { @ToolsFields }</div>;
+    private RenderFragment CreationContracts => @<div>@if (contractsVisited) { @ContractsFields }</div>;
+    private RenderFragment CreationReview => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@T("Identity")</dt><dd>@model!.DisplayName<br /><code>@model.Namespace/@model.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd><dt>@T("Instructions")</dt><dd class="configuration-value">@model.Instructions</dd><dt>@T("ModelProfile")</dt><dd>@model.ModelProfileNamespace/@model.ModelProfileName</dd><dt>@T("RuntimeProfile")</dt><dd>@model.RuntimeProfileNamespace/@model.RuntimeProfileName</dd><dt>@T("Tools")</dt><dd>@string.Join(", ", SelectedToolIds)</dd><dt>@T("GovernedToolSets")</dt><dd>@string.Join(", ", model.ToolSets.Select(t => t.ToolSet.Name))</dd></dl></ChildContent></FormSection>;
+    private EditContext? editContext;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model!);
+    private CreationWizard? creationWizard;
+    private bool ValidCreationFields(params string[] fields) => model is not null && fields.All(field => System.ComponentModel.DataAnnotations.Validator.TryValidateProperty(typeof(AgentEditorModel).GetProperty(field)!.GetValue(model), new(model) { MemberName = field }, null));
+    private bool CreationIdentityComplete => selectedScope is not null && ValidCreationFields(nameof(AgentEditorModel.Name), nameof(AgentEditorModel.DisplayName), nameof(AgentEditorModel.Namespace));
+    private bool CreationConfigurationComplete => ValidCreationFields(nameof(AgentEditorModel.Handler), nameof(AgentEditorModel.Instructions)) && ValidTags;
+    private bool ValidTags { get { try { if (model is not null) _ = model.ToRequest(); return true; } catch (ArgumentException) { return false; } } }
+    private bool CreationExecutionComplete => ValidCreationFields(nameof(AgentEditorModel.ModelProfileName), nameof(AgentEditorModel.RuntimeProfileName));
+    private IReadOnlyList<CreationWizardStep> CreationSteps =>
+    [
+        new("identity", T("Identity"), IdentityFields) { IsComplete = CreationIdentityComplete },
+        new("configuration", T("Configuration"), ConfigurationFields) { IsComplete = CreationConfigurationComplete },
+        new("model-execution", T("ModelAndExecution"), ExecutionFields) { IsComplete = CreationExecutionComplete },
+        new("tools", T("Tools"), CreationTools),
+        new("contracts", T("Contracts"), CreationContracts),
+        new("review", Shared["Verification"], CreationReview) { IsComplete = CreationIdentityComplete && CreationConfigurationComplete && CreationExecutionComplete }
+    ];
+    private void CreationStepChanging(CreationWizardStepChange step) { if (step.To == "tools") toolsVisited = true; if (step.To == "contracts") contractsVisited = true; }
+    private async Task FinishCreationAsync(CreationWizardFinish finish)
+    {
+        var valid = FormContext.Validate();
+        if (!valid || !CreationIdentityComplete || !CreationConfigurationComplete || !CreationExecutionComplete)
+        {
+            finish.ReturnToStepId = !CreationIdentityComplete ? "identity" : !CreationConfigurationComplete ? "configuration" : "model-execution";
+            if (selectedScope is null) errorMessage = T("CreationScopeRequired");
+            else if (!ValidTags) errorMessage = T("CreationConfigurationInvalid");
+            return;
+        }
+        await SaveAsync(applyRuntime: true);
+    }
+
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
@@ -283,6 +308,9 @@ else
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private ResourceGovernance governance = ResourceGovernance.User;
+    private bool accessVisited, policyDirty;
+    private bool CanManageAccess => savedResource is not null && ResourceOwnershipContext.CanManage(selectedScope, Services);
+    private bool HasUnsavedChanges => isDirty || policyDirty;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => IsNew || ResourceOwnershipContext.CanManage(selectedScope, Services);
     private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
@@ -320,6 +348,8 @@ else
         loadedKey = key;
         var version = ++loadVersion;
         loading = true;
+        accessVisited = policyDirty = false;
+        (sourceMode, toolsMode, contractsMode, accessMode, modelMode) = (false, false, false, false, false);
         errorMessage = null;
         try
         {
@@ -337,6 +367,7 @@ else
             runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {
+                savedResource = null; selectedScope = null; etag = null; readiness = null; activeRevision = null; agentModel = null;
                 model = new AgentEditorModel { Namespace = AgentResourceNamespace.Value };
                 var runtimeProfile = runtimeProfiles.FirstOrDefault();
                 if (runtimeProfile is not null)
@@ -418,13 +449,14 @@ else
         new("definition/model-execution", T("ModelAndExecution"), "server"),
         new("definition/tools", T("Tools"), "tool"),
         new("definition/contracts", T("Contracts"), "file-text"),
-        new("access", T("Access"), "key") { Visible = CanManage },
+        new("access", T("Access"), "key") { Visible = CanManageAccess },
         new("yaml", T("Yaml"), "code")
     ];
     private void SelectSection(string? path)
     {
         overviewMode = path == "overview";
-        accessMode = path == "access" && CanManage;
+        accessMode = path == "access" && CanManageAccess;
+        if (accessMode) accessVisited = true;
         toolsMode = path == "definition/tools";
         contractsMode = path == "definition/contracts";
         modelMode = path == "definition/model-execution";
@@ -443,8 +475,9 @@ else
     private void ShowContracts() => ShowSection("definition/contracts");
     private void ShowTools() => ShowSection("definition/tools");
     private void ShowSource() => ShowSection("yaml");
-    private void HandleInvalidSubmit(EditContext editContext)
+    private async Task HandleInvalidSubmit(EditContext editContext)
     {
+        if (IsNew && creationWizard is not null) { await creationWizard.GoToStepAsync(!CreationIdentityComplete ? "identity" : !CreationConfigurationComplete ? "configuration" : "model-execution"); return; }
         var configurationFields = new[] { nameof(AgentEditorModel.DisplayName), nameof(AgentEditorModel.Name), nameof(AgentEditorModel.Instructions), nameof(AgentEditorModel.Handler), nameof(AgentEditorModel.Tags) };
         var configurationInvalid = configurationFields.Any(field => editContext.GetValidationMessages(new FieldIdentifier(model!, field)).Any());
         var modelInvalid = editContext.GetValidationMessages(new FieldIdentifier(model!, nameof(AgentEditorModel.ModelProfileName))).Any()
@@ -504,7 +537,7 @@ else
             if (!rawInitialized || !HasRawDraft && (rawModelFingerprint != Fingerprint || rawUsesSavedDefinition != invalidInput))
             {
                 if (invalidInput && savedResource is not null) InitializeRawYaml(SavedRequest(), true);
-                else InitializeRawYaml(model.ToRequest(), false);
+                else InitializeRawYaml(Request(), false);
             }
         }
         catch (ArgumentException)
@@ -526,10 +559,12 @@ else
             if (!string.Equals(request.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", AgentResourceKinds.Agent));
             if (request.Metadata.Namespace != AgentResourceNamespace) throw new ArgumentException(T("AgentNamespaceImmutable"));
             if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
+            if (!IsNew && request.ScopeRef != selectedScope) throw new ArgumentException(T("ScopeImmutable"));
             var parsedModel = AgentEditorModel.FromRequest(request);
             _ = parsedModel.ToRequest();
             model = parsedModel;
-            rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
+            if (IsNew && request.ScopeRef is not null) selectedScope = request.ScopeRef;
+            rawYaml = ResourceManifestSerializer.ToYaml(Request());
             rawBaseline = rawYaml;
             rawModelFingerprint = Fingerprint;
             successMessage = T("YamlApplied");
@@ -735,6 +770,7 @@ else
     {
         if (!CanManage || model is null || saving) return;
         if (HasRawDraft) { ShowSource(); return; }
+        if (IsNew && selectedScope is null) { errorMessage = T("CreationScopeRequired"); return; }
         saving = true;
         errorMessage = null;
         errorId = null;

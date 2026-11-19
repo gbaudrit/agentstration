@@ -9,6 +9,7 @@ using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -159,6 +160,109 @@ public sealed class AgentResourceTemplateTests
         Assert.IsNull(handler.LastRequest);
     }
 
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public async Task CreationWizardRetainsFieldsAndValidatesBeforeCreatingAndPreparing(string locale)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var handler = new AgentHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = Context(http);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/agents/new");
+        var cut = context.Render<AgentEditor>();
+        var wizard = cut.FindComponent<CreationWizard>().Instance;
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("identity", wizard.CurrentStepId);
+        Assert.IsNull(handler.LastRequest);
+        cut.Find("[data-testid=agent-display-name]").Input("New agent");
+        cut.Find("[data-testid=agent-name]").Input("new-agent");
+        await cut.InvokeAsync(() => cut.FindComponent<Stub<ResourceScopeFormField>>().Instance.Parameters.Get(p => p.ValueChanged).InvokeAsync(ResourceScopeRef.Instance));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("configuration", wizard.CurrentStepId);
+        Assert.IsNull(handler.LastRequest);
+        cut.Find("[data-testid=agent-instructions]").Change("Saved instructions");
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("tools"));
+        Assert.IsNotNull(cut.Find("[data-testid=agent-tool-configuration]"));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("model-execution", wizard.CurrentStepId);
+        await cut.InvokeAsync(() => cut.FindComponent<Stub<ModelProfilePicker>>().Instance.Parameters.Get(p => p.ValueChanged).InvokeAsync("reasoning-default"));
+        cut.Find("[data-testid=agent-runtime-profile]").Change("/instance|default|runtime");
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("identity"));
+        Assert.AreEqual("New agent", cut.Find("[data-testid=agent-display-name]").GetAttribute("value"));
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.IsNotNull(handler.LastRequest);
+        Assert.AreEqual("new-agent", handler.LastRequest.Metadata.Name);
+        Assert.AreEqual(ResourceScopeRef.Instance, handler.LastRequest.ScopeRef);
+        Assert.AreEqual("Saved instructions", handler.LastRequest.Definition.Instructions);
+        Assert.AreEqual(1, handler.Preparations);
+        Assert.IsTrue(handler.CreateOnly);
+        Assert.Contains("/agents/new-agent", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
+    public async Task AccessDraftKeepsItsPanelAndUidAcrossSectionsAndDefinitionGenerationChanges()
+    {
+        using var handler = new AgentHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = Context(http);
+        var cut = context.Render<AgentEditor>(p => p.Add(c => c.Name, "welcome"));
+        var nav = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => nav.NavigateSection("access"));
+        var access = cut.FindComponent<Stub<ResourceAccessPanel>>().Instance;
+        Assert.AreEqual(handler.Current.Uid, access.Parameters.Get(p => p.ResourceUid));
+        await cut.InvokeAsync(() => access.Parameters.Get(p => p.DraftChanged).InvokeAsync(true));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        await cut.InvokeAsync(() => nav.NavigateSection("definition/configuration"));
+        cut.Find("[data-testid=agent-display-name]").Input("Definition saved independently");
+        cut.Find("[data-testid=agent-save-draft]").Click();
+        await cut.Find("#agent-resource-form").SubmitAsync();
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => nav.NavigateSection("access"));
+        Assert.AreSame(access, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance);
+        Assert.AreEqual(handler.Current.Generation, access.Parameters.Get(p => p.Generation));
+        await cut.InvokeAsync(() => access.Parameters.Get(p => p.DraftChanged).InvokeAsync(false));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task YamlIncludesTheExactOwnerAndRejectsChangingIt(bool changeOwner)
+    {
+        using var handler = new AgentHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = Context(http);
+        var cut = context.Render<AgentEditor>(p => p.Add(c => c.Name, "welcome"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("yaml"));
+        var yaml = cut.Find("[data-testid=agent-yaml-editor] textarea").GetAttribute("value")!;
+        Assert.Contains("scopeRef: /instance", yaml);
+        yaml = changeOwner ? yaml.Replace("scopeRef: /instance", "scopeRef: /tenant/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", StringComparison.Ordinal) : yaml.Replace("Saved agent", "Saved from YAML", StringComparison.Ordinal);
+        cut.Find("[data-testid=agent-yaml-editor] textarea").Input(yaml);
+        await cut.Find(".unsaved-changes-bar button.button-primary").ClickAsync();
+        if (changeOwner)
+        {
+            Assert.IsNull(handler.LastRequest);
+            Assert.IsNotNull(cut.Find("[data-testid=agent-yaml-editor] [role=alert]"));
+            Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        }
+        else
+        {
+            Assert.IsNotNull(handler.LastRequest);
+            Assert.AreEqual(ResourceScopeRef.Instance, handler.LastRequest.ScopeRef);
+            Assert.AreEqual("Saved from YAML", handler.Current.Definition.DisplayName);
+            Assert.AreEqual("\"initial\"", handler.LastEtag);
+        }
+    }
+
     private static BunitContext Context(HttpClient http, ResourceScopeRef? scope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
@@ -180,6 +284,7 @@ public sealed class AgentResourceTemplateTests
         context.Services.AddSingleton<IToolCategoriesClient>(new ToolCategoriesApiClient(http));
         context.ComponentFactories.AddStub<ModelProfilePicker>();
         context.ComponentFactories.AddStub<ResourceScopeFormField>();
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
         if (scope is { } owner) context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(owner));
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/agents/welcome");
         return context;
@@ -195,6 +300,8 @@ public sealed class AgentResourceTemplateTests
     {
         public TaskCompletionSource? ModelLookupGate { get; init; }
         private int modelLookups;
+        public int Preparations { get; private set; }
+        public bool CreateOnly { get; private set; }
         public AgentResource Current { get; private set; } = new()
         {
             Uid = Guid.NewGuid(),
@@ -213,13 +320,19 @@ public sealed class AgentResourceTemplateTests
             var path = request.RequestUri!.AbsolutePath;
             if (path.EndsWith("/model", StringComparison.Ordinal) && Interlocked.Increment(ref modelLookups) == 1 && ModelLookupGate is not null)
                 await ModelLookupGate.Task.WaitAsync(cancellationToken);
-            if (path == "/api/agents/welcome")
+            if (path == "/api/runtime/agents/new-agent/prepare")
+            {
+                Preparations++;
+                return new(HttpStatusCode.OK) { Content = JsonContent.Create(new Agentstration.Runtime.Contracts.PrepareAgentRuntimeResponse("new-agent", Current.Generation, "deployment", "revision", "Ready")) };
+            }
+            if (path is "/api/agents/welcome" or "/api/agents/new-agent")
             {
                 if (request.Method == HttpMethod.Put)
                 {
-                    LastEtag = request.Headers.IfMatch.Single().ToString();
+                    LastEtag = request.Headers.IfMatch.SingleOrDefault()?.ToString();
+                    CreateOnly = request.Headers.IfNoneMatch.Any(value => value.Tag == "*");
                     LastRequest = (await request.Content!.ReadFromJsonAsync<AgentResourceRequest>(cancellationToken))!;
-                    Current = Current with { Definition = LastRequest.Definition, Generation = Current.Generation + 1 };
+                    Current = Current with { Metadata = LastRequest.Metadata, ScopeRef = LastRequest.ScopeRef, Definition = LastRequest.Definition, Generation = Current.Generation + 1 };
                 }
                 var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Current) };
                 response.Headers.ETag = new(request.Method == HttpMethod.Put ? "\"updated\"" : "\"initial\"");

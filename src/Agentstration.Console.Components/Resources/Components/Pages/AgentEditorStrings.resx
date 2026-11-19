@@ -128,4 +128,7 @@
   <data name="Middleware" xml:space="preserve"><value>Middleware</value></data>
   <data name="ContextProviders" xml:space="preserve"><value>Context providers</value></data>
   <data name="ModelAndExecution" xml:space="preserve"><value>Model and execution</value></data>
+  <data name="CreationScopeRequired" xml:space="preserve"><value>Select the resource owner scope.</value></data>
+  <data name="ScopeImmutable" xml:space="preserve"><value>The owner scope cannot be changed in YAML.</value></data>
+  <data name="CreationConfigurationInvalid" xml:space="preserve"><value>Check the configuration and declared references.</value></data>
 </root>

@@ -128,4 +128,7 @@
   <data name="Middleware" xml:space="preserve"><value>Intergiciels</value></data>
   <data name="ContextProviders" xml:space="preserve"><value>Fournisseurs de contexte</value></data>
   <data name="ModelAndExecution" xml:space="preserve"><value>Modèle et exécution</value></data>
+  <data name="CreationScopeRequired" xml:space="preserve"><value>Sélectionnez le périmètre propriétaire de la ressource.</value></data>
+  <data name="ScopeImmutable" xml:space="preserve"><value>Le périmètre propriétaire ne peut pas être modifié en YAML.</value></data>
+  <data name="CreationConfigurationInvalid" xml:space="preserve"><value>Vérifiez la configuration et les références déclarées.</value></data>
 </root>

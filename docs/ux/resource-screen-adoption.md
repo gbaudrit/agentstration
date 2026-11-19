@@ -6,7 +6,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 | Route-owning component | Routes | Adoption |
 | --- | --- | --- |
-| AgentEditor.razor | `/agents/new`, `/agents/{Name}` | Existing detail pilot; creation wizard pending |
+| AgentEditor.razor | `/agents/new`, `/agents/{Name}` | Implemented: existing detail pilot extended with a 6-step creation wizard, exact owner in the Identity/YAML views and retained access drafts; 27 Agent/shared-access cases pass before final browser checks |
 | AgentRunner.razor | `/agents/{Name}/run`, `/runs/{RunId}` | Pending review and migration |
 | ConnectedServiceDetails.razor | `/connected-services/{Name}` | Pending review and migration |
 | ConnectedServiceEditor.razor | `/connected-services/new`, `/connected-services/{Name}/edit` | Pending review and migration |

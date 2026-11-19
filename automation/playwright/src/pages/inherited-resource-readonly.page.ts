@@ -162,6 +162,7 @@ export class InheritedResourceReadOnlyPage {
     expect(response?.status()).toBe(200);
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`)
       .waitFor({ state: 'visible' });
+    await new AgentEditorPage(this.page).selectCreationStep('model-execution');
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.modelProfileSearch), profileName);
     await expect(this.page.getByTestId(TestIds.agentEditor.modelProfileChoice)
       .and(this.page.locator(`[data-profile$="|${profileName}"]`))).toHaveCount(1);

@@ -183,6 +183,7 @@ export class DistributionPage {
   public async inspectDirectProfileChoice(consoleUrl: string): Promise<void> {
     await this.page.goto(`${consoleUrl}/agents/new?context=${encodeURIComponent(this.referenceContext ?? '/instance')}`, { waitUntil: 'domcontentloaded' });
     await expect(this.page.getByTestId(TestIds.agentEditor.form)).toHaveAttribute('data-interactive', 'true');
+    await this.page.locator('[data-wizard-step="model-execution"]').click();
     const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
     await expect(toggle).toBeVisible();
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();

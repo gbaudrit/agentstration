@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit, selectFirstAvailable, type ControlSelection } from './controls.js';
@@ -22,6 +23,7 @@ export class AgentEditorPage {
       { waitUntil: 'domcontentloaded' },
     );
     if (!response?.ok()) throw new Error(`New agent page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
 
@@ -45,7 +47,7 @@ export class AgentEditorPage {
     if (!await this.form.isVisible()) await this.openEdit();
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
     if (await this.page.getByTestId("agent-sections").count()) await this.selectSection("definition/tools");
-    else await this.page.getByTestId(TestIds.agentEditor.toolsTab).click();
+    else await this.selectCreationStep('tools');
     await this.page.getByTestId(TestIds.agentEditor.toolSetConfiguration).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.agentEditor.toolConfiguration).waitFor({ state: 'visible' });
   }
@@ -60,10 +62,12 @@ export class AgentEditorPage {
     await this.selectModelProfile(agent.modelProfile);
     await selectFirstAvailable(this.page.getByTestId(TestIds.agentEditor.runtimeProfile), agent.runtimeProfile, 'Runtime profile');
     if (await this.page.getByTestId("agent-sections").count()) await this.openEdit();
+    else await this.selectCreationStep('configuration');
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.instructions), agent.instructions);
   }
 
   public async createAndDeploy(name: string): Promise<void> {
+    await this.selectCreationStep('review');
     const submit = this.page.getByTestId(TestIds.agentEditor.createAndDeploy);
     if ((this.page.viewportSize()?.width ?? 1440) <= 620) {
       await submit.scrollIntoViewIfNeeded();
@@ -83,21 +87,13 @@ export class AgentEditorPage {
     await expect(this.form).toHaveAttribute('data-interactive', 'true');
   }
 
+  public async selectCreationStep(step: 'identity' | 'configuration' | 'model-execution' | 'tools' | 'contracts' | 'review'): Promise<void> {
+    await this.page.locator(`[data-wizard-step="${step}"]`).click();
+    await expect(this.page.locator(`[data-step-id="${step}"]`)).toBeVisible();
+  }
+
   public async selectSection(path: string): Promise<void> {
-    const navigation = this.page.getByTestId('agent-sections');
-    await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
-    let menu = navigation.locator('.resource-navigation-rail');
-    if (!await menu.isVisible()) {
-      await this.page.locator('.resource-header .resource-navigation-trigger').click();
-      menu = navigation.locator('dialog');
-      await expect(menu).toBeVisible();
-    }
-    const link = menu.locator(`a[data-resource-section="${path}"]`);
-    if (!await link.isVisible() && path.includes('/')) await menu.locator('.resource-navigation-row button[aria-controls]').first().click();
-    await link.click();
-    await expect(this.page).toHaveURL(url => url.hash === '#' + path);
-    await expect(navigation.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`)).toHaveAttribute('aria-current', 'page');
-    await expect(navigation.locator('dialog')).toHaveCount(0);
+    await selectResourceSection(this.page, path);
   }
 
   public async openOverview(): Promise<void> {
@@ -113,6 +109,7 @@ export class AgentEditorPage {
 
   public async selectModelProfile(selection: ProfileSelection): Promise<void> {
     if (await this.page.getByTestId("agent-sections").count()) await this.selectSection("definition/model-execution");
+    else await this.selectCreationStep('model-execution');
     const candidates = typeof selection === 'string' ? [selection] : [...selection];
     const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
