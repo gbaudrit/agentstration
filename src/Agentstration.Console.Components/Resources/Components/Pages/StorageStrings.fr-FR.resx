@@ -245,4 +245,9 @@
 <data name="Validation.Configuration"><value>Sélectionnez un type, configurez les liaisons obligatoires et corrigez les erreurs de configuration avant d’enregistrer.</value></data>
 <data name="Validation.DisplayNameRequired"><value>Saisissez un nom d’affichage.</value></data>
 <data name="Validation.TechnicalNameInvalid"><value>Utilisez 1 à 128 lettres minuscules, chiffres, points ou tirets, en commençant par une lettre ou un chiffre.</value></data>
+<data name="Type.IdentityMismatch"><value>Le type de stockage retourné ne correspond pas à l’identité demandée.</value></data>
+<data name="Validation.DisplayNameRange"><value>Utilisez un nom d’affichage de 1 à 200 caractères.</value></data>
+<data name="Validation.DescriptionRange"><value>Utilisez une description de 2 000 caractères au maximum.</value></data>
+<data name="Validation.NamespaceInvalid"><value>Saisissez un espace de noms valide.</value></data>
+<data name="Type.UseUnknown"><value>L’utilisation générique n’a pas été évaluée.</value></data>
 </root>

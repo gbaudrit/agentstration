@@ -74,7 +74,7 @@ public sealed class StorageTypeComponentTests
         var client = new TypesClient { FailWrites = true };
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Action(client.Resource, "edit"));
-        var page = context.Render<StorageTypeEditor>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+        var page = RenderEditor(context, client.Resource.Name);
         page.WaitForElement("[data-testid=storage-type-display-name]").Change("My retained change");
         Assert.IsEmpty(page.FindAll("[data-testid=storage-type-configuration-schema]"));
         page.Find("form").Submit();
@@ -102,7 +102,7 @@ public sealed class StorageTypeComponentTests
         var client = new TypesClient { FailWrites = true };
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Action(client.Resource, "versions/new"));
-        var page = context.Render<StorageTypeEditor>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+        var page = RenderEditor(context, client.Resource.Name);
         page.WaitForElement("[data-testid=storage-type-version]").Change("2.0.0");
         Assert.IsEmpty(page.FindAll("[data-testid=storage-type-display-name]"));
         page.Find("form").Submit();
@@ -137,7 +137,7 @@ public sealed class StorageTypeComponentTests
             if (managed) client.Resource = client.Resource with { Governance = ResourceGovernance.Core("storage.local") };
             using var context = Setup(client, selectedScope: managed ? Scope.Value : ResourceScopeRef.Workspace(Guid.NewGuid()).Value);
             context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Action(client.Resource, "edit"));
-            var page = context.Render<StorageTypeEditor>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+            var page = RenderEditor(context, client.Resource.Name);
             page.WaitForAssertion(() => Assert.IsNotNull(page.Find("[role=note]")));
             Assert.IsEmpty(page.FindAll("[data-testid=storage-type-save]"));
         }
@@ -202,10 +202,71 @@ public sealed class StorageTypeComponentTests
         Assert.IsNull(identity.ScopeRef);
     }
 
+    [TestMethod]
+    public void TypeCreationWizardAllowsIncompleteNavigationAndRetainsTheContractForm()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new TypesClient();
+        using var context = Setup(client);
+        var page = context.Render<StorageTypeEditor>();
+        var form = page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        page.Find("[data-testid=creation-wizard-next]").Click();
+        Assert.AreEqual("step", page.Find("[data-wizard-step=contract]").GetAttribute("aria-current"));
+        Assert.AreEqual("false", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        page.Find("[data-testid=storage-type-configuration-schema]").Change("not-json");
+        page.Find("[data-wizard-step=identity]").Click();
+        page.Find("[data-testid=storage-type-display-name]").Change("Wizard storage type");
+        page.Find("[data-testid=storage-type-name]").Change("wizard-type");
+        page.Find("[data-wizard-step=review]").Click();
+        page.Find("[data-testid=storage-type-save]").Click();
+        Assert.AreEqual("step", page.Find("[data-wizard-step=contract]").GetAttribute("aria-current"));
+        Assert.IsNull(client.Created);
+        Assert.AreEqual("not-json", page.Find("[data-testid=storage-type-configuration-schema]").GetAttribute("value"));
+        Assert.AreSame(form, page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        page.Find("[data-testid=storage-type-configuration-schema]").Change("{\"type\":\"object\"}");
+        page.Find("[data-wizard-step=review]").Click();
+        page.Find("[data-testid=storage-type-save]").Click();
+        page.WaitForAssertion(() => Assert.IsNotNull(client.Created));
+        Assert.IsNotNull(client.Created);
+        Assert.AreEqual("wizard-type", client.Created.Name);
+        Assert.AreEqual("1.0.0", client.Created.Properties.PreferredVersion);
+        Assert.IsNull(client.Created.Properties.Versions.Single().Contribution);
+    }
+
+    [TestMethod]
+    public void NewVersionWizardRequiresAnExplicitVersionAndReturnsToThatImmutableContract()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new TypesClient();
+        var previous = client.Resource.Definition.Versions.Single();
+        using var context = Setup(client);
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo(StorageTypeLinks.Action(client.Resource, "versions/new"));
+        var page = RenderEditor(context, client.Resource.Name);
+        Assert.AreEqual("", page.Find("[data-testid=storage-type-version]").GetAttribute("value"));
+        page.Find("[data-wizard-step=review]").Click(); page.Find("[data-testid=storage-type-save]").Click();
+        Assert.IsNull(client.Published);
+        Assert.AreEqual("step", page.Find("[data-wizard-step=contract]").GetAttribute("aria-current"));
+        page.Find("[data-testid=storage-type-version]").Change("2.0.0");
+        page.Find("[data-wizard-step=review]").Click(); page.Find("[data-testid=storage-type-save]").Click();
+        page.WaitForAssertion(() => Assert.IsNotNull(client.Published));
+        Assert.AreEqual("#versions", new Uri(nav.Uri).Fragment);
+        StringAssert.Contains(new Uri(nav.Uri).Query, "version=2.0.0");
+        Assert.AreEqual(previous, client.Resource.Definition.Versions[0]);
+        Assert.AreEqual("2.0.0", client.Resource.Definition.Versions[1].Version);
+        Assert.AreEqual(previous.Version, client.Resource.Definition.PreferredVersion);
+    }
+
+    private static IRenderedComponent<StorageTypeEditor> RenderEditor(BunitContext context, string name)
+    {
+        var publication = new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath.EndsWith("/versions/new", StringComparison.Ordinal);
+        return context.Render<StorageTypeEditor>(p => p.Add(value => value.Name, name).Add(value => value.Embedded, !publication));
+    }
     private static BunitContext Setup(TypesClient client, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IStorageTypesClient>(client);
         context.Services.AddSingleton(new ConsoleContextState(new ContextProvider(selectedScope ?? Scope.Value)));
@@ -221,6 +282,8 @@ public sealed class StorageTypeComponentTests
     {
         public IReadOnlyList<StorageUsage> Usages { get; init; } = [];
         public int UsageCalls { get; private set; }
+        public int ResourceReads { get; private set; }
+        private int revision;
 
         public StorageTypeResource Resource { get; set; } = Type();
         public bool FailWrites { get; set; }
@@ -231,15 +294,19 @@ public sealed class StorageTypeComponentTests
         public PutStorageTypeRequest? Updated { get; private set; }
         public PublishStorageTypeVersionRequest? Published { get; private set; }
         public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) { ListScope = scope; return Task.FromResult<IReadOnlyList<StorageTypeResource>>([Resource]); }
-        public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag));
+        public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) { ResourceReads++; return Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag)); }
         public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
         public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) { Created = body; return Result(); }
-        public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; return Result(); }
-        public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) { Published = body; LastEtag = etag; return Result(); }
+        public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; return Result(body.Properties); }
+        public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) { Published = body; LastEtag = etag; return Result(Resource.Definition with { Versions = Resource.Definition.Versions.Append(body.Version).ToArray(), PreferredVersion = body.SetPreferred ? body.Version.Version : Resource.Definition.PreferredVersion }); }
         public Task DeleteTypeAsync(ScopedResourceAddress address, string etag, CancellationToken token) => Task.CompletedTask;
-        private Task<ResourceSnapshot<StorageTypeResource>> Result() => FailWrites
-            ? Task.FromException<ResourceSnapshot<StorageTypeResource>>(new AgentstrationApiException("PRIVATE", "id", HttpStatusCode.Conflict, "storage_version_conflict"))
-            : Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag));
+        private Task<ResourceSnapshot<StorageTypeResource>> Result(StorageTypeProperties? properties = null)
+        {
+            if (FailWrites) return Task.FromException<ResourceSnapshot<StorageTypeResource>>(new AgentstrationApiException("PRIVATE", "id", HttpStatusCode.Conflict, "storage_version_conflict"));
+            if (properties is not null) Resource = Resource with { Definition = properties };
+            CurrentEtag = $"\"saved-{++revision}\"";
+            return Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag));
+        }
     }
     private static StorageTypeResource Type()
     {

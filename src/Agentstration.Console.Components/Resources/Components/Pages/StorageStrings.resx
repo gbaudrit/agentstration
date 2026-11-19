@@ -245,4 +245,9 @@
 <data name="Validation.Configuration"><value>Select a type, configure the required bindings and correct the configuration errors before saving.</value></data>
 <data name="Validation.DisplayNameRequired"><value>Enter a display name.</value></data>
 <data name="Validation.TechnicalNameInvalid"><value>Use 1–128 lowercase letters, digits, dots or hyphens, starting with a letter or digit.</value></data>
+<data name="Type.IdentityMismatch"><value>The returned Storage type does not match the requested identity.</value></data>
+<data name="Validation.DisplayNameRange"><value>Use a display name of 1–200 characters.</value></data>
+<data name="Validation.DescriptionRange"><value>Use a description of at most 2,000 characters.</value></data>
+<data name="Validation.NamespaceInvalid"><value>Enter a valid namespace.</value></data>
+<data name="Type.UseUnknown"><value>Generic Use has not been evaluated.</value></data>
 </root>
