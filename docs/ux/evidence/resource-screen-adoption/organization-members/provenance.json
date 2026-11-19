@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "f73e490057311c0750464266278d595e19d2fb2f",
+  "releaseBuild": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "consoleComponentCases": {
+    "passed": 831,
+    "failed": 0
+  },
+  "variants": [
+    "desktop Chromium en-US/dark 1440x1000",
+    "touch Chromium fr-FR/light 390x844"
+  ],
+  "screenshots": [
+    "member-overview-desktop-en.png",
+    "member-pending-role-desktop-en.png",
+    "member-retained-authentication-desktop-en.png",
+    "member-overview-mobile-fr.png",
+    "member-pending-role-mobile-fr.png",
+    "member-retained-authentication-mobile-fr.png"
+  ],
+  "maintainedConsoleAdministrationCasesPassed": 4,
+  "temporaryMemberAndArtifactCasesPassed": 4,
+  "finalFunctionalLanesAndBrowserSmoke": "pending"
+}
