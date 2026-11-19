@@ -2247,17 +2247,17 @@
     {
       "id": "source-providers-source-provider-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
-      "line": 27,
+      "line": 10,
       "host": "console",
       "routes": [
         "/sourceproviders"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceProviderSummaryResponse",
       "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Extension",
         "Contribution"
@@ -2325,6 +2325,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b08e100f6601fdabc4dae88e51dfedbf280e6877"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local name search, identity status filter, Extension/contribution column filters and additional namespace filter; exact totals and local 20/50/100 pages.",
+        "authorization": "PlatformAdmin is rechecked by the API. A successful catalog response authorizes visibility of create only together with target resource-write permission. Context snapshots clear privileged cached data and reauthorize; API denial removes rows and commands.",
+        "states": "Retained compatible refresh rows/view; initial/interactivity, superseded-response and identity-replacement guards.",
+        "actions": "Exact name links and Extension catalog destination retained with context; redundant Open-only menu removed.",
+        "validation": "SourceProviderCollectionTests plus the maintained configured-provider/status regression, current executable desktop/mobile smoke and inventory limits documented in list-layout-adoption.md."
       }
     },
     {
