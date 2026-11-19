@@ -1,12 +1,14 @@
-# Connected services: application evidence
+# Connected services: real application evidence
 
-Source: `81b3095ad9caa023addccb5f3d121476fbe0017b`. These PNGs are screenshots of the running application, not mock-ups. The Release host build completed before the campaign and no referenced assemblies changed during it.
+Product build: `050e9607ef2f53506aedab87cb43aa45aac71fe5` (Release, no warning or error; 823 Console component cases pass). Assemblies stayed unchanged throughout the campaigns. Screenshots are real Chromium captures, not mock-ups.
 
-Creation with incomplete navigation and final validation, saved Identity and configuration, a retained definition draft, explicit discard and actual save. The temporary probe uses tap on its own mobile controls; shared page-object navigation uses click. It does not claim a fresh policy-write or every discovery command.
+Creation with incomplete navigation/final validation, saved Identity, retained definition input, discard and a real metadata save. Both variants now verify positive space between Identity and Configuration, after styles are applied. Mobile probe controls use tap; shared page-object navigation uses click. These images do not claim every discovery command or a policy-write transaction.
 
-Both desktop English/dark (1440×1000) and French touch/light (390×844) pass horizontal-bound checks before each capture. Prerequisites await persisted preferences, language and theme; the operational setup hard-reloads the shell after changing preferences.
+Desktop English/dark is 1440×1000; French light/touch is 390×844. Setup awaits persisted preferences, actual language/theme and context readiness.
 
-At this commit the Release solution build has no warning or error, and all 819 Console component cases pass. The temporary storage, connected-service and operational probes (6 cases), maintained connected/storage collection regression (2 cases), and separate temporary storage-type probes (2 cases) pass. These are focused evidence, not the final required Fast/Integration and browser-smoke validation. New reusable UX journeys remain deferred under the repository authoring rules.
+The first temporary geometry probe measured immediately after navigation and failed before the styles were applied; its failure screenshot already showed the intended gap. The corrected probe polls the SAME positive-spacing assertion with Playwright’s default timeout. Both fresh variants pass on the unchanged product build. No assertion was removed or timeout increased.
+
+Final required Fast/Integration and browser smoke validation remains pending. New reusable UX journeys stay deferred under the repository authoring rules. Later unbuilt member-screen edits are not covered by this source commit.
 
 - [connected-service-review-desktop-en.png](connected-service-review-desktop-en.png)
 - [connected-service-overview-desktop-en.png](connected-service-overview-desktop-en.png)

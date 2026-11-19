@@ -1,14 +1,6 @@
 {
-  "sourceCommit": "81b3095ad9caa023addccb5f3d121476fbe0017b",
-  "hostBuild": "Release, completed before the browser campaign; assemblies unchanged throughout both campaigns",
-  "consoleComponentTests": {
-    "passed": 819,
-    "failed": 0
-  },
-  "variants": [
-    "desktop Chromium, en-US, dark, 1440x1000",
-    "touch Chromium, fr-FR, light, 390x844"
-  ],
+  "productBuildCommit": "050e9607ef2f53506aedab87cb43aa45aac71fe5",
+  "consoleComponentCasesPassed": 823,
   "screenshots": [
     "connected-service-review-desktop-en.png",
     "connected-service-overview-desktop-en.png",
@@ -17,5 +9,11 @@
     "connected-service-overview-mobile-fr.png",
     "connected-service-saved-mobile-fr.png"
   ],
-  "finalFullFunctionalAndSmokeValidation": "pending"
+  "variants": [
+    "desktop en-US/dark 1440x1000",
+    "touch fr-FR/light 390x844"
+  ],
+  "journeySourceChanges": "Artifact and governed-knowledge page objects repaired during validation; record their final commit separately in the adoption matrix. Product binaries stayed unchanged throughout the browser campaigns. Organization member edits were not built and are not validated by these captures.",
+  "finalFunctionalLanesAndSmoke": "pending",
+  "maintainedJourneyRepairCommit": "ce308d23"
 }
