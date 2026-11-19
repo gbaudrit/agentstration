@@ -9,7 +9,7 @@
                 <ResourceIdentityFields DisplayName="@DisplayName" DisplayNameChanged="DisplayNameChanged" DisplayNameExpression="DisplayNameExpression"
                                         TechnicalName="@TechnicalName" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="TechnicalNameExpression"
                                         IsNew="IsNew" Policy="NamePolicy" DisplayNameTestId="@DisplayNameTestId" TechnicalNameTestId="@TechnicalNameTestId" />
-                <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText Value="@Namespace" ValueExpression="NamespaceExpression" Disabled="true" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
+                <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText Value="@Namespace" ValueChanged="NamespaceChanged" ValueExpression="NamespaceExpression" Disabled="@(!IsNew || !NamespaceEditable || ReadOnly)" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
                 <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" Targets="ScopeTargets" />
                 <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" ReadOnly="DescriptionReadOnly" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
                 <FormField Label="@Shared["Labels"]" Class="form-span-2"><LabelsEditor Value="@Labels" ValueChanged="LabelsChanged" ValueExpression="LabelsExpression" ReadOnly="@(ReadOnly || LabelsReadOnly)" /></FormField>
@@ -28,6 +28,8 @@
     [Parameter] public EventCallback<string> TechnicalNameChanged { get; set; }
     [Parameter, EditorRequired] public Expression<Func<string>> TechnicalNameExpression { get; set; } = default!;
     [Parameter, EditorRequired] public string Namespace { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NamespaceChanged { get; set; }
+    [Parameter] public bool NamespaceEditable { get; set; }
     [Parameter, EditorRequired] public Expression<Func<string>> NamespaceExpression { get; set; } = default!;
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public EventCallback<ResourceScopeRef?> ScopeRefChanged { get; set; }

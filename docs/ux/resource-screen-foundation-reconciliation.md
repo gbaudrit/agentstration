@@ -43,7 +43,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `PackProjectDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ParameterEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `ResourcePlanDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
-| `RuntimeProfileEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `RuntimeProfileEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `RuntimeWorkerDetails.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
 | `SchemaEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `SecretEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
@@ -110,3 +110,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Namespace stays immutable; labels are read-only because the existing family API has no metadata mutation contract. Actual saved references preserve namespace/owner/context; no value retrieval/export or activation capability is introduced.
 - TypeScript, both Secret desktop/touch probes, the maintained descendant-grants journey and both Agent regression cases pass. [Real captures, source hashes and focused checks](evidence/resource-screen-foundation/secrets/README.md).
 - Agent product files remain unchanged. One screen commit, synchronized before and after; CI failures remain outside this work.
+
+### RuntimeProfileEditor
+
+- Standard Console template and retained form/state/presentations, actual deployment-count metric before saved Identity/labels, Identity runtime-type enrichments in AdditionalPanels, Configuration execution settings, advanced JSON options, independent Access and final saved YAML.
+- Creation retains its wizard and editable namespace through an opt-in shared Identity capability; saved namespaces remain immutable. Description/labels stay read-only because their writes are unsupported. The family remains Instance-owned; no activation state or owner is invented.
+- Specialized JSON parser/store, enum bindings, notifications, usage-dependent deletion and ETags remain intact. Refresh retains invalid JSON/messages and original ETag until explicit discard; identity replacement/access loss clears private content.
+- All 46 focused cases, TypeScript, both desktop/touch Runtime Profile probes, the maintained model-administration lifecycle and both maintained Agent regression cases pass. [Real captures and exact source hashes](evidence/resource-screen-foundation/runtime-profiles/README.md).
+- Protected Agent product files remain unchanged. Synchronization precedes/follows the screen commit; CI failures remain outside this work.

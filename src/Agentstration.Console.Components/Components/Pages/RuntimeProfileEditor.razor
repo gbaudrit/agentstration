@@ -2,67 +2,72 @@
 @page "/runtimeprofiles/{Name}"
 @implements IDisposable
 @inject IRuntimeProfilesClient Client
+@inject NotificationState Notifications
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
-@inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfileEditorStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+@if (IsNew) { <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
 <PageTitle>@(IsNew ? T("CreateProfile") : $"{Name} · {T("RuntimeProfile")}") · Agentstration</PageTitle>
 @{
     RenderFragment feedback = @<div>
-        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToSave")</strong><span>@error.Message</span></div> }
-        @if (!IsNew && selectedScope is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
         @if (CanManage && usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProfileUsedWarning", DeploymentCount(usages.Count))</div> }
+        @if (newerResource is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
     </div>;
+    var presentations = Presentations;
 }
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (model is null) { @feedback }
-else if (IsNew)
+@if (IsNew)
 {
-    <PageHeader Title="@T("CreateProfile")" Description="@T("Description")" TestId="resource-runtime-profile-editor"><Actions><a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions></PageHeader>
-    @feedback
-    <EditForm @key="model" EditContext="FormContext" FormName="runtime-profile-editor" class="resource-form" data-testid="runtime-profile-form" data-interactive="@(interactive ? "true" : "false")">
-        <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
-        <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
-        <fieldset class="resource-definition-fields" disabled="@saving" data-testid="runtime-profile-definition-fields"><CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="saving" FinishLabel="@T("CreateProfileAction")" FinishTestId="runtime-profile-save" /></fieldset>
-    </EditForm>
+    <PageHeader Title="@T("CreateProfile")" Description="@T("Description")" TestId="resource-runtime-profile-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    @if (loading) { <LoadingState Message="@T("Loading")" /> }
+    else
+    {
+        @feedback
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="runtime-profile-resource-form" FormName="runtime-profile-editor" FieldsTestId="runtime-profile-definition-fields" data-testid="runtime-profile-form" data-resource-etag="@etag"
+            Busy="busy" InvalidInputChanged="value => invalidInput = value" data-interactive="@(interactive ? "true" : "false")">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" FinishLabel="@T("CreateProfileAction")" FinishTestId="runtime-profile-save" />
+        </ResourceDefinitionForm>
+    }
 }
-else if (resource is not null)
+else
 {
-    <ResourceDetailsTemplate Name="@resource.Definition.DisplayName" ResourceType="@T("RuntimeProfile")" Domain="runtime" IconName="server"
-                             TechnicalName="@resource.Name" Namespace="@resource.Namespace.Value" ScopeRef="resource.ScopeRef"
-                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{resource.ScopeRef}")" DefaultSection="overview" SelectionChanged="SelectSection" Feedback="@feedback" HasDraft="@HasMetadataDraft" TestId="resource-runtime-profile-editor">
-        <Metadata>@if (section is "definition/configuration" or "definition/execution") { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
-        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@saving" data-testid="runtime-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/runtimeprofiles">@T("Back")</a></Actions>
-        <Content>
-            <div hidden="@(section != "overview")">
-                <ResourceIdentitySummary DisplayName="@resource.Definition.DisplayName" TechnicalName="@resource.Name" Namespace="@resource.Namespace.Value"><Scope><ResourceScopeBadge ScopeRef="resource.ScopeRef" /></Scope></ResourceIdentitySummary>
-                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></FormSection>
-            </div>
-            <div hidden="@(!section.StartsWith("definition/", StringComparison.Ordinal))">
-                <EditForm @key="model" EditContext="FormContext" OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmit" FormName="runtime-profile-editor" id="runtime-profile-resource-form" class="resource-form" data-testid="runtime-profile-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
-                    <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
-                    <fieldset class="resource-definition-fields" disabled="@(!CanManage || saving)" data-testid="runtime-profile-definition-fields"><div hidden="@(section != "definition/configuration")">@IdentityFields</div><div hidden="@(section != "definition/execution")">@ExecutionFields</div><div hidden="@(section != "definition/options")">@OptionsFields</div></fieldset>
-                </EditForm>
-            </div>
-            <div hidden="@(section != "deployments")">@Deployments</div>
-            @if (accessVisited && CanManageAccess && selectedScope is { } ownerScope) { <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="resource.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@RuntimeProfileResourceKinds.RuntimeProfile" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" /></div> }
-        </Content>
-        <DraftActions><button type="button" class="button-secondary" disabled="@saving" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="runtime-profile-resource-form" class="button-primary" disabled="@saving" data-testid="runtime-profile-save">@(saving ? T("Saving") : T("SaveChanges"))</button></DraftActions>
-    </ResourceDetailsTemplate>
+    <ConsoleResourceDetailsTemplate Resource="resource"
+        Name="@(resource?.Definition.DisplayName ?? Name!)" ResourceType="@T("RuntimeProfile")" Domain="runtime" IconName="server"
+        LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
+        ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" DefinitionSections="DefinitionSections"
+        Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
+        Yaml="@SavedYaml" Busy="busy" TestId="resource-runtime-profile-editor" SectionTestIdPrefix="runtime-profile">
+        <OverviewMetrics><MetricCard Label="@T("Deployments")" Value="@(usageCount?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? Shared["NotProvided"])" /></OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+        </CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="runtime-profile-resource-form" FormName="runtime-profile-editor" FieldsTestId="runtime-profile-definition-fields" data-testid="runtime-profile-form" data-resource-etag="@etag"
+            Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
+            OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
+        <AdditionalContent Context="path">@Deployments</AdditionalContent>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="runtime-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="runtime-profile-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="runtime-profile-save">@(busy ? T("Saving") : T("SaveChanges"))</button> }</DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="runtime-profile-delete-dialog" />
 
+
 @code {
-    private RenderFragment IdentityFields => @<div>        <FormSection Title="@T("Identity")"><ChildContent><FormGrid>
-            <ResourceIdentityFields @bind-DisplayName="Model.DisplayName" @bind-TechnicalName="Model.Name" IsNew="@IsNew" DisplayNameTestId="runtime-profile-display-name" TechnicalNameTestId="runtime-profile-name" />
-            <FormField Label="@T("Namespace")"><ChildContent><ClearableText @bind-Value="Model.Namespace" disabled="@(!IsNew)" /></ChildContent><Validation><ValidationMessage For="() => Model.Namespace" /></Validation></FormField>
-            <ResourceScopeFormField ResourceKind="@RuntimeProfileResourceKinds.RuntimeProfile" Value="@selectedScope" ValueChanged="ScopeChanged" Disabled="@(!IsNew)" />
+    private RuntimeProfileEditorModel Model => model;
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@RuntimeProfileResourceKinds.RuntimeProfile"
+        DisplayName="@Model.DisplayName" DisplayNameChanged="value => Model.DisplayName = value" DisplayNameExpression="@(() => Model.DisplayName)"
+        TechnicalName="@Model.Name" TechnicalNameChanged="value => Model.Name = value" TechnicalNameExpression="@(() => Model.Name)"
+        Namespace="@Model.Namespace" NamespaceChanged="value => Model.Namespace = value" NamespaceEditable="true" NamespaceExpression="@(() => Model.Namespace)"
+        ScopeRef="selectedScope" ScopeRefChanged="ScopeChanged" DescriptionExpression="@(() => Model.Description)" DescriptionReadOnly="true"
+        Labels="@Model.Tags" LabelsExpression="@(() => Model.Tags)" LabelsReadOnly="true" IsNew="IsNew" ReadOnly="@(!CanManage)"
+        DisplayNameTestId="runtime-profile-display-name" TechnicalNameTestId="runtime-profile-name">
+        <AdditionalPanels><FormSection Title="@T("RuntimeType")"><FormGrid>
             <FormField Required="true" Label="@T("RuntimeType")" Class="form-span-2"><ChildContent><ClearableText @bind-Value="Model.RuntimeType" /><small>@T("RuntimeTypeHelpPrefix") <code>microsoft-agent-framework</code> @T("RuntimeTypeHelpSuffix")</small></ChildContent><Validation><ValidationMessage For="() => Model.RuntimeType" /></Validation></FormField>
-        </FormGrid></ChildContent></FormSection>
-</div>;
+        </FormGrid></FormSection></AdditionalPanels>
+    </ResourceIdentityEditor>;
     private RenderFragment ExecutionFields => @<div>        <FormSection Title="@T("ExecutionPolicy")" Eyebrow="@T("Defaults")"><ChildContent><FormGrid>
             <FormField Required="true" Label="@T("SessionMode")"><ChildContent><ClearableSelect @bind-Value="Model.SessionMode">@foreach (var value in Enum.GetValues<RuntimeSessionMode>()) { <option value="@value">@SessionLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => Model.SessionMode" /></Validation></FormField>
             <FormField Required="true" Label="@T("ToolInvocation")"><ChildContent><ClearableSelect @bind-Value="Model.ToolInvocation">@foreach (var value in Enum.GetValues<RuntimeToolInvocationMode>()) { <option value="@value">@ToolInvocationLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => Model.ToolInvocation" /></Validation></FormField>
@@ -71,58 +76,77 @@ else if (resource is not null)
 </div>;
     private RenderFragment OptionsFields => @<div>        <FormSection Title="@T("RuntimeOptions")" Eyebrow="@T("Adapter")"><Actions><span>@T("Advanced")</span></Actions><ChildContent><FormGrid><FormField Label="@T("RuntimeSpecificJson")" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Model.RuntimeOptionsJson" ValueChanged="OptionsChanged" ValueExpression="() => Model.RuntimeOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("RuntimeJsonHelp")</small></ChildContent><Validation><ValidationMessage For="() => Model.RuntimeOptionsJson" /></Validation></FormField></FormGrid></ChildContent></FormSection>
 </div>;
-    private RenderFragment Deployments => @<div>    @if (!IsNew && usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("Deployments")</h2><span>@usages.Count</span></div><ul>@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.Name" Name="@usage.ResourceId" IconName="activity" /><small>@usage.Environment</small></li> }</ul></section> }</div>;
+    private RenderFragment Deployments => @<div>    @if (!IsNew && usages.Count > 0) { <FormSection Title="@T("Deployments")"><Actions><span>@usages.Count</span></Actions><ChildContent><ul>@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.Name" Name="@usage.ResourceId" IconName="activity" /><small>@usage.Environment</small></li> }</ul></ChildContent></FormSection> }</div>;
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@T("Identity")</dt><dd>@Model.DisplayName<br /><code>@Model.Namespace/@Model.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd><dt>@T("RuntimeType")</dt><dd>@Model.RuntimeType</dd><dt>@T("SessionMode")</dt><dd>@SessionLabel(Model.SessionMode)</dd><dt>@T("ToolInvocation")</dt><dd>@ToolInvocationLabel(Model.ToolInvocation)</dd><dt>@T("Streaming")</dt><dd>@StreamingLabel(Model.Streaming)</dd></dl></ChildContent></FormSection>;
 
-    private RuntimeProfileEditorModel Model => model!;
+    private RenderFragment EditAction => @<button type="button" class="button-secondary" @onclick="() => ShowSection(ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) ?? sectionState.DefinitionPath)">@Shared["Edit"]</button>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => IdentityFields, "definition/configuration" => ExecutionFields, "definition/options" => OptionsFields, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
+    private RuntimeProfileEditorModel model = new();
+    private RuntimeProfileResource? resource, newerResource;
+    private IReadOnlyList<RuntimeProfileUsageResponse> usages = [];
+    private int? usageCount;
+    private ResourceScopeRef? selectedScope;
+    private string? etag, newerEtag, loadedKey;
+    private bool busy, refreshing, confirmDelete, interactive, loading, invalidInput;
+    private long loadVersion;
+    private Exception? error;
+    private string baseline = string.Empty;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private EditContext? editContext, optionContext;
+    private ValidationMessageStore? optionMessages;
+    private ResourceDefinitionForm? definitionForm;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
+    private bool HasDraft => !loading && baseline.Length > 0 && (Fingerprint != baseline || invalidInput);
+    private bool CanManage => IsNew || resource is not null && !resource.Governance.IsManaged && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/runtimeprofiles", Services);
+    private string SavedYaml => resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource);
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags), nameof(model.RuntimeType)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.SessionMode), nameof(model.ToolInvocation), nameof(model.Streaming)] },
+        ["definition/options"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.RuntimeOptionsJson)] },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("ResourceYamlExport"), ReadOnlyActions = CanManage ? EditAction : null }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Description)] = Shared["Description"],
+        [nameof(model.Namespace)] = T("Namespace"), [nameof(model.Tags)] = Shared["Labels"], [nameof(model.RuntimeType)] = T("RuntimeType"),
+        [nameof(model.SessionMode)] = T("SessionMode"), [nameof(model.ToolInvocation)] = T("ToolInvocation"), [nameof(model.Streaming)] = T("Streaming"), [nameof(model.RuntimeOptionsJson)] = T("RuntimeSpecificJson")
+    };
+    private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/options", T("RuntimeOptions"), "code")];
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("deployments", T("Deployments"), "list-check") { Visible = usages.Count > 0 }];
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DeploymentCount(int count) => T(count == 1 ? "DeploymentCount.One" : "DeploymentCount.Many", count);
     private string SessionLabel(RuntimeSessionMode value) => Localizer[$"Session.{value}"];
     private string ToolInvocationLabel(RuntimeToolInvocationMode value) => Localizer[$"ToolInvocation.{value}"];
     private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
-    private readonly CancellationTokenSource cancellation = new();
-    private RuntimeProfileEditorModel? model; private RuntimeProfileResource? resource; private IReadOnlyList<RuntimeProfileUsageResponse> usages = []; private string? etag; private AgentstrationApiException? error; private bool saving; private bool confirmDelete; private bool interactive; private bool loading;
-    private ResourceScopeRef? selectedScope;
-    private bool invalidInput;
-    private string savedFingerprint = string.Empty;
     private void ScopeChanged(ResourceScopeRef? value)
     {
-        var initializing = IsNew && selectedScope is null && Fingerprint == savedFingerprint;
+        var initializing = IsNew && selectedScope is null && Fingerprint == baseline;
         selectedScope = value;
-        if (initializing) savedFingerprint = Fingerprint;
+        if (initializing) baseline = Fingerprint;
     }
-    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
-    private bool policyDirty, accessVisited;
-    private bool IsDirty => HasMetadataDraft || policyDirty;
-    private bool HasMetadataDraft => !loading && model is not null && CanManage && (Fingerprint != savedFingerprint || invalidInput);
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManageAccess => resource is not null && selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope, Services);
-    private bool CanManage => IsNew || resource is not null && !resource.Governance.IsManaged && ResourceOwnershipContext.CanManage(selectedScope, Services);
-    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
-    private string section = "overview";
-    private string? loadedKey;
-    private long loadVersion;
-    private EditContext? editContext;
-    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model!);
-    private ValidationMessageStore? optionMessages;
-    private EditContext? optionContext;
-    private bool ValidIdentityField(string name, object value) => model is not null && System.ComponentModel.DataAnnotations.Validator.TryValidateProperty(value, new(model) { MemberName = name }, null);
+    private bool ValidIdentityField(string name, object value) => System.ComponentModel.DataAnnotations.Validator.TryValidateProperty(value, new(model) { MemberName = name }, null);
     private bool IdentityComplete
     {
         get
         {
-            if (model is null || selectedScope is null || !ValidIdentityField(nameof(model.Name), model.Name) || !ValidIdentityField(nameof(model.DisplayName), model.DisplayName) || !ValidIdentityField(nameof(model.RuntimeType), model.RuntimeType)) return false;
+            if (selectedScope is null || !ValidIdentityField(nameof(model.Name), model.Name) || !ValidIdentityField(nameof(model.DisplayName), model.DisplayName) || !ValidIdentityField(nameof(model.RuntimeType), model.RuntimeType)) return false;
             try { _ = ResourceNamespace.Parse(model.Namespace); return true; } catch (ArgumentException) { return false; }
         }
     }
-    private bool ExecutionComplete => model is not null && new[] { nameof(model.SessionMode), nameof(model.ToolInvocation), nameof(model.Streaming) }.All(name => !FormContext.GetValidationMessages(new FieldIdentifier(model, name)).Any());
-    private bool OptionsComplete { get { if (model is null) return false; try { _ = model.ToProperties(); return true; } catch (ArgumentException) { return false; } } }
+    private bool ExecutionComplete => new[] { nameof(model.SessionMode), nameof(model.ToolInvocation), nameof(model.Streaming) }.All(name => !FormContext.GetValidationMessages(new FieldIdentifier(model, name)).Any());
+    private bool OptionsComplete { get { try { _ = model.ToProperties(); return true; } catch (ArgumentException) { return false; } } }
     private bool ValidateOptions()
     {
-        if (model is null) return false;
         if (optionContext != FormContext) { optionContext = FormContext; optionMessages = new(optionContext); }
         optionMessages!.Clear();
         var valid = OptionsComplete;
@@ -131,27 +155,9 @@ else if (resource is not null)
     }
     private void OptionsChanged(string? value)
     {
-        if (model is null) return;
         model.RuntimeOptionsJson = value;
         if (optionContext == FormContext) { optionMessages?.Clear(); FormContext.NotifyValidationStateChanged(); }
     }
-    private void SelectSection(string? path) { section = path ?? "overview"; if (section == "access" && CanManageAccess) accessVisited = true; }
-    private void ShowSection(string path) { section = path; if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
-    private void InvalidSubmit(EditContext context)
-    {
-        var optionsInvalid = model is not null && context.GetValidationMessages(new FieldIdentifier(model, nameof(model.RuntimeOptionsJson))).Any();
-        ShowSection(!IdentityComplete ? "definition/configuration" : optionsInvalid ? "definition/options" : "definition/execution");
-    }
-    private IReadOnlyList<ResourceNavigationItem> Sections =>
-    [
-        new("overview", Shared["Overview"], "home"),
-        new("definition", T("Definition"), "settings") { Navigable = false, Visible = CanManage },
-        new("definition/configuration", Shared["Configuration"], "forms") { Visible = CanManage },
-        new("definition/execution", T("ExecutionPolicy"), "server") { Visible = CanManage },
-        new("definition/options", T("RuntimeOptions"), "code") { Visible = CanManage },
-        new("deployments", T("Deployments"), "list-check") { Visible = usages.Count > 0 },
-        new("access", T("Access"), "key") { Visible = CanManageAccess }
-    ];
     private IReadOnlyList<CreationWizardStep> Steps =>
     [
         new("identity", T("Identity"), IdentityFields) { IsComplete = IdentityComplete },
@@ -162,14 +168,8 @@ else if (resource is not null)
     private async Task FinishAsync(CreationWizardFinish finish)
     {
         var valid = FormContext.Validate(); var optionsValid = ValidateOptions();
-        if (!valid || !optionsValid || !IdentityComplete) { finish.ReturnToStepId = !IdentityComplete ? "identity" : !ExecutionComplete ? "execution" : "options"; return; }
+        if (!valid || !optionsValid || !IdentityComplete) { finish.ReturnToStepId = !IdentityComplete ? "identity" : !ExecutionComplete ? "execution" : "options"; definitionForm?.RequestValidationFocus(); return; }
         await SaveAsync();
-    }
-    private void Discard()
-    {
-        if (saving || resource is null) return;
-        model = RuntimeProfileEditorModel.FromResource(resource); selectedScope = resource.ScopeRef;
-        invalidInput = false; savedFingerprint = Fingerprint; error = null;
     }
     private sealed record ConfigurationEntry(string Label, string Value);
     private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
@@ -180,53 +180,120 @@ else if (resource is not null)
         new(T("Streaming"), StreamingLabel(resource.Definition.Execution.Streaming)),
         new(T("RuntimeOptions"), resource.Definition.RuntimeOptions.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(resource.Definition.RuntimeOptions, new JsonSerializerOptions { WriteIndented = true }))
     ];
-    protected override async Task OnParametersSetAsync()
+    private void ShowSection(string path) { if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
+    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    private void Apply(RuntimeProfileResource value, string version)
     {
-        var key = $"{Name}|{Namespace}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (loadedKey == key) return;
-        loadedKey = key; var version = ++loadVersion; loading = true; error = null; policyDirty = accessVisited = false; model = null; resource = null; usages = []; section = "overview";
+        resource = value; model = RuntimeProfileEditorModel.FromResource(value); selectedScope = value.ScopeRef; etag = version;
+        newerResource = null; newerEtag = null; invalidInput = false; error = null; baseline = Fingerprint;
+    }
+    private void Discard()
+    {
+        if (busy || refreshing || resource is null) return;
+        Apply(newerResource ?? resource, newerEtag ?? etag!);
+    }
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRefValue}|{NavigationScope}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
+    }
+    private void Clear()
+    {
+        resource = newerResource = null; etag = newerEtag = null; selectedScope = null; model = new(); baseline = string.Empty;
+        usages = []; usageCount = null; busy = refreshing = false; invalidInput = confirmDelete = false;
+    }
+    private async Task LoadAsync()
+    {
+        var version = ++loadVersion; var addressKey = $"{Name}|{Namespace}|{ScopeRefValue}";
+        loading = true; loadState = new(ResourceLoadStatus.Loading); error = null; Clear();
         try
         {
-            if (IsNew) { model = new() { Namespace = SelectedNamespace.Value }; selectedScope = null; return; }
-            var snapshot = await Client.GetRuntimeProfileAsync(SelectedNamespace, Name!, cancellation.Token);
-            var references = (await Client.GetRuntimeProfileUsagesAsync(SelectedNamespace, snapshot.Value.Name, cancellation.Token)).Value;
+            if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token); if (version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            loadedKey = $"{addressKey}|{NavigationScope}";
+            var ns = ResourceNamespace.Parse(Namespace);
+            if (IsNew) { model.Namespace = ns.Value; baseline = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return; }
+            var snapshot = await Client.GetRuntimeProfileAsync(ns, Name!, cancellation.Token);
             if (version != loadVersion) return;
-            resource = snapshot.Value; model = RuntimeProfileEditorModel.FromResource(resource); selectedScope = resource.ScopeRef; etag = snapshot.ETag; usages = references;
+            var value = snapshot.Value;
+            if (value.Name != Name || value.Namespace != ns || value.ScopeRef is null || !string.IsNullOrWhiteSpace(ScopeRefValue) && value.ScopeRef != ResourceScopeRef.Parse(ScopeRefValue)) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+            var references = await Client.GetRuntimeProfileUsagesAsync(value.Namespace, value.Name, cancellation.Token);
+            if (version != loadVersion) return;
+            Apply(value, snapshot.ETag); usages = references.Value; usageCount = references.Count;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception) { if (version == loadVersion) { error = exception; loadedKey = null; } }
-        finally { if (version == loadVersion) { loading = false; invalidInput = false; savedFingerprint = Fingerprint; } }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == loadVersion) { Clear(); error = IsNew ? exception : null; loadState = Failure(exception); } }
+        finally { if (version == loadVersion) loading = false; }
     }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    private Task RetryAsync() => busy || loading || refreshing ? Task.CompletedTask : resource is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (IsNew || resource is not { ScopeRef: { } owner } current || loading || refreshing || busy) return;
+        var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetRuntimeProfileAsync(current.Namespace, current.Name, cancellation.Token);
+            if (version != loadVersion) return;
+            var value = snapshot.Value;
+            if (value.Uid != current.Uid || value.ScopeRef != owner || value.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var references = await Client.GetRuntimeProfileUsagesAsync(current.Namespace, current.Name, cancellation.Token);
+            if (version != loadVersion) return;
+            if (HasDraft)
+            {
+                if (etag != snapshot.ETag) { newerResource = value; newerEtag = snapshot.ETag; }
+                else resource = value;
+            }
+            else Apply(value, snapshot.ETag);
+            usages = references.Value; usageCount = references.Count; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (version != loadVersion) return;
+            var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) Clear();
+            loadState = failure with { HasContent = resource is not null };
+        }
+        finally { if (version == loadVersion) refreshing = false; }
+    }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+        System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+        _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     private async Task SaveAsync()
     {
-        if (!CanManage || model is null || saving) return;
-        if (!ValidateOptions()) { ShowSection("definition/options"); return; }
-        saving = true;
-        error = null;
+        if (!CanManage || busy || refreshing) return;
+        if (!ValidateOptions()) { if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; }
+        var version = loadVersion; var current = resource; var wasNew = IsNew; busy = true; error = null;
         try
         {
-            var wasNew = IsNew;
-            var @namespace = ResourceNamespace.Parse(model.Namespace);
-            var snapshot = wasNew
-                ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
-                : await Client.UpdateRuntimeProfileAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token);
+            var snapshot = wasNew ? await Client.CreateRuntimeProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
+                : await Client.UpdateRuntimeProfileAsync(current!.Namespace, current.Name, model.ToPutRequest(), etag!, cancellation.Token);
+            if (version != loadVersion) return;
+            if (snapshot.Value.Name != (wasNew ? model.Name : current!.Name) || snapshot.Value.ScopeRef != selectedScope || snapshot.Value.Namespace.Value != model.Namespace || !wasNew && snapshot.Value.Uid != current!.Uid)
+                throw new InvalidOperationException(T("ResourceIdentityMismatch"));
             Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            invalidInput = false; savedFingerprint = Fingerprint;
-            if (wasNew) Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", snapshot.Value.Name, snapshot.Value.Namespace, snapshot.Value.ScopeRef));
-            else
-            {
-                resource = snapshot.Value;
-                model = RuntimeProfileEditorModel.FromResource(snapshot.Value);
-                selectedScope = snapshot.Value.ScopeRef;
-                etag = snapshot.ETag;
-                savedFingerprint = Fingerprint;
-            }
+            if (wasNew) { baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(ResourceUrl(snapshot.Value)); }
+            else Apply(snapshot.Value, snapshot.ETag);
         }
-        catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { saving = false; }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+        finally { if (version == loadVersion) busy = false; }
     }
-    private void RequestDelete() { if (!CanManage) return; if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProfileUsedError", DeploymentCount(usages.Count)), Guid.NewGuid().ToString("N")); }
-    private async Task DeleteAsync() { if (!CanManage || model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteRuntimeProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); savedFingerprint = Fingerprint; invalidInput = false; Navigation.NavigateTo("/runtimeprofiles"); } catch (AgentstrationApiException exception) { error = exception; } }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private void RequestDelete() { if (!CanManage || busy || refreshing) return; if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProfileUsedError", DeploymentCount(usages.Count)), Guid.NewGuid().ToString("N")); }
+    private async Task DeleteAsync()
+    {
+        if (!CanManage || busy || refreshing || resource is not { } current || etag is null) return;
+        var version = loadVersion; confirmDelete = false; busy = true;
+        try { await Client.DeleteRuntimeProfileAsync(current.Namespace, current.Name, etag, cancellation.Token); if (version != loadVersion) return; baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+        finally { if (version == loadVersion) busy = false; }
+    }
+    private string ResourceUrl(RuntimeProfileResource value) => ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", value.Name, value.Namespace, value.ScopeRef);
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

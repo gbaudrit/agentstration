@@ -52,4 +52,7 @@
   <data name="Definition"><value>Définition</value></data>
   <data name="Access"><value>Accès</value></data>
 <data name="OptionsInvalid"><value>Les options d’exécution doivent former un objet JSON.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>La ressource a changé sur le serveur. Votre brouillon de définition est conservé. Abandonnez-le explicitement pour charger la nouvelle définition.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La ressource renvoyée ne correspond pas à l’identité demandée.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>Ce YAML exporte la ressource enregistrée. Modifiez sa définition pour effectuer des changements.</value></data>
 </root>

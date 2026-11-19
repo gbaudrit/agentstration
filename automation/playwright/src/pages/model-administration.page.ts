@@ -102,7 +102,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateRuntimeDisplayName(value: string): Promise<void> {
-    await selectResourceSection(this.page, 'definition/configuration');
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.runtimeSave),
