@@ -1,22 +1,22 @@
 {
-  "base": "118b9ad71528ee707fc5542bcf18eac417f6e006",
+  "base": "40b9b9d2b31155a5113c1051c9d58ece4419930c",
   "sourceHashes": {
-    "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor": "988c150ffb5125ae3c22318e1848062da350197d13096767cf216fa274160ff3",
-    "tests/Agentstration.Console.Components.Tests/NewToolDefinitionTests.cs": "5217a73174262962a66e925031d357cf1128df8597effccec3cd464df4b71a6c"
+    "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor": "762cc3121c04ce52e37a85d29bef2c1080b3e6eef5c1203ed6c16aad6f7c3133",
+    "tests/Agentstration.Console.Components.Tests/NewToolDefinitionTests.cs": "4bec56711d593b17c00ff889fb55b68d4daf3408c43c6df4ee4dd85200954849"
   },
   "hostHashes": {
-    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "55f6433758025539d4bd99a5fa6b0289c0468ccffcf51cae6c8d14244dece418",
-    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "d90376a1d55157aa4768a8f5bb3d1725e7be6bf14e5cc820ef70aeaf03a91bbf",
-    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "55f6433758025539d4bd99a5fa6b0289c0468ccffcf51cae6c8d14244dece418",
-    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "55f6433758025539d4bd99a5fa6b0289c0468ccffcf51cae6c8d14244dece418",
-    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "d90376a1d55157aa4768a8f5bb3d1725e7be6bf14e5cc820ef70aeaf03a91bbf",
-    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "d90376a1d55157aa4768a8f5bb3d1725e7be6bf14e5cc820ef70aeaf03a91bbf"
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "d9933c660039ea181fc554b2d99008ae078fa48e00578652370350b8b6de51ae",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "725c54ba1b272c75b309816ae7e44d717ae889db1b2be66d29733cd9f99538dc",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "d9933c660039ea181fc554b2d99008ae078fa48e00578652370350b8b6de51ae",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "d9933c660039ea181fc554b2d99008ae078fa48e00578652370350b8b6de51ae",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "725c54ba1b272c75b309816ae7e44d717ae889db1b2be66d29733cd9f99538dc",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "725c54ba1b272c75b309816ae7e44d717ae889db1b2be66d29733cd9f99538dc"
   },
   "phases": [
     {
       "name": "new-tool",
       "exitCode": 0,
-      "seconds": 72.0
+      "seconds": 71.2
     }
   ],
   "completed": true,

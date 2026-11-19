@@ -157,6 +157,7 @@ public sealed class NewToolDefinitionTests
         Assert.IsTrue(rendered.FindAll("[data-testid='tool-definition-identity']").Count == 1);
         Assert.HasCount(0, api.Requests);
         Identity(rendered);
+        Assert.HasCount(0, rendered.FindAll("[role='alert']"));
         rendered.Find("[data-testid='tool-definition-initial-version']").Change("2.01.0");
         await CreateAsync(rendered);
         Assert.AreEqual("identity", rendered.FindComponent<CreationWizard>().Instance.CurrentStepId);

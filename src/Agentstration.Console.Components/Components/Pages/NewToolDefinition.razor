@@ -17,6 +17,7 @@
 else
 {
     @if (ContextState.Current is not null && !ContextState.HasPermission("resources/write")) { <ResourceReadOnlyNotice Reason="ResourceReadOnlyReason.InsufficientPermissions" /> }
+    @if (identityValidationRequested && CanManage && !IdentityComplete) { <p class="error-panel" role="alert">@T("CreationIdentityInvalid")</p> }
     @if (error is not null) { <p class="error-panel" role="alert">@error</p> }
     <EditForm Model="identity" OnSubmit="SubmitAsync" class="resource-form">
         <FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
@@ -96,7 +97,7 @@ else
     private readonly object relayDialogs = new();
     private CreationWizard? wizard;
     private ToolRelayEditor? relayEditor;
-    private bool relayComplete, relayDirty, invalidInput, created;
+    private bool relayComplete, relayDirty, invalidInput, created, identityValidationRequested;
     private bool interactive, contextLoaded, relayVisited, flowVisited, loadingFlow, saving, contractLoaded;
     private string? error;
     private JsonElement? inputSchema, outputSchema;
@@ -190,9 +191,8 @@ else
     private bool ValidateIdentity()
     {
         if (!CanManage) { error = T("CreationScopeRequired"); return false; }
-        if (!identity.IsComplete) { error = T("CreationIdentityInvalid"); return false; }
-        try { _ = ResourceNamespace.Parse(identity.Namespace); }
-        catch (ArgumentException) { error = T("CreationIdentityInvalid"); return false; }
+        identityValidationRequested = true;
+        if (!IdentityComplete) return false;
         error = null;
         return true;
     }
