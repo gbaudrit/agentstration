@@ -34,6 +34,7 @@ public sealed class BootstrapModelDependencies(
         using var deadline = new CancellationTokenSource(timeout, timeProvider);
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         var lastState = "never";
+        var initialAttempt = true;
         try
         {
             while (true)
@@ -51,8 +52,9 @@ public sealed class BootstrapModelDependencies(
                         && model?.Value.Definition.Observation.State == ModelObservationState.Available) return;
                     lastState = observation.ErrorCode ?? observation.State;
                     // Only required providers are expedited; optional providers never consume this deadline.
-                    if (observation.State is "never" or "succeeded")
+                    if (initialAttempt || observation.State is "never" or "succeeded")
                         await observations.RequestAsync(provider.Value, wait.Token);
+                    initialAttempt = false;
                     await discovery.ProcessAsync(provider.Value, wait.Token);
                     observation = await observations.ReadAsync(provider.Value, wait.Token);
                     model = await models.FindAsync(config.Uid, profile.Definition.Model.Name, wait.Token);

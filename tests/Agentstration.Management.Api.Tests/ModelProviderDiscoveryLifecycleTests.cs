@@ -149,15 +149,22 @@ public sealed class ModelProviderDiscoveryLifecycleTests : ModelManagementApiTes
     }
 
     [TestMethod]
-    [DataRow(true)]
-    [DataRow(false)]
-    public async Task StagedBootstrapRequiresTheExactModelBeforeCreatingAProfile(bool modelInstalled)
+    [DataRow(true, false)]
+    [DataRow(false, false)]
+    [DataRow(true, true)]
+    public async Task StagedBootstrapRequiresTheExactModelBeforeCreatingAProfile(bool modelInstalled, bool failedBeforeStartup)
     {
         var adapter = new ControlledDiscovery { Models = [Model(modelInstalled ? "required-model" : "another-model")] };
         await using var factory = DiscoveryFactory(adapter).WithWebHostBuilder(builder =>
             builder.UseSetting("Agentstration:Bootstrap:ModelDependencyTimeout", "00:00:01"));
         using var client = factory.CreateClient();
         using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        if (failedBeforeStartup)
+        {
+            adapter.FailCatalog = true;
+            await ProcessDiscoveryAsync(factory, "ollama-local");
+            adapter.FailCatalog = false;
+        }
         using var execution = factory.Services.CreateScope();
         var handler = execution.ServiceProvider.GetServices<IBootstrapResourceHandler>()
             .Single(value => value.Kind == ModelResourceKinds.ModelProfile);

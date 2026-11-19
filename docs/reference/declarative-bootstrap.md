@@ -622,6 +622,7 @@ Staged startup queues Model Provider discovery before applying dependent Model P
 Each Model Profile requires its exact external model identifier, including its tag;
 a different installed model does not satisfy the dependency. Existing create-only
 profiles retain their saved definition and are checked against that definition.
+A required provider gets an immediate initial attempt even if a previous process retained a later retry deadline. Subsequent failures respect the discovery retry delay.
 Only providers needed by the selected profiles consume this wait. Optional providers
 are reconciled independently by the background discovery worker.
 
