@@ -4523,17 +4523,17 @@
     {
       "id": "runtime-profiles-runtime-profile-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/runtimeprofiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "RuntimeProfileSummaryResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Profile",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Runtime",
         "Session",
@@ -4603,6 +4603,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "fbcedc92ab50e1f905efe73d5edb055f89a7cfb9"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local name search, runtime/session/streaming and namespace filters; exact filtered total with local 20/50/100 paging. No extra reads.",
+        "states": "Refresh retains results; denied reads clear cached rows; request revisions reject superseded and foreign-context responses.",
+        "actions": "Exact name link retained; redundant Open-only column removed; creation requires resources/write.",
+        "validation": "RuntimeProfileCollectionTests; desktop/mobile deterministic smoke recorded in list-layout-adoption.md. Historical captures do not validate this composition."
       }
     },
     {
