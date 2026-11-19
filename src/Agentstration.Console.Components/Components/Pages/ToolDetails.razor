@@ -2,35 +2,42 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLabels
 @inject IToolsClient Client
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolDetailsStrings> Localizer
 
-<UnsavedNavigationGuard IsDirty="policyDirty" HasUnsavedChanges="@(() => policyDirty)" />
-@if (loadError is not null) { <ErrorState Message="@loadError" /> }
-else if (tool is null)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else
-{
-    <PageTitle>@tool.Definition.DisplayName · Agentstration</PageTitle>
-    <ResourceDetailsTemplate ScopeRef="tool.ScopeRef" ResourceType="@T("Tool")" Domain="tool" IconName="wrench" Name="@tool.Definition.DisplayName"
-                             TechnicalName="@tool.Name" Namespace="@tool.Namespace.Value" Description="@tool.Definition.Description"
-                             StatusText="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)"
-                             Enabled="tool.Definition.Enabled" EnabledChanged="ToggleAsync" EnabledDisabled="@(!CanManage || tool.Governance.IsManaged || toggling)" EnabledTestId="tool-enabled-toggle"
-                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{tool.Uid}")" DefaultSection="overview" SelectionChanged="SelectSection" TestId="resource-tool-details">
-        <Actions>@if (CanManage) { <a class="button-secondary" href="@NewDefinitionUrl">@T("NewDefinition")</a> }</Actions>
-        <Feedback>@if (tool.ScopeRef is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }@if (commandError is not null) { <p class="error-panel" role="alert">@commandError</p> }</Feedback>
-        <Content>
-        <div hidden="@(section != "overview")">
-            <ResourceIdentitySummary DisplayName="@tool.Definition.DisplayName" TechnicalName="@tool.Name" Namespace="@tool.Namespace.Value" Description="@tool.Definition.Description"><Scope><ResourceScopeBadge ScopeRef="tool.ScopeRef" /></Scope></ResourceIdentitySummary>
-            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">
-                <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-                    <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
-                    <Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-                </CollectionView>
-            </FormSection>
+<PageTitle>@(tool?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{ var presentations = Presentations; }
+<ConsoleResourceDetailsTemplate Resource="tool" Name="@(tool?.Definition.DisplayName ?? Name)" ResourceType="@T("Tool")" Domain="tool" IconName="wrench" Description="@tool?.Definition.Description"
+    StatusText="@(tool?.Definition.Discovery is { } discovery ? AvailabilityLabel(discovery.Available) : null)" Status="@(tool?.Definition.Discovery?.Available == true ? UiStatus.Success : tool?.Definition.Discovery is null ? UiStatus.Neutral : UiStatus.Warning)"
+    Enabled="tool?.Definition.Enabled" EnabledChanged="ToggleAsync" EnabledDisabled="@(!CanWrite || tool?.Governance.IsManaged != false || toggling || refreshing)" EnabledTestId="tool-enabled-toggle"
+    ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" SelectionChanged="SelectSection"
+    LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@(toggling || submitting)" Yaml="@SavedYaml" TestId="resource-tool-details" SectionTestIdPrefix="tool">
+    <Actions>@if (CanWrite) { <a class="button-secondary" href="@NewDefinitionUrl">@T("NewDefinition")</a> }</Actions>
+    <Feedback>@if (commandError is not null) { <p class="error-panel" role="alert">@commandError</p> }@if (InputContractChanged) { <div class="form-alert form-alert-warning" role="status">@T("InputContractChanged")</div> }</Feedback>
+    <OverviewMetrics>@if (tool?.Definition.Discovery is { } observed) { <MetricCard Label="@T("LastSeen")" Value="@observed.LastSeenAt.ToString("g")" /> }</OverviewMetrics>
+    <OverviewConfiguration>@Configuration</OverviewConfiguration>
+    <OverviewContent>@OverviewPanels</OverviewContent>
+    <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="tool-inspection-form" FormName="tool-inspection"
+        SectionState="sectionState" Sections="presentations" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
+    <AdditionalContent Context="path">@Execution</AdditionalContent>
+</ConsoleResourceDetailsTemplate>
+
+@code {
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.Tool" DisplayName="@model.DisplayName" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="model.ScopeRef"
+        Description="@model.Description" DescriptionExpression="@(() => model.Description)" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" ReadOnly="true" TestId="tool-identity-editor" />;
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+    </CollectionView>;
+    private RenderFragment DefinitionSection(string path) => path switch
+    {
+        "definition/identity" => Identity,
+        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
+    private RenderFragment OverviewPanels => @<div>@if (tool is not null) {
             <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
                 <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
                 <p>@(string.IsNullOrWhiteSpace(tool.Definition.Description) ? T("NoDescription") : tool.Definition.Description)</p>
@@ -59,15 +66,13 @@ else
                     <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
                     <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
                     <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
-                    <dt>@T("AvailableLabel")</dt><dd>@BooleanLabel(tool.Definition.Discovery?.Available == true)</dd>
+                    <dt>@T("AvailableLabel")</dt><dd>@(tool.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")</dd>
                     <dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
                     <dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
                 </dl>
             </section>
-        </div>
-        @if (executionVisited)
-        {
-        <div hidden="@(section != "execution")">
+    }</div>;
+    private RenderFragment Execution => @<div>@if (tool is not null) {
             <section class="panel tool-runner" aria-labelledby="tool-runner-heading" data-testid="tool-runner">
                 <div class="panel-header"><div><h2 id="tool-runner-heading">@T("RunTool")</h2><p class="muted">@T("RunToolHelp")</p></div></div>
                 <div class="tool-run-mode" role="group" aria-label="@T("RunMode")">
@@ -106,7 +111,7 @@ else
                             <span class="tool-run-managed-input" data-testid="tool-run-dry-run-managed">✓ @T("DryRunManaged")</span>
                         }
                     </div>
-                    <JsonSchemaInputEditor Schema="tool.Definition.Schema?.Input" Value="runInput" ValueChanged="ChangeRunInput" ValidationChanged="UpdateRunValidation" LockedValues="ManagedRunValues" Disabled="submitting" />
+                    <JsonSchemaInputEditor @key="inputResetIdentity" Schema="ExecutionSchema?.Input" Value="runInput" ValueChanged="ChangeRunInput" ValidationChanged="UpdateRunValidation" LockedValues="ManagedRunValues" Disabled="submitting" />
                 </div>
                 @if (runError is not null)
                 {
@@ -153,17 +158,8 @@ else
                     </details>
                 </section>
             }
-                </div>
-        }
-        @if (accessVisited && CanManage && tool.ScopeRef is { } accessOwner)
-        {
-            <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="tool.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="accessOwner" Namespace="tool.Namespace" Kind="@ToolResourceKinds.Tool" Name="@tool.Name" Generation="tool.Generation" Governance="tool.Governance" /></div>
-        }
-        </Content>
-    </ResourceDetailsTemplate>
-}
+    }</div>;
 
-@code {
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
@@ -172,15 +168,47 @@ else
     {
         [ToolDryRunContract.ParameterName] = JsonSerializer.SerializeToElement(true)
     };
-    private string section = "overview";
-    private bool executionVisited, accessVisited, policyDirty, toggling;
-    private string? loadedKey, loadError, commandError;
+    private readonly ResourceSectionState sectionState = new();
+    private bool toggling, refreshing, loading;
+    private string? loadedKey, commandError;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ToolInspectionModel model = new();
+    private EditContext? editContext;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    // Keep the visited input editor on its accepted contract until an explicit reset.
+    private ToolResource? executionSnapshot;
+    private Guid inputResetIdentity = Guid.NewGuid();
+    private ToolSchema? ExecutionSchema => (executionSnapshot ?? tool)?.Definition.Schema;
+    private bool InputContractChanged => executionSnapshot is not null && tool is not null
+        && JsonSerializer.Serialize(executionSnapshot.Definition.Schema) != JsonSerializer.Serialize(tool.Definition.Schema);
     private long loadVersion;
     private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", T("TabOverview"), "home"), new("execution", T("TabExecution"), "player-play"), new("access", T("TabAccess"), "lock") { Visible = CanManage }];
-    private void SelectSection(string? value) { section = value ?? "overview"; executionVisited |= section == "execution"; accessVisited |= section == "access"; }
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("execution", T("TabExecution"), "player-play")];
+    private string SavedYaml => tool is null ? string.Empty : ResourceManifestSerializer.ToYaml(tool);
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly"), Fields = [nameof(model.Name), nameof(model.Namespace), nameof(model.DisplayName), nameof(model.Description), nameof(model.Tags), nameof(model.ScopeRef)] },
+        ["definition/configuration"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly") },
+        ["execution"] = new() { Actions = ResetInputsAction },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly") }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = IdentityLabels["TechnicalName"], [nameof(model.DisplayName)] = IdentityLabels["DisplayName"], [nameof(model.Namespace)] = Shared["Namespace"],
+        [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"], [nameof(model.ScopeRef)] = Shared["Scope"]
+    };
+    private void SelectSection(string? value) { if (value == "execution" && executionSnapshot is null && tool is not null) ResetRunInput(); }
+    private void ResetRunInput()
+    {
+        executionSnapshot = tool; inputResetIdentity = Guid.NewGuid();
+        runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
+        runInput = CanSimulate ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { })) : JsonSerializer.SerializeToElement(new { });
+        runInputValid = true; runError = null; runResult = null;
+    }
+    private RenderFragment ResetInputsAction => @<button type="button" class="button-secondary" disabled="@(submitting || toggling || refreshing)" @onclick="ResetRunInput">@T("ResetRunInput")</button>;
     private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => tool is null ? [] : [new(T("TechnicalProvider"), tool.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), tool.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(tool.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(tool.Definition.RequiresApproval)), new(T("AvailableLabel"), BooleanLabel(tool.Definition.Discovery?.Available == true))];
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => tool is null ? [] : [new(T("TechnicalProvider"), tool.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), tool.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(tool.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(tool.Definition.RequiresApproval)), new(T("AvailableLabel"), tool.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")];
     private ToolResource? tool;
     private ToolProviderResource? provider;
     private ExtensionInventoryItemResponse? managingExtension;
@@ -192,8 +220,10 @@ else
     private string? runError;
     private RunToolResponse? runResult;
     private ResourceNamespace ToolNamespace => ResourceNamespace.Parse(NamespaceValue);
-    private bool CanSimulate => ToolDryRunContract.IsSupported(tool?.Definition.Schema?.Input);
+    private bool CanSimulate => ToolDryRunContract.IsSupported(ExecutionSchema?.Input);
     private bool CanManage => tool is not null && tool.ScopeRef is { } owner && ResourceOwnershipContext.CanManage(owner, Services);
+    private bool HasPermission(string permission) => Services.GetService<ConsoleContextState>()?.HasPermission(permission) ?? true;
+    private bool CanWrite => CanManage && HasPermission("resources/write");
     private string NewDefinitionUrl
     {
         get
@@ -206,6 +236,8 @@ else
     private bool CanSubmit => tool is { Definition.Enabled: true }
         && tool.Definition.Discovery?.Available == true
         && runInputValid
+        && !InputContractChanged
+        && HasPermission("runs/execute")
         && !submitting
         && (runMode != ToolRunMode.Execute || !tool.Definition.RequiresApproval);
 
@@ -227,54 +259,87 @@ else
         return generic.ResourceNotFound ? check.Message : generic.Value;
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        var key = $"{Name}|{NamespaceValue}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (key == loadedKey) return;
-        loadedKey = key; var request = ++loadVersion;
-        tool = null; provider = null; managingExtension = null; loadError = commandError = null;
-        section = "overview"; executionVisited = accessVisited = policyDirty = submitting = toggling = false;
+        var key = $"{Name}|{NamespaceValue}|{ScopeRefValue}|{NavigationScope}";
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
+    }
+    private void Clear()
+    {
+        tool = executionSnapshot = null; provider = null; managingExtension = null; etag = commandError = null;
+        model = new(); editContext = null; runInput = JsonSerializer.SerializeToElement(new { }); runInputValid = true; runError = null; runResult = null;
+    }
+    private void Apply(ResourceSnapshot<ToolResource> snapshot)
+    {
+        tool = snapshot.Value; etag = snapshot.ETag; model = ToolInspectionModel.From(snapshot.Value);
+    }
+    private async Task LoadAsync()
+    {
+        var request = ++loadVersion; loading = true; toggling = submitting = refreshing = false; Clear(); loadState = new(ResourceLoadStatus.Loading);
         try
         {
-        var requestedName = Name; var requestedNamespace = ToolNamespace;
-        ResourceScopeRef? requestedOwner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
-        var value = requestedOwner is { } exactOwner
-            ? await Client.GetToolAsync(exactOwner, requestedNamespace, requestedName, cancellation.Token)
-            : await Client.GetToolAsync(requestedNamespace, requestedName, cancellation.Token);
-        if (request != loadVersion) return;
-        var saved = value.Value;
-        if (saved.Name != requestedName || saved.Namespace != requestedNamespace || requestedOwner is { } owner && saved.ScopeRef != owner)
-            throw new InvalidOperationException(T("ResourceIdentityMismatch"));
-        ToolProviderResource? loadedProvider = null;
-        ExtensionInventoryItemResponse? loadedExtension = null;
-        if (Services.GetService<IExtensionsClient>() is { } extensions && saved.Definition.Provider is { } reference
-            && (reference.ScopeRef ?? saved.ScopeRef) is { } providerOwner)
-        {
-            loadedProvider = (await Client.GetProviderAsync(providerOwner, reference.Namespace ?? saved.Namespace, reference.Name, cancellation.Token)).Value;
+            if (Services.GetService<ConsoleContextState>() is { } context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token); if (request != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            loadedKey = $"{Name}|{NamespaceValue}|{ScopeRefValue}|{NavigationScope}";
+            var requestedName = Name; var ns = ToolNamespace;
+            ResourceScopeRef? requestedOwner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+            var snapshot = await (requestedOwner is { } exact ? Client.GetToolAsync(exact, ns, requestedName, cancellation.Token) : Client.GetToolAsync(ns, requestedName, cancellation.Token));
             if (request != loadVersion) return;
+            var saved = snapshot.Value;
+            if (saved.Name != requestedName || saved.Namespace != ns || saved.ScopeRef is null || requestedOwner is { } owner && saved.ScopeRef != owner) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+            var source = await LoadSourceAsync(saved); if (request != loadVersion) return;
+            Apply(snapshot); provider = source.Provider; managingExtension = source.Extension;
+            runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
+            runInput = CanSimulate ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { })) : JsonSerializer.SerializeToElement(new { });
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) { Clear(); loadState = Failure(exception); } }
+        finally { if (request == loadVersion) loading = false; }
+    }
+    private async Task<(ToolProviderResource? Provider, ExtensionInventoryItemResponse? Extension)> LoadSourceAsync(ToolResource saved)
+    {
+        ToolProviderResource? loadedProvider = null; ExtensionInventoryItemResponse? loadedExtension = null;
+        if (Services.GetService<IExtensionsClient>() is { } extensions && saved.Definition.Provider is { } reference && (reference.ScopeRef ?? saved.ScopeRef) is { } owner)
+        {
+            var ns = reference.Namespace ?? saved.Namespace;
+            loadedProvider = (await Client.GetProviderAsync(owner, ns, reference.Name, cancellation.Token)).Value;
+            if (loadedProvider.ScopeRef != owner || loadedProvider.Namespace != ns || loadedProvider.Name != reference.Name) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
             if (loadedProvider.Definition.Aep?.Extension is { } extensionReference)
             {
                 var inventory = await extensions.GetExtensionInventoryAsync(cancellation.Token);
-                if (request != loadVersion) return;
-                loadedExtension = inventory.SingleOrDefault(candidate =>
-                    string.Equals(candidate.RegistrationName, extensionReference.Name, StringComparison.Ordinal)
+                loadedExtension = inventory.SingleOrDefault(candidate => string.Equals(candidate.RegistrationName, extensionReference.Name, StringComparison.Ordinal)
                     && string.Equals(candidate.RegistrationNamespace, (extensionReference.Namespace ?? loadedProvider.Namespace).Value, StringComparison.Ordinal)
                     && candidate.RegistrationScopeRef == (extensionReference.ScopeRef ?? loadedProvider.ScopeRef));
             }
         }
-        if (request != loadVersion) return;
-        tool = saved; etag = value.ETag; provider = loadedProvider; managingExtension = loadedExtension;
-        runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
-        runInput = CanSimulate
-            ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { }))
-            : JsonSerializer.SerializeToElement(new { });
-        runInputValid = true;
-        runError = null;
-        runResult = null;
+        return (loadedProvider, loadedExtension);
+    }
+    private Task RetryAsync() => loading || toggling || submitting || refreshing ? Task.CompletedTask : tool is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (loading || toggling || submitting || refreshing || tool is not { ScopeRef: { } owner } current) return;
+        var request = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetToolAsync(owner, current.Namespace, current.Name, cancellation.Token); if (request != loadVersion) return;
+            var next = snapshot.Value;
+            if (next.Uid != current.Uid || next.ScopeRef != owner || next.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var source = await LoadSourceAsync(next); if (request != loadVersion) return;
+            Apply(snapshot); provider = source.Provider; managingExtension = source.Extension; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) { tool = null; loadError = exception.Message; loadedKey = null; } }
+        catch (Exception exception) { if (request == loadVersion) { var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) Clear(); loadState = failure with { HasContent = tool is not null }; } }
+        finally { if (request == loadVersion) refreshing = false; }
     }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
 
     private string ManagingExtensionUrl => managingExtension?.RegistrationName is null ? "/extensions"
         : ResourceOwnershipContext.Resource(Services, "/extensions", managingExtension.RegistrationName, ResourceNamespace.Parse(managingExtension.RegistrationNamespace), managingExtension.RegistrationScopeRef);
@@ -282,13 +347,14 @@ else
 
     private async Task ToggleAsync(bool enabled)
     {
-        if (!CanManage || tool!.Governance.IsManaged || toggling) return;
+        if (!CanWrite || tool!.Governance.IsManaged || toggling || refreshing) return;
         toggling = true; commandError = null; var request = loadVersion;
         try
         {
             var value = await Client.SetEnabledAsync(tool.Namespace, tool.Name, enabled, etag, cancellation.Token);
             if (request != loadVersion) return;
-            tool = value.Value; etag = value.ETag;
+            if (value.Value.Uid != tool.Uid || value.Value.ScopeRef != tool.ScopeRef || value.Value.Address != tool.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            Apply(value);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { if (request == loadVersion) commandError = exception.Message; }

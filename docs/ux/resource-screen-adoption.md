@@ -100,3 +100,5 @@ The new-foundation Tool Category pass, preserved membership/reference contract a
 The new-foundation Tool Provider pass, retained draft activation, qualified family commands and real evidence are recorded in the [Tool Provider verification report](evidence/resource-screen-foundation/tool-providers/README.md).
 
 The new-foundation Tool Set inspection pass, preserved provenance/policy behavior and observed backend deletion-scope limit are recorded in the [Tool Set verification report](evidence/resource-screen-foundation/tool-sets/README.md).
+
+The new-foundation catalog Tool pass, retained execution contract/parser state and independent permissions are recorded in the [Tool verification report](evidence/resource-screen-foundation/tools/README.md).
