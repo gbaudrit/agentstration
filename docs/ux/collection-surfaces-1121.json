@@ -5850,6 +5850,40 @@
         "evidenceStatus": "Source adopted; current browser validation pending."
       },
       "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-set-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/sets/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved ToolSet declarations and original working version remain distinct from immutable published membership. Current browser validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Category and member references retain exact coordinates; declared version, publication intent, tags and annotations keep their domain meaning. Activation is read-only: the existing family client exposes no enablement command.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
     }
   ],
   "specialized": [

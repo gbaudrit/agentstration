@@ -52,7 +52,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ToolDetails.razor | `/tools/{Name}` | Implemented: saved Identity/configuration, ETag-preserving header activation switch, exact-owner reads and execution, retained execution input/results and Access drafts. 8 Tool and 10 category regression cases pass; fresh browser and final full validation pending |
 | ToolGovernanceAudit.razor | `/tool-governance/{Owner}/{RunId}` | Pending review and migration |
 | ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Implemented; 8 component cases, desktop/mobile overview and Tools probes, and 4 managed-inventory browser variants pass; [real captures](evidence/resource-screen-adoption/tool-providers/README.md). Final full validation remains pending. |
-| ToolSetDetails.razor | `/tools/sets/{Name}` | Pending review and migration |
+| ToolSetDetails.razor | `/tools/sets/{Name}` | Implemented: template, saved Identity/configuration, version history and retained Access. Header activation is read-only because the existing family client has no enablement command. 12 managed-family component cases and source/catalog checks pass; browser and final full validation pending |
 | TransformationFunctionEditor.razor | `/transformation-functions/{Name}` | Pending review and migration |
 | TriggerDetails.razor | `/triggers/{Name}` | Pending review and migration |
 | TriggerEditor.razor | `/triggers/new`, `/triggers/{Name}/edit` | Pending review and migration |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Saved configuration summaries add shared frames: **98 shared frames + 258 active specialized collections = 356**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **99 shared frames + 258 active specialized collections = 357**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 
