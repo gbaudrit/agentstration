@@ -30,10 +30,16 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", catalogue.Find("[data-testid=function-description]").TextContent);
         Assert.IsEmpty(catalogue.FindAll("[data-testid=function-native-kind-create]"));
         Assert.IsFalse(catalogue.FindAll("button").Any(button => button.TextContent == (locale == "fr-FR" ? "Désactiver" : "Disable")));
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("navigate", _ => true).SetResult(navigation.Uri.Split('#')[0] + "#definition/identity");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var editor = context.Render<TransformationFunctionEditor>(parameters => parameters.Add(value => value.Name, "json-select-builtin"));
         Assert.Contains(help, editor.Find("[role=note]").TextContent);
-        Assert.IsTrue(editor.Find("fieldset").HasAttribute("disabled"));
         Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", editor.Find("[data-testid=function-description]").TextContent);
+        await editor.InvokeAsync(() => editor.FindComponent<Agentstration.Web.Components.ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.IsTrue(editor.Find("form > fieldset").HasAttribute("disabled"));
         await editor.Find("form").SubmitAsync();
         Assert.AreEqual(0, client.SaveCount);
     }

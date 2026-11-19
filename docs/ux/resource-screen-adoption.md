@@ -104,3 +104,5 @@ The new-foundation Tool Set inspection pass, preserved provenance/policy behavio
 The new-foundation catalog Tool pass, retained execution contract/parser state and independent permissions are recorded in the [Tool verification report](evidence/resource-screen-foundation/tools/README.md).
 
 Tool governance audit is explicitly reviewed as an execution-event collection, with privacy clearing and targeted desktop/touch verification: [contract justification and evidence](evidence/resource-screen-foundation/tool-governance-audit/README.md).
+
+Transformation Function now uses the resource foundation and CreationWizard, preserving native immutable versions: [verification and real evidence](evidence/resource-screen-foundation/transformation-functions/README.md).
