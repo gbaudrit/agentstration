@@ -161,6 +161,9 @@ export const TestIds = {
   resourceAdministration: {
     agents: 'resource-agents',
     namespacedAgentDetails: 'resource-namespaced-agent-details',
+    managedAgentIdentity: 'managed-agent-identity-editor',
+    managedAgentYaml: 'pack-agent-yaml-editor',
+    managedAgentRefresh: 'pack-agent-refresh',
     agentInstances: 'runtime-agent-instances',
     entries: 'resource-entries',
     modelProfiles: 'resource-model-profiles',
