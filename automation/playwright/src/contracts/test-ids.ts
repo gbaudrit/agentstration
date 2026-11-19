@@ -541,7 +541,6 @@ export const TestIds = {
     runs: 'flow-observability-runs',
     flowRunOpen: 'flow-run-open',
     flowRunDialog: 'flow-run-dialog',
-    flowRunsTab: 'flow-runs-tab',
     flowRunSubmit: 'flow-run-submit',
     runDetails: 'flow-observability-run-details',
     runError: 'flow-run-error',

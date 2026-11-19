@@ -166,8 +166,8 @@ public sealed partial class FlowDetailsDesignerTests
 
         var rendered = context.Render<FlowRunDetails>(parameters => parameters.Add(component => component.RunId, run.Id));
 
-        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope]").TextContent);
-        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope]").TextContent);
+        Assert.AreEqual("/instance", rendered.Find("[data-testid=flow-run-definition-scope] .configuration-value").TextContent);
+        Assert.AreEqual(executionScope.Value, rendered.Find("[data-testid=flow-run-execution-scope] .configuration-value").TextContent);
     }
 
     [TestMethod]

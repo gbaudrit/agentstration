@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { ExpectedTextByLocale } from '../locales/expected-text.js';
@@ -147,7 +148,7 @@ export class ExecutionScopesPage {
       TestIds.flowObservability.flowDetails,
     );
     await expect(async () => {
-      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+      await selectResourceSection(this.page, 'runs');
       await expect(this.page.getByTestId(TestIds.flowObservability.flowRunOpen)).toBeVisible();
     }).toPass({ timeout: 30_000 });
     await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).click();
@@ -208,7 +209,7 @@ export class ExecutionScopesPage {
       );
       const openRun = this.page.getByTestId(TestIds.flowObservability.flowRunOpen);
       await expect(async () => {
-        await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+        await selectResourceSection(this.page, 'runs');
         await expect(openRun).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 20_000 });
       await openRun.click();

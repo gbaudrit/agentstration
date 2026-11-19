@@ -24,7 +24,7 @@ public sealed partial class FlowDetailsDesignerTests
         var topology = rendered.FindComponent<FlowTopologyViewer>().Instance;
         var identity = rendered.FindAll(".form-section").First();
         StringAssert.Contains(identity.TextContent, run.Id);
-        Assert.AreEqual(run.ExecutionScopeRef.Value, rendered.Find("[data-testid=flow-run-execution-scope]").TextContent);
+        Assert.AreEqual(run.ExecutionScopeRef.Value, rendered.Find("[data-testid=flow-run-execution-scope] .configuration-value").TextContent);
         SelectFlowSection(context, "raw-events");
         SelectFlowSection(context, "overview");
         Assert.AreSame(topology, rendered.FindComponent<FlowTopologyViewer>().Instance);

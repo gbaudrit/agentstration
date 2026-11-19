@@ -79,7 +79,7 @@ else
         <div hidden="@(activeTab != RunTab.Summary)">
             <section class="metric-grid"><MetricCard Label="@T("Status")" Value="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /><MetricCard Label="@T("Duration")" Value="@Duration(run.StartedAt, run.CompletedAt)" Status="UiStatus.Neutral" /></section>
             <FormSection Title="@Shared["Identity"]"><dl class="resource-details"><dt>@T("RunIdentifier")</dt><dd><CopyableValue Value="@run.Id" /></dd><dt>@T("FlowAndVersion")</dt><dd><a href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@run.FlowId.Value · @run.FlowVersion</a></dd><dt>@T("CorrelationId")</dt><dd><CopyableValue Value="@run.CorrelationId" /></dd></dl></FormSection>
-            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value" data-testid="@setting.TestId">@setting.Value</span></CollectionValue></Information></CollectionView></FormSection>
+            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" ItemAttributes="SettingAttributes" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView></FormSection>
     @if (run.ProcessOrigin is { } process)
     {
         <div class="panel process-origin" data-testid="flow-process-origin">
@@ -324,6 +324,7 @@ else
     private static string SectionPath(RunTab tab) => tab == RunTab.Summary ? "overview" : tab == RunTab.InputOutput ? "input-output" : tab == RunTab.RawEvents ? "raw-events" : tab.ToString().ToLowerInvariant();
     private IReadOnlyList<ResourceNavigationItem> Sections => AvailableTabs.Select(tab => new ResourceNavigationItem(SectionPath(tab), tab == RunTab.Summary ? Shared["Overview"] : TabLabel(tab), tab switch { RunTab.Summary => "home", RunTab.Worker => "server", RunTab.Causality => "sitemap", RunTab.Activity => "activity", RunTab.InputOutput => "code", _ => "list" })).ToArray();
     private sealed record SavedSetting(string Label, string Value, string? TestId = null);
+    private static IReadOnlyDictionary<string, object> SettingAttributes(SavedSetting value) => value.TestId is { } id ? new Dictionary<string, object> { ["data-testid"] = id } : new Dictionary<string, object>();
     private IReadOnlyList<SavedSetting> SavedConfiguration => run is null ? [] : [
         new(T("DefinitionScope"), run.DefinitionScopeRef?.Value ?? "—", "flow-run-definition-scope"),
         new(T("ExecutionScope"), run.ExecutionScopeRef.Value, "flow-run-execution-scope"),
