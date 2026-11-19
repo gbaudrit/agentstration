@@ -14,10 +14,13 @@ export async function selectResourceSection(page: Page, path: string): Promise<v
     await expect(menu).toBeVisible();
   }
   const link = menu.locator(`a[data-resource-section="${path}"]`);
+  await expect(link).toHaveCount(1);
   if (!await link.isVisible() && path.includes('/')) {
     const parent = path.split('/')[0];
-    await menu.locator(`.resource-navigation-row button[aria-controls$="-${parent}"][aria-expanded=false]`).click();
+    const expander = menu.locator(`.resource-navigation-row button[aria-controls$="-${parent}"]`);
+    if (await expander.getAttribute('aria-expanded') === 'false') await expander.click();
   }
+  await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(url => url.hash === '#' + path);
   await expect(navigation.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`)).toHaveAttribute('aria-current', 'page');

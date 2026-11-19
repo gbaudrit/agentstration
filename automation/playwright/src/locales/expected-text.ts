@@ -115,6 +115,8 @@ export interface ExpectedText {
   inheritedResource: {
     title: string;
     message: string;
+    definitionTitle: string;
+    definitionMessage: string;
     changeScope: string;
   };
   flowDiagnostics: {
@@ -197,6 +199,8 @@ export const ExpectedTextByLocale = {
     inheritedResource: {
       title: 'View only',
       message: 'To modify this resource, go to its owner scope.',
+      definitionTitle: 'Read-only definition',
+      definitionMessage: 'This resource belongs to another scope. Switch to its owner scope to edit its definition.',
       changeScope: 'Change scope',
     },
     flowDiagnostics: {
@@ -277,6 +281,8 @@ export const ExpectedTextByLocale = {
     inheritedResource: {
       title: 'Consultation uniquement',
       message: 'Pour modifier cette ressource, acc\u00e9dez \u00e0 son p\u00e9rim\u00e8tre propri\u00e9taire.',
+      definitionTitle: 'Définition en lecture seule',
+      definitionMessage: 'Cette ressource appartient à un autre périmètre. Passez dans son périmètre propriétaire pour modifier sa définition.',
       changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
     flowDiagnostics: {

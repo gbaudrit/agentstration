@@ -95,9 +95,11 @@ export class InheritedResourceReadOnlyPage {
     ownerLabel: 'Instance' | 'Tenant',
   ): Promise<void> {
     await expect(this.notice).toBeVisible();
-    await expect(this.notice.getByText(expected.title, { exact: true })).toBeVisible();
-    await expect(this.notice.getByText(expected.message, { exact: true })).toBeVisible();
-    await expect(this.notice.getByText(ownerLabel, { exact: true })).toBeVisible();
+    const sharedNotice = await this.notice.evaluate(element => element.classList.contains('resource-readonly-notice'));
+    await expect(this.notice.getByText(sharedNotice ? expected.definitionTitle : expected.title, { exact: true })).toBeVisible();
+    await expect(this.notice.getByText(sharedNotice ? expected.definitionMessage : expected.message, { exact: true })).toBeVisible();
+    const scopePresentation = sharedNotice ? this.page.locator('.resource-header .resource-scope-badge') : this.notice;
+    await expect(scopePresentation.getByText(ownerLabel, { exact: true })).toBeVisible();
     const action = this.notice.getByTestId(TestIds.common.switchToOwnerContext);
     await expect(action).toHaveText(expected.changeScope);
     const ownerScope = ownerLabel === 'Instance' ? '/instance' : /\/tenants\/[0-9a-f-]+/i;
@@ -139,7 +141,7 @@ export class InheritedResourceReadOnlyPage {
   public async assertModelProfileManageable(): Promise<void> {
     await this.expectContext('/instance');
     await expect(this.notice).toHaveCount(0);
-    await this.page.getByTestId(TestIds.modelAdministration.profileEditTab).click();
+    await this.openModelProfileDefinition();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toBeVisible();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDelete)).toBeVisible();
@@ -231,14 +233,20 @@ export class InheritedResourceReadOnlyPage {
     target.searchParams.set('context', contextScope);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     expect(response?.status(), target.toString()).toBe(200);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     if (marker === TestIds.agentEditor.form) await new AgentEditorPage(this.page).openEdit();
-    else {
-      const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-    }
+    else await this.openModelProfileDefinition();
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await this.expectContext(contextScope);
+  }
+
+  private async openModelProfileDefinition(): Promise<void> {
+    const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
+      await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toHaveAttribute('data-interactive', 'true', { timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
 
   private async expectContext(scopeRef: string): Promise<void> {
