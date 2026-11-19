@@ -7,32 +7,19 @@
 
 <PageTitle>@(run is null ? T("Title") : run.Id) · Agentstration</PageTitle>
 <div data-testid="flow-observability-task-run-details" data-task-id="@TaskId" data-run-id="@RunId">
-@if (unavailable)
-{
-    <WorkApiUnavailableState OnRetry="LoadAsync" />
-}
-else if (notFound)
-{
-    <ErrorState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")" />
-}
-else if (run is null)
-{
-    <LoadingState />
-}
-else
-{
-    <ResourceDetailsTemplate Name="@run.Id" ResourceType="@T("Title")" Domain="flow" IconName="sitemap" StatusText="@Label("Status", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())"
-                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection">
-        <Actions><button class="button-secondary" disabled="@loading" @onclick="LoadAsync">@T("Refresh")</button><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId:D}", Services)">@T("BackToTask")</a></Actions>
+    <ResourceDetailsTemplate Name="@(run?.Id ?? RunId)" ResourceType="@T("Title")" Domain="flow" IconName="sitemap"
+                             StatusText="@(run is null ? null : Label("Status", run.Status))" Status="@(run is null ? UiStatus.Neutral : PlatformDashboardService.ToStatus(run.Status.ToString()))"
+                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SectionState="sectionState" SelectionChanged="SelectSection"
+                             LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync">
+        <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId:D}", Services)">@T("BackToTask")</a></Actions>
         <Content>
-        <div data-task-run-section="overview" hidden="@(section != "overview")">
-    <section class="run-summary">
-        <div><span class="field-label">@T("Status")</span><StatusBadge Text="@Label("Status", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /></div>
-        <div><span class="field-label">@T("FlowVersion")</span><strong>@run.FlowId.Value · @run.FlowVersion</strong></div>
-        <div><span class="field-label">@T("DefinitionState")</span><strong>@Label("DefinitionState", run.DefinitionState)</strong></div>
-        <div><span class="field-label">@T("TriggerStartedBy")</span><strong>@Label("Trigger", run.Trigger) · @(run.StartedBy ?? "—")</strong></div>
-        <div><span class="field-label">@T("CorrelationId")</span><code>@run.CorrelationId</code></div>
-    </section>
+        @if (run is not null)
+        {
+        <div data-task-run-section="overview" hidden="@(!sectionState.Is("overview"))">
+            <section class="metric-grid">
+                <MetricCard Label="@T("Status")" Value="@Label("Status", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" />
+                <MetricCard Label="@T("FlowVersion")" Value="@run.FlowVersion" Detail="@($"{run.FlowId.Namespace}/{run.FlowId.Value} · {Label("DefinitionState", run.DefinitionState)}")" />
+            </section>
             <FormSection Title="@Shared["Identity"]"><dl class="resource-details">
                 <dt>@T("RunId")</dt><dd><CopyableValue Value="@run.Id" /></dd>
                 <dt>@T("Task")</dt><dd><a href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId:D}", Services)">@TaskId</a></dd>
@@ -40,7 +27,7 @@ else
                 <dt>@T("ExecutionScope")</dt><dd><code>@run.ExecutionScopeRef</code></dd>
             </dl></FormSection>
             <FormSection Title="@Shared["Configuration"]"><dl class="resource-details">
-                <dt>@T("FlowVersion")</dt><dd>@run.FlowId.Value · @run.FlowVersion</dd>
+                <dt>@T("FlowVersion")</dt><dd>@run.FlowId.Namespace/@run.FlowId.Value · @run.FlowVersion</dd>
                 <dt>@T("DefinitionState")</dt><dd>@Label("DefinitionState", run.DefinitionState)</dd>
                 <dt>@T("TriggerStartedBy")</dt><dd>@Label("Trigger", run.Trigger) · @(run.StartedBy ?? "—")</dd>
             </dl></FormSection>
@@ -49,9 +36,9 @@ else
     {
         <article class="panel run-error"><strong>@run.Error.Code</strong><p>@RunErrorMessage(run.Error)</p>@if (RunErrorDetail(run.Error) is { } detail) { <code>@detail</code> }</article>
     }
-    @if (executionVisited)
+    @if (sectionState.HasVisited("execution"))
     {
-    <div data-task-run-section="execution" hidden="@(section != "execution")">
+    <div data-task-run-section="execution" hidden="@(!sectionState.Is("execution"))">
     <section class="designer-layout run-layout @(inspectorVisible ? null : "inspector-collapsed")">
         <div>
             <FlowTopologyViewer Graph="Topology" SelectedKey="selected?.StepName" SelectedKeyChanged="SelectStep"
@@ -74,9 +61,9 @@ else
     </section>
     </div>
     }
+        }
         </Content>
     </ResourceDetailsTemplate>
-}
 
 </div>
 @code {
@@ -85,35 +72,56 @@ else
     private readonly CancellationTokenSource lifetime = new();
     private FlowRun? run;
     private FlowStepRun? selected;
-    private bool unavailable, notFound;
-    private bool inspectorVisible, executionVisited, loading;
-    private string section = "overview";
+    private bool inspectorVisible, loading;
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private string? loadedKey;
     private long loadVersion;
     private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("execution", T("FlowTopology"), "sitemap")];
-    private void SelectSection(string? value) { section = value ?? "overview"; executionVisited |= section == "execution"; }
+    private void SelectSection(string? value) => sectionState.Select(value ?? "overview");
     private FlowTopologyGraph Topology => run is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(run);
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
         var key = $"{TaskId}|{RunId}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (loadedKey == key) return;
-        loadedKey = key; run = null; selected = null; section = "overview"; executionVisited = inspectorVisible = false;
-        await LoadAsync();
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; ClearInspection(); sectionState.Reset(key);
+        return LoadAsync(refresh: false);
     }
-    private async Task LoadAsync()
+    private Task RetryAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: run is not null);
+    private Task RefreshAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: true);
+    private void ClearInspection() { run = null; selected = null; inspectorVisible = false; }
+    private async Task LoadAsync(bool refresh)
     {
-        var request = ++loadVersion;
-        loading = true; unavailable = false; notFound = false;
+        var request = ++loadVersion; var requestedTask = TaskId; var requestedRun = RunId;
+        var expectedScope = refresh ? run?.ExecutionScopeRef : null;
+        loading = true;
+        if (!refresh) ClearInspection();
+        loadState = new(refresh && run is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = run is not null };
         try
         {
-            var saved = await Client.GetTaskFlowRunAsync(TaskId, RunId, lifetime.Token);
+            var saved = await Client.GetTaskFlowRunAsync(requestedTask, requestedRun, lifetime.Token);
             if (request != loadVersion) return;
-            if (saved.Id != RunId) { notFound = true; run = null; return; }
+            if (saved.Id != requestedRun || !Guid.TryParse(saved.WorkTaskId, out var actualTask) || actualTask != requestedTask
+                || expectedScope is { } scope && saved.ExecutionScopeRef != scope)
+            {
+                ClearInspection(); loadState = new(ResourceLoadStatus.NotFound) { Message = T("NotFoundMessage") }; return;
+            }
             run = saved; selected = run.Steps.FirstOrDefault(value => value.StepName == selected?.StepName) ?? run.Steps.FirstOrDefault();
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { if (request == loadVersion) { notFound = true; run = null; } }
-        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException) { if (request == loadVersion) { unavailable = true; run = null; } }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearInspection();
+            loadState = new(status) { HasContent = run is not null, Message = status == ResourceLoadStatus.NotFound ? T("NotFoundMessage") : null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
         finally { if (request == loadVersion) loading = false; }
     }
     private void SelectStep(string name) => selected = run?.Steps.FirstOrDefault(value => value.StepName == name);
@@ -132,5 +140,5 @@ else
     private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private static string Pretty(JsonElement? value) => value is null ? "—" : Pretty(value.Value);
     private static string Duration(DateTimeOffset? start, DateTimeOffset? end) { if (start is null) return "—"; var value = (end ?? DateTimeOffset.UtcNow) - start.Value; return value.TotalSeconds >= 1 ? $"{value.TotalSeconds:0.##} s" : $"{value.TotalMilliseconds:0} ms"; }
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { ++loadVersion; lifetime.Cancel(); lifetime.Dispose(); }
 }

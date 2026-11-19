@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Resources;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Components;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class TaskFlowRunDetailsTests
+public sealed partial class TaskFlowRunDetailsTests
 {
     [TestMethod]
     public void SavedRunUsesRealIdentityAndRetainsExecutionAcrossFragmentsWithoutReloading()
@@ -32,6 +33,7 @@ public sealed class TaskFlowRunDetailsTests
         rendered.WaitForElement("[data-task-run-section=overview]");
         StringAssert.Contains(rendered.Find("[data-task-run-section=overview]").TextContent, handler.Run.Id);
         StringAssert.Contains(rendered.Find("[data-task-run-section=overview]").TextContent, task.ToString());
+        StringAssert.Contains(rendered.Find("[data-task-run-section=overview]").TextContent, "task-review/task-flow");
         StringAssert.Contains(rendered.Find("[data-task-run-section=overview]").TextContent, handler.Run.ExecutionScopeRef.Value);
         Assert.AreEqual($"/api/tasks/{task:D}/flow-runs/{handler.Run.Id}", handler.Requests.Single());
         Assert.AreEqual(0, rendered.FindAll("[data-task-run-section=execution]").Count);
@@ -51,15 +53,18 @@ public sealed class TaskFlowRunDetailsTests
     [TestMethod]
     [DataRow(HttpStatusCode.NotFound)]
     [DataRow(HttpStatusCode.ServiceUnavailable)]
-    public void FailedReadsKeepTheExistingNotFoundAndRetrySemantics(HttpStatusCode status)
+    public void FailedReadsUseCommonNotFoundAndRetryStates(HttpStatusCode status)
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new RunHandler { Status = status };
         using var http = new HttpClient(handler) { BaseAddress = new("http://localhost/") };
         using var context = Context(http);
         var rendered = context.Render<TaskFlowRunDetails>(p => p.Add(c => c.TaskId, Guid.NewGuid()).Add(c => c.RunId, handler.Run.Id));
-        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, status == HttpStatusCode.NotFound ? "FlowRun not found" : "Work API"));
-        Assert.AreEqual(0, rendered.FindAll(".resource-details-template").Count);
+        rendered.WaitForAssertion(() => Assert.AreEqual(status == HttpStatusCode.NotFound ? ResourceLoadStatus.NotFound : ResourceLoadStatus.Failed,
+            rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status));
+        Assert.IsTrue(rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.BlocksContent);
+        Assert.AreEqual(status == HttpStatusCode.ServiceUnavailable, rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.CanRetry);
+        Assert.IsEmpty(rendered.FindAll("[data-task-run-section]"));
     }
 
     private static BunitContext Context(HttpClient http)
@@ -73,13 +78,18 @@ public sealed class TaskFlowRunDetailsTests
 
     private sealed class RunHandler : HttpMessageHandler
     {
-        public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+        public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
         public List<string> Requests { get; } = [];
-        public FlowRun Run { get; } = CreateRun();
+        public FlowRun Run { get; set; } = CreateRun();
+        public TaskCompletionSource<HttpResponseMessage>? NextRead { get; set; }
+        public bool ReadPending { get; private set; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(request.RequestUri!.AbsolutePath);
-            return Task.FromResult(new HttpResponseMessage(Status) { Content = Status == HttpStatusCode.OK ? JsonContent.Create(Run) : JsonContent.Create(new { title = "Unavailable" }) });
+            if (NextRead is { } pending) { NextRead = null; ReadPending = true; return pending.Task; }
+            var task = request.RequestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries)[2];
+            var value = Run with { WorkTaskId = Run.WorkTaskId ?? task };
+            return Task.FromResult(new HttpResponseMessage(Status) { Content = Status == HttpStatusCode.OK ? JsonContent.Create(value) : JsonContent.Create(new { title = "Unavailable" }) });
         }
         private static FlowRun CreateRun()
         {
@@ -89,13 +99,13 @@ public sealed class TaskFlowRunDetailsTests
             return new()
             {
                 Id = "task-flow-run",
-                FlowId = new("task-flow"),
+                FlowId = new("task-flow", ResourceNamespace.Parse("task-review")),
                 FlowVersion = "1.0.0",
                 Scope = new(Guid.NewGuid(), workspace, Guid.NewGuid()),
                 Input = JsonSerializer.SerializeToElement(new { request = "kept-input" }),
                 CreatedAt = now,
                 Status = FlowRunStatus.Succeeded,
-                DefinitionSnapshot = new(ResourceScopeRef.Instance, new("task-flow"), "1.0.0", null, definition, new Dictionary<string, string>(), now)
+                DefinitionSnapshot = new(ResourceScopeRef.Instance, new("task-flow", ResourceNamespace.Parse("task-review")), "1.0.0", null, definition, new Dictionary<string, string>(), now)
             };
         }
     }
