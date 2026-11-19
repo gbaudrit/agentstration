@@ -119,11 +119,11 @@ public sealed class StorageTypeComponentTests
         client.Resource = client.Resource with { Governance = ResourceGovernance.Core("storage.local", "1.0.0") };
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
-        var page = context.Render<StorageTypeDetails>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+        var page = RenderDetails(context, client.Resource.Name);
         page.WaitForElement("[data-testid=storage-type-managed]");
         Assert.IsEmpty(page.FindAll("[data-testid=storage-type-edit], [data-testid=storage-type-publish], [data-testid=storage-type-delete]"));
-        Assert.HasCount(1, page.FindAll("[data-testid=storage-type-access-tab]"));
-        page.Find("[data-testid=storage-type-definition-tab]").Click();
+        Assert.HasCount(1, page.FindAll(".resource-navigation-rail [data-resource-section=access]"));
+        SelectSection(context, "versions");
         Assert.HasCount(1, page.FindAll("[data-testid=storage-type-version-select]"));
         StringAssert.Contains(page.Markup, client.Resource.Definition.Versions.Single().SchemaDigest);
     }
@@ -172,7 +172,7 @@ public sealed class StorageTypeComponentTests
         var client = new TypesClient { Usages = usages };
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
-        var page = context.Render<StorageTypeDetails>(parameters => parameters.Add(value => value.Name, client.Resource.Name));
+        var page = RenderDetails(context, client.Resource.Name);
         page.WaitForAssertion(() => Assert.HasCount(2, page.FindAll(".resource-links li")));
         var rows = page.FindAll(".resource-links li");
         for (var index = 0; index < rows.Count; index++)
@@ -257,11 +257,67 @@ public sealed class StorageTypeComponentTests
         Assert.AreEqual(previous.Version, client.Resource.Definition.PreferredVersion);
     }
 
+    [TestMethod]
+    public void TypeHeaderActivationKeepsMetadataDraftsAndImmutableVersionsWithTheReturnedEtag()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new TypesClient(); var versions = client.Resource.Definition.Versions;
+        using var context = Setup(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
+        var page = RenderDetails(context, client.Resource.Name);
+        SelectSection(context, "definition/configuration");
+        var editor = page.FindComponent<StorageTypeEditor>().Instance;
+        page.Find("[data-testid=storage-type-display-name]").Change("Pending type title");
+        SelectSection(context, "overview"); page.Find("[data-testid=storage-type-enabled]").Change(false);
+        page.Find("[data-testid=storage-type-disable-confirmation-confirm]").Click();
+        page.WaitForAssertion(() => Assert.IsFalse(client.Resource.Definition.Enabled));
+        Assert.AreEqual("Custom type", client.Resource.Definition.DisplayName);
+        CollectionAssert.AreEqual(versions.ToArray(), client.Resource.Definition.Versions.ToArray());
+        var activationEtag = client.CurrentEtag;
+        SelectSection(context, "definition/configuration");
+        Assert.AreSame(editor, page.FindComponent<StorageTypeEditor>().Instance);
+        Assert.AreEqual("Pending type title", page.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
+        page.Find("form").Submit();
+        page.WaitForAssertion(() => Assert.AreEqual("Pending type title", client.Resource.Definition.DisplayName));
+        Assert.AreEqual(activationEtag, client.LastEtag);
+        Assert.IsFalse(client.Resource.Definition.Enabled);
+        CollectionAssert.AreEqual(versions.ToArray(), client.Resource.Definition.Versions.ToArray());
+    }
+
+    [TestMethod]
+    public void ImmutableVersionChoiceSurvivesSectionChangesWithoutAnotherResourceRead()
+    {
+        var client = new TypesClient(); var initial = client.Resource.Definition.Versions.Single();
+        client.Resource = client.Resource with { Definition = client.Resource.Definition with { Versions = [initial, initial with { Version = "2.0.0" }] } };
+        using var context = Setup(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
+        var page = RenderDetails(context, client.Resource.Name);
+        SelectSection(context, "versions"); page.Find("[data-testid=storage-type-version-select]").Change("2.0.0");
+        SelectSection(context, "overview"); SelectSection(context, "versions");
+        Assert.AreEqual("2.0.0", page.Find("[data-testid=storage-type-version-select]").GetAttribute("value"));
+        Assert.AreEqual(1, client.ResourceReads);
+        Assert.AreEqual(initial.Version, client.Resource.Definition.PreferredVersion);
+    }
+
     private static IRenderedComponent<StorageTypeEditor> RenderEditor(BunitContext context, string name)
     {
         var publication = new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath.EndsWith("/versions/new", StringComparison.Ordinal);
         return context.Render<StorageTypeEditor>(p => p.Add(value => value.Name, name).Add(value => value.Embedded, !publication));
     }
+    private static IRenderedComponent<StorageTypeDetails> RenderDetails(BunitContext context, string name)
+    {
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult(nav.Uri.Split('#')[0] + "#overview");
+        return context.Render<StorageTypeDetails>(p => p.Add(value => value.Name, name));
+    }
+    private static void SelectSection(BunitContext context, string path)
+    {
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo(nav.Uri.Split('#')[0] + "#" + path);
+    }
+
     private static BunitContext Setup(TypesClient client, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
