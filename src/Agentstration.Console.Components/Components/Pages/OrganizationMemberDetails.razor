@@ -1,34 +1,48 @@
 @page "/settings/organization/members/{UserId:guid}"
+@implements IDisposable
 @inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
 @inject ConsoleContextState ContextState
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("MemberAccess") · Agentstration</PageTitle>
+<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
+<ConfirmationDialog IsOpen="confirmRefresh" OnConfirm="ReloadAsync" OnCancel="() => confirmRefresh = false" Title="@Shared["LeaveTitle"]" Message="@Shared["LeaveMessage"]" ConfirmLabel="@Shared["Discard"]" />
 <div data-testid="console-admin-organization-member-details" data-member-id="@UserId">
-@if (member is null) { <LoadingState Message="@T("LoadingMemberAccess")" /> }
-else
+@if (loading) { <LoadingState Message="@T("LoadingMemberAccess")" /> }
+else if (error is not null) { <ErrorState Title="@Shared["Unavailable"]" Message="@error" /><button class="button-secondary" type="button" @onclick="ReloadAsync">@T("Member.Refresh")</button> }
+else if (member is not null)
 {
-    <PageHeader Title="@member.Principal.DisplayName" Description="@T("MemberAccess.Description")" />
-    <OrganizationSettingsNav />
-    <section class="dashboard-grid">
-        <article class="panel"><div class="panel-header"><h2>@T("Principal")</h2><StatusBadge Text="@T($"Status.{member.Principal.Status}")" Status="UiStatus.Success" /></div><p><strong>@T("Kind"):</strong> @member.Principal.Kind</p><p><strong>@T("Email"):</strong> @(member.Principal.Email ?? "—")</p><p><strong>@T("PrincipalId"):</strong> <code>@member.Principal.Id</code></p><p><strong>@T("InstanceRole"):</strong> @(targetIsPlatformAdministrator ? T("PlatformAdministrator") : "—")</p>@foreach(var identity in member.ExternalIdentities){<p><strong>@T("ExternalIdentity"):</strong> <code>@identity.Issuer</code> · <code>@identity.Subject</code></p>}</article>
-        <article class="panel"><div class="panel-header"><h2>@T("Membership")</h2><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" /></div><p>@T("JoinedAt", member.Membership.JoinedAt.ToLocalTime().ToString("g"))</p></article>
-    </section>
-    <section class="panel" style="margin-top:18px"><div class="panel-header"><h2>@T("RoleAssignments")</h2></div>@if(member.Roles.Count == 0){<EmptyState Title="@T("NoAccessAssigned")" Message="@T("MembershipNoAccess")" />}else{@foreach(var assigned in member.Roles){<article><p><strong>@assigned.Role.DisplayName</strong> @if(assigned.Scope.StartsWith("/tenants/",StringComparison.Ordinal)){<StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" />}</p><code>@assigned.Scope</code></article>}}</section>
-    <FormSection Title="@T("CurrentWorkspaceMembership")" style="margin-top:18px"><ChildContent>
+    <ResourceDetailsTemplate Name="@member.Principal.DisplayName" ResourceType="@T("MemberAccess")" Domain="identity" IconName="user"
+                             Description="@T("MemberAccess.Description")" StatusText="@T($"Status.{member.Principal.Status}")" Status="@(member.Principal.Status == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Neutral)"
+                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection">
+        <Metadata><CopyableValue Value="@UserId.ToString("D")" /></Metadata>
+        <Actions><button class="button-secondary" type="button" disabled="@busy" @onclick="RefreshAsync">@T("Member.Refresh")</button><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/settings/organization/members", Services)">@T("Members")</a></Actions>
+        <Content>
+        <div hidden="@(section != "overview")">
+            <section class="metric-grid"><MetricCard Label="@T("Principal")" Value="@T($"Status.{member.Principal.Status}")" Status="@(member.Principal.Status == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Neutral)" /><MetricCard Label="@T("Membership")" Value="@T($"Status.{member.Membership.Status}")" Detail="@T("JoinedAt", member.Membership.JoinedAt.ToLocalTime().ToString("g"))" Status="@(member.Membership.Status == MembershipStatus.Active ? UiStatus.Success : UiStatus.Warning)" /></section>
+            <FormSection Title="@Shared["Identity"]" Class="resource-identity-summary"><dl class="resource-details member-details"><dt>@T("DisplayName")</dt><dd>@member.Principal.DisplayName</dd><dt>@T("PrincipalId")</dt><dd><CopyableValue Value="@member.Principal.Id.ToString("D")" /></dd><dt>@T("Kind")</dt><dd>@T($"PrincipalKind.{member.Principal.Kind}")</dd><dt>@T("Email")</dt><dd>@(member.Principal.Email ?? "—")</dd>@foreach (var identity in member.ExternalIdentities) { <dt>@T("ExternalIdentity")</dt><dd><code>@identity.Issuer</code> · <code>@identity.Subject</code></dd> }</dl></FormSection>
+            <FormSection Title="@Shared["Configuration"]"><dl class="resource-details member-details"><dt>@T("Workspace")</dt><dd>@ContextState.Current?.WorkspaceDisplayName <code>@loadedWorkspace</code></dd><dt>@T("CurrentWorkspaceMembership")</dt><dd>@(workspaceMembership?.Role ?? "—")</dd><dt>@T("InstanceRole")</dt><dd>@(targetIsPlatformAdministrator ? T("PlatformAdministrator") : "—")</dd></dl></FormSection>
+            <FormSection Title="@T("RoleAssignments")">@if (member.Roles.Count == 0) { <EmptyState Title="@T("NoAccessAssigned")" Message="@T("MembershipNoAccess")" /> } else { @foreach (var assigned in member.Roles) { <article><p><strong>@assigned.Role.DisplayName</strong> @if (assigned.Scope.StartsWith("/tenants/", StringComparison.Ordinal)) { <StatusBadge Text="@T("Inherited")" Status="UiStatus.Info" /> }</p><code class="member-scope">@assigned.Scope</code></article> } }</FormSection>
+        </div>
+        <div hidden="@(section != "membership")">
+    <FormSection Title="@T("CurrentWorkspaceMembership")"><ChildContent>
         @if (!string.IsNullOrWhiteSpace(message)) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")">@message</p> }
-        <FormGrid><FormField Label="@T("Role")"><ChildContent><ClearableSelect @bind-Value="selectedRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</ClearableSelect></ChildContent></FormField></FormGrid>
-        <FormActions><button class="button-primary" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</FormActions>
+        <FormGrid><FormField Label="@T("Role")"><ChildContent><ClearableSelect Disabled="@(busy || !CanManageMembership)" @bind-Value="selectedRole">@foreach(var role in Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.All){<option value="@role">@role</option>}</ClearableSelect></ChildContent></FormField></FormGrid>
+        <FormActions><button class="button-primary" disabled="@(busy || !CanManageMembership)" @onclick="SaveMembershipAsync">@T("SaveRole")</button>@if(workspaceMembership is not null){<button class="button-secondary" disabled="@(busy || !CanManageMembership)" @onclick="RemoveMembershipAsync">@T("RemoveFromWorkspace")</button>}</FormActions>
     </ChildContent></FormSection>
-    @if (canManagePlatformAdministrators)
-    {
-        <FormSection Title="@T("ExternalAuthentication")" style="margin-top:18px"><ChildContent>
+        </div>
+        @if (canManagePlatformAdministrators)
+        {
+            <div hidden="@(section != "authentication")">
+        <FormSection Title="@T("ExternalAuthentication")"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(identityMessage)) { <p class="form-alert @(identityError ? "form-alert-danger" : "form-alert-success")">@identityMessage</p> }
             <FormGrid>
-                <FormField Label="@T("Issuer")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></ChildContent></FormField>
-                <FormField Label="@T("Subject")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newSubject" autocomplete="off" /></ChildContent></FormField>
+                <FormField Label="@T("Issuer")"><ChildContent><ClearableText Disabled="busy" UpdateOnInput="false" @bind-Value="newIssuer" placeholder="https://identity.example/realms/company" autocomplete="off" /></ChildContent></FormField>
+                <FormField Label="@T("Subject")"><ChildContent><ClearableText Disabled="busy" UpdateOnInput="false" @bind-Value="newSubject" autocomplete="off" /></ChildContent></FormField>
             </FormGrid>
-            <FormActions><button class="button-primary" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></FormActions>
+            <FormActions><button class="button-primary" disabled="@busy" @onclick="LinkExternalIdentityAsync">@T("LinkExternalIdentity")</button></FormActions>
             @if (member.ExternalIdentities.Count > 0)
             {
                 <CollectionView TItem="ExternalIdentity" Items="member.ExternalIdentities" InformationLabels="@(new string[] { T("Subject"), T("Linked") })" IdentityLabel="@T("Issuer")">
@@ -39,85 +53,132 @@ else
             <CollectionValue Label="@T("Linked")">@identity.LinkedAt.ToLocalTime().ToString("g")</CollectionValue>
         </Information>
         <Actions Context="identity">
-<CollectionActions ResourceName="@(identity.Subject)"><button class="text-button" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></CollectionActions></Actions>
+<CollectionActions ResourceName="@(identity.Subject)"><button class="text-button" disabled="@busy" @onclick="() => UnlinkExternalIdentityAsync(identity.Id)">@T("Unlink")</button></CollectionActions></Actions>
     </CollectionView>
             }
         </ChildContent></FormSection>
-        <FormSection Title="@T("InstanceAdministration")" style="margin-top:18px"><ChildContent>
+            </div>
+            <div hidden="@(section != "administration")">
+        <FormSection Title="@T("InstanceAdministration")"><ChildContent>
             @if (!string.IsNullOrWhiteSpace(platformMessage)) { <p class="form-alert @(platformError ? "form-alert-danger" : "form-alert-success")">@platformMessage</p> }
             <FormActions>
                 @if (targetIsPlatformAdministrator)
                 {
-                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(UserId == ContextState.Current?.UserId)">@T("RevokePlatformAdmin")</button>
+                    <button class="button-secondary" @onclick="RevokePlatformAdministratorAsync" disabled="@(busy || UserId == ContextState.Current?.UserId)">@T("RevokePlatformAdmin")</button>
                 }
                 else
                 {
-                    <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(member.Principal.Status != PrincipalStatus.Active)">@T("GrantPlatformAdmin")</button>
+                    <button class="button-primary" @onclick="GrantPlatformAdministratorAsync" disabled="@(busy || member.Principal.Status != PrincipalStatus.Active)">@T("GrantPlatformAdmin")</button>
                 }
             </FormActions>
-        </ChildContent></FormSection>
-    }
+        </ChildContent></FormSection>            </div>
+        }
+        </Content>
+    </ResourceDetailsTemplate>
 }
 </div>
 
 @code {
     [Parameter] public Guid UserId { get; set; }
-    private Agentstration.Identity.Contracts.OrganizationMemberResponse? member;
-    private Agentstration.Identity.Contracts.WorkspaceMemberResponse? workspaceMembership; private string selectedRole = Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Viewer; private string? message; private bool hasError;
-    private bool canManagePlatformAdministrators; private bool targetIsPlatformAdministrator; private string? platformMessage; private bool platformError;
-    private string newIssuer = ""; private string newSubject = ""; private string? identityMessage; private bool identityError;
+    private readonly CancellationTokenSource lifetime = new();
+    private OrganizationMemberResponse? member;
+    private WorkspaceMemberResponse? workspaceMembership;
+    private string section = "overview", selectedRole = BuiltInIdentityRoleNames.Viewer, roleBaseline = BuiltInIdentityRoleNames.Viewer;
+    private string newIssuer = "", newSubject = "";
+    private string? loadedKey, error, message, platformMessage, identityMessage;
+    private Guid loadedWorkspace;
+    private long loadVersion;
+    private bool loading = true, busy, confirmRefresh, hasError, platformError, identityError, canManagePlatformAdministrators, targetIsPlatformAdministrator;
+    private bool CanManageMembership => ContextState.HasPermission(AuthorizationPermissions.AuthorizationWrite);
+    private bool IsDirty => !loading && member is not null && (selectedRole != roleBaseline || newIssuer.Length > 0 || newSubject.Length > 0);
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("membership", T("CurrentWorkspaceMembership"), "users"), new("authentication", T("ExternalAuthentication"), "key") { Visible = canManagePlatformAdministrators }, new("administration", T("InstanceAdministration"), "shield") { Visible = canManagePlatformAdministrators }];
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    protected override async Task OnParametersSetAsync()
+    private string ContextKey => $"{UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private void SelectSection(string? value) => section = value ?? "overview";
+    protected override Task OnParametersSetAsync() => loadedKey == ContextKey ? Task.CompletedTask : LoadAsync();
+    private async Task LoadAsync()
     {
-        if (ContextState.Current is null) await ContextState.LoadAsync(default);
-        var workspaceId = ContextState.Current?.WorkspaceId ?? throw new InvalidOperationException("The Console context is unavailable.");
-        member = (await Client.GetOrganizationAsync(default)).Members.SingleOrDefault(value => value.Principal.Id == UserId);
-        workspaceMembership = (await Client.GetWorkspaceMembersAsync(workspaceId, default)).SingleOrDefault(value => value.Principal.Id == UserId);
-        selectedRole = workspaceMembership?.Role ?? Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Viewer;
-        canManagePlatformAdministrators = (await Client.GetCapabilitiesAsync(default)).IsPlatformAdministrator;
-        if (canManagePlatformAdministrators)
-            targetIsPlatformAdministrator = (await Client.GetPlatformAdministratorsAsync(default)).Any(value => value.Principal.Id == UserId);
+        loadedKey = ContextKey; var request = ++loadVersion; var userId = UserId;
+        loading = true; member = null; workspaceMembership = null; error = message = identityMessage = platformMessage = null;
+        selectedRole = roleBaseline = BuiltInIdentityRoleNames.Viewer; newIssuer = newSubject = "";
+        busy = confirmRefresh = canManagePlatformAdministrators = targetIsPlatformAdministrator = false; section = "overview";
+        try
+        {
+            await ContextState.EnsureLoadedAsync(lifetime.Token);
+            if (request != loadVersion) return;
+            loadedKey = ContextKey;
+            var workspace = ContextState.Current!.WorkspaceId;
+            var organization = await Client.GetOrganizationAsync(lifetime.Token);
+            if (request != loadVersion) return;
+            var memberships = await Client.GetWorkspaceMembersAsync(workspace, lifetime.Token);
+            if (request != loadVersion) return;
+            var capabilities = await Client.GetCapabilitiesAsync(lifetime.Token);
+            if (request != loadVersion) return;
+            var administrators = capabilities.IsPlatformAdministrator ? await Client.GetPlatformAdministratorsAsync(lifetime.Token) : [];
+            if (request != loadVersion) return;
+            var saved = organization.Members.SingleOrDefault(value => value.Principal.Id == userId);
+            var membership = memberships.SingleOrDefault(value => value.Principal.Id == userId);
+            if (saved is null || saved.Membership.PrincipalId != userId || saved.Membership.TenantId != organization.Tenant.Id || membership is not null && (membership.Membership.PrincipalId != userId || membership.Membership.WorkspaceId != workspace)) { error = T("Member.NotFound"); return; }
+            member = saved; loadedWorkspace = workspace; workspaceMembership = membership;
+            selectedRole = roleBaseline = membership?.Role ?? BuiltInIdentityRoleNames.Viewer;
+            canManagePlatformAdministrators = capabilities.IsPlatformAdministrator;
+            targetIsPlatformAdministrator = administrators.Any(value => value.Principal.Id == userId);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { if (request == loadVersion) error = T("Member.LoadFailed"); }
+        finally { if (request == loadVersion) { loading = false; if (error is not null) loadedKey = null; } }
     }
+    private Task RefreshAsync() { if (busy) return Task.CompletedTask; if (IsDirty) { confirmRefresh = true; return Task.CompletedTask; } return ReloadAsync(); }
+    private Task ReloadAsync() => busy ? Task.CompletedTask : LoadAsync();
+    private bool IsCurrent(long request) => request == loadVersion && ContextState.Current?.WorkspaceId == loadedWorkspace;
     private async Task SaveMembershipAsync()
     {
-        try { workspaceMembership = await Client.SetWorkspaceMembershipAsync(ContextState.Current!.WorkspaceId, UserId, selectedRole, default); hasError = false; message = T("WorkspaceRoleUpdated"); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { hasError = true; message = exception.Message; }
+        if (busy || member is null || !CanManageMembership) return;
+        var request = loadVersion; var user = UserId; var workspace = loadedWorkspace; var role = selectedRole; busy = true;
+        try { var saved = await Client.SetWorkspaceMembershipAsync(workspace, user, role, lifetime.Token); if (!IsCurrent(request)) return; if (saved.Principal.Id != user || saved.Membership.PrincipalId != user || saved.Membership.WorkspaceId != workspace) throw new InvalidOperationException(T("Member.NotFound")); workspaceMembership = saved; roleBaseline = saved.Role ?? BuiltInIdentityRoleNames.Viewer; hasError = false; message = T("WorkspaceRoleUpdated"); }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { hasError = true; message = exception.Message; } }
+        catch (InvalidOperationException) { if (IsCurrent(request)) { hasError = true; message = T("Member.NotFound"); } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
     private async Task RemoveMembershipAsync()
     {
-        try { await Client.RemoveWorkspaceMembershipAsync(ContextState.Current!.WorkspaceId, UserId, default); workspaceMembership = null; hasError = false; message = T("PrincipalRemoved"); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { hasError = true; message = exception.Message; }
+        if (busy || member is null || !CanManageMembership || workspaceMembership is null) return;
+        var request = loadVersion; var user = UserId; var workspace = loadedWorkspace; busy = true;
+        try { await Client.RemoveWorkspaceMembershipAsync(workspace, user, lifetime.Token); if (!IsCurrent(request)) return; workspaceMembership = null; roleBaseline = selectedRole; hasError = false; message = T("PrincipalRemoved"); }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { hasError = true; message = exception.Message; } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
     private async Task GrantPlatformAdministratorAsync()
     {
-        try { await Client.GrantPlatformAdministratorAsync(UserId, default); targetIsPlatformAdministrator = true; platformError = false; platformMessage = T("PlatformAdminGranted"); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { platformError = true; platformMessage = exception.Message; }
+        if (busy || !canManagePlatformAdministrators || member?.Principal.Status != PrincipalStatus.Active) return;
+        var request = loadVersion; var user = UserId; busy = true;
+        try { await Client.GrantPlatformAdministratorAsync(user, lifetime.Token); if (IsCurrent(request)) { targetIsPlatformAdministrator = true; platformError = false; platformMessage = T("PlatformAdminGranted"); } }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { platformError = true; platformMessage = exception.Message; } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
     private async Task RevokePlatformAdministratorAsync()
     {
-        try { await Client.RevokePlatformAdministratorAsync(UserId, default); targetIsPlatformAdministrator = false; platformError = false; platformMessage = T("PlatformAdminRevoked"); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { platformError = true; platformMessage = exception.Message; }
+        if (busy || !canManagePlatformAdministrators || UserId == ContextState.Current?.UserId) return;
+        var request = loadVersion; var user = UserId; busy = true;
+        try { await Client.RevokePlatformAdministratorAsync(user, lifetime.Token); if (IsCurrent(request)) { targetIsPlatformAdministrator = false; platformError = false; platformMessage = T("PlatformAdminRevoked"); } }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { platformError = true; platformMessage = exception.Message; } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
     private async Task LinkExternalIdentityAsync()
     {
-        try
-        {
-            await Client.LinkExternalIdentityAsync(UserId, newIssuer, newSubject, default);
-            member = (await Client.GetOrganizationAsync(default)).Members.Single(value => value.Principal.Id == UserId);
-            newIssuer = newSubject = ""; identityError = false; identityMessage = T("ExternalIdentityLinked");
-        }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception)
-        { identityError = true; identityMessage = exception.Message; }
+        if (busy || !canManagePlatformAdministrators) return;
+        var request = loadVersion; var user = UserId; var issuer = newIssuer; var subject = newSubject; busy = true;
+        try { await Client.LinkExternalIdentityAsync(user, issuer, subject, lifetime.Token); var saved = (await Client.GetOrganizationAsync(lifetime.Token)).Members.Single(value => value.Principal.Id == user); if (!IsCurrent(request)) return; member = saved; newIssuer = newIssuer == issuer ? "" : newIssuer; newSubject = newSubject == subject ? "" : newSubject; identityError = false; identityMessage = T("ExternalIdentityLinked"); }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { identityError = true; identityMessage = exception.Message; } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
     private async Task UnlinkExternalIdentityAsync(Guid externalIdentityId)
     {
-        try
-        {
-            await Client.UnlinkExternalIdentityAsync(UserId, externalIdentityId, default);
-            member = (await Client.GetOrganizationAsync(default)).Members.Single(value => value.Principal.Id == UserId);
-            identityError = false; identityMessage = T("ExternalIdentityUnlinked");
-        }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception)
-        { identityError = true; identityMessage = exception.Message; }
+        if (busy || !canManagePlatformAdministrators) return;
+        var request = loadVersion; var user = UserId; busy = true;
+        try { await Client.UnlinkExternalIdentityAsync(user, externalIdentityId, lifetime.Token); var saved = (await Client.GetOrganizationAsync(lifetime.Token)).Members.Single(value => value.Principal.Id == user); if (IsCurrent(request)) { member = saved; identityError = false; identityMessage = T("ExternalIdentityUnlinked"); } }
+        catch (AgentstrationApiException exception) { if (IsCurrent(request)) { identityError = true; identityMessage = exception.Message; } }
+        finally { if (IsCurrent(request)) busy = false; }
     }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }

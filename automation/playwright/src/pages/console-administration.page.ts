@@ -44,7 +44,7 @@ export class ConsoleAdministrationPage {
     if (!/^[0-9a-f-]{36}$/i.test(memberId)) throw new Error(`Invalid member identifier '${memberId}'.`);
     await link.click();
     await this.page.getByTestId(TestIds.consoleAdministration.organizationMemberDetails).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.consoleAdministration.organizationMemberDetails).locator('article.panel').first().waitFor({ state: 'visible' });
+    await this.page.getByTestId(TestIds.consoleAdministration.organizationMemberDetails).locator('.resource-identity-summary').waitFor({ state: 'visible' });
     return memberId;
   }
 
