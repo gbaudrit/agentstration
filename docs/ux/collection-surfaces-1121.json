@@ -2439,17 +2439,17 @@
     {
       "id": "runtime-workers-runtime-worker-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
-      "line": 14,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/runtime-workers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "RuntimeWorkerSummaryResponse",
       "identityLabel": "Worker",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Session",
         "Version",
@@ -2520,6 +2520,16 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "4275f58f05398f03963586549bd27848e129d09e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Worker array; display-name/Worker-ID search, presence/enrollment identity filters, runtime capability column choice, advanced session/software-version text filters; exact totals and local 20/50/100 pages. No resource-scope/namespace capability fabricated for global Workers.",
+        "authorization": "PlatformAdmin remains enforced by the existing API. Every Console context notification discards and reauthorizes privileged cached rows/options. Denied reads clear data.",
+        "identity": "Exact Worker UUID links preserve navigation; presence, enrollment, session, software/build, active/capacity, capability/material/implementation versions and last-seen data retained. Runtime material wording localized EN/FR.",
+        "states": "Retained compatible refresh/view, stable query, interactivity, context replacement, late response and localized failure guards.",
+        "actions": "Redundant Open-only menu removed; no enrollment or mutation workflow introduced.",
+        "validation": "WorkerCollectionTests and maintained RuntimeObservabilityConsoleTests inventory regression plus deterministic real Worker desktop/mobile smoke. See list-layout-adoption.md."
       }
     },
     {

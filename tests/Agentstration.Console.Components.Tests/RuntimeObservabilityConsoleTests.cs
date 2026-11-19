@@ -60,6 +60,7 @@ public sealed class RuntimeObservabilityConsoleTests
             ]
         });
 
+        context.WithResourceListContext();
         var cut = context.Render<RuntimeWorkers>();
 
         StringAssert.Contains(cut.Markup, ">Workers<");

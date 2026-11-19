@@ -5,4 +5,7 @@
 <data name="TargetKind.RuntimeRun"><value>Exécution d’agent</value></data><data name="TargetKind.FlowRun"><value>Exécution de Flow</value></data><data name="AssignmentState.Pending"><value>En attente</value></data><data name="AssignmentState.Assigned"><value>Assignée</value></data><data name="AssignmentState.Succeeded"><value>Réussie</value></data><data name="AssignmentState.Failed"><value>Échec</value></data><data name="AssignmentState.Cancelled"><value>Annulée</value></data><data name="AttemptState.Active"><value>Active</value></data><data name="AttemptState.Succeeded"><value>Réussie</value></data><data name="AttemptState.Failed"><value>Échec</value></data><data name="AttemptState.Interrupted"><value>Interrompue</value></data><data name="RunAttempts"><value>{0} : historique des tentatives ({1})</value></data><data name="FencingGeneration"><value>Génération de fencing {0}</value></data>
 <data name="AttemptDetails"><value>Session {0} · heartbeat {1} · lease {2} · fencing {3} · erreur {4}</value></data>
 <data name="IdentityMismatch"><value>Le worker retourné ne correspond pas à l’identité demandée.</value></data>
+<data name="Enrollment"><value>Enrôlement</value></data>
+<data name="Enrollment.Unknown"><value>Enrôlement inconnu</value></data>
+<data name="CapabilityFormat"><value>{0} {1} · matériel {2}</value></data>
 </root>
