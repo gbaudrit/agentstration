@@ -398,6 +398,7 @@ else
         appliedFocusStep = null; ApplyFocusStep();
         eventBuffer.Clear();
         await ReplayAsync();
+        if (revision != loadVersion || run is null) return;
         if (!run.Status.IsTerminal()) await ConnectAsync();
     }
 

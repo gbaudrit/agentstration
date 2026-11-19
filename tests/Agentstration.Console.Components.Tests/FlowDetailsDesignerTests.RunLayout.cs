@@ -76,6 +76,32 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty);
     }
 
+    [TestMethod]
+    public async Task AReplayCompletedDuringAnotherRunsInitialLoadCannotTerminateTheCircuit()
+    {
+        using var context = RunLayoutContext();
+        var pendingReplay = new TaskCompletionSource<IReadOnlyList<FlowRunEvent>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pendingSecond = new TaskCompletionSource<FlowRun>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = LayoutRun("first-replay"); var second = LayoutRun("second-loading");
+        var client = new FlowClientStub
+        {
+            RunLoader = id => id == first.Id ? Task.FromResult(first) : pendingSecond.Task,
+            RunEventLoader = id => id == first.Id ? pendingReplay.Task : Task.FromResult<IReadOnlyList<FlowRunEvent>>([])
+        };
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        var rendered = context.Render<FlowRunDetails>(p => p.Add(value => value.RunId, first.Id));
+        rendered.WaitForAssertion(() => Assert.AreEqual(1, client.EventReadCount));
+        rendered.Render(p => p.Add(value => value.RunId, second.Id));
+        Assert.IsEmpty(rendered.FindComponents<ResourceDetailsTemplate>());
+        var beforeReplayCompletion = rendered.RenderCount;
+        await rendered.InvokeAsync(() => pendingReplay.SetResult([]));
+        rendered.WaitForState(() => rendered.RenderCount > beforeReplayCompletion);
+        Assert.IsEmpty(rendered.FindComponents<ResourceDetailsTemplate>());
+        await rendered.InvokeAsync(() => pendingSecond.SetResult(second));
+        rendered.WaitForAssertion(() => Assert.AreEqual(second.Id, rendered.FindComponent<ResourceDetailsTemplate>().Instance.Description));
+        Assert.AreEqual(2, client.RunReadCount);
+    }
+
     private static BunitContext RunLayoutContext()
     {
         var context = FlowContext(); context.JSInterop.Mode = JSRuntimeMode.Loose;

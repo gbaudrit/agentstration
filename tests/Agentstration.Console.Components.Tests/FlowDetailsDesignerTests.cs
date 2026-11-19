@@ -855,6 +855,8 @@ public sealed partial class FlowDetailsDesignerTests
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(string flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(string? flowId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public int RunReadCount { get; private set; }
+        public int EventReadCount { get; private set; }
+        public Func<string, Task<IReadOnlyList<FlowRunEvent>>>? RunEventLoader { get; init; }
         public Func<string, Task<FlowRun>>? RunLoader { get; init; }
         public IReadOnlyList<InputRequest> PendingInputs { get; init; } = [];
         public Task<FlowRun> GetFlowRunAsync(string runId, CancellationToken cancellationToken)
@@ -868,8 +870,8 @@ public sealed partial class FlowDetailsDesignerTests
             : throw new NotSupportedException();
         public Task<IReadOnlyList<InputRequest>> GetFlowRunInputsAsync(string runId, CancellationToken cancellationToken) => Task.FromResult(PendingInputs);
         public Task<InputRequest> RespondToFlowRunInputAsync(string runId, string inputId, JsonElement value, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowRunEvent>>([]);
+        public Task<IReadOnlyList<FlowRunEvent>> GetFlowRunEventsAsync(string runId, long afterSequence, CancellationToken cancellationToken)
+        { EventReadCount++; return RunEventLoader?.Invoke(runId) ?? Task.FromResult<IReadOnlyList<FlowRunEvent>>([]); }
         public Task<FlowRun> CreateFlowRunAsync(string flowId, CreateFlowRunRequest request, CancellationToken cancellationToken)
         {
             LastRunRequest = request;
