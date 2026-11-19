@@ -40,18 +40,23 @@ public sealed class ResourceDetailsTemplateTests
             .Add(c => c.Name, "Service").Add(c => c.ResourceType, "Connected service")
             .Add(c => c.TechnicalName, "endpoint").Add(c => c.Namespace, "team")
             .Add(c => c.Content, editor).Add(c => c.Enabled, true)
+            .Add(c => c.EnabledTestId, "service-activation")
             .Add(c => c.EnabledChanged, value => activation = value)
             .Add(c => c.ResourceIdentity, "endpoint|team|instance")
             .Add(c => c.Sections, new[] { new ResourceNavigationItem("overview", "Overview", "home") }));
         var instance = cut.FindComponent<DraftProbe>().Instance;
         await cut.Find(".resource-details-content input").InputAsync("Incomplete local draft");
-        cut.Find("[role=switch]").Change(false);
+        var toggle = cut.Find("[data-testid=service-activation]");
+        Assert.AreEqual("switch", toggle.GetAttribute("role"));
+        toggle.Change(false);
         Assert.AreEqual(false, activation);
         cut.Render(p => p.Add(c => c.Name, "Updated saved service").Add(c => c.Enabled, false)
             .Add(c => c.EnabledDisabled, true));
         Assert.AreSame(instance, cut.FindComponent<DraftProbe>().Instance);
         Assert.AreEqual("Incomplete local draft", cut.Find(".resource-details-content input").GetAttribute("value"));
-        Assert.IsTrue(cut.Find("[role=switch]").HasAttribute("disabled"));
+        Assert.IsTrue(cut.Find("[data-testid=service-activation]").HasAttribute("disabled"));
+        cut.Render(p => p.Add(c => c.EnabledTestId, (string?)null));
+        Assert.IsFalse(cut.Find("[role=switch]").HasAttribute("data-testid"));
         Assert.AreEqual("team/endpoint", cut.Find(".resource-header-technical code").TextContent);
         Assert.IsNotNull(cut.Find(".resource-header .page-actions .resource-navigation-trigger"));
         await cut.Find(".resource-header .resource-navigation-trigger").ClickAsync();
