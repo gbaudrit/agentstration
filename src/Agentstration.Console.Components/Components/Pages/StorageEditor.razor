@@ -2,15 +2,18 @@
 @page "/storages/{Name}/edit"
 @implements IDisposable
 @inject IStoragesClient Client
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IConnectedServicesClient ServicesClient
 @inject ConsoleContextState Context
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
+@if (!Embedded) { <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" /> }
 @if (!Embedded)
 {
     <PageTitle>@T(IsNew ? "Create" : "Edit") · Agentstration</PageTitle>
-    <PageHeader ScopeRef="ownerScope" Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+    <PageHeader Enabled="model.Enabled" EnabledChanged="value => model.Enabled = value" EnabledDisabled="@(busy || !CanWrite)" ScopeRef="ownerScope" Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
 }
 @if (loading) { <LoadingState Message="@T("Loading")" /> }
 else if (!CanWrite) { <p role="alert">@T("ReadOnlyHelp")</p> }
@@ -18,16 +21,29 @@ else
 {
     <StorageError Error="error" />
     <div class="form-alert form-alert-info"><strong>@T("ManualMapping")</strong><span>@T("ManualMapping.Help")</span><a href="/connected-services">@T("ManageConnectedServices")</a></div>
-    <EditForm Model="model" OnSubmit="RequestSaveAsync" FormName="storage-editor" class="resource-form" data-testid="storage-form">
-        <fieldset disabled="@busy" class="storage-fields">
-            <section class="panel form-section"><div class="panel-header"><h2>@T("Identity")</h2></div><div class="form-grid">
+    @EditorForm
+
+}
+<StorageConfirmation IsOpen="confirmRebind" Title="@T("Rebind")" Message="@T("Rebind.Confirm")" ConfirmLabel="@T("Rebind")" TestId="storage-rebind-confirmation" OnConfirm="ConfirmSaveAsync" OnCancel="() => confirmRebind = false" />
+
+@code {
+    private RenderFragment EditorForm => @<EditForm @key="editContext" EditContext="editContext" OnSubmit="RequestSaveAsync" id="@FormId" FormName="storage-editor" class="resource-form" data-testid="storage-form">
+        <FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+        <fieldset disabled="@(busy || ExternalBusy)" class="storage-fields">
+            @if (IsNew) { <CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="@(busy || ExternalBusy)" CanFinish="CanSave" FinishLabel="@T("Save")" FinishTestId="storage-save" /> }
+            else { @IdentityFields @ConfigurationFields @SharingFields }
+        </fieldset>
+        @if (validationFailed) { <p class="field-validation-error" role="alert">@T("Validation.Configuration")</p> }
+        @if (!IsNew && !ExternalActions) { <div class="form-actions"><button type="submit" class="button-primary" disabled="@(!CanSave)" data-testid="storage-save">@T(busy ? "Saving" : "Save")</button></div> }
+    </EditForm>;
+    private RenderFragment IdentityFields => @<div>            <section class="panel form-section"><div class="panel-header"><h2>@T("Identity")</h2></div><div class="form-grid">
                 <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Generic" IsNew="IsNew" DisplayNameTestId="storage-display-name" TechnicalNameTestId="storage-name" />
                 <FormField Label="@T("Description")" Class="form-span-2"><ClearableText Multiline @bind-Value="model.Description" /></FormField>
                 <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="ownerScope" /></label>
                 <label><span>@T("Namespace")</span><code>@resourceNamespace</code></label>
-                <FormField Label="@T("Enabled")"><FormCheckbox @bind-Value="model.Enabled" /></FormField>
             </div><p>@T("Identity.Help")</p></section>
-            <section class="panel form-section"><div class="panel-header"><h2>@T("ExactType")</h2></div>
+</div>;
+    private RenderFragment ConfigurationFields => @<div>            <section class="panel form-section"><div class="panel-header"><h2>@T("ExactType")</h2></div>
                 @if (model.Type is { } savedType) { <p>@T("SelectedType"): <code>@savedType.Type.ScopeRef/@savedType.Type.Namespace/@savedType.Type.Name · @savedType.TypeUid · @savedType.Version · @savedType.SchemaDigest · @savedType.ContractDigest</code></p> }
                 <FormField Label="@T("Type")"><ClearableSelect TValue="string" Value="@TypeKey" ValueChanged="value => TypeChanged(new ChangeEventArgs { Value = value })" data-testid="storage-type">
                     <option value="">@T("SelectType")</option>
@@ -72,15 +88,61 @@ else
             {
                 <StorageCollectionsEditor Value="model.Collections" ValueChanged="value => model.Collections = value.ToList()" Capabilities="documentCapabilities" ValidationChanged="value => collectionsValid = value" />
             }
-            <DescendantUseGrantEditor OwnerScopeRef="ownerScope" Targets="scopeTargets" Grants="model.UseGrants" />
-        </fieldset>
-        @if (validationFailed) { <p class="field-validation-error" role="alert">@T("Validation.Required")</p> }
-        <div class="form-actions"><button type="submit" class="button-primary" disabled="@(!CanSave)" data-testid="storage-save">@T(busy ? "Saving" : "Save")</button>@if (!Embedded) { <a class="button-secondary" href="@BackUrl">@T("Cancel")</a> }</div>
-    </EditForm>
-}
-<StorageConfirmation IsOpen="confirmRebind" Title="@T("Rebind")" Message="@T("Rebind.Confirm")" ConfirmLabel="@T("Rebind")" TestId="storage-rebind-confirmation" OnConfirm="ConfirmSaveAsync" OnCancel="() => confirmRebind = false" />
+</div>;
+    private RenderFragment SharingFields => @<div>            <DescendantUseGrantEditor OwnerScopeRef="ownerScope" Targets="scopeTargets" Grants="model.UseGrants" /></div>;
+    private RenderFragment Review => @<div><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Namespace="@resourceNamespace.Value" Description="@model.Description"><Scope><ResourceScopeBadge ScopeRef="ownerScope" /></Scope></ResourceIdentitySummary>
+        <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("Type")</dt><dd>@model.Type?.Type.ScopeRef · @model.Type?.Type.Namespace/@model.Type?.Type.Name · @model.Type?.Version</dd><dt>@T("Enabled")</dt><dd>@T(model.Enabled ? "Yes" : "No")</dd></dl>@if (model.Type is not null) { <details><summary>@T("Configuration")</summary><pre>@JsonSerializer.Serialize(model.Properties(), new JsonSerializerOptions { WriteIndented = true })</pre></details> }</FormSection></div>;
+    [Parameter] public bool ExternalActions { get; set; }
+    [Parameter] public bool ExternalBusy { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public EventCallback<bool> SavingChanged { get; set; }
+    [Parameter] public ResourceSnapshot<StorageResource>? InitialSnapshot { get; set; }
+    public string FormId { get; } = $"storage-form-{Guid.NewGuid():N}";
+    public bool CanSubmit => CanSave;
+    public bool IsDirty => !loading && baseline is not null && (baseline != Fingerprint || invalidInput);
+    private string Fingerprint => JsonSerializer.Serialize(model);
+    private string? baseline, redirectedKey;
+    private EditContext editContext = null!;
+    private ValidationMessageStore messages = null!;
+    private bool invalidInput, reportedDirty, reportedCanSubmit;
+    private long loadVersion;
+    private bool ValidName => model.Name.Length is >= 1 and <= 128 && char.IsAsciiLetterOrDigit(model.Name[0]) && model.Name.All(value => char.IsAsciiLetterLower(value) || char.IsAsciiDigit(value) || value is '.' or '-');
+    private bool IdentityComplete => !string.IsNullOrWhiteSpace(model.DisplayName) && ValidName;
+    private void NewContext()
+    {
+        if (editContext is not null) editContext.OnFieldChanged -= FieldChanged;
+        editContext = new(model); messages = new(editContext); editContext.OnFieldChanged += FieldChanged;
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) { messages.Clear(args.FieldIdentifier); editContext.NotifyValidationStateChanged(); }
+    private bool ValidateIdentity()
+    {
+        messages.Clear();
+        if (string.IsNullOrWhiteSpace(model.DisplayName)) messages.Add(new FieldIdentifier(model, nameof(model.DisplayName)), T("Validation.DisplayNameRequired"));
+        if (!ValidName) messages.Add(new FieldIdentifier(model, nameof(model.Name)), T("Validation.TechnicalNameInvalid"));
+        editContext.NotifyValidationStateChanged(); return editContext.Validate();
+    }
+    private IReadOnlyList<CreationWizardStep> Steps => [new("identity", Shared["Identity"], IdentityFields) { IsComplete = IdentityComplete }, new("configuration", Shared["Configuration"], ConfigurationFields) { IsComplete = CanSave }, new("access", Shared["Access"], SharingFields) { IsComplete = true }, new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && CanSave }];
+    private async Task FinishAsync(CreationWizardFinish finish) { if (!ValidateIdentity()) { finish.ReturnToStepId = "identity"; return; } await RequestSaveAsync(); }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (reportedDirty != IsDirty || reportedCanSubmit != CanSubmit) { reportedDirty = IsDirty; reportedCanSubmit = CanSubmit; await DraftChanged.InvokeAsync(IsDirty); }
+    }
+    public void Discard()
+    {
+        if (busy || ExternalBusy || original is null) return;
+        model = StorageEditorModel.From(original); NewContext(); invalidInput = false; configurationValid = envelopeValid = collectionsValid = true; confirmRebind = validationFailed = false; pendingProperties = null; error = null; baseline = Fingerprint;
+        StateHasChanged();
+    }
+    public void ApplyOperationalSnapshot(ResourceSnapshot<StorageResource> snapshot)
+    {
+        if (original is null || original.Uid != snapshot.Value.Uid || StorageLinks.Address(original) != StorageLinks.Address(snapshot.Value)) return;
+        model.Enabled = original.Definition.Enabled;
+        var otherChanges = Fingerprint != baseline;
+        model.Enabled = snapshot.Value.Definition.Enabled; original = snapshot.Value; etag = snapshot.ETag;
+        if (!otherChanges) baseline = Fingerprint;
+        StateHasChanged();
+    }
 
-@code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
@@ -107,41 +169,52 @@ else
     private StorageTypeChoice? SelectedType => variants.FirstOrDefault(value => value.Matches(model.Type));
     private ConnectedServiceResource? SelectedService => services.FirstOrDefault(value => Key(value) == ServiceKey && value.Definition.Type == model.ConnectedServiceType);
     private bool BindingChanged => original is null || model.Type is not null && StorageDigests.Binding(original.Definition) != StorageDigests.Binding(model.Properties());
-    private bool CanSave => !loading && !busy && CanWrite && model.Type is not null && configurationValid && envelopeValid && collectionsValid && (!BindingChanged || ValidBinding);
+    private bool CanSave => !loading && !busy && !ExternalBusy && !invalidInput && CanWrite && model.Type is not null && configurationValid && envelopeValid && collectionsValid && (!BindingChanged || ValidBinding);
     private bool ValidBinding => SelectedType is { } choice && Available(choice) && (!choice.Version.RequiresConnectedService || SelectedService is { } service && ServiceAvailable(service)) && choice.Version.Requirements.Where(value => value.Required).All(requirement => model.Bindings.Any(binding => binding.RequirementId == requirement.Id && Exports.Contains(binding.Export) && Compatible(requirement, binding.Export)));
     private IReadOnlyList<ConnectedServiceExportDescriptor> Exports => SelectedService is not { } service ? [] : serviceTypes.Where(type => type.Uid == service.Definition.Type.TypeUid && type.Name == service.Definition.Type.Type.Name && type.ScopeRef == service.Definition.Type.Type.ScopeRef && type.Namespace == (service.Definition.Type.Type.Namespace ?? service.Namespace)).SelectMany(type => type.Definition.Versions.Where(version => version.Version == service.Definition.Type.Version && version.SchemaDigest == service.Definition.Type.SchemaDigest)).SelectMany(version => version.Exports).ToArray();
-    private string BackUrl => original is null ? "/storages" : StorageLinks.Details(original);
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation(original is null ? "/storages" : StorageLinks.Details(original), Services);
     private string T(string key) => Localizer[key].Value;
     protected override async Task OnParametersSetAsync()
     {
-        var key = $"{Name}|{ScopeRefValue}|{NamespaceValue}|{EmbeddedAddress}";
+        var key = $"{Name}|{ScopeRefValue}|{NamespaceValue}|{EmbeddedAddress}|{Context.Current?.SelectedScopeRef}";
         if (key == loadedKey) return;
-        loadedKey = key; loading = true; error = null;
+        loadedKey = key; var request = ++loadVersion; loading = true; error = null; baseline = null;
         try
         {
             await Context.EnsureLoadedAsync(cancellation.Token);
             if (!Context.HasPermission("resources/read")) return;
+            if (request != loadVersion) return;
             var contextScope = ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef);
+            loadedKey = $"{Name}|{ScopeRefValue}|{NamespaceValue}|{EmbeddedAddress}|{Context.Current.SelectedScopeRef}";
             ownerScope = IsNew ? contextScope : EmbeddedAddress?.ScopeRef ?? ResourceScopeRef.Parse(ScopeRefValue ?? throw new ArgumentException("scopeRef"));
             resourceNamespace = EmbeddedAddress?.Namespace ?? ResourceNamespace.Parse(NamespaceValue);
+            if (!Embedded && !IsNew)
+            {
+                var route = $"{Name}|{ownerScope}|{resourceNamespace}|{Context.Current.SelectedScopeRef}";
+                if (redirectedKey != route) { redirectedKey = route; Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/storages", Name!, resourceNamespace, ownerScope) + "#definition/configuration", replace: true); }
+                return;
+            }
             if (!IsNew)
             {
-                var snapshot = await Client.GetAsync(EmbeddedAddress ?? ScopedResourceAddress.Create(ownerScope.Value, resourceNamespace, StorageResourceKinds.Storage, Name!), cancellation.Token);
+                var snapshot = InitialSnapshot ?? await Client.GetAsync(EmbeddedAddress ?? ScopedResourceAddress.Create(ownerScope.Value, resourceNamespace, StorageResourceKinds.Storage, Name!), cancellation.Token);
+                if (request != loadVersion) return;
+                if (snapshot.Value.ScopeRef != ownerScope || snapshot.Value.Namespace != resourceNamespace || snapshot.Value.Name != (EmbeddedAddress?.Name ?? Name)) throw new InvalidOperationException(T("Error.IdentityMismatch"));
                 original = snapshot.Value; etag = snapshot.ETag; model = StorageEditorModel.From(original);
             }
             if (!CanWrite) return;
             var typesTask = Client.GetTypesAsync(ownerScope.Value, cancellation.Token);
-            var servicesTask = LoadServiceMetadataAsync();
+            var servicesTask = LoadServiceMetadataAsync(request);
             var scopesTask = Client.GetScopeTargetsAsync(cancellation.Token);
             await Task.WhenAll(typesTask, servicesTask, scopesTask);
+            if (request != loadVersion) return;
             variants = (await typesTask).SelectMany(type => type.Definition.Versions.Select(version => new StorageTypeChoice(type, version))).ToArray();
             scopeTargets = await scopesTask;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { error = exception; }
-        finally { loading = false; }
+        catch (Exception exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) { NewContext(); baseline = Fingerprint; invalidInput = false; loading = false; } }
     }
-    private async Task LoadServiceMetadataAsync()
+    private async Task LoadServiceMetadataAsync(long request)
     {
         servicesUnavailable = false;
         try
@@ -149,10 +222,11 @@ else
             var servicesTask = ServicesClient.GetConnectedServicesAsync(cancellation.Token);
             var typesTask = ServicesClient.GetTypesAsync(cancellation.Token);
             await Task.WhenAll(servicesTask, typesTask);
+            if (request != loadVersion) return;
             services = await servicesTask; serviceTypes = await typesTask;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception) { services = []; serviceTypes = []; servicesUnavailable = true; }
+        catch (Exception) { if (request == loadVersion) { services = []; serviceTypes = []; servicesUnavailable = true; } }
     }
     private void TypeChanged(ChangeEventArgs args)
     {
@@ -171,8 +245,9 @@ else
         && choice.Resource.ObservedUse?.Use.Allowed == true && TypeAvailability(choice) == StorageAvailability.Ready;
     private async Task RequestSaveAsync()
     {
-        validationFailed = !CanSave || string.IsNullOrWhiteSpace(model.DisplayName) || model.Name.Length is < 1 or > 128 || model.Name.Any(value => !char.IsAsciiLetterLower(value) && !char.IsAsciiDigit(value) && value is not '.' and not '-') || !char.IsAsciiLetterOrDigit(model.Name.FirstOrDefault());
-        if (validationFailed) return;
+        var identityValid = ValidateIdentity();
+        validationFailed = identityValid && !CanSave;
+        if (!identityValid || validationFailed) return;
         pendingProperties = model.Properties();
         if (!IsNew && (BindingChanged || original!.Definition.Enabled && !pendingProperties.Enabled)) { confirmRebind = true; return; }
         await SaveAsync();
@@ -181,19 +256,19 @@ else
     private async Task SaveAsync()
     {
         if (busy || pendingProperties is null || !CanWrite) return;
-        busy = true; error = null;
+        busy = true; error = null; await SavingChanged.InvokeAsync(true);
         try
         {
             ResourceSnapshot<StorageResource> snapshot;
             if (IsNew) snapshot = await Client.CreateAsync(new(model.Name, pendingProperties, ownerScope, resourceNamespace), cancellation.Token);
             else if (StorageDigests.Binding(original!.Definition) != StorageDigests.Binding(pendingProperties)) snapshot = await Client.ReconcileAsync(StorageLinks.Address(original), new(pendingProperties), etag!, cancellation.Token);
             else snapshot = await Client.UpdateAsync(StorageLinks.Address(original), new(pendingProperties), etag!, cancellation.Token);
-            original = snapshot.Value; etag = snapshot.ETag; model = StorageEditorModel.From(original);
-            if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo(StorageLinks.Details(original));
+            original = snapshot.Value; etag = snapshot.ETag; model = StorageEditorModel.From(original); NewContext(); invalidInput = false; baseline = Fingerprint;
+            if (Embedded) await Saved.InvokeAsync(); else Navigation.NavigateTo(ResourceOwnershipContext.PreserveNavigation(StorageLinks.Details(original), Services));
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { error = exception; }
-        finally { busy = false; pendingProperties = null; }
+        finally { busy = false; pendingProperties = null; await SavingChanged.InvokeAsync(false); }
     }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { if (editContext is not null) editContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

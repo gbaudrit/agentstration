@@ -5,6 +5,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -143,7 +144,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         Assert.IsTrue(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
         SelectType(page, "remote");
@@ -168,7 +169,7 @@ public sealed class StorageComponentTests
         using var culture = new TestCultureScope("en-US");
         var client = new StorageClient();
         using var context = Setup(client);
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         SelectType(page, "local");
         Assert.IsEmpty(page.FindAll("[data-testid=storage-service], [data-testid=storage-export]"));
@@ -190,7 +191,7 @@ public sealed class StorageComponentTests
         var client = new StorageClient();
         using var context = Setup(client, serviceGeneration: 2);
         Navigate(context, Resource(), edit: true);
-        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents").Add(value => value.Embedded, true));
         page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "Saved service revision unavailable"));
         Assert.AreEqual(0, client.Reconciles);
         SelectService(page);
@@ -217,7 +218,7 @@ public sealed class StorageComponentTests
         var client = new StorageClient();
         using var context = Setup(client);
         Navigate(context, Resource(), edit: true);
-        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents").Add(value => value.Embedded, true));
         page.WaitForElement("[data-testid=storage-save]");
         page.Find("[data-testid=storage-display-name]").Change("Updated documents");
         page.Find("form").Submit();
@@ -235,7 +236,7 @@ public sealed class StorageComponentTests
         var client = new StorageClient { Failure = new("PRIVATE BACKEND DETAILS", "correlation", HttpStatusCode.Conflict, "storage_version_conflict") };
         using var context = Setup(client);
         Navigate(context, Resource(), edit: true);
-        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents").Add(value => value.Embedded, true));
         page.WaitForElement("[data-testid=storage-save]");
         page.Find("form").Submit();
         page.WaitForAssertion(() => StringAssert.Contains(page.Find("[data-testid=storage-error]").TextContent, "revision is stale"));
@@ -293,7 +294,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new() { TypesMissing = true }); Navigate(context, Resource(), edit: true);
-        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents"));
+        var page = context.Render<StorageEditor>(parameters => parameters.Add(value => value.Name, "documents").Add(value => value.Embedded, true));
         page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "saved exact type is unavailable"));
         StringAssert.Contains(page.Markup, TypeUid.ToString());
         Assert.IsFalse(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
@@ -304,7 +305,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new(), servicesUnavailable: true);
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         SelectType(page, "local");
         Assert.IsFalse(page.Find("[data-testid=storage-save]").HasAttribute("disabled"));
@@ -338,7 +339,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         SelectType(page, "remote");
         SelectService(page);
@@ -352,7 +353,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new() { TypeUseDenied = true });
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         var choices = page.FindAll("[data-testid=storage-type] option").Where(value => !string.IsNullOrEmpty(value.GetAttribute("value"))).ToArray();
         Assert.IsTrue(choices.Length > 0);
@@ -370,7 +371,7 @@ public sealed class StorageComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new() { TypeEnabled = enabled, TypeAvailability = availability, MissingUseObservation = missingObservation });
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         var choices = page.FindAll("[data-testid=storage-type] option").Where(value => !string.IsNullOrEmpty(value.GetAttribute("value"))).ToArray();
         Assert.IsNotEmpty(choices);
@@ -385,7 +386,7 @@ public sealed class StorageComponentTests
         using var culture = new TestCultureScope("en-US");
         var client = new StorageClient { Failure = new("Secret PRIVATE-PATH hidden-resource", "correlation", HttpStatusCode.Forbidden, "storage_access_denied") };
         using var context = Setup(client);
-        var page = context.Render<StorageEditor>();
+        var page = RenderNewEditor(context);
         page.WaitForElement("[data-testid=storage-type]");
         SelectType(page, "local");
         page.Find("[data-testid=storage-display-name]").Change("Denied local");
@@ -445,15 +446,66 @@ public sealed class StorageComponentTests
         Assert.AreEqual(1, client.UsageCalls);
     }
 
+    [TestMethod]
+    public void WizardAllowsIncompleteNextAndRetainsTheExactTypeUntilFinalCreation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StorageClient();
+        using var context = Setup(client);
+        var page = context.Render<StorageEditor>();
+        var form = page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        Assert.AreEqual("false", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        page.Find("[data-testid=creation-wizard-next]").Click();
+        Assert.AreEqual("step", page.Find("[data-wizard-step=configuration]").GetAttribute("aria-current"));
+        SelectType(page, "local");
+        page.Find("[data-wizard-step=review]").Click();
+        page.Find("[data-testid=storage-save]").Click();
+        Assert.AreEqual("step", page.Find("[data-wizard-step=identity]").GetAttribute("aria-current"));
+        Assert.HasCount(2, page.FindAll(".validation-message"));
+        Assert.IsNull(client.Created);
+        page.Find("[data-testid=storage-display-name]").Change("Wizard documents");
+        page.Find("[data-testid=storage-name]").Change("wizard-documents");
+        page.Find("[data-wizard-step=configuration]").Click();
+        Assert.AreSame(form, page.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.IsNull(client.Created);
+        page.Find("[data-wizard-step=review]").Click();
+        page.Find("[data-testid=storage-save]").Click();
+        page.WaitForAssertion(() => Assert.IsNotNull(client.Created));
+        Assert.IsNotNull(client.Created);
+        Assert.AreEqual(TypeUid, client.Created.Properties.Type.TypeUid);
+        Assert.AreEqual("1", client.Created.Properties.Type.Version);
+        Assert.IsEmpty(client.Created.Properties.Bindings);
+    }
+
+    [TestMethod]
+    public void StandaloneEditUsesCanonicalConfigurationWithTheExactSavedAddress()
+    {
+        using var context = Setup(new()); Navigate(context, Resource(), edit: true);
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        context.Render<StorageEditor>(p => p.Add(value => value.Name, "documents"));
+        var uri = new Uri(nav.Uri);
+        Assert.AreEqual("/storages/documents", uri.AbsolutePath);
+        Assert.AreEqual("#definition/configuration", uri.Fragment);
+        StringAssert.Contains(uri.Query, "namespace=evidence");
+        StringAssert.Contains(uri.Query, "scopeRef=" + Uri.EscapeDataString(Scope.Value));
+    }
+
     private static BunitContext Setup(StorageClient client, bool canWrite = true, bool canRead = true, long serviceGeneration = 1, bool servicesUnavailable = false, string? selectedScope = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IStoragesClient>(client);
         context.Services.AddSingleton<IConnectedServicesClient>(new ServiceClient(serviceGeneration, servicesUnavailable));
         context.Services.AddSingleton(new ConsoleContextState(new ContextProvider(canWrite, canRead, selectedScope)));
         return context;
+    }
+    private static IRenderedComponent<StorageEditor> RenderNewEditor(BunitContext context)
+    {
+        var page = context.Render<StorageEditor>();
+        page.WaitForElement("[data-wizard-step=review]").Click();
+        return page;
     }
     private static void Navigate(BunitContext context, StorageResource resource, bool edit = false) => context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageLinks.Details(resource).Replace("?", edit ? "/edit?" : "?", StringComparison.Ordinal));
     private static void SelectType(IRenderedComponent<StorageEditor> page, string name)
@@ -471,6 +523,8 @@ public sealed class StorageComponentTests
     }
     private sealed class StorageClient : IStoragesClient
     {
+        public StorageResource Current { get; private set; } = Resource();
+        private int revision = 4;
         public IReadOnlyList<StorageUsage> Usages { get; init; } = [];
         public int UsageCalls { get; private set; }
 
@@ -497,13 +551,24 @@ public sealed class StorageComponentTests
         }).ToArray());
         public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult<IReadOnlyList<StorageResource>>([Resource()]); }
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Workspace", true)]);
-        public Task<ResourceSnapshot<StorageResource>> GetAsync(ScopedResourceAddress address, CancellationToken token) => Task.FromResult(new ResourceSnapshot<StorageResource>(Resource(), "\"revision-4\""));
+        public int ResourceReads { get; private set; }
+        public Task<ResourceSnapshot<StorageResource>> GetAsync(ScopedResourceAddress address, CancellationToken token)
+        {
+            ResourceReads++;
+            return Task.FromResult(new ResourceSnapshot<StorageResource>(Current, $"\"revision-{revision}\""));
+        }
         public Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
         public Task<ResourceSnapshot<StorageResource>> CreateAsync(CreateStorageRequest body, CancellationToken token) { Created = body; return Result(); }
-        public Task<ResourceSnapshot<StorageResource>> UpdateAsync(ScopedResourceAddress address, PutStorageRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; LastAddress = address; return Result(); }
-        public Task<ResourceSnapshot<StorageResource>> ReconcileAsync(ScopedResourceAddress address, ReconcileStorageRequest body, string etag, CancellationToken token) { Reconciles++; Reconciled = body; LastEtag = etag; LastAddress = address; return Result(); }
-        public Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token) { Deactivations++; LastEtag = etag; return Result(); }
-        private Task<ResourceSnapshot<StorageResource>> Result() => Failure is null ? Task.FromResult(new ResourceSnapshot<StorageResource>(Resource(), "\"revision-5\"")) : Task.FromException<ResourceSnapshot<StorageResource>>(Failure);
+        public Task<ResourceSnapshot<StorageResource>> UpdateAsync(ScopedResourceAddress address, PutStorageRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; LastAddress = address; return Result(body.Properties); }
+        public Task<ResourceSnapshot<StorageResource>> ReconcileAsync(ScopedResourceAddress address, ReconcileStorageRequest body, string etag, CancellationToken token) { Reconciles++; Reconciled = body; LastEtag = etag; LastAddress = address; return Result(body.Properties); }
+        public Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token) { Deactivations++; LastEtag = etag; return Result(Current.Definition with { Enabled = false }); }
+        private Task<ResourceSnapshot<StorageResource>> Result(StorageProperties? properties = null)
+        {
+            if (Failure is not null) return Task.FromException<ResourceSnapshot<StorageResource>>(Failure);
+            if (properties is not null) Current = Current with { Definition = properties };
+            revision++;
+            return Task.FromResult(new ResourceSnapshot<StorageResource>(Current, $"\"revision-{revision}\""));
+        }
     }
     private sealed class ServiceClient(long generation, bool unavailable) : IConnectedServicesClient
     {

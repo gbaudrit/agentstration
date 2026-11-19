@@ -42,7 +42,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
 | StagedArtifactDetails.razor | `/artifacts/staged/{Id}` | Pending review and migration |
 | StorageDetails.razor | `/storages/{Name}` | Pending review and migration |
-| StorageEditor.razor | `/storages/new`, `/storages/{Name}/edit` | Pending review and migration |
+| StorageEditor.razor | `/storages/new`, `/storages/{Name}/edit` | Implemented: retained 4-step Identity/Configuration/Access/Review wizard, incomplete navigation and final field validation, original explicit type/service/export selection, saved UID/version/digests, envelope, collections and rebind confirmation. Saved embedded drafts expose their real form and ETag control to the family detail; standalone edit redirects once to canonical Configuration. 134 Storage/source component cases pass for the combined editor/detail changes, including creation after an initial validation error. Final browser/full validation pending |
 | StorageTypeDetails.razor | `/storage-types/{Name}` | Pending review and migration |
 | StorageTypeEditor.razor | `/storage-types/new`, `/storage-types/{Name}/edit`, `/storage-types/{Name}/versions/new` | Pending review and migration |
 | TaskDetails.razor | `/tasks/{TaskId:guid}` | Pending review and migration |

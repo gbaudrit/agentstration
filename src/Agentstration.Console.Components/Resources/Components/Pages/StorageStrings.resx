@@ -240,4 +240,9 @@
   <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>Executing a document operation requires runs/execute in the selected context. Select an authorized context or request this permission.</value></data>
   <data name="Documents.RunQuery" xml:space="preserve"><value>Run query</value></data>
   <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Enter a JSON object of at most 8 KiB and a page size within the displayed limit.</value></data>
+<data name="Error.IdentityMismatch"><value>The returned Storage does not match the requested identity.</value></data>
+<data name="SavedCollectionsAndUsePolicy"><value>Document collections and descendant use policy</value></data>
+<data name="Validation.Configuration"><value>Select a type, configure the required bindings and correct the configuration errors before saving.</value></data>
+<data name="Validation.DisplayNameRequired"><value>Enter a display name.</value></data>
+<data name="Validation.TechnicalNameInvalid"><value>Use 1–128 lowercase letters, digits, dots or hyphens, starting with a letter or digit.</value></data>
 </root>
