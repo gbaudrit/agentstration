@@ -106,15 +106,23 @@ public sealed class SourceRegistryConsoleTests
     }
 
     [TestMethod]
-    public void NewRegistryRouteRendersTheEditorInsteadOfTreatingNewAsARegistryName()
+    [DataRow("/settings/source-registries/new")]
+    [DataRow("/settings/source-registries/new?context=%2Finstance")]
+    [DataRow("/settings/source-registries/new#configuration")]
+    [DataRow("/settings/source-registries/new?context=%2Finstance#configuration")]
+    public void NewRegistryRouteRendersTheEditorInsteadOfTreatingNewAsARegistryName(string route)
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Context(new StubSourceRegistriesClient(), new StubSecretsClient([]));
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/settings/source-registries/new");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(route);
 
         var cut = context.Render<SourceRegistries>(parameters => parameters.Add(component => component.Name, "new"));
 
         cut.WaitForAssertion(() => Assert.AreEqual("Add a Source registry", cut.Find("h1").TextContent));
+        cut.Find(".resource-form input[type=text]").Input("Unsubmitted registry");
+        Assert.IsNotNull(cut.Find(".resource-form input[type=url]"));
+        Assert.AreEqual(new Uri(new Uri("http://localhost/"), route).AbsoluteUri,
+            context.Services.GetRequiredService<NavigationManager>().Uri);
     }
 
     [TestMethod]

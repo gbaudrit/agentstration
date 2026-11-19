@@ -157,7 +157,7 @@ else
     private AgentstrationApiException? error;
     private bool busy;
     private bool confirmDelete;
-    private bool IsNew => Navigation.ToBaseRelativePath(Navigation.Uri).EndsWith("/new", StringComparison.OrdinalIgnoreCase);
+    private bool IsNew => new Uri(Navigation.Uri).AbsolutePath.EndsWith("/new", StringComparison.OrdinalIgnoreCase);
     private bool IsList => string.IsNullOrWhiteSpace(Name) && !IsNew;
     private bool CanSave => model is not null
         && (model.AuthenticationMode != SourceRegistryAuthenticationMode.StaticBearer
