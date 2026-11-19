@@ -128,6 +128,8 @@ export class AgentEditorPage {
   }
 
   public async expectModelProfileUnavailable(value: string): Promise<void> {
+    if (await this.page.getByTestId("agent-sections").count()) await this.selectSection("definition/model-execution");
+    else await this.selectCreationStep('model-execution');
     const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.modelProfileSearch), value.split('|').at(-1)!);
@@ -139,6 +141,7 @@ export class AgentEditorPage {
   public get form(): Locator { return this.page.getByTestId(TestIds.agentEditor.form); }
   public get identitySection(): Locator { return this.page.getByTestId(TestIds.agentEditor.identitySection); }
   public get behaviorSection(): Locator { return this.page.getByTestId(TestIds.agentEditor.behaviorSection); }
+  public get modelSection(): Locator { return this.page.getByTestId(TestIds.agentEditor.modelSection); }
 
   private async contextualUrl(url: string): Promise<string> {
     const target = new URL(url);

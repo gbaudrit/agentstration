@@ -458,6 +458,7 @@ export const TestIds = {
     editTab: 'agent-edit-tab',
     identitySection: 'agent-identity-section',
     behaviorSection: 'agent-behavior-section',
+    modelSection: 'agent-model-section',
     name: 'agent-name',
     displayName: 'agent-display-name',
     description: 'agent-description',
