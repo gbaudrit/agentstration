@@ -106,9 +106,8 @@ export class GovernedExtensionInventoryPage {
       this.assertScopedLink(await owner.getAttribute('href'));
       await this.assertNoMutation(locale);
       if (href.includes('/flows/')) {
-        const text = GovernedInventoryTextByLocale[locale];
-        for (const tab of [text.definition, text.deployments, text.yaml]) {
-          await this.page.locator('nav.section-tabs').getByRole('button', { name: tab, exact: true }).click();
+        for (const section of ['definition/configuration', 'deployments', 'yaml']) {
+          await selectResourceSection(this.page, section);
           await this.assertNoMutation(locale);
         }
       }
@@ -157,7 +156,9 @@ export class GovernedExtensionInventoryPage {
     this.assertScopedLink(await provider.getAttribute('href'));
     await expect(this.page.locator('main')).toContainText('Governed inventory fixture');
     await provider.click();
-    await expect(this.page.locator('#tool-provider-resource-form fieldset')).toHaveAttribute('disabled', '');
+    await selectResourceSection(this.page, 'definition/identity');
+    await expect(this.page.locator('#tool-provider-resource-form > fieldset')).toHaveAttribute('disabled', '');
+    await selectResourceSection(this.page, 'overview');
     await this.page.locator("a[href^='/extensions/qa-managed?']").click();
     await this.navigate(`${consoleUrl}/tools?context=%2Finstance`);
     const owners = this.page.locator("a[href^='/extensions/qa-managed?']");

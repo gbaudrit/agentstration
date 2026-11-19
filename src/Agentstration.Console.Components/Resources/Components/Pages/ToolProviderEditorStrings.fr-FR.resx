@@ -54,4 +54,8 @@
 <data name="IdentityIncomplete"><value>Renseignez un nom d’affichage, un nom technique valide et un périmètre propriétaire.</value></data>
 <data name="ConnectionIncomplete"><value>Complétez la connexion pour le type de fournisseur et le transport sélectionnés.</value></data>
 <data name="ToolProvider"><value>Fournisseur d’outils</value></data>
+  <data name="RefreshDraftConflict"><value>Une définition enregistrée plus récente est disponible. Abandonnez vos modifications de définition pour la charger.</value></data>
+  <data name="MissingResourceOwner"><value>Le lien de la ressource doit préciser son périmètre propriétaire exact.</value></data>
+  <data name="ResourceIdentityMismatch"><value>La ressource retournée ne correspond pas à l’identité demandée.</value></data>
+  <data name="ResourceYamlExport"><value>Le YAML présente la définition enregistrée. Utilisez le formulaire pour modifier cette ressource.</value></data>
 </root>

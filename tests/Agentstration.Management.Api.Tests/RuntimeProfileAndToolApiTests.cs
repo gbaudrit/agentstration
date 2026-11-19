@@ -31,6 +31,49 @@ namespace Agentstration.Management.Tests;
 public sealed class RuntimeProfileAndToolApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task ToolProviderCommandsKeepTheirExactNamespaceAndOwnerAcrossDiscovery()
+    {
+        var discovery = new QualifiedProviderDiscovery();
+        await using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IToolProviderDiscovery>(); services.AddSingleton<IToolProviderDiscovery>(discovery);
+        }));
+        var requestContext = await GetBootstrapContextAsync(factory);
+        using var requestScope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(requestContext);
+        var owner = ResourceScopeRef.Workspace(requestContext.WorkspaceId);
+        var service = factory.Services.GetRequiredService<ToolManagementService>();
+        var properties = new ToolProviderProperties { DisplayName = "Original", ProviderType = ToolProviderType.Mcp, Mcp = new() { Transport = McpToolProviderTransport.StreamableHttp, Endpoint = new("http://localhost/mcp-fixture") } };
+        var homonym = await service.PutProviderAsync(new ToolProviderResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, ScopeRef = owner, Metadata = new() { Name = "qualified-provider" }, Definition = properties }, null, true, default);
+        var target = await service.PutProviderAsync(homonym.Value with { Uid = Guid.Empty, Metadata = new() { Name = "qualified-provider", Namespace = new("other.providers") } }, null, true, default);
+        using var client = factory.CreateClient();
+        var query = $"?resourceNamespace=other.providers&scopeRef={Uri.EscapeDataString(owner.Value)}";
+        using var update = new HttpRequestMessage(HttpMethod.Put, "/api/toolproviders/qualified-provider" + query) { Content = JsonContent.Create(new PutToolProviderRequest(properties with { DisplayName = "Changed exact target" })) };
+        update.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(target.ETag));
+        using var updated = await client.SendAsync(update); Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode, await updated.Content.ReadAsStringAsync());
+        var saved = await updated.Content.ReadFromJsonAsync<ToolProviderResource>(); Assert.AreEqual(target.Value.Uid, saved!.Uid); Assert.AreEqual(target.Value.Namespace, saved.Namespace); Assert.AreEqual(owner, saved.ScopeRef);
+        using var test = await client.PostAsync("/api/toolproviders/qualified-provider/test" + query, null); Assert.AreEqual(HttpStatusCode.OK, test.StatusCode);
+        using var refresh = await client.PostAsync("/api/toolproviders/qualified-provider/refresh" + query, null); Assert.AreEqual(HttpStatusCode.OK, refresh.StatusCode);
+        Assert.HasCount(3, discovery.Targets); Assert.IsTrue(discovery.Targets.All(v => v == (owner, target.Value.Namespace, target.Value.Name)));
+        var original = await service.GetProviderExactAsync(owner, homonym.Value.Name, homonym.Value.Namespace, default);
+        Assert.AreEqual(homonym.ETag, original!.ETag); Assert.AreEqual("Original", original.Value.Definition.DisplayName);
+        using var stale = new HttpRequestMessage(HttpMethod.Put, "/api/toolproviders/qualified-provider" + query) { Content = JsonContent.Create(new PutToolProviderRequest(properties)) };
+        stale.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(target.ETag));
+        using var rejected = await client.SendAsync(stale); Assert.AreEqual(HttpStatusCode.Conflict, rejected.StatusCode);
+        var problem = await rejected.Content.ReadFromJsonAsync<JsonElement>(); Assert.AreEqual("Resource version conflict", problem.GetProperty("title").GetString());
+    }
+
+    private sealed class QualifiedProviderDiscovery : IToolProviderDiscovery
+    {
+        public List<(ResourceScopeRef? Scope, ResourceNamespace Namespace, string Name)> Targets { get; } = [];
+        public bool Supports(ToolProviderType providerType) => providerType == ToolProviderType.Mcp;
+        public Task<ToolProviderDiscoveryResult> DiscoverAsync(ToolProviderResource provider, CancellationToken cancellationToken)
+        {
+            Targets.Add((provider.ScopeRef, provider.Namespace, provider.Name));
+            return Task.FromResult(new ToolProviderDiscoveryResult([], new Dictionary<string, bool>(), new Dictionary<string, string>()));
+        }
+    }
+
+    [TestMethod]
     public async Task ToolCatalogReadsDoNotWriteControlPlaneResources()
     {
         await using var factory = Factory();
