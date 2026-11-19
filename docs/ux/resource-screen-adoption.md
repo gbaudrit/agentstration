@@ -94,3 +94,5 @@ The new-foundation Secret pass, independent write-only draft contract and local 
 The new-foundation Runtime Profile pass and retained namespace/JSON/ETag behavior are recorded in the [Runtime Profile verification report](evidence/resource-screen-foundation/runtime-profiles/README.md).
 
 The new-foundation Source Provider pass, exact ownership/reference handling and focused evidence are recorded in the [Source Provider verification report](evidence/resource-screen-foundation/source-providers/README.md). Deferred composition follow-up #1236 includes the transverse matrix while retaining its validation/merge gate.
+
+The new-foundation Tool Category pass, preserved membership/reference contract and focused evidence are recorded in the [Tool Category verification report](evidence/resource-screen-foundation/tool-categories/README.md).

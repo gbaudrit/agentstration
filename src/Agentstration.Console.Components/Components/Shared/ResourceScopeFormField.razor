@@ -5,19 +5,19 @@
 
 @if (targets is null)
 {
-    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft>
+    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft Validation="Validation">
         <ClearableSelect TValue="string" Value="@Localizer["ResourceScope.Loading"].Value" disabled AllowClear="false"><option>@Localizer["ResourceScope.Loading"]</option></ClearableSelect>
     </FormField>
 }
 else if (targets.Count == 0)
 {
-    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft>
+    <FormField Label="@Localizer["ResourceScope.Label"]" Tooltip="@Localizer["ResourceScope.Help"]" TooltipOpenToLeft Validation="Validation">
         <ClearableSelect TValue="string" Value="@Localizer["ResourceScope.Unavailable"].Value" disabled AllowClear="false"><option>@Localizer["ResourceScope.Unavailable"]</option></ClearableSelect>
     </FormField>
 }
 else
 {
-    <ResourceScopePicker Targets="targets" Value="currentValue" ValueChanged="ChangeAsync" Disabled="Disabled" />
+    <ResourceScopePicker Targets="targets" Value="currentValue" ValueChanged="ChangeAsync" Disabled="Disabled" Validation="Validation" />
 }
 
 @code {
@@ -26,6 +26,7 @@ else
     [Parameter] public EventCallback<ResourceScopeRef?> ValueChanged { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public ResourceScopeKind? RequiredKind { get; set; }
+    [Parameter] public RenderFragment? Validation { get; set; }
     [Parameter] public IReadOnlyList<ResourceScopeTargetResponse>? Targets { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();

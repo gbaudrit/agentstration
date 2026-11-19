@@ -57,7 +57,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `StorageTypeEditor.razor` | Previously treated; review again | Delegated definition/editor; coordinate with owning detail and preserve creation wizard | Yes |
 | `TaskDetails.razor` | Previously remaining | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
 | `TaskFlowRunDetails.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
-| `ToolCategoryEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `ToolCategoryEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `ToolDefinitionEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolGovernanceAudit.razor` | Previously treated; review again | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
@@ -126,3 +126,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Refresh preserves invalid drafts/messages and original ETags until explicit discard; replacement/access loss clears private content. A missing persisted owner now produces common failed-load feedback rather than assuming Instance; generated links already carry the exact owner.
 - All 48 focused cases, TypeScript, both final Source Provider desktop/touch probes, the maintained local Git creation case, both Runtime Profile normalized-namespace probes and both maintained Agent regression cases pass. [Real captures and exact hashes](evidence/resource-screen-foundation/source-providers/README.md).
 - Protected Agent product files remain unchanged. #1236 records the transverse deferred composition scope and stays open/blocked. One screen commit with synchronization before/after; CI failures are not handled.
+
+### ToolCategoryEditor
+
+- Standard Console template, actual saved member count above saved Identity/labels, retained common form/state/presentations, Identity before membership Configuration, independently authorized Access and final saved YAML. Creation keeps its wizard, namespace/scope and existing limits.
+- A family editor model retains validation, eligibility, raw relative/missing references and properties projection. Grouped provider/member presentation, exact homonym-safe IDs/links and bounded-catalog fallback remain intact. Membership stays checkboxes under its existing selection contract; the Workspace-only category has no activation or descendant policy target. Labels are read-only because metadata writes are unsupported.
+- Refresh retains invalid metadata and membership changes made while its request is in flight; explicit discard adopts the refreshed family catalog/member bundle and ETag. Deletion invalidates the removed snapshot before leaving, releasing the combined guard. Scope validation remains inside the common field, including unavailable targets.
+- All 49 focused cases, both final Category desktop/touch probes and both maintained Agent regression cases pass. [Real captures, geometry and exact hashes](evidence/resource-screen-foundation/tool-categories/README.md).
+- Protected Agent product files remain unchanged. Shared empty feedback no longer creates a phantom gap. Deferred UX follow-up remains open/blocked; CI failures are not handled.

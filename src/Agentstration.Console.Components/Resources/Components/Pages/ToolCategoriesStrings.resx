@@ -10,4 +10,6 @@
 <data name="NamespaceInvalid"><value>Enter a valid namespace.</value></data>
 <data name="ScopeRequired"><value>Select an owner scope.</value></data>
 <data name="ScopeMismatch"><value>This category is not available in the requested scope. Select its owner context and try again.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>New resource or catalog data is available. Your definition draft has been kept. Discard it explicitly to load the refreshed data.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>This YAML exports the saved resource. Edit its definition to make changes.</value></data>
 </root>

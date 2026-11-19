@@ -45,6 +45,7 @@
 }
 
 .resource-details-feedback { display: contents; }
+.resource-details-feedback ::deep > div:empty { display: none; }
 .resource-details-content ::deep .resource-form,
 .resource-details-content ::deep .resource-editor-view { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .resource-details-content ::deep .form-section { min-width: 0; }
