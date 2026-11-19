@@ -1749,17 +1749,17 @@
     {
       "id": "secrets-secret-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
-      "line": 22,
+      "line": 10,
       "host": "console",
       "routes": [
         "/secrets"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SecretResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Vault",
         "Type"
@@ -1827,6 +1827,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b41ff12a71406354abc024baeb4b427af3a568de"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized SecretResponse array; local name search, identity status, Vault/type column filters and additional exact scope filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained compatible refresh rows/view; stable query, interactivity, stale-response, context replacement and denied-read guards.",
+        "security": "Metadata/status only; no Secret-value read/write or Vault initialization. Exact name/scope links and applicable badges retained.",
+        "actions": "Context-aware Secrets/Vaults navigation and permission-gated creation; redundant Manage-only menu removed.",
+        "validation": "SecretCollectionTests and deterministic populated metadata-only desktop English/mobile French smoke. Evidence and limits in list-layout-adoption.md."
       }
     },
     {
