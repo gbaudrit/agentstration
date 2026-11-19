@@ -42,7 +42,7 @@ else
         @if (!IsReadOnly)
         {
             <FormSection Title="@T("PublishVersion")" Description="@T("EtagProtected")">
-                <FormField Label="@T("PublishVersion")" Required><ClearableText UpdateOnInput="false" @bind-Value="publishVersion" Disabled="@(saving || ExternalBusy)" data-testid="flow-publish-version" /></FormField>
+                <FormField Label="@T("PublishVersion")" Required><Validation><ValidationMessage For="() => publishVersion" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="publishVersion" Disabled="@(saving || ExternalBusy)" data-testid="flow-publish-version" /></ChildContent></FormField>
                 <FormActions Busy="@(saving || ExternalBusy)">
                     @if (!ExternalActions) { <button type="submit" class="button-secondary" disabled="@(!CanSubmit)">@T("Save")</button> }
                     <button type="button" class="button-primary" disabled="@(!CanSubmit)" @onclick="PublishAsync" data-testid="flow-publish-and-activate">@T("PublishAndActivate")</button>
@@ -172,20 +172,20 @@ else
         original = snapshot; etag = IsReadOnly ? null : snapshot.ETag; model.Enabled = snapshot.Value.Enabled;
         baseline = SavedFingerprint(snapshot.Value); StateHasChanged();
     }
-    private bool Validate()
+    private bool Validate(string? publicationVersion = null)
     {
         messages.Clear(); error = null;
         if (model is null || original is null || invalidInput) return false;
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Length > 200) messages.Add(new FieldIdentifier(this, nameof(displayName)), T("Validation.DisplayName"));
-        if (string.IsNullOrWhiteSpace(model.Version)) messages.Add(new FieldIdentifier(model, nameof(model.Version)), T("Validation.Version"));
+        if (publicationVersion is null && string.IsNullOrWhiteSpace(model.Version)) messages.Add(new FieldIdentifier(model, nameof(model.Version)), T("Validation.Version"));
         if (!formContext.GetValidationMessages().Any())
         {
             try
             {
-                FlowValidator.ValidateVersion(new FlowVersion(original.Value.ScopeRef!.Value, new(original.Value.Id, original.Value.Namespace), model.Version,
+                FlowValidator.ValidateVersion(new FlowVersion(original.Value.ScopeRef!.Value, new(original.Value.Id, original.Value.Namespace), publicationVersion ?? model.Version,
                     model.Description, model.CreateDefinition(), original.Value.Metadata, original.Value.UpdatedAt));
             }
-            catch (FlowValidationException exception) when (exception.Code == "flow_version_invalid") { messages.Add(new FieldIdentifier(model, nameof(model.Version)), T("Validation.Version")); }
+            catch (FlowValidationException exception) when (exception.Code == "flow_version_invalid") { messages.Add(publicationVersion is null ? new FieldIdentifier(model, nameof(model.Version)) : new FieldIdentifier(this, nameof(publishVersion)), T("Validation.Version")); }
             catch (Exception exception) when (exception is InvalidOperationException or ArgumentException) { error = T("Validation.Configuration"); }
         }
         formContext.NotifyValidationStateChanged(); return !formContext.GetValidationMessages().Any() && error is null;
@@ -200,11 +200,11 @@ else
         catch (Exception exception) { if (revision == loadVersion) error = exception.Message; }
         finally { if (revision == loadVersion) await SetSavingAsync(false); }
     }
-    private async Task<bool> PersistAsync(long revision)
+    private async Task<bool> PersistAsync(long revision, string? publicationVersion = null)
     {
         if (revision != loadVersion || original is null || model is null || etag is null || IsReadOnly) return false;
         var current = original;
-        var request = new UpdateFlowRequest(model.Description, model.Version, model.Enabled, model.CreateDefinition(), current.Value.Metadata) { DisplayName = displayName };
+        var request = new UpdateFlowRequest(model.Description, publicationVersion ?? model.Version, model.Enabled, model.CreateDefinition(), current.Value.Metadata) { DisplayName = displayName };
         var saved = await Client.UpdateFlowAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef!.Value, request, etag, cancellation.Token);
         if (revision != loadVersion) return false;
         if (!SameIdentity(saved.Value, current.Value)) throw new InvalidOperationException(T("IdentityMismatch"));
@@ -214,12 +214,12 @@ else
     }
     private async Task PublishAsync()
     {
-        if (!CanSubmit || !Validate()) return;
+        if (!CanSubmit || !Validate(publishVersion)) return;
         if (string.IsNullOrWhiteSpace(publishVersion)) { error = T("Validation.PublishVersion"); return; }
         var revision = loadVersion; var version = publishVersion; await SetSavingAsync(true);
         try
         {
-            if (!await PersistAsync(revision) || original is null) return;
+            if (!await PersistAsync(revision, version) || original is null) return;
             var current = original;
             var published = await Client.CreateFlowVersionAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef!.Value, new(version, true), cancellation.Token);
             if (revision != loadVersion) return;

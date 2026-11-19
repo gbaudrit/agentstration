@@ -208,9 +208,10 @@ export class FlowCollectionPage {
     await expect(menu).toBeFocused();
     expect(this.page.url()).toBe(before);
     const link = row.locator('a.resource-name-link');
-    const destination = new URL((await link.getAttribute('href'))!, before).href;
+    const destination = new URL((await link.getAttribute('href'))!, before);
+    destination.hash = 'overview';
     await link.click();
-    await expect(this.page).toHaveURL(destination);
+    await expect(this.page).toHaveURL(destination.href);
     await expect(this.page.getByTestId(TestIds.flowObservability.flowDetails)).toBeVisible();
     await this.page.goto(before, { waitUntil: 'domcontentloaded' });
     await this.assertCompactStructure(locale);

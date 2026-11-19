@@ -79,6 +79,7 @@ public sealed class FlowOrchestrationEditorTests
         rendered.WaitForAssertion(() => Assert.AreEqual("2.3.0", rendered.Find("[data-testid=flow-status-message]").GetAttribute("data-published-version")));
         CollectionAssert.AreEqual(new[] { "save", "publish", "read" }, handler.Commands);
         Assert.AreEqual("2.3.0", handler.Published!.Version);
+        Assert.AreEqual("2.3.0", handler.Updated!.Version);
         Assert.IsTrue(handler.Published.Activate);
         Assert.AreEqual("2.3.0", handler.Resource.ActiveVersion);
         Assert.AreEqual(handler.Uid, handler.Resource.Uid);
@@ -179,6 +180,7 @@ public sealed class FlowOrchestrationEditorTests
             if (request.Method == HttpMethod.Post && path.EndsWith("/versions", StringComparison.Ordinal))
             {
                 Commands.Add("publish"); Published = await request.Content!.ReadFromJsonAsync<CreateFlowVersionRequest>(Json, cancellationToken);
+                Assert.AreEqual(Resource.Version, Published!.Version, "Publication must match the persisted definition version.");
                 Resource = Resource with { ActiveVersion = Published!.Version };
                 return Ok(new FlowVersionResponse("review", Published.Version, Resource.Description, Resource.Definition, Resource.Metadata, DateTimeOffset.UnixEpoch) { ScopeRef = Owner, Namespace = new("team") });
             }
