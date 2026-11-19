@@ -50,7 +50,7 @@ public sealed class PacksComponentTests
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
-        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant?view=definition", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
+        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant#definition/configuration", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
     }
 
     [TestMethod]

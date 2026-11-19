@@ -5,9 +5,12 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Triggers;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,7 +35,7 @@ public sealed class NamespacedAgentDetailsTests
             .Add(component => component.Name, "assistant-diagnostics"));
 
         var navigation = context.Services.GetRequiredService<NavigationManager>();
-        Assert.AreEqual("http://localhost/agents/assistant-diagnostics?namespace=agentstration.assistant", navigation.Uri);
+        Assert.AreEqual($"http://localhost/agents/assistant-diagnostics?namespace=agentstration.assistant&scopeRef={Uri.EscapeDataString(FakeManagementClient.Scope.Value)}&context={Uri.EscapeDataString(FakeManagementClient.Scope.Value)}", navigation.Uri);
     }
 
     [TestMethod]
@@ -47,17 +50,19 @@ public sealed class NamespacedAgentDetailsTests
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(runtime);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo($"http://localhost/namespaces/{FakeManagementClient.PackNamespace.Value}/agents/concierge");
         navigation.NavigateTo(navigation.GetUriWithQueryParameter(
             "returnUrl",
             "/modelprofiles/reasoning?context=/instance&tab=usages"));
 
+        ConfigureNavigation(context);
         var rendered = context.Render<NamespacedAgentDetails>(parameters => parameters
             .Add(component => component.AgentNamespace, FakeManagementClient.PackNamespace.Value)
             .Add(component => component.Name, "concierge"));
 
         Assert.AreEqual(FakeManagementClient.PackNamespace, agents.RequestedNamespace);
-        CollectionAssert.AreEqual(new[] { "Overview", "Definition", "Model", "Runtime", "Access", "YAML" }, rendered.FindAll("[role='tab']").Select(tab => tab.TextContent.Trim()).ToArray());
-        Assert.AreEqual("true", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
+        CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Model", "Runtime", "Access", "YAML" }, rendered.FindAll(".resource-navigation-rail a[data-resource-section]").Select(tab => tab.TextContent.Trim()).ToArray());
+        Assert.AreEqual("page", rendered.Find("a[data-resource-section='overview']").GetAttribute("aria-current"));
         Assert.AreEqual(4, rendered.FindAll(".namespaced-agent-metrics .metric-card").Count);
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Model profile", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find(".namespaced-agent-metrics").TextContent.Contains("Runtime profile", StringComparison.Ordinal));
@@ -71,24 +76,28 @@ public sealed class NamespacedAgentDetailsTests
             rendered.Find("[data-testid='namespaced-agent-context-return']").GetAttribute("href"));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
-        Assert.IsFalse(rendered.FindAll("button:not([role='tab'])").Any(button => button.TextContent.Trim() == "Definition"));
-        await rendered.Find("#agent-definition-tab").ClickAsync(new());
-        Assert.AreEqual("true", rendered.Find("#agent-definition-tab").GetAttribute("aria-selected"));
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.Sections.Single(item => item.Path == "definition").Navigable);
+        Assert.Contains("Concierge", rendered.Find(".resource-identity-summary").TextContent);
+        Assert.Contains(FakeManagementClient.PackNamespace.Value, rendered.Find(".resource-identity-summary").TextContent);
+        Assert.IsEmpty(rendered.FindAll("[role=switch]"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
+        Assert.AreEqual("page", rendered.Find("a[data-resource-section='definition/configuration']").GetAttribute("aria-current"));
         Assert.IsTrue(rendered.Markup.Contains("Review the original Agent fields.", StringComparison.Ordinal));
         var definition = rendered.Find("[data-testid='pack-agent-definition-form']");
         Assert.IsTrue(definition.QuerySelectorAll("input:not([disabled]), textarea:not([disabled])").Length == 0);
         Assert.IsTrue(definition.QuerySelectorAll("textarea").Any(field => field.GetAttribute("value")?.Contains("Original instructions from the Pack.", StringComparison.Ordinal) == true));
         Assert.IsTrue(definition.InnerHtml.Contains("binding:model-reasoning", StringComparison.Ordinal));
-        await rendered.Find("#agent-overview-tab").ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
 
-        await rendered.Find("#agent-model-tab").ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/model"));
 
-        Assert.AreEqual("false", rendered.Find("#agent-overview-tab").GetAttribute("aria-selected"));
-        Assert.AreEqual("true", rendered.Find("#agent-model-tab").GetAttribute("aria-selected"));
+        Assert.IsNull(rendered.Find("a[data-resource-section='overview']").GetAttribute("aria-current"));
+        Assert.AreEqual("page", rendered.Find("a[data-resource-section='definition/model']").GetAttribute("aria-current"));
         var profileLinks = rendered.FindAll("a")
-            .Where(link => link.GetAttribute("href")?.Contains("modelprofiles", StringComparison.Ordinal) == true)
+            .Where(link => link.GetAttribute("href")?.StartsWith("/modelprofiles/", StringComparison.Ordinal) == true)
             .Where(link => link.GetAttribute("data-testid") != "namespaced-agent-context-return")
             .ToArray();
+        Assert.IsNotEmpty(profileLinks);
         Assert.IsTrue(profileLinks.All(link => link.GetAttribute("href") == "/modelprofiles/reasoning?namespace=shared.models"));
         Assert.IsTrue(rendered.Markup.Contains("model-reasoning", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("shared.models/reasoning", StringComparison.Ordinal));
@@ -96,10 +105,10 @@ public sealed class NamespacedAgentDetailsTests
             "/packs?publisher=agentstration&name=daily-life-assistant",
             rendered.FindAll("a").First(link => link.TextContent.Contains("Open Pack installation", StringComparison.Ordinal)).GetAttribute("href"));
 
-        await rendered.Find("#agent-runtime-tab").ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/runtime"));
 
-        Assert.AreEqual("false", rendered.Find("#agent-model-tab").GetAttribute("aria-selected"));
-        Assert.AreEqual("true", rendered.Find("#agent-runtime-tab").GetAttribute("aria-selected"));
+        Assert.IsNull(rendered.Find("a[data-resource-section='definition/model']").GetAttribute("aria-current"));
+        Assert.AreEqual("page", rendered.Find("a[data-resource-section='definition/runtime']").GetAttribute("aria-current"));
         Assert.IsTrue(rendered.Markup.Contains("local-runtime", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("shared.platform/maf-shared", StringComparison.Ordinal));
         Assert.AreEqual(
@@ -114,13 +123,15 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual(FakeManagementClient.PackNamespace, runtime.PreparedNamespace);
         Assert.AreEqual("concierge", runtime.PreparedAgentName);
         Assert.AreEqual(1, runtime.PreparedGeneration);
+        Assert.AreEqual(FakeManagementClient.Scope, runtime.PreparedScope);
+        Assert.AreEqual(FakeManagementClient.Scope, runtime.ObservedScope);
         Assert.IsTrue(rendered.Markup.Contains("Revision ready", StringComparison.Ordinal));
 
-        await rendered.Find("#agent-definition-tab").ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
 
-        Assert.AreEqual("true", rendered.Find("#agent-definition-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual("page", rendered.Find("a[data-resource-section='definition/configuration']").GetAttribute("aria-current"));
         Assert.IsTrue(rendered.Find("[data-testid='pack-agent-definition-form']").QuerySelectorAll("input:not([disabled]), textarea:not([disabled])").Length == 0);
-        await rendered.Find("#agent-yaml-tab").ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("yaml"));
         var source = rendered.Find("[data-testid='pack-agent-yaml'] textarea");
         Assert.IsTrue(source.HasAttribute("readonly"));
         Assert.IsTrue((source.GetAttribute("value") ?? string.Empty).Contains("binding: model-reasoning", StringComparison.Ordinal));
@@ -139,9 +150,78 @@ public sealed class NamespacedAgentDetailsTests
         Assert.AreEqual("Préparer la génération 4", localizer["DeployGeneration", 4].Value);
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Identity", "Settings")]
+    [DataRow("fr-FR", "Identité", "Paramètres")]
+    public async Task ManagedAgentKeepsItsPolicyDraftAndOriginalSourceAcrossSections(string locale, string identity, string settings)
+    {
+        using var culture = new CultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation();
+        var client = new FakeManagementClient();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IManagementApiClient>(client);
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.AddSingleton<IAgentRunnerRuntimeClient>(new FakeRuntimeClient());
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"http://localhost/namespaces/{FakeManagementClient.PackNamespace.Value}/agents/concierge?scopeRef={Uri.EscapeDataString(FakeManagementClient.Scope.Value)}");
+        ConfigureNavigation(context);
+        var cut = context.Render<NamespacedAgentDetails>(p => p.Add(c => c.AgentNamespace, FakeManagementClient.PackNamespace.Value).Add(c => c.Name, "concierge"));
+        Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
+        Assert.Contains(settings, cut.Find(".resource-configuration-summary").TextContent);
+        Assert.AreEqual(FakeManagementClient.Scope, client.RequestedScope);
+        var nav = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => nav.NavigateSection("access"));
+        var panel = cut.FindComponent<Stub<ResourceAccessPanel>>().Instance;
+        Assert.AreEqual(FakeManagementClient.Uid, panel.Parameters.Get(p => p.ResourceUid));
+        await cut.InvokeAsync(() => panel.Parameters.Get(p => p.DraftChanged).InvokeAsync(true));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => nav.NavigateSection("yaml"));
+        Assert.Contains("binding: model-reasoning", cut.Find("[data-testid=pack-agent-yaml] textarea").GetAttribute("value")!);
+        await cut.InvokeAsync(() => nav.NavigateSection("access"));
+        Assert.AreSame(panel, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance);
+        Assert.AreEqual(1, client.Reads);
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        await cut.InvokeAsync(() => panel.Parameters.Get(p => p.DraftChanged).InvokeAsync(false));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    public async Task AnInheritedManagedAgentDoesNotExposeOwnerPolicyAdministration()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IManagementApiClient>(new FakeManagementClient());
+        context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
+        context.Services.AddSingleton<IAgentRunnerRuntimeClient>(new FakeRuntimeClient());
+        context.Services.AddSingleton<IConsoleNavigationContext>(new OwnerContext(ResourceScopeRef.Workspace(Guid.NewGuid())));
+        ConfigureNavigation(context);
+        var cut = context.Render<NamespacedAgentDetails>(p => p.Add(c => c.AgentNamespace, FakeManagementClient.PackNamespace.Value).Add(c => c.Name, "concierge"));
+        Assert.IsEmpty(cut.FindAll("a[data-resource-section=access]"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
+        Assert.IsNotNull(cut.Find("[data-testid=pack-agent-definition-form]"));
+        Assert.IsEmpty(cut.FindAll("[data-testid=pack-agent-definition-form] input:not([disabled]), [data-testid=pack-agent-definition-form] textarea:not([disabled])"));
+    }
+
+    private sealed class OwnerContext(ResourceScopeRef owner) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => owner.Value;
+        public string AddToUri(string uri) => uri;
+    }
+
+    private static void ConfigureNavigation(BunitContext context)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var current = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "definition/configuration", "definition/model", "definition/runtime", "access", "yaml" })
+            module.Setup<string>("navigate", call => call.Arguments[0] is string uri && uri.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(current + "#" + path);
+    }
+
     private sealed class FakeRuntimeClient : IAgentRunnerRuntimeClient
     {
         private bool ready;
+        public ResourceScopeRef? PreparedScope { get; private set; }
+        public ResourceScopeRef? ObservedScope { get; private set; }
         public ResourceNamespace? PreparedNamespace { get; private set; }
         public string? PreparedAgentName { get; private set; }
         public long? PreparedGeneration { get; private set; }
@@ -158,6 +238,17 @@ public sealed class NamespacedAgentDetailsTests
             return Task.FromResult(new PrepareAgentRuntimeResponse(agentName, generation, "deployment-concierge", "revision-concierge", "Ready"));
         }
 
+        public Task<AgentRuntimeReadinessResponse> GetAgentReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, long generation, CancellationToken cancellationToken)
+        {
+            ObservedScope = scope;
+            return GetAgentReadinessAsync(ns, name, generation, cancellationToken);
+        }
+        public Task<PrepareAgentRuntimeResponse> PrepareAgentAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, long generation, CancellationToken cancellationToken)
+        {
+            PreparedScope = scope;
+            return PrepareAgentAsync(ns, name, generation, cancellationToken);
+        }
+
         public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -172,6 +263,10 @@ public sealed class NamespacedAgentDetailsTests
 
     private sealed class FakeManagementClient(bool packManaged = true) : IManagementApiClient
     {
+        public static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        public static readonly Guid Uid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        public ResourceScopeRef? RequestedScope { get; private set; }
+        public int Reads { get; private set; }
         public static readonly ResourceNamespace PackNamespace = new("agentstration.daily-life-assistant");
         private static readonly ResourceNamespace ProfileNamespace = new("shared.models");
 
@@ -179,10 +274,11 @@ public sealed class NamespacedAgentDetailsTests
 
         public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
         {
-            RequestedNamespace = @namespace;
+            Reads++; RequestedNamespace = @namespace;
             var resource = new AgentResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
+                Uid = Uid, ScopeRef = Scope,
                 Kind = AgentResourceKinds.Agent,
                 Metadata = new ResourceMetadata
                 {
@@ -211,6 +307,12 @@ public sealed class NamespacedAgentDetailsTests
                 }
             };
             return Task.FromResult(new ResourceSnapshot<AgentResource>(resource, "\"agent-etag\""));
+        }
+
+        public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken)
+        {
+            RequestedScope = scope;
+            return GetAgentAsync(ns, name, cancellationToken);
         }
 
         public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

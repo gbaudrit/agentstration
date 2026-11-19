@@ -5747,6 +5747,40 @@
         "domainSemantics": "Saved setting/value rows preserve schema, bindings, policies, state and declared exact Flow targets. Settings gain no resource identity or actions.",
         "evidenceStatus": "Source adopted; browser validation reported separately."
       }
+    },
+    {
+      "id": "namespaced-agent-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "line": 46,
+      "host": "console",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved effective Agent settings are distinct from the original read-only Pack source and logical bindings. Current browser validation remains pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved configuration settings retain full values and exact profile references. They are not fictional resources. Original Pack source and deployment/binding panels retain their meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
     }
   ],
   "specialized": [

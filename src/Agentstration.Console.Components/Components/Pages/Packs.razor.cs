@@ -298,9 +298,9 @@ public partial class Packs
     private void BindingChanged(string name, ChangeEventArgs args) => bindingSelections[name] = args.Value?.ToString() ?? string.Empty;
     private static string BindingValue(string name, ResourceNamespace @namespace, ResourceScopeRef? scopeRef = null) =>
         scopeRef is null ? $"{@namespace.Value}:{name}" : $"{scopeRef.Value.Value}|{@namespace.Value}:{name}";
-    private static string? DefinitionFormUrl(ManagedPackResource resource) => resource.Kind switch
+    private string? DefinitionFormUrl(ManagedPackResource resource) => resource.Kind switch
     {
-        AgentResourceKinds.Agent => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/agents/{Uri.EscapeDataString(resource.Name)}?view=definition",
+        AgentResourceKinds.Agent => ConsoleResourceUrls.Agent(resource.Namespace, resource.Name, selected?.Value.ScopeRef, ResourceOwnershipContext.TryGetCurrent(Services)) + "#definition/configuration",
         FlowResourceKinds.Flow => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/flows/{Uri.EscapeDataString(resource.Name)}?view=definition",
         EntryResourceKinds.Entry => $"/namespaces/{Uri.EscapeDataString(resource.Namespace.Value)}/entries/{Uri.EscapeDataString(resource.Name)}?view=definition",
         _ => null

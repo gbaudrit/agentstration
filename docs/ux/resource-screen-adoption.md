@@ -6,13 +6,13 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 | Route-owning component | Routes | Adoption |
 | --- | --- | --- |
-| AgentEditor.razor | `/agents/new`, `/agents/{Name}` | Implemented: existing detail pilot extended with a 6-step creation wizard, exact owner in the Identity/YAML views and retained access drafts; 27 Agent/shared-access cases pass before final browser checks |
+| AgentEditor.razor | `/agents/new`, `/agents/{Name}` | Implemented: 6-step creation wizard, saved Identity/owner, exact-owner YAML and retained Access drafts. 27 Agent/shared-access cases and 2 maintained desktop/mobile browser cases pass; [real captures](evidence/resource-screen-adoption/agents/README.md). Final full validation remains pending. |
 | AgentRunner.razor | `/agents/{Name}/run`, `/runs/{RunId}` | Pending review and migration |
 | ConnectedServiceDetails.razor | `/connected-services/{Name}` | Pending review and migration |
 | ConnectedServiceEditor.razor | `/connected-services/new`, `/connected-services/{Name}/edit` | Pending review and migration |
 | ConsoleEntryInteraction.razor | `/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}` | Pending review and migration |
 | DataSourceEditor.razor | `/data-sources/new`, `/data-sources/{Name}` | Pending review and migration |
-| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Implemented; 17 profile/managed-family component cases pass, including exact pinned references, invalid JSON retention, header activation and publication-retry routing; TypeScript/catalog pass; existing lifecycle/inventory journeys maintained; browser checks pending |
+| DataSourceProfileEditor.razor | `/data-source-profiles/new`, `/data-source-profiles/{Name}` | Implemented; 17 profile/managed-family cases, 3 maintained lifecycle browser cases and 4 managed-inventory variants pass. Desktop/mobile creation and actual publication verified; [real captures](evidence/resource-screen-adoption/data-source-profiles/README.md). Final full validation remains pending. |
 | EntryEditor.razor | `/entries/{Name}`, `/namespaces/{EntryNamespace}/entries/{Name}` | Pending review and migration |
 | ExtensionDetails.razor | `/extensions/{RegistrationName}`, `/extensions/enrollment/{EnrollmentInstanceId:guid}` | Pending review and migration |
 | FlowDesigner.razor | `/flows/{FlowId}/designer`, `/namespaces/{FlowNamespace}/flows/{FlowId}/designer` | Pending review and migration |
@@ -25,7 +25,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ModelDetails.razor | `/models/{Name}` | Pending review and migration |
 | ModelProfileEditor.razor | `/modelprofiles/new`, `/modelprofiles/{Name}` | Pending review and migration |
 | ModelProviderDetails.razor | `/modelproviders/new`, `/modelproviders/{Name}` | Pending review and migration |
-| NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Pending review and migration |
+| NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Implemented; 14 managed-Agent/Pack component cases and source/catalog checks pass, including exact runtime owner, retained policy drafts and original read-only bindings. Fresh browser checks remain pending |
 | NewFlow.razor | `/flows/new` | Pending review and migration |
 | NewToolDefinition.razor | `/tools/definitions/new` | Pending review and migration |
 | OrganizationMemberDetails.razor | `/settings/organization/members/{UserId:guid}` | Pending review and migration |
@@ -33,11 +33,11 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | PackProjectDetails.razor | `/pack-projects/{ProjectId:guid}` | Pending review and migration |
 | ParameterEditor.razor | `/parameters/new`, `/parameters/{Name}` | Implemented; focused components and desktop/mobile browser checks pass. [Real captures](evidence/resource-screen-adoption/parameters/README.md). Full final validation remains pending. |
 | ResourcePlanDetails.razor | `/resource-plans/{Id:guid}` | Pending review and migration |
-| RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Implemented; 10 profile cases and 15 shared access-panel cases pass; TypeScript/catalog pass; browser page object maintained; browser checks pending |
+| RuntimeProfileEditor.razor | `/runtimeprofiles/new`, `/runtimeprofiles/{Name}` | Implemented; 10 profile cases and 15 shared Access cases pass. Desktop/mobile creation, invalid JSON retention and discard pass; [real captures](evidence/resource-screen-adoption/runtime-profiles/README.md). Full runtime lifecycle and final validation remain pending. |
 | RuntimeWorkerDetails.razor | `/settings/runtime-workers/{WorkerId:guid}` | Pending review and migration |
 | SchemaEditor.razor | `/schemas/new`, `/schemas/{Name}` | Pending review and migration |
 | SecretEditor.razor | `/secrets/new`, `/secrets/{Name}` | Layout/wizard browser checks pass at `70897500`; access-draft/managed follow-up passes the 33-case grant/access regression selection; fresh browser checks for that follow-up remain pending. [Real captures](evidence/resource-screen-adoption/secrets/README.md). Full final validation remains pending. |
-| SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Implemented; 6 suggestion/wizard/EN/FR overview/ETag cases pass; TypeScript/catalog pass; browser checks pending |
+| SourceProviderDetails.razor | `/sourceproviders/new`, `/sourceproviders/{Name}` | Implemented; 6 component cases and desktop/mobile creation against the real local Git extension pass; [real captures](evidence/resource-screen-adoption/source-providers/README.md). Final full validation remains pending. |
 | SourceRegistries.razor | `/settings/source-registries`, `/settings/source-registries/new`, `/settings/source-registries/{Name}` | Pending review and migration |
 | Sources.razor | `/settings/sources`, `/settings/sources/{Publisher}/{Name}` | Pending review and migration |
 | StagedArtifactDetails.razor | `/artifacts/staged/{Id}` | Pending review and migration |
@@ -51,7 +51,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ToolDefinitionEditor.razor | `/tools/definitions/{Name}` | Pending review and migration |
 | ToolDetails.razor | `/tools/{Name}` | Pending review and migration |
 | ToolGovernanceAudit.razor | `/tool-governance/{Owner}/{RunId}` | Pending review and migration |
-| ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Implemented; 8 focused switch/wizard/read-only/navigation cases pass; TypeScript/catalog pass; browser checks pending |
+| ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Implemented; 8 component cases, desktop/mobile overview and Tools probes, and 4 managed-inventory browser variants pass; [real captures](evidence/resource-screen-adoption/tool-providers/README.md). Final full validation remains pending. |
 | ToolSetDetails.razor | `/tools/sets/{Name}` | Pending review and migration |
 | TransformationFunctionEditor.razor | `/transformation-functions/{Name}` | Pending review and migration |
 | TriggerDetails.razor | `/triggers/{Name}` | Pending review and migration |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Saved configuration summaries add shared frames: **95 shared frames + 258 active specialized collections = 353**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **96 shared frames + 258 active specialized collections = 354**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 
