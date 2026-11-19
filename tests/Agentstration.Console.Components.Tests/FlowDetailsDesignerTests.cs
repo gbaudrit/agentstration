@@ -630,9 +630,10 @@ public sealed partial class FlowDetailsDesignerTests
         var rendered = context.Render<FlowRunDetails>(parameters => parameters
             .Add(component => component.RunId, "flowrun-missing"));
 
-        StringAssert.Contains(rendered.Markup, strings["NotFoundTitle"].Value);
+        Assert.AreEqual(ResourceLoadStatus.NotFound, rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
         StringAssert.Contains(rendered.Markup, strings["NotFoundMessage"].Value);
-        Assert.AreEqual("/flow-runs", rendered.Find("a.button-secondary").GetAttribute("href"));
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.HasContent);
+        Assert.IsEmpty(rendered.FindComponents<Agentstration.Web.FlowDesigner.Components.FlowTopologyViewer>());
     }
 
     [TestMethod]

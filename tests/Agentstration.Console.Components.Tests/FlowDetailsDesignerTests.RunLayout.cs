@@ -58,7 +58,8 @@ public sealed partial class FlowDetailsDesignerTests
         context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { RunLoader = _ => Task.FromResult(other) });
         var rendered = context.Render<FlowRunDetails>(p => p.Add(value => value.RunId, "requested-execution"));
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<ErrorState>()));
-        Assert.IsEmpty(rendered.FindComponents<ResourceDetailsTemplate>());
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.HasContent);
+        Assert.IsEmpty(rendered.FindAll(".resource-form, .flow-run-overview, .input-request-panel"));
         Assert.DoesNotContain(other.Id, rendered.Markup);
     }
 
@@ -91,12 +92,15 @@ public sealed partial class FlowDetailsDesignerTests
         context.Services.AddSingleton<IFlowApiClient>(client);
         var rendered = context.Render<FlowRunDetails>(p => p.Add(value => value.RunId, first.Id));
         rendered.WaitForAssertion(() => Assert.AreEqual(1, client.EventReadCount));
+        Assert.IsTrue(rendered.FindComponent<ResourceDetailsTemplate>().Instance.Busy, "Refresh must stay disabled while the initial replay is pending.");
         rendered.Render(p => p.Add(value => value.RunId, second.Id));
-        Assert.IsEmpty(rendered.FindComponents<ResourceDetailsTemplate>());
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.HasContent);
+        Assert.IsEmpty(rendered.FindAll(".resource-form, .flow-run-overview, .input-request-panel"));
         var beforeReplayCompletion = rendered.RenderCount;
         await rendered.InvokeAsync(() => pendingReplay.SetResult([]));
         rendered.WaitForState(() => rendered.RenderCount > beforeReplayCompletion);
-        Assert.IsEmpty(rendered.FindComponents<ResourceDetailsTemplate>());
+        Assert.IsFalse(rendered.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.HasContent);
+        Assert.IsEmpty(rendered.FindAll(".resource-form, .flow-run-overview, .input-request-panel"));
         await rendered.InvokeAsync(() => pendingSecond.SetResult(second));
         rendered.WaitForAssertion(() => Assert.AreEqual(second.Id, rendered.FindComponent<ResourceDetailsTemplate>().Instance.Description));
         Assert.AreEqual(2, client.RunReadCount);

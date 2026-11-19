@@ -12,27 +12,12 @@
 <UnsavedNavigationGuard IsDirty="@HasPendingResponse" HasUnsavedChanges="@(() => HasPendingResponse)" />
 <PageTitle>@(run is null ? T("FlowRun") : run.Id) · Agentstration</PageTitle>
 <div data-testid="flow-observability-run-details">
-@if (notFound)
-{
-    <ErrorState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")">
-        <a class="button-secondary" href="/flow-runs">@T("BackToRuns")</a>
-    </ErrorState>
-}
-else if (loadError is not null)
-{
-    <ErrorState Title="@T("UnableToLoad")" Message="@loadError.Message" ErrorId="@loadError.ErrorId" />
-}
-else if (run is null)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else
-{
-    <ResourceDetailsTemplate Name="@(run.ProcessOrigin is { } processTitle ? ProcessLabel(processTitle) : T("FlowRun"))" ResourceType="@T("FlowRun")" Domain="flow" IconName="flow-run" Description="@run.Id"
-                             StatusText="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())"
-                             Sections="Sections" DefaultSection="overview" ResourceIdentity="@loadedKey" SelectionChanged="SelectSectionAsync" NavigationLabel="@T("RunViewsAriaLabel")">
-        <Actions><a class="button-secondary" href="@($"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}")">@T("BackToRuns")</a>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a></Actions>
+    <ResourceDetailsTemplate Name="@(run?.ProcessOrigin is { } processTitle ? ProcessLabel(processTitle) : T("FlowRun"))" ResourceType="@T("FlowRun")" Domain="flow" IconName="flow-run" Description="@(run?.Id ?? RunId)"
+                             StatusText="@(run is null ? null : StatusLabel(run.Status))" Status="@(run is null ? UiStatus.Neutral : PlatformDashboardService.ToStatus(run.Status.ToString()))"
+                             Sections="Sections" DefaultSection="overview" ResourceIdentity="@loadedKey" SelectionChanged="SelectSectionAsync" SectionState="sectionState" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RetryAsync" Busy="IsLoading" NavigationLabel="@T("RunViewsAriaLabel")">
+        <Actions>@if (run is not null) { <a class="button-secondary" href="@($"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}")">@T("BackToRuns")</a>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a> }</Actions>
         <Feedback>
+    @if (run is not null) {
     @if (run.Error is not null && activeTab == RunTab.Summary)
     {
         <article class="panel run-error" data-testid="flow-run-error">
@@ -74,11 +59,12 @@ else
         <div class="panel realtime-warning" role="status"><span>@realtimeError</span><button class="button-secondary" @onclick="ConnectAsync">@T("RetryLiveUpdates")</button></div>
     }
         @if (inputError is not null && pendingInput is null) { <p class="error-panel" role="alert">@inputError</p> }
+        }
         </Feedback>
-        <Content>
+        <Content>@if (run is not null) {
         <div hidden="@(activeTab != RunTab.Summary)">
             <section class="metric-grid"><MetricCard Label="@T("Status")" Value="@StatusLabel(run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status.ToString())" /><MetricCard Label="@T("Duration")" Value="@Duration(run.StartedAt, run.CompletedAt)" Status="UiStatus.Neutral" /></section>
-            <FormSection Title="@Shared["Identity"]"><dl class="resource-details"><dt>@T("RunIdentifier")</dt><dd><CopyableValue Value="@run.Id" /></dd><dt>@T("FlowAndVersion")</dt><dd><a href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@run.FlowId.Value · @run.FlowVersion</a></dd><dt>@T("CorrelationId")</dt><dd><CopyableValue Value="@run.CorrelationId" /></dd></dl></FormSection>
+            <FormSection Title="@Shared["Identity"]"><dl class="resource-details"><dt>@T("RunIdentifier")</dt><dd><CopyableValue Value="@run.Id" /></dd><dt>@T("FlowAndVersion")</dt><dd><a href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@run.FlowId.Namespace/@run.FlowId.Value · @run.FlowVersion</a></dd><dt>@T("CorrelationId")</dt><dd><CopyableValue Value="@run.CorrelationId" /></dd></dl></FormSection>
             <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" ItemAttributes="SettingAttributes" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView></FormSection>
     @if (run.ProcessOrigin is { } process)
     {
@@ -162,7 +148,7 @@ else
                 </section>
             </article>
         </div>
-        @if (visited.Contains(RunTab.Causality))
+        @if (sectionState.HasVisited("causality"))
         {
         <div hidden="@(activeTab != RunTab.Causality)">
             @if (causality is null)
@@ -219,7 +205,7 @@ else
             }
         </div>
         }
-        @if (visited.Contains(RunTab.InputOutput))
+        @if (sectionState.HasVisited("input-output"))
         {
         <div hidden="@(activeTab != RunTab.InputOutput)">
             <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
@@ -228,20 +214,20 @@ else
             </section>
         </div>
         }
-        @if (visited.Contains(RunTab.Worker))
+        @if (sectionState.HasVisited("worker"))
         {
         <div hidden="@(activeTab != RunTab.Worker)">
             <RuntimePlacementSummary Active="@(activeTab == RunTab.Worker)" TargetKind="RuntimeAssignmentTargetKind.FlowRun" RunId="@(run.RootFlowRunId ?? run.Id)" ScopeRef="@run.ExecutionScopeRef" />
                 </div>
         }
-        @foreach (var timelineTab in AvailableTabs.Where(value => (value is RunTab.Activity or RunTab.Handoffs or RunTab.RawEvents) && visited.Contains(value)))
+        @foreach (var timelineTab in AvailableTabs.Where(value => (value is RunTab.Activity or RunTab.Handoffs or RunTab.RawEvents) && sectionState.HasVisited(SectionPath(value))))
         {
             <div @key="timelineTab" hidden="@(activeTab != timelineTab)"><FlowRunTimeline Events="eventBuffer.Snapshot()" IsLive="@(!run.Status.IsTerminal())" InferParticipantHandoffs="IsHandoffRun"
                              View="@TimelineView(timelineTab)" ShowHeader="false" ShowNavigation="false" /></div>
         }
+        }
         </Content>
     </ResourceDetailsTemplate>
-}
 
 </div>
 @code {
@@ -271,8 +257,9 @@ else
     private InputRequest? pendingInput;
     private FlowStepRun? selected;
     private Microsoft.AspNetCore.SignalR.Client.HubConnection? hub;
-    private AgentstrationApiException? loadError;
-    private bool notFound;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private bool loading, initializing;
+    private bool IsLoading => loading || initializing;
     private string? realtimeError;
     private bool IsHandoffRun => run?.DefinitionSnapshot.Definition is OrchestrationFlowDefinition { Pattern: HandoffOrchestrationPattern };
     private int streamingRenderScheduled;
@@ -287,7 +274,8 @@ else
     private TimeSpan? replayElapsed;
     private IReadOnlyList<FlowRunEvent>? replayEvents;
     private CancellationTokenSource? replayCancellation;
-    private RunTab activeTab;
+    private readonly ResourceSectionState sectionState = new();
+    private RunTab activeTab => AvailableTabs.FirstOrDefault(tab => SectionPath(tab) == sectionState.CurrentPath);
     private static readonly RunTab[] StandardTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.InputOutput, RunTab.RawEvents];
     private static readonly RunTab[] HandoffTabs = [RunTab.Summary, RunTab.Worker, RunTab.Causality, RunTab.Activity, RunTab.Handoffs, RunTab.InputOutput, RunTab.RawEvents];
     private IReadOnlyList<RunTab> AvailableTabs => IsHandoffRun ? HandoffTabs : StandardTabs;
@@ -320,7 +308,6 @@ else
     private string? loadedKey;
     private long loadVersion;
     private string? appliedFocusStep;
-    private readonly HashSet<RunTab> visited = [];
     private static string SectionPath(RunTab tab) => tab == RunTab.Summary ? "overview" : tab == RunTab.InputOutput ? "input-output" : tab == RunTab.RawEvents ? "raw-events" : tab.ToString().ToLowerInvariant();
     private IReadOnlyList<ResourceNavigationItem> Sections => AvailableTabs.Select(tab => new ResourceNavigationItem(SectionPath(tab), tab == RunTab.Summary ? Shared["Overview"] : TabLabel(tab), tab switch { RunTab.Summary => "home", RunTab.Worker => "server", RunTab.Causality => "sitemap", RunTab.Activity => "activity", RunTab.InputOutput => "code", _ => "list" })).ToArray();
     private sealed record SavedSetting(string Label, string Value, string? TestId = null);
@@ -359,48 +346,65 @@ else
     {
         var key = $"{RunId}|{ScopeRef}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
         if (loadedKey == key) { ApplyFocusStep(); return; }
-        loadedKey = key;
+        loadedKey = key; sectionState.Reset(key);
+        await LoadInitialAsync();
+    }
+
+    private Task RetryAsync() => IsLoading ? Task.CompletedTask : run is null ? LoadInitialAsync() : RefreshRunAsync();
+    private Task RefreshAsync() => IsLoading ? Task.CompletedTask : RefreshRunAsync();
+    private async Task LoadInitialAsync()
+    {
         var revision = ++loadVersion;
-        replayCancellation?.Cancel();
-        run = null; causality = null; selected = null; pendingInput = null; visited.Clear(); activeTab = RunTab.Summary;
-        responseText = selectedChoice = string.Empty; inputError = null; submittingInput = false; eventBuffer.Clear();
-        if (hub is { } previous) { hub = null; await previous.DisposeAsync(); if (revision != loadVersion) return; }
-        notFound = false;
-        loadError = null;
-        realtimeError = null;
+        ClearInspection();
+        initializing = true; loadState = new(ResourceLoadStatus.Loading);
         try
         {
+            if (hub is { } previous) { hub = null; await previous.DisposeAsync(); if (revision != loadVersion) return; }
             var requestedId = RunId; var requestedScope = string.IsNullOrWhiteSpace(ScopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRef);
             var loaded = requestedScope is { } scope ? await Client.GetFlowRunAsync(requestedId, scope, cancellation.Token) : await Client.GetFlowRunAsync(requestedId, cancellation.Token);
             if (revision != loadVersion) return;
-            if (loaded.Id != requestedId || requestedScope is { } owner && loaded.ExecutionScopeRef != owner) throw new AgentstrationApiException(T("IdentityMismatch"), Guid.NewGuid().ToString("N"));
+            if (loaded.Id != requestedId || requestedScope is { } owner && loaded.ExecutionScopeRef != owner) throw new AgentstrationApiException(T("IdentityMismatch"), Guid.NewGuid().ToString("N"), System.Net.HttpStatusCode.NotFound);
             run = loaded;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            await RefreshInputAsync(); if (revision != loadVersion) return;
+            await RefreshCausalityAsync(); if (revision != loadVersion) return;
+            var origins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token); if (revision != loadVersion) return;
+            contractOrigins = origins;
+            if (!IsHandoffRun && sectionState.Is("handoffs")) sectionState.Select("overview");
+            selected = run.Steps.FirstOrDefault(step => step.StepName == FocusStep) ?? run.Steps.FirstOrDefault();
+            appliedFocusStep = null; ApplyFocusStep();
+            eventBuffer.Clear();
+            await ReplayAsync();
+            if (revision != loadVersion || run is null) return;
+            if (!run.Status.IsTerminal()) await ConnectAsync();
         }
-        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (revision == loadVersion) SetLoadFailure(exception); }
+        finally { if (revision == loadVersion) initializing = false; }
+    }
+
+    private void ClearInspection()
+    {
+        replayCancellation?.Cancel();
+        run = null; causality = null; contractOrigins = []; selected = null; pendingInput = null;
+        responseText = selectedChoice = string.Empty; inputError = realtimeError = causalityError = null;
+        submittingInput = inspectorVisible = replayInProgress = loading = initializing = false;
+        replayEvents = null; replaySequence = null; replayElapsed = null; eventBuffer.Clear();
+    }
+    private void SetLoadFailure(Exception exception)
+    {
+        var status = exception is AgentstrationApiException api ? api.StatusCode switch
         {
-            if (revision != loadVersion) return;
-            run = null;
-            notFound = true;
-            return;
-        }
-        catch (AgentstrationApiException exception)
+            System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+            System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+            _ => ResourceLoadStatus.Failed
+        } : ResourceLoadStatus.Failed;
+        if (status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden)
         {
-            if (revision != loadVersion) return;
-            run = null;
-            loadError = exception;
-            return;
+            ClearInspection(); ++loadVersion; loading = false;
+            if (hub is { } connection) { hub = null; _ = connection.DisposeAsync(); }
         }
-        await RefreshInputAsync(); if (revision != loadVersion) return;
-        await RefreshCausalityAsync(); if (revision != loadVersion) return;
-        var origins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run!, cancellation.Token); if (revision != loadVersion) return;
-        contractOrigins = origins;
-        if (!IsHandoffRun && activeTab == RunTab.Handoffs) activeTab = RunTab.Summary;
-        selected = run.Steps.FirstOrDefault(step => step.StepName == FocusStep) ?? run.Steps.FirstOrDefault();
-        appliedFocusStep = null; ApplyFocusStep();
-        eventBuffer.Clear();
-        await ReplayAsync();
-        if (revision != loadVersion || run is null) return;
-        if (!run.Status.IsTerminal()) await ConnectAsync();
+        loadState = new(status) { HasContent = run is not null, Message = status == ResourceLoadStatus.NotFound ? T("NotFoundMessage") : null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     }
 
     private async Task ConnectAsync()
@@ -478,15 +482,22 @@ else
     {
         if (run is not { } current) return;
         var revision = loadVersion;
-        var loaded = await Client.GetFlowRunAsync(current.Id, current.ExecutionScopeRef, cancellation.Token);
-        if (revision != loadVersion) return;
-        if (!SameRun(current, loaded)) throw new AgentstrationApiException(T("IdentityMismatch"), Guid.NewGuid().ToString("N"));
-        run = loaded;
-        await RefreshInputAsync(); if (revision != loadVersion) return;
-        if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
-        await RefreshCausalityAsync(); if (revision != loadVersion) return;
-        var origins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run, cancellation.Token);
-        if (revision == loadVersion) contractOrigins = origins;
+        loading = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var loaded = await Client.GetFlowRunAsync(current.Id, current.ExecutionScopeRef, cancellation.Token);
+            if (revision != loadVersion) return;
+            if (!SameRun(current, loaded)) throw new AgentstrationApiException(T("IdentityMismatch"), Guid.NewGuid().ToString("N"), System.Net.HttpStatusCode.NotFound);
+            run = loaded;
+            await RefreshInputAsync(); if (revision != loadVersion) return;
+            if (selected is not null) selected = run.Steps.FirstOrDefault(value => value.StepName == selected.StepName);
+            await RefreshCausalityAsync(); if (revision != loadVersion) return;
+            var origins = await FlowRunInspection.ReadErrorOriginsAsync(Client, run, cancellation.Token);
+            if (revision == loadVersion) { contractOrigins = origins; loadState = new(ResourceLoadStatus.Ready) { HasContent = true }; }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (revision == loadVersion) SetLoadFailure(exception); }
+        finally { if (revision == loadVersion) loading = false; }
     }
 
     private async Task RefreshCausalityAsync()
@@ -519,8 +530,7 @@ else
 
     private async Task SelectTabAsync(RunTab tab)
     {
-        activeTab = tab;
-        visited.Add(tab);
+        sectionState.Select(SectionPath(tab));
         if (tab == RunTab.Causality && causality is null) await RefreshCausalityAsync();
     }
 
