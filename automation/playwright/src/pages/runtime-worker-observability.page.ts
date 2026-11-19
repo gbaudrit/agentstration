@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { LoginPage } from './login.page.js';
 import { fillAndCommit } from './controls.js';
+import { selectResourceSection } from './resource-sections.js';
 
 interface RuntimeRunWire {
   id: string;
@@ -96,8 +97,7 @@ export class RuntimeWorkerObservabilityPage {
   }
 
   public async openAssignments(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.runtimeWorkerObservability.assignmentsTab);
-    await this.activateTab(tab);
+    await selectResourceSection(this.page, 'assignments');
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.assignments)).toBeVisible();
   }
 

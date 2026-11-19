@@ -78,23 +78,51 @@ public sealed class RuntimeObservabilityConsoleTests
             "flowrun-root-1", "Succeeded", "microsoft-agent-framework", "1.0", "1.0", now.AddMinutes(-1), now,
             [new(Guid.NewGuid(), workerId, Guid.NewGuid(), 1, "Succeeded", now.AddMinutes(-1), now, now.AddSeconds(30), now, null)],
             ResourceScopeRef.Instance);
-        using var context = CreateContext(new RuntimeClient { Details = new(worker, [assignment]) });
+        var client = new RuntimeClient { Details = new(worker, [assignment]) };
+        using var context = CreateContext(client);
 
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo($"/settings/runtime-workers/{workerId:D}");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri + "#overview");
         var cut = context.Render<RuntimeWorkerDetails>(parameters => parameters.Add(component => component.WorkerId, workerId));
 
         StringAssert.Contains(cut.Markup, "Back to Workers");
-        StringAssert.Contains(cut.Find(".page-header .status-badge").ClassName, "status-success");
-        Assert.AreEqual("true", cut.Find("#worker-overview-tab").GetAttribute("aria-selected"));
-        StringAssert.Contains(cut.Markup, "Identity and presence");
+        StringAssert.Contains(cut.Find(".resource-header .status-badge").ClassName, "status-success");
+        Assert.AreEqual("page", cut.Find("[data-resource-section=overview]").GetAttribute("aria-current"));
+        StringAssert.Contains(cut.Find("[data-worker-section=overview]").TextContent, "Identity");
+        StringAssert.Contains(cut.Find("[data-worker-section=overview]").TextContent, workerId.ToString("D"));
+        StringAssert.Contains(cut.Find("[data-worker-section=overview]").TextContent, "Configuration");
         StringAssert.Contains(cut.Markup, "0.3.0-alpha.1");
-        Assert.IsFalse(cut.Markup.Contains("Durable assignments handled by this Worker", StringComparison.Ordinal));
+        Assert.IsTrue(cut.Find("[data-worker-section=assignments]").HasAttribute("hidden"));
 
-        cut.Find("#worker-assignments-tab").Click();
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#assignments");
 
-        Assert.AreEqual("true", cut.Find("#worker-assignments-tab").GetAttribute("aria-selected"));
+        cut.WaitForAssertion(() => Assert.AreEqual("page", cut.Find("[data-resource-section=assignments]").GetAttribute("aria-current")));
+        Assert.IsFalse(cut.Find("[data-worker-section=assignments]").HasAttribute("hidden"));
+        Assert.IsTrue(cut.Find("[data-worker-section=overview]").HasAttribute("hidden"));
         StringAssert.Contains(cut.Markup, "Durable assignments handled by this Worker");
         StringAssert.Contains(cut.Markup, "/flow-runs/flowrun-root-1?scopeRef=%2Finstance");
         Assert.IsFalse(cut.Markup.Contains("This Worker has no assignment history.", StringComparison.Ordinal));
+        Assert.AreEqual(1, client.WorkerReads, "Fragment transitions retain the loaded worker and bounded assignment history.");
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#overview");
+        cut.WaitForAssertion(() => Assert.IsFalse(cut.Find("[data-worker-section=overview]").HasAttribute("hidden")));
+        Assert.AreEqual(1, client.WorkerReads);
+        Assert.AreEqual(0, cut.FindAll(".resource-header [role=switch]").Count, "Presence is observed, not an activation flag.");
+    }
+
+    [TestMethod]
+    public void WorkerDetailsRejectAResponseForAnotherWorker()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var worker = new RuntimeWorkerSummaryResponse(Guid.NewGuid(), "Another worker", "1", "Active", RuntimeWorkerPresenceState.Unknown,
+            null, null, null, 0, null, null, []);
+        using var context = CreateContext(new RuntimeClient { Details = new(worker, []) });
+        var rendered = context.Render<RuntimeWorkerDetails>(parameters => parameters.Add(component => component.WorkerId, Guid.NewGuid()));
+        StringAssert.Contains(rendered.Markup, "does not match the requested identity");
+        Assert.AreEqual(0, rendered.FindAll("[data-testid=runtime-worker-details]").Count);
+        Assert.IsFalse(rendered.Markup.Contains("Another worker", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -138,8 +166,12 @@ public sealed class RuntimeObservabilityConsoleTests
         public RuntimeAssignmentPlacementResponse? Placement { get; init; }
         public Task<IReadOnlyList<AgentInstanceResponse>> GetAgentInstancesAsync(CancellationToken cancellationToken) => Task.FromResult(Instances);
         public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) => Task.FromResult(Workers);
-        public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
-            Task.FromResult(Details ?? throw new InvalidOperationException("Worker details were not configured."));
+        public int WorkerReads { get; private set; }
+        public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken)
+        {
+            WorkerReads++;
+            return Task.FromResult(Details ?? throw new InvalidOperationException("Worker details were not configured."));
+        }
         public Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) => Task.FromResult(Placement);
         public Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();

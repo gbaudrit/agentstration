@@ -139,8 +139,6 @@ export const TestIds = {
     inventory: 'runtime-workers',
     workerRow: 'runtime-worker-row',
     details: 'runtime-worker-details',
-    overviewTab: 'runtime-worker-overview-tab',
-    assignmentsTab: 'runtime-worker-assignments-tab',
     assignments: 'runtime-worker-assignments',
     assignmentRow: 'runtime-worker-assignment-row',
     flowRunWorkerTab: 'flow-run-worker-tab',
