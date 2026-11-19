@@ -4587,17 +4587,17 @@
     {
       "id": "knowledge-sources-knowledge-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
-      "line": 16,
+      "line": 10,
       "host": "console",
       "routes": [
         "/knowledge-sources"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "KnowledgeSourceResource",
       "identityLabel": "KnowledgeSource",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "DataSources",
         "ProjectionFlow",
@@ -4666,6 +4666,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "3696788dd6b048a40318c03ce2c8cadde8070597"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized array. Local technical/display-name search and enabled filter; advanced displayed Data Source/projection/retrieval text filters plus namespace and exact scope. Exact totals and local 20/50/100 pages; no projection or readiness reads added.",
+        "identity": "Preserve Knowledge Source, Data Source and distinct projection/retrieval Flow identities and existing test markers. References retain their own namespace and scope, falling back to the owning source only when unspecified. No profile substitution.",
+        "states": "Retained compatible refresh, failure/retry, successful shrink clamp, denied-read clearing, context replacement and stale-response rejection.",
+        "actions": "Existing permission-gated create and related Artifacts/ToolSets links preserve context. Redundant Inspect-only row menu removed; no lifecycle command added.",
+        "validation": "KnowledgeSourceCollectionTests plus existing clickable-name regression and desktop/mobile metadata browser smoke; ledger records limits."
       }
     },
     {

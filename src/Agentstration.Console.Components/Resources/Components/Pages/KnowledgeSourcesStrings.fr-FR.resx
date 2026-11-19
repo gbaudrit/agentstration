@@ -199,4 +199,6 @@
   <data name="RecordArtifact" xml:space="preserve"><value>Artefact</value></data>
   <data name="RecordOrdinal" xml:space="preserve"><value>Ligne {0}</value></data>
   <data name="RecordCount" xml:space="preserve"><value>{0} lignes JSON</value></data>
+  <data name="ActiveVersionLabel"><value>active</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
 </root>

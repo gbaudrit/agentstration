@@ -665,7 +665,8 @@ public sealed partial class KnowledgeSourceEditorTests
     public void ListMakesTheKnowledgeSourceNameClickable()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource()));
+        using var context = CreateContext(new KnowledgeClientStub(ProjectedSource())).WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
 
         var rendered = context.Render<KnowledgeSources>();
 
@@ -684,7 +685,7 @@ public sealed partial class KnowledgeSourceEditorTests
             StringAssert.StartsWith(dataSource.GetAttribute("href"), "/data-sources/documentation?");
             var projection = rendered.Find("[data-testid='knowledge-source-projection-flow-link']");
             Assert.AreEqual("default/knowledge-projection-builtin:1.0.0", projection.TextContent);
-            Assert.AreEqual("/flows/knowledge-projection-builtin", projection.GetAttribute("href"));
+            StringAssert.StartsWith(projection.GetAttribute("href"), "/flows/knowledge-projection-builtin?scopeRef=" + Uri.EscapeDataString(DataSourceScope.Value));
         });
     }
 

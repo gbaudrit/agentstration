@@ -199,4 +199,6 @@
   <data name="RecordArtifact" xml:space="preserve"><value>Artifact</value></data>
   <data name="RecordOrdinal" xml:space="preserve"><value>Record {0}</value></data>
   <data name="RecordCount" xml:space="preserve"><value>{0} JSON records</value></data>
+  <data name="ActiveVersionLabel"><value>active</value></data>
+  <data name="Scope"><value>Scope</value></data>
 </root>

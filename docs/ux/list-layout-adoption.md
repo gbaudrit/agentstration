@@ -35,6 +35,8 @@ Each screen is completed, checked, committed and published before the next start
 
 | Tools | Existing complete authorized Tools/Providers arrays and optional shared Extension inventory. Existing name/namespace/external-ID/displayed-provider search, availability/enabled and additional namespace/exact-scope filters; exact totals and local 20/50/100 pages. No optional-provenance filter. | Template adopted; qualified Tool links including operational Workspace behavior and exact Extension matching retained. Legitimate family navigation and provenance styling preserved; obsolete mobile-table CSS and Details-only menu removed. Extension/origin versions separately labelled. Six new plus four maintained cases, warning-free Web/Workplace/fixture builds, full targeted format, two catalog assertions and real 25-published-relay-Tool desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/tools/README.md). No Tool invocation claimed. Full lanes and #1242 remain deferred. |
 
+| Knowledge Sources | Existing complete authorized array. Name search, enabled and advanced displayed Data Source/projection/retrieval text filters, namespace/exact-scope filters; exact totals and local 20/50/100 pages. No readiness, content or projection reads added. | Template adopted; distinct dependencies and badges retained, exact reference scopes/namespaces honored and Flow destinations qualified. Creation permission-gated, related navigation contextual, Inspect-only menu removed. Six new plus existing link regression cases, warning-free Web build, full targeted format, two catalog assertions and real 25-disabled-source desktop/mobile API smoke pass; [captures and source proof](evidence/list-layout/knowledge-sources/README.md). No acquisition/projection/content operation claimed. Full lanes and #1242 remain deferred. |
+
 ## Remaining top-level Console list adapters
 
 This source inventory identifies concrete top-level list adapters still outside the new page composition. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
@@ -51,7 +53,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `Deployments.razor` | `/agent-instances`, `/deployments` | Adopted |
 | `Extensions.razor` | `/extensions` | Remaining; requires individual contract review |
 | `Flows.razor` | `/flows` | Protected pilot |
-| `KnowledgeSources.razor` | `/knowledge-sources` | Remaining; requires individual contract review |
+| `KnowledgeSources.razor` | `/knowledge-sources` | Adopted |
 | `ModelProfiles.razor` | `/modelprofiles` | Adopted |
 | `ModelProviders.razor` | `/modelproviders` | Adopted |
 | `OrganizationAccess.razor` | `/settings/organization/access` | Remaining; requires individual contract review |
