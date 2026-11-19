@@ -29,6 +29,8 @@ public sealed class ToolDefinitionConsoleTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolDefinitionsClient>(new DefinitionClient());
         context.Services.AddAgentstrationWebComponents();
+        context.WithResourceListContext(new ResourceListContextProvider { Scope = "/workspaces/11111111-1111-1111-1111-111111111111" });
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.GetRequiredService<IConsoleNavigationContext>().SetSelectedScopeRef("/workspaces/11111111-1111-1111-1111-111111111111");
 
         var rendered = context.Render<ToolDefinitions>();

@@ -2591,12 +2591,12 @@
     {
       "id": "tool-definitions-tool-definition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
-      "line": 18,
+      "line": 11,
       "host": "console",
       "routes": [
         "/tools/definitions"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolDefinitionResource",
       "identityLabel": "Tool",
       "scope": true,
@@ -2669,6 +2669,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8ba7f2f0949b9e969a4cea2d212ce16f17458f5d"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ToolDefinition catalog including operational acquisition projections. Local technical/display-name search, identity enabled-state filter, kind/approval column filters and additional namespace filter; exact totals and local 20/50/100 pages. No extra reads.",
+        "targets": "Preserves actual Flow namespace/name and pinned version or active alias, Relay namespace/name/generation and Acquisition template namespace/id.",
+        "actions": "Existing direct primary Edit action retained as required by the maintained regression, along with exact resource-name links. Creation requires resources/write and preserves the existing NavigationContext.AddToUri destination.",
+        "states": "Compatible refresh retains rows, selected view and stable query. Superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
+        "validation": "ToolDefinitionCollectionTests and the existing direct-edit/list regression; deterministic desktop/mobile smoke and inventory limits in list-layout-adoption.md."
       }
     },
     {
