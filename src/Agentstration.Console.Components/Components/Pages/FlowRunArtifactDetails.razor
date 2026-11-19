@@ -5,12 +5,6 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
 <PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
-<div class="artifact-header">
-<PageHeader Title="@(artifact is null ? Id : ArtifactName(artifact))" Description="@T("DurableDetailsDescription")" TestId="durable-artifact-details">
-    <Actions><a class="button-secondary" href="/artifacts">@T("Back")</a></Actions>
-</PageHeader>
-</div>
-
 @if (loading)
 {
     <LoadingState Message="@T("Loading")" />
@@ -21,21 +15,23 @@ else if (error is not null)
 }
 else if (artifact is not null)
 {
-    <ResourceTabs Label="@T("DetailsSections")">
-        @foreach (var tab in Enum.GetValues<DetailsTab>())
-        {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="durable-artifact-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
-        }
-    </ResourceTabs>
-
-    <main id="durable-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-        @if (activeTab == DetailsTab.Overview)
-        {
+    <ResourceDetailsTemplate Name="@ArtifactName(artifact)" ResourceType="@T("Artifact")" Domain="artifact" IconName="file"
+                             TechnicalName="@artifact.Name" Namespace="@artifact.Namespace.Value" ScopeRef="artifact.ScopeRef"
+                             Description="@T("DurableDetailsDescription")" StatusText="@T("Immutable")" Status="UiStatus.Neutral"
+                             Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection" TestId="durable-artifact-details">
+        <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)">@T("Back")</a></Actions>
+        <Content>
+        <div data-artifact-section="overview" hidden="@(activeTab != DetailsTab.Overview)">
             <section class="metric-grid">
                 <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Durable")" Status="UiStatus.Success" />
                 <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
                 <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
             </section>
+
+            <ResourceIdentitySummary DisplayName="@ArtifactName(artifact)" TechnicalName="@artifact.Name" Namespace="@artifact.Namespace.Value">
+                <Scope><ResourceScopeBadge ScopeRef="artifact.ScopeRef" /></Scope>
+                <AdditionalDetails><dt>@T("Identifier")</dt><dd><CopyableValue Value="@artifact.ArtifactId.ToString()" /></dd></AdditionalDetails>
+            </ResourceIdentitySummary>
 
             @if (artifact.Receipt.DataContract is { } contract)
             {
@@ -110,13 +106,14 @@ else if (artifact is not null)
                 </section>
             }
 
-        }
-        else if (activeTab == DetailsTab.Content)
+        </div>
+        <div data-artifact-section="content" hidden="@(activeTab != DetailsTab.Content)">
+        @if (contentVisited)
         {
             <DurableArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
         }
-        else
-        {
+        </div>
+        <div data-artifact-section="storage" hidden="@(activeTab != DetailsTab.Storage)">
             <FormSection Title="@T("StorageReceipt")" Eyebrow="@T("Storage")" Description="@T("StorageReceiptHelp")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     @if (!string.IsNullOrEmpty(artifact.Receipt.StorageFlowRunId)) { <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd> }
@@ -148,8 +145,9 @@ else if (artifact is not null)
                     </dl>
                 }
             </ChildContent></FormSection>
-        }
-    </main>
+        </div>
+        </Content>
+    </ResourceDetailsTemplate>
 }
 
 @code {
@@ -158,6 +156,15 @@ else if (artifact is not null)
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;
     private DetailsTab activeTab;
+    private bool contentVisited;
+    private string? loadedKey;
+    private long loadVersion;
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", T("Tab.Overview"), "home"), new("content", T("Tab.Content"), "file"), new("storage", T("Tab.Storage"), "database")];
+    private void SelectSection(string? value)
+    {
+        activeTab = value switch { "content" => DetailsTab.Content, "storage" => DetailsTab.Storage, _ => DetailsTab.Overview };
+        if (activeTab == DetailsTab.Content) contentVisited = true;
+    }
     private bool loading = true;
     private string? error;
     private bool interactive, readingRecord;
@@ -167,16 +174,21 @@ else if (artifact is not null)
 
     protected override async Task OnParametersSetAsync()
     {
-        loading = true;
-        error = null;
+        var key = $"{Id}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return;
+        loadedKey = key; var request = ++loadVersion;
+        loading = true; error = null; artifact = null; readingRecord = false; contentVisited = false; activeTab = DetailsTab.Overview;
         recordContent = recordReadError = null;
         try
         {
-            artifact = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
-            if (artifact is null) error = T("DurableNotFound");
+            var saved = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
+            if (request != loadVersion) return;
+            if (saved is null || saved.ArtifactId != ArtifactId) error = T("DurableNotFound");
+            else artifact = saved;
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) error = exception.Message; }
+        finally { if (request == loadVersion) { loading = false; if (error is not null) loadedKey = null; } }
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -189,15 +201,17 @@ else if (artifact is not null)
     private async Task ReadRecordAsync(string memberId)
     {
         if (readingRecord || !interactive) return;
+        var request = loadVersion; var id = ArtifactId;
         readingRecord = true;
         recordContent = recordReadError = null;
         try
         {
-            var content = await Client.ReadRecordAsync(ArtifactId, memberId, cancellation.Token);
+            var content = await Client.ReadRecordAsync(id, memberId, cancellation.Token);
+            if (request != loadVersion) return;
             recordContent = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64));
         }
-        catch (Exception) { recordReadError = T("RecordReadFailed"); }
-        finally { readingRecord = false; }
+        catch (Exception) { if (request == loadVersion) recordReadError = T("RecordReadFailed"); }
+        finally { if (request == loadVersion) readingRecord = false; }
     }
 
     private static string ArtifactName(FlowRunArtifactResource value) => value.Receipt.Provenance.TryGetValue("fileName", out var fileName)
@@ -211,7 +225,6 @@ else if (artifact is not null)
     private static string StagedUrl(StagedArtifactId id) => $"/artifacts/staged/{id}";
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
-    private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
     private enum DetailsTab { Overview, Content, Storage }
     private sealed record RecordRow(StorageRecordMember Member, int Ordinal);
 

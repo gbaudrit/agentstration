@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Page } from '@playwright/test';
 import type { ExpectedText } from '../locales/expected-text.js';
 import { TestIds } from '../contracts/test-ids.js';
@@ -72,7 +73,8 @@ export class ArtifactAdministrationPage {
     const durableSource = await this.createStaged(consoleUrl, `durable-${suffix}.txt`, 'text/plain', durableText);
     const durable = await this.persist(consoleUrl, durableSource);
     await this.openDurable(consoleUrl, durable.artifactId);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     await expect(this.page.getByTestId(TestIds.artifacts.durableOpenMaterialized)).toBeVisible({ timeout: 90_000 });
     await expect(this.page.getByTestId(TestIds.artifacts.durableMaterializationHistory)).toBeVisible();
@@ -105,7 +107,8 @@ export class ArtifactAdministrationPage {
     await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
     await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:\\?|$)`));
     await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toHaveCount(0);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     const materialized = this.page.getByTestId(TestIds.artifacts.durableOpenMaterialized);
     await expect(materialized).toBeVisible({ timeout: 90_000 });
@@ -309,7 +312,8 @@ export class ArtifactAdministrationPage {
 
   private async assertMaterializationFailure(consoleUrl: string, artifactId: string, secrets: readonly string[]): Promise<void> {
     await this.openDurable(consoleUrl, artifactId);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     const alert = this.page.getByRole('alert');
     await expect(alert).toBeVisible({ timeout: 90_000 });

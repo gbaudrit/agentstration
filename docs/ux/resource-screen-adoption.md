@@ -18,7 +18,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | FlowDesigner.razor | `/flows/{FlowId}/designer`, `/namespaces/{FlowNamespace}/flows/{FlowId}/designer` | Pending review and migration |
 | FlowDetails.razor | `/flows/{FlowId}`, `/namespaces/{FlowNamespace}/flows/{FlowId}` | Pending review and migration |
 | FlowOrchestrationEditor.razor | `/flows/{FlowId}/orchestration`, `/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration` | Pending review and migration |
-| FlowRunArtifactDetails.razor | `/artifacts/durable/{Id}` | Pending review and migration |
+| FlowRunArtifactDetails.razor | `/artifacts/durable/{Id}` | Implemented: shared template and Overview/Content/Storage navigation, exact saved Identity/owner and immutable provenance/receipt. Content is lazy and retained across fragments; record reads and metadata ignore superseded responses. No publication or activation is invented. Maintained browser helpers use shared navigation; 19 artifact component cases pass, including lazy retained content and no reload for fragments. Browser/final validation pending |
 | FlowRunDetails.razor | `/flow-runs/{RunId}` | Pending review and migration |
 | KnowledgeSourceDetails.razor | `/knowledge-sources/{Name}` | Pending review and migration |
 | KnowledgeSourceEditor.razor | `/knowledge-sources/new`, `/knowledge-sources/{Name}/edit` | Pending review and migration |
