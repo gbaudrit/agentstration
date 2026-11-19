@@ -1,0 +1,29 @@
+{
+  "testedBase": "6dd728fdae39a76a89112d56b3ba1c66515bce06",
+  "finalSynchronizedBase": "f7d582fc02f0b338f35d49ed4e8caa6e1e5055c8",
+  "parallelFilesSinceBrowser": [
+    "docs/ux/collection-surfaces-1121.json",
+    "docs/ux/list-layout-adoption.md",
+    "docs/ux/resource-collections-1121.md",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor.cs",
+    "tests/Agentstration.Console.Components.Tests/DataSourceProfileCollectionTests.cs",
+    "tests/Agentstration.Console.Components.Tests/ExtensionManagedResourcePresentationTests.cs"
+  ],
+  "toolSetProductHashesUnchanged": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor": "8e1fcbd9d58d78a38cb1481c25ec3a21621a0bd406fe5aa59566694a5a1fc1bc",
+    "src/Agentstration.Console.Components/Console/ToolSetInspectionModel.cs": "eb34072bbb5d1454f6d15814fc7e72d72fee1445e1d9f874357504d28ccde847",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolSetsStrings.fr-FR.resx": "ff4a12329348d8edc6d581f06c16ccddb5a8b9a2e05153e2d29ada97ff8de2f1",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolSetsStrings.resx": "ce5928358624f7e7e2e0dd3692f3ed9925b0872a8af4fbee138993338b22bdd5"
+  },
+  "sharedPresentationSourcesUnchanged": true,
+  "focusedCasesAfterFinalSync": 33,
+  "agentProtectedHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  }
+}
