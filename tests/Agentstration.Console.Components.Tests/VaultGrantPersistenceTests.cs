@@ -31,7 +31,7 @@ public sealed class VaultGrantPersistenceTests
     }
 
     [TestMethod]
-    public void GrantIsSentBySaveAndShownWhenEditorIsReopened()
+    public async Task GrantIsSentBySaveAndShownWhenEditorIsReopened()
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
@@ -45,6 +45,7 @@ public sealed class VaultGrantPersistenceTests
 
         var editor = context.Render<VaultEditor>(parameters => parameters
             .Add(component => component.Name, "shared"));
+        await editor.InvokeAsync(() => editor.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
         editor.WaitForElement(".grant-add select").Change(workspace.Value);
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
@@ -57,11 +58,12 @@ public sealed class VaultGrantPersistenceTests
         Assert.AreEqual(0, editor.FindAll(".unsaved-changes-bar").Count);
         var reopened = context.Render<VaultEditor>(parameters => parameters
             .Add(component => component.Name, "shared"));
+        await reopened.InvokeAsync(() => reopened.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
         reopened.WaitForAssertion(() => Assert.AreEqual("Default", reopened.Find(".grant-target-identity .disclosure-trigger").TextContent));
     }
 
     [TestMethod]
-    public void DiscardRestoresPersistedGrantsAndHidesBar()
+    public async Task DiscardRestoresPersistedGrantsAndHidesBar()
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
@@ -74,6 +76,7 @@ public sealed class VaultGrantPersistenceTests
         ConfigureVaultNavigation(context);
 
         var editor = context.Render<VaultEditor>(parameters => parameters.Add(component => component.Name, "shared"));
+        await editor.InvokeAsync(() => editor.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
         editor.WaitForElement(".grant-add select").Change(workspace.Value);
         editor.Find(".grant-add-button").Click();
         editor.Find(".unsaved-changes-bar .button-secondary").Click();
@@ -166,7 +169,7 @@ public sealed class VaultGrantPersistenceTests
     }
 
     [TestMethod]
-    public void ClearingVaultDisplayNameMarksDraftDirtyAndDiscardRestoresItsIdentity()
+    public async Task ClearingVaultDisplayNameMarksDraftDirtyAndDiscardRestoresItsIdentity()
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
@@ -178,6 +181,7 @@ public sealed class VaultGrantPersistenceTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
         ConfigureVaultNavigation(context);
         var editor = context.Render<VaultEditor>(parameters => parameters.Add(component => component.Name, "shared"));
+        await editor.InvokeAsync(() => editor.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
         editor.WaitForElement("[data-testid='vault-display-name']").Closest(".form-field")!.QuerySelector(".field-clear")!.Click();
         Assert.HasCount(1, editor.FindAll(".unsaved-changes-bar"));
         editor.Find("form").Submit();
@@ -226,16 +230,16 @@ public sealed class VaultGrantPersistenceTests
         var uri = $"http://localhost/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}";
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(uri);
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var section in new[] { "overview", "definition/configuration", "definition/grants", "master-key" })
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "master-key" })
         {
             var target = uri + "#" + section;
             module.Setup<string>("navigate", invocation => invocation.Arguments[0] is string value && value.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(target);
         }
         var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
         Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
-        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
         cut.Find("[data-testid=vault-display-name]").Change("Draft vault");
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
         Assert.Contains("Shared", cut.Find(".resource-identity-summary").TextContent);
@@ -329,7 +333,7 @@ public sealed class VaultGrantPersistenceTests
         ConfigureVaultNavigation(context);
         var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
-        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         cut.Find("[data-testid=vault-display-name]").Change("Updated vault");
         await cut.InvokeAsync(() => navigation.NavigateSection("access"));
         var panel = cut.FindComponent<ResourceAccessPanel>().Instance;
@@ -349,7 +353,7 @@ public sealed class VaultGrantPersistenceTests
     }
 
     [TestMethod]
-    public void ManagedVaultKeepsDefinitionReadOnlyAndOwnerAccessAvailable()
+    public async Task ManagedVaultKeepsDefinitionReadOnlyAndOwnerAccessAvailable()
     {
         var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
         using var context = new BunitContext().WithCollectionPresentation();
@@ -359,6 +363,7 @@ public sealed class VaultGrantPersistenceTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
         ConfigureVaultNavigation(context);
         var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
         Assert.IsTrue(cut.Find("fieldset").HasAttribute("disabled"));
         Assert.HasCount(1, cut.FindAll("a[data-resource-section=access]"));
         Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
@@ -429,6 +434,36 @@ public sealed class VaultGrantPersistenceTests
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(tenant, ResourceScopeKind.Tenant, "Tenant", true), new(workspace, ResourceScopeKind.Workspace, "Workspace", true)]);
     }
 
+    [TestMethod]
+    public async Task VaultRefreshRetainsInvalidIdentityAndAdoptsTheNewEtagOnlyOnExplicitDiscard()
+    {
+        var tenant = ResourceScopeRef.Tenant(Guid.NewGuid()); var client = new StubSecretsClient(tenant, ResourceScopeRef.Workspace(Guid.NewGuid()));
+        using var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources"); context.Services.AddSingleton<ISecretsClient>(client);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/vaults/shared?scopeRef={Uri.EscapeDataString(tenant.Value)}");
+        ConfigureVaultNavigation(context);
+        var cut = context.Render<VaultEditor>(p => p.Add(c => c.Name, "shared"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        cut.Find("[data-testid=vault-display-name]").Change("");
+        await cut.Find("#vault-resource-form").SubmitAsync();
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        client.VaultLoader = () => Task.FromResult(new ResourceSnapshot<VaultResponse>(new(client.Saved with { Definition = client.Saved.Definition with { DisplayName = "New server vault" } }, "available"), "\"external\""));
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("", cut.Find("[data-testid=vault-display-name]").GetAttribute("value"));
+        Assert.HasCount(1, cut.FindAll(".validation-message"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.Contains("Shared", cut.Find(".resource-identity-summary").TextContent);
+        cut.Find(".unsaved-changes-bar .button-secondary").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        Assert.AreEqual("New server vault", cut.Find("[data-testid=vault-display-name]").GetAttribute("value"));
+        cut.Find("[data-testid=vault-display-name]").Change("Saved after discard");
+        await cut.Find("#vault-resource-form").SubmitAsync();
+        Assert.AreEqual("\"external\"", client.LastVaultEtag);
+        Assert.AreEqual("Saved after discard", client.Saved.Definition.DisplayName);
+    }
+
     private static void ConfigureSecretNavigation(BunitContext context)
     {
         var uri = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
@@ -444,7 +479,7 @@ public sealed class VaultGrantPersistenceTests
     {
         var uri = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var section in new[] { "overview", "definition/configuration", "definition/grants", "master-key", "access" })
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "master-key", "access", "yaml" })
         {
             var target = uri + "#" + section;
             module.Setup<string>("navigate", invocation => invocation.Arguments[0] is string value && value.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(target);
@@ -453,6 +488,8 @@ public sealed class VaultGrantPersistenceTests
 
     private sealed class StubSecretsClient(ResourceScopeRef tenant, ResourceScopeRef workspace) : ISecretsClient
     {
+        public Func<Task<ResourceSnapshot<VaultResponse>>>? VaultLoader { get; set; }
+        public string? LastVaultEtag { get; private set; }
         public bool ValueConfigured { get; init; }
         public bool ManagedVault { get; init; }
         public bool ManagedSecret { get; init; }
@@ -492,9 +529,10 @@ public sealed class VaultGrantPersistenceTests
             return Task.FromResult(new ResourceSnapshot<VaultResource>(Saved, "\"created\""));
         }
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, ResourceScopeRef scopeRef, CancellationToken token) =>
-            Task.FromResult(new ResourceSnapshot<VaultResponse>(new(ManagedVault ? Saved with { Governance = ResourceGovernance.Core("vault") } : Saved, "available"), "\"1\""));
+            VaultLoader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<VaultResponse>(new(ManagedVault ? Saved with { Governance = ResourceGovernance.Core("vault") } : Saved, "available"), "\"1\""));
         public Task<ResourceSnapshot<VaultResource>> UpdateVaultAsync(string name, ResourceScopeRef scopeRef, PutVaultRequest request, string etag, CancellationToken token)
         {
+            LastVaultEtag = etag;
             Saved = Saved with { Definition = request.Properties, Generation = Saved.Generation + 1 };
             return Task.FromResult(new ResourceSnapshot<VaultResource>(Saved, "\"2\""));
         }

@@ -26,6 +26,7 @@ else
     [Parameter] public EventCallback<ResourceScopeRef?> ValueChanged { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public ResourceScopeKind? RequiredKind { get; set; }
+    [Parameter] public IReadOnlyList<ResourceScopeTargetResponse>? Targets { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ResourceScopeTargetResponse>? targets;
@@ -35,6 +36,13 @@ else
     protected override async Task OnParametersSetAsync()
     {
         if (Value is not null) currentValue = Value;
+        if (Targets is not null)
+        {
+            targets = RequiredKind is null ? Targets : Targets.Where(target => target.Kind == RequiredKind).ToArray();
+            loadedKind = ResourceKind;
+            await SelectInitialTargetAsync();
+            return;
+        }
         if (string.Equals(loadedKind, ResourceKind, StringComparison.Ordinal)) return;
         var client = Services.GetService(typeof(IResourceScopeInventoryClient)) as IResourceScopeInventoryClient;
         if (client is null)
@@ -48,18 +56,23 @@ else
             var available = await client.GetTargetsAsync(ResourceKind, cancellation.Token);
             targets = RequiredKind is null ? available : available.Where(target => target.Kind == RequiredKind).ToArray();
             loadedKind = ResourceKind;
-            if (currentValue is not null) return;
-            var selected = targets.FirstOrDefault(target => target.Kind == ResourceScopeKind.Workspace && target.CanWrite)
-                ?? targets.FirstOrDefault(target => target.CanWrite);
-            if (selected is not null)
-            {
-                currentValue = selected.ScopeRef;
-                await ValueChanged.InvokeAsync(selected.ScopeRef);
-            }
+            await SelectInitialTargetAsync();
         }
         catch (AgentstrationApiException)
         {
             targets = [];
+        }
+    }
+
+    private async Task SelectInitialTargetAsync()
+    {
+        if (currentValue is not null || targets is null) return;
+        var selected = targets.FirstOrDefault(target => target.Kind == ResourceScopeKind.Workspace && target.CanWrite)
+            ?? targets.FirstOrDefault(target => target.CanWrite);
+        if (selected is not null)
+        {
+            currentValue = selected.ScopeRef;
+            await ValueChanged.InvokeAsync(selected.ScopeRef);
         }
     }
 

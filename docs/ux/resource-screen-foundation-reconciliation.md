@@ -12,7 +12,7 @@ Agent source, styles and translations are protected from this migration. The pre
 
 The previous adoption matrix contains **51 route-owning components**, grouping aliases and creation/detail routes: **31 previously treated** and **20 previously remaining**. These are historical adoption statuses, not compliance with the requested new foundation. Agent is the protected reference. The other components require renewed review, including previously treated families. Collection routes keep their collection layout; creation retains its own layout and `CreationWizard`. Embedded editors and specialized operational views require contract inspection rather than automatic exclusion or fabricated resource capabilities.
 
-The classification below identifies inspection boundaries; specialized exceptions are not approved exclusions. Exact composition and justified omissions must be reconciled with the requested guide once it is available.
+The classification below identifies inspection boundaries; specialized exceptions are not approved exclusions. Exact composition and justified omissions are being reconciled with the current guide in this checkout.
 
 | Component | Previous pass | Inspection boundary | Current wizard present |
 | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `TransformationFunctionEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TriggerDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `TriggerEditor.razor` | Previously remaining | Delegated definition/editor; coordinate with owning detail and preserve creation wizard | No |
-| `VaultEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
+| `VaultEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 
 ## Embedded and delegated surfaces
 
@@ -94,3 +94,11 @@ No implementation or test result on the requested foundation is inferred from th
 - Draft-preserving refresh, original/newer ETag handling and explicit discard, shared loading/retry/read-only states, and replacement-identity clearing.
 - 47 targeted cases pass; TypeScript passes; Parameter desktop/French touch probes, both maintained naming cases and both maintained Agent regression cases pass. [Real evidence and exact source hashes](evidence/resource-screen-foundation/parameters/README.md).
 - Agent's protected files are unchanged. No CI failure is inspected or remediated as part of this migration. Remaining previously treated and pending screens still require their individual new-foundation pass; the historical 31/20 count is not a new-foundation completion count.
+
+### VaultEditor
+
+- Standard Console template and retained definition form with shared state/presentations, standard Identity then Configuration, authorized independent Access, master-key commands and final saved YAML. Actual health metric above saved Identity; labels stay within Identity.
+- Creation retains its wizard and family-authorized inventory. Provider enrichments use AdditionalPanels. Description/labels stay read-only because their mutation is unsupported; no activation or namespace capability is invented.
+- Refresh preserves invalid drafts and original ETags, buffers newer snapshots for explicit discard, and clears private content on changed identity or lost access. Initialization retains its existing command/health distinction and confirmation; the key-file path warning wraps on mobile.
+- 57 targeted cases, TypeScript, both final Vault desktop/touch probes, the maintained descendant-grants journey and both maintained Agent regression cases pass. [Real captures and exact source hashes](evidence/resource-screen-foundation/vaults/README.md).
+- Protected Agent product files remain unchanged. Synchronization occurs before and after the screen commit; CI failures are not handled.

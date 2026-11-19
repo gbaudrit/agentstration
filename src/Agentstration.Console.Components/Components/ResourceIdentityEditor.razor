@@ -10,8 +10,8 @@
                                         TechnicalName="@TechnicalName" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="TechnicalNameExpression"
                                         IsNew="IsNew" Policy="NamePolicy" DisplayNameTestId="@DisplayNameTestId" TechnicalNameTestId="@TechnicalNameTestId" />
                 <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText Value="@Namespace" ValueExpression="NamespaceExpression" Disabled="true" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
-                <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" />
-                <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
+                <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" Targets="ScopeTargets" />
+                <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" ReadOnly="DescriptionReadOnly" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
                 <FormField Label="@Shared["Labels"]" Class="form-span-2"><LabelsEditor Value="@Labels" ValueChanged="LabelsChanged" ValueExpression="LabelsExpression" ReadOnly="@(ReadOnly || LabelsReadOnly)" /></FormField>
             </FormGrid>
         </fieldset>
@@ -39,6 +39,8 @@
     [Parameter, EditorRequired] public Expression<Func<string>> LabelsExpression { get; set; } = default!;
     [Parameter] public Agentstration.Web.Components.Naming.ResourceNamePolicy NamePolicy { get; set; } = Agentstration.Web.Components.Naming.ResourceNamePolicy.Generic;
     [Parameter] public bool LabelsReadOnly { get; set; }
+    [Parameter] public bool DescriptionReadOnly { get; set; }
+    [Parameter] public IReadOnlyList<ResourceScopeTargetResponse>? ScopeTargets { get; set; }
     [Parameter] public bool IsNew { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public RenderFragment? AdditionalPanels { get; set; }

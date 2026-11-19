@@ -107,7 +107,7 @@ export class DescendantSecretsPage {
   }
 
   public scopeBadge(scopeRef: string): Locator {
-    return this.page.locator(`.resource-form .resource-scope-badge[title="${scopeRef}"]`);
+    return this.page.locator(`.resource-header [data-scope-ref="${scopeRef}"]`);
   }
 
   public async saveChanges(): Promise<void> {
@@ -145,7 +145,7 @@ export class DescendantSecretsPage {
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
     if (await target.isVisible()) return;
     if (await this.page.locator('.creation-wizard').count()) await this.page.locator('[data-wizard-step=grants]').click();
-    else await selectResourceSection(this.page, 'definition/grants');
+    else await selectResourceSection(this.page, new URL(this.page.url()).pathname.startsWith('/vaults/') ? 'definition/configuration' : 'definition/grants');
     await target.waitFor({ state: 'visible' });
   }
 

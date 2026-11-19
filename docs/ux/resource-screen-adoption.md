@@ -86,3 +86,5 @@ Verification completed for this pause point:
 - At final product source `3163e81f`, both transient Agent Runner probes pass, with **13 real captures**, native touch, retained invalid input, successful execution, recorded scope facts, Worker/history, Back/Escape/focus, document bounds and readable metric values. See the linked [evidence](evidence/resource-screen-adoption/agent-runner/README.md) for exact assembly hashes and individual captures.
 
 The repository-wide `npm run test:smoke` campaign has not been run for this pause point; remote CI is not a verified result. The targeted results above do not constitute full acceptance of every migrated or pending surface. No PR is created or made ready, and no issue is closed.
+
+The new-foundation Vault pass and its justified capability limits are recorded in the [Vault verification report](evidence/resource-screen-foundation/vaults/README.md). Earlier adoption counts remain historical.
