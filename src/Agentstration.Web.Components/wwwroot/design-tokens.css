@@ -267,7 +267,7 @@
 .resource-header-identity { max-width: 100%; display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
 .resource-icon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border: 1px solid color-mix(in srgb,var(--domain-color,var(--muted)) 55%,var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb,var(--domain-color,var(--muted)) 10%,var(--surface)); color: var(--domain-color,var(--text)); font-size: 1.2rem; }
 .resource-header .eyebrow { color: var(--domain-color) !important; margin: 0 0 3px; }
-.resource-header h1 { margin: 0; font-size: clamp(1.35rem,2vw,1.8rem); letter-spacing: -.035em; }
+.resource-header h1 { min-width: 0; max-width: 100%; margin: 0; overflow-wrap: anywhere; font-size: clamp(1.35rem,2vw,1.8rem); letter-spacing: -.035em; }
 .resource-description { max-width: 760px; margin: var(--space-2) 0 0; color: var(--muted); }
 .resource-metadata code { color: var(--muted); font: var(--font-size-xs) var(--font-family-mono); overflow-wrap: anywhere; }
 .status-indicator { display: inline-flex; align-items: center; gap: 7px; width: max-content; color: var(--muted); font-size: var(--font-size-xs); font-weight: 700; }
