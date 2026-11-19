@@ -2824,17 +2824,17 @@
     {
       "id": "data-source-profiles-data-source-profile-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
-      "line": 17,
+      "line": 11,
       "host": "console",
       "routes": [
         "/data-source-profiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "DataSourceProfileResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "ManagingExtension"
       ],
@@ -2905,6 +2905,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "d8f150003f2dff78f668de5a233e6c17a365becd"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized profile array; local name search and additional namespace filter; exact filtered total and 20/50/100 local pages. One shared optional Extension inventory request per refresh.",
+        "states": "Refresh retains profiles and compatible provenance. Request revisions protect both profile and inventory results. Context replacement and denied reads clear caches and option sources.",
+        "actions": "Exact scope/namespace/context name links and Data Sources destination retained. Open-only column removed; creation requires resources/write.",
+        "validation": "DataSourceProfileCollectionTests and existing EN/FR ExtensionManagedResourcePresentationTests; deterministic desktop/mobile fixture smoke recorded in list-layout-adoption.md. Historical screenshots are not evidence for the new composition."
       }
     },
     {

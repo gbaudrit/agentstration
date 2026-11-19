@@ -164,7 +164,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     public void ProfileListShowsExtensionAndDistinctBundleVersion(string cultureName, string managedLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
