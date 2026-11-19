@@ -36,7 +36,7 @@
   <data name="InitialVersion"><value>Initial version</value></data>
   <data name="InitialVersionHelp"><value>Semantic version assigned to the editable definition.</value></data>
   <data name="Enabled"><value>Enabled</value></data>
-  <data name="EnabledHelp"><value>Allow this orchestration to be selected for execution after creation.</value></data>
+  <data name="EnabledHelp"><value>Keep this orchestration enabled. Execution also requires a published version.</value></data>
   <data name="ConfigurationEyebrow"><value>Team setup</value></data>
   <data name="ConfigurationTitle"><value>Configure the orchestration</value></data>
   <data name="ConfigurationHelp"><value>Select participants, arrange their order and preview the execution topology.</value></data>
@@ -54,4 +54,19 @@
   <data name="Creating"><value>Creating…</value></data>
   <data name="CreateDraft"><value>Create Draft</value></data>
   <data name="CreateOrchestration"><value>Create Orchestration</value></data>
+  <data name="Namespace"><value>Namespace</value></data>
+  <data name="DefaultDisplayName"><value>Multi-agent review</value></data>
+  <data name="DefaultDescription"><value>Coordinates agents to produce a reviewed result.</value></data>
+  <data name="LoadingAgents"><value>Loading participants…</value></data>
+  <data name="Retry"><value>Retry</value></data>
+  <data name="Participants"><value>Participants</value></data>
+  <data name="EnabledOn"><value>Enabled</value></data>
+  <data name="EnabledOff"><value>Disabled</value></data>
+  <data name="PublicationSeparate"><value>Creation does not publish a version. Review and publish separately when the definition is ready.</value></data>
+  <data name="Validation.Scope"><value>Choose an authorized scope before creating the Flow.</value></data>
+  <data name="Validation.Name"><value>Use 1 to 128 letters, digits, '-' or '_', starting with a letter or digit.</value></data>
+  <data name="Validation.DisplayName"><value>Enter a display name of at most 200 characters.</value></data>
+  <data name="Validation.Version"><value>Enter a semantic version such as 1.0.0.</value></data>
+  <data name="Validation.Configuration"><value>Select at least two distinct participants and complete a valid orchestration strategy.</value></data>
+  <data name="IdentityMismatch"><value>The response does not match the requested Flow identity and scope.</value></data>
 </root>

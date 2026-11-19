@@ -482,7 +482,6 @@ export const TestIds = {
     description: 'flow-description',
     version: 'flow-version',
     orchestrationKind: 'flow-kind-orchestration',
-    continue: 'flow-continue',
     configuration: 'flow-orchestration-configuration',
     enabled: 'flow-enabled',
     participantsSection: 'flow-participants-section',
