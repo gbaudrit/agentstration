@@ -31,6 +31,7 @@ else if (provider is not null)
                              StatusText="@StatusLabel(provider.Definition.Discovery.Status)" Status="@ProviderStatus(provider.Definition.Discovery.Status)"
                              Enabled="enabled" EnabledChanged="value => enabled = value" EnabledDisabled="@(!CanMutate || busy)"
                              Sections="Sections" ResourceIdentity="@($"{loadedKey}|{provider.ScopeRef}")" DefaultSection="overview" SelectionChanged="SelectSection" Feedback="@feedback" HasDraft="@IsDirty" TestId="resource-tool-provider-editor">
+        <Metadata>@if (section.StartsWith("definition/", StringComparison.Ordinal)) { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
         <Actions>@if (CanMutate) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@busy"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" type="button" @onclick="RefreshAsync" disabled="@busy"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }<a class="button-secondary" href="/tools/providers">@T("Back")</a></Actions>
         <Content>
             <div hidden="@(section != "overview")" data-testid="provider-overview-panel">

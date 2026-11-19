@@ -24,10 +24,12 @@ public sealed class ToolProviderEditorTests
         Assert.IsNotNull(rendered.Find("[data-testid=provider-tools-panel]").Closest("[hidden]"));
         Assert.IsNotNull(rendered.Find("[data-testid=provider-connection-panel]").Closest("[hidden]"));
         await rendered.InvokeAsync(() => navigation.NavigateSection("tools"));
+        Assert.IsEmpty(rendered.FindAll(".required-fields-note"));
         Assert.IsTrue(rendered.Find("[data-testid=provider-overview-panel]").HasAttribute("hidden"));
         Assert.IsNull(rendered.Find("[data-testid=provider-tools-panel]").Closest("[hidden]"));
         Assert.IsNotNull(rendered.Find("[data-testid=provider-connection-panel]").Closest("[hidden]"));
         await rendered.InvokeAsync(() => navigation.NavigateSection("definition/connection"));
+        Assert.HasCount(1, rendered.FindAll(".resource-header .required-fields-note"));
         Assert.IsTrue(rendered.Find("[data-testid=provider-overview-panel]").HasAttribute("hidden"));
         Assert.IsNotNull(rendered.Find("[data-testid=provider-tools-panel]").Closest("[hidden]"));
         Assert.IsNull(rendered.Find("[data-testid=provider-connection-panel]").Closest("[hidden]"));
