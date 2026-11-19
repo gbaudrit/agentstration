@@ -1814,17 +1814,17 @@
     {
       "id": "flows-flow-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
-      "line": 18,
+      "line": 11,
       "host": "console",
       "routes": [
         "/flows"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FlowSummary",
       "identityLabel": "CollectionResource",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Version",
         "Updated"
@@ -5312,12 +5312,12 @@
     {
       "id": "connected-services-connected-service-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
-      "line": 22,
+      "line": 10,
       "host": "console",
       "routes": [
         "/connected-services"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ConnectedServiceResource",
       "scope": true,
       "state": true,
@@ -5348,7 +5348,8 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Name"
     },
     {
       "id": "data-source-queries-data-source-query-tool-publication",
@@ -17607,6 +17608,31 @@
       "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
       "classification": "inventoried",
       "reason": "Saved Vault configuration summary is a functional collection recorded in shared frames; fixed wizard/navigation entries remain controls."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor",
+      "classification": "non-collection-control",
+      "reason": "Generic list-page composition for concrete inventoried adapters; its CollectionView renders their rows. Column/filter definitions, active-filter controls and page controls are not independent functional collections."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CollectionFilterField.razor",
+      "classification": "non-collection-control",
+      "reason": "Filter control options and date bounds are form controls, not a functional collection."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CollectionPager.razor",
+      "classification": "non-collection-control",
+      "reason": "Page sizes and bounded page navigation buttons are collection navigation controls, not a separate functional collection."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceDefinitionForm.razor",
+      "classification": "non-collection-control",
+      "reason": "Retained resource form sections, field declarations and read-only fieldsets are form composition controls, not functional item collections."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor",
+      "classification": "non-collection-control",
+      "reason": "Generic resource-detail section mounting and navigation declarations are layout controls. Family-provided configuration collections retain their own concrete frame inventory."
     }
   ],
   "reconciliation": {

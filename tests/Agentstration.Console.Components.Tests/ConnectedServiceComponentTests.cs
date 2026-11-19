@@ -33,6 +33,8 @@ public sealed class ConnectedServiceComponentTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(Resource(scope)));
 
+        context.WithResourceListContext();
+
         var rendered = context.Render<ConnectedServicesPage>();
 
         rendered.WaitForAssertion(() =>
@@ -188,6 +190,7 @@ public sealed class ConnectedServiceComponentTests
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(null));
+        context.WithResourceListContext();
         var rendered = context.Render<ConnectedServicesPage>();
         rendered.WaitForAssertion(() =>
         {
@@ -203,9 +206,10 @@ public sealed class ConnectedServiceComponentTests
         using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConnectedServicesClient>(new StubClient(Resource(ResourceScopeRef.Instance)));
+        context.WithResourceListContext();
         var rendered = context.Render<ConnectedServicesPage>();
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-row']")));
-        rendered.Find(".connected-services-toolbar input").Change("no-match");
+        rendered.Find(".search-box input").Change("no-match");
         Assert.IsNotNull(rendered.Find(".empty-state button"));
         rendered.Find(".empty-state button").Click();
         Assert.HasCount(1, rendered.FindAll("[data-testid='connected-service-row']"));

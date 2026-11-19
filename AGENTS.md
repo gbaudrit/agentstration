@@ -19,6 +19,7 @@ Before making a non-trivial change, read:
 - `docs/architecture.md` for boundaries, current flows, and planned increments.
 - Relevant records in `docs/decisions/` for established architectural decisions.
 - For persisted Console resource screens, follow `docs/ux/resource-screen-authoring.md` for the shared template, composition order and required component mapping.
+- For Console resource list screens, follow `docs/ux/list-screen-authoring.md` for the shared page template, column/filter declarations and explicit pagination/count semantics.
 
 Inspect the existing implementation before adding a new abstraction. This is an intentionally small MVP; extend the current verticals instead of creating parallel frameworks.
 

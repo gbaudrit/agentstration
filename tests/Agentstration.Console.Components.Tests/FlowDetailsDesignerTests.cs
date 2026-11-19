@@ -313,11 +313,13 @@ public sealed partial class FlowDetailsDesignerTests
         };
         context.Services.AddSingleton<IFlowApiClient>(client);
 
+        context.WithResourceListContext();
+
         var rendered = context.Render<Agentstration.Web.Components.Pages.Flows>();
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.HasCount(4, headers);
+        Assert.HasCount(3, headers);
         Assert.AreEqual(strings["Updated"].Value, headers[2]);
         Assert.AreEqual("Active", rendered.Find("tbody .status-icon-only button").GetAttribute("aria-label"));
         var link = rendered.Find("tbody .resource-name-link");

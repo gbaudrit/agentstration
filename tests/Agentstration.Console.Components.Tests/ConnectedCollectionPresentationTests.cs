@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ConnectedCollectionPresentationTests
+public sealed partial class ConnectedCollectionPresentationTests
 {
     [TestMethod]
     [DataRow("en-US", "Read-only in this scope", "Ready")]
@@ -32,6 +32,8 @@ public sealed class ConnectedCollectionPresentationTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(workspace));
         context.Services.AddSingleton<IConnectedServicesClient>(new ConnectedServicesApiClient(http));
+
+        context.WithResourceListContext();
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.ConnectedServices>();
         rendered.WaitForAssertion(() => Assert.HasCount(3, rendered.FindAll("[data-testid=connected-service-row]")));

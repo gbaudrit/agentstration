@@ -2,7 +2,7 @@
 
 @if (State.Status == ResourceLoadStatus.Refreshing)
 {
-    <div class="resource-refresh-status" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>@Shared["ResourceRefreshing"]</span></div>
+    <div class="resource-refresh-status" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>@(RefreshingMessage ?? Shared["ResourceRefreshing"])</span></div>
 }
 else if (State.Status == ResourceLoadStatus.Loading)
 {
@@ -13,13 +13,13 @@ else if (State.Status != ResourceLoadStatus.Ready)
     @if (State.HasContent && State.Status == ResourceLoadStatus.Failed)
     {
         <div class="form-alert form-alert-danger resource-refresh-error" role="alert">
-            <div><strong>@Shared["ResourceRefreshFailed"]</strong><span>@Message</span>@if (!string.IsNullOrWhiteSpace(State.ErrorId)) { <small>@Shared["ErrorId"]: <code>@State.ErrorId</code></small> }</div>
+            <div><strong>@(RefreshFailureTitle ?? Shared["ResourceRefreshFailed"])</strong><span>@Message</span>@if (!string.IsNullOrWhiteSpace(State.ErrorId)) { <small>@Shared["ErrorId"]: <code>@State.ErrorId</code></small> }</div>
             @RetryAction
         </div>
     }
     else
     {
-        <ErrorState Title="@Title" Message="@Message" ErrorId="@State.ErrorId">@RetryAction</ErrorState>
+        <ErrorState Title="@ResolvedTitle" Message="@Message" ErrorId="@State.ErrorId">@RetryAction</ErrorState>
     }
 }
 
@@ -27,7 +27,10 @@ else if (State.Status != ResourceLoadStatus.Ready)
     [Parameter, EditorRequired] public ResourceLoadState State { get; set; } = new(ResourceLoadStatus.Ready);
     [Parameter] public EventCallback OnRetry { get; set; }
     [Parameter] public string? RetryTestId { get; set; }
-    private string Title => Shared[State.Status switch
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? RefreshingMessage { get; set; }
+    [Parameter] public string? RefreshFailureTitle { get; set; }
+    private string ResolvedTitle => Title ?? Shared[State.Status switch
     {
         ResourceLoadStatus.NotFound => "ResourceNotFound",
         ResourceLoadStatus.Forbidden => "ResourceForbidden",

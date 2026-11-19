@@ -1,0 +1,120 @@
+{
+  "issue": 1241,
+  "baseline": "7e4a53f24eb6322f267d75c15424b8cabafcc752",
+  "workingTree": "Uncommitted list-layout changes",
+  "capturedAt": "2026-11-19T15:11:42.610Z",
+  "fixturePrefix": "fr1241-24204a4d",
+  "sourceFiles": [
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "sha256": "4e57dcba98e65fb816cb90c0df8e7b7af1ce0b6984530415c9a8ce0e9ef54747"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor.cs",
+      "sha256": "eb704379e63b8fe85b4c504db668360faaa3c5f5af5814facf267b644a3f1d74"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "sha256": "2079adf10142eabb681a56fe4f0e3421e97a5f95fb26993f9742e7ff30e92b47"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Components/Pages/Flows.razor.cs",
+      "sha256": "f15a3b52425165e5cde75cbd844efeaaa34f6e8915c42cb98b52cd6e6833747c"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Resources/Components/Pages/FlowsStrings.fr-FR.resx",
+      "sha256": "e22fcd882071aa317bb6dacee2dbba4c940162125e0b9e8c830fccf3fe2c9cf1"
+    },
+    {
+      "path": "src/Agentstration.Console.Components/Resources/Components/Pages/FlowsStrings.resx",
+      "sha256": "52fc4abe620387741501031c98d624288abb4bdacbd19a9de660454dafb04c91"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionColumn.cs",
+      "sha256": "29208be6263b312697e02d9848434d628ca2313cb5de8ff119e76e54f290fd53"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionFilter.cs",
+      "sha256": "1d522cc6d8a8c7615182a16abf96b921eab1fe6b4615a933ab0a2283b8523800"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionFilterField.razor",
+      "sha256": "a00dbd5eb21d6080b6fbb5b3470a13d9771bab6b28a48ca3ecbd9d6816057dc9"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionPager.razor",
+      "sha256": "9d749e51396dd457dd30980f70805e66770a1a726f752ce98b3e4e837c2b2630"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionPagination.cs",
+      "sha256": "3644110c2943baa199bd3a77cd1512bb051ee70e8ddb533e5fd87325f47d10a7"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/CollectionView.razor",
+      "sha256": "2da0e44ee3b8c36c2b6f0200a9251b7410e653720a99f5f041e63d87e986adf7"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor",
+      "sha256": "c0332d0f50d94f66353674aec59e965d494a99ddc20d09de9b4f76518ac17485"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor.css",
+      "sha256": "7674c6308725384eb973a7958af8f46274c06f6859ea7cf799ed64a9122a99a7"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/ResourceLoadFeedback.razor",
+      "sha256": "107f4348b42a4bc91e7805a14d0496bcdaaca06795d488040927ac2baab3600c"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/Resources/SharedFormStrings.fr-FR.resx",
+      "sha256": "cdb6257b9f05d0a03fd33f2391ddad501f135f4d92a6199678ea73c9b995ab12"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/Resources/SharedFormStrings.resx",
+      "sha256": "765768c81f831768976f28499a9f44734af22d7f32dad9e768b264e9b2316ec4"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/SearchBox.razor",
+      "sha256": "b6ae6b4ce190ac2af883f973cc530bbcead2335a6cd36fba20ed4cd558ca0ada"
+    },
+    {
+      "path": "src/Agentstration.Web.Components/wwwroot/management.css",
+      "sha256": "465be7ce1a224b26f2aecab7c233f5002eaf4d2b91b4d5b5afd7085997a28a70"
+    }
+  ],
+  "variants": [
+    {
+      "name": "desktop-en-dark",
+      "width": 1440,
+      "height": 1000,
+      "locale": "en-US",
+      "theme": "dark",
+      "touch": false,
+      "next": "Next",
+      "page2": "Page 2",
+      "noMatches": "No matching results",
+      "passed": true,
+      "connectedServiceMatches": 13,
+      "flowSecondPage": 14,
+      "flowLargerPage": 34,
+      "browserErrors": []
+    },
+    {
+      "name": "mobile-fr-light",
+      "width": 390,
+      "height": 844,
+      "locale": "fr-FR",
+      "theme": "light",
+      "touch": true,
+      "next": "Suivant",
+      "page2": "Page 2",
+      "noMatches": "Aucun résultat correspondant",
+      "passed": true,
+      "connectedServiceMatches": 13,
+      "flowSecondPage": 14,
+      "flowLargerPage": 34,
+      "browserErrors": []
+    }
+  ],
+  "reusableScenario": "Deferred in #1242 until explicit maintainer UX validation and implementation merge"
+}

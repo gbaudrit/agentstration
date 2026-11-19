@@ -237,4 +237,24 @@
   <data name="ReadOnlyReason.Inherited" xml:space="preserve"><value>This resource belongs to another scope. Switch to its owner scope to edit its definition.</value></data>
   <data name="ReadOnlyReason.Managed" xml:space="preserve"><value>This definition is managed by the platform or an installation and cannot be edited here.</value></data>
   <data name="ReadOnlyReason.InsufficientPermissions" xml:space="preserve"><value>You do not have permission to edit this definition.</value></data>
+  <data name="MoreFilters" xml:space="preserve"><value>More filters</value></data>
+  <data name="ActiveFilters" xml:space="preserve"><value>Active filters</value></data>
+  <data name="RemoveFilter" xml:space="preserve"><value>Remove filter {0}: {1}</value></data>
+  <data name="ClearFilters" xml:space="preserve"><value>Clear filters</value></data>
+  <data name="ApplyFilters" xml:space="preserve"><value>Apply filters</value></data>
+  <data name="FilterFrom" xml:space="preserve"><value>From</value></data>
+  <data name="FilterTo" xml:space="preserve"><value>To</value></data>
+  <data name="FilterRange" xml:space="preserve"><value>{0} to {1}</value></data>
+  <data name="FilterAnyDate" xml:space="preserve"><value>Any date</value></data>
+  <data name="CollectionPageSize" xml:space="preserve"><value>Rows per page</value></data>
+  <data name="CollectionEmpty" xml:space="preserve"><value>No records yet</value></data>
+  <data name="CollectionEmptyHelp" xml:space="preserve"><value>Records will appear here when available.</value></data>
+  <data name="CollectionLoading" xml:space="preserve"><value>Loading results…</value></data>
+  <data name="CollectionRefreshing" xml:space="preserve"><value>Refreshing results…</value></data>
+  <data name="CollectionLoadFailed" xml:space="preserve"><value>Unable to load results</value></data>
+  <data name="CollectionRefreshFailed" xml:space="preserve"><value>Unable to update results</value></data>
+  <data name="CollectionLoadFailedMessage" xml:space="preserve"><value>The results could not be loaded. Try again.</value></data>
+  <data name="CollectionForbiddenMessage" xml:space="preserve"><value>You do not have permission to view this collection in the selected context.</value></data>
+  <data name="CollectionEmptyPage" xml:space="preserve"><value>No records on this page</value></data>
+  <data name="CollectionContinuePages" xml:space="preserve"><value>Use the page controls to continue browsing the results.</value></data>
 </root>

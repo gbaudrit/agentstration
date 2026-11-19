@@ -29,6 +29,7 @@ public sealed partial class FlowDetailsDesignerTests
             Task.FromResult(new FlowSummaryPage([new("flow", "Flow", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
                 { ScopeRef = ResourceScopeRef.Parse(owner), IsManaged = managed }], false))
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         void AssertLock()
         {
@@ -65,9 +66,11 @@ public sealed partial class FlowDetailsDesignerTests
             return Task.FromResult(new FlowSummaryPage(rows.Skip(skip).Take(take).ToArray(), rows.Length > skip + take));
         }
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.HasCount(4, cut.FindAll("th"));
+        Assert.HasCount(3, cut.FindAll("th"));
+        Assert.IsEmpty(cut.FindAll(".collection-actions"));
         Assert.AreEqual("Resource", cut.FindAll("th")[0].TextContent);
         Assert.AreEqual("Version", cut.FindAll("th")[1].QuerySelector(".flow-version-heading")!.ChildNodes[0].TextContent.Trim());
         Assert.IsEmpty(cut.FindAll(".collection-qualified-name > svg"));
@@ -109,6 +112,7 @@ public sealed partial class FlowDetailsDesignerTests
             return Task.FromResult(new FlowSummaryPage([new($"flow-{skip}", "Flow", "Direct", "1.0.0", "Unknown", 0, 0, FlowClientStub.Now)], true));
         }
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         await cut.FindAll(".collection-pager button")[1].ClickAsync(new());
         Assert.AreEqual("default/flow-0", cut.Find(".collection-qualified-name code").TextContent);

@@ -237,4 +237,24 @@
   <data name="ReadOnlyReason.Inherited" xml:space="preserve"><value>Cette ressource appartient à un autre périmètre. Passez dans son périmètre propriétaire pour modifier sa définition.</value></data>
   <data name="ReadOnlyReason.Managed" xml:space="preserve"><value>Cette définition est gérée par la plateforme ou une installation et ne peut pas être modifiée ici.</value></data>
   <data name="ReadOnlyReason.InsufficientPermissions" xml:space="preserve"><value>Vous ne disposez pas des droits nécessaires pour modifier cette définition.</value></data>
+  <data name="MoreFilters" xml:space="preserve"><value>Plus de filtres</value></data>
+  <data name="ActiveFilters" xml:space="preserve"><value>Filtres actifs</value></data>
+  <data name="RemoveFilter" xml:space="preserve"><value>Retirer le filtre {0} : {1}</value></data>
+  <data name="ClearFilters" xml:space="preserve"><value>Effacer les filtres</value></data>
+  <data name="ApplyFilters" xml:space="preserve"><value>Appliquer les filtres</value></data>
+  <data name="FilterFrom" xml:space="preserve"><value>Du</value></data>
+  <data name="FilterTo" xml:space="preserve"><value>Au</value></data>
+  <data name="FilterRange" xml:space="preserve"><value>De {0} à {1}</value></data>
+  <data name="FilterAnyDate" xml:space="preserve"><value>Toute date</value></data>
+  <data name="CollectionPageSize" xml:space="preserve"><value>Lignes par page</value></data>
+  <data name="CollectionEmpty" xml:space="preserve"><value>Aucun enregistrement</value></data>
+  <data name="CollectionEmptyHelp" xml:space="preserve"><value>Les enregistrements apparaîtront ici lorsqu’ils seront disponibles.</value></data>
+  <data name="CollectionLoading" xml:space="preserve"><value>Chargement des résultats…</value></data>
+  <data name="CollectionRefreshing" xml:space="preserve"><value>Actualisation des résultats…</value></data>
+  <data name="CollectionLoadFailed" xml:space="preserve"><value>Impossible de charger les résultats</value></data>
+  <data name="CollectionRefreshFailed" xml:space="preserve"><value>Impossible d’actualiser les résultats</value></data>
+  <data name="CollectionLoadFailedMessage" xml:space="preserve"><value>Les résultats n’ont pas pu être chargés. Réessayez.</value></data>
+  <data name="CollectionForbiddenMessage" xml:space="preserve"><value>Vous n’avez pas l’autorisation de consulter cette liste dans le contexte sélectionné.</value></data>
+  <data name="CollectionEmptyPage" xml:space="preserve"><value>Aucun enregistrement sur cette page</value></data>
+  <data name="CollectionContinuePages" xml:space="preserve"><value>Utilisez la pagination pour poursuivre la consultation des résultats.</value></data>
 </root>
