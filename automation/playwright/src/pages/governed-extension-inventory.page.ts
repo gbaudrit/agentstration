@@ -119,7 +119,7 @@ export class GovernedExtensionInventoryPage {
           await this.assertNoMutation(locale);
         }
         await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveAttribute('readonly', '');
-        await expect(this.page.locator('fieldset')).toHaveAttribute('disabled', '');
+        await expect(this.page.locator('#profile-resource-form fieldset')).toHaveAttribute('disabled', '');
       }
       await this.navigate(new URL(href, consoleUrl).href);
       await this.managed.locator('a').click();
@@ -157,7 +157,7 @@ export class GovernedExtensionInventoryPage {
     this.assertScopedLink(await provider.getAttribute('href'));
     await expect(this.page.locator('main')).toContainText('Governed inventory fixture');
     await provider.click();
-    await expect(this.page.locator('fieldset')).toHaveAttribute('disabled', '');
+    await expect(this.page.locator('#profile-resource-form fieldset')).toHaveAttribute('disabled', '');
     await this.page.locator("a[href^='/extensions/qa-managed?']").click();
     await this.navigate(`${consoleUrl}/tools?context=%2Finstance`);
     const owners = this.page.locator("a[href^='/extensions/qa-managed?']");
