@@ -1,4 +1,5 @@
 @page "/tools/definitions/new"
+@using Microsoft.AspNetCore.Components.Sections
 @implements IDisposable
 @inject IToolDefinitionsClient Definitions
 @inject IFlowApiClient Flows
@@ -23,6 +24,7 @@ else
             <CreationWizard @key="scopeVersion" @ref="wizard" Steps="Steps" Busy="saving" Disabled="@(!CanManage)" OnStepChanging="ChangingStepAsync" OnFinish="FinishAsync" FinishLabel="@T("CreationCreateDraft")" FinishTestId="tool-definition-create-draft" />
         </fieldset>
     </EditForm>
+    <SectionOutlet SectionId="@relayDialogs" />
 }
 </div>
 
@@ -52,7 +54,7 @@ else
             </section>
 </div>;
     private RenderFragment ConfigurationFields => @<div>
-        <div hidden="@(kind != "relay")">@if (relayVisited) { <ToolRelayEditor @ref="relayEditor" CreationIdentity="identity" Source="@(SourceScopeValid ? Source : null)" SourceScopeRef="SourceScope" ShowCreationActions="false" CreationCompletenessChanged="value => relayComplete = value" DraftChanged="value => relayDirty = value" OnCreated="Created" /> }</div>
+        <div hidden="@(kind != "relay")">@if (relayVisited) { <ToolRelayEditor @ref="relayEditor" DialogSectionId="@relayDialogs" CreationIdentity="identity" Source="@(SourceScopeValid ? Source : null)" SourceScopeRef="SourceScope" ShowCreationActions="false" CreationCompletenessChanged="value => relayComplete = value" DraftChanged="value => relayDirty = value" OnCreated="Created" /> }</div>
         <div hidden="@(kind != "flow")">@if (flowVisited) {
                 <section class="panel tool-create-section" data-testid="tool-definition-flow-configuration">
                     <div class="panel-header tool-create-section-header"><div><p class="eyebrow">@T("CreationFlowEyebrow")</p><h2>@T("CreationFlowTitle")</h2><p>@T("CreationFlowHelp")</p></div></div>
@@ -90,6 +92,7 @@ else
     private IReadOnlyList<FlowVersionResponse> versions = [];
     private string initialKind = "flow", kind = "flow", selectedFlow = "", selectedVersion = "";
     private int contractRequest, scopeVersion;
+    private readonly object relayDialogs = new();
     private CreationWizard? wizard;
     private ToolRelayEditor? relayEditor;
     private bool relayComplete, relayDirty, invalidInput, created;

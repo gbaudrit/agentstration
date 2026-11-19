@@ -5884,6 +5884,144 @@
         "evidenceStatus": "Source adopted; current browser validation pending."
       },
       "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-definition-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-definition-published-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionVersionResource",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Flow",
+        "PublishedAt"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-definition-consumers",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionUsage",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Version",
+        "RelayVersion"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-relay-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "line": 42,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Relay definition/target/binding overview is separate from retained editors, immutable publications and consumers. Current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Keeps source UID/generation and actual source version distinct from the relay publication version. Binding and schema references remain exact; Secret values are never resolved.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
     }
   ],
   "specialized": [
@@ -16934,8 +17072,8 @@
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "classification": "non-collection-control",
-      "reason": "Native implementation Flow reference field; fixed form field, preserves scoped option labels."
+      "classification": "inventoried",
+      "reason": "Saved settings, immutable publication and consumer collections are mapped above. Native implementation Flow selector retains its exact scoped options."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",

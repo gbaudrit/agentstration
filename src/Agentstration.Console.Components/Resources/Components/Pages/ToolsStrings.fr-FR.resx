@@ -162,4 +162,9 @@
   <data name="CreationSelectSource" xml:space="preserve"><value>Sélectionnez un Tool source</value></data>
   <data name="CreationIndependentVersions" xml:space="preserve"><value>La version du relais est indépendante de celle du Tool source.</value></data>
   <data name="CreationLoadingContext" xml:space="preserve"><value>Chargement du contexte sélectionné de la Console…</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La réponse ne correspond pas à l’identité de la ressource demandée.</value></data>
+  <data name="DisplayNameRequired" xml:space="preserve"><value>Renseignez un nom d’affichage.</value></data>
+  <data name="PublicationVersionInvalid" xml:space="preserve"><value>Renseignez une version au format majeur.mineur.correctif.</value></data>
+  <data name="SchemaReferences" xml:space="preserve"><value>Références de schémas partagés</value></data>
+  <data name="InputEnvelope" xml:space="preserve"><value>Enveloppe d’entrée</value></data>
 </root>

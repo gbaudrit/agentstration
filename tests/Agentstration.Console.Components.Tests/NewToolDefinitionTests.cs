@@ -319,6 +319,26 @@ public sealed class NewToolDefinitionTests
         Assert.IsFalse(api.Requests.Any(r => r.Method != HttpMethod.Get));
     }
 
+    [TestMethod]
+    public async Task RelayCreatorDialogsRemainOutsideTheWizardFormAndCancelKeepsItsState()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?toolKind=relay&source=source.v2.4.0");
+        var cut = context.Render<NewToolDefinition>(); Identity(cut);
+        var wizard = cut.FindComponent<CreationWizard>().Instance;
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("configuration"));
+        cut.Find("[data-requirement-id='/collection'] [data-testid=relay-binding-kind]").Change("Parameter");
+        cut.Find("[data-testid=relay-binding-create]").Click();
+        var dialog = cut.Find("[role=dialog]");
+        Assert.IsNull(dialog.Closest("form"));
+        Assert.IsEmpty(cut.FindAll("form form"));
+        await dialog.QuerySelector(".dialog-actions .button-secondary")!.ClickAsync(new());
+        Assert.IsEmpty(cut.FindAll("[role=dialog]"));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("identity"));
+        Assert.AreEqual("Search", cut.Find("[data-testid=tool-definition-display-name]").GetAttribute("value"));
+        Assert.IsNull(api.Created);
+    }
+
     private static async Task CreateAsync(IRenderedComponent<NewToolDefinition> rendered)
     {
         await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("review"));

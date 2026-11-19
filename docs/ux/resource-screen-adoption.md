@@ -27,7 +27,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | ModelProviderDetails.razor | `/modelproviders/new`, `/modelproviders/{Name}` | Pending review and migration |
 | NamespacedAgentDetails.razor | `/namespaces/{AgentNamespace}/agents/{Name}` | Implemented; 14 managed-Agent/Pack component cases and source/catalog checks pass, including exact runtime owner, retained policy drafts and original read-only bindings. 2 real desktop/mobile probes pass; [real captures](evidence/resource-screen-adoption/managed-agents/README.md). Final full validation pending |
 | NewFlow.razor | `/flows/new` | Pending review and migration |
-| NewToolDefinition.razor | `/tools/definitions/new` | Implemented: shared 3-step wizard with unrestricted incomplete navigation, retained family Flow/relay editors, explicit final validation and draft-only creation. Exact-owner source preselection avoids homonyms; binary relay options use switches. 60 Tool creation/definition/relay/detail component cases and source/catalog checks pass; browser and final full validation pending |
+| NewToolDefinition.razor | `/tools/definitions/new` | Implemented: shared 3-step wizard with unrestricted incomplete navigation, retained family Flow/relay editors, explicit final validation and draft-only creation. Exact-owner source preselection avoids homonyms; binary relay options use switches. 60 Tool creation/definition/relay/detail component cases and source/catalog checks pass; 2 real desktop/mobile probes and the maintained schema-contract journey pass at `c27c8c82`. [Real captures](evidence/resource-screen-adoption/tool-creation/README.md). Final full validation pending |
 | OrganizationMemberDetails.razor | `/settings/organization/members/{UserId:guid}` | Pending review and migration |
 | PackComposer.razor | `/pack-projects/new` | Pending review and migration |
 | PackProjectDetails.razor | `/pack-projects/{ProjectId:guid}` | Pending review and migration |
@@ -47,8 +47,8 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 | StorageTypeEditor.razor | `/storage-types/new`, `/storage-types/{Name}/edit`, `/storage-types/{Name}/versions/new` | Pending review and migration |
 | TaskDetails.razor | `/tasks/{TaskId:guid}` | Pending review and migration |
 | TaskFlowRunDetails.razor | `/tasks/{TaskId:guid}/flowruns/{RunId}` | Pending review and migration |
-| ToolCategoryEditor.razor | `/tools/categories/new`, `/tools/categories/{Name}` | Implemented: 3-step wizard/template, saved Identity and exact declarations, retained provider-grouped picker, original ETags and owner-response verification. 10 component cases and source/catalog checks pass; browser and final full validation pending |
-| ToolDefinitionEditor.razor | `/tools/definitions/{Name}` | Pending review and migration |
+| ToolCategoryEditor.razor | `/tools/categories/new`, `/tools/categories/{Name}` | Implemented: 3-step wizard/template, saved Identity and exact declarations, retained provider-grouped picker, original ETags and owner-response verification. 10 component cases and source/catalog checks pass; 2 real desktop/mobile probes pass at `c27c8c82`. [Real captures](evidence/resource-screen-adoption/tool-categories/README.md). Final full validation pending |
+| ToolDefinitionEditor.razor | `/tools/definitions/{Name}` | Implemented: saved Flow/acquisition/relay composition, Identity and saved configuration, retained definition sections and lazy UID-based Access, exact-owner history and ETag-preserving commands. Relay retains live bindings, external contextual dialogs and explicit publication review. 61 targeted component, 18 ToolDefinition/relay API and 3 client cases pass; full Console suite: 804 passing cases. Browser and final full validation pending |
 | ToolDetails.razor | `/tools/{Name}` | Implemented: saved Identity/configuration, ETag-preserving header activation switch, exact-owner reads and execution, retained execution input/results and Access drafts. 8 Tool and 10 category regression cases pass; fresh browser and final full validation pending |
 | ToolGovernanceAudit.razor | `/tool-governance/{Owner}/{RunId}` | Pending review and migration |
 | ToolProviderEditor.razor | `/tools/providers/new`, `/tools/providers/{Name}` | Implemented; 8 component cases, desktop/mobile overview and Tools probes, and 4 managed-inventory browser variants pass; [real captures](evidence/resource-screen-adoption/tool-providers/README.md). Final full validation remains pending. |
@@ -66,7 +66,7 @@ The table is a source inventory, not a claim of browser validation. Route aliase
 
 ## Shared collection inventory
 
-Saved configuration summaries add shared frames: **99 shared frames + 258 active specialized collections = 357**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
+Saved configuration summaries add shared frames: **103 shared frames + 258 active specialized collections = 361**, with 148 audited repeated-item sources before additional screen adoption. Historical evidence retains its recorded source commit.
 
 ## Final acceptance still required
 

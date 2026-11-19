@@ -162,4 +162,9 @@
   <data name="CreationSelectSource" xml:space="preserve"><value>Select a source Tool</value></data>
   <data name="CreationIndependentVersions" xml:space="preserve"><value>The relay version is independent of the source Tool version.</value></data>
   <data name="CreationLoadingContext" xml:space="preserve"><value>Loading the selected Console context…</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>The response does not match the requested resource identity.</value></data>
+  <data name="DisplayNameRequired" xml:space="preserve"><value>Enter a display name.</value></data>
+  <data name="PublicationVersionInvalid" xml:space="preserve"><value>Enter a version in major.minor.patch format.</value></data>
+  <data name="SchemaReferences" xml:space="preserve"><value>Shared schema references</value></data>
+  <data name="InputEnvelope" xml:space="preserve"><value>Input envelope</value></data>
 </root>
