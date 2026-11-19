@@ -3,6 +3,41 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
+      "id": "flow-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "line": 34,
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/flow-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Flow settings preserve actual kind, enablement and known publication data; definition and metadata remain explicit disclosures. Settings are not resource identities and gain no owner or row actions.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
       "id": "agent-editor-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
       "line": 62,

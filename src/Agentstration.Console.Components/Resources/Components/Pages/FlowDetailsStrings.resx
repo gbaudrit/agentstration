@@ -88,4 +88,10 @@
   <data name="ExecutionPreview"><value>Execution preview</value></data>
   <data name="ExecutionPreviewHelp"><value>Review the current Flow topology at a glance.</value></data>
 <data name="Tab.Definition"><value>Definition</value></data><data name="Tab.YAML"><value>YAML</value></data><data name="RawDefinition"><value>Raw definition</value></data><data name="FlowYaml"><value>Flow YAML</value></data><data name="FlowYamlEditableHelp"><value>Edit the complete Flow definition as YAML.</value></data><data name="FlowYamlReadOnlyHelp"><value>This published Flow definition is read-only.</value></data><data name="Source"><value>Source</value></data><data name="ReadOnly"><value>Read-only</value></data><data name="FlowYamlDefinition"><value>Flow YAML definition</value></data><data name="OpenYamlEditor"><value>Open YAML editor</value></data>
+<data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+<data name="ResourceUid" xml:space="preserve"><value>Resource UID</value></data>
+<data name="DefinitionConfiguration" xml:space="preserve"><value>Saved Flow configuration</value></data>
+<data name="Metadata" xml:space="preserve"><value>Saved metadata</value></data>
+<data name="IdentityMismatch" xml:space="preserve"><value>The returned Flow does not match this resource.</value></data>
+<data name="Back" xml:space="preserve"><value>Back to Flows</value></data>
 </root>
