@@ -181,7 +181,7 @@ else
         new(T("RuntimeOptions"), resource.Definition.RuntimeOptions.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(resource.Definition.RuntimeOptions, new JsonSerializerOptions { WriteIndented = true }))
     ];
     private void ShowSection(string path) { if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
     private void Apply(RuntimeProfileResource value, string version)
     {
         resource = value; model = RuntimeProfileEditorModel.FromResource(value); selectedScope = value.ScopeRef; etag = version;
@@ -286,11 +286,12 @@ else
         finally { if (version == loadVersion) busy = false; }
     }
     private void RequestDelete() { if (!CanManage || busy || refreshing) return; if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProfileUsedError", DeploymentCount(usages.Count)), Guid.NewGuid().ToString("N")); }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
         if (!CanManage || busy || refreshing || resource is not { } current || etag is null) return;
         var version = loadVersion; confirmDelete = false; busy = true;
-        try { await Client.DeleteRuntimeProfileAsync(current.Namespace, current.Name, etag, cancellation.Token); if (version != loadVersion) return; baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(BackUrl); }
+        try { await Client.DeleteRuntimeProfileAsync(current.Namespace, current.Name, etag, cancellation.Token); if (version != loadVersion) return; Clear(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
         catch (Exception exception) { if (version == loadVersion) error = exception; }
         finally { if (version == loadVersion) busy = false; }
     }

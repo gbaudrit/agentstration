@@ -200,6 +200,17 @@ public sealed class RuntimeProfileEditorTests
         Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionPresentations, cut.FindComponent<ResourceDefinitionForm>().Instance.Sections);
     }
 
+    [TestMethod]
+    public async Task ConfirmedRuntimeProfileDeletionReleasesItsPendingPolicyDraft()
+    {
+        var client = new RuntimeProfilesClientStub(); using var context = Context(client, false);
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.Deletes);
+        Assert.AreEqual("/runtimeprofiles", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
     private sealed class NavigationContext(ResourceScopeRef scope) : IConsoleNavigationContext
     {
         public string? ScopeRef => scope.Value;
@@ -262,6 +273,7 @@ public sealed class RuntimeProfileEditorTests
             Task.FromResult(new RuntimeProfileUsagesResponse([], 0));
 
         public int Writes { get; private set; }
+        public int Deletes { get; private set; }
         public string? LastEtag { get; private set; }
         public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken)
         {
@@ -273,7 +285,7 @@ public sealed class RuntimeProfileEditorTests
             Writes++; LastEtag = etag; Profile = Profile with { Definition = request.Properties, Generation = Profile.Generation + 1 };
             return Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"updated\""));
         }
-        public Task DeleteRuntimeProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteRuntimeProfileAsync(string profileName, string etag, CancellationToken cancellationToken) { Deletes++; return Task.CompletedTask; }
     }
 
     private sealed class ScopeInventoryClientStub : IResourceScopeInventoryClient
