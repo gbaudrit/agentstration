@@ -16,7 +16,7 @@ else if (details is not null)
         <Metadata><CopyableValue Value="@details.Worker.WorkerId.ToString("D")" /></Metadata>
         <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/settings/runtime-workers", Services)">@T("BackToWorkers")</a></Actions>
         <Content>
-        <div data-worker-section="overview" hidden="@(section != "overview")">
+        <div class="worker-overview" data-worker-section="overview" hidden="@(section != "overview")">
             <section class="metric-grid worker-metrics">
                 <MetricCard Label="@T("Presence")" Value="@T($"Presence.{details.Worker.Presence}")" Detail="@T($"Enrollment.{details.Worker.EnrollmentState}")" Status="@PresenceStatus(details.Worker.Presence)" />
                 <MetricCard Label="@T("Capacity")" Value="@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")" Detail="@T("ActiveAssignments", details.Worker.ActiveAssignments)" Status="@(details.Worker.ActiveAssignments > 0 ? UiStatus.Info : UiStatus.Neutral)" />
