@@ -5,7 +5,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="../../src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css" Link="TestAssets/AgentEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Agentstration.Console.Components/Components/ResourceYamlEditor.razor.css" Link="TestAssets/ResourceYamlEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor.css" Link="TestAssets/EntryEditor.razor.css" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web.Components/wwwroot/design-tokens.css" Link="TestAssets/design-tokens.css" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../src/Agentstration.Web.Components/MainLayout.razor" Link="TestAssets/MainLayout.razor" CopyToOutputDirectory="PreserveNewest" />
