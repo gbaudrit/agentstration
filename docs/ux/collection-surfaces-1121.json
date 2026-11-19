@@ -5376,12 +5376,12 @@
     {
       "id": "storages-storage-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "line": 24,
+      "line": 9,
       "host": "console",
       "routes": [
         "/storages"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StorageResource",
       "scope": true,
       "state": true,
@@ -5412,7 +5412,17 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Storage",
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Primary Storage list reads one bounded skip/take server page through a new family client method. Unknown total; previous/next and 20/50/100 sizes. No page-local search/filter controls or fetch-all Storage pagination.",
+        "supplementaryCatalog": "Existing full type-contract evidence catalog and related journey links retained after the primary collection. Type evidence loads initially/on refresh and is reused across page navigation; no new API or local type pagination introduced.",
+        "identity": "Exact qualified Storage/type links preserve context; type/version and availability/scope/governance markers retained. No content/configuration/Secret values displayed.",
+        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards including supplementary type evidence.",
+        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md."
+      }
     },
     {
       "id": "connected-services-connected-service-resource",

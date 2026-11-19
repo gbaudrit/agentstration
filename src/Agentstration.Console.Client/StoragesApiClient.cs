@@ -9,6 +9,7 @@ namespace Agentstration.Web.Console;
 
 public interface IStoragesClient
 {
+    Task<PagedResponse<StorageResource>> GetStoragesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) => throw new NotSupportedException();
     Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token);
     Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token);
     Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token);
@@ -68,6 +69,10 @@ public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient, 
 
     public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) =>
         ReadPagesAsync<StorageTypeResource>("api/storage-types", scope, token);
+
+    public Task<PagedResponse<StorageResource>> GetStoragesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) =>
+        ApiResponse.ReadAsync<PagedResponse<StorageResource>>(httpClient,
+            $"api/storages?scopeRef={Uri.EscapeDataString(scope.Value)}&skip={skip}&take={take}", token);
 
     public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) =>
         ReadPagesAsync<StorageResource>("api/storages", scope, token);

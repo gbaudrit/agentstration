@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Agentstration.Api.Contracts;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
@@ -135,7 +136,7 @@ public sealed class StorageComponentTests
         var client = new StorageClient();
         using var context = Setup(client, canRead: false);
         var page = context.Render<Storages>();
-        page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "Access is denied"));
+        page.WaitForAssertion(() => StringAssert.Contains(page.Markup, "Access denied"));
         Assert.AreEqual(0, client.ListCalls);
     }
 
@@ -627,6 +628,7 @@ public sealed class StorageComponentTests
             ObservedVersions = type.Definition.Versions.Select(version => new StorageTypeVersionAvailability(version.Version, TypeAvailability)).ToArray(),
             ObservedUse = MissingUseObservation ? null : new(scope, new(!TypeUseDenied, TypeUseDenied ? ResourceAccessDecisionReasons.GrantMissing : ResourceAccessDecisionReasons.SameScope))
         }).ToArray());
+        public Task<PagedResponse<StorageResource>> GetStoragesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult(new PagedResponse<StorageResource>([Resource()], null)); }
         public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) { ListCalls++; ListScope = scope; return Task.FromResult<IReadOnlyList<StorageResource>>([Resource()]); }
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token) => Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Workspace", true)]);
         public bool FailReads { get; set; }
