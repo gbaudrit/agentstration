@@ -2365,17 +2365,17 @@
     {
       "id": "resource-plans-resource-plan-snapshot",
       "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
-      "line": 44,
+      "line": 10,
       "host": "console",
       "routes": [
         "/resource-plans"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ResourcePlanSnapshot",
       "identityLabel": "Plan",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Changes",
         "Validation",
@@ -2442,6 +2442,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "926bb001d9ae665b4043d8e765b9b2bf7f0e0343"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "One bounded primary ListPlansAsync status/skip/take request. Existing server status filter; no name search, global total/direct jumps or local filters on per-page review evidence. Previous/next and 20/50/100 sizes. Existing per-plan review enrichment remains bounded to 50 ChangeSets and four concurrent reads.",
+        "identity": "Plan ID/title/goal, physical Workspace marker, status and actual revision retained. Links preserve the current logical navigation context so the family API resolves the same operational Workspace.",
+        "states": "Successful page/pager facts survive compatible failures, retry requested page, and empty terminal page retains Previous. Query changes clear incompatible results; user/logical scope/physical Workspace key cancels stale primary and supplementary reads. Review pending/failure stays unknown, not falsely unvalidated; denied review clears privileged content.",
+        "actions": "Redundant Open-only menu removed; no creation, materialization, validation or application command added. Local layout/table/pager CSS removed; domain goal typography retained.",
+        "validation": "ResourcePlanCollectionTests and populated desktop/mobile deterministic API draft smoke; ledger records limits."
       }
     },
     {

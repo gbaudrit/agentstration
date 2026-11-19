@@ -288,4 +288,6 @@
   <data name="MaterializationDiagnostic.planning_resource_name_collision" xml:space="preserve"><value>Two plan elements target the same resource name.</value></data>
   <data name="Issue.BindingStale.Title" xml:space="preserve"><value>Binding needs updating</value></data>
   <data name="Issue.BindingStale.Description" xml:space="preserve"><value>A selected profile or Tool changed. Refresh the proposal, then verify again.</value></data>
+  <data name="RevisionLabel"><value>Revision</value></data>
+  <data name="Status.Unknown"><value>Unknown</value></data>
 </root>

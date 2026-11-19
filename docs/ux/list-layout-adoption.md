@@ -37,6 +37,8 @@ Each screen is completed, checked, committed and published before the next start
 
 | Knowledge Sources | Existing complete authorized array. Name search, enabled and advanced displayed Data Source/projection/retrieval text filters, namespace/exact-scope filters; exact totals and local 20/50/100 pages. No readiness, content or projection reads added. | Template adopted; distinct dependencies and badges retained, exact reference scopes/namespaces honored and Flow destinations qualified. Creation permission-gated, related navigation contextual, Inspect-only menu removed. Six new plus existing link regression cases, warning-free Web build, full targeted format, two catalog assertions and real 25-disabled-source desktop/mobile API smoke pass; [captures and source proof](evidence/list-layout/knowledge-sources/README.md). No acquisition/projection/content operation claimed. Full lanes and #1242 remain deferred. |
 
+| Resource Plans | Existing bounded status/skip/take API and truthful HasMore. Server status filter only, unknown total, previous/next and 20/50/100 sizes. Existing per-plan review enrichment remains bounded to fifty ChangeSets with four concurrent reads; no filter on these page-local facts. | Template adopted; plan ID/title/goal, Workspace, status, actual revision, review count/readiness/staleness and updated time retained. Context-qualified links; Open-only menu and local table/pager layout CSS removed. Nine focused component cases, warning-free Web build, full targeted format, two catalog assertions and real 25-draft desktop/mobile smoke pass; [captures and source proof](evidence/list-layout/resource-plans/README.md). Pending/failed review stays unknown, stale primary/supplementary reads are rejected, failed pages retain successful pager facts. Browser performs no materialization/application. Full lanes and #1242 remain deferred. |
+
 ## Remaining top-level Console list adapters
 
 This source inventory identifies concrete top-level list adapters still outside the new page composition. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
@@ -61,7 +63,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Remaining; requires individual contract review |
 | `Packs.razor` | `/packs` | Remaining; requires individual contract review |
 | `Parameters.razor` | `/parameters` | Adopted |
-| `ResourcePlans.razor` | `/resource-plans` | Remaining; requires individual contract review |
+| `ResourcePlans.razor` | `/resource-plans` | Adopted |
 | `ResourceScopes.razor` | `/settings/resource-scopes` | Remaining; requires individual contract review |
 | `RuntimeProfiles.razor` | `/runtimeprofiles` | Adopted in this batch |
 | `RuntimeWorkers.razor` | `/settings/runtime-workers` | Adopted |
