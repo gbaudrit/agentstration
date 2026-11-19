@@ -57,7 +57,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     [TestMethod]
     public void PageRendersAttemptAndExplainsWhenArgumentsWereNotRetained()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = AuditContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient());
 
@@ -79,7 +79,7 @@ public sealed class ToolGovernanceAuditConsoleTests
     [TestMethod]
     public void PageRendersRetainedInvocationArguments()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = AuditContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolGovernanceAuditClient>(new FakeAuditClient("{\"query\":\"latest dotnet version\"}"));
 
@@ -94,8 +94,82 @@ public sealed class ToolGovernanceAuditConsoleTests
         });
     }
 
-    private sealed class FakeAuditClient(string? arguments = null) : IToolGovernanceAuditClient
+    [TestMethod]
+    public void AuditNavigationRetainsDeepFiltersAndUsesTheRealSequenceContinuation()
     {
+        using var context = AuditContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeAuditClient(nextSequence: 4);
+        context.Services.AddSingleton<IToolGovernanceAuditClient>(client);
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("/?toolCallId=deep-call#audit");
+        var rendered = context.Render<ToolGovernanceAudit>(parameters => parameters
+            .Add(value => value.Owner, "flow").Add(value => value.RunId, "flow-run-exact"));
+        rendered.WaitForElement(".governance-record");
+        Assert.AreEqual("deep-call", client.LastFilters!.ToolCallId);
+        Assert.AreEqual(1, client.ReadCount);
+        rendered.Find(".governance-filters input").Change("pending-call");
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#overview");
+        rendered.WaitForAssertion(() => Assert.Contains("flow-run-exact", rendered.Find(".resource-identity-summary").TextContent));
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#audit");
+        Assert.AreEqual("pending-call", rendered.Find(".governance-filters input").GetAttribute("value"));
+        Assert.AreEqual(1, client.ReadCount);
+        rendered.Find(".governance-filters .button-primary").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("pending-call", client.LastFilters!.ToolCallId));
+        rendered.Find(".load-more button").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual(2, rendered.FindAll(".governance-record").Count));
+        Assert.AreEqual(4, client.AfterSequence);
+        Assert.AreEqual(50, client.Limit);
+        Assert.AreEqual(3, client.ReadCount);
+        Assert.IsEmpty(rendered.FindAll(".load-more"));
+    }
+
+    [TestMethod]
+    public async Task SupersededExecutionReadCannotReplaceTheCurrentAudit()
+    {
+        using var context = AuditContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var first = new TaskCompletionSource<ToolGovernanceAuditPage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new DeferredAuditClient(first.Task);
+        context.Services.AddSingleton<IToolGovernanceAuditClient>(client);
+        var rendered = context.Render<ToolGovernanceAudit>(parameters => parameters
+            .Add(value => value.Owner, "flow").Add(value => value.RunId, "first-run"));
+        rendered.Render(parameters => parameters.Add(value => value.Owner, "flow").Add(value => value.RunId, "second-run"));
+        rendered.WaitForAssertion(() => Assert.Contains("second-run", rendered.Find(".governance-record h2").TextContent));
+        await rendered.InvokeAsync(() => first.SetResult(AuditPage("first-run")));
+        rendered.WaitForAssertion(() => Assert.Contains("second-run", rendered.Find(".governance-record h2").TextContent));
+        Assert.DoesNotContain("first-run", rendered.Find(".governance-record").TextContent);
+    }
+
+    private static ToolGovernanceAuditPage AuditPage(string runId) => new([new ToolGovernanceAuditRecord
+    {
+        OwnerKind = ToolExecutionOwnerKind.FlowRun, RunId = runId, Sequence = 1, Timestamp = DateTimeOffset.UnixEpoch,
+        ToolCallId = "logical-call", InvocationId = "attempt", ToolId = "lookup", ToolName = runId
+    }], null);
+
+    private sealed class DeferredAuditClient(Task<ToolGovernanceAuditPage> first) : IToolGovernanceAuditClient
+    {
+        public Task<ToolGovernanceAuditPage> GetAsync(ToolExecutionOwnerKind ownerKind, string runId, ResourceScopeRef? scopeRef,
+            long afterSequence, int limit, ToolGovernanceAuditFilters filters, CancellationToken cancellationToken) =>
+            runId == "first-run" ? first : Task.FromResult(AuditPage(runId));
+    }
+
+    private static BunitContext AuditContext()
+    {
+        var context = new BunitContext().WithCollectionPresentation();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#audit");
+        module.Setup<string>("navigate", _ => true).SetResult("http://localhost/#audit");
+        return context;
+    }
+
+    private sealed class FakeAuditClient(string? arguments = null, long? nextSequence = null) : IToolGovernanceAuditClient
+    {
+        public int ReadCount { get; private set; }
+        public long AfterSequence { get; private set; }
+        public int Limit { get; private set; }
+        public ToolGovernanceAuditFilters? LastFilters { get; private set; }
         public Task<ToolGovernanceAuditPage> GetAsync(
             ToolExecutionOwnerKind ownerKind,
             string runId,
@@ -103,12 +177,15 @@ public sealed class ToolGovernanceAuditConsoleTests
             long afterSequence,
             int limit,
             ToolGovernanceAuditFilters filters,
-            CancellationToken cancellationToken) => Task.FromResult(new ToolGovernanceAuditPage(
+            CancellationToken cancellationToken)
+        {
+            ReadCount++; AfterSequence = afterSequence; Limit = limit; LastFilters = filters;
+            return Task.FromResult(new ToolGovernanceAuditPage(
                 [new ToolGovernanceAuditRecord
                 {
                     OwnerKind = ownerKind,
                     RunId = runId,
-                    Sequence = 4,
+                    Sequence = afterSequence + 4,
                     Timestamp = DateTimeOffset.UnixEpoch,
                     ToolCallId = "logical-call",
                     InvocationId = "attempt-1",
@@ -126,7 +203,8 @@ public sealed class ToolGovernanceAuditConsoleTests
                         ToolExecutionHookEvaluationKind.Denied,
                         "blocked")]
                 }],
-                null));
+                afterSequence == 0 ? nextSequence : null));
+        }
     }
 
     private sealed class DelegateHandler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
