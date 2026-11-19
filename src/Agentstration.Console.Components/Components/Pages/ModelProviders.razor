@@ -1,55 +1,51 @@
-@inject IServiceProvider Services
 @page "/modelproviders"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IModelProvidersClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-model-providers">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button><a class="button-primary" href="/modelproviders/new">@T("CreateProvider")</a></Actions>
-</PageHeader>
-
-@if (loading && providers is null)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (providers?.Count == 0)
-{
-    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" />
-}
-else
-{
-    <CollectionView TItem="ModelProviderResponse" Items="providers ?? []" InformationLabels="@(new string[] { T("Type"), T("Management"), T("Models") })" >
-        <Identity Context="provider"><CollectionIdentity DisplayName="@provider.Properties.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" Domain="model" ><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="provider">
-            <CollectionValue Label="@T("Type")">@provider.Properties.ContributionId</CollectionValue>
-            <CollectionValue Label="@T("Management")">@provider.Properties.RegistrationSource</CollectionValue>
-            <CollectionValue Label="@T("Models")">@ModelCount(provider.Properties.ModelCount)</CollectionValue>
-        </Information>
-        <Actions Context="provider"><CollectionActions ResourceName="@($"{provider.Properties.DisplayName} ({provider.Namespace}/{provider.Name}, {provider.ScopeRef})")"><a href="@DetailsUrl(provider)">@T("ViewDetails")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="ModelProviderResponse" Title="@T("Title")" Description="@T("Description")" TestId="resource-model-providers"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ModelProviderResponse>? providers;
-    private AgentstrationApiException? error;
-    private bool loading;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelCount(int count) => T(count == 1 ? "ModelCount.One" : "ModelCount.Many", count);
-    private string StatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "starting" => "Starting", "unavailable" => "Unavailable", "failed" => "Failed", _ => "Unknown" }}"];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
+    private string StatusLabel(string? status) => T($"Status.{StatusValue(status)}");
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/modelproviders/new", Services)">@T("CreateProvider")</a></PermissionGate> : null;
+    private CollectionColumn<ModelProviderResponse> IdentityColumn => new("identity", T("Provider"), provider => @<CollectionIdentity DisplayName="@provider.Properties.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server" Domain="model">
+        <IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Properties.Status)" Status="@ModelManagementUi.Status(provider.Properties.Status)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
     {
-        loading = true; error = null;
-        try { providers = await Client.GetModelProvidersAsync(cancellation.Token); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
-    }
+        Filters = [new("status", T("Status"), CollectionFilterKind.Choice)
+        {
+            Options = new[] { "Available", "Starting", "Unavailable", "Failed", "Unknown" }.Select(value => new CollectionFilterOption(value, StatusLabel(value))).ToArray()
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<ModelProviderResponse>> Columns =>
+    [
+        new("type", T("Type"), provider => @<span>@provider.Properties.ContributionId</span>)
+        {
+            Filters = [new("type", T("Type"), CollectionFilterKind.Choice) { Options = Options(provider => provider.Properties.ContributionId) }]
+        },
+        new("management", T("Management"), provider => @<span>@provider.Properties.RegistrationSource</span>)
+        {
+            Filters = [new("management", T("Management"), CollectionFilterKind.Choice) { Options = Options(provider => provider.Properties.RegistrationSource), Advanced = true }]
+        },
+        new("models", T("Models"), provider => @<span>@ModelCount(provider.Properties.ModelCount)</span>)
+        {
+            Filters = [new("models", T("Models"), CollectionFilterKind.Number) { Advanced = true }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters => [new("namespace", T("Namespace"), CollectionFilterKind.Choice) { Options = Options(provider => provider.Namespace) }];
+    private IReadOnlyList<CollectionFilterOption> Options(Func<ModelProviderResponse, string> select) => (providers ?? []).Select(select).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray();
+    private static string StatusValue(string? status) => status?.ToLowerInvariant() switch { "available" => "Available", "starting" => "Starting", "unavailable" => "Unavailable", "failed" => "Failed", _ => "Unknown" };
     private string DetailsUrl(ModelProviderResponse provider) => ResourceOwnershipContext.Resource(Services, "/modelproviders", provider.Name, ResourceNamespace.Parse(provider.Namespace), provider.ScopeRef);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

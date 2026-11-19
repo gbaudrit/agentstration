@@ -3034,17 +3034,17 @@
     {
       "id": "model-providers-model-provider-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
-      "line": 26,
+      "line": 10,
       "host": "console",
       "routes": [
         "/modelproviders"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ModelProviderResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Type",
         "Management",
@@ -3115,6 +3115,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "79f6f9e17c9743e6650fad1d35e923a977f66673"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local technical/display-name search, identity status filter, contribution-type column filter, advanced registration-source/model-count column filters and additional namespace filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained rows/view and stable query on compatible refresh; initial/interactivity, stale-response, context replacement and denied-access guards.",
+        "actions": "Exact owner-qualified name link retained; redundant View details-only menu removed. Create action requires resources/write.",
+        "validation": "ModelProviderCollectionTests and current deterministic executable desktop/mobile smoke documented in list-layout-adoption.md."
       }
     },
     {
