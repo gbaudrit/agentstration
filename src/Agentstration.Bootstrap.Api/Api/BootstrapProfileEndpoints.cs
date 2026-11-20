@@ -10,6 +10,17 @@ public static class BootstrapProfileEndpoints
 {
     public static IEndpointRouteBuilder MapAgentstrationBootstrapProfiles(this IEndpointRouteBuilder endpoints)
     {
+        var startup = endpoints.MapGroup("/api/bootstrap/startup").RequireAuthorization(AgentstrationPolicies.Authenticated);
+        startup.MapGet("/admission", (IBootstrapStartupStatus status, HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(new BootstrapStartupAdmission(status.Read().Ready));
+        });
+        startup.MapGet("", (IBootstrapStartupStatus status, HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(status.Read());
+        }).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
         group.MapPost("/source-profile", GetSourceProfileAsync);

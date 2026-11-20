@@ -13,7 +13,7 @@ namespace Agentstration.Web.Pages;
 
 [AllowAnonymous]
 public sealed class LoginModel(
-    SignInManager<LocalIdentityUser> signIn,
+    LocalAuthenticationService authentication,
     LocalBootstrapCoordinator bootstrap,
     IOptions<AgentstrationWebOptions> options,
     IStringLocalizer<AuthStrings> localizer) : PageModel
@@ -46,11 +46,11 @@ public sealed class LoginModel(
             return RedirectToPage("/Bootstrap", new { returnUrl = ReturnUrl });
         if (!ModelState.IsValid) return Page();
 
-        var result = await signIn.PasswordSignInAsync(
-            Input.UserName.Trim(), Input.Password, Input.RememberMe, lockoutOnFailure: true);
-        if (result.Succeeded) return LocalRedirect(ReturnUrl);
+        var result = await authentication.PasswordSignInAsync(
+            Input.UserName.Trim(), Input.Password, Input.RememberMe, cancellationToken);
+        if (result == LocalLoginOutcome.Succeeded) return LocalRedirect(ReturnUrl);
 
-        ModelState.AddModelError(string.Empty, result.IsLockedOut
+        ModelState.AddModelError(string.Empty, result == LocalLoginOutcome.LockedOut
             ? localizer["AccountLocked"].Value
             : localizer["InvalidCredentials"].Value);
         return Page();

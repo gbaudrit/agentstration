@@ -294,3 +294,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 242. [ADR-0242 — Model Provider discovery runs asynchronously](0242-model-provider-discovery-runs-asynchronously.md)
 
 243. [ADR-0243 — Standalone startup always runs in phases](0243-standalone-startup-always-runs-in-phases.md)
+244. [ADR-0244 — Observe startup through an administrator-only progress screen](0244-authenticated-startup-progress-and-admission.md)

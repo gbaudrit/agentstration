@@ -36,6 +36,7 @@ internal static class StandaloneHostServiceCollectionExtensions
         services.AddSingleton(toolExecutionCapture);
         services.AddScoped<DeclarativeBootstrapService>();
         services.AddScoped<BootstrapStartupCoordinator>();
+        services.AddBootstrapAuthenticationAdmission();
         services.AddScoped<Agentstration.Infrastructure.Bootstrap.BootstrapModelDependencies>();
         return services;
     }

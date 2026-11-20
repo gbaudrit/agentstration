@@ -11,7 +11,7 @@ public sealed class BootstrapModelDependencies(
     ModelProviderManagementService providers, ModelProfileManagementService profiles,
     ModelDiscoveryService models, ModelProviderDiscoveryLifecycle discovery,
     ModelProviderDiscoveryState observations, IRequestContextScopeFactory scopes,
-    IConfiguration configuration, TimeProvider timeProvider)
+    IConfiguration configuration, TimeProvider timeProvider, BootstrapStartupState? startup = null)
 {
     public async Task WaitAsync(BootstrapResourceDocument document, BootstrapResourceOperationContext operation,
         CancellationToken cancellationToken)
@@ -51,6 +51,8 @@ public sealed class BootstrapModelDependencies(
                     if (observation.Health == "available" && observation.State == "succeeded"
                         && model?.Value.Definition.Observation.State == ModelObservationState.Available) return;
                     lastState = observation.ErrorCode ?? observation.State;
+                    startup?.ObserveModelWait(profile.Name, config.Name, profile.Definition.Model.Name,
+                        observation.Health == "available" ? "required_model_missing" : "provider_unavailable", config.Namespace.Value, (config.ScopeRef ?? ResourceScopeRef.Instance).Value);
                     // Only required providers are expedited; optional providers never consume this deadline.
                     if (initialAttempt || observation.State is "never" or "succeeded")
                         await observations.RequestAsync(provider.Value, wait.Token);

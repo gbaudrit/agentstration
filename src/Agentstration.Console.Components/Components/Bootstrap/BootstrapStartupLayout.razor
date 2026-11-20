@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider Authentication
+
+<div class="app-shell bootstrap-startup-shell">
+    <header class="bootstrap-startup-header">
+        <a class="bootstrap-startup-brand" href="" aria-label="@Localizer["Brand"]"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" /><strong>@Localizer["Brand"]</strong></a>
+        <div class="bootstrap-startup-session"><span>@userName</span><a href="logout">@Localizer["SignOut"]</a></div>
+    </header>
+    <main class="bootstrap-startup-main">@Body</main>
+</div>
+
+@code {
+    private string? userName;
+    protected override async Task OnInitializedAsync() => userName =
+        (await Authentication.GetAuthenticationStateAsync()).User.Identity?.Name ?? Localizer["Administrator"].Value;
+}

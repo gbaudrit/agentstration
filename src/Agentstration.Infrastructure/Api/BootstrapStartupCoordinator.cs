@@ -35,6 +35,7 @@ public sealed class BootstrapStartupCoordinator(
         if (!options.InitialBootstrapEnabled)
         {
             await automaticEnrollment.ActivateAsync(cancellationToken);
+            startup.MoveTo("finalization");
             return;
         }
         if (options.ExtensionDependencyTimeout < TimeSpan.FromSeconds(1)
@@ -57,6 +58,7 @@ public sealed class BootstrapStartupCoordinator(
         await automaticEnrollment.ActivateAsync(cancellationToken);
 
         startup.EnableAdministration();
+        startup.MoveTo("extensions");
         var selections = new List<BootstrapProfileSelection>();
         foreach (var application in applications)
             selections.Add(await SelectAsync(application, cancellationToken));
@@ -64,6 +66,7 @@ public sealed class BootstrapStartupCoordinator(
         foreach (var selection in selections)
             requirements.AddRange(await bootstrap.GetExtensionRequirementsAsync(selection, cancellationToken));
         await WaitForContributionsAsync(requirements, options.ExtensionDependencyTimeout, cancellationToken);
+        startup.MoveTo("resources");
 
         // Re-read the bounded catalog before dependent resource mutation. Never apply
         // a different file set merely because the extension took time to arrive.
@@ -83,6 +86,7 @@ public sealed class BootstrapStartupCoordinator(
                 : scopes.PushTenant(context.PrincipalId, context.TenantId);
             await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, cancellationToken);
         }
+        startup.MoveTo("finalization");
     }
 
     private async Task<InitialApplication> PrepareAsync(
@@ -161,6 +165,8 @@ public sealed class BootstrapStartupCoordinator(
                     }
                     catch (BootstrapDependencyException exception)
                     {
+                        startup.ObserveContributionWait(requirement.ResourceKind, requirement.ResourceName,
+                            requirement.Selector.ExtensionId, requirement.Selector.ContributionId);
                         lastDiagnostic = $"{requirement.Profile}/{requirement.Location}: {requirement.ResourceKind}/{requirement.ResourceName} requires extension '{requirement.Selector.ExtensionId}' installation '{requirement.Selector.InstanceId}', {requirement.Selector.Kind}/{requirement.Selector.ContributionId} [{exception.Code}]: {exception.Message}";
                         if (exception.Code is not ("extension_unavailable" or "contribution_unavailable"))
                             throw new DeclarativeBootstrapException(lastDiagnostic, exception);

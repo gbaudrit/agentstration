@@ -206,7 +206,11 @@ internal static class StandaloneHostCompositionExtensions
         app.UseAuthentication();
         app.UseMiddleware<PrincipalResolutionMiddleware>();
         app.UseMiddleware<RequestContextMiddleware>();
-        app.UseMiddleware<StandardManagementDataMiddleware>();
+        app.UseMiddleware<BootstrapStartupAdmissionMiddleware>();
+        app.UseWhen(context => context.RequestServices.GetRequiredService<BootstrapStartupState>().IsReady
+            && !context.Request.Path.StartsWithSegments("/api/bootstrap/startup")
+            && context.Request.Path != "/startup/progress",
+            branch => branch.UseMiddleware<StandardManagementDataMiddleware>());
         app.UseAuthorization();
         if (!composition.ApiOnlyTesting) app.UseAntiforgery();
         app.MapAgentstrationApi();

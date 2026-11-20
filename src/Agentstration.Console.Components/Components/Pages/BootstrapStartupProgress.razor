@@ -1,0 +1,95 @@
+@page "/startup/progress"
+@layout Agentstration.Web.Components.Bootstrap.BootstrapStartupLayout
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.Web.Components.Bootstrap
+@implements IAsyncDisposable
+@inject IBootstrapStartupApiClient Client
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<PageTitle>@Localizer["Title"]</PageTitle>
+<PageHeader Title="@Localizer["Title"]" Description="@Localizer["Description"]" />
+
+@if (denied)
+{
+    <ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" />
+}
+else if (snapshot is null)
+{
+    <LoadingState Message="@(disconnected ? Localizer["ConnectionLostDescription"] : Localizer["Checking"])" />
+}
+else
+{
+    @if (disconnected) { <p class="startup-progress-notice" role="status">@Localizer["ConnectionLostDescription"]</p> }
+    <StepProgress Steps="@Steps" ActiveStepId="@snapshot.ActiveStepId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
+        <HeaderContent>
+            <div class="startup-progress-summary" role="status">
+                <strong>@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]</strong>
+                <span>@Localizer["StepCount", snapshot.Steps.Count(step => step.State is "succeeded" or "skipped"), snapshot.Steps.Count]</span>
+            </div>
+        </HeaderContent>
+    </StepProgress>
+    @if (snapshot.State == "failed") { <p class="startup-progress-notice" role="alert">@Localizer["Recovery"]</p> }
+}
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "ReturnUrl")] public string? ReturnUrl { get; set; }
+    private readonly CancellationTokenSource stopping = new();
+    private BootstrapStartupSnapshot? snapshot;
+    private string? selected;
+    private bool following = true, denied, disconnected;
+    private Task? polling;
+
+    private IReadOnlyList<ProgressStep> Steps => snapshot!.Steps.Select(step => new ProgressStep(
+        step.Id, Localizer["Stage_" + step.Id].Value, step.State switch
+        {
+            "succeeded" => ProgressStepStatus.Succeeded,
+            "running" => ProgressStepStatus.Running,
+            "waiting" => ProgressStepStatus.Waiting,
+            "failed" => ProgressStepStatus.Failed,
+            "skipped" => ProgressStepStatus.Skipped,
+            _ => ProgressStepStatus.Pending
+        }, builder =>
+        {
+            builder.OpenComponent<BootstrapStartupStepPanel>(0);
+            builder.AddAttribute(1, nameof(BootstrapStartupStepPanel.Snapshot), snapshot);
+            builder.AddAttribute(2, nameof(BootstrapStartupStepPanel.StepId), step.Id);
+            builder.CloseComponent();
+        })).ToArray();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) polling = PollAsync();
+        return Task.CompletedTask;
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2), Clock);
+        try { while (await timer.WaitForNextTickAsync(stopping.Token)) await InvokeAsync(LoadAsync); }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+    }
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var current = await Client.GetAsync(stopping.Token);
+            if (snapshot is not null && snapshot.AttemptId != current.AttemptId) { selected = null; following = true; }
+            snapshot = current; disconnected = denied = false;
+            if (current.Ready) Navigation.NavigateTo(BootstrapStartupNavigation.LocalReturnUrl(ReturnUrl).TrimStart('/'), replace: true);
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { snapshot = null; denied = true; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        { Navigation.NavigateTo("login?ReturnUrl=" + Uri.EscapeDataString(BootstrapStartupNavigation.ProgressUrl(ReturnUrl)), forceLoad: true); }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or InvalidOperationException or OperationCanceledException) { disconnected = true; }
+        if (!stopping.IsCancellationRequested) StateHasChanged();
+    }
+    public async ValueTask DisposeAsync()
+    {
+        stopping.Cancel();
+        if (polling is not null) await polling;
+        stopping.Dispose();
+    }
+}

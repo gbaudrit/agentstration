@@ -1,0 +1,2 @@
+.startup-progress-summary { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding: 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); }
+.startup-progress-notice { padding: 1rem; border: 1px solid var(--warning, #d49a32); border-radius: .75rem; background: var(--surface); color: var(--text); }

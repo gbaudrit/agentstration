@@ -1,0 +1,114 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <data name="Brand" xml:space="preserve">
+    <value>Agentstration</value>
+  </data>
+  <data name="Administrator" xml:space="preserve">
+    <value>Administrateur</value>
+  </data>
+  <data name="SignOut" xml:space="preserve">
+    <value>Se déconnecter</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Initialisation de l’instance</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>Suivez la préparation de votre environnement. La Console s’ouvrira automatiquement lorsque l’instance sera prête.</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Bootstrap en cours</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Échec du bootstrap</value>
+  </data>
+  <data name="StepCount" xml:space="preserve">
+    <value>{0} étapes sur {1} terminées</value>
+  </data>
+  <data name="Checking" xml:space="preserve">
+    <value>Vérification de la disponibilité de l’instance…</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Réessayer</value>
+  </data>
+  <data name="AccessUnavailable" xml:space="preserve">
+    <value>Accès temporairement indisponible</value>
+  </data>
+  <data name="AccessUnavailableDescription" xml:space="preserve">
+    <value>Déconnectez-vous et réessayez ultérieurement.</value>
+  </data>
+  <data name="ConnectionLost" xml:space="preserve">
+    <value>Connexion interrompue</value>
+  </data>
+  <data name="ConnectionLostDescription" xml:space="preserve">
+    <value>L’instance est momentanément injoignable. Le suivi reprendra lorsque la connexion sera rétablie.</value>
+  </data>
+  <data name="Recovery" xml:space="preserve">
+    <value>Le bootstrap s’est arrêté. Corrigez la configuration ou la dépendance requise, puis redémarrez l’instance. Consultez les journaux du serveur pour le diagnostic détaillé.</value>
+  </data>
+  <data name="Stage_topology" xml:space="preserve">
+    <value>Structure de l’instance</value>
+  </data>
+  <data name="Stage_extensions" xml:space="preserve">
+    <value>Extensions et contributions</value>
+  </data>
+  <data name="Stage_resources" xml:space="preserve">
+    <value>Ressources et dépendances</value>
+  </data>
+  <data name="Stage_finalization" xml:space="preserve">
+    <value>Ouverture de la Console</value>
+  </data>
+  <data name="Explanation_topology" xml:space="preserve">
+    <value>Préparation du stockage, de l’identité, des tenants, des espaces de travail et des politiques d’enrôlement.</value>
+  </data>
+  <data name="Explanation_extensions" xml:space="preserve">
+    <value>Attente des extensions et des contributions requises par les profils sélectionnés.</value>
+  </data>
+  <data name="Explanation_resources" xml:space="preserve">
+    <value>Application des ressources sélectionnées et vérification de leurs dépendances requises.</value>
+  </data>
+  <data name="Explanation_finalization" xml:space="preserve">
+    <value>Finalisation de la préparation avant l’ouverture de la Console.</value>
+  </data>
+  <data name="ModelMissing" xml:space="preserve">
+    <value>En attente du modèle exact requis.</value>
+  </data>
+  <data name="ProviderUnavailable" xml:space="preserve">
+    <value>Le fournisseur n’est pas encore disponible. La découverte réessaiera dans le délai prévu pour le bootstrap.</value>
+  </data>
+  <data name="Resource" xml:space="preserve">
+    <value>Ressource</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Fournisseur</value>
+  </data>
+  <data name="ExpectedModel" xml:space="preserve">
+    <value>Modèle attendu</value>
+  </data>
+  <data name="OpenProvider" xml:space="preserve">
+    <value>Ouvrir la configuration du fournisseur</value>
+  </data>
+  <data name="Created" xml:space="preserve">
+    <value>Créées</value>
+  </data>
+  <data name="Skipped" xml:space="preserve">
+    <value>Déjà présentes</value>
+  </data>
+  <data name="Conflicts" xml:space="preserve">
+    <value>Conflits</value>
+  </data>
+  <data name="ResourceFailures" xml:space="preserve">
+    <value>Ressources en échec</value>
+  </data>
+  <data name="ContributionMissing" xml:space="preserve">
+    <value>En attente d’une contribution d’extension requise.</value>
+  </data>
+  <data name="Extension" xml:space="preserve">
+    <value>Extension</value>
+  </data>
+  <data name="Contribution" xml:space="preserve">
+    <value>Contribution</value>
+  </data>
+  <data name="GateConnectionLostDescription" xml:space="preserve">
+    <value>L’instance est momentanément injoignable. Réessayez.</value>
+  </data>
+</root>

@@ -1,0 +1,54 @@
+@inject IBootstrapStartupApiClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@implements IDisposable
+
+@if (denied)
+{
+    <LayoutView Layout="typeof(BootstrapStartupLayout)"><ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" /></LayoutView>
+}
+else if (error)
+{
+    <LayoutView Layout="typeof(BootstrapStartupLayout)"><ErrorState Title="@Localizer["ConnectionLost"]" Message="@Localizer["GateConnectionLostDescription"]"><button class="button-secondary" @onclick="CheckAsync">@Localizer["Retry"]</button></ErrorState></LayoutView>
+}
+else if (allowed)
+{
+    @ChildContent
+}
+else
+{
+    <LoadingState Message="@Localizer["Checking"]" />
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private readonly CancellationTokenSource stopping = new();
+    private bool allowed, denied, error;
+    private int revision;
+
+    protected override Task OnParametersSetAsync() => CheckAsync();
+    private async Task CheckAsync()
+    {
+        var request = ++revision;
+        allowed = denied = error = false;
+        try
+        {
+            var admission = await Client.GetAdmissionAsync(stopping.Token);
+            if (request != revision || stopping.IsCancellationRequested) return;
+            var relative = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+            var path = relative.Split('?', '#')[0];
+            if (!admission.Ready && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsRepairPath(path))
+                Navigation.NavigateTo(BootstrapStartupNavigation.ProgressUrl(relative).TrimStart('/'), replace: true);
+            else allowed = true;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { if (request == revision) denied = true; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("login?ReturnUrl=" + Uri.EscapeDataString(BootstrapStartupNavigation.LocalReturnUrl("/" + Navigation.ToBaseRelativePath(Navigation.Uri))), forceLoad: true);
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or InvalidOperationException or OperationCanceledException)
+        { if (request == revision) error = true; }
+    }
+    public void Dispose() { stopping.Cancel(); stopping.Dispose(); }
+}

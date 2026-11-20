@@ -675,11 +675,41 @@ this option. For example:
 }
 ```
 
-After topology and enrollment-policy setup, ordinary authenticated administration
-of model providers, profiles and extensions is available while dependencies wait.
-Existing authorization and scope checks remain in force. Health readiness and
-execution routes remain unavailable, and execution workers stay suspended until
-all Bootstrap phases succeed. Provider discovery runs independently of this fence.
+After topology and enrollment-policy setup, login is available to global Platform
+administrators while dependencies wait. Local login, Console BFF session issuance
+and validation, enabled OIDC sign-in, and retained authenticated sessions enforce
+this temporary admission rule. Workspace administrator membership alone is
+insufficient. Ordinary admission resumes at startup readiness.
+
+Browser entry after sign-in opens `/startup/progress` instead of the partial
+Console overview. The shared StepProgress component displays the coordinator's
+four actual stages: instance structure, required extensions/contributions,
+resources/dependencies, and finalization. Its selected panel follows the active
+stage until the administrator selects another stage; following can be resumed.
+Model/provider details are activity data in the generic resource panel. No panel
+is specific to an extension or provider implementation.
+
+The page reads `GET /api/bootstrap/startup` every two seconds. This PlatformAdmin
+endpoint returns an attempt identity, revision, stage states, safe dependency
+identities and resource outcome counts. It exposes no raw exception, credential,
+manifest content or server file path. `GET /api/bootstrap/startup/admission` is an
+authenticated readiness-only probe used by Console routing. Both endpoints are
+non-cacheable and observe local state without contacting a provider or provisioning
+business resources. The anonymous `/startup/ready` login-availability probe remains
+empty and unchanged.
+
+A reload reconnects to the current process-local attempt. Transient read failures
+retain the last snapshot and polling resumes automatically. At readiness the page
+opens a validated local return destination. These observations are not a durable
+startup journal or the manual Bootstrap application history. Existing startup
+readiness semantics remain authoritative; this delivery adds no critical-worker
+startup barrier.
+
+Administrators can still open provider/profile/extension repair pages with existing
+authorization and scope checks. Health readiness and execution routes remain
+unavailable, and execution workers stay suspended until all Bootstrap phases
+succeed. Provider discovery runs independently of this fence. See
+[ADR-0244](../decisions/0244-authenticated-startup-progress-and-admission.md).
 
 If the deadline expires, the diagnostic identifies the profile, provider and exact
 missing model. The staged listener remains available for administrative repair;

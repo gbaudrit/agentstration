@@ -25,6 +25,7 @@ internal static class StorageServiceCollectionExtensions
         services.AddSingleton(context.Options.StorageContent);
         services.AddSingleton<InstanceInitializationOptions>();
         services.AddSingleton<BootstrapStartupState>();
+        services.AddSingleton<Agentstration.Bootstrap.Contracts.IBootstrapStartupStatus>(provider => provider.GetRequiredService<BootstrapStartupState>());
         services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
         services.AddSingleton<WorkspacePlatformResourceProvisioner>();
         services.AddSingleton<ConnectedServicePlatformResourceProvisioner>();

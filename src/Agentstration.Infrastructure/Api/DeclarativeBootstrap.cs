@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Bootstrap.Contracts;
+using Agentstration.Infrastructure;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Microsoft.Extensions.Configuration;
@@ -20,7 +21,8 @@ public sealed partial class DeclarativeBootstrapService(
     IEnumerable<IBootstrapResourceHandler> resourceHandlers,
     ILogger<DeclarativeBootstrapService> logger,
     SourceBootstrapProfileLoader? sourceProfiles = null,
-    IBootstrapExtensionReferenceResolver? extensionReferences = null)
+    IBootstrapExtensionReferenceResolver? extensionReferences = null,
+    BootstrapStartupState? startup = null)
 {
     private readonly BootstrapExtensionReferencePreparation extensionPreparation = new(extensionReferences);
     private const string ConfigurationSection = "Agentstration:Bootstrap";
@@ -166,7 +168,15 @@ public sealed partial class DeclarativeBootstrapService(
                 try
                 {
                     resource = prepared[source.Location];
+                    if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name);
                     var result = await handlers[resource.Kind].ApplyAsync(resource, operation, cancellationToken);
+                    if (phase == BootstrapStartupPhase.Resources)
+                        startup?.ObserveResource(resource.Kind, resource.Metadata.Name, result switch
+                        {
+                            BootstrapResourceApplyResult.Created => "created",
+                            BootstrapResourceApplyResult.Skipped => "skipped",
+                            _ => "conflict"
+                        });
                     var disposition = result switch
                     {
                         BootstrapResourceApplyResult.Created => BootstrapResourceDisposition.Create,
@@ -179,6 +189,7 @@ public sealed partial class DeclarativeBootstrapService(
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
+                    if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
                     var message = $"Bootstrap resource '{resource.Kind}/{resource.Metadata.Name}' from '{source.Location}' failed: {exception.Message}";
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
                         BootstrapResourceDisposition.Failed, exception.Message));

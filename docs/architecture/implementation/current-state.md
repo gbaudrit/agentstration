@@ -647,3 +647,15 @@ Standalone startup always opens the listener after storage initialization and be
 phased Bootstrap. Readiness and execution remain fenced until initialization
 completes; `InitialBootstrapEnabled` controls only initial profile application.
 See [ADR-0243](../../decisions/0243-standalone-startup-always-runs-in-phases.md).
+
+During pending or failed startup, global Platform administrators alone can sign in
+or use retained Console/API sessions. Browser entry opens the dedicated
+`/startup/progress` view through the shared StepProgress component. A process-local
+Bootstrap observation port projects four actual coordinator stages and safe
+resource/dependency activity; authenticated admission and PlatformAdmin progress
+reads are non-cacheable and do not call providers or provision defaults. The same
+typed Console client supports embedded and independently hosted Console routing.
+A successful startup restores ordinary admission and redirects to the validated
+local destination. A terminal failure retains correction/restart guidance. This
+increment does not add a durable startup journal or change readiness's worker
+barrier. See [ADR-0244](../../decisions/0244-authenticated-startup-progress-and-admission.md).

@@ -11,7 +11,8 @@ public sealed class BffSessionAuthorityService(
     LocalAuthenticationService localAuthentication,
     IIdentityStore identities,
     IPlatformAuthorizationService platformAuthorization,
-    Agentstration.Identity.Contracts.IAuthorizationService authorization)
+    Agentstration.Identity.Contracts.IAuthorizationService authorization,
+    IAuthenticationAdmissionPolicy? admission = null)
 {
     public async Task<BffLocalSessionAuthorityResult> AuthenticateLocalAsync(
         BffLocalSessionRequest request,
@@ -44,6 +45,7 @@ public sealed class BffSessionAuthorityService(
         CancellationToken cancellationToken)
     {
         if (!string.Equals(request.AuthenticationMethod, BffSessionAuthenticationMethods.Local, StringComparison.Ordinal)
+            || (admission is not null && !await admission.CanSignInAsync(request.PrincipalId, cancellationToken))
             || !string.Equals(request.Provider, "local", StringComparison.Ordinal)
             || !await localAuthentication.ValidateSessionAsync(
                 request.PrincipalId,
