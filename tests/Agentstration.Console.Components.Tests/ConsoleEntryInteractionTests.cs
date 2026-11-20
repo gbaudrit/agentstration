@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Agentstration.Console.Components.Tests;
 
 [TestClass]
-public sealed class ConsoleEntryInteractionTests
+public sealed partial class ConsoleEntryInteractionTests
 {
     private static readonly Guid WorkspaceId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid InteractionId = Guid.Parse("44444444-4444-4444-4444-444444444444");
@@ -195,6 +195,10 @@ public sealed class ConsoleEntryInteractionTests
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigation = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        navigation.Mode = JSRuntimeMode.Loose;
+        navigation.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#interaction");
+        navigation.Setup<string>("navigate", _ => true).SetResult("http://localhost/#interaction");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddAgentstrationWebComponents();
         entries = new(explicitEntries ?? (includeEntry ? [Entry(canInvoke)] : []));
@@ -232,11 +236,15 @@ public sealed class ConsoleEntryInteractionTests
     {
         public (Guid WorkspaceId, ResourceNamespace Namespace, string Name, CreateInteractionRequest Request)? LastSubmission { get; private set; }
         public Exception? DiscoveryError { get; set; }
+        public IReadOnlyList<EntryResponse> Available { get; set; } = entries;
+        public TaskCompletionSource<IReadOnlyList<EntryResponse>>? NextDiscovery { get; set; }
+        public Exception? SubmitError { get; set; }
         public Task<IReadOnlyList<EntryResponse>> GetExposedEntriesAsync(EntryExposureSurface surface, EntryWorkplacePlacement? placement, CancellationToken cancellationToken) =>
-            DiscoveryError is null ? Task.FromResult(entries) : Task.FromException<IReadOnlyList<EntryResponse>>(DiscoveryError);
+            NextDiscovery?.Task ?? (DiscoveryError is null ? Task.FromResult(Available) : Task.FromException<IReadOnlyList<EntryResponse>>(DiscoveryError));
         public Task<EntrySubmissionResponse> SubmitConsoleEntryAsync(Guid workspaceId, ResourceNamespace @namespace, string name, CreateInteractionRequest request, CancellationToken cancellationToken)
         {
             LastSubmission = (workspaceId, @namespace, name, request);
+            if (SubmitError is not null) return Task.FromException<EntrySubmissionResponse>(SubmitError);
             var interaction = ConsoleEntryInteractionTests.Interaction(InteractionStatus.Completed);
             return Task.FromResult(new EntrySubmissionResponse(interaction, new RespondAction("done"), null));
         }
@@ -261,11 +269,13 @@ public sealed class ConsoleEntryInteractionTests
         public InteractionResponse Interaction { get; set; } = ConsoleEntryInteractionTests.Interaction(InteractionStatus.Active);
         public IReadOnlyList<ConversationMessage> Messages { get; set; } = [];
         public WorkTaskResponse CurrentTask { get; set; } = CreateTask(WorkTaskStatus.Completed);
+        public Exception? ReadError { get; set; }
+        public Exception? ContinueError { get; set; }
         public int CancelCalls { get; private set; }
         public Guid CancelWorkspaceId { get; private set; }
         public Guid CancelTaskId { get; private set; }
         public Task<IReadOnlyList<InteractionResponse>> ListInteractionsAsync(Guid workspaceId, int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InteractionResponse>>([Interaction]);
-        public Task<InteractionResponse> GetInteractionAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult(Interaction);
+        public Task<InteractionResponse> GetInteractionAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => ReadError is null ? Task.FromResult(Interaction) : Task.FromException<InteractionResponse>(ReadError);
         public Task<IReadOnlyList<ConversationMessage>> ListMessagesAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult(Messages);
         public Task<IReadOnlyList<PendingActionContract>> ListPendingActionsAsync(Guid workspaceId, Guid interactionId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PendingActionContract>>([]);
         public Task<WorkTaskResponse> GetTaskAsync(Guid workspaceId, Guid taskId, CancellationToken cancellationToken) => System.Threading.Tasks.Task.FromResult(CurrentTask);
@@ -281,7 +291,7 @@ public sealed class ConsoleEntryInteractionTests
         public Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(Guid workspaceId, Guid taskId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkTaskActivity>>([]);
         public Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(Guid workspaceId, Guid taskId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkTaskResult>>([]);
         public Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(Guid workspaceId, Guid taskId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkTaskArtifact>>([]);
-        public Task<AddConversationMessageResponse> AddMessageAsync(Guid workspaceId, Guid interactionId, string content, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<AddConversationMessageResponse> AddMessageAsync(Guid workspaceId, Guid interactionId, string content, CancellationToken cancellationToken) => ContinueError is not null ? Task.FromException<AddConversationMessageResponse>(ContinueError) : Task.FromResult(new AddConversationMessageResponse(new(Guid.NewGuid(), new(workspaceId), new(interactionId), null, ConversationRole.User, content, Now), Interaction, new RespondAction("Accepted"), null));
         public Task<PendingActionResolutionResponse> RespondAsync(Guid workspaceId, Guid interactionId, Guid actionId, string resumeToken, IReadOnlyDictionary<string, JsonElement> values, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Uri GetArtifactContentUri(Guid workspaceId, Guid taskId, Guid artifactId) => new($"http://localhost/api/workspaces/{workspaceId:D}/tasks/{taskId:D}/artifacts/{artifactId:D}/content");
     }

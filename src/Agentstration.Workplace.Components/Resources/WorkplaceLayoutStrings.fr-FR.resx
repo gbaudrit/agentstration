@@ -28,4 +28,7 @@
   <data name="Read" xml:space="preserve"><value>Lue</value></data>
   <data name="Unread" xml:space="preserve"><value>Non lue</value></data>
   <data name="Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="AnswerPendingQuestion" xml:space="preserve"><value>Répondez à la question ci-dessus pour continuer.</value></data>
+  <data name="ConversationClosed" xml:space="preserve"><value>Cette conversation est fermée.</value></data>
+  <data name="ConversationReconnect" xml:space="preserve"><value>La conversation sera à nouveau disponible après la reconnexion.</value></data>
 </root>

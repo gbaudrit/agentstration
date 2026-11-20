@@ -19,7 +19,7 @@
                     <TaskActivityView Activity="activity" ParticipantVisibility="Presentation.Participants.Visibility" />
                     break;
                 case WorkplaceAction action when action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction:
-                    <div class="inline-pending"><PendingActionPanel Action="action" Busy="Busy" OnSubmit="OnPendingAction" ConversationMode="true" /></div>
+                    <div class="inline-pending"><PendingActionPanel @key="(PendingId(action), ResponseAcknowledgement)" Action="action" Busy="Busy" SubmitDisabled="PendingSubmitDisabled" OnSubmit="OnPendingAction" ConversationMode="true" DraftChanged="PendingDraftChangedAsync" /></div>
                     break;
                 case WorkTaskResponse task:
                     <InlineTaskCard Task="task" DetailsUrl="@TaskDetailsUrl(task)" />
@@ -57,7 +57,7 @@
             <p class="interaction-error" role="alert">@Error</p>
         }
     </div>
-    <ConversationComposer Busy="Busy" DisabledReason="@ComposerDisabledReason" OnSubmit="OnMessage" />
+    <ConversationComposer Busy="Busy" DisabledReason="@ComposerDisabledReason" OnSubmit="OnMessage" TrySubmit="TrySendMessage" DraftChanged="ComposerDraftChangedAsync" />
 </section>
 
 @code {
@@ -80,6 +80,21 @@
     [Parameter, EditorRequired] public required Func<WorkTaskArtifact, string> ArtifactContentUrl { get; set; }
     [Parameter] public Func<WorkTaskResponse, string> TaskDetailsUrl { get; set; } = task => $"/tasks/{task.Id}";
 
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public Func<string, Task<bool>>? TrySendMessage { get; set; }
+    [Parameter] public long ResponseAcknowledgement { get; set; }
+    [Parameter] public bool PendingSubmitDisabled { get; set; }
+    [Parameter] public string? SubmitDisabledReason { get; set; }
+    private bool pendingDraft, composerDraft, reportedDraft, disposed;
+    public bool HasPendingDraft => pendingDraft;
+    public bool HasMessageDraft => composerDraft;
+    private Task pendingInitialization = System.Threading.Tasks.Task.CompletedTask;
+    private PendingActionId? draftPendingId;
+    private long acknowledgedResponse;
+    private static PendingActionId? PendingId(WorkplaceAction? value) => value switch { RequestInputAction input => input.PendingActionId, RequestChoiceAction choice => choice.PendingActionId, RequestConfirmationAction confirmation => confirmation.PendingActionId, _ => null };
+    private async Task PendingDraftChangedAsync(bool value) { pendingDraft = value; await ReportDraftAsync(); }
+    private async Task ComposerDraftChangedAsync(bool value) { composerDraft = value; await ReportDraftAsync(); }
+    private Task ReportDraftAsync() { var value = pendingDraft || composerDraft; if (value == reportedDraft) return System.Threading.Tasks.Task.CompletedTask; reportedDraft = value; return DraftChanged.InvokeAsync(value); }
     private IReadOnlyList<TimelineItem> Timeline
     {
         get
@@ -162,22 +177,33 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        autoScrollModule = await JavaScript.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
-        await autoScrollModule.InvokeVoidAsync("initialize", conversationThread);
+        if (disposed) return;
+        if (firstRender) await (pendingInitialization = InitializeScrollAsync());
+        if (!disposed) await ReportDraftAsync();
     }
 
+    private async Task InitializeScrollAsync()
+    {
+        try
+        {
+            autoScrollModule = await JavaScript.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
+            if (!disposed) await autoScrollModule.InvokeVoidAsync("initialize", conversationThread);
+        }
+        catch (JSDisconnectedException) when (disposed) { }
+    }
     protected override void OnParametersSet()
     {
+        var pendingId = PendingId(Action);
+        if (draftPendingId != pendingId || acknowledgedResponse != ResponseAcknowledgement) { draftPendingId = pendingId; acknowledgedResponse = ResponseAcknowledgement; pendingDraft = false; }
         var taskId = Task?.Id ?? Results.FirstOrDefault()?.WorkTaskId.Value;
         if (taskId == diagnosticsTaskId) return;
         diagnosticsTaskId = taskId;
         diagnosticsExpanded = false;
     }
-    private string? ComposerDisabledReason => Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
-        ? "Answer the question above to continue."
-        : Status == InteractionStatus.Closed ? "This conversation is closed."
-        : !string.IsNullOrWhiteSpace(Error) ? "The conversation will be available again after reconnecting."
+    private string? ComposerDisabledReason => !string.IsNullOrWhiteSpace(SubmitDisabledReason) ? SubmitDisabledReason : Action is RequestChoiceAction or RequestConfirmationAction or RequestInputAction || Status == InteractionStatus.WaitingForUser
+        ? Localizer["AnswerPendingQuestion"].Value
+        : Status == InteractionStatus.Closed ? Localizer["ConversationClosed"].Value
+        : !string.IsNullOrWhiteSpace(Error) ? Localizer["ConversationReconnect"].Value
         : null;
     private sealed record TimelineItem(DateTimeOffset Timestamp, int Order, string Key, object Value);
     private sealed record AssistantResponseItem(string Content);
@@ -186,14 +212,14 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (autoScrollModule is null) return;
+        if (disposed) return;
+        disposed = true;
         try
         {
-            await autoScrollModule.InvokeVoidAsync("dispose", conversationThread);
-            await autoScrollModule.DisposeAsync();
+            await pendingInitialization;
+            if (autoScrollModule is not null) { await autoScrollModule.InvokeVoidAsync("dispose", conversationThread); await autoScrollModule.DisposeAsync(); }
         }
-        catch (JSDisconnectedException)
-        {
-        }
+        catch (JSDisconnectedException) { }
+        GC.SuppressFinalize(this);
     }
 }

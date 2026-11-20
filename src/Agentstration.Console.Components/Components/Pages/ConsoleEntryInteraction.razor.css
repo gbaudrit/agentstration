@@ -1,2 +1,11 @@
 .console-entry-interaction { width:100%; }
 .console-entry-terminal-error { display:grid; gap:.25rem; margin-bottom:1rem; padding:1rem; border:1px solid var(--danger-border, #dc2626); border-radius:.75rem; background:var(--danger-surface, rgba(220,38,38,.08)); }
+
+.console-entry-interaction { min-width: 0; }
+.console-entry-interaction ::deep .entry-renderer,
+.console-entry-interaction ::deep .entry-heading,
+.console-entry-interaction ::deep .primary-entry-content,
+.console-entry-interaction ::deep .prompt-composer { min-width: 0; max-width: 100%; }
+.console-entry-interaction ::deep .prompt-entry { grid-template-columns: minmax(0, 1fr); }
+.console-entry-interaction ::deep .primary-entry-content .entry-renderer { color: var(--text); }
+.console-entry-interaction ::deep .collection-name-heading strong { min-width: 0; overflow-wrap: anywhere; }
