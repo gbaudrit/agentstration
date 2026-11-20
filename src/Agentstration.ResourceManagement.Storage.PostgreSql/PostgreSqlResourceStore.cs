@@ -154,7 +154,7 @@ public sealed class PostgreSqlResourceStore(
         if (requestContext.AccessMode != ControlPlaneAccessMode.System)
         {
             var target = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
-            var visibleScopeIds = await EffectiveVisibleScopeIdsAsync(context, target, cancellationToken);
+            var visibleScopeIds = await EffectiveVisibleScopeIdsAsync(context, target, cancellationToken, includeAncestors: true);
             query = query.Where(value => visibleScopeIds.Contains(value.ScopeId));
         }
         var matches = await FilterDiscoverableAsync(context,
@@ -172,7 +172,7 @@ public sealed class PostgreSqlResourceStore(
         if (uid == Guid.Empty) throw new ArgumentException("A resource UID cannot be empty.", nameof(uid));
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
-        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken, includeAncestors: true)
             || !await CanDiscoverAsync(context, document, cancellationToken)) return null;
         return Deserialize<T>(document);
     }
@@ -183,7 +183,7 @@ public sealed class PostgreSqlResourceStore(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope)
             .SingleOrDefaultAsync(value => value.Uid == uid, cancellationToken);
-        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken, includeAncestors: true)
             || !await CanDiscoverAsync(context, document, cancellationToken)) return null;
         using var payload = JsonDocument.Parse(document.Payload);
         var root = payload.RootElement;
@@ -199,7 +199,7 @@ public sealed class PostgreSqlResourceStore(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var scope = await RequireScopeAsync(context, address.ScopeRef, cancellationToken);
-        await EnsureCanReadAsync(context, scope, cancellationToken);
+        await EnsureCanReadAsync(context, scope, cancellationToken, includeAncestors: true);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.ScopeId == scope.Id
             && value.Namespace == address.Namespace.Value && value.Kind == address.Kind && value.Name == address.Name, cancellationToken);
         return document is null || !await CanDiscoverAsync(context, document, cancellationToken)
@@ -590,9 +590,7 @@ public sealed class PostgreSqlResourceStore(
             ControlPlaneAccessMode.System => query,
             ControlPlaneAccessMode.Instance => query.Where(value =>
                 value.Scope.Ref == ResourceScopeRef.Instance.Value),
-            ControlPlaneAccessMode.TenantAdministration => query.Where(value =>
-                value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value),
-            ControlPlaneAccessMode.Tenant => query.Where(value =>
+            ControlPlaneAccessMode.TenantAdministration or ControlPlaneAccessMode.Tenant => query.Where(value =>
                 value.Scope.Ref == ResourceScopeRef.Tenant(requestContext.Current.TenantId).Value
                 || value.Scope.Ref == ResourceScopeRef.Instance.Value),
             ControlPlaneAccessMode.Workspace => query.Where(value =>
@@ -646,12 +644,12 @@ public sealed class PostgreSqlResourceStore(
         _ => throw new InvalidOperationException("Control Plane access requires an explicit tenant, workspace, or system context.")
     };
 
-    private async Task<bool> CanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
+    private async Task<bool> CanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken, bool includeAncestors = false)
     {
         if (requestContext.AccessMode == ControlPlaneAccessMode.System) return true;
         if (requestContext.AccessMode is not (ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration or ControlPlaneAccessMode.Tenant or ControlPlaneAccessMode.Workspace)) return false;
         var current = await RequireScopeAsync(context, CurrentScopeRef(), cancellationToken);
-        return (await EffectiveVisibleScopeIdsAsync(context, current, cancellationToken)).Contains(scope.Id);
+        return (await EffectiveVisibleScopeIdsAsync(context, current, cancellationToken, includeAncestors)).Contains(scope.Id);
     }
 
     private async Task<bool> CanDiscoverAsync(ResourceManagementDbContext context, ControlPlaneDocument document,
@@ -716,9 +714,9 @@ public sealed class PostgreSqlResourceStore(
             && (grant.TargetScopeRef == targetRef
                 || grant.TargetScopeRef == tenantRef && grant.IncludeDescendants));
 
-    private async Task EnsureCanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
+    private async Task EnsureCanReadAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken, bool includeAncestors = false)
     {
-        if (!await CanReadAsync(context, scope, cancellationToken))
+        if (!await CanReadAsync(context, scope, cancellationToken, includeAncestors))
             throw new ResourceScopeAccessDeniedException(ResourceScopeRef.Parse(scope.Ref));
     }
 
@@ -754,11 +752,14 @@ public sealed class PostgreSqlResourceStore(
         return [.. result];
     }
 
+    // Resource reads filter inherited candidates by Discover policy; ownership inventories remain scope-bound.
     private Task<long[]> EffectiveVisibleScopeIdsAsync(
         ResourceManagementDbContext context,
         ResourceScopeRow target,
-        CancellationToken cancellationToken) =>
-        requestContext.AccessMode is ControlPlaneAccessMode.Instance or ControlPlaneAccessMode.TenantAdministration
+        CancellationToken cancellationToken,
+        bool includeAncestors = false) =>
+        requestContext.AccessMode == ControlPlaneAccessMode.Instance
+            || requestContext.AccessMode == ControlPlaneAccessMode.TenantAdministration && !includeAncestors
             ? Task.FromResult(new[] { target.Id })
             : VisibleScopeIdsAsync(context, target, cancellationToken);
 

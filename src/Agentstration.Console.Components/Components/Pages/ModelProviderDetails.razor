@@ -253,10 +253,13 @@ else
         string? warning = null; var catalogueForbidden = false;
         try
         {
-            loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            loadedSecrets = await SecretsClient.GetSecretsAsync(snapshot.Value.ScopeRef!.Value, cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token);
+            if (CanWrite && ResourceOwnershipContext.CanManage(snapshot.Value.ScopeRef, Services))
+            {
+                loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+                loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+                loadedSecrets = await SecretsClient.GetSecretsAsync(snapshot.Value.ScopeRef!.Value, cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+                targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token);
+            }
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)
         { loadedExtensions = []; loadedParameters = []; loadedSecrets = []; targets = []; catalogueForbidden = true; warning = exception.Message; }

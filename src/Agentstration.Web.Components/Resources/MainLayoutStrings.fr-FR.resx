@@ -51,6 +51,7 @@
   <data name="ContextChangeFailedMessage" xml:space="preserve"><value>Le périmètre sélectionné n’a pas pu être chargé. Réessayez ou revenez à la page précédente.</value></data>
   <data name="LoadingContext" xml:space="preserve"><value>Chargement du contexte…</value></data>
   <data name="RetryContext" xml:space="preserve"><value>Réessayer</value></data>
-  <data name="ContextResourceUnavailable" xml:space="preserve"><value>Cette ressource est indisponible dans le périmètre sélectionné. Sa liste est affichée à la place.</value></data>
+  <data name="ContextResourceUnavailable" xml:space="preserve"><value>Le périmètre a bien été changé. La liste est affichée, car cette ressource n’y est pas accessible.</value></data>
   <data name="ReturnToPreviousContext" xml:space="preserve"><value>Revenir au périmètre précédent</value></data>
+  <data name="ContextResourceUnavailableTitle" xml:space="preserve"><value>Ressource indisponible dans ce périmètre</value></data>
 </root>

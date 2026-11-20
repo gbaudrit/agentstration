@@ -27,7 +27,7 @@ public sealed class TriggerCollectionTests
         Assert.IsEmpty(cut.FindAll(".collection-actions"));
         Assert.AreEqual("45", cut.FindAll(".metric-card strong").First().TextContent.Trim());
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
-        StringAssert.Contains(originalUrl!, "/triggers/trigger-0?namespace=schedules&scopeRef=%2Finstance");
+        StringAssert.Contains(originalUrl!, "/triggers/trigger-0?namespace=schedules&scopeRef=%2Fworkspaces%2F99999999-0000-0000-0000-000000000001");
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
         Assert.HasCount(5, cut.FindAll("tbody tr"));
         await cut.Find("[data-filter-key=enabled] select").ChangeAsync(new() { Value = "true" });

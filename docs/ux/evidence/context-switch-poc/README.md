@@ -1,6 +1,6 @@
 # POC — Changer de périmètre en conservant sa position
 
-La branche `codex/poc-context-switch` part de `82206267` sur `codex/ux-corrections`, puis intègre `7ba891ad`. La PR #1256 et la FR #1254 suivent ce POC ; le parcours réutilisable reste différé dans le sous-ticket natif #1255.
+La branche `codex/poc-context-switch`, initialement issue de `codex/ux-corrections` (`82206267`, puis `7ba891ad`), est rebasée sur `main` (`51969396`) après la fusion squash de la PR #1238. Ses cinq commits propres conservent les nouvelles présentations et la navigation vers les collections déjà intégrées à `main`. La PR #1256 cible désormais `main` ; la FR #1254 et le sous-ticket natif #1255 suivent le POC et son parcours réutilisable différé.
 
 ## Mécanisme commun aux ressources
 
@@ -65,10 +65,11 @@ Le SDK .NET du dépôt doit être dans `PATH`. Remplacer le nom du script pour e
 ## Validation technique
 
 - Compilation Release complète : aucun avertissement ni erreur.
-- Tests ciblés : 17 cas du résolveur, 39 cas d’état/navigation/état de santé et 98 cas du cadre partagé/Flows/tableau de bord, tous réussis. Les cas du résolveur imposent une seule lecture du contexte et aucune lecture préalable par type de ressource.
-- Fast après généralisation : 2 550 cas, 2 533 réussites, 17 échecs déjà présents hors du correctif. Une copie isolée de `7ba891ad` reproduit 16 de ces échecs (1 552 cas de Console.Components, 1 536 réussites). Le dix-septième, `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows`, est déjà reproduit sur `82206267`. [Liste et comparaison](baseline-failures.json). Le mainteneur confie ces autres corrections à un autre agent ; elles ne sont pas modifiées ici.
-- Integration après généralisation : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés.
-- Après généralisation, les 5 vérifications multi-familles, les 8 vérifications Agent/brouillons, les 2 variantes bureau/mobile de la vue d’ensemble et les 3 régressions navigateur `hierarchical-context` réussissent. La campagne globale de 494 cas n’est pas exécutée intégralement. Les résultats historiques JavaScript (17 cas) et TypeScript précèdent la généralisation, qui ne modifie pas ces sources.
+- Après rebase sur `main` (`51969396`) : compilation Release complète sans avertissement ni erreur ; les 2 641 tests Fast réussissent. Les anciens échecs disparaissent avec les corrections de la branche mère, sans correction supplémentaire hors du POC. [Historique et nouvelle référence](baseline-failures.json).
+- Vérifications ciblées de la résolution des conflits : 78 tests de détail Flow et le cas du Designer publié avec désérialisation de son YAML réussissent. Les derniers groupes ciblés avant rebase comptaient 276 réussites ; la suite Fast complète est au vert après rebase ; le résultat actualisé de la suite Integration est enregistré dans la PR #1256.
+- Integration après correction des accès Tenant, avant rebase : 1 575 cas, 1 547 réussites, aucun échec, 28 cas optionnels ignorés.
+- Après rebase, le smoke Déclencheur/Tenant produit 4 enregistrements de résultats réussis ; les 8 vérifications Agent/brouillons, les 2 variantes de la vue d’ensemble et les 7 régressions existantes `hierarchical-context`/`operational-triggers`/`model-profile-cross-scope` réussissent, sur bureau/mobile et français/anglais. Les liens de fiche supplémentaires de `main` demandent seulement de préciser le lien de nom de ressource dans le smoke ponctuel de la vue d’ensemble. Les preuves multi-familles antérieures restent disponibles. La campagne globale de 494 cas n’est pas exécutée intégralement.
+- JavaScript : 17 réussites. TypeScript et XML/symétrie des clés de traduction réussissent. La suite PostgreSQL réelle n’est pas activée.
 
 ## Captures
 
@@ -76,3 +77,17 @@ Le SDK .NET du dépôt doit être dans `PATH`. Remplacer le nom du script pour e
 - Vue d’ensemble Instance : [bureau](overview-desktop-instance.png), [mobile](overview-mobile-instance.png).
 - Agent accessible : [bureau anglais](desktop-en-accessible.png), [mobile français](mobile-fr-accessible.png).
 - Agent indisponible : [bureau anglais](desktop-en-unavailable.png), [mobile français](mobile-fr-unavailable.png).
+
+## Suivi — Déclencheurs, accès Tenant et bandeau
+
+Les liens de la collection Déclencheurs utilisaient le périmètre du Flow cible comme propriétaire du déclencheur. Pour un déclencheur d’Instance conservé dans son Workspace opérationnel, le résolveur commun détectait donc une identité contradictoire et refusait la bascule. Les nouveaux liens portent le propriétaire physique enregistré ; les anciens liens utilisant le périmètre logique du Flow sont normalisés après une lecture autorisée du déclencheur. Un propriétaire physique explicite différent est refusé, même en présence d’un homonyme. Le résolveur commun ne comporte aucun cas Déclencheur. L’accès partagé au Flow ne partage pas le déclencheur ; dans ce cas, le passage au Tenant affiche normalement la collection.
+
+Le filtre de lecture de l’administration Tenant écartait les ressources Instance avant l’évaluation de leurs autorisations. Les lectures communes considèrent maintenant cet ancêtre puis appliquent la politique existante. Fournisseurs et profils de modèle sont accessibles depuis le Tenant lorsqu’une autorisation de découverte le permet ; la propagation reste nécessaire pour ses Workspaces. Les inventaires techniques et les écritures conservent leur contrôle de propriétaire. Cette précision du modèle est soumise à revue dans [ADR-0239](../../../decisions/0239-tenant-administration-discovers-explicitly-shared-ancestors.md) ; l’ADR-0184 accepté n’est pas réécrit.
+
+Le bandeau distingue désormais un titre, une explication de la bascule réussie et un bouton de retour avec icône. Il s’adapte au mobile et aux couleurs du thème. Les textes et leurs tests sont disponibles en français et en anglais.
+
+[Smoke ponctuel Déclencheur/Tenant](trigger-tenant-smoke.mts) : création d’un déclencheur Instance, accès du Flow propagé depuis le Tenant, lien depuis la collection et ancien lien, bascules répétées, fournisseurs/profils avec et sans propagation, révocation et bandeau mobile.
+
+Le sélecteur lit également l’ancre réelle du navigateur, qui peut avoir changé sans notification de `NavigationManager`. Le retour précédent conserve ainsi une section choisie dans le menu ; un changement de section pendant une résolution en cours annule cette ancienne résolution. Un fournisseur hérité n’exige plus ses catalogues d’édition et de secrets pour afficher sa définition en lecture seule.
+
+[Résultats Déclencheur/Tenant](trigger-tenant-verification.json) · [Bandeau bureau](context-unavailable-desktop-fr.png) · [Bandeau mobile](context-unavailable-mobile-fr.png).

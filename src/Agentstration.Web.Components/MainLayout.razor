@@ -143,9 +143,13 @@
             {
                 @if (unavailableContextReturn is { } previousLocation)
                 {
-                    <div class="form-alert" role="status" data-testid="context-resource-unavailable">
-                        <p>@T("ContextResourceUnavailable")</p>
-                        <a href="@previousLocation" data-testid="context-return-previous">@T("ReturnToPreviousContext")</a>
+                    <div class="context-resource-notice" role="status" data-testid="context-resource-unavailable">
+                        <span class="context-resource-notice-icon" aria-hidden="true"><UiIcon Name="info-circle" /></span>
+                        <div class="context-resource-notice-copy">
+                            <h2>@T("ContextResourceUnavailableTitle")</h2>
+                            <p>@T("ContextResourceUnavailable")</p>
+                        </div>
+                        <a class="button-secondary context-resource-notice-return" href="@previousLocation" data-testid="context-return-previous"><UiIcon Name="arrow-left" />@T("ReturnToPreviousContext")</a>
                     </div>
                 }
                 <CascadingValue @key="activeContext.SelectedScopeRef" Name="ConsoleContextScope" Value="activeContext.SelectedScopeRef" IsFixed="true">@Body</CascadingValue>

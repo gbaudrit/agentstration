@@ -1,5 +1,5 @@
 {
-  "revision": "5c8ae96d + shared Console resource context switching",
+  "revision": "rebased on main 51969396",
   "results": [
     {
       "check": "accessible exact Agent and anchor, inherited read-only, no document reload",

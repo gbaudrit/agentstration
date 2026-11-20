@@ -349,11 +349,16 @@ public partial class MainLayout
     {
         if (switchingContext || ContextState.IsLoading || ResourceNavigationState.IsLoading || !ContextMatchesLocation
             || ContextState.Current is not { } current || option.ScopeRef == current.SelectedScopeRef) return;
-        var source = NavigationManager.Uri;
+        var navigationSource = NavigationManager.Uri;
         switchingContext = true;
         try
         {
-            var sourceUri = new Uri(source);
+            // Fragment pushes can update the browser before NavigationManager reports another location.
+            var browserSource = contextModule is null ? null : await contextModule.InvokeAsync<string?>("currentLocation", lifetimeCancellation.Token);
+            if (navigationSource != NavigationManager.Uri) return;
+            var sourceUri = new Uri(browserSource ?? navigationSource);
+            if (!ConsoleResourceNavigationState.SameLocation(sourceUri, new Uri(navigationSource))) return;
+            var source = sourceUri.AbsoluteUri;
             var resource = ResourceNavigationState.GetCurrent(sourceUri, current.SelectedScopeRef);
             var path = sourceUri.AbsolutePath;
             var collection = NavigationGroups.SelectMany(group => group.Items)
@@ -374,7 +379,9 @@ public partial class MainLayout
             }
             var destination = await ContextSwitchResolver.ResolveAsync(
                 new(sourceUri, current.SelectedScopeRef, option.ScopeRef, fallback, resource?.OwnerScopeRef, ResourceNavigationState.HasFrame), lifetimeCancellation.Token);
-            if (source != NavigationManager.Uri) return;
+            if (navigationSource != NavigationManager.Uri) return;
+            var latestBrowserLocation = contextModule is null ? null : await contextModule.InvokeAsync<string?>("currentLocation", lifetimeCancellation.Token);
+            if (navigationSource != NavigationManager.Uri || latestBrowserLocation is not null && new Uri(latestBrowserLocation).AbsoluteUri != source) return;
             contextSelectorOpen = false;
             contextQuery = string.Empty;
             pendingContextSwitch = (source, NavigationManager.ToAbsoluteUri(destination.Location).AbsoluteUri, fallback, resource, destination.ResourceUnavailable);

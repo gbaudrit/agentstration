@@ -18,6 +18,40 @@ namespace Agentstration.Web.Tests;
 public sealed class TriggerDetailsFoundationTests
 {
     [TestMethod]
+    [DataRow("/instance")]
+    [DataRow("/tenants/33333333-3333-3333-3333-333333333333")]
+    public void LegacyFlowScopeLinksAreCanonicalizedToTheSavedTriggerOwner(string legacyOwner)
+    {
+        using var api = new TriggerHandler();
+        api.Resource = api.Resource with { Definition = api.Resource.Definition with {
+            Target = api.Resource.Definition.Target with { Flow = api.Resource.Definition.Target.Flow! with { ScopeRef = ResourceScopeRef.Parse(legacyOwner) } }
+        } };
+        using var context = Context(api);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.Uri + "&scopeRef=" + Uri.EscapeDataString(legacyOwner) + "#yaml");
+        var page = context.Render<TriggerDetails>(p => p.Add(v => v.Name, "schedule"));
+        page.WaitForAssertion(() =>
+        {
+            var location = new Uri(navigation.Uri);
+            Assert.AreEqual(api.Resource.ScopeRef!.Value.Value, Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(location.Query)["scopeRef"].ToString());
+            Assert.AreEqual("/instance", Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(location.Query)["context"].ToString());
+            Assert.AreEqual("#yaml", location.Fragment);
+        });
+    }
+
+    [TestMethod]
+    public void AnExplicitDifferentPhysicalOwnerCannotOpenTheCurrentContextsHomonym()
+    {
+        using var api = new TriggerHandler(); using var context = Context(api);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.Uri + "&scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Workspace(Guid.NewGuid()).Value));
+        var page = context.Render<TriggerDetails>(p => p.Add(v => v.Name, "schedule"));
+        page.WaitForAssertion(() => Assert.AreEqual(ResourceLoadStatus.NotFound, page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status));
+        Assert.IsNull(page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsEmpty(page.FindAll("[data-testid=trigger-display-name]"));
+    }
+
+    [TestMethod]
     [DataRow("en-US", ConsoleContextKind.Instance, "Instance")]
     [DataRow("fr-FR", ConsoleContextKind.Instance, "Instance")]
     [DataRow("en-US", ConsoleContextKind.Tenant, "Tenant")]

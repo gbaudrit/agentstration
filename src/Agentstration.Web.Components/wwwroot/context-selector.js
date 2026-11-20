@@ -18,3 +18,5 @@ export function ensureContextUrl(scopeRef, historyEntryState) {
     url.searchParams.set('context', scopeRef);
     window.Blazor.navigateTo(url.toString(), { replaceHistoryEntry: true, historyEntryState });
 }
+
+export function currentLocation() { return window.location.href; }

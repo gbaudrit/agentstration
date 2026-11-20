@@ -10,6 +10,45 @@ public sealed partial class MainLayoutNavigationTests
     private static string SwitchTarget => $"/workspaces/{SwitchingContextProvider.WorkspaceId:D}";
 
     [TestMethod]
+    public async Task SwitchingUsesTheBrowsersCurrentAnchorWhenBlazorStillHasThePreviousOne()
+    {
+        var resolver = new SwitchResolver(request => Task.FromResult(new ConsoleContextSwitchDestination(request.FallbackLocation, true)));
+        using var context = SwitchContext(resolver);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/triggers/schedule?context=%2Finstance#overview");
+        var browserLocation = navigation.Uri.Replace("#overview", "#yaml", StringComparison.Ordinal);
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/context-selector.js");
+        module.Setup<string?>("currentLocation", _ => true).SetResult(browserLocation);
+        var rendered = RenderLayout(context);
+        await SwitchWorkspaceAsync(rendered);
+        Assert.AreEqual("#yaml", resolver.Request!.Location.Fragment);
+        rendered.WaitForAssertion(() => Assert.AreEqual(browserLocation,
+            rendered.Find("[data-testid=context-return-previous]").GetAttribute("href")));
+    }
+
+    [TestMethod]
+    public async Task ANewBrowserAnchorCancelsAnOlderContextResolution()
+    {
+        var completion = new TaskCompletionSource<ConsoleContextSwitchDestination>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resolver = new SwitchResolver(_ => completion.Task);
+        using var context = SwitchContext(resolver);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/agents/same?context=%2Finstance#overview");
+        var source = navigation.Uri;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/context-selector.js");
+        var location = module.Setup<string?>("currentLocation", _ => true);
+        location.SetResult(source.Replace("#overview", "#yaml", StringComparison.Ordinal));
+        var rendered = RenderLayout(context);
+        var pending = SwitchWorkspaceAsync(rendered);
+        rendered.WaitForAssertion(() => Assert.IsNotNull(resolver.Request));
+        location.SetResult(source.Replace("#overview", "#access", StringComparison.Ordinal));
+        completion.SetResult(new("/agents?context=" + Uri.EscapeDataString(SwitchTarget)));
+        await pending;
+        Assert.AreEqual(source, navigation.Uri);
+        Assert.AreEqual("/instance", context.Services.GetRequiredService<ConsoleContextState>().Current?.SelectedScopeRef);
+    }
+
+    [TestMethod]
     public async Task SelectorKeepsTheCollectionAndDoesNotUseNativeNavigation()
     {
         using var context = SwitchContext();
@@ -55,8 +94,11 @@ public sealed partial class MainLayoutNavigationTests
     }
 
     [TestMethod]
-    public async Task UnavailableResourceNoticeAppearsOnlyAfterAcceptedNavigationAndReturnsToTheSource()
+    [DataRow("en-US", "Resource unavailable in this context")]
+    [DataRow("fr-FR", "Ressource indisponible dans ce périmètre")]
+    public async Task UnavailableResourceNoticeAppearsOnlyAfterAcceptedNavigationAndReturnsToTheSource(string locale, string title)
     {
+        using var culture = new TestCultureScope(locale);
         var resolver = new SwitchResolver(request => Task.FromResult(new ConsoleContextSwitchDestination(request.FallbackLocation, true)));
         using var context = SwitchContext(resolver);
         var navigation = context.Services.GetRequiredService<NavigationManager>();
@@ -65,6 +107,8 @@ public sealed partial class MainLayoutNavigationTests
         var rendered = RenderLayout(context);
         await SwitchWorkspaceAsync(rendered);
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=context-resource-unavailable]")));
+        Assert.AreEqual(title, rendered.Find("[data-testid=context-resource-unavailable] h2").TextContent);
+        Assert.Contains("button-secondary", rendered.Find("[data-testid=context-return-previous]").ClassName!);
         Assert.AreEqual(source, rendered.Find("[data-testid=context-return-previous]").GetAttribute("href"));
         Assert.AreEqual("/agents", new Uri(navigation.Uri).AbsolutePath);
         Assert.AreEqual(string.Empty, new Uri(navigation.Uri).Fragment);

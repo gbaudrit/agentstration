@@ -1,0 +1,28 @@
+[
+  {
+    "triggerSourceOwnerCorrect": true,
+    "legacyLinkRepaired": true,
+    "tenantFallback": true,
+    "repeatedSwitchesWork": true
+  },
+  {
+    "collection": "modelproviders",
+    "tenantReadable": true,
+    "descendantsReadableWhenGranted": true,
+    "exactTenantGrantDoesNotReachWorkspace": true,
+    "sameUid": true,
+    "noReload": true
+  },
+  {
+    "collection": "modelprofiles",
+    "tenantReadable": true,
+    "descendantsReadableWhenGranted": true,
+    "exactTenantGrantDoesNotReachWorkspace": true,
+    "sameUid": true,
+    "noReload": true
+  },
+  {
+    "mobileNoticeFits": true,
+    "noBrowserErrors": true
+  }
+]

@@ -74,7 +74,7 @@ try {
  await page.screenshot({path:evidence+'/mobile-fr-accessible.png',fullPage:true});
  await pages.hierarchicalContext.setAgentAccess(product.consoleUrl,fixture,[]);
  await atOwner('yaml');await switchTo(fixture.scopes.workspace);await shell(fixture.scopes.workspace);
- await expect(page.getByTestId(TestIds.console.contextResourceUnavailable)).toContainText('indisponible dans le périmètre sélectionné');
+ await expect(page.getByTestId(TestIds.console.contextResourceUnavailable)).toContainText('Ressource indisponible dans ce périmètre');
  await page.screenshot({path:evidence+'/mobile-fr-unavailable.png',fullPage:true});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  results.push({check:'French mobile accessible/unavailable flows and no horizontal overflow',passed:true});

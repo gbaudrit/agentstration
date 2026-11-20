@@ -74,7 +74,7 @@ try {
     await expect(page.getByTestId('flow-observability-flows')).toHaveAttribute('data-interactive', 'true');
     await expect(page.getByTestId('flow-observability-flows')).toHaveAttribute('aria-busy', 'false');
     expect(new URL(page.url()).searchParams.get('context')).toBe('/instance');
-    await page.locator(`a[href*="/flows/${flowName}?"]`).click();
+    await page.locator(`a.resource-name-link[href*="/flows/${flowName}?"]`).click();
     await selectResourceSection(page, 'definition/identity');
     await expect(page.getByTestId('flow-definition-display-name')).toBeEnabled();
     await expect(page.getByTestId('inherited-resource-notice')).toHaveCount(0);

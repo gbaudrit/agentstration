@@ -46,6 +46,7 @@
     private RenderFragment DeleteAction => @<button type="button" class="button-danger" disabled="@Busy" @onclick="() => confirmDelete = true" data-testid="trigger-delete">@T("Delete")</button>;
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [Parameter] public string Name { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "context")] public string? ContextValue { get; set; }
     private readonly ResourceSectionState sectionState = new();
     private readonly CancellationTokenSource lifetime = new();
@@ -56,10 +57,10 @@
     private TriggerEditor? editor;
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private bool loading, running, changingState, refreshing, confirmEnable, confirmDelete, hasError, editorDirty, editorBusy, historyKnown, disposed;
-    private string? message, historyError, loadedKey, returnAfterDelete;
+    private string? message, historyError, loadedKey, returnAfterDelete, canonicalOwnerLocation;
     private long loadVersion, historyVersion;
     private string Identity => $"{loadedKey}|{stored?.Value.Uid}";
-    private string ContextKey => $"{Name}|{NamespaceValue}|{ContextValue}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private string ContextKey => $"{Name}|{NamespaceValue}|{ScopeRefValue}|{ContextValue}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
     private ResourceScopeRef? PhysicalOwner => ContextState.Current is { WorkspaceId: var workspace } && workspace != Guid.Empty ? ResourceScopeRef.Workspace(workspace) : null;
     private bool HasDraft => editor?.IsDirty ?? editorDirty;
     private bool commandBusy => running || changingState || refreshing;
@@ -83,7 +84,7 @@
     }
     private void ClearPrivate()
     {
-        stored = newerSnapshot = null; editor = null; history = []; historyKnown = false; historyError = message = null;
+        canonicalOwnerLocation = null; stored = newerSnapshot = null; editor = null; history = []; historyKnown = false; historyError = message = null;
         editorDirty = editorBusy = running = changingState = refreshing = confirmEnable = confirmDelete = false; ++historyVersion;
     }
     private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync(stored is not null);
@@ -104,6 +105,7 @@
             if (HasDraft) newerSnapshot = snapshot.ETag != stored?.ETag || snapshot.Value.Generation != stored?.Value.Generation ? snapshot : null;
             else { stored = snapshot; newerSnapshot = null; }
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            CanonicalizeLegacyOwner(snapshot.Value);
             await ReadHistoryAsync(request, key);
         }
         catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
@@ -116,7 +118,24 @@
         finally { if (Current(request, key)) loading = false; }
     }
     private static ResourceLoadStatus FailureStatus(Exception exception) => exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
-    private bool Matches(ResourceSnapshot<TriggerResource> snapshot, ResourceSnapshot<TriggerResource>? previous) => snapshot.Value.Kind == TriggerResourceKinds.Trigger && snapshot.Value.Name == Name && snapshot.Value.Namespace == ResourceNamespace.Parse(NamespaceValue) && snapshot.Value.ScopeRef == PhysicalOwner && snapshot.Value.Uid != Guid.Empty && (previous is null || snapshot.Value.Uid == previous.Value.Uid);
+    private bool Matches(ResourceSnapshot<TriggerResource> snapshot, ResourceSnapshot<TriggerResource>? previous) => snapshot.Value.Kind == TriggerResourceKinds.Trigger && snapshot.Value.Name == Name && snapshot.Value.Namespace == ResourceNamespace.Parse(NamespaceValue) && snapshot.Value.ScopeRef == PhysicalOwner && MatchesRequestedOwner(snapshot.Value) && snapshot.Value.Uid != Guid.Empty && (previous is null || snapshot.Value.Uid == previous.Value.Uid);
+    private bool MatchesRequestedOwner(TriggerResource trigger)
+    {
+        if (string.IsNullOrWhiteSpace(ScopeRefValue)) return true;
+        if (!ResourceScopeRef.TryParse(ScopeRefValue, out var requested)) return false;
+        // Older collection links used the target Flow's logical scope instead of the Trigger owner.
+        return requested == trigger.ScopeRef || requested.Kind != ResourceScopeKind.Workspace
+            && ContextState.Current?.SelectedKind != ConsoleContextKind.Workspace && requested == TriggerUi.DefinitionScope(trigger);
+    }
+    private void CanonicalizeLegacyOwner(TriggerResource trigger)
+    {
+        if (string.IsNullOrWhiteSpace(ScopeRefValue) || ScopeRefValue == trigger.ScopeRef?.Value) return;
+        var location = new Uri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(location.Query);
+        query["scopeRef"] = trigger.ScopeRef!.Value.Value;
+        var canonical = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(location.GetLeftPart(UriPartial.Path), query) + location.Fragment;
+        if (canonical != Navigation.Uri) canonicalOwnerLocation = canonical;
+    }
     private void DiscardDefinition()
     {
         if (Busy) return;
@@ -206,7 +225,19 @@
         catch (Exception exception) { if (Current(request, key)) SetError(exception); }
         finally { if (Current(request, key)) changingState = false; }
     }
-    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); } }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (canonicalOwnerLocation is { } canonical)
+        {
+            canonicalOwnerLocation = null;
+            Navigation.NavigateTo(canonical, replace: true);
+        }
+        else if (returnAfterDelete is { } destination)
+        {
+            returnAfterDelete = null;
+            Navigation.NavigateTo(destination);
+        }
+    }
     private void ClearMessage() { message = null; hasError = false; }
     private void SetSuccess(string value) { message = value; hasError = false; }
     private void SetError(Exception exception) { message = exception is HttpRequestException or TimeoutException ? T("OperationUnconfirmed") : TriggerUi.ErrorMessage(exception, Localizer); hasError = true; }
