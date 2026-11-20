@@ -1,0 +1,130 @@
+[
+  {
+    "capture": "creation-list-link-desktop-en.png",
+    "sha256": "53a4a8e1d422e8f260c0849599a1638a5d7ca540107e189004aaeda05264a398",
+    "project": "desktop-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts "
+  },
+  {
+    "project": "desktop-chromium",
+    "target": {
+      "coarse": false,
+      "style": "",
+      "minWidth": "32px",
+      "minHeight": "32px",
+      "width": "32px",
+      "html": "<a class=\"button-secondary resource-collection-link\" href=\"/parameters?context=%2Fworkspaces%2F6bd21224-ebf5-44a4-9673-18881bd022f9\" aria-label=\"Parameters\" title=\"Parameters\" b-fjp4tzggj0=\"\"><!--!--><svg class=\"ui-icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" b-5rs60wpzzf=\"\"><use href=\"_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-list\" b-5rs60wpzzf=\"\"></use></svg></a>"
+    }
+  },
+  {
+    "capture": "resource-list-link-desktop-en.png",
+    "sha256": "8f7e0255e4024eacff1f12be213c8f864cafa5b405a9b9c068efb38baec08679",
+    "project": "desktop-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts "
+  },
+  {
+    "capture": "guarded-list-return-desktop-en.png",
+    "sha256": "cad78603486906f54f0cdb37bb5a6604ab95c2ceae21399ac79b09bfc2dde49b",
+    "project": "desktop-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts "
+  },
+  {
+    "capture": "missing-resource-list-return-desktop-en.png",
+    "sha256": "b879a577389ee7a642281cba40cf8e0ec90bbb61a0b4946f478837c8bb5be991",
+    "project": "desktop-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts "
+  },
+  {
+    "capture": "creation-list-link-mobile-fr.png",
+    "sha256": "06ebad3c6566716df5e9fa2567a02639ec4359b0943a3aafbfe3f3d268ef6efb",
+    "project": "mobile-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts @responsive"
+  },
+  {
+    "project": "mobile-chromium",
+    "target": {
+      "coarse": true,
+      "style": "",
+      "minWidth": "44px",
+      "minHeight": "44px",
+      "width": "44px",
+      "html": "<a class=\"button-secondary resource-collection-link\" href=\"/parameters?context=%2Fworkspaces%2Fcade5696-9016-4c0a-8f49-74547fac2695\" aria-label=\"Param\u00e8tres\" title=\"Param\u00e8tres\" b-fjp4tzggj0=\"\"><!--!--><svg class=\"ui-icon \" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\" b-5rs60wpzzf=\"\"><use href=\"_content/Agentstration.Web.Components/tabler/tabler-sprite.svg#tabler-list\" b-5rs60wpzzf=\"\"></use></svg></a>"
+    }
+  },
+  {
+    "capture": "resource-list-link-mobile-fr.png",
+    "sha256": "cf595727d985212bc1af43c84c6986ec3fa6559e782ce4c68682768550b430da",
+    "project": "mobile-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts @responsive"
+  },
+  {
+    "capture": "guarded-list-return-mobile-fr.png",
+    "sha256": "de19698a2eb4ddbc013d46e04a96ed5fb1bfa34d27374922a1d83a17eff9862c",
+    "project": "mobile-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts @responsive"
+  },
+  {
+    "capture": "missing-resource-list-return-mobile-fr.png",
+    "sha256": "d9851826b83e25b6c4ef6cd59520972e24ffb64c8a7710792fa729af95ffb2c6",
+    "project": "mobile-chromium",
+    "test": "List navigation preserves context and guarded invalid drafts @responsive"
+  },
+  {
+    "sourceHashes": {
+      "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "efd77153e845bafb3c99e81ec2f3a68c4da712f175267221dc8d3605662df84c",
+      "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor": "d59b76b0c1e86e93e39ca9611f59994ed69fd29bb4edb93d2b7a5ec678e01fe6",
+      "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor": "431dbf0fcc525de996260d15accde2f5ea1a35e2a06dcc9406885ad8f7b22ae0",
+      "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor": "188190acf4918a907e8cad66bc9d25462adc6c049bc8f86e14b953a0fb14bba4",
+      "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor": "7db2872e37364df2c3d53e0b822aec8f2dd41c49872b7d7680e89e0bcc029c48",
+      "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "d9b798c27bde8595d843af9306c383f3e5bb2e1cb9ce8df5b9d2333a9e52b3ef",
+      "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor": "b3f3d75864ab5b861abc702846f239b28e533844f73bea734944f5946194d679",
+      "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor": "902199ef02176540c18abbac60517217a09d4171d7bd9f734fd8293891894158",
+      "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor": "19bf7cfe665113aa16b7cb672f8745c110c0f056d1117b69ec186972042c4b67",
+      "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor": "22bca5df647b30410bb77bb37570a587e930148577331e41cf54c4cd21c0f062",
+      "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor": "0ea8ebeab879dfb886af4a853bc731b4481937cd38751b31d31db78adf48802d",
+      "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor": "1fdd1424f869f7d82eca473cc525fa46e08f9aca31c0030a28ac44e018340602",
+      "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor": "4e9714cb2d7e4c44f8b835c70baf4c308798babd0a5e20a9ede7cb27357ef010",
+      "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor": "93e4529c71256bc5aae755f9f1f8fc94e732da9e3089df7a4406758517f41cff",
+      "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor": "fc93a840aa39d2ca2192708dc494e912d2fa04b4caee9880d28edb4f2204dad4",
+      "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor": "fde1c53de9c9e88a9907290c5d30a5148d4a65437bde64537e9046e86d31c536",
+      "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor": "4ebcdf76c271e34f7e25b77e79e378bbe192026817514df167000eecf1124cf8",
+      "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor": "f20db5e97797ee8280f005793b5f1bb0ce66d0e1d4467e0428eb3f2f8bdb070a",
+      "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor": "0e5a009fd58e8381e9fbb0aa90ec29f7ebb36a104e0e535f9f20265d1563d930",
+      "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor": "28707715701627b3bfec61134b11720c2664b983827c8b11dcd6d2e5d761c2dd",
+      "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor": "906b1f8eaf6935bbc57eac6aa92f7c6506bb4816efcdb852df09b1faff245c01",
+      "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor": "a6aa8e9026288f53ee86fdffc004e9f75e9f3b427459f46c386d87d3242d65a4",
+      "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor": "ddb9fc12fe327ca3f1b2e94bcc0e8820d8b59f59c456da1122e0c3cbee109d83",
+      "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor": "63b4ba462d692dc6bb11964bc1506d0217a1e6247e51b40bdf6fdc25b1964be6",
+      "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor": "7f51568791a248712dd4ad03b7e01800afe20ac86d1f2534be972884470d5e9f",
+      "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor": "f4ec72752f87d23c09e7b70c4e277a852f4d3442c059c85d705d75d55ce2959c",
+      "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor": "cbe340997699562940c2e471f2ca6df857bc8aee983aee4f2bbcdc430ed84c56",
+      "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor": "7ae489c90c7d3ee016720eb417565aac3f7a0cb6e91de1135b805a795b190b42",
+      "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor": "dd31a7ea0733be6655de136deeb858f6b4cfbfec04b3e9cbaf1e2130df609252",
+      "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor": "73d5472b5519e0409311da780ab569d4c315bd7a4660b1989f5053e7ca5bde6f",
+      "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor": "a33b18bee3d962dd37d71997fd3b05090f42c93fd892e45f49fc94d089585957",
+      "src/Agentstration.Console.Components/Components/Pages/Sources.razor": "31940297d5ddf1c3eb44ffd2da1314570fc27e219f3eabe4aefca6d13b32669f",
+      "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor": "cb40e23436d6e289d76dfa7a7c308c233a6b6a006a3af25daa1a8e59873afcdf",
+      "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor": "9c7138305c6fb36a1809e270ee3d2ce5455fbad738847b6246ee914cde2f0b65",
+      "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor": "ac352e018aa0702febb58f0094ff5c6089bd88a2c2f0729181d25fe7d2da530f",
+      "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor": "879d9a3a84cfc6d11e77eec927b3fad2f7ddcef7fc8d03e1bfaa2da1214fc3f9",
+      "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor": "5febf651f184955e2e49c8eb502a62b407b4e1a90d90ef6157a60dfa47d284d8",
+      "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor": "9f629f75d38d8df1473e9533fab140112e21b52739255e78b60c568ac0d631a8",
+      "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor": "e9a3b9266265f60c63f70519a2a59bf1b6fc0c9197018c8715264b6fc72e2b4a",
+      "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor": "cdd4d3dedefc1e9e96846314acabcdb77028c0f914f027123036602e5c69a801",
+      "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor": "9f341e4008d0e79e42a10463ba1f3b102b4b79e423aaed4860f0688ffc3baf08",
+      "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor": "dad9fb51f37207887b076def33641edd83f4c852011261b2417a5bb65936480a",
+      "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor": "4077e00c7b4e2a59ddc0040dce1dc36d441f40a42272ad98674b0d1ccf99616c",
+      "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor": "bb79830de24deb1d6decadd0e5ce2ecdd68430e9d83f8a9ba6a70a9e2b674084",
+      "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor": "fa61bfab30d9884f8e508b7128b9895a62962fd77484a3e0d3a157d7d21d86d3",
+      "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor": "4ee571483bcf7c1d9913e5b0030ae3d9ba6ecdd9150fa38346dda1cf4aef0fb8",
+      "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor": "dfa1fc1fabbf3a3a2bbc51b6c922480f767c490ecc746b3ea313a3aafbc0a31b",
+      "src/Agentstration.Web.Components/PageHeader.razor": "ffae56880bbb19478f83adb8dc0b248a8886c1f5267775d63b68f058d9dd0cbb",
+      "src/Agentstration.Web.Components/ResourceCollectionLink.razor": "2536ef80712ef8e13e6ac92960c2531574e3012f658cf7373e132154c769f550",
+      "src/Agentstration.Web.Components/ResourceCollectionLink.razor.css": "a1cfe37f3790cbcf6445cc2e494242fd7b5db7b768b28f5e54a6d54c071e7769",
+      "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor": "a989f8508ace60631d5099e6434f1bf709ca694eb4e711044181d53466ffc336",
+      "src/Agentstration.Web.Components/ResourceHeader.razor": "83bf8ddce7d863ca6d68f977a084497a2509c741dfd3edf63c8cc305f41a4aae",
+      "src/Agentstration.Web.Components/ResourceHeader.razor.css": "297f6d08fcee33f3139e57b9af439bd0a82df75ec4eba4f44779bf408d41788c",
+      "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor": "0d92c56af1518def0fc6e974d6c4b2e24d418c05628daeda54411386469a5dc0"
+    }
+  }
+]
