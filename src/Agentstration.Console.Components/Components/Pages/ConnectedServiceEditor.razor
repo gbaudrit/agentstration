@@ -14,7 +14,7 @@
 @if (!Embedded)
 {
     <PageTitle>@(IsNew ? T("Create") : T("EditConnectedService")) · Agentstration</PageTitle>
-    <PageHeader Enabled="model.Enabled" EnabledChanged="SetEnabled" EnabledDisabled="@(!CanMutate || IsBusy)" EnabledTestId="connected-service-enabled" ScopeRef="selectedScope" Title="@(IsNew ? T("Create") : model.DisplayName)" Description="@T("Editor.Description")" TestId="connected-service-editor"><Actions><a class="button-secondary" href="@(IsNew ? "/connected-services" : DetailsUrl())">@T("Cancel")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="/connected-services" CollectionLabel="@T("ConnectedServices")" Enabled="model.Enabled" EnabledChanged="SetEnabled" EnabledDisabled="@(!CanMutate || IsBusy)" EnabledTestId="connected-service-enabled" ScopeRef="selectedScope" Title="@(IsNew ? T("Create") : model.DisplayName)" Description="@T("Editor.Description")" TestId="connected-service-editor"><Actions>@if (!IsNew) { <a class="button-secondary" href="@DetailsUrl()">@T("Cancel")</a> }</Actions></PageHeader>
 }
 @if (loading || loadFailed) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
 else
