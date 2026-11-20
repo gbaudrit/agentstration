@@ -129,4 +129,20 @@
   <data name="Status.Unknown"><value>Unknown</value></data>
   <data name="Range"><value>Range: {0} to {1}.</value></data>
   <data name="Access"><value>Access</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer version is available. Your draft and its original version are retained. Discard the draft to load the newer version.</value></data>
+  <data name="ProviderOptionsInvalid" xml:space="preserve"><value>Enter a valid JSON object containing versioned provider options.</value></data>
+  <data name="ReasoningMode.Automatic" xml:space="preserve"><value>Automatic</value></data>
+  <data name="ReasoningMode.Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="ReasoningMode.Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="OutputFormat.Text" xml:space="preserve"><value>Text</value></data>
+  <data name="OutputFormat.JsonObject" xml:space="preserve"><value>JSON object</value></data>
+  <data name="OutputFormat.JsonSchema" xml:space="preserve"><value>JSON schema</value></data>
+  <data name="GuidedOptionsUnavailable" xml:space="preserve"><value>The saved options or their schema cannot be represented by the guided editor. Edit the raw JSON explicitly to preserve their contract, version and values.</value></data>
+  <data name="ProviderOptionRequired" xml:space="preserve"><value>Provider option '{0}' is required.</value></data>
+  <data name="ProviderOptionInvalid.Text" xml:space="preserve"><value>Enter a valid value for provider option '{0}'.</value></data>
+  <data name="ProviderOptionInvalid.Toggle" xml:space="preserve"><value>Enter true or false for provider option '{0}'.</value></data>
+  <data name="ProviderOptionInvalid.WholeNumber" xml:space="preserve"><value>Enter a whole number for provider option '{0}'.</value></data>
+  <data name="ProviderOptionInvalid.DecimalNumber" xml:space="preserve"><value>Enter a JSON number for provider option '{0}'.</value></data>
+  <data name="ProviderOptionInvalid.JsonObject" xml:space="preserve"><value>Enter a valid JSON object for provider option '{0}'.</value></data>
+  <data name="ProviderOptionInvalid.JsonValue" xml:space="preserve"><value>Enter a valid, non-null JSON value for provider option '{0}'.</value></data>
 </root>

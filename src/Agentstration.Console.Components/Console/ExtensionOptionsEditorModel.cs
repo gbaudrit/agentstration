@@ -115,7 +115,7 @@ public sealed class ExtensionOptionsEditorModel
         {
             if (string.IsNullOrWhiteSpace(field.Value))
             {
-                if (field.Required) throw new ArgumentException($"Provider option '{field.Name}' is required.");
+                if (field.Required) throw new ArgumentException($"Provider option '{field.Name}' is required.", field.Name);
                 continue;
             }
             values[field.Name] = ParseValue(field);
@@ -205,13 +205,13 @@ public sealed class ExtensionOptionsEditorModel
                 ExtensionOptionFieldKind.WholeNumber when long.TryParse(field.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) => JsonValue.Create(value),
                 ExtensionOptionFieldKind.DecimalNumber => ParseNumber(field),
                 ExtensionOptionFieldKind.JsonObject => ParseObject(field),
-                ExtensionOptionFieldKind.JsonValue => JsonNode.Parse(field.Value!) ?? throw new ArgumentException($"Provider option '{field.Name}' cannot be null."),
-                _ => throw new ArgumentException($"Provider option '{field.Name}' has an invalid value.")
+                ExtensionOptionFieldKind.JsonValue => JsonNode.Parse(field.Value!) ?? throw new ArgumentException($"Provider option '{field.Name}' cannot be null.", field.Name),
+                _ => throw new ArgumentException($"Provider option '{field.Name}' has an invalid value.", field.Name)
             };
         }
         catch (JsonException exception)
         {
-            throw new ArgumentException($"Provider option '{field.Name}' must contain valid JSON.", exception);
+            throw new ArgumentException($"Provider option '{field.Name}' must contain valid JSON.", field.Name, exception);
         }
     }
 
@@ -219,13 +219,13 @@ public sealed class ExtensionOptionsEditorModel
     {
         var node = JsonNode.Parse(field.Value!);
         if (node is not JsonValue || !double.TryParse(field.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
-            throw new ArgumentException($"Provider option '{field.Name}' must be a number.");
+            throw new ArgumentException($"Provider option '{field.Name}' must be a number.", field.Name);
         return node;
     }
 
     private static JsonObject ParseObject(ExtensionOptionFieldEditor field) =>
         JsonNode.Parse(field.Value!) as JsonObject
-        ?? throw new ArgumentException($"Provider option '{field.Name}' must be a JSON object.");
+        ?? throw new ArgumentException($"Provider option '{field.Name}' must be a JSON object.", field.Name);
 
     private static string? DisplayValue(JsonNode? value, ExtensionOptionFieldKind kind) => value switch
     {

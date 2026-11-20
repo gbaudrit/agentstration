@@ -90,6 +90,7 @@ public sealed class ExtensionOptionsEditorModelTests
         var exception = Assert.Throws<ArgumentException>(() => editor.ToProviderOptionsJson());
 
         StringAssert.Contains(exception.Message, "valid JSON");
+        Assert.AreEqual("metadata", exception.ParamName);
     }
 
     private static ExtensionOptionSetResponse Contract() => new(
