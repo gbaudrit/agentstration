@@ -26,6 +26,7 @@ public sealed class PlatformDashboardService(
     private readonly CancellationTokenSource lifetime = new();
     private readonly object loadLock = new();
     private PlatformDashboardLoad? sharedLoad;
+    private ConsoleContextSnapshot? sharedContext;
     private int disposed;
 
     public PlatformDashboardLoad StartShared()
@@ -33,7 +34,13 @@ public sealed class PlatformDashboardService(
         lock (loadLock)
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-            return sharedLoad ??= Start(lifetime.Token);
+            var current = contextState?.Current;
+            if (sharedLoad is null || !ReferenceEquals(sharedContext, current))
+            {
+                sharedContext = current;
+                sharedLoad = Start(lifetime.Token);
+            }
+            return sharedLoad;
         }
     }
 

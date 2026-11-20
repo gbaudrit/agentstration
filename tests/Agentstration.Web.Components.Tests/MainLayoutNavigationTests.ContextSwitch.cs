@@ -27,6 +27,34 @@ public sealed partial class MainLayoutNavigationTests
     }
 
     [TestMethod]
+    public async Task ContextSwitchRefreshesShellStatusAfterLoadingTheTargetContext()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = SwitchContext();
+        context.Services.AddScoped<IPlatformStatusProvider, SwitchingPlatformStatusProvider>();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/?context=%2Finstance");
+        var rendered = RenderLayout(context);
+        rendered.WaitForAssertion(() => Assert.AreEqual("Operational", rendered.Find(".health-indicator small").TextContent));
+        await SwitchWorkspaceAsync(rendered);
+        rendered.WaitForAssertion(() => Assert.AreEqual("Attention required", rendered.Find(".health-indicator small").TextContent));
+        var provider = (SwitchingPlatformStatusProvider)context.Services.GetRequiredService<IPlatformStatusProvider>();
+        CollectionAssert.AreEqual(new[] { "/instance", SwitchTarget }, provider.Contexts.ToArray());
+    }
+
+    private sealed class SwitchingPlatformStatusProvider(ConsoleContextState state) : IPlatformStatusProvider
+    {
+        public List<string> Contexts { get; } = [];
+        public Task<PlatformStatusResult> GetStatusAsync(CancellationToken cancellationToken)
+        {
+            Contexts.Add(state.Current?.SelectedScopeRef ?? "unresolved");
+            return Task.FromResult(state.Current?.SelectedKind == ConsoleContextKind.Instance
+                ? new PlatformStatusResult(Models.UiStatus.Success, PlatformStatusKind.Operational)
+                : new PlatformStatusResult(Models.UiStatus.Warning, PlatformStatusKind.AttentionRequired));
+        }
+    }
+
+    [TestMethod]
     public async Task UnavailableResourceNoticeAppearsOnlyAfterAcceptedNavigationAndReturnsToTheSource()
     {
         var resolver = new SwitchResolver(request => Task.FromResult(new ConsoleContextSwitchDestination(request.FallbackLocation, true)));

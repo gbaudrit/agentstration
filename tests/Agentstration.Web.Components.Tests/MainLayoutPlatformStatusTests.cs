@@ -4,6 +4,7 @@ using Agentstration.Web.Components.State;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Web.Components.Tests;
 
@@ -66,6 +67,39 @@ public sealed class MainLayoutPlatformStatusTests
             Assert.AreEqual("Aucun déploiement actif", rendered.Find(".health-indicator small").TextContent);
             Assert.IsTrue(rendered.Find(".health-indicator .status-badge").ClassList.Contains("status-success"));
         });
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task APreviousStatusRefreshCannotOverwriteTheCurrentContext(bool previousFails)
+    {
+        var provider = new SequencedStatusProvider();
+        var state = new PlatformStatusState(provider, NullLogger<PlatformStatusState>.Instance);
+        var first = state.RefreshAsync(CancellationToken.None);
+        provider.Loads[0].SetResult(new(UiStatus.Warning, PlatformStatusKind.AttentionRequired));
+        await first;
+        var previous = state.RefreshAsync(CancellationToken.None);
+        Assert.AreEqual(PlatformStatusKind.Connecting, state.Kind);
+        var current = state.RefreshAsync(CancellationToken.None);
+        provider.Loads[2].SetResult(new(UiStatus.Success, PlatformStatusKind.Operational));
+        await current;
+        if (previousFails) provider.Loads[1].SetException(new HttpRequestException("Previous context failed"));
+        else provider.Loads[1].SetResult(new(UiStatus.Warning, PlatformStatusKind.AttentionRequired));
+        await previous;
+        Assert.AreEqual(PlatformStatusKind.Operational, state.Kind);
+        Assert.AreEqual(UiStatus.Success, state.Status);
+    }
+
+    private sealed class SequencedStatusProvider : IPlatformStatusProvider
+    {
+        public List<TaskCompletionSource<PlatformStatusResult>> Loads { get; } = [];
+        public Task<PlatformStatusResult> GetStatusAsync(CancellationToken cancellationToken)
+        {
+            var completion = new TaskCompletionSource<PlatformStatusResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Loads.Add(completion);
+            return completion.Task.WaitAsync(cancellationToken);
+        }
     }
 
     private static BunitContext CreateContext(out ControlledPlatformStatusProvider provider)

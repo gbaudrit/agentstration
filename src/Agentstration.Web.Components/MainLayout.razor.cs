@@ -202,7 +202,6 @@ public partial class MainLayout
         PlatformStatus.Changed += OnPlatformStatusChanged;
         ContextState.Changed += OnContextChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
-        platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
             ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
@@ -426,6 +425,8 @@ public partial class MainLayout
     private void OnContextChanged()
     {
         NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        if (ContextState.Current is not null && ContextState.Error is null)
+            platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         _ = InvokeAsync(StateHasChanged);
     }
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);

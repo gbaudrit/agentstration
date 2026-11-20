@@ -33,7 +33,7 @@ Pour reproduire depuis la racine après installation des dépendances et compila
 ```sh
 AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true \
 AGENTSTRATION_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
-node --import ./automation/playwright/node_modules/tsx/dist/loader.mjs \
+node --import ./automation/playwright/node_modules/tsx/dist/esm/index.mjs \
   docs/ux/evidence/context-switch-poc/smoke.mts
 ```
 
@@ -42,12 +42,12 @@ Le SDK .NET du dépôt doit être dans `PATH`. Le script démarre puis arrête s
 ## Validation technique exécutée
 
 - Solution complète, compilation Release : réussite, aucun avertissement ni erreur.
-- 18 cas .NET du POC et 2 cas de régression Flow : réussite. Les tests de navigation de `MainLayout` passent également (16 cas au total), dont le retour au contexte précédent après un chargement refusé et le blocage du sélecteur pendant un chargement.
-- Dernière suite Fast après correction Flow : 2 488 cas, 2 485 réussites et 3 échecs. `ConversationListReturnsToThePersistedGenericInteraction` et `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows` sont déjà reproduits dans un checkout isolé de `82206267` (1 527 cas, 1 525 réussites et ces 2 échecs). Le troisième, `ReplacedOperationalWorkspaceRejectsLateMetadataAndInspectRevocationClearsBothCollections`, concerne un test Artifact inchangé qui partage une même réponse HTTP entre deux lectures ; il passe dans la vérification ciblée suivante de 93 cas Flow, Access et Artifact. Ces 93 cas passent intégralement, de même que les 73 cas Flow seuls.
-- Suite Integration réexécutée après correction Flow : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés sans fournisseurs réels/PostgreSQL configurés.
+- 18 cas .NET du POC, 2 cas de régression Flow et 5 cas de régression pour la vue d’ensemble et l’état de santé : réussite. Les vérifications ciblées Dashboard/Overview (13 cas) et MainLayout/navigation/état de santé (23 cas) passent intégralement. Les 5 nouveaux cas échouent avant le correctif, puis passent après celui-ci.
+- Dernière suite Fast après correction de la vue d’ensemble : 2 493 cas, 2 491 réussites et 2 échecs préexistants (`ConversationListReturnsToThePersistedGenericInteraction` et `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows`). Les deux sont déjà reproduits dans un checkout isolé de `82206267` (1 527 cas, 1 525 réussites et ces 2 échecs). L’échec Artifact intermittent de la campagne précédente n’apparaît pas dans cette exécution.
+- Suite Integration réexécutée après correction de la vue d’ensemble : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés sans fournisseurs réels/PostgreSQL configurés.
 - Tests JavaScript des composants : 17 réussites. Compilation TypeScript : réussite. Catalogues de localisation anglais/français : XML valide, aucune clé dupliquée et clés symétriques.
 - Smoke ponctuel du POC : les huit vérifications de `verification.json` passent, avec les quatre captures ci-dessous.
-- Régressions navigateur ciblées : 11 cas réussis sur Chromium système, en bureau, mobile et localisation. Les traces et vidéos restent activées ; le binaire ffmpeg du système est utilisé dans cet environnement.
+- Régressions navigateur ciblées : 11 cas réussis lors de la validation initiale, puis 3 cas hiérarchiques réexécutés après le correctif de la vue d’ensemble (bureau, mobile et localisation), tous réussis sur Chromium système. Les traces et vidéos restent activées ; le binaire ffmpeg du système est utilisé dans cet environnement.
 
 La campagne navigateur globale de 494 cas n’est pas exécutée intégralement pour ce POC. Les régressions ciblées couvrent les contextes hiérarchiques, les ressources héritées, l’inventaire des périmètres et les usages inter-périmètres des profils de modèle, sur bureau, mobile et localisation. Leur ancien lien `tab=usages` est remplacé par `#usages` ; la confirmation native de bascule est remplacée par le dialogue du garde partagé.
 
@@ -57,7 +57,17 @@ L’échec des accès est reproduit après Workspace → Instance → création 
 
 Le smoke ponctuel [flow-access-smoke.mts](flow-access-smoke.mts), lancé comme `smoke.mts`, crée un Flow par l’interface après la bascule et enregistre Discover/Use avec propagation aux descendants. Il relit la politique enregistrée par l’API. Les deux exécutions, français et anglais automatiques sans cookie de langue, passent sans erreur navigateur : [résultats](flow-access-verification.json).
 
-Le passage involontaire du français à l’anglais reste distinct et non résolu. Le signalement précise Chrome, lancement Aspire/AppHost, langue automatique, dès Workspace → Instance. Le parcours équivalent reste en français sur l’hôte Console de test ainsi que sur AppHost, en HTTP (`localhost:5100`) puis en HTTPS (`localhost:7100`, certificat local de test). Les préférences restent automatiques et aucun cookie de langue n’est créé. Ces vérifications ne reproduisent pas le signalement ; elles ne prouvent pas sa résolution. Ce point reste suivi dans la PR brouillon #1256.
+Le passage involontaire du français à l’anglais n’a pas été reproduit. Le mainteneur a ensuite indiqué qu’il pouvait s’agir d’une fausse alerte ; aucun comportement de langue n’est modifié. Le signalement précise Chrome, lancement Aspire/AppHost, langue automatique, dès Workspace → Instance. Le parcours équivalent reste en français sur l’hôte Console de test ainsi que sur AppHost, en HTTP (`localhost:5100`) puis en HTTPS (`localhost:7100`, certificat local de test). Les préférences restent automatiques et aucun cookie de langue n’est créé. Ces vérifications ne reproduisent pas le signalement ; elles ne prouvent pas sa résolution. Ce point reste suivi dans la PR brouillon #1256.
+
+## Retour utilisateur : vue d’ensemble conservant les anciens indicateurs
+
+Le défaut est reproduit sans F5 : Workspace → Instance conserve 4 Flows dans la vue d’ensemble alors que l’API renvoie les Flows de l’Instance. `PlatformDashboardService` conservait son chargement partagé pendant toute la durée du circuit Blazor. Remonter la page ne suffisait donc pas à recharger les données.
+
+Le chargement partagé est désormais associé au snapshot de contexte validé. Il reste partagé entre l’état de santé du menu et les tuiles de la page dans ce contexte. Chaque contexte nouvellement chargé, y compris un retour au précédent, lance une nouvelle lecture. L’état de santé attend le contexte validé, est réinitialisé pendant son rechargement et ignore les succès ou échecs tardifs d’un chargement précédent.
+
+Le smoke ponctuel [overview-smoke.mts](overview-smoke.mts), lancé comme `smoke.mts`, compare les compteurs Agents/Flows à l’API dans chaque contexte, sur bureau et mobile français, sans rechargement du document. Dans la fixture, il observe 4 Flows en Workspace puis 14 en Instance. Il ouvre ensuite la liste via la tuile, vérifie que l’identité du Flow de l’Instance reste éditable et que ses accès sont modifiables. Une autorisation avec propagation rend un Flow supplémentaire visible en Workspace : le retour affiche bien 5, puis l’Instance revient à 14. L’historique fonctionne aussi. Aucune règle de lecture seule ou d’autorisation serveur n’est modifiée.
+
+Les deux variantes passent sans exception navigateur ni débordement horizontal : [résultats](overview-verification.json), [capture bureau](overview-desktop-instance.png), [capture mobile](overview-mobile-instance.png). Le parcours réutilisable reste différé dans #1255.
 
 ## Captures
 

@@ -221,6 +221,46 @@ public sealed class DashboardTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SharedDashboardReloadsBothContextDirectionsAndIgnoresLatePreviousLoads(bool previousLoadPending)
+    {
+        var fake = new MockApiClient(new FixedTimeProvider(Now));
+        var workspaceId = Guid.NewGuid();
+        var workspace = new ConsoleContextSnapshot(Guid.NewGuid(), "Admin", Guid.NewGuid(), "tenant", "Tenant",
+            workspaceId, "default", "Default", new HashSet<string>(), []);
+        var provider = new StubConsoleContextProvider(workspace);
+        var state = new ConsoleContextState(provider);
+        await state.LoadAsync(CancellationToken.None);
+        var previous = new TaskCompletionSource<WorkTaskOperationsCountersResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!previousLoadPending) previous.SetResult(new(7, 0, 0, 0, 0));
+        var work = new StubWorkClient(new(2, 0, 0, 0, 0)) { SummaryLoader = () => previous.Task };
+        using var service = new PlatformDashboardService(new StubManagementClient([], [], []), fake, work, fake,
+            new StubModelProvidersClient([]), new StubExtensionsClient([]),
+            NullLogger<PlatformDashboardService>.Instance, contextState: state);
+        var source = service.StartShared();
+        Assert.AreSame(source, service.StartShared(), "The shell and overview share one load within a context.");
+
+        provider.Current = workspace with { SelectedScopeRef = "/instance", SelectedKind = ConsoleContextKind.Instance };
+        work.SummaryLoader = null;
+        await state.LoadAsync(CancellationToken.None);
+        var instance = service.StartShared();
+        Assert.AreNotSame(source, instance);
+        Assert.AreEqual(2, (await instance.Snapshot).RunningTasks);
+        if (previousLoadPending) previous.SetResult(new(7, 0, 0, 0, 0));
+        Assert.AreEqual(7, (await source.Snapshot).RunningTasks);
+        Assert.AreSame(instance, service.StartShared(), "A previous response cannot restore the old cache.");
+
+        provider.Current = workspace;
+        work.SummaryLoader = () => Task.FromResult(new WorkTaskOperationsCountersResponse(9, 0, 0, 0, 0));
+        await state.LoadAsync(CancellationToken.None);
+        var returned = service.StartShared();
+        Assert.AreNotSame(source, returned, "Returning to a scope must reload its current data.");
+        Assert.AreEqual(9, (await returned.Snapshot).RunningTasks);
+        Assert.AreEqual(3, work.SummaryReads);
+    }
+
+    [TestMethod]
     public async Task SimulatedManagementClientSupportsCrudAndConcurrency()
     {
         var fake = new MockApiClient(new FixedTimeProvider(Now));
@@ -347,12 +387,15 @@ public sealed class DashboardTests
     private sealed class StubWorkClient(WorkTaskOperationsCountersResponse counters) : IWorkApiClient
     {
         public string? RequestedWorkspaceId { get; private set; }
+        public Func<Task<WorkTaskOperationsCountersResponse>>? SummaryLoader { get; set; }
+        public int SummaryReads { get; private set; }
         public Task<IReadOnlyList<WorkSummary>> GetWorkItemsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkSummary>>([]);
         public Task<WorkTaskOperationsPageResponse> GetTasksAsync(string? workspaceId, WorkTaskStatus? status, string? search, bool? hasPendingAction, int page, int pageSize, string sort, string direction, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<WorkTaskOperationsCountersResponse> GetTaskSummaryAsync(string? workspaceId, CancellationToken cancellationToken)
         {
             RequestedWorkspaceId = workspaceId;
-            return Task.FromResult(counters);
+            SummaryReads++;
+            return SummaryLoader?.Invoke() ?? Task.FromResult(counters);
         }
         public Task<WorkTaskOperationsDetailResponse> GetTaskAsync(Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Agentstration.Flows.FlowRun> GetTaskFlowRunAsync(Guid taskId, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -365,7 +408,8 @@ public sealed class DashboardTests
 
     private sealed class StubConsoleContextProvider(ConsoleContextSnapshot context) : IConsoleContextProvider
     {
-        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(context);
+        public ConsoleContextSnapshot Current { get; set; } = context;
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(Current);
     }
 
     private sealed class ControlledWorkClient : IWorkApiClient
