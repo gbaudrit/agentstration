@@ -14,6 +14,8 @@ using Agentstration.Work.Contracts;
 
 namespace Agentstration.Web.Console;
 
+public sealed record ExecutionSummaryPage(IReadOnlyList<ExecutionSummary> Items, bool HasMore);
+
 public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient, IAgentRunnerRuntimeClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -21,17 +23,26 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public async Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken)
     {
         var runs = await GetRunsAsync(null, cancellationToken);
-        return runs.Select(run => new ExecutionSummary(
-            run.Id,
-            run.Properties.Agent.ResourceId,
-            null,
-            null,
-            run.Status.State.ToString(),
-            run.Status.StartedAt ?? run.Status.CreatedAt,
-            run.Status.CompletedAt is { } completed ? completed - (run.Status.StartedAt ?? run.Status.CreatedAt) : null,
-            run.Status.Response,
-            run.Status.Error)).ToArray();
+        return runs.Select(ToExecutionSummary).ToArray();
     }
+
+    public async Task<ExecutionSummaryPage> GetExecutionsPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken cancellationToken)
+    {
+        var page = await ApiResponse.ReadAsync<RuntimeRunPageResponse>(httpClient,
+            $"api/runtime/runs?scopeRef={Uri.EscapeDataString(scope.Value)}&skip={skip}&top={take}", cancellationToken);
+        return new(page.Value.Select(ToExecutionSummary).ToArray(), !string.IsNullOrEmpty(page.NextLink));
+    }
+
+    private static ExecutionSummary ToExecutionSummary(RuntimeRun run) => new(
+        run.Id,
+        run.Properties.Agent.ResourceId,
+        null,
+        null,
+        run.Status.State.ToString(),
+        run.Status.StartedAt ?? run.Status.CreatedAt,
+        run.Status.CompletedAt is { } completed ? completed - (run.Status.StartedAt ?? run.Status.CreatedAt) : null,
+        run.Status.Response,
+        run.Status.Error);
 
     public async Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken)
     {

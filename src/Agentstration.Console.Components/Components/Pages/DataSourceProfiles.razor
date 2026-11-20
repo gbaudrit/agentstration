@@ -2,60 +2,49 @@
 @implements IDisposable
 @inject IDataSourceProfilesClient Client
 @inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> ExtensionLocalizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Profiles") · Agentstration</PageTitle>
-<PageHeader Title="@T("Profiles")" Description="@T("ProfilesHelp")" TestId="resource-data-source-profiles">
-    <Actions><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a><a class="button-secondary" href="/data-sources">@T("DataSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (items.Count == 0) { <EmptyState Title="@T("Profiles")" Message="@T("EmptyProfiles")"><a class="button-primary" href="/data-source-profiles/new">@T("Create")</a></EmptyState> }
-else
-{
-    <CollectionView TItem="DataSourceProfileResource" Items="items" InformationLabels="@(new[] { ExtensionLocalizer["ManagingExtension"].Value })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data"><Versions><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@ExtensionLocalizer["ManagingExtension"]">@if (Owner(item) is { } owner) {
-                <a href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a><br />
-                <code>@owner.Installation.ExtensionId</code><span> · @owner.Installation.ExtensionVersion</span><br />
-                <span>@ExtensionLocalizer["Bundle"]: @owner.Installation.BundleId · @owner.Installation.BundleVersion</span>
-            } else if (item.Governance.Origin.Kind == ResourceOriginKind.Extension) {
-                <span>@item.Governance.Origin.Reference · @item.Governance.Origin.Version</span>
-            } else { <span>—</span> }</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a href="@Url(item)">@T("Open")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="DataSourceProfileResource" Title="@T("Profiles")" Description="@T("ProfilesHelp")"
+                            TestId="resource-data-source-profiles" ContextKey="@contextKey" IconName="database"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("Profiles")" EmptyMessage="@T("EmptyProfiles")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/data-sources", Services)">@T("DataSources")</a></Actions>
+</ResourceCollectionTemplate>
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<DataSourceProfileResource> items = [];
-    private IReadOnlyList<ExtensionInventoryItemResponse> extensions = [];
-    private bool loading = true;
-    private string? error;
     private string T(string key) => Localizer[key];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
-    {
-        loading = true; error = null;
-        try
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/data-source-profiles/new", Services)">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<DataSourceProfileResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data">
+        <Versions><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" /></Versions>
+        <IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<DataSourceProfileResource>> Columns =>
+    [
+        new("extension", ExtensionLocalizer["ManagingExtension"], item => @<text>@if (Owner(item) is { } owner) {
+            <a href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a><br />
+            <code>@owner.Installation.ExtensionId</code><span> · @owner.Installation.ExtensionVersion</span><br />
+            <span>@ExtensionLocalizer["Bundle"]: @owner.Installation.BundleId · @owner.Installation.BundleVersion</span>
+        } else if (item.Governance.Origin.Kind == ResourceOriginKind.Extension) {
+            <span>@item.Governance.Origin.Reference · @item.Governance.Origin.Version</span>
+        } else { <span>—</span> }</text>)
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", T("Namespace"), CollectionFilterKind.Choice)
         {
-            items = await Client.GetAsync(cancellation.Token);
-            extensions = [];
-            if (Services.GetService<IExtensionsClient>() is { } client)
-            {
-                try { extensions = await client.GetExtensionInventoryAsync(cancellation.Token); }
-                catch (AgentstrationApiException) { }
-            }
+            Options = (items ?? []).Select(item => item.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
+    ];
     private ExtensionManagedResourceOwner? Owner(DataSourceProfileResource item) => item.ScopeRef is { } scope
         ? ExtensionManagedResourceOwner.Find(extensions, item.Governance, scope, item.Namespace, item.Kind, item.Name, item.Uid)
         : null;
     private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

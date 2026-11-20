@@ -1,0 +1,14 @@
+{
+  "baseCommit": "4531157259f052efa7d92a2570549ea32513a7a7",
+  "route": "/data-sources",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/DataSources.razor": "63ab08b046836e1b044403b7992cd9ef93228dd7",
+    "src/Agentstration.Console.Components/Components/Pages/DataSources.razor.cs": "f4e68ff825e04af8a368832523c6fc5b2d19e8dd",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

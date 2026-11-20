@@ -1,0 +1,17 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: playwright-bootstrap-provenance
+definition:
+  displayName: Browser Bootstrap provenance fixture
+  description: Isolated editable namespaced resources for the existing Bootstrap versus Pack provenance journey.
+  targetScope: workspace
+  bindings:
+    - name: assistant-model
+      targetKind: modelProfile
+      displayName: Fixture model
+      required: true
+    - name: assistant-runtime
+      targetKind: runtimeProfile
+      displayName: Fixture runtime
+      required: true

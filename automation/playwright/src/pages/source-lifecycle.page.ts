@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 import { expect, type APIResponse, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -188,7 +189,7 @@ export class SourceLifecyclePage {
 
     // Optional input failure is visible in provenance while the valid input publishes.
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).uncheck();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).uncheck();
     await this.saveKnowledge();
     const partial = await this.runProjection(consoleUrl);
     expect(partial.inputIssues).toEqual([expect.objectContaining({ bindingName: 'secondary', code: 'knowledge_projection_acquisition_missing' })]);
@@ -198,7 +199,7 @@ export class SourceLifecyclePage {
 
     const second = await this.acquire(consoleUrl, f.sources[1]);
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).check();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).check();
     await this.saveKnowledge();
     const aggregate = await this.runProjection(consoleUrl);
     expect(aggregate.inputIssues).toEqual([]);
@@ -242,7 +243,8 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByRole('checkbox', { name: text.enabled, exact: false }).check();
+    await this.page.locator('[data-wizard-step=configuration]').click();
+    await this.page.getByRole('switch', { name: text.enabled, exact: false }).check();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
@@ -306,20 +308,27 @@ export class SourceLifecyclePage {
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(f.profile);
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(f.profile);
+    await this.page.locator('[data-wizard-step=acquisition]').click();
     await choose(this.page.getByRole('combobox', { name: text.acquisitionFlow, exact: true }), f.acquisitionFlow);
+    await this.page.locator('[data-wizard-step=contracts]').click();
     await this.page.getByLabel(text.configurationSchema, { exact: true }).fill(JSON.stringify(sourceSchema));
-    await this.page.getByRole('button', { name: text.save, exact: true }).click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/data-source-profiles/${f.profile}\\?`));
     const profile = await this.read<ResourceWire & { activeVersion: string }>(consoleUrl, `/api/datasourceprofiles/${f.profile}`);
     expect(profile.activeVersion).toBe('1.0.0');
   }
 
+  private get profileRevisionRows(): Locator {
+    return this.page.locator('.resource-details-main tbody > tr:visible, .resource-details-main .collection-card:visible');
+  }
+
   private async inspectProfileYaml(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     await this.open(consoleUrl, `/data-source-profiles/${this.fixture.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await this.page.getByRole('tab', { name: text.yaml, exact: true }).click();
-    await expect(this.page.locator('textarea.runner-json')).toHaveValue(new RegExp(this.fixture.acquisitionFlow));
-    await this.page.getByRole('tab', { name: text.revisions, exact: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' })).toHaveCount(1);
+    await selectResourceSection(this.page, 'yaml');
+    await expect(this.page.getByTestId(TestIds.sourceLifecycle.profileYaml)).toHaveValue(new RegExp(this.fixture.acquisitionFlow));
+    await selectResourceSection(this.page, 'revisions');
+    await expect(this.profileRevisionRows.filter({ hasText: '1.0.0' })).toHaveCount(1);
   }
 
   private async createSourceInConsole(consoleUrl: string, name: string, index: number, text: ExpectedText['sourceLifecycle']): Promise<void> {
@@ -327,13 +336,20 @@ export class SourceLifecyclePage {
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(name);
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(name);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile), this.fixture.profile);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
     const endpoint = editor.locator('[data-schema-path="$.endpoint"] input');
     await endpoint.fill('x');
     await endpoint.blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
-    await editor.locator('[data-schema-path="$.artifactId"] input').fill(this.fixture.artifactIds[index]);
+    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
+    await expect(this.page).toHaveURL(/\/data-sources\/new(?:[?#]|$)/);
+    await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
+    await expect(endpoint).toBeFocused();
+    const artifact = editor.locator('[data-schema-path="$.artifactId"] input');
+    await artifact.fill(this.fixture.artifactIds[index]);
+    await artifact.blur();
+    await expect(artifact).toHaveValue(this.fixture.artifactIds[index]);
     await endpoint.fill(`https://example.test/lifecycle/${index}`);
     await endpoint.blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();
@@ -346,20 +362,20 @@ export class SourceLifecyclePage {
   private async reviseProfile(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     const f = this.fixture;
     await this.open(consoleUrl, `/data-source-profiles/${f.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await this.page.getByRole('tab', { name: text.definition, exact: true }).click();
-    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
-    await this.page.getByRole('button', { name: text.save, exact: true }).click();
+    await selectResourceSection(this.page, 'definition/configuration');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileVersion).fill('1.1.0');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).definition.version).toBe('1.1.0');
-    await this.page.getByRole('tab', { name: text.revisions, exact: true }).click();
-    await this.page.getByRole('textbox', { name: text.version, exact: true }).fill('1.1.0');
+    await selectResourceSection(this.page, 'revisions');
+    await this.page.getByTestId(TestIds.sourceLifecycle.profilePublishVersion).fill('1.1.0');
     await this.page.getByRole('button', { name: text.publish, exact: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' })).toBeVisible();
+    await expect(this.profileRevisionRows.filter({ hasText: '1.1.0' })).toBeVisible();
     // Explicit activation and rollback exercise the revision controls as well.
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
-    await expect(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true })).toBeAttached();
-    await revealCollectionAction(this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
-    await this.page.locator('tbody > tr, .collection-card').filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
+    await revealCollectionAction(this.profileRevisionRows.filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.profileRevisionRows.filter({ hasText: '1.0.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
+    await expect(this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true })).toBeAttached();
+    await revealCollectionAction(this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }));
+    await this.profileRevisionRows.filter({ hasText: '1.1.0' }).getByRole('button', { name: text.activate, exact: true, includeHidden: true }).click();
     await expect.poll(async () => (await this.read<ResourceWire & { activeVersion: string }>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).activeVersion).toBe('1.1.0');
   }
 
@@ -421,7 +437,7 @@ export class SourceLifecyclePage {
     await choose(binding.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource), source);
   }
   private async saveKnowledge(): Promise<void> {
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave)).toBeEnabled();
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
@@ -447,7 +463,7 @@ export class SourceLifecyclePage {
   }
 
   private async editKnowledge(consoleUrl: string): Promise<void> {
-    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
   }
   private async runProjection(consoleUrl: string): Promise<Projection> {
     const before = await this.read<Projection[]>(consoleUrl, this.knowledgeApi() + '/projections');
@@ -589,7 +605,7 @@ export class SourceLifecyclePage {
       await this.post(consoleUrl, '/api/knowledgesources', {
         name: `${f.knowledge}-ancestor`, scopeRef: f.scope, properties: this.knowledgeProperties(ancestorName, '/instance'),
       }, 201);
-      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
       await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource).locator('option:checked')).toContainText(ancestorName);
     }
     if (knowledge) {
@@ -697,9 +713,17 @@ export class SourceLifecyclePage {
     url.searchParams.set('namespace', 'default');
     url.searchParams.set('scopeRef', this.scope);
     url.searchParams.set('context', this.scope);
-    if (view) url.searchParams.set('view', view);
-    const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    expect(response?.status()).toBe(200);
+    if (view) url.hash = view === 'definition' ? 'definition/configuration' : view;
+    const current = new URL(this.page.url());
+    if ((path.startsWith('/data-sources/') || path.startsWith('/knowledge-sources/')) && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
+      await selectResourceSection(this.page, url.hash.slice(1));
+      // Data Source fixtures also change profile readiness through the API.
+      // Knowledge section changes retain the live projection/snapshot state already updated by the screen.
+      if (path.startsWith('/data-sources/')) await this.page.reload({ waitUntil: 'domcontentloaded' });
+    } else {
+      const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBe(200);
+    }
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
   }

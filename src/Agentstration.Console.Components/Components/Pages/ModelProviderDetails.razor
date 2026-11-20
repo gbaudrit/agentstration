@@ -2,240 +2,413 @@
 @page "/modelproviders/{Name}"
 @implements IDisposable
 @inject IModelProvidersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> CollectionLabels
 @inject IExtensionsClient ExtensionsClient
 @inject IParametersClient ParametersClient
 @inject ISecretsClient SecretsClient
+@inject IResourceScopeInventoryClient Scopes
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
 @inject NotificationState Notifications
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLabels
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProviderDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> ModelLabels
 
-<PageTitle>@(IsNew ? T("CreateProvider") : $"{Name} · {T("ModelProvider")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateProvider") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-provider-editor">
-    <Actions>@if (!IsNew) { @if (CanManage) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-provider-delete">@T("Delete")</button> }<a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }<a class="button-secondary" href="/modelproviders">@T("Back")</a></Actions>
-</PageHeader>
-
-@if (model is null) { <LoadingState Message="@T("Loading")" /> }
+<PageTitle>@(IsNew ? T("CreateProvider") : resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{ var presentations = Presentations;
+RenderFragment definition = @<text>@if (model is not null) {
+    <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="model-provider-resource-form" FormName="model-provider-editor"
+        OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmitAsync" InvalidInputChanged="value => invalidInput = value" ReadOnly="@(!CanManage)" Busy="saving"
+        FieldsTestId="model-provider-definition-fields" Sections="presentations" SectionState="@(IsNew ? null : sectionState)" SectionContent="@(IsNew ? null : DefinitionSection)" SectionRequested="RequestSection"
+        data-testid="model-provider-form" data-interactive="@interactive.ToString().ToLowerInvariant()" data-resource-etag="@etag" @oninput="MarkDirty" @onchange="MarkDirty">
+        <ChildContent>@if (IsNew) {
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard @ref="wizard" Steps="CreationSteps" OnFinish="FinishCreationAsync" Busy="saving" Disabled="@(!CanManage || loading)" FinishLabel="@T("CreateProviderAction")" FinishTestId="model-provider-save" TestId="model-provider-creation-wizard" />
+        }</ChildContent>
+    </ResourceDefinitionForm>
+}</text>; }
+@if (IsNew)
+{
+    <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft || creators.Count > 0)" />
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Title="@T("CreateProvider")" Description="@T("Description")" TestId="resource-model-provider-editor"></PageHeader>
+    @if (model is null) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
+    else { @Feedback @definition }
+}
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProviderError")</strong><span>@error.Message</span></div> }
-    @if (!IsNew && selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
-    @if (CanManage && usages.Count > 0) { <div class="form-alert form-alert-warning">@T("ProviderReferencedBy", ProfileCount(usages.Count))</div> }
-    @if (!IsNew)
-    {
-        <nav class="section-tabs model-provider-tabs" role="tablist" aria-label="@T("ModelProvider")">
-            <button id="model-provider-overview-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Overview ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Overview ? "active" : null)" @onclick="() => activeTab = ProviderTab.Overview">@T("Tab.Overview")</button>
-            <button id="model-provider-configuration-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Configuration ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Configuration ? "active" : null)" @onclick="() => activeTab = ProviderTab.Configuration" disabled="@(!interactive)" data-testid="model-provider-configuration-tab" data-interactive="@(interactive ? "true" : "false")">@T("Tab.Configuration")</button>
-            @if (CanManage) { <button id="model-provider-access-tab" type="button" role="tab" aria-selected="@(activeTab == ProviderTab.Access ? "true" : "false")" aria-controls="model-provider-tab-panel" class="@(activeTab == ProviderTab.Access ? "active" : null)" @onclick="() => activeTab = ProviderTab.Access" data-testid="model-provider-access-tab">@T("Tab.Access")</button> }
-        </nav>
-    }
-    <div id="model-provider-tab-panel" role="tabpanel" aria-labelledby="@ActiveTabId">
-    @if (IsNew || activeTab == ProviderTab.Configuration)
-    {
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-provider-editor" class="resource-form" data-testid="model-provider-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <fieldset class="resource-definition-fields" disabled="@(!CanManage)" data-testid="model-provider-definition-fields">
-        <FormSection Title="@T("ProviderResource")" Eyebrow="@T("Identity")"><Actions>@if (status is not null) { <StatusBadge Text="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</Actions><ChildContent><FormGrid>
-            <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-provider-display-name" TechnicalNameTestId="model-provider-name" />
-            <FormField Label="@T("Namespace")"><Validation><ValidationMessage For="() => model.Namespace" /></Validation><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="model.Namespace" Disabled="@(!IsNew)" /></ChildContent></FormField>
-            <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProvider" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-            <FormField Label="@T("ExtensionRegistration")"><Validation><ValidationMessage For="() => model.ExtensionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(model.ExtensionId, System.Globalization.CultureInfo.InvariantCulture)" data-testid="model-provider-extension" ValueChanged="changed => ExtensionChanged(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectExtension")</option>@foreach (var extension in extensions) { <option value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</ClearableSelect></ChildContent></FormField>
-            <FormField Label="@T("ModelProviderContribution")"><Validation><ValidationMessage For="() => model.ContributionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(model.ContributionId, System.Globalization.CultureInfo.InvariantCulture)" data-testid="model-provider-contribution" ValueChanged="changed => ContributionChanged(new ChangeEventArgs { Value = changed })"><option value="">@T("SelectContribution")</option>@foreach (var contribution in Contributions) { <option value="@contribution.Id">@contribution.Id</option> }</ClearableSelect></ChildContent></FormField>
-        </FormGrid></ChildContent></FormSection>
-        @if (Requirements.Count > 0)
-        {
-            <FormSection Title="@T("ValueBindings")" Eyebrow="@T("ConfigurationValues")" Description="@T("ValueBindingsHelp")" TestId="model-provider-value-bindings"><ChildContent>
-                <div class="binding-requirements">
-                    @foreach (var requirement in Requirements)
-                    {
-                        var binding = Binding(requirement);
-                        <ValueBindingRequirementEditor @key="binding" Requirement="@RequirementModel(requirement)"
-                            AllowedSources="@BindingSources(requirement)" Options="@BindingOptions(requirement)"
-                            Selection="@BindingSelection(binding)" SelectionChanged="value => BindingChanged(binding, value)"
-                            CreationContext="@CreationContext(requirement)" ResourceCreated="ValueCreatedAsync"
-                            Disabled="@(!CanManage)" TestIdPrefix="model-provider" DialogSectionId="@binding" />
-                    }
-                </div>
-            </ChildContent></FormSection>
-        }
-        <FormSection Title="@T("ExtensionOwnedEndpoint")" Eyebrow="@T("Connection")" Description="@T("ConnectionHelp")"><Actions>@if (!IsNew) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@testing" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button> }</Actions><ChildContent>@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code>@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p class="@(status.Status == "available" ? "inline-info" : "inline-warning")" data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status)@if (!string.IsNullOrWhiteSpace(status.Details)) { <span> — @status.Details</span> }</p> }</ChildContent></FormSection>
-        </fieldset>
-        @if (CanManage) { <FormActions><a class="button-secondary" href="/modelproviders">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-provider-save">@(saving ? T("Saving") : IsNew ? T("CreateProviderAction") : T("SaveChanges"))</button></FormActions> }
-    </EditForm>
-    }
-
-    @if (!IsNew && activeTab == ProviderTab.Overview)
-    {
-        <section class="metric-grid model-provider-summary" aria-label="@T("ProviderSummary")">
-            <MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
-            <MetricCard Label="@T("AvailableModels")" Value="@ModelCount(models.Count)" Detail="@T("Discovery")" Status="@(models.Count > 0 ? UiStatus.Success : UiStatus.Neutral)" />
-            <MetricCard Label="@T("ModelProfileUsages")" Value="@ProfileCount(usages.Count)" Detail="@T("UsagesHelp")" Status="@(usages.Count > 0 ? UiStatus.Info : UiStatus.Neutral)" />
-            <MetricCard Label="@T("ModelProviderContribution")" Value="@model.ContributionId" Detail="@model.ExtensionId" Status="UiStatus.Info" />
-        </section>
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("AvailableModels")</h2></div><div class="model-discovery-actions"><span>@ModelCount(models.Count)</span>@if (CanManage) { <button class="button-secondary" type="button" @onclick="RefreshModelsAsync" disabled="@refreshing" data-testid="model-provider-refresh">@(refreshing ? T("RefreshingModels") : T("RefreshModels"))</button> }</div></div>
-            @if (modelsError is not null) { <div class="form-alert form-alert-warning">@modelsError</div> }
-            @if (discoveryResult is not null) { <div class="form-alert form-alert-success" role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</div> }
-            @if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> }
-            else { <CollectionView TItem="AvailableModelResponse" Items="models" InformationLabels="@(new string[] { T("Capabilities"), T("Input"), T("Output") })" IdentityLabel="@T("Model")" StateLabel="@T("Status")">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : model!.Namespace)" Name="@(item.ResourceName ?? item.Name)" Href="@(string.IsNullOrWhiteSpace(item.ResourceName) ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details" ><IconBadges>@if (!string.IsNullOrWhiteSpace(item.ResourceName)) { <ResourceScopeBadge ScopeRef="selectedScope" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(selectedScope, Services))" IconOnly /> }<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" IconOnly /></IconBadges></CollectionIdentity><code>@item.Name</code></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue>
-            <CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue>
-            <CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue>
-        </Information>
-        <Actions Context="item">
-@if (string.Equals(item.Status, "available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@(item.DisplayName)"> <a class="text-button" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a> </CollectionActions> }</Actions>
-    </CollectionView> }
-        </section>
-        @if (usages.Count > 0) { <section class="panel resource-section"><div class="panel-header"><h2>@T("ModelProfileUsages")</h2><span>@usages.Count</span></div><ul class="resource-links">@foreach (var usage in usages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Name="@usage.Name" Href="@ProfileUrl(usage)" IconName="layers" Domain="model" /></li> }</ul></section> }
-    }
-    @if (!IsNew && CanManage && activeTab == ProviderTab.Access && resource is not null && resource.ScopeRef is { } ownerScope)
-    {
-        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProvider" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
-    }
-    </div>
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProvider")" Domain="model" IconName="plug"
+        StatusText="@(status is null ? null : StatusLabel(status.Status))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" ResourceIdentity="@(loadedKey ?? Name ?? string.Empty)"
+        SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@Busy"
+        DefinitionReadOnlyReason="@(CanWrite ? null : ResourceReadOnlyReason.InsufficientPermissions)" HasDraft="HasDraft" HasAdditionalDraft="@(creators.Count > 0)"
+        Yaml="@(resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource))" SectionTestIdPrefix="model-provider-details" TestId="resource-model-provider-editor">
+        <PrimaryActions>@if (CanWrite && resource is not null) { <a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }</PrimaryActions>
+        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-provider-delete">@T("Delete")</button> }</Actions>
+        <Feedback>@Feedback</Feedback>
+        <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
+            <MetricCard Label="@T("AvailableModels")" Value="@(modelsKnown ? ModelCount(models.Count) : "—")" Detail="@T("Discovery")" />
+            <MetricCard Label="@T("ModelProfileUsages")" Value="@(usagesKnown ? ProfileCount(usages.Count) : "—")" Detail="@T("UsagesHelp")" />
+        </OverviewMetrics>
+        <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>
+        <DefinitionContent Context="path">@definition</DefinitionContent>
+        <AdditionalContent Context="path">@AdditionalContent(path)</AdditionalContent>
+        <DraftActions><button class="button-secondary" type="button" disabled="@(Busy || creators.Count > 0)" @onclick="Discard">@Shared["Discard"]</button><button class="button-primary" type="submit" form="model-provider-resource-form" disabled="@(Busy || !CanManage || creators.Count > 0)" data-testid="model-provider-save">@(saving ? T("Saving") : T("SaveChanges"))</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
-
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
-@if (model is not null)
-{
-    @foreach (var binding in model.ValueBindings) { <Microsoft.AspNetCore.Components.Sections.SectionOutlet SectionId="@binding" /> }
-}
-
+<ConfirmationDialog IsOpen="confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", resource?.Name ?? Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-provider-delete-dialog" />
+@if (model is not null) { @foreach (var binding in model.ValueBindings) { <Microsoft.AspNetCore.Components.Sections.SectionOutlet @key="binding" SectionId="binding" /> } }
 @code {
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "extension")] public string? SuggestedExtension { get; set; }
     [SupplyParameterFromQuery(Name = "extensionNamespace")] public string? SuggestedExtensionNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "contributionId")] public string? SuggestedContributionId { get; set; }
     [SupplyParameterFromQuery(Name = "displayName")] public string? SuggestedDisplayName { get; set; }
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ModelProviderEditorModel? model;
+    private ModelProviderResource? resource;
+    private ProviderBundle? baselineBundle, newerBundle;
+    private EditContext? editContext;
+    private ValidationMessageStore? messages;
+    private ResourceDefinitionForm? definitionForm;
+    private CreationWizard? wizard;
+    private string? loadedKey, etag, baseline, pendingNavigation, modelsError, catalogueWarning;
+    private AgentstrationApiException? error;
+    private IReadOnlyList<ExtensionResponse> extensions = [];
+    private IReadOnlyList<ParameterResource> parameters = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
+    private IReadOnlyList<ModelProviderUsageResponse> usages = [];
+    private IReadOnlyList<AvailableModelResponse> models = [];
+    private ModelProviderStatusResponse? status;
+    private ModelDiscoveryDiffResponse? discoveryResult;
+    private bool hydrated, loading, persisted, saving, testing, refreshing, confirmDelete, invalidInput, touched, modelsKnown, usagesKnown, catalogueForbidden;
+    private long loadVersion;
+    private readonly HashSet<ModelProviderValueBindingEditorModel> creators = [];
+    private bool IsNew => !persisted;
+    private bool interactive => hydrated && !loading;
+    private bool Busy => loading || saving || testing || refreshing;
+    private bool CanWrite => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanEditDefinition => CanWrite && (IsNew ? scopeTargets.Any(target => target.ScopeRef == model?.ScopeRef && target.CanWrite) : resource is not null && !resource.Governance.IsManaged && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services));
+    private bool CanManage => hydrated && CanEditDefinition;
+    private bool CanOperate => hydrated && resource is not null && CanWrite && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
+    private bool CanDelete => CanOperate && !resource!.Governance.IsManaged && (Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesDelete));
+    private bool HasDraft => model is not null && baseline is not null && (Fingerprint != baseline || touched || invalidInput);
+    private string Fingerprint => model is null ? string.Empty : JsonSerializer.Serialize(new { model.Name, model.Namespace, model.DisplayName, model.ScopeRef, model.ExtensionId, model.ExtensionScopeRef, model.ContributionId, model.ValueBindings, model.SpecificationOverrides });
+    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private ResourceScopeRef? selectedScope { get => model?.ScopeRef; set { if (model is not null) model.ScopeRef = value; } }
+    private EditContext FormContext => editContext ??= NewContext();
+    private EditContext NewContext() { var context = new EditContext(model!); messages = new(context); return context; }
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/modelproviders", Services);
     private string ModelCount(int count) => T(count == 1 ? "ModelCount.One" : "ModelCount.Many", count);
     private string ProfileCount(int count) => T(count == 1 ? "ProfileCount.One" : "ProfileCount.Many", count);
     private string StatusLabel(string? value) => Localizer[$"Status.{value?.ToLowerInvariant() switch { "available" => "Available", "starting" => "Starting", "unavailable" => "Unavailable", "failed" => "Failed", _ => "Unknown" }}"];
-    private readonly CancellationTokenSource cancellation = new();
-    private ModelProviderEditorModel? model; private ModelProviderResource? resource; private IReadOnlyList<ModelProviderUsageResponse> usages = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
-    private IReadOnlyList<ParameterResource> parameters = []; private IReadOnlyList<SecretResponse> secrets = [];
-    private ModelProviderStatusResponse? status; private ModelDiscoveryDiffResponse? discoveryResult; private AgentstrationApiException? error; private string? modelsError; private string? etag; private bool saving; private bool testing; private bool refreshing; private bool confirmDelete;
-    private ResourceScopeRef? selectedScope;
-    private bool hydrated;
-    private bool loading;
-    private bool interactive => hydrated && !loading;
-    private bool persisted;
-    private ProviderTab activeTab;
-    private string ActiveTabId => activeTab switch { ProviderTab.Configuration => "model-provider-configuration-tab", ProviderTab.Access => "model-provider-access-tab", _ => "model-provider-overview-tab" };
-    private bool IsNew => !persisted;
-    private bool CanManage => IsNew || ResourceOwnershipContext.CanManage(selectedScope, Services);
-    private ExtensionResponse? SelectedExtension => model is null ? null : extensions.SingleOrDefault(value => ExtensionKey(value) == model.ExtensionId);
+    private string ContextKey => $"{Name}|{Namespace}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+    private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
+    private ExtensionResponse? SelectedExtension => ResolveExtension(model?.ExtensionId, model?.ExtensionScopeRef);
+    private ExtensionResponse? ResolveExtension(string? key, ResourceScopeRef? owner)
+    {
+        var matches = extensions.Where(value => ExtensionKey(value) == key && (value.RegistrationScopeRef is null || value.RegistrationScopeRef == ResourceScopeRef.Instance)).ToArray();
+        if (owner is { } scope) return matches.SingleOrDefault(value => value.RegistrationScopeRef == scope) ?? (matches.Length == 1 && matches[0].RegistrationScopeRef is null ? matches[0] : null);
+        return matches.Length == 1 ? matches[0] : null;
+    }
     private IReadOnlyList<ExtensionContributionResponse> Contributions => SelectedExtension?.Contributions.Where(value => value.Kind == "model-provider").ToArray() ?? [];
-    private IReadOnlyList<ExtensionValueRequirementResponse> Requirements => (SelectedExtension?.ValueRequirements ?? [])
-        .Where(value => value.ContributionKind == "model-provider" && value.ContributionId.Equals(model?.ContributionId, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private IReadOnlyList<ExtensionValueRequirementResponse> Requirements => (SelectedExtension?.ValueRequirements ?? []).Where(value => value.ContributionKind == "model-provider" && value.ContributionId.Equals(model?.ContributionId, StringComparison.OrdinalIgnoreCase)).ToArray();
     private IReadOnlyList<ParameterResource> AvailableParameters => parameters.Where(CanUse).ToArray();
     private IReadOnlyList<SecretResponse> AvailableSecrets => secrets.Where(value => value.ValueConfigured && CanUse(value.Resource)).ToArray();
-    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
-    protected override async Task OnParametersSetAsync()
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("models", T("AvailableModels"), "stack-2"), new("usages", T("ModelProfileUsages"), "link")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
-        loading = true;
-        persisted = !string.IsNullOrWhiteSpace(Name);
-        try { await LoadAsync(); }
-        finally { loading = false; }
+        ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(ModelProviderEditorModel.Name), nameof(ModelProviderEditorModel.Namespace), nameof(ModelProviderEditorModel.DisplayName), nameof(ModelProviderEditorModel.Description), nameof(ModelProviderEditorModel.Tags), nameof(ModelProviderEditorModel.ScopeRef), nameof(ModelProviderEditorModel.ExtensionId), nameof(ModelProviderEditorModel.ExtensionScopeRef), nameof(ModelProviderEditorModel.ContributionId)] },
+        ["definition/configuration"] = new() { HasRequiredFields = Requirements.Any(value => value.Required), Fields = [nameof(ModelProviderEditorModel.ValueBindings), nameof(ModelProviderEditorModel.SpecificationOverrides)], Actions = CanOperate ? TestActions : null, ReadOnlyActions = CanOperate ? TestActions : null },
+        ["models"] = new() { ReadOnly = true, ReadOnlyActions = CanOperate ? DiscoveryActions : null },
+        ["usages"] = new() { ReadOnly = true }, ["yaml"] = new() { ReadOnly = true }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(ModelProviderEditorModel.Name)] = IdentityLabels["TechnicalName"], [nameof(ModelProviderEditorModel.Namespace)] = T("Namespace"), [nameof(ModelProviderEditorModel.DisplayName)] = IdentityLabels["DisplayName"],
+        [nameof(ModelProviderEditorModel.Description)] = Shared["Description"], [nameof(ModelProviderEditorModel.Tags)] = Shared["Labels"], [nameof(ModelProviderEditorModel.ScopeRef)] = Shared["Scope"],
+        [nameof(ModelProviderEditorModel.ExtensionId)] = T("ExtensionRegistration"), [nameof(ModelProviderEditorModel.ExtensionScopeRef)] = Shared["Scope"], [nameof(ModelProviderEditorModel.ContributionId)] = T("ModelProviderContribution"),
+        [nameof(ModelProviderEditorModel.ValueBindings)] = T("ValueBindings"), [nameof(ModelProviderEditorModel.SpecificationOverrides)] = T("SpecificationOverrides")
+    };
+    private RenderFragment Feedback => @<div>@if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProviderError")</strong><span>@error.Message</span></div> }@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }@if (catalogueWarning is not null) { <div class="form-alert form-alert-warning" role="status">@catalogueWarning</div> }@if (IsNew && !CanWrite) { <ResourceReadOnlyNotice Reason="ResourceReadOnlyReason.InsufficientPermissions" /> }</div>;
+    private RenderFragment Identity { get { var value = model!; return @<ResourceIdentityEditor ResourceKind="@ModelResourceKinds.ModelProvider" DisplayName="@value.DisplayName" DisplayNameChanged="changed => value.DisplayName = changed" DisplayNameExpression="@(() => value.DisplayName)"
+        TechnicalName="@value.Name" TechnicalNameChanged="changed => value.Name = changed" TechnicalNameExpression="@(() => value.Name)" Namespace="@value.Namespace" NamespaceChanged="changed => value.Namespace = changed" NamespaceExpression="@(() => value.Namespace)" NamespaceEditable="IsNew"
+        ScopeRef="value.ScopeRef" ScopeRefChanged="changed => value.ScopeRef = changed" ScopeTargets="scopeTargets" IsNew="IsNew" ReadOnly="@(!CanManage)" Description="@value.Description" DescriptionExpression="@(() => value.Description)" DescriptionReadOnly="true" Labels="@value.Tags" LabelsExpression="@(() => value.Tags)" LabelsReadOnly="true"
+        DisplayNameTestId="model-provider-display-name" TechnicalNameTestId="model-provider-name" TestId="model-provider-identity-editor">
+        <ScopeValidation><ValidationMessage For="() => value.ScopeRef" /></ScopeValidation>
+        <AdditionalPanels><FormSection Title="@T("ProviderResource")"><FormGrid>
+            <FormField Label="@T("ExtensionRegistration")" Required><Validation><ValidationMessage For="() => value.ExtensionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@value.ExtensionId" ValueExpression="@(() => value.ExtensionId)" ValueChanged="ExtensionChanged" data-testid="model-provider-extension"><option value="">@T("SelectExtension")</option>@if (!extensions.Any(item => ExtensionKey(item) == value.ExtensionId) && !string.IsNullOrEmpty(value.ExtensionId)) { <option value="@value.ExtensionId" disabled>@value.ExtensionId</option> }@foreach (var extension in extensions.Where(item => item.RegistrationScopeRef is null || item.RegistrationScopeRef == ResourceScopeRef.Instance)) { <option @key="extension" value="@ExtensionKey(extension)">@extension.RegistrationNamespace/@extension.RegistrationName — @(extension.Extension?.Name ?? extension.RegistrationName)</option> }</ClearableSelect></ChildContent></FormField>
+            <FormField Label="@T("ModelProviderContribution")" Required><Validation><ValidationMessage For="() => value.ContributionId" /></Validation><ChildContent><ClearableSelect TValue="string" Value="@value.ContributionId" ValueExpression="@(() => value.ContributionId)" ValueChanged="ContributionChanged" data-testid="model-provider-contribution"><option value="">@T("SelectContribution")</option>@if (!Contributions.Any(item => item.Id == value.ContributionId) && !string.IsNullOrEmpty(value.ContributionId)) { <option value="@value.ContributionId" disabled>@value.ContributionId</option> }@foreach (var contribution in Contributions) { <option @key="contribution.Id" value="@contribution.Id">@contribution.Id</option> }</ClearableSelect></ChildContent></FormField>
+        </FormGrid></FormSection></AdditionalPanels>
+    </ResourceIdentityEditor>; } }
+    private RenderFragment Configuration { get { var value = model!; return @<div class="resource-editor-view">
+        @if (Requirements.Count > 0) { <FormSection Title="@T("ValueBindings")" Description="@T("ValueBindingsHelp")" TestId="model-provider-value-bindings"><div class="binding-requirements">@foreach (var requirement in Requirements) { var binding = Binding(requirement); <ValueBindingRequirementEditor @key="binding" Requirement="@RequirementModel(requirement)" AllowedSources="@BindingSources(requirement)" Options="@BindingOptions(requirement)" Selection="@BindingSelection(binding)" SelectionChanged="selection => BindingChangedAndNotify(binding, selection)" CreationContext="@CreationContext(requirement)" ResourceCreated="ValueCreatedAsync" CreationChanged="open => CreatorChanged(binding, open)" ValidationField="@(new FieldIdentifier(value, nameof(value.ValueBindings)))" Disabled="@(!CanManage || saving || catalogueForbidden)" TestIdPrefix="model-provider" DialogSectionId="binding" /> }</div></FormSection> }
+        <FormSection Title="@T("ExtensionOwnedEndpoint")" Description="@T("ConnectionHelp")">@if (SelectedExtension is { } selected) { <dl class="resource-details"><dt>@T("AepEndpoint")</dt><dd><code class="configuration-value">@selected.Endpoint</code></dd><dt>@T("ExtensionId")</dt><dd><code>@(selected.Extension?.Id ?? T("NotObserved"))</code></dd><dt>@T("Source")</dt><dd>@selected.DiscoverySource</dd></dl> }@if (status is not null) { <p data-testid="model-provider-status" data-checked-at="@status.CheckedAt.ToString("O")">@T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")) : @StatusLabel(status.Status) @status.Details</p> }</FormSection>
+    </div>; } }
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => Configuration, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    private RenderFragment TestActions => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="TestAsync" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button>;
+    private RenderFragment DiscoveryActions => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="RefreshModelsAsync" data-testid="model-provider-refresh">@(refreshing ? T("RefreshingModels") : T("RefreshModels"))</button>;
+    private bool IdentityComplete => model is not null && model.ScopeRef == ResourceScopeRef.Instance
+        && System.ComponentModel.DataAnnotations.Validator.TryValidateObject(model, new(model), null, validateAllProperties: true);
+    private bool ConfigurationComplete => model is not null && !invalidInput
+        && model.MissingRequiredBindings(Requirements.Where(item => item.Required).Select(item => item.Id)).Count == 0;
+    private IReadOnlyList<CreationWizardStep> CreationSteps =>
+    [
+        new("identity", Shared["Identity"], Identity) { IsComplete = IdentityComplete },
+        new("configuration", Shared["Configuration"], Configuration) { IsComplete = ConfigurationComplete },
+        new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && ConfigurationComplete }
+    ];
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@IdentityLabels["DisplayName"]</dt><dd>@model?.DisplayName</dd><dt>@IdentityLabels["TechnicalName"]</dt><dd><code>@model?.Namespace/@model?.Name</code></dd><dt>@T("ExtensionRegistration")</dt><dd><code>@model?.ExtensionId</code></dd><dt>@T("ModelProviderContribution")</dt><dd><code>@model?.ContributionId</code></dd></dl></FormSection>;
+    private sealed record Setting(string Label, string Value);
+    private IEnumerable<Setting> SavedEntries => resource is null ? [] : new Setting[] { new(T("ExtensionRegistration"), $"{resource.Definition.Extension.ScopeRef} {(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}/{resource.Definition.Extension.Name}".Trim()), new(T("ModelProviderContribution"), resource.Definition.ContributionId), new(T("ValueBindings"), JsonSerializer.Serialize(resource.Definition.ValueBindings)), new(T("SpecificationOverrides"), JsonSerializer.Serialize(resource.Definition.SpecificationOverrides)) };
+    private RenderFragment SavedConfiguration => @<CollectionView TItem="Setting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
+    private RenderFragment AdditionalContent(string path) => path switch { "models" => ModelsPanel, "usages" => UsagesPanel, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    private RenderFragment ModelsPanel => @<FormSection Title="@T("AvailableModels")">@if (modelsError is not null) { <p role="alert">@modelsError</p> }@if (discoveryResult is not null) { <p role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</p> }@if (!modelsKnown) { <p>@T("ObservationUnavailable")</p> } else if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> } else { <CollectionView TItem="AvailableModelResponse" Items="models" IdentityLabel="@T("Model")" InformationLabels="@(new[] { T("Capabilities"), T("Input"), T("Output") })"><Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.ResourceName is null ? null : resource?.Namespace.Value)" Name="@(item.ResourceName ?? item.Name)" Href="@(item.ResourceName is null ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details"><IconBadges>@if (item.ResourceName is not null) { <ResourceScopeBadge ScopeRef="resource?.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource?.ScopeRef, Services))" IconOnly /> }<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" IconOnly /></IconBadges></CollectionIdentity><code>@item.Name</code></Identity><Information Context="item"><CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue><CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue><CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue></Information><Actions Context="item">@if (CanWrite && item.Status.Equals("available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@item.DisplayName"><Primary><a class="button-secondary" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a></Primary></CollectionActions> }</Actions></CollectionView> }</FormSection>;
+    private RenderFragment UsagesPanel => @<FormSection Title="@T("ModelProfileUsages")">@if (!usagesKnown) { <p>@T("UsagesUnavailable")</p> } else if (usages.Count == 0) { <p>@T("UsagesHelp")</p> } else { <CollectionView TItem="ModelProviderUsageResponse" Items="usages" IdentityLabel="@T("ModelProfileUsages")" InformationLabels="Array.Empty<string>()"><Identity Context="usage">@if (usage.Namespace is { } ns && usage.ScopeRef is { } owner) { <CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@ns.Value" Name="@usage.Name" Href="@ResourceOwnershipContext.Resource(Services, "/modelprofiles", usage.Name, ns, owner)" IconName="layers" Domain="model"><IconBadges><ResourceScopeBadge ScopeRef="owner" IconOnly /></IconBadges></CollectionIdentity> } else { <strong>@usage.DisplayName</strong><code>@usage.Name</code> }</Identity><Information Context="usage"></Information></CollectionView> }</FormSection>;
+    private sealed record ProviderBundle(ResourceSnapshot<ModelProviderResource> Snapshot, IReadOnlyList<ExtensionResponse> Extensions, IReadOnlyList<ParameterResource> Parameters, IReadOnlyList<SecretResponse> Secrets, IReadOnlyList<ResourceScopeTargetResponse> Targets, IReadOnlyList<ModelProviderUsageResponse> Usages, ModelProviderStatusResponse? Status, IReadOnlyList<AvailableModelResponse> Models, bool ModelsKnown, bool UsagesKnown, string? ObservationError, string? CatalogueWarning, bool CatalogueForbidden = false);
+    protected override Task OnParametersSetAsync()
+    {
+        var key = ContextKey;
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key; persisted = !string.IsNullOrWhiteSpace(Name); ClearPrivate(); sectionState.Reset(key);
+        return LoadAsync(false);
     }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; hydrated = true; StateHasChanged(); }
-    private async Task LoadAsync()
+    protected override void OnAfterRender(bool firstRender)
     {
-        error = null;
-        modelsError = null;
+        if (firstRender) { hydrated = true; StateHasChanged(); }
+        if (pendingNavigation is { } target) { pendingNavigation = null; Navigation.NavigateTo(target); }
+    }
+    private void ClearPrivate()
+    {
+        model = null; resource = null; editContext = null; messages = null; baseline = etag = null; baselineBundle = newerBundle = null;
+        extensions = []; parameters = []; secrets = []; scopeTargets = []; usages = []; models = []; creators.Clear();
+        status = null; discoveryResult = null; error = null; modelsError = catalogueWarning = null;
+        saving = testing = refreshing = confirmDelete = invalidInput = touched = modelsKnown = usagesKnown = catalogueForbidden = false;
+    }
+    private Task RetryAsync() => Busy ? Task.CompletedTask : LoadAsync(resource is not null);
+    private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync(true);
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var expected = resource; var requestedName = Name; var requestedNamespace = ResourceNamespace.Default;
+        loading = true; loadState = new(refresh && resource is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = resource is not null };
         try
         {
-            var loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
-            var loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token);
-            var loadedSecrets = IsNew
-                ? await SecretsClient.GetSecretsAsync(cancellation.Token)
-                : null;
+            requestedNamespace = SelectedNamespace;
             if (IsNew)
             {
-                extensions = loadedExtensions;
-                parameters = loadedParameters;
-                secrets = loadedSecrets ?? [];
-                var extensionNamespace = SuggestedExtensionNamespace ?? SelectedNamespace.Value;
-                model = new ModelProviderEditorModel { Namespace = SelectedNamespace.Value, ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{extensionNamespace}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty };
-                SyncBindings();
-                return;
+                var loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return;
+                var loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return;
+                var loadedSecrets = await SecretsClient.GetSecretsAsync(cancellation.Token); if (request != loadVersion) return;
+                var targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token); if (request != loadVersion) return;
+                extensions = loadedExtensions; parameters = loadedParameters; secrets = loadedSecrets;
+                scopeTargets = targets.Where(target => target.Kind == ResourceScopeKind.Instance).ToArray();
+                model = new() { Namespace = requestedNamespace.Value, ScopeRef = scopeTargets.FirstOrDefault(target => target.CanWrite)?.ScopeRef,
+                    ExtensionId = string.IsNullOrWhiteSpace(SuggestedExtension) ? string.Empty : $"{SuggestedExtensionNamespace ?? requestedNamespace.Value}:{SuggestedExtension}", ContributionId = SuggestedContributionId ?? string.Empty, DisplayName = SuggestedDisplayName ?? string.Empty };
+                model.ExtensionScopeRef = SelectedExtension?.RegistrationScopeRef; SyncBindings(false); ResetForm();
+                loadState = new(ResourceLoadStatus.Ready) { HasContent = true }; return;
             }
-
-            var snapshot = await Client.GetModelProviderAsync(SelectedNamespace, Name!, cancellation.Token);
-            var loadedUsages = (await Client.GetModelProviderUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
-            extensions = loadedExtensions;
-            parameters = loadedParameters;
-            model = ModelProviderEditorModel.FromResource(snapshot.Value);
-            resource = snapshot.Value;
-            var providerScope = snapshot.Value.ScopeRef
-                ?? throw new InvalidOperationException("A Model Provider must expose its ownership scope.");
-            selectedScope = providerScope;
-            secrets = await SecretsClient.GetSecretsAsync(providerScope, cancellation.Token);
-            etag = snapshot.ETag;
-            usages = loadedUsages;
-            SyncBindings();
-            await LoadObservedAsync();
+            var snapshot = await Client.GetModelProviderAsync(requestedNamespace, requestedName!, cancellation.Token);
+            if (request != loadVersion) return;
+            if (!Matches(snapshot.Value, requestedNamespace, requestedName!, expected)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var bundle = await ReadBundleAsync(snapshot, request);
+            if (request != loadVersion) return;
+            if (HasDraft || creators.Count > 0)
+            {
+                if (bundle.CatalogueForbidden)
+                {
+                    extensions = []; parameters = []; secrets = []; scopeTargets = []; creators.Clear();
+                    catalogueWarning = bundle.CatalogueWarning; catalogueForbidden = bundle.CatalogueForbidden;
+                    newerBundle = null;
+                    baselineBundle = baselineBundle is null ? null : baselineBundle with { Extensions = [], Parameters = [], Secrets = [], Targets = [], CatalogueForbidden = true, CatalogueWarning = bundle.CatalogueWarning };
+                }
+                if (snapshot.ETag != etag || snapshot.Value.Generation != resource?.Generation) newerBundle = bundle;
+            }
+            else Adopt(bundle);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
         {
-            error = exception;
-            model ??= new ModelProviderEditorModel { Namespace = SelectedNamespace.Value };
+            if (request != loadVersion) return;
+            var state = exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+            if (state is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearPrivate();
+            loadState = new(state) { HasContent = resource is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
         }
+        finally { if (request == loadVersion) loading = false; }
     }
-    private void ExtensionChanged(ChangeEventArgs args) { if (model is null) return; model.ExtensionId = args.Value?.ToString() ?? string.Empty; if (!Contributions.Any(value => value.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty; SyncBindings(); }
-    private void ContributionChanged(ChangeEventArgs args) { if (model is null) return; model.ContributionId = args.Value?.ToString() ?? string.Empty; SyncBindings(); }
-    private async Task LoadObservedAsync() { if (model is null) return; var @namespace = ResourceNamespace.Parse(model.Namespace); try { status = await Client.GetProviderStatusAsync(@namespace, model.Name, cancellation.Token); models = await Client.GetProviderModelsAsync(@namespace, model.Name, cancellation.Token); } catch (AgentstrationApiException exception) { modelsError = exception.Message; models = []; } }
-    private async Task SaveAsync() { if (!CanManage || model is null || saving) return; saving = true; error = null; try { var wasNew = IsNew; var @namespace = ResourceNamespace.Parse(model.Namespace); var snapshot = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token) : await Client.UpdateModelProviderAsync(@namespace, model.Name, model.ToPutRequest(), etag!, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), wasNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success)); resource = snapshot.Value; model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; SyncBindings(); if (wasNew) { discoveryResult = await DiscoverAfterCreationAsync(snapshot.Value); await LoadObservedAsync(); Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name)); model = ModelProviderEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag; SyncBindings(); persisted = true; } else { await LoadObservedAsync(); } } catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); } catch (AgentstrationApiException exception) { error = exception; } finally { saving = false; } }
-    private async Task TestAsync() { if (model is null || testing) return; testing = true; error = null; try { status = await Client.TestProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, cancellation.Token); await LoadObservedAsync(); } catch (AgentstrationApiException exception) { error = exception; } finally { testing = false; } }
-    private async Task<ModelDiscoveryDiffResponse?> DiscoverAfterCreationAsync(ModelProviderResource created)
+    private bool Matches(ModelProviderResource candidate, ResourceNamespace ns, string name, ModelProviderResource? expected)
     {
+        if (candidate.Name != name || candidate.Namespace != ns || candidate.ScopeRef != ResourceScopeRef.Instance) return false;
+        if (!string.IsNullOrWhiteSpace(ScopeRefValue) && candidate.ScopeRef != ResourceScopeRef.Parse(ScopeRefValue)) return false;
+        return expected is null || expected.Uid == Guid.Empty || candidate.Uid == expected.Uid;
+    }
+    private async Task<ProviderBundle> ReadBundleAsync(ResourceSnapshot<ModelProviderResource> snapshot, long request)
+    {
+        IReadOnlyList<ExtensionResponse> loadedExtensions = []; IReadOnlyList<ParameterResource> loadedParameters = []; IReadOnlyList<SecretResponse> loadedSecrets = []; IReadOnlyList<ResourceScopeTargetResponse> targets = [];
+        string? warning = null; var catalogueForbidden = false;
         try
         {
-            var result = await Client.RefreshProviderModelsAsync(created.Namespace, created.Name, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("InitialDiscoveryComplete"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success));
-            return result;
+            loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+            loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+            loadedSecrets = await SecretsClient.GetSecretsAsync(snapshot.Value.ScopeRef!.Value, cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
+            targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token);
         }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)
+        { loadedExtensions = []; loadedParameters = []; loadedSecrets = []; targets = []; catalogueForbidden = true; warning = exception.Message; }
+        if (request != loadVersion) return EmptyBundle(snapshot);
+        IReadOnlyList<ModelProviderUsageResponse> loadedUsages = []; var knowUsages = false;
+        try { loadedUsages = (await Client.GetModelProviderUsagesAsync(snapshot.Value.Namespace, snapshot.Value.Name, cancellation.Token)).Value; knowUsages = true; }
         catch (AgentstrationApiException exception)
         {
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("InitialDiscoveryFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Warning));
-            return null;
+            warning = exception.Message;
+            if (exception.StatusCode is not (System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)) { loadedUsages = usages; knowUsages = usagesKnown; }
         }
+        if (request != loadVersion) return EmptyBundle(snapshot);
+        var observed = await ReadObservedAsync(snapshot.Value);
+        return new(snapshot, loadedExtensions, loadedParameters, loadedSecrets, targets.Where(target => target.Kind == ResourceScopeKind.Instance).ToArray(), loadedUsages, observed.Status, observed.Models, observed.Known, knowUsages, observed.Error, warning, catalogueForbidden);
     }
-    private async Task RefreshModelsAsync()
+    private static ProviderBundle EmptyBundle(ResourceSnapshot<ModelProviderResource> snapshot) => new(snapshot, [], [], [], [], [], null, [], false, false, null, null);
+    private async Task<(ModelProviderStatusResponse? Status, IReadOnlyList<AvailableModelResponse> Models, bool Known, string? Error)> ReadObservedAsync(ModelProviderResource saved)
     {
-        if (model is null || refreshing) return;
-        refreshing = true;
-        modelsError = null;
-        discoveryResult = null;
-        try
+        ModelProviderStatusResponse? observed = null;
+        try { observed = await Client.GetProviderStatusAsync(saved.Namespace, saved.Name, cancellation.Token); return (observed, await Client.GetProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token), true, null); }
+        catch (AgentstrationApiException exception)
         {
-            discoveryResult = await Client.RefreshProviderModelsAsync(ResourceNamespace.Parse(model.Namespace), model.Name, cancellation.Token);
-            await LoadObservedAsync();
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DiscoveryRefreshed"), DiscoverySummary(discoveryResult), DateTimeOffset.Now, UiStatus.Success));
+            return exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized
+                ? (null, [], false, exception.Message)
+                : (observed ?? status, models, modelsKnown, exception.Message);
         }
-        catch (AgentstrationApiException exception) { modelsError = exception.Message; }
-        finally { refreshing = false; }
     }
-    private string DiscoverySummary(ModelDiscoveryDiffResponse result) => T("DiscoverySummary", result.Created, result.Updated, result.Unchanged, result.Missing, result.Reappeared, result.Total);
-    private void RequestDelete() { if (!CanManage) return; if (usages.Count == 0) confirmDelete = true; else error = new AgentstrationApiException(T("ProviderUsedBy", ProfileCount(usages.Count)), Guid.NewGuid().ToString("N")); }
-    private async Task DeleteAsync() { if (!CanManage || model is null || etag is null) return; confirmDelete = false; try { await Client.DeleteModelProviderAsync(ResourceNamespace.Parse(model.Namespace), model.Name, etag, cancellation.Token); Navigation.NavigateTo("/modelproviders"); } catch (AgentstrationApiException exception) { error = exception; } }
-    private void SyncBindings()
+    private void Adopt(ProviderBundle bundle)
+    {
+        baselineBundle = bundle; resource = bundle.Snapshot.Value; etag = bundle.Snapshot.ETag;
+        extensions = bundle.Extensions; parameters = bundle.Parameters; secrets = bundle.Secrets; scopeTargets = bundle.Targets; usages = bundle.Usages; usagesKnown = bundle.UsagesKnown;
+        status = bundle.Status; models = bundle.Models; modelsKnown = bundle.ModelsKnown; modelsError = bundle.ObservationError; catalogueWarning = bundle.CatalogueWarning; catalogueForbidden = bundle.CatalogueForbidden;
+        model = ModelProviderEditorModel.FromResource(resource); SyncBindings(false); ResetForm(); newerBundle = null;
+    }
+    private void ResetForm() { editContext = null; messages = null; invalidInput = touched = false; creators.Clear(); baseline = Fingerprint; }
+    private void MarkDirty() { if (model is not null && CanManage) touched = true; }
+    private void CreatorChanged(ModelProviderValueBindingEditorModel binding, bool open) { if (model?.ValueBindings.Contains(binding) != true) return; if (open) creators.Add(binding); else creators.Remove(binding); }
+    private void ExtensionChanged(string value)
+    {
+        if (model is null || !CanManage) return;
+        model.ExtensionId = value; model.ExtensionScopeRef = ResolveExtension(value, null)?.RegistrationScopeRef;
+        if (!Contributions.Any(item => item.Id == model.ContributionId)) model.ContributionId = Contributions.Count == 1 ? Contributions[0].Id : string.Empty;
+        SyncBindings(true); MarkDirty();
+    }
+    private void ContributionChanged(string value) { if (model is null || !CanManage) return; model.ContributionId = value; SyncBindings(true); MarkDirty(); }
+    private void SyncBindings(bool removeOld)
     {
         if (model is null) return;
         var existing = model.ValueBindings.ToDictionary(value => value.RequirementId, StringComparer.Ordinal);
-        model.ValueBindings = Requirements.Select(requirement =>
+        foreach (var requirement in Requirements)
         {
-            var binding = existing.GetValueOrDefault(requirement.Id) ?? new ModelProviderValueBindingEditorModel { RequirementId = requirement.Id };
-            if (IsSecured(requirement) && binding.Kind != ModelProviderValueBindingKind.Secret)
-            {
-                binding.Kind = ModelProviderValueBindingKind.Secret;
-                binding.Name = binding.Namespace = binding.ScopeRef = string.Empty;
-                binding.Literal = null;
-            }
-            return binding;
-        }).ToList();
+            if (!existing.TryGetValue(requirement.Id, out var binding)) existing[requirement.Id] = binding = new() { RequirementId = requirement.Id };
+            if ((removeOld || !binding.IsConfigured) && IsSecured(requirement) && binding.Kind != ModelProviderValueBindingKind.Secret) { binding.Kind = ModelProviderValueBindingKind.Secret; binding.Name = binding.ScopeRef = string.Empty; binding.Namespace = ResourceNamespace.DefaultValue; binding.Literal = null; }
+        }
+        model.ValueBindings = existing.Values.Where(value => !removeOld || Requirements.Any(item => item.Id == value.RequirementId)).ToList();
+        if (removeOld) creators.Clear();
+    }
+    private void BindingChangedAndNotify(ModelProviderValueBindingEditorModel binding, ValueBindingSelection value)
+    {
+        if (!CanManage || model is null) return;
+        BindingChanged(binding, value); messages?.Clear(FormContext.Field(nameof(model.ValueBindings))); FormContext.NotifyFieldChanged(FormContext.Field(nameof(model.ValueBindings))); MarkDirty();
+    }
+    private Task RequestSection(string path) { Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); return Task.CompletedTask; }
+    private Task InvalidSubmitAsync(EditContext context)
+    {
+        if (!IsNew) return Task.CompletedTask;
+        return RevealCreationErrorAsync();
+    }
+    private async Task RevealCreationErrorAsync()
+    {
+        var section = ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations);
+        if (wizard is not null) await wizard.GoToStepAsync(section == "definition/identity" ? "identity" : "configuration");
+        definitionForm?.RequestValidationFocus();
+    }
+    private bool ValidateForSave()
+    {
+        if (model is null) return false;
+        messages ??= new(FormContext); messages.Clear();
+        if (model.ScopeRef != ResourceScopeRef.Instance) messages.Add(FormContext.Field(nameof(model.ScopeRef)), Shared["Validation.Required", Shared["Scope"]]);
+        if (model.MissingRequiredBindings(Requirements.Where(item => item.Required).Select(item => item.Id)).Count > 0) messages.Add(FormContext.Field(nameof(model.ValueBindings)), Shared["Validation.Required", T("ValueBindings")]);
+        FormContext.NotifyValidationStateChanged();
+        return FormContext.Validate();
+    }
+    private async Task FinishCreationAsync(CreationWizardFinish args)
+    {
+        if (!CanManage || Busy || creators.Count > 0) return;
+        if (!ValidateForSave()) { args.ReturnToStepId = ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) == "definition/identity" ? "identity" : "configuration"; definitionForm?.RequestValidationFocus(); return; }
+        await SaveAsync(FormContext);
+    }
+    private async Task SaveAsync(EditContext context)
+    {
+        if (!CanManage || Busy || model is null || creators.Count > 0) return;
+        if (!ValidateForSave()) { await definitionForm!.RevealValidationAsync(); return; }
+        var request = loadVersion; var wasNew = IsNew; var previous = resource; var ns = ResourceNamespace.Parse(model.Namespace); var name = model.Name.Trim();
+        saving = true; error = null;
+        try
+        {
+            var saved = wasNew ? await Client.CreateModelProviderAsync(model.ToCreateRequest(), cancellation.Token) : await Client.UpdateModelProviderAsync(resource!.Namespace, resource.Name, model.ToPutRequest(), etag!, cancellation.Token);
+            if (request != loadVersion) return;
+            if (!Matches(saved.Value, wasNew ? ns : previous!.Namespace, wasNew ? name : previous!.Name, previous)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            persisted = true;
+            Adopt(new(saved, extensions, parameters, secrets, scopeTargets, usages, status, models, modelsKnown, usagesKnown, modelsError, catalogueWarning));
+            Notifications.Add(new(Guid.NewGuid(), T(wasNew ? "CreatedNotification" : "UpdatedNotification"), saved.Value.Name, DateTimeOffset.Now, UiStatus.Success));
+            if (wasNew) discoveryResult = await DiscoverAfterCreationAsync(saved.Value, request);
+            if (request != loadVersion) return;
+            await LoadObservedAsync(request);
+            if (request != loadVersion) return;
+            if (wasNew) Navigation.NavigateTo(DetailsUrl(saved.Value));
+        }
+        catch (ArgumentException exception) { if (request == loadVersion) error = new(exception.Message, Guid.NewGuid().ToString("N")); }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) saving = false; }
+    }
+    private void Discard() { if (Busy || creators.Count > 0 || baselineBundle is null) return; Adopt(newerBundle ?? baselineBundle); error = null; }
+    private async Task LoadObservedAsync(long request)
+    {
+        if (resource is not { } saved) return;
+        var observed = await ReadObservedAsync(saved);
+        if (request != loadVersion) return;
+        modelsError = observed.Error;
+        status = observed.Status; models = observed.Models; modelsKnown = observed.Known;
+    }
+    private async Task TestAsync()
+    {
+        if (!CanOperate || Busy || resource is not { } saved) return;
+        var request = loadVersion; testing = true; error = null;
+        try { var tested = await Client.TestProviderAsync(saved.Namespace, saved.Name, cancellation.Token); if (request != loadVersion) return; status = tested; await LoadObservedAsync(request); }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) testing = false; }
+    }
+    private async Task<ModelDiscoveryDiffResponse?> DiscoverAfterCreationAsync(ModelProviderResource saved, long request)
+    {
+        try { var result = await Client.RefreshProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token); if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("InitialDiscoveryComplete"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success)); return result; }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("InitialDiscoveryFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Warning)); return null; }
+    }
+    private async Task RefreshModelsAsync()
+    {
+        if (!CanOperate || Busy || resource is not { } saved) return;
+        var request = loadVersion; refreshing = true; modelsError = null; discoveryResult = null;
+        try { var result = await Client.RefreshProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token); if (request != loadVersion) return; discoveryResult = result; await LoadObservedAsync(request); if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("DiscoveryRefreshed"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success)); }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) modelsError = exception.Message; }
+        finally { if (request == loadVersion) refreshing = false; }
+    }
+    private string DiscoverySummary(ModelDiscoveryDiffResponse result) => T("DiscoverySummary", result.Created, result.Updated, result.Unchanged, result.Missing, result.Reappeared, result.Total);
+    private void RequestDelete() { if (!CanDelete || Busy) return; if (usagesKnown && usages.Count == 0) confirmDelete = true; else error = new(usagesKnown ? T("ProviderUsedBy", ProfileCount(usages.Count)) : T("UsagesUnavailable"), Guid.NewGuid().ToString("N")); }
+    private async Task DeleteAsync()
+    {
+        if (!CanDelete || Busy || resource is not { } saved || etag is null) return;
+        var request = loadVersion; confirmDelete = false; saving = true;
+        try { await Client.DeleteModelProviderAsync(saved.Namespace, saved.Name, etag, cancellation.Token); if (request != loadVersion) return; ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); pendingNavigation = BackUrl; }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) saving = false; }
     }
     private ModelProviderValueBindingEditorModel Binding(ExtensionValueRequirementResponse requirement) =>
         model!.ValueBindings.Single(value => value.RequirementId == requirement.Id);
@@ -282,10 +455,17 @@ else
     }
     private async Task ValueCreatedAsync(ScopedResourceAddress address)
     {
+        var request = loadVersion;
         if (address.Kind == ParameterResourceKinds.Parameter)
-            parameters = await ParametersClient.GetParametersAsync(cancellation.Token);
+        {
+            var loaded = await ParametersClient.GetParametersAsync(cancellation.Token);
+            if (request == loadVersion) parameters = loaded;
+        }
         else
-            secrets = await SecretsClient.GetSecretsAsync(address.ScopeRef, cancellation.Token);
+        {
+            var loaded = await SecretsClient.GetSecretsAsync(address.ScopeRef, cancellation.Token);
+            if (request == loadVersion) secrets = loaded;
+        }
     }
     private static ParameterValueType? ParameterType(string valueType) => valueType.ToLowerInvariant() switch
     {
@@ -313,26 +493,21 @@ else
     private string Features(AvailableModelResponse item)
     {
         var features = new List<string>();
-        if (IsSupported(item.Specification.Features.Streaming?.Support)) features.Add("Streaming");
-        if (IsSupported(item.Specification.Features.Tools?.Support)) features.Add("Tools");
-        if (IsSupported(item.Specification.Features.StructuredOutput?.Support)) features.Add("Structured output");
-        if (IsSupported(item.Specification.Features.Reasoning?.Support)) features.Add("Reasoning");
+        if (IsSupported(item.Specification.Features.Streaming?.Support)) features.Add(ModelLabels["Streaming"]);
+        if (IsSupported(item.Specification.Features.Tools?.Support)) features.Add(ModelLabels["Tools"]);
+        if (IsSupported(item.Specification.Features.StructuredOutput?.Support)) features.Add(ModelLabels["Structuredoutput"]);
+        if (IsSupported(item.Specification.Features.Reasoning?.Support)) features.Add(ModelLabels["Reasoning"]);
         return features.Count == 0 ? T("NotReported") : string.Join(" · ", features);
     }
     private static bool IsSupported(ModelFeatureSupport? support) => support is
         ModelFeatureSupport.Native or ModelFeatureSupport.Emulated or ModelFeatureSupport.Partial;
-    private static string ProfileUrl(ModelProviderUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.Name)}";
-    private string ModelDetailsUrl(AvailableModelResponse item) => ConsoleResourceUrls.Model(
-        ResourceAddress.Create(ResourceNamespace.Parse(model?.Namespace), ModelResourceKinds.Model, item.ResourceName!), resource?.ScopeRef ?? selectedScope);
+    private string ModelDetailsUrl(AvailableModelResponse item) => ConsoleResourceUrls.Model(ResourceAddress.Create(resource!.Namespace, ModelResourceKinds.Model, item.ResourceName!), resource.ScopeRef);
     private string CreateModelProfileUrl(string? modelName = null)
     {
-        var providerNamespace = ResourceNamespace.Parse(model?.Namespace ?? Namespace).Value;
-        var providerName = model?.Name ?? Name ?? string.Empty;
-        return $"/modelprofiles/new?namespace={Uri.EscapeDataString(providerNamespace)}&provider={Uri.EscapeDataString(providerName)}&providerNamespace={Uri.EscapeDataString(providerNamespace)}"
-            + (modelName is null ? string.Empty : $"&model={Uri.EscapeDataString(modelName)}");
+        var ns = resource?.Namespace.Value ?? model?.Namespace ?? Namespace ?? ResourceNamespace.DefaultValue;
+        var name = resource?.Name ?? model?.Name ?? Name ?? string.Empty;
+        return ResourceOwnershipContext.PreserveNavigation($"/modelprofiles/new?namespace={Uri.EscapeDataString(ns)}&provider={Uri.EscapeDataString(name)}&providerNamespace={Uri.EscapeDataString(ns)}" + (modelName is null ? string.Empty : $"&model={Uri.EscapeDataString(modelName)}"), Services);
     }
-    private static string DetailsUrl(ResourceNamespace @namespace, string name) => $"/modelproviders/{Uri.EscapeDataString(name)}?namespace={Uri.EscapeDataString(@namespace.Value)}";
-    private static string ExtensionKey(ExtensionResponse extension) => $"{extension.RegistrationNamespace}:{extension.RegistrationName}";
-    private enum ProviderTab { Overview, Configuration, Access }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private string DetailsUrl(ModelProviderResource saved) => ResourceOwnershipContext.Resource(Services, "/modelproviders", saved.Name, saved.Namespace, saved.ScopeRef);
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

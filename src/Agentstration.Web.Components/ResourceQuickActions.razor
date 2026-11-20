@@ -1,0 +1,12 @@
+<div class="resource-quick-actions-host">
+    <FormSection Title="@Title" Class="resource-quick-actions" TestId="@TestId">
+        <FormActions Class="resource-quick-actions-buttons" Busy="Busy" role="group" aria-label="@Title">@ChildContent</FormActions>
+    </FormSection>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

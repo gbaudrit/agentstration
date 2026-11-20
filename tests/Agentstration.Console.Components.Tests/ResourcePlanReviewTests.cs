@@ -10,10 +10,12 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 
@@ -123,19 +125,20 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
+        PrepareNavigation(context);
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(6, rendered.FindAll("[role=tab]").Count);
+            Assert.AreEqual(6, rendered.FindAll("[data-resource-section]").Count);
             Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal);
             Assert.Contains("ChangeSet belongs to an earlier revision", rendered.Markup, StringComparison.Ordinal);
         });
-        rendered.Find("#tab-Changes").Click();
-        Assert.IsTrue(rendered.FindAll("button").Single(value => value.TextContent.Contains("Check proposal", StringComparison.Ordinal)).HasAttribute("disabled"));
+        Select(rendered, "changes");
+        Assert.IsTrue(VisibleButtons(rendered).Single(value => value.TextContent.Contains("Check proposal", StringComparison.Ordinal)).HasAttribute("disabled"));
         Assert.Contains("definition.displayName", rendered.Markup, StringComparison.Ordinal);
         Assert.AreEqual(1, rendered.FindAll(".resource-plan-change").Count);
         Assert.Contains("Compare 1 field", rendered.Find(".resource-plan-change-diff summary").TextContent, StringComparison.Ordinal);
-        rendered.Find("#tab-Graph").Click();
+        Select(rendered, "graph");
         Assert.AreEqual(1, rendered.FindAll(".topology-node").Count);
         Assert.AreEqual(0, rendered.FindAll(".topology-legend").Count);
         rendered.Find(".topology-node").Click();
@@ -144,12 +147,12 @@ public sealed class ResourcePlanReviewTests
         rendered.Find(".resource-plan-graph-details header button").Click();
         Assert.IsEmpty(rendered.FindAll(".resource-plan-graph-details"));
         rendered.Find(".topology-node").Click();
-        rendered.Find("#tab-Changes").Click();
-        rendered.Find("#tab-Graph").Click();
+        Select(rendered, "changes");
+        Select(rendered, "graph");
         Assert.Contains("triage", rendered.Find(".resource-plan-graph-details").TextContent, StringComparison.Ordinal);
-        rendered.Find("#tab-Validation").Click();
+        Select(rendered, "validation");
         Assert.Contains("Verification is stale", rendered.Markup, StringComparison.Ordinal);
-        rendered.Find("#tab-Activity").Click();
+        Select(rendered, "activity");
         Assert.Contains("Plan origin", rendered.Find(".resource-plan-origin-card").TextContent, StringComparison.Ordinal);
         Assert.Contains(Plan.Origin.PrincipalId.ToString("D"), rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
         Assert.IsFalse(rendered.Find(".resource-plan-origin").TextContent.Contains("Plan creator", StringComparison.Ordinal));
@@ -172,11 +175,12 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
+        PrepareNavigation(context);
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Plans de ressources", context.Services.GetRequiredService<IStringLocalizer<ResourcePlansStrings>>()["Title"].Value, StringComparison.Ordinal));
         Assert.Contains("Créer un profil de modèle pour continuer", rendered.Markup, StringComparison.Ordinal);
-        rendered.Find("#tab-Validation").Click();
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
+        Select(rendered, "validation");
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(1, client.ValidationCalls);
@@ -197,26 +201,27 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider(identityRead: true)));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
+        PrepareNavigation(context);
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForAssertion(() => Assert.Contains("Support design", rendered.Markup, StringComparison.Ordinal));
-        rendered.Find("#tab-Activity").Click();
+        Select(rendered, "activity");
         Assert.Contains("Plan creator", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
         Assert.IsFalse(rendered.Find(".resource-plan-origin").TextContent.Contains("Appliqué par", StringComparison.Ordinal));
-        rendered.Find("#tab-Application").Click();
+        Select(rendered, "application");
         Assert.Contains("Vérifiez d’abord la proposition", rendered.Find(".resource-plan-application-pending").TextContent, StringComparison.Ordinal);
-        rendered.Find("#tab-Validation").Click();
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
+        Select(rendered, "validation");
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() => Assert.Contains("Prêt pour la suite", rendered.Find(".resource-plan-validation-summary").TextContent, StringComparison.Ordinal));
         Assert.IsEmpty(rendered.FindAll(".resource-plan-application-summary"));
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Voir l’application", StringComparison.Ordinal)).Click();
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Voir l’application", StringComparison.Ordinal)).Click();
         Assert.Contains("Appliquer la proposition", rendered.Markup, StringComparison.Ordinal);
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Appliquer la proposition", StringComparison.Ordinal)).Click();
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Appliquer la proposition", StringComparison.Ordinal)).Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(client.LastApplyRequest);
             Assert.AreEqual(set.Value.Digest, client.LastApplyRequest.ChangeSetDigest);
-            Assert.IsTrue(rendered.Find("#tab-Application").ClassList.Contains("active"));
+            Assert.IsTrue(rendered.Find("[data-resource-section=application]").GetAttribute("aria-current") == "page");
             Assert.Contains("Ressources appliquées", rendered.Find(".resource-plan-application-summary").TextContent, StringComparison.Ordinal);
             Assert.AreEqual("1", rendered.Find(".resource-plan-application-counts strong").TextContent);
             Assert.Contains("Triage", rendered.Find(".resource-plan-application-operations").TextContent, StringComparison.Ordinal);
@@ -225,7 +230,7 @@ public sealed class ResourcePlanReviewTests
             Assert.AreEqual("Triage", resourceLink.TextContent);
             Assert.HasCount(1, rendered.FindAll(".resource-plan-application-operations li a"));
         });
-        rendered.Find("#tab-Activity").Click();
+        Select(rendered, "activity");
         rendered.WaitForAssertion(() =>
         {
             Assert.Contains("Appliqué par", rendered.Find(".resource-plan-origin").TextContent, StringComparison.Ordinal);
@@ -247,10 +252,11 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
+        PrepareNavigation(context);
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
-        rendered.WaitForElement("#tab-Validation");
-        rendered.Find("#tab-Validation").Click();
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
+        rendered.WaitForElement("[data-resource-section=validation]");
+        Select(rendered, "validation");
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Vérifier la proposition", StringComparison.Ordinal)).Click();
 
         rendered.WaitForAssertion(() =>
         {
@@ -275,9 +281,11 @@ public sealed class ResourcePlanReviewTests
         context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
         context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
 
+        PrepareNavigation(context);
         var rendered = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         rendered.WaitForElement(".resource-plan-binding-card");
         rendered.FindAll(".resource-plan-binding-card select")[0].Change("0");
+        PrepareNavigation(context);
         var partiallyReopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         partiallyReopened.WaitForAssertion(() => Assert.Contains("0 of 1 bindings configured", partiallyReopened.Markup, StringComparison.Ordinal));
         Assert.AreEqual("0", partiallyReopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
@@ -289,26 +297,125 @@ public sealed class ResourcePlanReviewTests
         Assert.AreEqual("model-a", binding.ModelProfile.Name);
         Assert.AreEqual("runtime-a", binding.RuntimeProfile.Name);
         Assert.AreEqual(ResourceScopeRef.Workspace(Scope.WorkspaceId.Value), binding.ModelProfile.ScopeRef);
+        PrepareNavigation(context);
         var reopened = context.Render<ResourcePlanDetails>(parameters => parameters.Add(value => value.Id, Plan.Id.Value));
         reopened.WaitForAssertion(() => Assert.Contains("1 of 1 bindings configured", reopened.Markup, StringComparison.Ordinal));
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
         Assert.AreEqual("0", reopened.FindAll(".resource-plan-binding-card select")[1].GetAttribute("value"));
-        reopened.Find("#tab-Changes").Click();
+        Select(reopened, "changes");
         Assert.Contains("Plan proposal", reopened.Markup, StringComparison.Ordinal);
-        rendered.Find("#tab-Changes").Click();
+        Select(rendered, "changes");
         Assert.Contains("Plan proposal", rendered.Markup, StringComparison.Ordinal);
         Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
         Assert.Contains("runtime-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
-        rendered.Find("#tab-Graph").Click();
+        Select(rendered, "graph");
         Assert.AreEqual(1, rendered.FindAll(".topology-node").Count);
-        rendered.Find("#tab-Changes").Click();
+        Select(rendered, "changes");
         rendered.Find("#change-set-select").Change(set.Value.Id.Value.ToString("D"));
         Assert.Contains("Saved proposal", rendered.Markup, StringComparison.Ordinal);
         Assert.AreEqual(2, rendered.FindAll(".resource-plan-change").Count);
         rendered.Find("#change-set-select").Change("preview");
         Assert.Contains("model-a", rendered.Find(".resource-plan-change-highlights").TextContent, StringComparison.Ordinal);
-        rendered.FindAll("button").Single(value => value.TextContent.Contains("Save this proposal", StringComparison.Ordinal)).Click();
+        VisibleButtons(rendered).Single(value => value.TextContent.Contains("Save this proposal", StringComparison.Ordinal)).Click();
         rendered.WaitForAssertion(() => Assert.AreEqual("reviewed", client.LastChangeSetRequest?.ExpectedDigest));
+    }
+
+    [TestMethod]
+    public void SharedOperationalFrameKeepsThePlansOwnIdentityAndSixInspectionSections()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new FakeClient(ChangeSet(Plan.Revision, []));
+        using var context = ReviewContext(client);
+        var page = context.Render<ResourcePlanDetails>(p => p.Add(value => value.Id, Plan.Id.Value));
+        page.WaitForElement("[data-testid=resource-plan-identity-summary]");
+        Assert.AreEqual(Plan.Id.ToString(), page.FindComponent<ResourceIdentitySummary>().Instance.TechnicalName);
+        Assert.IsNull(page.FindComponent<ResourceIdentitySummary>().Instance.Labels);
+        Assert.IsNull(page.FindComponent<ResourceDetailsTemplate>().Instance.ScopeRef);
+        CollectionAssert.AreEqual(new[] { "overview", "changes", "graph", "validation", "application", "activity" },
+            page.FindAll("[data-resource-section]").Select(value => value.GetAttribute("data-resource-section")).ToArray());
+        Assert.IsTrue(page.Markup.IndexOf("metric-grid", StringComparison.Ordinal) < page.Markup.IndexOf("resource-plan-identity-summary", StringComparison.Ordinal));
+        Assert.Contains("Coordinate support", page.Find("[data-testid=resource-plan-configuration-summary]").TextContent, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void FailedAutoSavedBindingsSurviveSectionsAndChangedRefreshUntilExplicitDiscard()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new FakeClient(ChangeSet(Plan.Revision, [])) { FailBindingSave = true };
+        using var context = ReviewContext(client, withProfiles: true);
+        var page = context.Render<ResourcePlanDetails>(p => p.Add(value => value.Id, Plan.Id.Value));
+        page.WaitForElement(".resource-plan-binding-card select").Change("0");
+        Assert.IsTrue(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Select(page, "graph"); Select(page, "overview");
+        client.CurrentPlan = new(Plan with { Title = "New saved title", Revision = 3 }, "\"newer-plan\"");
+        Refresh(page);
+        Assert.AreEqual("0", page.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
+        Assert.AreEqual("Support design", page.FindComponent<ResourceDetailsTemplate>().Instance.Name);
+        Assert.Contains("A newer plan", page.Find(".form-alert-warning").TextContent, StringComparison.Ordinal);
+        Assert.IsTrue(page.FindAll(".resource-plan-binding-card select")[0].HasAttribute("disabled"));
+        page.Find(".unsaved-changes-bar .button-secondary").Click();
+        Assert.AreEqual("New saved title", page.FindComponent<ResourceDetailsTemplate>().Instance.Name);
+        Assert.AreEqual("", page.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
+        Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.ServiceUnavailable, ResourceLoadStatus.Failed)]
+    [DataRow(HttpStatusCode.Forbidden, ResourceLoadStatus.Forbidden)]
+    [DataRow(HttpStatusCode.NotFound, ResourceLoadStatus.NotFound)]
+    public void RefreshRetainsRecoverableBindingsAndPurgesPrivateReadLoss(HttpStatusCode status, ResourceLoadStatus expected)
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new FakeClient(ChangeSet(Plan.Revision, [])) { FailBindingSave = true };
+        using var context = ReviewContext(client, withProfiles: true);
+        var page = context.Render<ResourcePlanDetails>(p => p.Add(value => value.Id, Plan.Id.Value));
+        page.WaitForElement(".resource-plan-binding-card select").Change("0"); client.ReadFailure = status;
+        Refresh(page);
+        Assert.AreEqual(expected, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+        if (status == HttpStatusCode.ServiceUnavailable) Assert.AreEqual("0", page.FindAll(".resource-plan-binding-card select")[0].GetAttribute("value"));
+        else { Assert.IsEmpty(page.FindAll(".resource-plan-binding-card")); Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!()); }
+    }
+
+    [TestMethod]
+    public void ForeignPlanScopeIsRejectedBeforeReadingAuxiliaryInformation()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new FakeClient(ChangeSet(Plan.Revision, []));
+        using var context = ReviewContext(client);
+        var page = context.Render<ResourcePlanDetails>(p => p.Add(value => value.Id, Plan.Id.Value));
+        page.WaitForElement("[data-testid=resource-plan-identity-summary]"); var calls = client.ActivityCalls;
+        client.CurrentPlan = new(Plan with { Scope = new(Guid.NewGuid(), WorkspaceId.New()) }, "\"foreign\""); Refresh(page);
+        Assert.AreEqual(ResourceLoadStatus.NotFound, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.AreEqual(calls, client.ActivityCalls); Assert.IsEmpty(page.FindAll("[data-testid=resource-plan-identity-summary]"));
+    }
+
+    private static BunitContext ReviewContext(FakeClient client, bool withProfiles = false)
+    {
+        var context = new BunitContext().WithCollectionPresentation(); context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourcePlansApiClient>(client); RegisterProfiles(context, withProfiles);
+        context.Services.AddSingleton(new ConsoleContextState(new FakeContextProvider()));
+        context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default).GetAwaiter().GetResult();
+        PrepareNavigation(context); return context;
+    }
+    private static void Select(IRenderedComponent<ResourcePlanDetails> page, string path) => page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection(path)).GetAwaiter().GetResult();
+    private static void Refresh(IRenderedComponent<ResourcePlanDetails> page) => page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync()).GetAwaiter().GetResult();
+    private static void PrepareNavigation(BunitContext context)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        var url = $"http://localhost/resource-plans/{Plan.Id.Value:D}"; navigation.NavigateTo(url);
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Setup<string>("currentLocation", _ => true).SetResult(url);
+        foreach (var path in new[] { "overview", "changes", "graph", "validation", "application", "activity" })
+        { var target = url + "#" + path; module.Setup<string>("navigate", call => Equals(call.Arguments[0], target)).SetResult(target); }
+    }
+
+    private static IEnumerable<AngleSharp.Dom.IElement> VisibleButtons(IRenderedComponent<ResourcePlanDetails> page) => page.FindAll("button").Where(button => !Hidden(button));
+    private static bool Hidden(AngleSharp.Dom.IElement element)
+    {
+        for (var current = element; current is not null; current = current.ParentElement)
+            if (current.HasAttribute("hidden")) return true;
+        return false;
     }
 
     private static ResourceChange Change(int order, string logicalId, IReadOnlyList<string> dependsOn, string displayName)
@@ -406,19 +513,27 @@ public sealed class ResourcePlanReviewTests
         private ResourceChangeSetApplicationSnapshot? application;
         private ResourcePlanBindingDraftSnapshot? savedBindings;
         public Guid AppliedPrincipalId => ResourcePlanReviewTests.AppliedPrincipalId;
+        public ResourcePlanSnapshot CurrentPlan { get; set; } = new(Plan, "\"plan\"");
+        public bool FailBindingSave { get; set; }
+        public HttpStatusCode? ReadFailure { get; set; }
+        public int ActivityCalls { get; private set; }
         public int ValidationCalls { get; private set; }
         public ResourcePlanMaterializationRequest? LastMaterializationRequest { get; private set; }
         public ResourcePlanMaterializationRequest? LastChangeSetRequest { get; private set; }
         public ApplyResourceChangeSetRequest? LastApplyRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
-        public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? new(Plan, "\"plan\"") : null);
-        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(application is null
+        public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => ReadFailure is { } status ? Task.FromException<ResourcePlanSnapshot?>(new HttpRequestException("public fixture read failure", null, status)) : Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? CurrentPlan : null);
+        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken)
+        {
+            ActivityCalls++; return Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(application is null
             ? [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch)]
             : [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch),
                 new(Guid.NewGuid(), Plan.Id, Scope, Plan.Revision, ResourcePlanActivityType.Applied, AppliedPrincipalId, null, DateTimeOffset.UnixEpoch.AddMinutes(1))]);
+        }
         public Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(savedBindings);
         public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
         {
+            if (FailBindingSave) throw new HttpRequestException("public fixture rejected binding save");
             if (savedBindings?.ETag != expectedETag) throw new InvalidOperationException("stale bindings");
             savedBindings = new(new(Plan.Id, Scope, request.PlanRevision, request.Bindings, DateTimeOffset.UnixEpoch, request.IntegrationBindings), "\"saved\"");
             return Task.FromResult(savedBindings);

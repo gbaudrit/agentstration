@@ -1,0 +1,49 @@
+{
+  "testedSourceCommit": "9bcfd4ef",
+  "documentationOnlyChangesAfterBuild": true,
+  "reviewedTopLevelScreens": 38,
+  "adoptedCatalogs": 33,
+  "protectedPilots": 2,
+  "retainedSpecializedScreens": [
+    "/settings/resource-scopes",
+    "/settings",
+    "/settings/bootstrap"
+  ],
+  "releaseSolutionBuild": {
+    "status": "passed",
+    "warnings": 0,
+    "errors": 0,
+    "command": "dotnet build Agentstration.slnx -c Release --no-restore"
+  },
+  "fastLane": {
+    "status": "failed-existing-baseline-case",
+    "total": 2198,
+    "passed": 2197,
+    "failed": 1,
+    "skipped": 0,
+    "command": "dotnet test --solution Agentstration.Tests.Fast.slnx -c Release --no-build --minimum-expected-tests 777 --max-parallel-test-modules 4"
+  },
+  "existingFailure": {
+    "test": "FlowOrchestrationEditorTests.ParticipantReorderingNotifiesDraftOwnershipAndDiscardRestoresTheSavedOrder",
+    "expected": "Agent B",
+    "actual": "agent-b",
+    "baselineCommit": "118b9ad71528ee707fc5542bcf18eac417f6e006",
+    "baselineReproduction": "Same isolated test restored, compiled and run in detached checkout; identical failure at line 59. Protected editor/test fixture unchanged by list migration."
+  },
+  "collectionInventory": {
+    "status": "passed",
+    "assertions": 3,
+    "command": "npx playwright test tests/collection-surface-catalog.spec.ts --project=desktop-chromium"
+  },
+  "newReusableJourney1242": "blocked pending explicit UX validation and merge",
+  "integrationLane": {
+    "status": "passed",
+    "total": 1570,
+    "passed": 1542,
+    "failed": 0,
+    "skipped": 28,
+    "skipReason": "Optional live providers/PostgreSQL dependencies are not configured.",
+    "duration": "8m 37s 218ms",
+    "command": "dotnet test --solution Agentstration.Tests.Integration.slnx -c Release --no-build --minimum-expected-tests 954 --max-parallel-test-modules 2"
+  }
+}

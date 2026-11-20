@@ -1,0 +1,63 @@
+{
+  "base": "7ba891ad",
+  "productSourceCommit": "4ce25b31c6b5c219b8858b33cff086bc09f3ce3c",
+  "targetedTests": {
+    "webComponents": 41,
+    "consoleComponents": 117
+  },
+  "typescript": "passed",
+  "browserCases": [
+    {
+      "sourceReport": "probe-results.json",
+      "project": "desktop-chromium",
+      "title": "List navigation preserves context and guarded invalid drafts ",
+      "status": "passed",
+      "durationMs": 18818
+    },
+    {
+      "sourceReport": "probe-results.json",
+      "project": "mobile-chromium",
+      "title": "List navigation preserves context and guarded invalid drafts @responsive",
+      "status": "passed",
+      "durationMs": 14862
+    },
+    {
+      "sourceReport": "agent-results.json",
+      "project": "desktop-chromium",
+      "title": "an administrator can create and deploy an agent  @smoke",
+      "status": "passed",
+      "durationMs": 42990
+    },
+    {
+      "sourceReport": "agent-results.json",
+      "project": "mobile-chromium",
+      "title": "an administrator can create and deploy an agent @responsive @smoke",
+      "status": "passed",
+      "durationMs": 51642
+    },
+    {
+      "sourceReport": "browser-results.json",
+      "project": "desktop-chromium",
+      "title": "an administrator can publish a handoff Flow and its Entry @smoke",
+      "status": "passed",
+      "durationMs": 62914
+    }
+  ],
+  "unchangedHostAssemblies": {
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6bd96383b54672cbc9b52a1dc355658ed0a6b553ef8575cb8f20ce16d7a77553",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6bd96383b54672cbc9b52a1dc355658ed0a6b553ef8575cb8f20ce16d7a77553",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "f383e805684af86569d79cb35b07f8f857229fdbbdbc752ad721ba0436d2c3d9",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6bd96383b54672cbc9b52a1dc355658ed0a6b553ef8575cb8f20ce16d7a77553",
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "f383e805684af86569d79cb35b07f8f857229fdbbdbc752ad721ba0436d2c3d9",
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Workplace.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6bd96383b54672cbc9b52a1dc355658ed0a6b553ef8575cb8f20ce16d7a77553",
+    "src/Agentstration.Workplace.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Web.Components.dll": "ef88fb73f471d905c86072460aa39796898ca8950ed99c4b357d370144379584"
+  },
+  "ci": "Not inspected or modified, as requested",
+  "scope": "Focused local checks; full test solutions and complete browser suite not run."
+}

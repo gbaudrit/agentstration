@@ -1,0 +1,18 @@
+{
+  "baseCommit": "1a5bbcbdb78856a46cd0c5fdaf078b2dffc16daf",
+  "route": "/packs",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Packs.razor": "b407044d0a3ecae6cfcf949661aa4ef9b535c772",
+    "src/Agentstration.Console.Components/Components/Pages/Packs.razor.cs": "2cb015a457aa64dd68bd4b5de1a3c8e93b45fc54",
+    "src/Agentstration.Console.Client/PacksApiClient.cs": "f6d068a1f1c41361a81027b6980fde72e26c8b3f",
+    "src/Agentstration.Packs.Api/Api/PackEndpoints.cs": "754e50b6f2905a7a5084aa833237a7846593ea0f",
+    "src/Agentstration.Packs/PackManagementService.Installation.cs": "e101c1dc407a2680a7eea65223a58fb5a7c6f5a8",
+    "src/Agentstration.ResourceManagement.Storage.Sqlite/SqliteResourceStore.cs": "a23381ef600b0b05e176f3fd657270484276d17b",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

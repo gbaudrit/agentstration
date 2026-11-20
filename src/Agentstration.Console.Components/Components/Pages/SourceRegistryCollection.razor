@@ -1,0 +1,64 @@
+@implements IDisposable
+@inject ISourceRegistriesClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourceRegistriesStrings> Localizer
+
+<ResourceCollectionTemplate TItem="SourceRegistryRegistrationView" Title="@T("Title")" Description="@T("Description")" TestId="distribution-source-registries" ContextKey="@contextKey"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="@(registries ?? [])" RowTestId="source-registry-row" LoadState="loadState" Disabled="@(!interactive || busy)"
+                            ItemAttributes="@(item => new Dictionary<string, object> { ["class"] = IsOfficial(item) ? "registry-official" : string.Empty })"
+                            EmptyTitle="@T("NoRegistries")" EmptyMessage="@T("NoRegistriesMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <PrimaryActions>@if (hasCatalogAuthorization) { <a class="button-primary" href="@CreateUrl">@T("AddRegistry")</a> }</PrimaryActions>
+    <Navigation><ResourceTabs Label="@T("RegistryNavigation")">
+        <a class="active" href="/settings/source-registries">@T("Registrations")</a>
+        <a href="/settings/source-registries/discovery">@T("DiscoverSources")</a>
+        <a href="/settings/sources">@T("ImportedSources")</a>
+    </ResourceTabs></Navigation>
+    <Feedback>
+        <p class="form-help">@T("List.SnapshotHelp")</p>
+        @if (operationError is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("OperationFailed")</strong><span>@operationError.Message</span>@if (operationError.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">@T("ReloadLatest")</button> }</div> }
+    </Feedback>
+    <EmptyActions>@if (hasCatalogAuthorization) { <a class="button-primary" href="@CreateUrl">@T("AddRegistry")</a> }</EmptyActions>
+    <ItemActions Context="item">
+        <CollectionActions ResourceName="@item.Registration.Definition.DisplayName">
+            <button class="switch-button" type="button" role="switch" aria-checked="@item.Registration.Definition.Enabled.ToString().ToLowerInvariant()" aria-label="@F("ToggleRegistry", item.Registration.Definition.DisplayName)" disabled="@(busy || !interactive)" @onclick="() => ToggleAsync(item)"><span></span>@BooleanLabel(item.Registration.Definition.Enabled)</button>
+            <button class="text-button" disabled="@(busy || !interactive || !item.Registration.Definition.Enabled)" @onclick="() => RefreshAsync(item)">@T("RefreshNow")</button>
+        </CollectionActions>
+    </ItemActions>
+</ResourceCollectionTemplate>
+
+@code {
+    private string T(string key) => Localizer[key].Value;
+    private string F(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string CreateUrl => ResourceOwnershipContext.PreserveNavigation("/settings/source-registries/new", Services);
+    private string RegistryUrl(string name) => ResourceOwnershipContext.PreserveNavigation($"/settings/source-registries/{Uri.EscapeDataString(name)}", Services);
+    private CollectionColumn<SourceRegistryRegistrationView> IdentityColumn => new("identity", T("Registry"), item => @<text>
+        <CollectionIdentity DisplayName="@item.Registration.Definition.DisplayName" Namespace="@item.Registration.Namespace.Value" Name="@item.Registration.Name" Href="@RegistryUrl(item.Registration.Name)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.Registration.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@item.Registration.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Registration.ScopeRef, Services))" IconOnly /><StatusBadge Text="@ObservedStatus(item.Observed.Definition.Status)" Status="@ObservedTone(item.Observed.Definition.Status)" IconOnly /></IconBadges><Badges><small>@FormatDate(item.Observed.Definition.LastSuccessfulRefreshAt)</small></Badges></CollectionIdentity>
+        @if (IsOfficial(item)) { <span class="registry-kind-note">@T("WellKnownOfficial")</span> }
+    </text>);
+    private IReadOnlyList<CollectionColumn<SourceRegistryRegistrationView>> Columns =>
+    [
+        new("endpoint", T("EndpointType"), item => @<text><StatusBadge Text="@EndpointType(item)" Status="@(IsOfficial(item) ? UiStatus.Info : UiStatus.Neutral)" /><small>@TrustPolicy(item.Registration.Definition.TrustPolicy)</small></text>),
+        new("result", T("LastResult"), item => @<text><strong>@RefreshOutcome(item.Observed.Definition.LastOutcome)</strong>@if (!string.IsNullOrWhiteSpace(item.Observed.Definition.LastErrorMessage)) { <small class="registry-error" title="@item.Observed.Definition.LastErrorMessage">@item.Observed.Definition.LastErrorMessage</small> }</text>),
+        new("refresh", T("NextRefresh"), item => @<text>@NextRefresh(item)</text>),
+        new("enabled", T("Enabled"), item => @<text>@BooleanLabel(item.Registration.Definition.Enabled)</text>)
+    ];
+    private static bool IsOfficial(SourceRegistryRegistrationView value) => string.Equals(value.Registration.Name, SourceRegistryWellKnown.OfficialName, StringComparison.Ordinal);
+    private string EndpointType(SourceRegistryRegistrationView value) => IsOfficial(value) ? T("Endpoint.Official") : value.Registration.Definition.AuthenticationMode != SourceRegistryAuthenticationMode.None || value.Registration.Definition.EndpointPolicy.AllowPrivateNetwork ? T("Endpoint.Private") : T("Endpoint.External");
+    private string NextRefresh(SourceRegistryRegistrationView item)
+    {
+        if (!item.Registration.Definition.Enabled || !item.Registration.Definition.RefreshPolicy.PeriodicEnabled) return T("NotScheduled");
+        var observed = item.Observed.Definition;
+        if (observed.LastAttemptedAt is not { } lastAttempt) return T("DueNow");
+        var next = SourceRefreshSchedule.GetNextDue(lastAttempt, observed.ConsecutiveFailures,
+            item.Registration.Definition.RefreshPolicy, $"registry|{item.Registration.Uid:N}");
+        return next <= Clock.GetUtcNow() ? T("DueNow") : FormatDate(next);
+    }
+    private string ObservedStatus(SourceRegistryObservedStatus value) => T($"Observed.{value}");
+    private string RefreshOutcome(SourceRegistryRefreshOutcome? value) => value is null ? T("Never") : T($"Outcome.{value}");
+    private string TrustPolicy(SourceRegistryTrustPolicy value) => T($"TrustPolicy.{value}");
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+    private static UiStatus ObservedTone(SourceRegistryObservedStatus value) => value switch { SourceRegistryObservedStatus.Fresh or SourceRegistryObservedStatus.Recovered => UiStatus.Success, SourceRegistryObservedStatus.NeverFetched or SourceRegistryObservedStatus.Disabled => UiStatus.Neutral, SourceRegistryObservedStatus.Stale or SourceRegistryObservedStatus.NoCompatibleCatalog => UiStatus.Warning, _ => UiStatus.Danger };
+    private string FormatDate(DateTimeOffset? value) => value is null ? "—" : value.Value.ToLocalTime().ToString("g");
+}

@@ -1,0 +1,5 @@
+.resource-collection-link { display: inline-grid; place-items: center; flex: 0 0 auto; width: 2rem; height: 2rem; min-width: 2rem; min-height: 2rem; padding: .35rem; text-decoration: none; }
+.resource-collection-link ::deep .ui-icon { width: 1rem; height: 1rem; }
+@media (pointer: coarse) {
+    .resource-collection-link { width: 2.75rem; height: 2.75rem; min-width: 2.75rem; min-height: 2.75rem; }
+}

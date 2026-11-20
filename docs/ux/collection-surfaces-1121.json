@@ -3,6 +3,183 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
+      "id": "agent-runner-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "line": 62,
+      "host": "console",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/execution-scopes.spec.ts",
+          "tests/flow-observability.spec.ts",
+          "tests/runtime-worker-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Current Agent configuration and generation remain distinct from the recorded generation, model facts and execution options of an existing Runtime Run. Definition owner and execution scope remain separate context.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "flow-run-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "line": 83,
+      "host": "console",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/flow-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Recorded execution configuration preserves definition and execution scopes as distinct business context, trigger, deployment and caller facts; no resource ownership or mutable publication is inferred.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "flow-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
+      "line": 25,
+      "host": "console",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/flows"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/flow-observability.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The same saved configuration renderer is used by the full Flow overview and on-demand Preview on /flows. Focused component checks and local browser smoke are reported in agents-summary-poc.md."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Flow settings preserve actual kind, enablement and known publication data. Full detail uses its real publication history; on-demand Preview omits the unavailable publication date. Settings are not resource identities and gain no owner or row actions.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "agent-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "line": 43,
+      "host": "console",
+      "routes": [
+        "/agents/{Name}",
+        "/agents"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/create-agent.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "The saved configuration renderer is shared by the full Agent overview and on-demand Preview on /agents. Focused component cases and local desktop/mobile smoke are recorded in agents-summary-poc.md; no new reusable UX journey is claimed."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Agent configuration uses setting/value rows, preserving full structured values and exact profile links. Settings are not resource identities and gain no owner, lifecycle, publication version or row actions.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "connected-service-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Input",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceKind",
+        "ValueOrResource"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Bindings and literal options are source-reviewed. Existing family regression mapping is partial and does not claim populated detail-summary browser coverage; historical captures remain historical."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Configuration rows contain saved value bindings and literal options. Preserve reference coordinates and structured values; Secret references remain references without resolving contents. The former export-descriptor table is no longer rendered.",
+        "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
       "id": "run-grid-flow-run",
       "source": "src/Agentstration.Console.Components/Components/RunGrid.razor",
       "line": 3,
@@ -233,12 +410,12 @@
     {
       "id": "extensions-extension-inventory-item-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
-      "line": 226,
+      "line": 194,
       "host": "console",
       "routes": [
         "/extensions"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ExtensionInventoryItemResponse",
       "identityLabel": "Extension",
       "scope": true,
@@ -249,8 +426,35 @@
         "Enrollment",
         "Contributions"
       ],
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [
+          "evidence/list-layout/extensions/README.md"
+        ],
+        "interpretation": "Fresh deterministic populated desktop EN and mobile FR catalog checks; Summary/Enrollments and protected details retain their own contracts."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
+        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
+        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
+        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
+        "implementationPR": 1123,
+        "coveragePR": 1132,
+        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
+        "sourceBlob": "a65fd07a0202a7783d3d415d1c5a718ea6f04175"
+      },
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Bounded composite snapshot: full visible registrations, first 200 enrollment requests, bounded bundle observations. No global search/filter/total/pagination.",
+        "navigation": "Existing summary, catalog and enrollment destinations retained.",
+        "states": "Retained compatible refresh; principal/logical/physical context clears metadata and drafts; revisions/cancellation reject obsolete responses.",
+        "actions": "Exact detail link; only meaningful Source Provider contribution commands; registration and enrollment permissions retained.",
+        "evidence": "evidence/list-layout/extensions/README.md"
+      },
+      "historicalVerification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "domainSpecifications": [
@@ -303,33 +507,22 @@
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
         }
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
-        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
-        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
-        "implementationPR": 1123,
-        "coveragePR": 1132,
-        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
-        "sourceBlob": "a65fd07a0202a7783d3d415d1c5a718ea6f04175"
       }
     },
     {
       "id": "agent-runs-execution-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor",
-      "line": 8,
+      "line": 9,
       "host": "console",
       "routes": [
         "/agent-runs"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ExecutionSummary",
       "identityLabel": "Run",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Agent",
         "Started",
@@ -399,15 +592,22 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "f00a1635645daf8fd3a95df50c5b2050c14b41ab"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "New family client page adapter preserves the existing RuntimeRunPageResponse continuation with one exact-scope skip/top request and existing execution-summary projection. Unknown total, previous/next and 20/50/100 sizes. No search/filter contract fabricated for loaded pages and no fetch-all loop.",
+        "identity": "Existing Run/Agent/start/duration/outcome and status retained. Run name links explicitly retain exact execution scope and navigation context. Open-only menu removed.",
+        "states": "Compatible refresh/view and successful pager facts retained on failure; retry actual requested page. Empty terminal continuation keeps Previous and empty-page wording, not empty-catalog wording. Context/stale response and runs/read guards.",
+        "validation": "AgentRunCollectionTests plus populated deterministic real-run desktop/mobile API smoke; list-layout-adoption.md records evidence and limits."
       }
     },
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",
-      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
-      "line": 73,
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "line": 23,
       "host": "console",
       "routes": [
-        "/agents/new",
         "/agents/{Name}"
       ],
       "renderer": "CollectionView",
@@ -503,17 +703,17 @@
     {
       "id": "tool-sets-tool-set-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/sets"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolSetResource",
       "identityLabel": "ToolSet",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Members",
         "Category"
@@ -584,26 +784,38 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "2fb39f1c9d0884b973964c593adfb4513ceb225f"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog and latest immutable publication projection. Local name/description search, identity enabled-state filter, category column filter, advanced exact member-count column filter, additional namespace filter; exact totals and local 20/50/100 pages. No extra reads.",
+        "publication": "PublishedVersion only; unpublished drafts display an em dash. Draft version is never substituted.",
+        "navigation": "Legitimate Tool-family destinations and Knowledge Sources action retained with context; exact owner-qualified name links replace redundant Inspect-only actions. No creation workflow invented.",
+        "states": "Retained rows/view and stable query on compatible refresh; superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
+        "validation": "ToolSetCollectionTests; deterministic desktop/mobile fixture smoke and source proof recorded in list-layout-adoption.md."
+      },
+      "headerReview": {
+        "change": "Knowledge Sources header shortcut removed by user request; five family tabs and all catalog information/filters retained.",
+        "evidence": "evidence/list-layout/tool-sets/header-review/README.md"
       }
     },
     {
       "id": "tool-providers-tool-provider-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
-      "line": 11,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/providers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolProviderResource",
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Type",
-        "Tools",
-        "Enabled"
+        "Tools"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -668,6 +880,19 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "47554d80b254a4798ab7b39759c476e41db2a92e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local technical/display-name search; identity-associated discovery-status filter, type/enabled column filters, advanced exact tool-count column filter and additional namespace filter. Exact totals and local 20/50/100 paging; no extra reads.",
+        "navigation": "Legitimate Tool-family destinations and owner-qualified resource links retain context.",
+        "states": "Compatible refresh retains rows and view. Superseded/foreign-context responses are rejected; context replacement and denied access clear caches. Unknown discovery statuses remain neutral.",
+        "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
+        "validation": "ToolProviderCollectionTests; current deterministic desktop/mobile smoke, source proof and limits in list-layout-adoption.md."
+      },
+      "columnsReview": {
+        "change": "Enabled information column removed; identity, provider type and tool count retained. Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tool-providers/columns-review/README.md"
       }
     },
     {
@@ -925,7 +1150,7 @@
     {
       "id": "organization-members-agentstration-identity-contracts-local-account-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 27,
+      "line": 37,
       "host": "console",
       "routes": [
         "/settings/organization/members"
@@ -1008,13 +1233,13 @@
     {
       "id": "organization-members-agentstration-identity-contracts-organization-member-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 45,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/organization/members"
       ],
-      "renderer": "CollectionView",
-      "itemType": "Agentstration.Identity.Contracts.OrganizationMemberResponse",
+      "renderer": "ResourceCollectionTemplate",
+      "itemType": "OrganizationMemberResponse",
       "identityLabel": "Member",
       "scope": false,
       "state": true,
@@ -1086,6 +1311,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ba41bf2d086da5a1d576c391e6f033835c2ee025"
+      },
+      "pageComposition": {
+        "contract": "Complete authorized organization members and assignments, exact local 20/50/100 pages; role and scope match one assignment. AuthorizationRead required; optional local-account administration uses existing server capabilities.",
+        "state": "Retained compatible refresh, guarded principal/logical/physical context replacement and denial. Sensitive account draft cleared on context notification.",
+        "evidence": "docs/ux/evidence/list-layout/organization-members/README.md",
+        "tests": "OrganizationMembersCollectionTests; OrganizationLocalizationTests"
       }
     },
     {
@@ -1169,6 +1400,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -1252,6 +1489,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -1335,22 +1578,28 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
       "id": "packs-installed-pack-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
-      "line": 43,
+      "line": 12,
       "host": "console",
       "routes": [
         "/packs"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "InstalledPackResource",
       "identityLabel": "Pack",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Purpose",
         "Audience",
@@ -1423,6 +1672,13 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8eacc3f9268d389422b63931845f1e9597fcc3c7"
+      },
+      "pageComposition": {
+        "contract": "Complete authorized InstalledPack and PackProject arrays; exact local pages, name/publisher search, status/purpose/audience/publisher/owner filters. Metrics independent of filtered pages.",
+        "state": "ResourcesRead/Write gates, retained refresh; physical/logical/principal context guard, cleared sensitive catalogs and dialogs on notifications, late-response rejection.",
+        "preserved": "Existing inline detail, projects, install/fork/uninstall dialogs and ETags. Name uses explicit owner-scoped inspection; foreign-owner row switches to owning context. Legacy mutation contracts unchanged.",
+        "evidence": "docs/ux/evidence/list-layout/packs/README.md",
+        "tests": "PacksCollectionTests; PacksComponentTests"
       }
     },
     {
@@ -1474,17 +1730,17 @@
     {
       "id": "data-sources-data-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
-      "line": 16,
+      "line": 10,
       "host": "console",
       "routes": [
         "/data-sources"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "DataSourceResource",
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Profile"
       ],
@@ -1551,22 +1807,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b31088d4db1f0070368edc16ef4a6005e65f7051"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized DataSourceResource array. Name search, enabled identity filter, advanced displayed Storage/profile/direct-input text filter, namespace and exact scope filters; exact filtered total and 20/50/100 local pages.",
+        "identity": "Exact namespace/name/owner/context links and scope/status/governance markers retained. Existing DirectInput, dataset Storage and legacy Profile semantics preserved.",
+        "states": "Retained compatible refresh/view, stable query, interactivity, stale response/context replacement and denied-read guards.",
+        "actions": "Original dataset-composition creation destination permission-gated, Profiles destination retained, redundant Open-only menu removed.",
+        "validation": "DataSourceCollectionTests and real metadata-only desktop/mobile API smoke; list-layout-adoption.md records evidence and limits."
       }
     },
     {
       "id": "secrets-secret-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
-      "line": 22,
+      "line": 10,
       "host": "console",
       "routes": [
         "/secrets"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SecretResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Vault",
         "Type"
@@ -1634,17 +1899,26 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b41ff12a71406354abc024baeb4b427af3a568de"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized SecretResponse array; local name search, identity status, Vault/type column filters and additional exact scope filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained compatible refresh rows/view; stable query, interactivity, stale-response, context replacement and denied-read guards.",
+        "security": "Metadata/status only; no Secret-value read/write or Vault initialization. Exact name/scope links and applicable badges retained.",
+        "actions": "Context-aware Secrets/Vaults navigation and permission-gated creation; redundant Manage-only menu removed.",
+        "validation": "SecretCollectionTests and deterministic populated metadata-only desktop English/mobile French smoke. Evidence and limits in list-layout-adoption.md."
       }
     },
     {
       "id": "flows-flow-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
-      "line": 18,
+      "line": 11,
       "host": "console",
       "routes": [
         "/flows"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FlowSummary",
       "identityLabel": "CollectionResource",
       "scope": true,
@@ -1716,7 +1990,8 @@
         "kindPlacement": "name suffix",
         "versionPlacement": "dedicated column; active or definition version and existing workspace draft revision",
         "pagination": "server skip/top; 20/50/100 rows; nextLink-backed hasMore; total unknown",
-        "validation": "awaiting maintainer UX validation before wider adoption"
+        "validation": "awaiting maintainer UX validation before wider adoption",
+        "actions": "Independent Open, authorized Edit and on-demand Preview; no new mutation command."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -1733,18 +2008,19 @@
     {
       "id": "organization-access-access-row",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
-      "line": 12,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/organization/access"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AccessRow",
       "identityLabel": "Principal",
       "scope": true,
       "state": false,
       "actions": false,
       "informationKeys": [
+        "Scope",
         "Role",
         "Inheritance"
       ],
@@ -1811,12 +2087,21 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "75df26675ed2aae0308bf4439f88487c72a0979e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized organization membership/role arrays flattened to assignment rows without additional business requests. Name/exact principal ID search; exact role-ID, assignment-scope and existing inheritance predicates; exact assignment totals and local 20/50/100 pages.",
+        "identity": "Principal name and complete copyable ID link to the existing member destination with navigation context. Scope remains an assignment fact, separate from principal identity; existing Tenant-inherited versus explicit presentation retained. Role metadata is not replaced by display-name guesses.",
+        "states": "AuthorizationRead matches the API permission; resource/read is not invented. Compatible refresh retains rows, retry/clamp, true no-assignment versus no-match states, cancellation and stale response protection. Key includes user/logical scope/Tenant/Workspace; every role/context notification clears cached identity metadata before reauthorization.",
+        "actions": "Existing Organization navigation retained. No role, account or membership mutation or redundant Open-only command added.",
+        "validation": "OrganizationAccessCollectionTests and real populated desktop/mobile metadata smoke; ledger records limits."
       }
     },
     {
       "id": "flow-details-flow-version-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
-      "line": 84,
+      "line": 92,
       "host": "console",
       "routes": [
         "/flows/{FlowId}",
@@ -2054,17 +2339,17 @@
     {
       "id": "source-providers-source-provider-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
-      "line": 27,
+      "line": 10,
       "host": "console",
       "routes": [
         "/sourceproviders"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceProviderSummaryResponse",
       "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Extension",
         "Contribution"
@@ -2132,22 +2417,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "b08e100f6601fdabc4dae88e51dfedbf280e6877"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local name search, identity status filter, Extension/contribution column filters and additional namespace filter; exact totals and local 20/50/100 pages.",
+        "authorization": "PlatformAdmin is rechecked by the API. A successful catalog response authorizes visibility of create only together with target resource-write permission. Context snapshots clear privileged cached data and reauthorize; API denial removes rows and commands.",
+        "states": "Retained compatible refresh rows/view; initial/interactivity, superseded-response and identity-replacement guards.",
+        "actions": "Exact name links and Extension catalog destination retained with context; redundant Open-only menu removed.",
+        "validation": "SourceProviderCollectionTests plus the maintained configured-provider/status regression, current executable desktop/mobile smoke and inventory limits documented in list-layout-adoption.md."
       }
     },
     {
       "id": "resource-plans-resource-plan-snapshot",
       "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
-      "line": 44,
+      "line": 10,
       "host": "console",
       "routes": [
         "/resource-plans"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ResourcePlanSnapshot",
       "identityLabel": "Plan",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Changes",
         "Validation",
@@ -2214,22 +2508,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "926bb001d9ae665b4043d8e765b9b2bf7f0e0343"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "One bounded primary ListPlansAsync status/skip/take request. Existing server status filter; no name search, global total/direct jumps or local filters on per-page review evidence. Previous/next and 20/50/100 sizes. Existing per-plan review enrichment remains bounded to 50 ChangeSets and four concurrent reads.",
+        "identity": "Plan ID/title/goal, physical Workspace marker, status and actual revision retained. Links preserve the current logical navigation context so the family API resolves the same operational Workspace.",
+        "states": "Successful page/pager facts survive compatible failures, retry requested page, and empty terminal page retains Previous. Query changes clear incompatible results; user/logical scope/physical Workspace key cancels stale primary and supplementary reads. Review pending/failure stays unknown, not falsely unvalidated; denied review clears privileged content.",
+        "actions": "Redundant Open-only menu removed; no creation, materialization, validation or application command added. Local layout/table/pager CSS removed; domain goal typography retained.",
+        "validation": "ResourcePlanCollectionTests and populated desktop/mobile deterministic API draft smoke; ledger records limits."
       }
     },
     {
       "id": "runtime-workers-runtime-worker-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
-      "line": 14,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/runtime-workers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "RuntimeWorkerSummaryResponse",
       "identityLabel": "Worker",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Session",
         "Version",
@@ -2300,32 +2603,38 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "4275f58f05398f03963586549bd27848e129d09e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Worker array; display-name/Worker-ID search, presence/enrollment identity filters, runtime capability column choice, advanced session/software-version text filters; exact totals and local 20/50/100 pages. No resource-scope/namespace capability fabricated for global Workers.",
+        "authorization": "PlatformAdmin remains enforced by the existing API. Every Console context notification discards and reauthorizes privileged cached rows/options. Denied reads clear data.",
+        "identity": "Exact Worker UUID links preserve navigation; presence, enrollment, session, software/build, active/capacity, capability/material/implementation versions and last-seen data retained. Runtime material wording localized EN/FR.",
+        "states": "Retained compatible refresh/view, stable query, interactivity, context replacement, late response and localized failure guards.",
+        "actions": "Redundant Open-only menu removed; no enrollment or mutation workflow introduced.",
+        "validation": "WorkerCollectionTests and maintained RuntimeObservabilityConsoleTests inventory regression plus deterministic real Worker desktop/mobile smoke. See list-layout-adoption.md."
       }
     },
     {
       "id": "deployments-agent-instance-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
-      "line": 23,
+      "line": 11,
       "host": "console",
       "routes": [
         "/agent-instances",
         "/deployments"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AgentInstanceResponse",
       "identityLabel": "AgentInstance",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Agent",
         "Run",
-        "Execution",
         "Worker",
-        "RuntimeProfile",
-        "Started",
-        "LastActivity",
-        "Lease"
+        "ExecutionTiming"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "scopeMeaning": "Existing ExecutionScopeRef; no definition-owner lookup.",
@@ -2393,17 +2702,27 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "e86b3944fd8323125f833602b7496d4d570b4e8e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing exact-scope active-instance snapshot. RuntimeObservabilityQueryService examines at most 500 assigned records; the endpoint exposes no skip/filter/continuation contract. No search, filter, total, direct navigation or local pagination is advertised. Shared count explicitly describes loaded resources; localized snapshot guidance and observed-empty wording disclose the bound.",
+        "identity": "Actual instance identity and execution-scope badge; existing exact Run/Flow Run scope links, qualified Agent route, Worker UUID destination and navigation context retained. No Agent ownership is inferred from execution scope. Generation/revision, participants/turns, Worker/session, runtime profile and timing/lease facts preserved.",
+        "states": "Retained compatible snapshot/view; stale/context-replaced responses and runs/read denial guarded. Existing list/empty/row test IDs retained.",
+        "actions": "Redundant Open-only menu removed; no enrollment, creation, deployment or execution command introduced.",
+        "validation": "AgentInstanceCollectionTests and maintained runtime observability regression; real active Worker/Agent instance desktop/mobile smoke. Evidence and 500-assignment observation limit in list-layout-adoption.md.",
+        "columns": "Four shared information declarations group Agent/generation/profile/revision, Run/kind/participant/turns, Worker/session and start/activity/lease timing. No fact is discarded and no local responsive CSS is introduced."
       }
     },
     {
       "id": "tool-definitions-tool-definition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
-      "line": 18,
+      "line": 11,
       "host": "console",
       "routes": [
         "/tools/definitions"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolDefinitionResource",
       "identityLabel": "Tool",
       "scope": true,
@@ -2476,17 +2795,30 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8ba7f2f0949b9e969a4cea2d212ce16f17458f5d"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ToolDefinition catalog including operational acquisition projections. Local technical/display-name search, identity enabled-state filter, kind/approval column filters and additional namespace filter; exact totals and local 20/50/100 pages. No extra reads.",
+        "targets": "Preserves actual Flow namespace/name and pinned version or active alias, Relay namespace/name/generation and Acquisition template namespace/id.",
+        "actions": "Existing direct primary Edit action retained as required by the maintained regression, along with exact resource-name links. Creation requires resources/write and preserves the existing NavigationContext.AddToUri destination.",
+        "states": "Compatible refresh retains rows, selected view and stable query. Superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
+        "validation": "ToolDefinitionCollectionTests and the existing direct-edit/list regression; deterministic desktop/mobile smoke and inventory limits in list-layout-adoption.md."
+      },
+      "actionsReview": {
+        "change": "Edit remains a direct exact-scoped link, styled as a standard secondary button with a localized plain Edit/Modifier label instead of an arrow-text shortcut.",
+        "evidence": "evidence/list-layout/tool-definitions/actions-review/README.md"
       }
     },
     {
       "id": "triggers-trigger-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
-      "line": 45,
+      "line": 11,
       "host": "console",
       "routes": [
         "/triggers"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "TriggerResource",
       "identityLabel": "Trigger",
       "scope": true,
@@ -2561,22 +2893,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "f3a5557f257484e8160271fd089b986cabd9e4d7"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing API returns its complete operational-Workspace array after server-side enumeration. Local name/target search, enabled/schedule/outcome and advanced target/namespace/definition-scope filters; exact totals and local 20/50/100 pages. Existing metrics describe the entire authorized response, independently of filters. No client continuation loop.",
+        "identity": "Qualified Trigger and target Flow links retain logical definition scope and navigation context; the physical operational Workspace is not substituted for definition scope. Existing governance/state badges and chronological sort retained.",
+        "states": "Retained refresh failure, clamped successful shrink, forbidden clearing, cancellation and stale-response rejection. Context key includes user, selected logical scope and operational Workspace.",
+        "actions": "Existing permission-gated creation only; no redundant Open-only menu, enable or execution command added.",
+        "validation": "TriggerCollectionTests; fresh desktop/mobile disabled-metadata API smoke and existing family journey recorded in list-layout-adoption.md."
       }
     },
     {
       "id": "vaults-vault-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
-      "line": 15,
+      "line": 10,
       "host": "console",
       "routes": [
         "/vaults"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "VaultResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Provider",
         "Location"
@@ -2644,22 +2985,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "1e1777af7e35ac53cf7b8d95dd088afd8b611188"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized VaultResponse array; local name search, identity status filter, provider column filter and additional exact owner-scope filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained compatible refresh rows/view with stable query; interactivity, stale-response, context-replacement and denied-read guards.",
+        "security": "Only Vault metadata/status is requested. No Secret values or vault-initialization command is introduced. Existing provider/local location and scope/status/governance presentation retained.",
+        "actions": "Legitimate Secrets/Vaults destinations and exact name/scope links retain context; redundant Manage-only action removed; creation requires resources/write.",
+        "validation": "VaultCollectionTests plus real deterministic desktop/mobile metadata-only API smoke; evidence and inventory limits in list-layout-adoption.md."
       }
     },
     {
       "id": "data-source-profiles-data-source-profile-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
-      "line": 17,
+      "line": 11,
       "host": "console",
       "routes": [
         "/data-source-profiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "DataSourceProfileResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "ManagingExtension"
       ],
@@ -2730,19 +3080,27 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "d8f150003f2dff78f668de5a233e6c17a365becd"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized profile array; local name search and additional namespace filter; exact filtered total and 20/50/100 local pages. One shared optional Extension inventory request per refresh.",
+        "states": "Refresh retains profiles and compatible provenance. Request revisions protect both profile and inventory results. Context replacement and denied reads clear caches and option sources.",
+        "actions": "Exact scope/namespace/context name links and Data Sources destination retained. Open-only column removed; creation requires resources/write.",
+        "validation": "DataSourceProfileCollectionTests and existing EN/FR ExtensionManagedResourcePresentationTests; deterministic desktop/mobile fixture smoke recorded in list-layout-adoption.md. Historical screenshots are not evidence for the new composition."
       }
     },
     {
       "id": "source-registries-source-registry-registration-view",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
-      "line": 61,
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
+      "line": 8,
       "host": "console",
       "routes": [
         "/settings/source-registries",
         "/settings/source-registries/new",
         "/settings/source-registries/{Name}"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceRegistryRegistrationView",
       "identityLabel": "Registry",
       "scope": true,
@@ -2819,22 +3177,29 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "be7cec3afab3325f621215f19a25d311dea401ed"
+      },
+      "pageComposition": {
+        "contract": "Bounded first 1000 Instance registry registrations, no continuation, global search/filter/pager/total or global metrics. Explicit snapshot help.",
+        "state": "API PlatformAdmin authoritative; cached catalog cleared on every context notification, late responses rejected; compatible refresh retained.",
+        "commands": "Latest snapshot/ETag toggle and explicit business refresh retained; redundant Manage destination removed from menu. Editor/detail remain in SourceRegistries host.",
+        "evidence": "docs/ux/evidence/list-layout/source-registries/README.md",
+        "tests": "SourceRegistryCollectionTests; SourceRegistryConsoleTests"
       }
     },
     {
       "id": "model-providers-model-provider-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
-      "line": 26,
+      "line": 10,
       "host": "console",
       "routes": [
         "/modelproviders"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ModelProviderResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Type",
         "Management",
@@ -2905,22 +3270,30 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "79f6f9e17c9743e6650fad1d35e923a977f66673"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local technical/display-name search, identity status filter, contribution-type column filter, advanced registration-source/model-count column filters and additional namespace filter; exact totals and local 20/50/100 pages.",
+        "states": "Retained rows/view and stable query on compatible refresh; initial/interactivity, stale-response, context replacement and denied-access guards.",
+        "actions": "Exact owner-qualified name link retained; redundant View details-only menu removed. Create action requires resources/write.",
+        "validation": "ModelProviderCollectionTests and current deterministic executable desktop/mobile smoke documented in list-layout-adoption.md."
       }
     },
     {
       "id": "parameters-parameter-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
-      "line": 18,
+      "line": 10,
       "host": "console",
       "routes": [
         "/parameters"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ParameterResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "ValueType",
         "Value"
@@ -2986,22 +3359,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "300cca481a9299bc30a4bbe56d9f44cde317e6cb"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Parameter array. Technical/display-name search, typed value column filter, advanced visible-value text filter and additional exact ownership-scope filter; exact totals and local 20/50/100 pages. No namespace navigation or filter is invented for the current name/scope API.",
+        "values": "Preserves visible typed nonsecret values and the existing readable-configuration/Secret guidance. No Secret values are requested.",
+        "states": "Stable query and retained rows/view on compatible refresh; stale-response, context-replacement, read-denial and interactivity guards.",
+        "actions": "Existing exact name/scope destinations retained with navigation context; Manage-only row actions removed; creation requires resources/write.",
+        "validation": "ParameterCollectionTests plus the maintained visible-value/exact-scope regression, executable desktop/mobile smoke and inventory limits in list-layout-adoption.md."
       }
     },
     {
       "id": "artifacts-staged-artifact-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 17,
+      "line": 22,
       "host": "console",
       "routes": [
         "/artifacts"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StagedArtifactView",
       "identityLabel": "Artifact",
       "scope": false,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Producer",
         "Size",
@@ -3070,22 +3452,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "9cab592386c16ca86dedb73c9c1d42f2433123a0"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Workspace metadata arrays loaded together atomically. Separate durable/local-copy queries, exact totals and 20/50/100 local pages; no content, lease or materialization read added. Search actual name/ID; filters use displayed fields only.",
+        "identity": "Durable Artifact and local copy IDs, producer execution/resource references, storage/media/size/time and local availability explanation retained. Context-qualified links preserve existing destinations. Producer kind and byte units localized EN/FR.",
+        "states": "Retained compatible failed refresh across both collections; successful shrink clamps each query; stale user/logical/physical Workspace responses rejected. Both resources/read and artifacts/inspect required; denial clears both catalogs and counts.",
+        "actions": "Existing legitimate durable/local-copy sections retained with independent queries; redundant Open-only row menus removed. Related Knowledge Sources link retains context. No content or retention/mutation command added.",
+        "validation": "ArtifactCollectionTests plus maintained readable identity/storage/French explanation regressions; deterministic desktop/mobile evidence recorded in ledger."
       }
     },
     {
       "id": "artifacts-flow-run-artifact-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 41,
+      "line": 12,
       "host": "console",
       "routes": [
         "/artifacts"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FlowRunArtifactResource",
       "identityLabel": "Artifact",
       "scope": false,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "FlowRun",
         "Step",
@@ -3156,6 +3547,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "9cab592386c16ca86dedb73c9c1d42f2433123a0"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Workspace metadata arrays loaded together atomically. Separate durable/local-copy queries, exact totals and 20/50/100 local pages; no content, lease or materialization read added. Search actual name/ID; filters use displayed fields only.",
+        "identity": "Durable Artifact and local copy IDs, producer execution/resource references, storage/media/size/time and local availability explanation retained. Context-qualified links preserve existing destinations. Producer kind and byte units localized EN/FR.",
+        "states": "Retained compatible failed refresh across both collections; successful shrink clamps each query; stale user/logical/physical Workspace responses rejected. Both resources/read and artifacts/inspect required; denial clears both catalogs and counts.",
+        "actions": "Existing legitimate durable/local-copy sections retained with independent queries; redundant Open-only row menus removed. Related Knowledge Sources link retains context. No content or retention/mutation command added.",
+        "validation": "ArtifactCollectionTests plus maintained readable identity/storage/French explanation regressions; deterministic desktop/mobile evidence recorded in ledger."
       }
     },
     {
@@ -3239,22 +3639,28 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "482a1e7037b202dd5ba8c620d82ed30277d9b039"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-specialized-explorer-and-embedded-inventory",
+        "reason": "Primary accessible ownership tree selects a scope; resource list is the selected-node detail, not a standalone resource catalog.",
+        "review": "evidence/list-layout/resource-scopes/README.md",
+        "uiChanged": false
       }
     },
     {
       "id": "tool-categories-tool-category-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/tools/categories"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolCategoryResource",
       "identityLabel": "Category",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "DescriptionColumn",
         "Members"
@@ -3320,19 +3726,28 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ceca225cc6897c7f406fef633db9914685e41550"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local technical/display-name and description search; exact member-count column filter and additional namespace filter; exact totals and local 20/50/100 paging. No extra reads.",
+        "navigation": "Existing legitimate Tool catalog, ToolSets, categories, definitions and providers destinations retained with context.",
+        "states": "Retained results and selected view during refresh; page shrink clamping; request revision guards; Principal/scope replacement and access denial clear cached results.",
+        "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
+        "validation": "ToolCategoryCollectionTests; deterministic desktop/mobile smoke and limits recorded in list-layout-adoption.md."
       }
     },
     {
       "id": "agents-agent-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
-      "line": 37,
+      "line": 11,
       "host": "console",
       "routes": [
         "/agents"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AgentSummary",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Agents",
       "scope": true,
       "state": true,
       "actions": true,
@@ -3340,7 +3755,7 @@
         "Definition",
         "ModelProfile",
         "Deployment",
-        "LastActivity"
+        "List.DeploymentUpdated"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -3408,19 +3823,27 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "5c22628e5c4b78506ec51ec63158b70555893e83"
+      },
+      "pageComposition": {
+        "contract": "Primary Agent API skip/top with nextLink, 20/50/100 pages, unknown total/no arbitrary jumps. No unsupported global search or local status filters.",
+        "enrichment": "Single bounded first-1000 deployment observation per page, exact owner/namespace/name association; missing matches are unknown, with incomplete-window help and actual observed deployment update time.",
+        "state": "ResourcesRead/Write gates, compatible refresh and successful pager facts retained; principal/logical/physical context + revision guards, denied/late metadata cleared.",
+        "commands": "Existing scoped links, namespace/managed/ownership gates, Run/Edit/Delete/QuickInspect and latest scoped ETag confirmation retained; inspector Run permission aligned.",
+        "evidence": "docs/ux/evidence/list-layout/agents/README.md",
+        "tests": "AgentCollectionPermissionsTests; AgentsCollectionTests; ApiClientTests.AgentCollections"
       }
     },
     {
       "id": "model-profiles-model-profile-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
-      "line": 35,
+      "line": 11,
       "host": "console",
       "routes": [
         "/modelprofiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ModelProfileSummaryResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Profile",
       "scope": true,
       "state": true,
       "actions": true,
@@ -3492,6 +3915,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "e4feda69f678c71f4501e90f221fd6c072680fb2"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse from ModelProfileManagementService.ListAsync/store.ListAllAsync. One unfiltered load; local existing name/provider/model search, canonical status, provider-name choice, advanced model/known usage-count filters and namespace/exact-scope filters. Exact totals and local 20/50/100 pages. No provider catalog load or per-row resolution is introduced.",
+        "identity": "Exact qualified profile links, status tones including neutral future states, provider/model/nullable usage facts and scope/governance badges retained. Options derive from authorized profile summaries.",
+        "actions": "Create requires resources/write. Only exact-owner, unmanaged profiles with resources/read and resources/delete have Delete commands; Open-only menu link removed. Existing usage check, confirmation, latest scoped snapshot ETag, conflict usages and notification retained.",
+        "states": "Compatible refresh/view, stable query, successful shrink clamping, stale/context-replaced read guards, denied-read clearing and operation cancellation/context checks. A confirmed successful deletion is removed from the retained snapshot before refresh. Operation feedback is localized and never displays raw transport errors.",
+        "validation": "ModelProfileListTests plus maintained EN/FR ModelProfileCollectionStatusTests, populated deterministic desktop/mobile API smoke and actual disposable-profile confirmation/deletion. Evidence/limits in list-layout-adoption.md."
       }
     },
     {
@@ -3694,18 +4126,20 @@
     {
       "id": "organization-security-audit-agentstration-security-contracts-security-audit-event",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
-      "line": 25,
+      "line": 9,
       "host": "console",
       "routes": [
         "/settings/organization/security-audit"
       ],
-      "renderer": "CollectionView",
-      "itemType": "Agentstration.Security.Contracts.SecurityAuditEvent",
+      "renderer": "ResourceCollectionTemplate",
+      "itemType": "SecurityAuditEvent",
       "identityLabel": "Action",
       "scope": true,
       "state": true,
       "actions": false,
       "informationKeys": [
+        "Scope",
+        "Outcome",
         "Time",
         "Actor",
         "Target",
@@ -3774,6 +4208,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ba2bc21188b7c1c36e65a7fe412e8e24fc6974a5"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing one-request latest-event snapshot, limit 200 with no continuation/query/total contract. No search, filters, pager or global count; localized bounded-snapshot help and shared loaded count. API PlatformAdmin policy remains authoritative, with no invented resources/read gate.",
+        "identity": "Localized action plus exact action/reason codes; audit Workspace/Tenant/Instance context remains an event fact, not resource ownership. Time, outcome, full copyable actor/target/correlation IDs retained; no invented resource destination. Unknown actions/outcomes use localized neutral fallbacks.",
+        "states": "Compatible refresh retains events; error/retry, forbidden clearing, cancellation and late-response protection. Every context/role notification clears privileged cached events before API reauthorization.",
+        "actions": "Existing Organization navigation retained; only refresh/view controls added by the template. No identity/security mutation or content read.",
+        "validation": "SecurityAuditCollectionTests plus existing Organization localization regression; deterministic desktop/mobile source evidence recorded in ledger."
       }
     },
     {
@@ -4132,17 +4575,17 @@
     {
       "id": "schemas-schema-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
-      "line": 22,
+      "line": 11,
       "host": "console",
       "routes": [
         "/schemas"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SchemaResource",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Schema",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Format",
         "Dialect"
@@ -4213,6 +4656,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "73c84d39a78c40be6cbeac3e796cbdf1c102d772"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog. Local name search, format column choice, advanced dialect text, exact scope and namespace substring filters. Exact totals and local 20/50/100 pages; existing namespace/name ordering retained.",
+        "identity": "Exact namespace/name/scope links preserve navigation; draft generation and scope/governance badges retained. Format identifiers and dialect URIs remain technical values.",
+        "states": "Retained compatible refresh rows/view, stable query, interactivity, context replacement, late response and denied-read guards.",
+        "actions": "Create requires resources/write; redundant Open-only menu removed.",
+        "validation": "SchemaCollectionTests and maintained SchemaConsoleTests library regression; deterministic populated desktop/mobile API smoke. See list-layout-adoption.md for evidence and limits."
       }
     },
     {
@@ -4264,17 +4716,17 @@
     {
       "id": "knowledge-sources-knowledge-source-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
-      "line": 16,
+      "line": 10,
       "host": "console",
       "routes": [
         "/knowledge-sources"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "KnowledgeSourceResource",
       "identityLabel": "KnowledgeSource",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "DataSources",
         "ProjectionFlow",
@@ -4343,22 +4795,31 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "3696788dd6b048a40318c03ce2c8cadde8070597"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized array. Local technical/display-name search and enabled filter; advanced displayed Data Source/projection/retrieval text filters plus namespace and exact scope. Exact totals and local 20/50/100 pages; no projection or readiness reads added.",
+        "identity": "Preserve Knowledge Source, Data Source and distinct projection/retrieval Flow identities and existing test markers. References retain their own namespace and scope, falling back to the owning source only when unspecified. No profile substitution.",
+        "states": "Retained compatible refresh, failure/retry, successful shrink clamp, denied-read clearing, context replacement and stale-response rejection.",
+        "actions": "Existing permission-gated create and related Artifacts/ToolSets links preserve context. Redundant Inspect-only row menu removed; no lifecycle command added.",
+        "validation": "KnowledgeSourceCollectionTests plus existing clickable-name regression and desktop/mobile metadata browser smoke; ledger records limits."
       }
     },
     {
       "id": "runtime-profiles-runtime-profile-summary-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",
-      "line": 17,
+      "line": 10,
       "host": "console",
       "routes": [
         "/runtimeprofiles"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "RuntimeProfileSummaryResponse",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Profile",
       "scope": true,
       "state": false,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Runtime",
         "Session",
@@ -4428,6 +4889,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "fbcedc92ab50e1f905efe73d5edb055f89a7cfb9"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized ValueResponse catalog; local name search, runtime/session/streaming and namespace filters; exact filtered total with local 20/50/100 paging. No extra reads.",
+        "states": "Refresh retains results; denied reads clear cached rows; request revisions reject superseded and foreign-context responses.",
+        "actions": "Exact name link retained; redundant Open-only column removed; creation requires resources/write.",
+        "validation": "RuntimeProfileCollectionTests; desktop/mobile deterministic smoke recorded in list-layout-adoption.md. Historical captures do not validate this composition."
       }
     },
     {
@@ -4558,6 +5027,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "af4c269b81a0a86c1c6d56981a9f5a8ae2e39377"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-fixed-embedded-configuration-summary",
+        "reason": "Four tuples from application options inside a settings dashboard; no resource collection or server paging contract.",
+        "review": "evidence/list-layout/settings/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -4612,18 +5087,18 @@
     {
       "id": "sources-source-console-list-item",
       "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
-      "line": 83,
+      "line": 37,
       "host": "console",
       "routes": [
         "/settings/sources",
         "/settings/sources/{Publisher}/{Name}"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceConsoleListItem",
       "identityLabel": "Source",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Origin",
         "LatestImport"
@@ -4693,6 +5168,13 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "1d37e4240befcea387357030fd0dfffa7c241f17"
+      },
+      "pageComposition": {
+        "contract": "Complete PlatformAdmin-authorized Source Console response; exact local 20/50/100 pages, name/publisher search, import outcome/origin and advanced publisher/owner filters. Metrics describe complete response independently of criteria.",
+        "state": "Retained compatible refresh; physical/logical/principal context key, API reauthorization on notifications, stale/denied response protection.",
+        "preserved": "Existing import form and complete detail/command branches, publisher+name+owner destinations; redundant Open-only row menu omitted.",
+        "evidence": "docs/ux/evidence/list-layout/sources/README.md",
+        "tests": "SourcesCollectionTests; SourcesLocalizationTests; SourceConsoleLocalePresentationTests"
       }
     },
     {
@@ -4755,16 +5237,18 @@
       "renderer": "CollectionView",
       "itemType": "RuntimeRun",
       "identityLabel": "Run",
-      "scope": true,
+      "scope": false,
       "state": true,
       "actions": false,
       "informationKeys": [
         "Date",
         "Duration",
         "Initiator",
-        "Version",
+        "GenerationLabel",
         "Prompt",
-        "Origin"
+        "Origin",
+        "ExecutionScope",
+        "RecordedAgent"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -4788,7 +5272,7 @@
         "decision": "shared-identity-and-applicable-markers",
         "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
         "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
+        "domainSemantics": "Bounded recent runs match the Agent technical name; recorded qualified Agent reference and execution scope remain explicit business context. Agent generation is not a publication version and execution scope is not resource ownership.",
         "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
         "implementationPR": 1123,
         "coveragePR": 1132,
@@ -4799,20 +5283,19 @@
     {
       "id": "tools-tool-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
-      "line": 24,
+      "line": 11,
       "host": "console",
       "routes": [
         "/tools"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ToolResource",
       "identityLabel": "Tool",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
-        "Provider",
-        "Enabled"
+        "Provider"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -4877,6 +5360,20 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "d6cf1529c822db00738620e86b193f489ba288da"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized Tools and Providers arrays with one shared optional Extension inventory request. Local existing name/namespace/external-ID/displayed-provider search, availability/enabled and additional namespace/exact-scope filters; exact totals and local 20/50/100 pages. No provenance filter based on optional inventory.",
+        "identity": "Preserve exact Tool navigation including operational Workspace handling and exact Provider/Extension matching by name, namespace and scope. Extension version and recorded origin version remain separately labelled.",
+        "states": "Atomic successful catalog/enrichment replacement, retained failed refresh and successful shrink, authorization clearing, cancellation and stale-context rejection; context includes physical Workspace. Optional inventory errors do not hide primary Tools.",
+        "actions": "Preserve legitimate Tool-family navigation; remove redundant Details-only menu. Obsolete local responsive table CSS removed; meaningful provenance styling retained.",
+        "validation": "ToolCollectionTests plus maintained ToolCatalogTests and ExtensionsConsoleTests.ToolCatalog; desktop/mobile populated governed-fixture smoke recorded in ledger."
+      },
+      "controlsReview": {
+        "header": "Redundant Providers button removed; existing family tabs retained.",
+        "columns": "Tool identity and provider only; Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tools/controls-review/README.md"
       }
     },
     {
@@ -5025,73 +5522,6 @@
       "discoveredDuring": "2026-11-18 main synchronization #1174"
     },
     {
-      "id": "connected-service-details-connected-service-value-binding",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "line": 37,
-      "host": "console",
-      "routes": [
-        "/connected-services/{Name}"
-      ],
-      "renderer": "CollectionView",
-      "itemType": "ConnectedServiceValueBinding",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": [
-        "SourceKind",
-        "ValueOrResource"
-      ],
-      "validation": "source-adopted-current-validation-pending",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "implementationPR": 1174,
-        "coveragePR": 1132,
-        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
-    },
-    {
-      "id": "connected-service-details-connected-service-export-descriptor",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "line": 40,
-      "host": "console",
-      "routes": [
-        "/connected-services/{Name}"
-      ],
-      "renderer": "CollectionView",
-      "itemType": "ConnectedServiceExportDescriptor",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": [
-        "ValueType",
-        "Protection",
-        "Format"
-      ],
-      "validation": "source-adopted-current-validation-pending",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "implementationPR": 1174,
-        "coveragePR": 1132,
-        "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
-    },
-    {
       "id": "transformation-functions-function-kind-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
       "line": 22,
@@ -5100,7 +5530,7 @@
         "/transformation-functions",
         "/function-kinds"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FunctionKindResource",
       "scope": true,
       "state": true,
@@ -5108,12 +5538,14 @@
       "informationKeys": [
         "Version"
       ],
-      "validation": "source-adopted-current-validation-pending",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "routeEvidence": [
+          "evidence/list-layout/transformation-functions/README.md"
+        ],
+        "interpretation": "Fresh populated EN desktop / FR mobile checks; immutable schemas and protected editor unchanged."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5122,32 +5554,42 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Kinds",
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
+        "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
+        "evidence": "evidence/list-layout/transformation-functions/README.md"
+      }
     },
     {
       "id": "transformation-functions-transformation-function-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
-      "line": 36,
+      "line": 13,
       "host": "console",
       "routes": [
         "/transformation-functions",
         "/function-kinds"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "TransformationFunctionResource",
       "scope": true,
       "state": true,
       "actions": false,
       "informationKeys": [
+        "Kind",
         "Version",
         "FunctionDescription"
       ],
-      "validation": "source-adopted-current-validation-pending",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "routeEvidence": [
+          "evidence/list-layout/transformation-functions/README.md"
+        ],
+        "interpretation": "Fresh populated EN desktop / FR mobile checks; immutable schemas and protected editor unchanged."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5156,17 +5598,29 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Functions",
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
+        "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
+        "evidence": "evidence/list-layout/transformation-functions/README.md"
+      },
+      "columnReview": {
+        "type": "Actual FunctionKind names referenced by all declared versions, with repeated names collapsed; compact muted presentation like Flow types.",
+        "description": "51% of desktop table width; full-width description value in cards. Family-scoped proportions affect only the transformation-function catalog.",
+        "evidence": "evidence/list-layout/transformation-functions/column-review/README.md"
+      }
     },
     {
       "id": "storages-storage-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "line": 24,
+      "line": 9,
       "host": "console",
       "routes": [
         "/storages"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StorageResource",
       "scope": true,
       "state": true,
@@ -5197,17 +5651,28 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Storage",
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Primary Storage list reads one bounded skip/take server page through a new family client method. Unknown total; previous/next and 20/50/100 sizes. No page-local search/filter controls or fetch-all Storage pagination.",
+        "supplementaryCatalog": "Removed by user request. A secondary header button opens /storage-types with current navigation context; the list makes no type-catalog request.",
+        "identity": "Exact qualified Storage/type links preserve context; type/version and availability/scope/governance markers retained. No content/configuration/Secret values displayed.",
+        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards.",
+        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md.",
+        "headerReview": "evidence/list-layout/storages/header-review/README.md"
+      }
     },
     {
       "id": "connected-services-connected-service-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
-      "line": 22,
+      "line": 10,
       "host": "console",
       "routes": [
         "/connected-services"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ConnectedServiceResource",
       "scope": true,
       "state": true,
@@ -5238,7 +5703,8 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Name"
     },
     {
       "id": "data-source-queries-data-source-query-tool-publication",
@@ -5407,12 +5873,12 @@
     {
       "id": "storage-types-storage-type-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
-      "line": 21,
+      "line": 9,
       "host": "console",
       "routes": [
         "/storage-types"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "StorageTypeResource",
       "scope": true,
       "state": true,
@@ -5443,7 +5909,21 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Type",
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "One bounded family API page using scopeRef/skip/take; nextLink indicates HasMore only and is never followed. Unknown total; previous/next and 20/50/100 sizes; no global search/filter capability claimed. Existing fetch-all client method remains for unrelated consumers but this screen does not call it.",
+        "identity": "Exact qualified type links preserve context, preferred contract version and applicable availability/scope/governance markers retained.",
+        "states": "Retained successful rows and pager facts on failed page or refresh; retry requested page; removed terminal page falls back once to page one; context replacement and stale response protection.",
+        "actions": "Existing authorized create and Storages navigation retained.",
+        "validation": "StorageTypeCollectionTests plus maintained existing list regressions; real API desktop/mobile smoke; list-layout-adoption.md records limits."
+      },
+      "headerLabelReview": {
+        "navigation": "Header /storages destination uses the existing localized Storages label instead of Back to Storages; owner/context and permissions unchanged.",
+        "evidence": "evidence/list-layout/storage-types/header-review/README.md"
+      }
     },
     {
       "id": "data-source-dataset-editor-data-source-acquisition-resource",
@@ -5514,6 +5994,1328 @@
       "discoveredDuring": "2026-11-18 main synchronization #1174",
       "identityLabel": "Requirement",
       "rowTestId": "storage-mapping"
+    },
+    {
+      "id": "parameter-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/parameters/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Component checks cover saved typed values and draft isolation; new screenshot validation is recorded separately."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
+    },
+    {
+      "id": "vault-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "line": 41,
+      "host": "console",
+      "routes": [
+        "/vaults/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/foundry-secret-binding.spec.ts",
+          "tests/descendant-secrets.spec.ts",
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Vault provider and allowed descendant scopes; component checks cover draft isolation and grants. Browser evidence is recorded after host validation."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved configuration settings, not resource rows. No owner/state/version/action invented for a setting. No Secret or master key contents are resolved.",
+        "evidenceStatus": "New browser validation pending; historical captures remain historical."
+      }
+    },
+    {
+      "id": "secret-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "line": 43,
+      "host": "console",
+      "routes": [
+        "/secrets/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/foundry-secret-binding.spec.ts",
+          "tests/descendant-secrets.spec.ts",
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved metadata only: exact Vault reference, key, opaque type and allowed descendant scopes. Values remain write-only and are never loaded for the overview."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Configuration settings are not resource rows. Only the real declared Vault reference has a scoped link. No secret contents or replacement draft appear in saved summaries.",
+        "evidenceStatus": "Component and current source validation; browser evidence pending."
+      }
+    },
+    {
+      "id": "tool-provider-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "line": 39,
+      "host": "console",
+      "routes": [
+        "/tools/providers/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts",
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved provider type, activation and transport-specific settings; references are displayed without resolving Secret contents. Existing tools remain scoped to the loaded provider."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Settings retain transport semantics and are not resource identities. Actual tool members retain their own identity, state, managed/read-only status and activation commands.",
+        "evidenceStatus": "Focused and browser validation pending this screen commit."
+      }
+    },
+    {
+      "id": "runtime-profile-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/runtimeprofiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/model-administration.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved runtime type, execution modes and structured adapter options. Existing deployment usages and access policies retain family semantics."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Runtime options and execution settings are configuration values, without invented publication versions, owners or resource commands.",
+        "evidenceStatus": "Focused and browser validation pending this screen commit."
+      }
+    },
+    {
+      "id": "source-provider-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/sourceproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved extension coordinates and source-provider contribution; option contracts remain specialized descriptors with their own preferred versions and source-channel context."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "The extension is a real scoped resource reference. Contribution and option-contract IDs are configuration descriptors, without fictional resource ownership or publication state. Observed provider status is not an activation toggle.",
+        "evidenceStatus": "Focused and browser validation pending this screen commit."
+      }
+    },
+    {
+      "id": "data-source-profile-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "line": 40,
+      "host": "console",
+      "routes": [
+        "/data-source-profiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-lifecycle.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved profile settings and exact declared Flow references; fresh browser validation remains pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved setting/value rows preserve schema, bindings, policies, state and declared exact Flow targets. Settings gain no resource identity or actions.",
+        "evidenceStatus": "Source adopted; browser validation reported separately."
+      }
+    },
+    {
+      "id": "namespaced-agent-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "line": 46,
+      "host": "console",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved effective Agent settings are distinct from the original read-only Pack source and logical bindings. Current browser validation remains pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved configuration settings retain full values and exact profile references. They are not fictional resources. Original Pack source and deployment/binding panels retain their meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-category-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "line": 33,
+      "host": "console",
+      "routes": [
+        "/tools/categories/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/resource-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved declarations remain separate from the retained provider-grouped membership editor. Current browser validation is pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved setting/value summary preserves the exact relative or explicit Tool references. Its settings are not resource identities. Member multi-selection stays in its specialized picker.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "line": 25,
+      "host": "console",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/tool-execution.spec.ts",
+          "tests/resource-access.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Tool configuration is separate from the retained execution input and access policy editors. Fresh browser validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Read-only saved provider identity, external identity, activation, approval and availability preserve Tool semantics. Execution simulation and results retain their specialized renderers.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-set-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/sets/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved ToolSet declarations and original working version remain distinct from immutable published membership. Current browser validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Category and member references retain exact coordinates; declared version, publication intent, tags and annotations keep their domain meaning. Activation is read-only: the existing family client exposes no enablement command.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
+    },
+    {
+      "id": "tool-definition-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-definition-published-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionVersionResource",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Flow",
+        "PublishedAt"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-definition-consumers",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "line": 28,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ToolDefinitionUsage",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Version",
+        "RelayVersion"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Preserves definition, immutable publication and consumer identities; source Flow version and working definition version retain distinct meanings.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "tool-relay-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "line": 42,
+      "host": "console",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ConfigurationValue"
+      ],
+      "validation": "source-adopted-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-contract-bindings.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Relay definition/target/binding overview is separate from retained editors, immutable publications and consumers. Current validation pending."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Keeps source UID/generation and actual source version distinct from the relay publication version. Binding and schema references remain exact; Secret values are never resolved.",
+        "evidenceStatus": "Source adopted; current browser validation pending."
+      },
+      "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "transformation-function-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "line": 69,
+      "host": "console",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Reconciles the existing read-only saved configuration frame introduced upstream; no editor UI change or new browser claim."
+      }
+    },
+    {
+      "id": "flowrunartifactdetails-configurationentry",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "line": 35,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelprofileeditor-profilesetting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "line": 167,
+      "host": "console",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ProfileSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelproviderdetails-setting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "line": 168,
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelproviderdetails-modelproviderusageresponse",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "line": 171,
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ModelProviderUsageResponse",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "identityLabel": "ModelProfileUsages",
+      "informationKeys": [],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "staged-artifact-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "line": 31,
+      "host": "console",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "console-entry-interaction-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor",
+      "host": "console",
+      "routes": [
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 33,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved interaction settings retain execution context and input semantics, independent of resource ownership.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "data-source-dataset-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new?composition=dataset",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DatasetSetting",
+      "identityLabel": "Name",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceSettingValue"
+      ],
+      "line": 51,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-policies.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved acquisition, destination, freshness and transformation settings retain dataset business semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "data-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceSetting",
+      "identityLabel": "Name",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceSettingValue"
+      ],
+      "line": 54,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-policies.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved enabled state, exact profile reference and configuration JSON; profile links retain their owner and namespace.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "entry-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 53,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts",
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved execution target and draft review values remain separate datasets; neither acquires a fabricated namespace, owner, status or publication version.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "entry-editor-draft-configuration-review",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "line": 215,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts",
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved execution target and draft review values remain separate datasets; neither acquires a fabricated namespace, owner, status or publication version.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "extension-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "host": "console",
+      "routes": [
+        "/extensions",
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 18,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Extension configuration is shared by the persisted overview and exact registration Preview. Enrollment configuration remains a separate read-only Definition collection.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "extension-details-enrollment-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 80,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved registration configuration and enrollment configuration are distinct collections; authorized endpoint links retain their exact destinations.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "knowledge-source-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 27,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-knowledge.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "knowledge-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 27,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-knowledge.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "organization-member-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Member.Value"
+      ],
+      "line": 80,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved account, identity and role information retain member-access semantics and are not resource ownership badges.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "pack-project-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Project.Value"
+      ],
+      "line": 54,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved publisher, version, audience, purpose, categories, tags and provenance retain Pack Project semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "pack-project-details-source-documents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Source document kind/name, full copyable path, retained unsaved state and direct Form/YAML selection preserve editor selection semantics; no fabricated resource owner or detail destination.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "itemType": "PackProjectSourceDocument",
+      "identityLabel": "PackResources",
+      "informationKeys": [
+        "Project.SourcePath"
+      ],
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "line": 62,
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "resource-plan-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ReviewSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 46,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset.",
+        "nativeSpecifications": [
+          "tests/Agentstration.Console.Playwright/resource-plan-review.spec.mjs"
+        ]
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved review settings summarize the Resource Plan; approval, review and execution commands keep their independent authorization.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "schema-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "host": "console",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 34,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved schema format and contract metadata retain schema semantics; publication history remains a separate collection.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "source-registries-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "host": "console",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 97,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved registry endpoint, authentication, trust and refresh policies remain configuration values.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "sources-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "host": "console",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 65,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved source registration and publication settings retain source catalog semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "storage-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Type.Value"
+      ],
+      "line": 215,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/connected-storage-collection.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Storage connection and policy values preserve their business labels and exact reference destinations.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "storage-type-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Type.Value"
+      ],
+      "line": 218,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/connected-storage-collection.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved enabled state, provider, connector and export-contract values retain their existing meanings.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "trigger-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "host": "console",
+      "routes": [
+        "/triggers/{Name}",
+        "/triggers/{Name}/edit"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "line": 233,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/operational-triggers.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved schedule, Flow target, version resolution, misfire, concurrency, last schedule, error and input retain Trigger semantics and exact target links.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
     }
   ],
   "specialized": [
@@ -6333,6 +8135,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "482a1e7037b202dd5ba8c620d82ed30277d9b039"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-specialized-explorer-and-embedded-inventory",
+        "reason": "Primary accessible ownership tree selects a scope; resource list is the selected-node detail, not a standalone resource catalog.",
+        "review": "evidence/list-layout/resource-scopes/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -6559,6 +8367,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -6633,6 +8447,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -7003,45 +8823,6 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8eacc3f9268d389422b63931845f1e9597fcc3c7"
-      }
-    },
-    {
-      "id": "pack-project-details-source-documents",
-      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
-      "host": "console",
-      "routes": [
-        "/pack-projects/{ProjectId:guid}"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Source document selection remains native alongside its specialized editors; builds use the common frame with exact identity and inline inspection.",
-      "validation": "source-adopted-and-regression-mapped",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "native applicable semantics; preserve family interaction",
-        "domainSpecifications": [
-          "tests/distribution.spec.ts"
-        ],
-        "sharedHostSpecifications": [],
-        "routeEvidence": [],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering.",
-        "compactEvidence": {
-          "routeCases": [],
-          "populatedHostCases": [
-            "case-57fbc53bcfaf"
-          ],
-          "workplaceObservationIndexes": []
-        }
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
-        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Source document selection remains native alongside its specialized editors; builds use the common frame with exact identity and inline inspection.",
-        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
-        "implementationPR": 1123,
-        "coveragePR": 1132,
-        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
-        "sourceBlob": "867c4a4cee0fcfdaff7aa94acb8e7f02e7f82443"
       }
     },
     {
@@ -14133,6 +15914,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -14173,6 +15960,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -14213,6 +16006,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -14941,39 +16740,6 @@
         "decision": "native-domain-presentation",
         "implementationPR": 1174,
         "domainSemantics": "Typed query profile evidence retains exact id/version/encoding within the selected immutable type contract.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      }
-    },
-    {
-      "id": "storages-type-version-evidence",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "host": "console",
-      "routes": [
-        "/storages"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
-      "validation": "source-reviewed-current-validation-pending",
-      "discoveredDuring": "2026-11-18 main synchronization #1174",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
-        "routeEvidence": [],
-        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
-        "currentPopulatedEvidence": {
-          "specification": "tests/connected-storage-collection.spec.ts",
-          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
-          "variants": [
-            "en-US/dark/desktop",
-            "fr-FR/light/mobile/touch"
-          ],
-          "gallery": "evidence/1121/main-sync-1181/README.md"
-        }
-      },
-      "compactAdoption": {
-        "decision": "native-domain-presentation",
-        "implementationPR": 1174,
-        "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
         "evidenceStatus": "Fresh validation pending final merged source."
       }
     },
@@ -16430,7 +18196,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are enumerated in the surface entries, including the compact-rollout reconciliation. Fixed navigation, tabs, enum options and schema-generated form fields remain controls, not extra collections."
+      "reason": "Definition navigation and fixed form choices remain controls. Saved overview configuration and pinned ToolSet collections now live in AgentResourceSummary."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
@@ -16564,8 +18330,8 @@
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "classification": "non-collection-control",
-      "reason": "Native implementation Flow reference field; fixed form field, preserves scoped option labels."
+      "classification": "inventoried",
+      "reason": "Saved settings, immutable publication and consumer collections are mapped above. Native implementation Flow selector retains its exact scoped options."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
@@ -16575,7 +18341,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+      "reason": "Publication history remains mapped above; saved configuration moved into FlowResourceSummary shared by detail and on-demand Preview. Definition and navigation options retain native semantics."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
@@ -16850,7 +18616,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
       "classification": "inventoried",
-      "reason": "Functional datasets explicitly enumerated above; fixed tabs, enum options and schema-generated input fields retain native control semantics."
+      "reason": "Functional datasets include the current resource-detail configuration summary, explicitly enumerated in the shared frames. Navigation and fixed form choices remain controls."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
@@ -16986,6 +18752,51 @@
       "source": "src/Agentstration.Web.Components/ResourceNavigation.razor",
       "classification": "non-collection-control",
       "reason": "Configured resource-local primary/child navigation entries duplicated into a modal drawer, not functional resource datasets; resource content and collections remain screen-owned."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "classification": "inventoried",
+      "reason": "Saved Vault configuration summary is a functional collection recorded in shared frames; fixed wizard/navigation entries remain controls."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor",
+      "classification": "non-collection-control",
+      "reason": "Generic list-page composition for concrete inventoried adapters; its CollectionView renders their rows. Column/filter definitions, active-filter controls and page controls are not independent functional collections."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CollectionFilterField.razor",
+      "classification": "non-collection-control",
+      "reason": "Filter control options and date bounds are form controls, not a functional collection."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/CollectionPager.razor",
+      "classification": "non-collection-control",
+      "reason": "Page sizes and bounded page navigation buttons are collection navigation controls, not a separate functional collection."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceDefinitionForm.razor",
+      "classification": "non-collection-control",
+      "reason": "Retained resource form sections, field declarations and read-only fieldsets are form composition controls, not functional item collections."
+    },
+    {
+      "source": "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor",
+      "classification": "non-collection-control",
+      "reason": "Generic resource-detail section mounting and navigation declarations are layout controls. Family-provided configuration collections retain their own concrete frame inventory."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted Agents overview configuration and pinned ToolSet collections retain their existing frame identities; quick actions are commands, not a dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted Flow saved configuration retains its existing frame identity, shared by detail and on-demand Preview; topology and quick actions are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Saved Extension configuration is shared by the persisted overview and exact registration Preview. Quick actions are commands; pending enrollment controls remain in the collection's existing inline editor."
     }
   ],
   "reconciliation": {
@@ -17091,6 +18902,104 @@
       "unmountedLegacy": 4,
       "auditedRepeatedItemSources": 114,
       "meaning": "Functional collections, including shared embedded selectors/history renderers; not routes, screens, raw foreach loops or route aliases. Fixed navigation, enum options and schema-generated form fields remain controls."
+    },
+    {
+      "date": "2026-11-18",
+      "reviewedSourceCommit": "5b00cd2bad6e6a352757aaf73e49ab30389a7ceb",
+      "reason": "Resource detail templates add the Agent configuration summary; the preceding Connected Service UX correction replaces its binding summary and removes its export-descriptor table. Reconcile current renderers without reusing historical screenshot claims.",
+      "retiredFrames": [
+        {
+          "id": "connected-service-details-connected-service-value-binding",
+          "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+          "itemType": "ConnectedServiceValueBinding"
+        },
+        {
+          "id": "connected-service-details-connected-service-export-descriptor",
+          "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+          "itemType": "ConnectedServiceExportDescriptor"
+        }
+      ],
+      "addedFrames": [
+        "agent-editor-configuration-summary",
+        "connected-service-details-configuration-summary"
+      ],
+      "sharedFrames": 88,
+      "specializedActive": 258,
+      "unmountedLegacy": 4,
+      "activeCollections": 346,
+      "auditedRepeatedItemSources": 147
+    },
+    {
+      "date": "2026-11-20",
+      "reviewedSourceCommit": "821efdf74a9672521a79fa180dbfb8f7a49e3c00",
+      "reason": "Reconcile eighteen new resource configuration/review summaries and migrate the existing Pack Project source-document collection from native to shared-frame ownership without counting it twice.",
+      "addedFrames": [
+        "console-entry-interaction-saved-configuration-summary",
+        "data-source-dataset-editor-saved-configuration-summary",
+        "data-source-editor-saved-configuration-summary",
+        "entry-editor-saved-configuration-summary",
+        "entry-editor-draft-configuration-review",
+        "extension-details-saved-configuration-summary",
+        "extension-details-enrollment-configuration-summary",
+        "knowledge-source-details-saved-configuration-summary",
+        "knowledge-source-editor-saved-configuration-summary",
+        "organization-member-details-saved-configuration-summary",
+        "pack-project-details-saved-configuration-summary",
+        "resource-plan-details-saved-configuration-summary",
+        "schema-editor-saved-configuration-summary",
+        "source-registries-saved-configuration-summary",
+        "sources-saved-configuration-summary",
+        "storage-details-saved-configuration-summary",
+        "storage-type-details-saved-configuration-summary",
+        "trigger-details-saved-configuration-summary"
+      ],
+      "migratedFrames": [
+        "pack-project-details-source-documents"
+      ],
+      "sharedFrames": 131,
+      "specializedActive": 256,
+      "unmountedLegacy": 4,
+      "activeCollections": 387,
+      "auditedRepeatedItemSources": 155,
+      "validation": "Source catalog checked locally; family browser results and optional limitations are reported in PR #1238 for the final head. Historical screenshots retain their original provenance."
+    }
+  ],
+  "retiredSurfaces": [
+    {
+      "reason": "User requested removing the supplementary Storage type panel from /storages; header navigation now opens /storage-types. Historical entry retained as evidence only.",
+      "surface": {
+        "id": "storages-type-version-evidence",
+        "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+        "host": "console",
+        "routes": [
+          "/storages"
+        ],
+        "renderer": "native-specialized",
+        "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+        "validation": "source-reviewed-current-validation-pending",
+        "discoveredDuring": "2026-11-18 main synchronization #1174",
+        "verification": {
+          "sourceReviewed": true,
+          "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+          "routeEvidence": [],
+          "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
+          "currentPopulatedEvidence": {
+            "specification": "tests/connected-storage-collection.spec.ts",
+            "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+            "variants": [
+              "en-US/dark/desktop",
+              "fr-FR/light/mobile/touch"
+            ],
+            "gallery": "evidence/1121/main-sync-1181/README.md"
+          }
+        },
+        "compactAdoption": {
+          "decision": "native-domain-presentation",
+          "implementationPR": 1174,
+          "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+          "evidenceStatus": "Fresh validation pending final merged source."
+        }
+      }
     }
   ]
 }

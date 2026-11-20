@@ -1,0 +1,22 @@
+.empty-state {
+    display: grid;
+    justify-items: center;
+    gap: .75rem;
+    padding: clamp(2rem, 5vw, 4rem) 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+}
+
+.empty-state .state-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.empty-state h2 { margin: .25rem 0 0; font-size: 1.1rem; }
+.empty-state p { max-width: 38rem; margin: 0; line-height: 1.6; text-wrap: pretty; }
+.empty-state-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; margin-top: .5rem; }

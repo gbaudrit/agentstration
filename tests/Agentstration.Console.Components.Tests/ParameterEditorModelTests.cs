@@ -78,6 +78,9 @@ public sealed class ParameterEditorModelTests
         var properties = ModelProviderEditorModel.FromResource(resource).ToProperties();
 
         Assert.AreEqual(8_192, properties.SpecificationOverrides["exact-model"].Limits.ContextTokens);
+        Assert.AreEqual(resource.Definition.Extension, properties.Extension);
+        var explicitOwner = resource with { Definition = resource.Definition with { Extension = new ResourceReference("extension", ResourceScopeRef.Instance) } };
+        Assert.AreEqual(explicitOwner.Definition.Extension, ModelProviderEditorModel.FromResource(explicitOwner).ToProperties().Extension);
     }
 
     [TestMethod]

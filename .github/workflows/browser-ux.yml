@@ -61,18 +61,22 @@ jobs:
             shards: 3
           - project: mobile-chromium
             shard: 1
-            shards: 3
+            shards: 4
           - project: mobile-chromium
             shard: 2
-            shards: 3
+            shards: 4
           - project: mobile-chromium
             shard: 3
-            shards: 3
+            shards: 4
+          - project: mobile-chromium
+            shard: 4
+            shards: 4
           - project: locale-contracts
             shard: 1
             shards: 1
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Cold host preparation exceeded 11 minutes; budget it separately from smoke and evidence upload.
+    timeout-minutes: 35
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -132,6 +136,7 @@ jobs:
         working-directory: automation/playwright
         run: npm run test:fixtures && npm run test:components
       - name: Run browser UX smoke tests
+        timeout-minutes: 20
         working-directory: automation/playwright
         env:
           AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true

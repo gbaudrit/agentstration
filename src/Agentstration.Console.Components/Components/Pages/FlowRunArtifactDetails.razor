@@ -3,40 +3,45 @@
 @inject IArtifactsClient Client
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLabels
 
 <PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
-<div class="artifact-header">
-<PageHeader Title="@(artifact is null ? Id : ArtifactName(artifact))" Description="@T("DurableDetailsDescription")" TestId="durable-artifact-details">
-    <Actions><a class="button-secondary" href="/artifacts">@T("Back")</a></Actions>
-</PageHeader>
-</div>
+@{ var presentations = Presentations; }
+<ConsoleResourceDetailsTemplate Resource="artifact" Name="@(artifact is null ? Id : ArtifactName(artifact))" ResourceType="@T("Artifact")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
+    StatusText="@(artifact is null ? null : T("Immutable"))" Status="UiStatus.Neutral" ResourceIdentity="@(loadedKey ?? Id)"
+    SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
+    LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="loading" DefinitionReadOnlyReason="ResourceReadOnlyReason.Unspecified"
+    Yaml="@SavedYaml" YamlDescription="@T("MetadataYamlHelp")" SectionTestIdPrefix="durable-artifact" TestId="durable-artifact-details">
 
-@if (loading)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error" />
-}
-else if (artifact is not null)
-{
-    <ResourceTabs Label="@T("DetailsSections")">
-        @foreach (var tab in Enum.GetValues<DetailsTab>())
-        {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="durable-artifact-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
-        }
-    </ResourceTabs>
+    <OverviewMetrics>@if (artifact is not null) {
+        <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Immutable")" Status="UiStatus.Neutral" />
+        <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
+        <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("d")" Detail="@artifact.CreatedAt.ToLocalTime().ToString("t")" />
+    }</OverviewMetrics>
+    <IdentityDetails>@if (artifact is not null) { <dt>@T("Identifier")</dt><dd><CopyableValue Value="@artifact.ArtifactId.ToString()" /></dd> }</IdentityDetails>
+    <OverviewConfiguration>@Configuration</OverviewConfiguration>
+    <OverviewContent>@OverviewPanels</OverviewContent>
+    <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="durable-artifact-inspection-form" FormName="durable-artifact-inspection"
+        Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" Busy="loading" /></DefinitionContent>
+    <AdditionalContent Context="path">@AdditionalContent(path)</AdditionalContent>
+</ConsoleResourceDetailsTemplate>
 
-    <main id="durable-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-        @if (activeTab == DetailsTab.Overview)
-        {
-            <section class="metric-grid">
-                <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Durable")" Status="UiStatus.Success" />
-                <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
-                <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("g")" Detail="@T("Immutable")" />
-            </section>
-
+@code {
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ArtifactResourceKinds.FlowRunArtifact" DisplayName="@model.DisplayName" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="model.ScopeRef" Description="@model.Description" DescriptionExpression="@(() => model.Description)" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)"
+        ReadOnly="true" TestId="durable-artifact-identity-editor"><AdditionalPanels><FormSection Title="@T("Identifier")"><CopyableValue Value="@model.ArtifactId" /></FormSection></AdditionalPanels></ResourceIdentityEditor>;
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+    </CollectionView>;
+    private RenderFragment DefinitionSection(string path) => path switch
+    {
+        "definition/identity" => Identity,
+        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
+    private RenderFragment OverviewPanels => @<div class="resource-editor-view" data-artifact-section="overview">@if (artifact is not null) {
             @if (artifact.Receipt.DataContract is { } contract)
             {
                 <FormSection Title="@T("DataContract")"><ChildContent>
@@ -103,20 +108,18 @@ else if (artifact is not null)
                     <CollectionView TItem="RecordRow" Items="@(records.Members.Select((member, index) => new RecordRow(member, index + 1)).ToArray())" IdentityLabel="@T("RecordOrdinal")" InformationLabels="@(new[] { T("Size") })">
                         <Identity Context="row"><strong>@row.Ordinal</strong></Identity>
                         <Information Context="row"><CollectionValue Label="@T("Size")">@ExactSize(row.Member.Length)</CollectionValue></Information>
-                        <Actions Context="row"><button type="button" class="button-secondary" disabled="@(readingRecord || !interactive)" @onclick="() => ReadRecordAsync(row.Member.Id)">@T("ReadRecord")</button></Actions>
+                        <Actions Context="row"><button type="button" class="button-secondary" disabled="@(readingRecord || loading || !interactive)" @onclick="() => ReadRecordAsync(row.Member.Id)">@T("ReadRecord")</button></Actions>
                     </CollectionView>
                     @if (recordReadError is not null) { <p role="alert">@recordReadError</p> }
                     @if (recordContent is not null) { <pre data-testid="artifact-record-content">@recordContent</pre> }
                 </section>
             }
 
-        }
-        else if (activeTab == DetailsTab.Content)
-        {
-            <DurableArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
-        }
-        else
-        {
+    }</div>;
+    private RenderFragment AdditionalContent(string path) => path switch
+    {
+        "content" => @<div data-artifact-section="content" hidden="@(!sectionState.Is("content"))"><DurableArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /></div>,
+        "storage" => @<div class="resource-editor-view" data-artifact-section="storage" hidden="@(!sectionState.Is("storage"))">@if (artifact is not null) {
             <FormSection Title="@T("StorageReceipt")" Eyebrow="@T("Storage")" Description="@T("StorageReceiptHelp")"><ChildContent>
                 <dl class="resource-details durable-artifact-details-grid">
                     @if (!string.IsNullOrEmpty(artifact.Receipt.StorageFlowRunId)) { <dt>@T("StorageFlowRun")</dt><dd><a class="text-button" href="@FlowRunUrl(artifact.Receipt.StorageFlowRunId)">@artifact.Receipt.StorageFlowRunId</a></dd> }
@@ -148,35 +151,92 @@ else if (artifact is not null)
                     </dl>
                 }
             </ChildContent></FormSection>
-        }
-    </main>
-}
-
-@code {
+        }</div>,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
     private static readonly JsonSerializerOptions ContractJson = new() { WriteIndented = true };
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;
-    private DetailsTab activeTab;
-    private bool loading = true;
-    private string? error;
+    private DurableArtifactInspectionModel model = new();
+    private EditContext? editContext;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private string? loadedKey;
+    private long loadVersion;
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("content", T("Tab.Content"), "file"), new("storage", T("Tab.Storage"), "database")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = true, Fields = [nameof(model.Name), nameof(model.Namespace), nameof(model.DisplayName), nameof(model.Description), nameof(model.Tags), nameof(model.ScopeRef), nameof(model.ArtifactId)] },
+        ["definition/configuration"] = new() { ReadOnly = true, Fields = [nameof(model.MediaType), nameof(model.Length), nameof(model.Sha256), nameof(model.CreatedAt)] },
+        ["yaml"] = new() { ReadOnly = true }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = IdentityLabels["TechnicalName"], [nameof(model.DisplayName)] = IdentityLabels["DisplayName"], [nameof(model.Namespace)] = Shared["Namespace"],
+        [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"], [nameof(model.ScopeRef)] = Shared["Scope"],
+        [nameof(model.ArtifactId)] = T("Identifier"), [nameof(model.MediaType)] = T("MediaType"), [nameof(model.Length)] = T("Size"), [nameof(model.Sha256)] = "SHA-256", [nameof(model.CreatedAt)] = T("Created")
+    };
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => artifact is null ? [] : [new(T("MediaType"), artifact.Receipt.MediaType), new(T("Size"), ExactSize(artifact.Receipt.Length)), new("SHA-256", artifact.Receipt.Sha256), new(T("Created"), artifact.CreatedAt.ToLocalTime().ToString("g"))];
+    // Inspection export only: never serialize the content, opaque locator or unreviewed storage/provenance payload.
+    private string SavedYaml => artifact is null ? string.Empty : ResourceManifestSerializer.ToYaml(new
+    {
+        artifact.ApiVersion, artifact.Kind, artifact.Uid, artifact.ScopeRef, artifact.Generation,
+        Metadata = new { artifact.Metadata.Name, artifact.Metadata.Namespace, artifact.Metadata.Tags },
+        artifact.ArtifactId, artifact.CreatedAt, artifact.SourceArtifactId, artifact.ProducerFlowRunId, artifact.ProducerFlowStepId,
+        artifact.Receipt.MediaType, artifact.Receipt.Length, artifact.Receipt.Sha256
+    });
+    private bool loading;
     private bool interactive, readingRecord;
     private string? recordContent, recordReadError;
     private FlowRunArtifactId ArtifactId => FlowRunArtifactId.Parse(Id);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        loading = true;
-        error = null;
-        recordContent = recordReadError = null;
+        var key = $"{Id}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; sectionState.Reset(key); ClearPrivate();
+        return LoadAsync(refresh: false);
+    }
+    private Task RetryAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: artifact is not null);
+    private Task RefreshAsync() => loading ? Task.CompletedTask : LoadAsync(refresh: true);
+    private void ClearPrivate() { artifact = null; model = new(); editContext = null; readingRecord = false; recordContent = recordReadError = null; }
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var expected = artifact;
+        loading = true; readingRecord = false;
+        if (!refresh) ClearPrivate();
+        loadState = new(refresh && artifact is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = artifact is not null };
         try
         {
-            artifact = await Client.GetDurableAsync(ArtifactId, cancellation.Token);
-            if (artifact is null) error = T("DurableNotFound");
+            var requestedId = ArtifactId;
+            var saved = await Client.GetDurableAsync(requestedId, cancellation.Token);
+            if (request != loadVersion) return;
+            if (saved is null || saved.ArtifactId != requestedId || expected is not null && (saved.Name != expected.Name || saved.Namespace != expected.Namespace || saved.ScopeRef != expected.ScopeRef || expected.Uid != Guid.Empty && saved.Uid != expected.Uid))
+            {
+                ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound) { Message = T("DurableNotFound") }; return;
+            }
+            artifact = saved; var next = DurableArtifactInspectionModel.From(saved);
+            if (next != model) { model = next; editContext = null; }
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearPrivate();
+            loadState = new(status) { HasContent = artifact is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
+        finally { if (request == loadVersion) loading = false; }
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -188,36 +248,35 @@ else if (artifact is not null)
 
     private async Task ReadRecordAsync(string memberId)
     {
-        if (readingRecord || !interactive) return;
+        if (loading || readingRecord || !interactive || artifact is null) return;
+        var request = loadVersion; var id = artifact.ArtifactId;
         readingRecord = true;
         recordContent = recordReadError = null;
         try
         {
-            var content = await Client.ReadRecordAsync(ArtifactId, memberId, cancellation.Token);
+            var content = await Client.ReadRecordAsync(id, memberId, cancellation.Token);
+            if (request != loadVersion || artifact is null || artifact.ArtifactId != id) return;
             recordContent = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64));
         }
-        catch (Exception) { recordReadError = T("RecordReadFailed"); }
-        finally { readingRecord = false; }
+        catch (Exception) { if (request == loadVersion) recordReadError = T("RecordReadFailed"); }
+        finally { if (request == loadVersion) readingRecord = false; }
     }
 
-    private static string ArtifactName(FlowRunArtifactResource value) => value.Receipt.Provenance.TryGetValue("fileName", out var fileName)
-        && !string.IsNullOrWhiteSpace(fileName) ? fileName : value.ArtifactId.ToString();
+    private static string ArtifactName(FlowRunArtifactResource value) => DurableArtifactInspectionModel.DisplayNameFor(value);
     private static IReadOnlyList<KeyValuePair<string, string>> VisibleProvenance(FlowRunArtifactResource value)
     {
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "provider", "fileName", "correlationId" };
         return value.Receipt.Provenance.Where(entry => allowed.Contains(entry.Key)).OrderBy(entry => entry.Key, StringComparer.Ordinal).ToArray();
     }
-    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
-    private static string StagedUrl(StagedArtifactId id) => $"/artifacts/staged/{id}";
+    private string FlowRunUrl(string id) => ResourceOwnershipContext.PreserveNavigation($"/flow-runs/{Uri.EscapeDataString(id)}", Services);
+    private string StagedUrl(StagedArtifactId id) => ResourceOwnershipContext.PreserveNavigation($"/artifacts/staged/{id}", Services);
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
-    private static string TabId(DetailsTab tab) => $"durable-artifact-{tab.ToString().ToLowerInvariant()}-tab";
-    private enum DetailsTab { Overview, Content, Storage }
     private sealed record RecordRow(StorageRecordMember Member, int Ordinal);
 
     public void Dispose()
     {
-        cancellation.Cancel();
+        ++loadVersion; cancellation.Cancel();
         cancellation.Dispose();
     }
 }

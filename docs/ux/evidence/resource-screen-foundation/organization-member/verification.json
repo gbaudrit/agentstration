@@ -1,0 +1,157 @@
+{
+  "base": "80fc54bd8cacf829d28420e6b0c51fa69d1d2305",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "8de0338bab7b87faea6ecab62341fcaf5150ce65e49a72db3f97aec3a8c50474",
+    "automation/playwright/src/pages/console-administration.page.ts": "2c61a492a5f697896bd35deb3f33148c58992c2f8de77bf3902af3bb76f29f16",
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor": "f6643c37fc59686761c9bca0a4beccf410cfb627ac6237d0f1313ce1ccd9bdd4",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/OrganizationStrings.fr-FR.resx": "7c5dc80785891b3340b6ba8ae848016bcb38a4f0e7431e05795d9d890ee737b1",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/OrganizationStrings.resx": "ff613ca0bc96aae725f5ca455aff93bd0ddd3400d71daefcbe058e5cc73f4f96",
+    "tests/Agentstration.Console.Components.Tests/OrganizationLocalizationTests.cs": "2f7eec6b48bfe1dcab8ceb0a9c0e1acaeb22315435cb76eae2dbcd6a11e332f2",
+    "tests/Agentstration.Console.Components.Tests/OrganizationMemberDetailsTests.Foundation.cs": "fdd20fbd1710a547c81128da1e0dc90d7828bbbf19840c0dba3570eb6f02475a",
+    "tests/Agentstration.Console.Components.Tests/OrganizationMemberDetailsTests.cs": "67b458a65647f92545aea465d53ba9e8f0e8fe843d48c77e699e644fa0320a98"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "ef6710aa3dc6f5895a3ba562bbd8ac4514b12dc26a74640bb589b152262fedba",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "1a23f5993fa4b4ade52ae82d6d8ffab5cf24ceaaa8398483b7452846a8943a26",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "97a938b3f3fc8c47ccfb4972878db65c3fd792c72b8b08c66dc666bd6f1177fd",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "ef6710aa3dc6f5895a3ba562bbd8ac4514b12dc26a74640bb589b152262fedba",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "ef6710aa3dc6f5895a3ba562bbd8ac4514b12dc26a74640bb589b152262fedba",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "1a23f5993fa4b4ade52ae82d6d8ffab5cf24ceaaa8398483b7452846a8943a26",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "1a23f5993fa4b4ade52ae82d6d8ffab5cf24ceaaa8398483b7452846a8943a26",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "97a938b3f3fc8c47ccfb4972878db65c3fd792c72b8b08c66dc666bd6f1177fd",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "97a938b3f3fc8c47ccfb4972878db65c3fd792c72b8b08c66dc666bd6f1177fd"
+  },
+  "phases": [
+    {
+      "name": "console-administration-regression",
+      "exitCode": 0,
+      "seconds": 78.2
+    },
+    {
+      "name": "organization-member",
+      "exitCode": 0,
+      "seconds": 95.7
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "organization-member-overview-desktop-en.png",
+      "sha256": "01c11fac3b3d979182d11425932ced7b099697e5b08f45223e8d8a7c240fd533"
+    },
+    {
+      "file": "organization-member-role-draft-desktop-en.png",
+      "sha256": "082250a99044a261ef7a6288ec716a0fa13077af3c56740a68835fa6689c8d6d"
+    },
+    {
+      "file": "organization-member-authentication-draft-desktop-en.png",
+      "sha256": "490f308616be253fb4b36d18ae9eb822bf0d03280d97efc167a597945239099d"
+    },
+    {
+      "file": "organization-member-retained-refresh-desktop-en.png",
+      "sha256": "d7f892e0431c7aedbadf953f0616bff863745297c6b94e40d44acfd1849522e1"
+    },
+    {
+      "file": "organization-member-role-saved-authentication-retained-desktop-en.png",
+      "sha256": "f7495255cdbadcde54b8b06af51781f11996b8fd64cbf79ea4b9b69a1723e5c2"
+    },
+    {
+      "file": "organization-member-identity-linked-desktop-en.png",
+      "sha256": "0023d13834df76ef5362c2b790768967065bba2f84af6dd3580a856777942d10"
+    },
+    {
+      "file": "organization-member-invalid-link-retained-desktop-en.png",
+      "sha256": "4025b4ce2d234d9b35c34dc5df0b19ec78f38be1726edcdffb3f2f630c3b01ff"
+    },
+    {
+      "file": "organization-member-unlink-keeps-draft-desktop-en.png",
+      "sha256": "a4cc77f44d82ebcef1e726cd10d36b0da10613acdf87ad8c7a9f844b142c6105"
+    },
+    {
+      "file": "organization-member-explicit-discard-desktop-en.png",
+      "sha256": "7df04133befd8a20b9f84b9977ed61adba22c7c6a69ba9bf481b62e1e7b8b657"
+    },
+    {
+      "file": "organization-member-administration-desktop-en.png",
+      "sha256": "c770a533002a1f6078101596bbb1ecfda42f1abb39e99690e626ba3a9a0b6f4b"
+    },
+    {
+      "file": "organization-member-membership-removed-desktop-en.png",
+      "sha256": "732ecaa45b4ea79a8c1876ec519ceec8a8b8102058e301745f9d7217f16efad4"
+    },
+    {
+      "file": "organization-member-overview-mobile-fr.png",
+      "sha256": "05a4c0a5dd4e9c6d89893e4462f045649a01caf64df6cbc6e339fe47f483b1d8"
+    },
+    {
+      "file": "organization-member-role-draft-mobile-fr.png",
+      "sha256": "2cb8a96cfaa35fdb26b87081b0ecd0385f2268a8efa869a01a913a559a8bd21c"
+    },
+    {
+      "file": "organization-member-authentication-draft-mobile-fr.png",
+      "sha256": "c5fd56c73d382fdf1150dfc3515cb0d7639f6b8bbbed361f3928ee4f438183d0"
+    },
+    {
+      "file": "organization-member-retained-refresh-mobile-fr.png",
+      "sha256": "1c78a7c64f78ac6d2bf7f0cfa21ebc67fc1390fc53cd7db70b1684be496534a3"
+    },
+    {
+      "file": "organization-member-role-saved-authentication-retained-mobile-fr.png",
+      "sha256": "24c6ea2e29ad46e393f4825d3f12b66e521130dedfbf48a8da1dce484c453f28"
+    },
+    {
+      "file": "organization-member-identity-linked-mobile-fr.png",
+      "sha256": "3c7dff499605229ac79e5513b0501902ff1867bf2f9613c49eb5043f47013ddd"
+    },
+    {
+      "file": "organization-member-invalid-link-retained-mobile-fr.png",
+      "sha256": "c44d58c778709c9dff387fd496ffb62a54186d2efd980731487b887a9a65e4aa"
+    },
+    {
+      "file": "organization-member-unlink-keeps-draft-mobile-fr.png",
+      "sha256": "7de4044f509d5e09ca0c71f4a7e5483b421eee3159b21cfedbf46e995a978574"
+    },
+    {
+      "file": "organization-member-explicit-discard-mobile-fr.png",
+      "sha256": "380abd047508347f3fa8e2e718c2547cf4210c48a96d9365707a6aa0523dd2fc"
+    },
+    {
+      "file": "organization-member-administration-mobile-fr.png",
+      "sha256": "bd8b25ab97a6bc2c1d224eee22eaf7284c9fcd32a9812f7ee977722f2f13dd1c"
+    },
+    {
+      "file": "organization-member-membership-removed-mobile-fr.png",
+      "sha256": "74f79e19113133f9064236b65dd34cb0bbcbdb73b85deef09600e9210a288c79"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 21,
+    "logSha256": "e85a1b65b8eb88d4849c001000dbddd155e3ca8681336b773fe07e1bbcb74136"
+  },
+  "maintainedRegression": {
+    "campaign": "organization-member-05",
+    "base": "80fc54bd8cacf829d28420e6b0c51fa69d1d2305",
+    "phase": {
+      "name": "console-administration-regression",
+      "exitCode": 0,
+      "seconds": 78.2
+    },
+    "sourceHashesMatch": true,
+    "hostHashesMatch": true
+  },
+  "nativeProbeSha256": "e62afa2ae3bc4b18245582618f99caf6bbcf1048a8b4a6c67de01a61f3663572",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ]
+}

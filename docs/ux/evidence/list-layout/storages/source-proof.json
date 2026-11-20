@@ -1,0 +1,17 @@
+{
+  "baseCommit": "db98139c9ed48be0e0a803833224522b97812ebf",
+  "route": "/storages",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor": "0d9e7b556e03b6f7a8c6880296c18dfc1a3abd9d",
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor.cs": "776eab1f9f717542ba0bb0c7023576704dcd1ea7",
+    "src/Agentstration.Console.Client/StoragesApiClient.cs": "dc0b85c3be113dba408e741220746b95e9a3519c",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png",
+    "type-evidence-desktop-en.png",
+    "type-evidence-mobile-fr.png"
+  ]
+}

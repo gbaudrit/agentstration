@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -12,6 +13,8 @@ public sealed class ParameterEditorModel
     public string Name { get; set; } = string.Empty;
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string Namespace { get; set; } = ResourceNamespace.Default.Value;
+    public string Tags { get; set; } = string.Empty;
     public ParameterValueType ValueType { get; set; } = ParameterValueType.Text;
     [Required] public string Value { get; set; } = string.Empty;
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
@@ -28,6 +31,8 @@ public sealed class ParameterEditorModel
     public static ParameterEditorModel From(ParameterResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         ValueType = resource.Definition.ValueType,

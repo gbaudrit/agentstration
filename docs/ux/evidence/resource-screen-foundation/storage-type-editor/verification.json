@@ -1,0 +1,158 @@
+{
+  "base": "67784be20fe5099e6a456d08645402d76465dd8c",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "83cd947780af4880e0fc552cc9b0c5429ed9c61c0c6e33b9fbc2f0c45ae2268b",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor": "d274ef0bb16b7f94901eae87ec4f04e38b8dbf35f759be2881029be304567077",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeEditor.razor.css": "11c16d2467eed2251d751d50a1e89b94271861851e6bf7b5d3e19c21dd120b6d",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeVersionFields.razor": "c668412072837f60c4d8396467d8a4283da1c895a3f9d53f3c9560a72ea8dfda",
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypeVersionFields.razor.css": "46f2e4eb39d96195cd6ae844312b25d52693c6376184ba3375d3894d0fe8273d",
+    "src/Agentstration.Console.Components/Console/StorageTypeEditorModel.cs": "d10a2f922e9eddffedb27e216d17a11a30546ed1b88c692e20d87480f1df19b3",
+    "tests/Agentstration.Console.Components.Tests/StorageTypeComponentTests.EditorFoundation.cs": "530d8725a71f941575515152e444fcf29e36df11f2e6c25070452cab45991acd",
+    "tests/Agentstration.Console.Components.Tests/StorageTypeComponentTests.cs": "fe931704f11d8b44065fcf16a1d2e7f2eee3f0e7b13c8dc331fb1a8a15591702"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "c00baa29591dba9217edf8d3a64a83b5b424ec37fc3ae23444293d60049b6d8d",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "75cfb3e80e1fe8b5ff1864e0988f28b40b5c9a946efe1f49eb9a7fe540c706aa",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "bbf15aabe0f263c26e6b1f2c18d7315873b3758fb91de8a26d24cec1f66d5333",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "c00baa29591dba9217edf8d3a64a83b5b424ec37fc3ae23444293d60049b6d8d",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "c00baa29591dba9217edf8d3a64a83b5b424ec37fc3ae23444293d60049b6d8d",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "75cfb3e80e1fe8b5ff1864e0988f28b40b5c9a946efe1f49eb9a7fe540c706aa",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "75cfb3e80e1fe8b5ff1864e0988f28b40b5c9a946efe1f49eb9a7fe540c706aa",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "bbf15aabe0f263c26e6b1f2c18d7315873b3758fb91de8a26d24cec1f66d5333",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "bbf15aabe0f263c26e6b1f2c18d7315873b3758fb91de8a26d24cec1f66d5333"
+  },
+  "phases": [
+    {
+      "name": "storage-type-editor",
+      "exitCode": 0,
+      "seconds": 97.3
+    },
+    {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 130.7
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "storage-type-editor-invalid-identity-desktop-en.png",
+      "sha256": "6937738bd6596a089b8943a6bf908117306e2b411962c8a2abce1d499d932716"
+    },
+    {
+      "file": "storage-type-editor-identity-desktop-en.png",
+      "sha256": "43b1cee04f160fa3c9bdece29fc77c81f0fde80a68cf95559b4a9709c3d72be9"
+    },
+    {
+      "file": "storage-type-editor-invalid-contract-desktop-en.png",
+      "sha256": "6e55bf1e0b25eb6b750bafd0406f1bc5d85792206e36695089e42792c7487ad1"
+    },
+    {
+      "file": "storage-type-editor-invalid-limit-desktop-en.png",
+      "sha256": "7728c589a383d3d27d9573b23f09e2a18c5438d4d1b8a0316cee972d1b15ee48"
+    },
+    {
+      "file": "storage-type-editor-contract-desktop-en.png",
+      "sha256": "4a33c1856e288ef180246d689b6b0e2ad07df2638e1769c8cc0433d6c5b57e56"
+    },
+    {
+      "file": "storage-type-editor-review-desktop-en.png",
+      "sha256": "e0366a9e534dbbcaa07c9daf05ddef8fe992cf7d7b7ba7a6665621ef15d06d46"
+    },
+    {
+      "file": "storage-type-editor-created-desktop-en.png",
+      "sha256": "a772b9be2ab2c06670d861620743c66f323e03b9d1e00c0272ceeb1a5c9dd3d3"
+    },
+    {
+      "file": "storage-type-editor-publication-invalid-version-desktop-en.png",
+      "sha256": "80d5986145237e5d0da33a1f2a7de1060a357f9d5b82ed4102e8e0da74f80004"
+    },
+    {
+      "file": "storage-type-editor-publication-invalid-schema-desktop-en.png",
+      "sha256": "70000d05bba5c3f5232e92fec0b0a43db4fa072baa3e1c137e7afb454b71e0b9"
+    },
+    {
+      "file": "storage-type-editor-publication-review-desktop-en.png",
+      "sha256": "48ea1de7cda958c16a86a7e3b01c4e3c02780c8ba9b8737012f171cfd2e72075"
+    },
+    {
+      "file": "storage-type-editor-published-desktop-en.png",
+      "sha256": "e756f42260f72e158e9726a15ee703410dce2428cea9048ef544a234cc40ffd7"
+    },
+    {
+      "file": "storage-type-editor-invalid-identity-mobile-fr.png",
+      "sha256": "741a5a4a4eb6117dc6b48d6287cc34774034a4c3296f7aa8ae1aaee37e507697"
+    },
+    {
+      "file": "storage-type-editor-identity-mobile-fr.png",
+      "sha256": "1efbfca12ac115ba68e35389eff237ff75e5f40f47ce15bb4429724d4ccc2f00"
+    },
+    {
+      "file": "storage-type-editor-invalid-contract-mobile-fr.png",
+      "sha256": "2b2ad705736f5880bf4af5a649fd64a1c3f2c7d72e95231126e0d92cd67a7555"
+    },
+    {
+      "file": "storage-type-editor-invalid-limit-mobile-fr.png",
+      "sha256": "702338d2a8888e3f425e5c97dd48fe0497137883c179f8e5b05f4feb4036023a"
+    },
+    {
+      "file": "storage-type-editor-contract-mobile-fr.png",
+      "sha256": "f3a2574e9ed10ba593f0199c068e270417f9d52f65abcb25365dcdaea9723ab1"
+    },
+    {
+      "file": "storage-type-editor-review-mobile-fr.png",
+      "sha256": "11a7dbfc22a35ebec306b307d4f0c5844cc404f4cd4aebc7b23260909c42a8b9"
+    },
+    {
+      "file": "storage-type-editor-created-mobile-fr.png",
+      "sha256": "8fe963661825ddb3b0bea5f73fb4ac66c6c19ffa2a0c41744355193bcaa849b1"
+    },
+    {
+      "file": "storage-type-editor-publication-invalid-version-mobile-fr.png",
+      "sha256": "b935ff71d514d4b601bd7300980142f970a84b26a992230883ce1ddba6289f52"
+    },
+    {
+      "file": "storage-type-editor-publication-invalid-schema-mobile-fr.png",
+      "sha256": "04f932c009d570fce8b5d2ead5bef1482269c518c810b6bb060911e7c5fe5d5d"
+    },
+    {
+      "file": "storage-type-editor-publication-review-mobile-fr.png",
+      "sha256": "de01d65e3ab7ef0057e84a6ba8ff18b0db89a9d89bac4d84145884e0c7436686"
+    },
+    {
+      "file": "storage-type-editor-published-mobile-fr.png",
+      "sha256": "aa84865066317e23b204278ef94540c9dc33e04895f0fdbbd101220c618d8065"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 24,
+    "logSha256": "c8addd60251b6bb6e65b49b3dde0fa7fddae0b9f6cd5bb5f816f94c4fdd1b1c8"
+  },
+  "maintainedRegression": {
+    "base": "67784be20fe5099e6a456d08645402d76465dd8c",
+    "phase": {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 130.7
+    }
+  },
+  "nativeProbeSha256": "f19885e621cba6822c10dbe7615ccaf8f5b3ce62d674ba07dd505928099d93ac",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ],
+  "integrationHeads": [
+    "c93a05291a45c6d90cecb7a7de1d5d2f3c360898"
+  ],
+  "integrationNote": "Fast-forwarded the parallel Extension inventory and list documentation commits after validation. All recorded editor and protected Agent source hashes remain unchanged; browser evidence records the actual tested base, not a claim that parallel changes were tested."
+}

@@ -16,6 +16,10 @@ public sealed class ModelProfileEditorModel
 
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [Required] public ResourceScopeRef? ScopeRef { get; set; }
+    public string Tags { get; set; } = string.Empty;
+    private ResourceReference? originalProvider;
+    private string? originalProviderNamespace;
     [Required] public string ProviderNamespace { get; set; } = ResourceNamespace.DefaultValue;
     [Required] public string ProviderName { get; set; } = string.Empty;
     [Required] public string ModelName { get; set; } = string.Empty;
@@ -32,7 +36,7 @@ public sealed class ModelProfileEditorModel
     public bool StrictOutput { get; set; }
     public string? ProviderOptionsJson { get; set; }
 
-    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
+    public CreateModelProfileRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value, ScopeRef);
     public PutModelProfileRequest ToPutRequest() => new(ToProperties());
 
     public ModelProfileProperties ToProperties()
@@ -43,7 +47,8 @@ public sealed class ModelProfileEditorModel
         {
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-            Provider = new ResourceReference(ProviderName.Trim(), ResourceScopeRef.Instance, ResourceNamespace.Parse(ProviderNamespace)),
+            Provider = originalProvider is not null && originalProvider.Name == ProviderName && originalProviderNamespace == ProviderNamespace
+                ? originalProvider : new ResourceReference(ProviderName.Trim(), ResourceScopeRef.Instance, ResourceNamespace.Parse(ProviderNamespace)),
             Model = new ModelSelection { Name = ModelName.Trim() },
             Generation = new ModelGenerationOptions
             {
@@ -68,6 +73,10 @@ public sealed class ModelProfileEditorModel
     public static ModelProfileEditorModel FromResource(ModelProfileResource resource) => new()
     {
         Name = resource.Name,
+        ScopeRef = resource.ScopeRef,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
+        originalProvider = resource.Definition.Provider,
+        originalProviderNamespace = (resource.Definition.Provider.Namespace ?? resource.Namespace).Value,
         Namespace = resource.Namespace.Value,
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
@@ -89,6 +98,23 @@ public sealed class ModelProfileEditorModel
             ? JsonSerializer.Serialize(resource.Definition.ProviderOptions, IndentedJson)
             : null
     };
+
+    public IReadOnlySet<string> InvalidFields()
+    {
+        var results = new List<ValidationResult>();
+        Validator.TryValidateObject(this, new ValidationContext(this), results, true);
+        return results.SelectMany(result => result.MemberNames).Concat(InputIssues().Select(issue => issue.Field)).ToHashSet(StringComparer.Ordinal);
+    }
+
+    public IReadOnlyList<ModelProfileInputIssue> InputIssues()
+    {
+        var issues = new List<ModelProfileInputIssue>();
+        try { ParseJson(JsonSchema, OutputFormat == ModelOutputFormat.JsonSchema); }
+        catch (ArgumentException) { issues.Add(new(nameof(JsonSchema), ModelProfileInputIssueCode.JsonSchemaInvalid)); }
+        try { ParseProviderOptions(ProviderOptionsJson); }
+        catch (ArgumentException) { issues.Add(new(nameof(ProviderOptionsJson), ModelProfileInputIssueCode.ProviderOptionsInvalid)); }
+        return issues;
+    }
 
     private static IReadOnlyList<string>? ParseLines(string? value)
     {
@@ -118,6 +144,9 @@ public sealed class ModelProfileEditorModel
         catch (JsonException exception) { throw new ArgumentException("Provider options must be a JSON object.", exception); }
     }
 }
+
+public enum ModelProfileInputIssueCode { JsonSchemaInvalid, ProviderOptionsInvalid }
+public sealed record ModelProfileInputIssue(string Field, ModelProfileInputIssueCode Code);
 
 public static class ModelManagementUi
 {

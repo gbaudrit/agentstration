@@ -63,6 +63,7 @@
   <data name="Edit" xml:space="preserve">
     <value>Definition</value>
   </data>
+  <data name="EditDefinition" xml:space="preserve"><value>Edit definition</value></data>
   <data name="Access" xml:space="preserve">
     <value>Access</value>
   </data>
@@ -157,6 +158,7 @@
     <value>optional</value>
   </data>
   <data name="Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Labels" xml:space="preserve"><value>Labels</value></data>
   <data name="Description" xml:space="preserve"><value>Description</value></data>
   <data name="NotProvided" xml:space="preserve"><value>Not provided</value></data>
   <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
@@ -199,4 +201,73 @@
   <data name="NoSecret" xml:space="preserve"><value>No secret</value></data>
   <data name="SecretCoordinates" xml:space="preserve"><value>Vault: {0} · {1}/{2}</value></data>
   <data name="SecretMissingValue" xml:space="preserve"><value>The selected Secret has no configured value.</value></data>
+  <data name="RequiredFields" xml:space="preserve"><value>Required fields</value></data>
+  <data name="Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="Verification" xml:space="preserve"><value>Review</value></data>
+  <data name="SectionActions" xml:space="preserve"><value>Section actions</value></data>
+  <data name="Validation.Required" xml:space="preserve"><value>{0} is required.</value></data>
+  <data name="Validation.StringLength" xml:space="preserve"><value>{0} must contain no more than {1} characters.</value></data>
+  <data name="Validation.StringLengthRange" xml:space="preserve"><value>{0} must contain between {1} and {2} characters.</value></data>
+  <data name="Validation.MinLength" xml:space="preserve"><value>{0} must contain at least {1} elements.</value></data>
+  <data name="Validation.MaxLength" xml:space="preserve"><value>{0} must contain no more than {1} elements.</value></data>
+  <data name="Validation.Range" xml:space="preserve"><value>{0} must be between {1} and {2}.</value></data>
+  <data name="Validation.Format" xml:space="preserve"><value>{0} has an invalid format.</value></data>
+  <data name="Validation.Email" xml:space="preserve"><value>{0} must contain a valid email address.</value></data>
+  <data name="Validation.Url" xml:space="preserve"><value>{0} must contain a valid URL.</value></data>
+  <data name="Validation.Phone" xml:space="preserve"><value>{0} must contain a valid phone number.</value></data>
+  <data name="Validation.CreditCard" xml:space="preserve"><value>{0} must contain a valid card number.</value></data>
+  <data name="Validation.Selection" xml:space="preserve"><value>Select a valid value for {0}.</value></data>
+  <data name="Validation.Compare" xml:space="preserve"><value>{0} must match {1}.</value></data>
+  <data name="Validation.Invalid" xml:space="preserve"><value>An invalid value was provided.</value></data>
+  <data name="ResourceLoading" xml:space="preserve"><value>Loading resource…</value></data>
+  <data name="ResourceRefreshing" xml:space="preserve"><value>Refreshing resource…</value></data>
+  <data name="ResourceRefreshFailed" xml:space="preserve"><value>Unable to refresh the resource</value></data>
+  <data name="ResourceLoadFailed" xml:space="preserve"><value>Unable to load resource</value></data>
+  <data name="ResourceLoadFailedMessage" xml:space="preserve"><value>The resource could not be loaded. Try again.</value></data>
+  <data name="ResourceNotFound" xml:space="preserve"><value>Resource not found</value></data>
+  <data name="ResourceNotFoundMessage" xml:space="preserve"><value>This resource is no longer available in the selected context.</value></data>
+  <data name="ResourceForbidden" xml:space="preserve"><value>Access denied</value></data>
+  <data name="ResourceForbiddenMessage" xml:space="preserve"><value>You do not have permission to view this resource in the selected context.</value></data>
+  <data name="RetryResourceLoad" xml:space="preserve"><value>Retry</value></data>
+  <data name="RefreshResource" xml:space="preserve"><value>Refresh</value></data>
+  <data name="ErrorId" xml:space="preserve"><value>Error ID</value></data>
+  <data name="ReadOnlyDefinition" xml:space="preserve"><value>Read-only definition</value></data>
+  <data name="ReadOnlyReason.Unspecified" xml:space="preserve"><value>This definition is available for consultation only.</value></data>
+  <data name="ReadOnlyReason.Inherited" xml:space="preserve"><value>This resource belongs to another scope. Switch to its owner scope to edit its definition.</value></data>
+  <data name="ReadOnlyReason.Managed" xml:space="preserve"><value>This definition is managed by the platform or an installation and cannot be edited here.</value></data>
+  <data name="ReadOnlyReason.InsufficientPermissions" xml:space="preserve"><value>You do not have permission to edit this definition.</value></data>
+  <data name="MoreFilters" xml:space="preserve"><value>More filters</value></data>
+  <data name="ActiveFilters" xml:space="preserve"><value>Active filters</value></data>
+  <data name="RemoveFilter" xml:space="preserve"><value>Remove filter {0}: {1}</value></data>
+  <data name="ClearFilters" xml:space="preserve"><value>Clear filters</value></data>
+  <data name="ApplyFilters" xml:space="preserve"><value>Apply filters</value></data>
+  <data name="FilterFrom" xml:space="preserve"><value>From</value></data>
+  <data name="FilterTo" xml:space="preserve"><value>To</value></data>
+  <data name="FilterRange" xml:space="preserve"><value>{0} to {1}</value></data>
+  <data name="FilterAnyDate" xml:space="preserve"><value>Any date</value></data>
+  <data name="CollectionPageSize" xml:space="preserve"><value>Rows per page</value></data>
+  <data name="CollectionEmpty" xml:space="preserve"><value>No records yet</value></data>
+  <data name="CollectionEmptyHelp" xml:space="preserve"><value>Records will appear here when available.</value></data>
+  <data name="CollectionLoading" xml:space="preserve"><value>Loading results…</value></data>
+  <data name="CollectionRefreshing" xml:space="preserve"><value>Refreshing results…</value></data>
+  <data name="CollectionLoadFailed" xml:space="preserve"><value>Unable to load results</value></data>
+  <data name="CollectionRefreshFailed" xml:space="preserve"><value>Unable to update results</value></data>
+  <data name="CollectionLoadFailedMessage" xml:space="preserve"><value>The results could not be loaded. Try again.</value></data>
+  <data name="CollectionForbiddenMessage" xml:space="preserve"><value>You do not have permission to view this collection in the selected context.</value></data>
+  <data name="CollectionEmptyPage" xml:space="preserve"><value>No records on this page</value></data>
+  <data name="CollectionContinuePages" xml:space="preserve"><value>Use the page controls to continue browsing the results.</value></data>
+  <data name="ResourceVersion" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="VersionLabel" xml:space="preserve"><value>Version</value></data>
+  <data name="IdentityQuickView" xml:space="preserve"><value>Resource identity</value></data>
+  <data name="ResourceScopeBadge.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="CloseIdentity" xml:space="preserve"><value>Close resource identity</value></data>
+  <data name="NamedResourceScope" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ResourceUid" xml:space="preserve"><value>Resource UUID</value></data>
+  <data name="ResourceManifest" xml:space="preserve"><value>Resource manifest</value></data>
+<data name="Preview" xml:space="preserve"><value>Preview</value></data>
+<data name="ClosePreview" xml:space="preserve"><value>Close preview</value></data>
+<data name="QuickActions" xml:space="preserve"><value>Quick actions</value></data>
 </root>

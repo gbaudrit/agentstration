@@ -1,16 +1,61 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
 public sealed class OrchestrationEditorModel
 {
     public string Name { get; set; } = "multi-agent-review";
+    [Required, StringLength(200)] public string DisplayName { get; set; } = "multi-agent-review";
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+    public string Tags { get; set; } = string.Empty;
+    [JsonIgnore] public string PublishVersion { get; set; } = string.Empty;
     public string? Description { get; set; } = "Coordinates multiple agents to produce a reviewed result.";
     public string Version { get; set; } = "0.1.0";
     public bool Enabled { get; set; } = true;
     public FlowOrchestrationStrategy Strategy { get; set; } = FlowOrchestrationStrategy.Sequential;
     public List<string> ParticipantIds { get; } = [];
+    public Dictionary<string, FlowTargetReference> ParticipantReferences { get; } = new(StringComparer.Ordinal);
+    public FlowTargetReference? ManagerReference { get; private set; }
+
+    public FlowTargetReference ParticipantReference(string id) => ParticipantReferences.TryGetValue(id, out var reference)
+        ? reference : new(FlowTargetKind.Agent, id);
+    public FlowTargetReference ManagerTarget => ManagerReference?.Id == ManagerId
+        ? ManagerReference : new(FlowTargetKind.Agent, ManagerId);
+
+    public static AgentSummary? FindCatalogAgent(FlowTargetReference reference, IReadOnlyList<AgentSummary> agents,
+        ResourceNamespace ownerNamespace, ResourceScopeRef? ownerScope)
+    {
+        var candidates = agents.Where(agent => agent.Id == reference.Id && agent.Namespace == (reference.Namespace ?? ownerNamespace)).ToArray();
+        if (reference.ScopeRef is { } scope) return candidates.FirstOrDefault(agent => agent.ScopeRef == scope);
+        var local = candidates.FirstOrDefault(agent => agent.ScopeRef == ownerScope);
+        if (local is not null) return local;
+        // Instance is a known ancestor. Do not guess another Tenant/Workspace for a relative reference.
+        return candidates.Length == 1 && (candidates[0].ScopeRef is null || candidates[0].ScopeRef == ResourceScopeRef.Instance) ? candidates[0] : null;
+    }
+
+    public void SelectParticipant(FlowTargetReference reference)
+    {
+        if (ParticipantIds.Contains(reference.Id, StringComparer.Ordinal)) return;
+        ParticipantIds.Add(reference.Id);
+        ParticipantReferences[reference.Id] = reference;
+        if (ManagerId == reference.Id) SelectManager(null);
+    }
+
+    public void RemoveParticipant(string id)
+    {
+        ParticipantIds.Remove(id);
+        ParticipantReferences.Remove(id);
+    }
+
+    public void SelectManager(FlowTargetReference? reference)
+    {
+        ManagerReference = reference;
+        ManagerId = reference?.Id ?? string.Empty;
+    }
     public bool IncludeFullHistory { get; set; } = true;
     public string InitialParticipant { get; set; } = string.Empty;
     public List<FlowHandoffEditorRoute> Handoffs { get; } = [];
@@ -30,13 +75,27 @@ public sealed class OrchestrationEditorModel
         if (ParticipantIds.Distinct(StringComparer.Ordinal).Count() != ParticipantIds.Count)
             throw new InvalidOperationException("Each participant can only be selected once.");
 
+        if (Strategy == FlowOrchestrationStrategy.Handoff)
+        {
+            if (string.IsNullOrWhiteSpace(InitialParticipant))
+                throw new InvalidOperationException("Select the initial handoff participant.");
+            if (Handoffs.Count == 0)
+                throw new InvalidOperationException("Add at least one handoff route.");
+        }
+        if (Strategy == FlowOrchestrationStrategy.Magentic)
+        {
+            if (string.IsNullOrWhiteSpace(ManagerId))
+                throw new InvalidOperationException("Select a manager for the Magentic orchestration.");
+            if (ParticipantIds.Contains(ManagerId, StringComparer.Ordinal))
+                throw new InvalidOperationException("The Magentic manager must be distinct from the participants.");
+        }
         return CreatePreviewDefinition();
     }
 
     public OrchestrationFlowDefinition CreatePreviewDefinition()
     {
         var participants = ParticipantIds
-            .Select(id => new FlowTargetReference(FlowTargetKind.Agent, id))
+            .Select(ParticipantReference)
             .ToArray();
         FlowOrchestrationPattern pattern = Strategy switch
         {
@@ -57,12 +116,16 @@ public sealed class OrchestrationEditorModel
         var model = new OrchestrationEditorModel
         {
             Name = flow.Name,
+            DisplayName = flow.DisplayName ?? flow.Name,
+            Namespace = flow.Namespace.Value,
+            Tags = string.Join(Environment.NewLine, flow.Metadata.OrderBy(value => value.Key, StringComparer.Ordinal).Select(value => $"{value.Key}={value.Value}")),
             Description = flow.Description,
             Version = flow.Version,
             Enabled = flow.Enabled,
             Strategy = definition.Strategy
         };
         model.ParticipantIds.AddRange(definition.Participants.Select(participant => participant.Id));
+        foreach (var participant in definition.Participants) model.ParticipantReferences[participant.Id] = participant;
         switch (definition.Pattern)
         {
             case SequentialOrchestrationPattern sequential:
@@ -79,7 +142,7 @@ public sealed class OrchestrationEditorModel
                 model.MaximumIterations = groupChat.MaximumIterations;
                 break;
             case MagenticOrchestrationPattern magentic:
-                model.ManagerId = magentic.Manager.Id;
+                model.SelectManager(magentic.Manager);
                 model.MaximumRounds = magentic.MaximumRounds;
                 model.MaximumStalls = magentic.MaximumStalls;
                 model.MaximumResets = magentic.MaximumResets;
@@ -99,10 +162,6 @@ public sealed class OrchestrationEditorModel
 
     private HandoffOrchestrationPattern CreateHandoffPattern()
     {
-        if (string.IsNullOrWhiteSpace(InitialParticipant))
-            throw new InvalidOperationException("Select the initial handoff participant.");
-        if (Handoffs.Count == 0)
-            throw new InvalidOperationException("Add at least one handoff route.");
         return new HandoffOrchestrationPattern(
             InitialParticipant,
             Handoffs.Select(route => new FlowHandoff(route.From, route.To)).ToArray(),
@@ -113,12 +172,8 @@ public sealed class OrchestrationEditorModel
 
     private MagenticOrchestrationPattern CreateMagenticPattern()
     {
-        if (string.IsNullOrWhiteSpace(ManagerId))
-            throw new InvalidOperationException("Select a manager for the Magentic orchestration.");
-        if (ParticipantIds.Contains(ManagerId, StringComparer.Ordinal))
-            throw new InvalidOperationException("The Magentic manager must be distinct from the participants.");
         return new MagenticOrchestrationPattern(
-            new FlowTargetReference(FlowTargetKind.Agent, ManagerId),
+            ManagerTarget,
             MaximumRounds,
             MaximumStalls,
             MaximumResets);

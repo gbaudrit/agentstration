@@ -13,6 +13,7 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class TriggerDetailsPermissionsTests
 {
+    private static readonly Guid ResourceWorkspace = Guid.Parse("11111111-1111-1111-1111-111111111111");
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
@@ -29,22 +30,28 @@ public sealed class TriggerDetailsPermissionsTests
         var client = new TriggerClient();
         context.Services.AddSingleton<ITriggerApiClient>(client);
 
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("http://localhost/triggers/permission-race");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri);
+        module.Setup<string>("navigate", _ => true).SetResult(navigation.Uri + "#overview");
+
         // MainLayout starts this shared request independently of the page's resource request.
         var permissions = state.LoadAsync(default);
         var page = context.Render<TriggerDetails>(parameters => parameters.Add(value => value.Name, "permission-race"));
         Assert.IsEmpty(page.FindAll("[data-testid='trigger-enable']"));
         snapshot.SetResult(new(Guid.NewGuid(), "Reader", ResourceScopeRef.Instance.Value, ConsoleContextKind.Instance,
-            Guid.NewGuid(), "tenant", "Tenant", Guid.NewGuid(), "default", "Default workspace",
-            canManage ? new HashSet<string> { AuthorizationPermissions.ResourcesWrite } : [], [], []));
+            Guid.NewGuid(), "tenant", "Tenant", ResourceWorkspace, "default", "Default workspace",
+            canManage ? new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite } : [AuthorizationPermissions.ResourcesRead], [], []));
         await permissions;
         page.WaitForAssertion(() =>
         {
             StringAssert.Contains(page.Markup, "Permission race Trigger");
-            Assert.HasCount(canManage ? 1 : 0, page.FindAll("[data-testid='trigger-enable']"));
+            Assert.AreEqual(!canManage, page.Find("[data-testid='trigger-enable']").HasAttribute("disabled"));
         });
         if (canManage)
         {
-            page.Find("[data-testid='trigger-enable']").Click();
+            page.Find("[data-testid='trigger-enable']").Change(true);
             Assert.HasCount(1, page.FindAll("[data-testid='trigger-enable-dialog']"));
         }
         Assert.AreEqual(0, client.SaveCalls, "Opening a confirmation must not enable the Trigger.");
@@ -64,7 +71,8 @@ public sealed class TriggerDetailsPermissionsTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = TriggerResourceKinds.Trigger,
             Metadata = new() { Name = "permission-race" },
-            ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()),
+            ScopeRef = ResourceScopeRef.Workspace(ResourceWorkspace),
+            Uid = Guid.NewGuid(),
             Definition = new()
             {
                 DisplayName = "Permission race Trigger",

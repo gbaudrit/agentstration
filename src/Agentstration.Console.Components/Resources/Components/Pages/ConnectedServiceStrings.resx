@@ -28,7 +28,7 @@
   <data name="Availability.Stale"><value>Stale</value></data>
   <data name="Availability.Unavailable"><value>Unavailable</value></data>
   <data name="Availability.Disabled"><value>Disabled</value></data>
-  <data name="Details.Description"><value>Inspect the pinned type resource, safe configuration, exports and diagnostics.</value></data>
+  <data name="Details.Description"><value>Manage the service configuration and review its availability.</value></data>
   <data name="DetailsSections"><value>Connected Service sections</value></data>
   <data name="Tab.Overview"><value>Overview</value></data>
   <data name="Tab.Definition"><value>Definition</value></data>
@@ -155,4 +155,17 @@
 <data name="SchemaCandidate.Unsupported" xml:space="preserve"><value>This candidate cannot be exported with the supported acquisition schema profile. Its original evidence remains available.</value></data>
 <data name="SchemaCandidate.Failed" xml:space="preserve"><value>The Schema draft could not be created. Check the name, permissions and supported schema constructs.</value></data>
 <data name="SchemaCandidate.Library" xml:space="preserve"><value>Inspect or reuse a published Schema</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="NoMatches" xml:space="preserve"><value>No matching connected services</value></data>
+  <data name="NoMatches.Message" xml:space="preserve"><value>Try another search or clear the filters to see all connected services.</value></data>
+  <data name="ClearFilters" xml:space="preserve"><value>Clear filters</value></data>
+  <data name="ServiceType" xml:space="preserve"><value>Service type</value></data>
+<data name="CompleteConfiguration"><value>Complete the required configuration before creating the Connected Service.</value></data>
+<data name="IdentityMismatch"><value>The returned Connected Service does not match the requested identity.</value></data>
+  <data name="TypeContractUnavailable" xml:space="preserve"><value>The pinned type contract is unavailable in this context. Saved values remain available for inspection; configuration cannot be changed until the exact contract is available.</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Descendant use</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A refreshed version is available. Your draft and its original version are retained. Discard the draft to adopt the refreshed resource.</value></data>
+  <data name="RequiredBindingsMissing" xml:space="preserve"><value>Configure the required bindings: {0}.</value></data>
+  <data name="ConfigurationInvalid" xml:space="preserve"><value>Correct the configuration errors before saving.</value></data>
+  <data name="ConcurrencyConflict" xml:space="preserve"><value>This service changed on the server. Your draft is retained. Discard it to adopt the refreshed resource before saving again.</value></data>
 </root>

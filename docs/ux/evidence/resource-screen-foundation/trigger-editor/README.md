@@ -1,0 +1,35 @@
+# Trigger creation and delegated-definition preparation
+
+This pass prepares TriggerEditor, including `/triggers/new` and the existing dedicated edit route, for the owning TriggerDetails migration in the next screen commit. It does not claim that the persisted TriggerDetails shell is already reconciled. Creation uses the shared CreationWizard with Identity / Target / Schedule / Static input / Verification; navigation remains available before all fields are filled. ResourceDefinitionForm uses the family's actual root properties, localized labels and validation stores, and accepts the persisted host's exact ResourceSectionState/presentation dictionary. Identity uses ResourceIdentityEditor, with saved/creation namespace and ownership immutable and actual labels shown read-only inside the panel. The existing update API only writes Definition, so label mutation is not fabricated.
+
+ADR-0186 distinguishes the physical operational Workspace owner from the logical Instance/Tenant/Workspace authorization context and from the target Flow owner. The screen uses the already authorized shared context to display that fixed physical owner; it never offers a scope selector or assigns the target Flow's scope to the Trigger. ResourceIdentityEditor.ScopeContent is an optional value slot for this concrete case. Omitted values retain the existing ResourceScopeFormField behavior, with no additional loader or business schema. Agent source/style/translations remain protected.
+
+The private draft model and its existing naming regex, 120-character display-name limit, 500-character description limit, interval bounds, schedule/DST conversions and JSON-object rule are owned by TriggerEditorModel. Commands, previews, permissions, confirmations and ETags stay in the adapter. The existing five-occurrence preview, IANA choices, cron presets, exact scoped Flow choices and bounded first 100-item Flow inventory remain; there is no implicit whole-catalog load. Changed preview responses cannot overwrite a later request or field change. Free navigation with an empty time-zone field does not throw while rendering Verification.
+
+Metadata saves preserve the original resource metadata/namespace/UID/ETag and the whole saved Flow target, including version, UID, integrity hash and relative namespace, unless the user explicitly changes its selection. Explicitly clearing/reselecting a target requests normal API resolution; metadata edits do not silently bind the latest publication. Creation remains disabled, without an invented execution identity. Namespace queries now remain part of the actual creation/update address rather than being dropped from the envelope.
+
+Incoming snapshots retain invalid raw JSON, numeric/date parsing state, model/EditContext and original ETag until explicit discard. Acknowledged activation updates the saved envelope/ETag while preserving unrelated fields. Main read denials, missing/foreign owners and identity mismatches suppress private form/catalog content; recoverable reads expose Retry. A missing auxiliary Flow catalog retains the exact saved reference, and recoverable/rejected writes retain the draft without implicit retries. Specialized parser/preview errors stay inline and navigate/focus their owning section after the save lock is released. Native validation exposed stale mirrored wizard Busy state after a network preview and a pane-focus/field-focus ordering race; the adapter now relies on the wizard’s own finalization lock and uses optional CreationWizard.OnStepReady to ask the common form for field focus after pane focus completes. The existing 24 editor/family cases and nine wizard cases include a genuinely deferred preview and callback ordering. Permissions remain independently enforced by the family/API.
+
+24 focused editor/shared-identity/Trigger localization and schedule/DST cases plus nine CreationWizard cases, TypeScript and three Release hosts pass without warnings/errors. Native English/dark desktop and French/light true-touch probes verify incomplete/free step navigation, first-error focus, invalid JSON retained across steps, actual creation in a non-default namespace, the real physical operational owner versus logical Instance Flow target, creation disabled by contract, stale-ETag rejection retaining the draft, Escape/focus restoration, explicit leave/discard and subsequent successful metadata save preserving the full published target. The maintained operational Trigger journeys and protected Agent desktop/mobile journeys pass. The dedicated probe initially used a worker-scoped authentication option inside a describe group; its configuration was moved to file scope before application execution, without changing product rules, assertions or timeouts. The maintained regressions use identical recorded product-source and host hashes. The 18 PNGs are unmodified application captures. Exact tested base/source/host hashes and browser phases are in verification.json.
+
+The maintained operational Trigger journey now visits wizard steps and retains its authorization/isolation assertions. The next persisted-host pass still owns the shared Console frame, saved Overview/Identity/Configuration, activation switch with enable confirmation, independently meaningful target Access, read-only YAML and history. New reusable #1236 coverage remains deferred until explicit UX validation and merge. Full solution suites are omitted at maintainer request; no CI failures are inspected or handled.
+
+
+- [trigger-editor-identity-desktop-en.png](trigger-editor-identity-desktop-en.png)
+- [trigger-editor-target-desktop-en.png](trigger-editor-target-desktop-en.png)
+- [trigger-editor-schedule-desktop-en.png](trigger-editor-schedule-desktop-en.png)
+- [trigger-editor-invalid-input-desktop-en.png](trigger-editor-invalid-input-desktop-en.png)
+- [trigger-editor-review-desktop-en.png](trigger-editor-review-desktop-en.png)
+- [trigger-editor-created-desktop-en.png](trigger-editor-created-desktop-en.png)
+- [trigger-editor-stale-save-desktop-en.png](trigger-editor-stale-save-desktop-en.png)
+- [trigger-editor-leave-cancelled-desktop-en.png](trigger-editor-leave-cancelled-desktop-en.png)
+- [trigger-editor-metadata-saved-desktop-en.png](trigger-editor-metadata-saved-desktop-en.png)
+- [trigger-editor-identity-mobile-fr.png](trigger-editor-identity-mobile-fr.png)
+- [trigger-editor-target-mobile-fr.png](trigger-editor-target-mobile-fr.png)
+- [trigger-editor-schedule-mobile-fr.png](trigger-editor-schedule-mobile-fr.png)
+- [trigger-editor-invalid-input-mobile-fr.png](trigger-editor-invalid-input-mobile-fr.png)
+- [trigger-editor-review-mobile-fr.png](trigger-editor-review-mobile-fr.png)
+- [trigger-editor-created-mobile-fr.png](trigger-editor-created-mobile-fr.png)
+- [trigger-editor-stale-save-mobile-fr.png](trigger-editor-stale-save-mobile-fr.png)
+- [trigger-editor-leave-cancelled-mobile-fr.png](trigger-editor-leave-cancelled-mobile-fr.png)
+- [trigger-editor-metadata-saved-mobile-fr.png](trigger-editor-metadata-saved-mobile-fr.png)

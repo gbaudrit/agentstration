@@ -38,7 +38,8 @@ export class FormAdaptersPage {
   public async exerciseAccountAdministration(base: string, locale: SupportedTestLocale): Promise<void> {
     const scope = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
     await this.page.goto(`${base}/settings/organization/members${scope ? `?context=${encodeURIComponent(scope)}` : ''}`);
-    const section = this.page.getByTestId(TestIds.consoleAdministration.organizationMembers);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const section = this.page.locator('#organization-local-accounts');
     await expect(section.locator('.form-field input').first()).toBeVisible();
     await this.fields.assertAssociations();
     const before = await this.count(base, '/api/identity/accounts/');
@@ -66,23 +67,34 @@ export class FormAdaptersPage {
     await this.page.getByTestId(TestIds.distribution.packProjectPublisher).fill('forms');
     await this.page.getByTestId(TestIds.distribution.packProjectPublisher).press('Tab');
     await this.page.getByTestId(TestIds.distribution.packProjectDisplayName).fill('Shared classification contract');
+    await composer.locator('[data-wizard-step=resources]').click();
     await composer.locator('[data-resource-kind="Flow"][data-resource-name="system-direct-agent-dotnet-expert"]').getByTestId(TestIds.distribution.packProjectAddResource).click();
+    await composer.locator('[data-wizard-step=review]').click();
     const create = this.page.getByTestId(TestIds.distribution.packProjectCreate);
     await expect(create).toBeEnabled();
+    await composer.locator('[data-wizard-step=identity]').click();
     const choice = composer.locator('.composer-metadata select').first();
     const original = await choice.inputValue();
     await this.fields.clearField(choice, locale);
+    await expect(choice.locator('..').locator('..').locator('.form-field-messages')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
+    await composer.locator('[data-wizard-step=review]').click();
     await expect(create).toBeDisabled();
-    await expect(composer.locator('.validation-errors')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
+    await composer.locator('[data-wizard-step=identity]').click();
     await choice.selectOption(original);
+    await composer.locator('[data-wizard-step=review]').click();
     await expect(create).toBeEnabled();
     await this.fields.assertWithinViewport();
   }
 
   public async exerciseRegistryRequiredSelection(base: string, locale: SupportedTestLocale): Promise<void> {
     const before = await this.count(base, '/api/sourceregistries');
-    await this.page.goto(`${base}/settings/source-registries/new`);
-    await this.page.locator('.resource-form .form-field input').first().fill('Unsubmitted registry');
+    await this.page.goto(`${base}/settings/source-registries/new?context=%2Finstance`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const displayName = this.page.locator('.resource-form .form-field input').first();
+    await displayName.fill('Unsubmitted registry');
+    await displayName.press('Tab');
+    await expect(displayName).toHaveValue('Unsubmitted registry');
+    await this.page.locator('[data-wizard-step=configuration]').click();
     const endpoint = this.page.locator('.resource-form input[type=url]');
     await endpoint.fill('https://example.test/index.json');
     await endpoint.press('Tab');

@@ -1,6 +1,7 @@
 using Agentstration.Web.Components.Naming;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Components.Tests;
@@ -97,6 +98,40 @@ public sealed class ResourceIdentityFieldsTests
             .Add(value => value.IsNew, true));
 
         Assert.AreEqual("initial-resume", technicalName);
+    }
+
+    [TestMethod]
+    public async Task AutomaticTechnicalNameNotifiesTheFormSoAnEarlierRequiredErrorCanClear()
+    {
+        using var context = Context();
+        var model = new IdentityModel();
+        var edit = new EditContext(model);
+        var field = new FieldIdentifier(model, nameof(model.Name));
+        var messages = new ValidationMessageStore(edit);
+        messages.Add(field, "Name required");
+        edit.OnFieldChanged += (_, args) =>
+        {
+            if (!args.FieldIdentifier.Equals(field)) return;
+            messages.Clear(field); edit.NotifyValidationStateChanged();
+        };
+        var rendered = context.Render<CascadingValue<EditContext>>(parameters => parameters.Add(value => value.Value, edit)
+            .AddChildContent<ResourceIdentityFields>(fields => fields
+                .Add(value => value.DisplayName, model.DisplayName).Add(value => value.DisplayNameChanged, value => model.DisplayName = value)
+                .Add(value => value.DisplayNameExpression, () => model.DisplayName)
+                .Add(value => value.TechnicalName, model.Name).Add(value => value.TechnicalNameChanged, value => model.Name = value)
+                .Add(value => value.TechnicalNameExpression, () => model.Name).Add(value => value.IsNew, true)
+                .Add(value => value.DisplayNameTestId, "display")));
+        Assert.HasCount(1, edit.GetValidationMessages(field).ToArray());
+        await rendered.Find("[data-testid=display]").InputAsync(new ChangeEventArgs { Value = "New resource" });
+        Assert.AreEqual("new-resource", model.Name);
+        Assert.IsTrue(edit.IsModified(field));
+        Assert.IsEmpty(edit.GetValidationMessages(field).ToArray());
+    }
+
+    private sealed class IdentityModel
+    {
+        public string DisplayName { get; set; } = "";
+        public string Name { get; set; } = "";
     }
 
     private static BunitContext Context()

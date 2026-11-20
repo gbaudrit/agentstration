@@ -1,0 +1,152 @@
+{
+  "base": "5df6676cebb0baff3a5bb55a65ef2ebdf6527f0e",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "22caa136518e550bcfd85c6d29242b716975482412f7926da57137e11b032074",
+    "automation/playwright/src/pages/flow-observability.page.ts": "79c7d4cd40bb1a649b8f9383bdfd4337722205dbaf2dc0e6d5f9b0a243c34391",
+    "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor": "80a3f5ed7819ed2c394e6a126fb9d9d1de8432097bd5c291b977ec3a2615b1f1",
+    "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor.css": "42d28a3599ed8885a6b0ef627ed3cc5981c698e33f78d65754fc4334f0fa80cd",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/TaskDetailsStrings.fr-FR.resx": "dde075bdb7cf1acd25fd701c654a7e3fc74d60fc632e38e05f1f23a41ff398ef",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/TaskDetailsStrings.resx": "ff37d70af4480a995505c66e004aaff0a14883edd019478c3a2c7eb510e43211",
+    "src/Agentstration.Workplace.Components/PendingActionPanel.razor": "854a703704ffefae0811777233871f3b4ec370aa060a002507ad2b99497ff01c",
+    "tests/Agentstration.Console.Components.Tests/TaskDetailsLocalizationTests.cs": "808d7ce0faff3461d2e0b29a89b5dd603c7a6c1d401479873081c365cb39e5ee",
+    "tests/Agentstration.Console.Components.Tests/TaskDetailsTests.cs": "3628f7d626646a7adb8cc53c909049b256cc1002f1044ddbf0703ee7f3a7d6e8",
+    "tests/Agentstration.Workplace.Components.Tests/PendingActionPanelTests.cs": "bd517161d235e326a942800f2b9ce578f2e6d6c24be23ad8ef105310d7d68406"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "e2cbd49295a14e6fe29b8ad06628f157940033e93143bc3247420117b2c1a3c4",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "6ffc06824a311772ded77addc77910f3de306f062bd51601ece80ceefb2ce86a",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d9415becc07bd486b87d7440cd80dad1af752f306c907f0d2409f588c59f51ab",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "e2cbd49295a14e6fe29b8ad06628f157940033e93143bc3247420117b2c1a3c4",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "e2cbd49295a14e6fe29b8ad06628f157940033e93143bc3247420117b2c1a3c4",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "6ffc06824a311772ded77addc77910f3de306f062bd51601ece80ceefb2ce86a",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "6ffc06824a311772ded77addc77910f3de306f062bd51601ece80ceefb2ce86a",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d9415becc07bd486b87d7440cd80dad1af752f306c907f0d2409f588c59f51ab",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d9415becc07bd486b87d7440cd80dad1af752f306c907f0d2409f588c59f51ab"
+  },
+  "phases": [
+    {
+      "name": "task",
+      "exitCode": 0,
+      "seconds": 102.2
+    },
+    {
+      "name": "observability-regression",
+      "exitCode": 0,
+      "seconds": 120.0
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 117.4
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "task-overview-desktop-en.png",
+      "sha256": "0e43559c4c7890e5d06d4e3c4dc09c20af6dbb383f0bfd18068aa840e62d12d1"
+    },
+    {
+      "file": "task-execution-desktop-en.png",
+      "sha256": "108be6d55a77797f14f5bd614ddd8481a65faadc69047d414240a050b86ae378"
+    },
+    {
+      "file": "task-results-desktop-en.png",
+      "sha256": "a3ce24bb6a054989296d9da203245b5f08253f6077169741572b9b916fcd72f8"
+    },
+    {
+      "file": "task-artifacts-desktop-en.png",
+      "sha256": "cc19c6ad5c3840cad0862b993e0d51ceb2a88e99f630afa37fbdf5e5041b5e42"
+    },
+    {
+      "file": "task-pending-actions-desktop-en.png",
+      "sha256": "d4a24d4298983012093dabfaa1a5267b697fe890112968b6df46ac91723b38ef"
+    },
+    {
+      "file": "task-interaction-desktop-en.png",
+      "sha256": "0496c71865ce4d0a4208b0c52a89ce677911b09c70db67025b5bb98cb515cadb"
+    },
+    {
+      "file": "task-activity-desktop-en.png",
+      "sha256": "8eee1562e210062f790d29384572a70fe4e835499f3df3a3402747855a9ab4b1"
+    },
+    {
+      "file": "task-refreshed-desktop-en.png",
+      "sha256": "ad7d0239b19bdd2c751b4f74337ce2b87f73f17d82209445dc5eda02215d6cd0"
+    },
+    {
+      "file": "task-not-found-desktop-en.png",
+      "sha256": "4d6e93503ecdb1becfbb93ad0134d06703baf4a72faa2435fe49fead197dde34"
+    },
+    {
+      "file": "task-overview-mobile-fr.png",
+      "sha256": "6d864ad39429f811e0d4978b9e2b2a8c4333da073d44cafa714ea9633c6e75eb"
+    },
+    {
+      "file": "task-execution-mobile-fr.png",
+      "sha256": "7e91c831210f3c7063d3af1f006ae74b8babba663bc6bc8125afe3282ef46936"
+    },
+    {
+      "file": "task-results-mobile-fr.png",
+      "sha256": "1973ea7fb8b65f0d7feab77d6467e85c54504f1c5d2868c7012fa856e11fb6af"
+    },
+    {
+      "file": "task-artifacts-mobile-fr.png",
+      "sha256": "942422a3b0fc7d688c32bb17b4908c469f4c7027691c1ffe3c2753be4765ba80"
+    },
+    {
+      "file": "task-pending-actions-mobile-fr.png",
+      "sha256": "ea85732854a5946a7f2954a4e8400c004c6cea8d24bcef85b2c229211bb805f0"
+    },
+    {
+      "file": "task-interaction-mobile-fr.png",
+      "sha256": "222ae4bc07f7f9ed672ffafbcfcac2da28a17a7deb5215f372c920c1aa306dbb"
+    },
+    {
+      "file": "task-activity-mobile-fr.png",
+      "sha256": "e2d222cb763bf3f77d30b02e0364f64e416fe17dda4440e4d4d55d4b4e843086"
+    },
+    {
+      "file": "task-refreshed-mobile-fr.png",
+      "sha256": "d869f4d82b7cbda5f26b1b0924a262405deeabc8f7470302c330f63162db9673"
+    },
+    {
+      "file": "task-not-found-mobile-fr.png",
+      "sha256": "1df4a31aef76ce4da9dcaed449db733fca099edc568c280831288b3997ba8729"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 17,
+    "logSha256": "6527d3656c816e997f8d885288807ae90f26174eb7cf14a5eaa3b98254f4ab52"
+  },
+  "maintainedRegression": {
+    "campaign": "task-05",
+    "base": "5df6676cebb0baff3a5bb55a65ef2ebdf6527f0e",
+    "phase": {
+      "name": "observability-regression",
+      "exitCode": 0,
+      "seconds": 120.0
+    },
+    "sourceHashesMatch": true,
+    "hostHashesMatch": true
+  },
+  "responsePanelTests": {
+    "passed": 9,
+    "logSha256": "402f7bc8fcb3e52d19cc10316cbc39baece5faa83c337309b2c3cfdc6f995cac"
+  },
+  "nativeProbeSha256": "a5fca6d7006f64993978bff8fa0baea4bec076cb2511f7e95728041675c6add4",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ]
+}

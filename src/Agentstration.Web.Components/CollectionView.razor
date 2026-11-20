@@ -3,14 +3,25 @@
 @inject IJSRuntime JS
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 <div class="resource-collection @(Compact ? "collection-compact" : null)" @ref="root">
+    @if (Toolbar is not null || ShowViewSwitch)
+    {
     <div class="@(Toolbar is null ? null : "collection-toolbar")">
     @Toolbar
+    @if (ShowViewSwitch)
+    {
     <div class="collection-view-switch" role="group" aria-label="@Shared["CollectionView"]">
         <button type="button" class="button-secondary" aria-pressed="@((!cards).ToString().ToLowerInvariant())" @onclick="() => SelectView(false)"><UiIcon Name="table" /> @Shared["TableView"]</button>
         <button type="button" class="button-secondary" aria-pressed="@(cards.ToString().ToLowerInvariant())" @onclick="() => SelectView(true)"><UiIcon Name="list" /> @Shared["CardView"]</button>
     </div>
+    }
     </div>
-    @if (cards)
+    }
+    @BeforeResults
+    @if (!ShowItems)
+    {
+        @ContentState
+    }
+    else if (cards)
     {
         <CascadingValue Name="CollectionCard" Value="true" IsFixed>
             <ul class="collection-cards">
@@ -67,6 +78,10 @@
     [Parameter] public RenderFragment? InformationHeader { get; set; }
     [Parameter] public bool Compact { get; set; }
     [Parameter] public RenderFragment? Toolbar { get; set; }
+    [Parameter] public RenderFragment? BeforeResults { get; set; }
+    [Parameter] public RenderFragment? ContentState { get; set; }
+    [Parameter] public bool ShowItems { get; set; } = true;
+    [Parameter] public bool ShowViewSwitch { get; set; } = true;
     private ElementReference root;
     private bool cards;
     private bool selectedView;

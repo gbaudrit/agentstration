@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { LoginPage } from './login.page.js';
 import { fillAndCommit } from './controls.js';
+import { selectResourceSection } from './resource-sections.js';
 
 interface RuntimeRunWire {
   id: string;
@@ -70,7 +71,7 @@ export class RuntimeWorkerObservabilityPage {
 
   public workerRow(workerId: string): Locator {
     return this.page.getByTestId(TestIds.runtimeWorkerObservability.workerRow)
-      .filter({ has: this.page.locator(`a[href="/settings/runtime-workers/${workerId}"]`) });
+      .and(this.page.locator(`[data-worker-id="${workerId}"]`));
   }
 
   public async expectPresence(workerId: string, presence: 'Online' | 'Stale' | 'Offline' | 'Unknown'): Promise<string | null> {
@@ -96,8 +97,7 @@ export class RuntimeWorkerObservabilityPage {
   }
 
   public async openAssignments(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.runtimeWorkerObservability.assignmentsTab);
-    await this.activateTab(tab);
+    await selectResourceSection(this.page, 'assignments');
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.assignments)).toBeVisible();
   }
 
@@ -112,7 +112,10 @@ export class RuntimeWorkerObservabilityPage {
     await expect(row).toBeVisible();
     const assignmentId = await row.getAttribute('data-assignment-id');
     if (!assignmentId) throw new Error(`Worker assignment '${runId}' does not expose its assignment identifier.`);
-    await row.locator(`a.worker-run-link[href^="/runs/${runId}"], a.worker-run-link[href^="/flow-runs/${runId}"]`).click();
+    const link = row.locator(`a.worker-run-link[href^="/runs/${runId}"], a.worker-run-link[href^="/flow-runs/${runId}"]`);
+    const href = await link.getAttribute('href');
+    await link.click();
+    await selectResourceSection(this.page, href?.startsWith('/flow-runs/') ? 'worker' : 'execution/worker');
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.placement)).toHaveAttribute('data-assignment-id', assignmentId);
   }
 
@@ -134,13 +137,13 @@ export class RuntimeWorkerObservabilityPage {
 
   public async openRuntimeRunPlacement(consoleUrl: string, runId: string, workerId: string, state = 'Succeeded', errorCode?: string): Promise<void> {
     await this.open(`${consoleUrl}/runs/${encodeURIComponent(runId)}`, TestIds.flowObservability.agentRunner);
+    await selectResourceSection(this.page, 'execution/worker');
     await this.expectCurrentPlacement(workerId, state, errorCode, runId);
   }
 
   public async openFlowRunPlacement(consoleUrl: string, runId: string, workerId: string): Promise<void> {
     await this.open(`${consoleUrl}/flow-runs/${encodeURIComponent(runId)}`, TestIds.flowObservability.runDetails);
-    const workerTab = this.page.getByTestId(TestIds.runtimeWorkerObservability.flowRunWorkerTab);
-    await this.activateTab(workerTab);
+    await selectResourceSection(this.page, 'worker');
     await this.expectCurrentPlacement(workerId, 'Succeeded', undefined, runId);
   }
 
@@ -460,6 +463,7 @@ export class RuntimeWorkerObservabilityPage {
   private async open(url: string, marker: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Runtime Worker observability route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
   }
 

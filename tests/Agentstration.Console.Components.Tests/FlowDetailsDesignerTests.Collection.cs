@@ -18,6 +18,7 @@ public sealed partial class FlowDetailsDesignerTests
     [DataRow("/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", false, false)]
     public async Task CompactFlowLockMatchesManagedOrInheritedReadOnlyInTableAndCards(string current, string owner, bool managed, bool locked)
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -28,6 +29,7 @@ public sealed partial class FlowDetailsDesignerTests
             Task.FromResult(new FlowSummaryPage([new("flow", "Flow", "Workflow", "1.0.0", "Active", 0, 0, FlowClientStub.Now)
                 { ScopeRef = ResourceScopeRef.Parse(owner), IsManaged = managed }], false))
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         void AssertLock()
         {
@@ -48,6 +50,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public async Task CompactFlowsKeepExactIdentityAndAlignedVersionSlotsAcrossPagesAndViews()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -63,9 +66,12 @@ public sealed partial class FlowDetailsDesignerTests
             return Task.FromResult(new FlowSummaryPage(rows.Skip(skip).Take(take).ToArray(), rows.Length > skip + take));
         }
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
         Assert.HasCount(4, cut.FindAll("th"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions-menu"));
+        Assert.IsEmpty(cut.FindAll(".collection-destructive-actions"));
         Assert.AreEqual("Resource", cut.FindAll("th")[0].TextContent);
         Assert.AreEqual("Version", cut.FindAll("th")[1].QuerySelector(".flow-version-heading")!.ChildNodes[0].TextContent.Trim());
         Assert.IsEmpty(cut.FindAll(".collection-qualified-name > svg"));
@@ -93,6 +99,7 @@ public sealed partial class FlowDetailsDesignerTests
     [TestMethod]
     public async Task FailedFlowPageRetainsPreviousRowsAndRetriesTheFailedRequest()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -106,6 +113,7 @@ public sealed partial class FlowDetailsDesignerTests
             return Task.FromResult(new FlowSummaryPage([new($"flow-{skip}", "Flow", "Direct", "1.0.0", "Unknown", 0, 0, FlowClientStub.Now)], true));
         }
         });
+        context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         await cut.FindAll(".collection-pager button")[1].ClickAsync(new());
         Assert.AreEqual("default/flow-0", cut.Find(".collection-qualified-name code").TextContent);

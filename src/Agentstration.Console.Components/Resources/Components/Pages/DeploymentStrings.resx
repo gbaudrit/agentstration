@@ -6,4 +6,9 @@
 <data name="Hosting.InProcess"><value>In process</value></data><data name="Hosting.SharedHost"><value>Shared host</value></data><data name="Hosting.DedicatedProcess"><value>Dedicated process</value></data><data name="Hosting.DedicatedContainer"><value>Dedicated container</value></data><data name="Hosting.RemoteEndpoint"><value>Remote endpoint</value></data><data name="Hosting.FoundryHosted"><value>Foundry hosted</value></data><data name="Scope"><value>Scope</value></data>
   <data name="AgentInstance"><value>Agent instance</value></data>
   <data name="ExecutionScope"><value>Execution scope</value></data>
+<data name="RunKind.Unknown"><value>Unknown</value></data>
+<data name="SnapshotHelp"><value>This view shows a bounded snapshot of active Agent instances. Refresh to update it.</value></data>
+<data name="SnapshotEmptyTitle"><value>No observed Agent instances</value></data>
+<data name="ExecutionTiming"><value>Timing</value></data>
+<data name="Session"><value>Session</value></data>
 </root>

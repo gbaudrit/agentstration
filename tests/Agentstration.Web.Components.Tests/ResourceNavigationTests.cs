@@ -49,7 +49,7 @@ public sealed class ResourceNavigationTests
         var cut = context.Render<ResourceNavigation>(p => p.Add(c => c.Items, Items()).Add(c => c.DefaultPath, "overview"));
         cut.WaitForAssertion(() => Assert.AreEqual("overview", cut.Instance.CurrentPath));
         Assert.DoesNotContain("Confidential section", cut.Markup);
-        Assert.AreEqual("This section is unavailable. Showing an available section.", cut.Find(".resource-navigation-feedback").TextContent);
+        Assert.AreEqual(context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<ResourceNavigationStrings>>()["Unavailable"].Value, cut.Find(".resource-navigation-feedback").TextContent);
         var uri = new Uri((string)context.JSInterop.Invocations.Last(call => call.Identifier == "navigate").Arguments[0]!);
         Assert.AreEqual("#overview", uri.Fragment);
         Assert.Contains("scopeRef=%2Ftenants%2Fowner", uri.Query);
@@ -97,6 +97,18 @@ public sealed class ResourceNavigationTests
     }
 
     [TestMethod]
+    public async Task InitiallyExpandedGroupsKeepTheCallersCollapseChoiceAcrossRenders()
+    {
+        using var context = Context("#overview");
+        var cut = context.Render<ResourceNavigation>(p => p.Add(c => c.Items, Items()).Add(c => c.ExpandGroupsInitially, true));
+        Assert.IsFalse(cut.Find(".resource-navigation-children").HasAttribute("hidden"));
+        await cut.Find(".resource-navigation-rail button[aria-controls]").ClickAsync();
+        cut.Render();
+        Assert.IsTrue(cut.Find(".resource-navigation-children").HasAttribute("hidden"));
+        Assert.AreEqual("overview", cut.Instance.CurrentPath);
+    }
+
+    [TestMethod]
     public void PermissionChangesChooseAnAllowedDefaultAndNoAllowedViewSelectsNothing()
     {
         using var context = Context("#yaml");
@@ -108,7 +120,7 @@ public sealed class ResourceNavigationTests
         cut.Render(p => p.Add(c => c.Items, items.Select(item => item with { Visible = false }).ToArray()));
         Assert.IsNull(cut.Instance.CurrentPath);
         Assert.IsEmpty(cut.FindAll("a"));
-        Assert.Contains("No sections are available.", cut.Markup);
+        Assert.Contains(context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<ResourceNavigationStrings>>()["Empty"].Value, cut.Markup);
     }
 
     [TestMethod]

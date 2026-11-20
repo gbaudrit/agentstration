@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "81b3095ad9caa023addccb5f3d121476fbe0017b",
+  "hostBuild": "Release, completed before the browser campaign; assemblies unchanged throughout both campaigns",
+  "consoleComponentTests": {
+    "passed": 819,
+    "failed": 0
+  },
+  "variants": [
+    "desktop Chromium, en-US, dark, 1440x1000",
+    "touch Chromium, fr-FR, light, 390x844"
+  ],
+  "screenshots": [
+    "worker-overview-desktop-en.png",
+    "worker-assignments-desktop-en.png",
+    "worker-overview-mobile-fr.png",
+    "worker-assignments-mobile-fr.png"
+  ],
+  "finalFullFunctionalAndSmokeValidation": "pending"
+}

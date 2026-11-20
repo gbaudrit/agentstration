@@ -1,0 +1,84 @@
+{
+  "testedBase": "8500115ea33e3954a506ad0ac722d07de7255b6b",
+  "finalSourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "4c6b5fdbd6eb9e0a877e10eee7a5cecd18e92a95333173ce0ba5a1a91cdbe092",
+    "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor": "98390ca031774050ffe8de2d6da5d8092bf175d6d1f0899642d9666cef66f902",
+    "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor.css": "7e0d6241b45c6c2767dad672f7f9e079e97d357efa1193691da392daf0d0d94b",
+    "src/Agentstration.Console.Components/Console/ModelDetailsEditorModel.cs": "5deb48c91130b7bec5de3fabe7449436204e45b508b482fabbb0395ef9793c10",
+    "src/Agentstration.Console.Components/Console/ModelSpecificationOverrideEditorModel.cs": "57c37f601d9663b682de1ef2bd14bd180f18481a6d1c842cd019881c2172c54a",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelDetailsStrings.fr-FR.resx": "e734c38ff758a393d7483891e05876806ad588450377cc8deca5e3100a64f249",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ModelDetailsStrings.resx": "79acc36b7fcfab5bb87ea7f18d1b8aabecda405c8fb25b3f98505095ff9a828d",
+    "tests/Agentstration.Console.Components.Tests/ModelDetailsTests.Foundation.cs": "e60818cc485fb08b7809d9a7cb7f5f037eb689a0f353688e8b18a2424bef2b44",
+    "tests/Agentstration.Console.Components.Tests/ModelDetailsTests.cs": "3db1edb3e00f5fa4a94e6637210d2112cfd9bbc65b272ac004671abc0f348ffb"
+  },
+  "finalHostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "12df4742955f542891e5596b828e6bcfc645c25d59196e71dfd6fd67758571ee",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "dbcee2f41f55d06499b25c5d99ca91845373388960f8dbebf41000b59afdec49",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "7c845ed6d04d8c5516b65d2e97bd594b038526ff0a4dbafd5470656b201ab2b9",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "12df4742955f542891e5596b828e6bcfc645c25d59196e71dfd6fd67758571ee",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "12df4742955f542891e5596b828e6bcfc645c25d59196e71dfd6fd67758571ee",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "dbcee2f41f55d06499b25c5d99ca91845373388960f8dbebf41000b59afdec49",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "dbcee2f41f55d06499b25c5d99ca91845373388960f8dbebf41000b59afdec49",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "7c845ed6d04d8c5516b65d2e97bd594b038526ff0a4dbafd5470656b201ab2b9",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "7c845ed6d04d8c5516b65d2e97bd594b038526ff0a4dbafd5470656b201ab2b9"
+  },
+  "protectedAgentHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "finalBrowserPhases": [
+    {
+      "name": "model-details",
+      "exitCode": 0,
+      "seconds": 82.5
+    }
+  ],
+  "componentTests": {
+    "passed": 23,
+    "filter": "ModelDetailsTests | ParameterEditorModelTests"
+  },
+  "typescript": "passed",
+  "earlierModelAdministrationRegression": {
+    "passed": 1,
+    "phase": {
+      "name": "model-regression",
+      "exitCode": 0,
+      "seconds": 60.4
+    },
+    "sourceHashes": {
+      "automation/playwright/src/contracts/test-ids.ts": "4c6b5fdbd6eb9e0a877e10eee7a5cecd18e92a95333173ce0ba5a1a91cdbe092",
+      "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor": "b51baa7328470ae73d6fa122c0857fb7c02c523109f4b89961b6312a30391521",
+      "src/Agentstration.Console.Components/Console/ModelDetailsEditorModel.cs": "5deb48c91130b7bec5de3fabe7449436204e45b508b482fabbb0395ef9793c10",
+      "src/Agentstration.Console.Components/Console/ModelSpecificationOverrideEditorModel.cs": "57c37f601d9663b682de1ef2bd14bd180f18481a6d1c842cd019881c2172c54a",
+      "src/Agentstration.Console.Components/Resources/Components/Pages/ModelDetailsStrings.fr-FR.resx": "ff908aa3ab5effb7e644ea97b5e986193f93b7f2b43ff380c491fbe57b599029",
+      "src/Agentstration.Console.Components/Resources/Components/Pages/ModelDetailsStrings.resx": "0bbc98e5229d817f6cdc778c16119cdd5669855ce37892cac39c86436e330d5c",
+      "tests/Agentstration.Console.Components.Tests/ModelDetailsTests.Foundation.cs": "ef7843d5f9d9427c59b916ab940ac8f016d13303110119c122f00ada332a7f54",
+      "tests/Agentstration.Console.Components.Tests/ModelDetailsTests.cs": "3db1edb3e00f5fa4a94e6637210d2112cfd9bbc65b272ac004671abc0f348ffb"
+    },
+    "hostHashes": {
+      "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "30219f21679ef300d622232521aff5749775fcb19b27a3ee47e4eace263ebc43",
+      "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "5cd124df7b97331ca4c5d60aef26e8724937644bebefe2e813756191a18e0524",
+      "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "61994c81df6015e77613ecce7881e22db2e5fceb367e77a7ea5d97682ce1925c",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "30219f21679ef300d622232521aff5749775fcb19b27a3ee47e4eace263ebc43",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "30219f21679ef300d622232521aff5749775fcb19b27a3ee47e4eace263ebc43",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "5cd124df7b97331ca4c5d60aef26e8724937644bebefe2e813756191a18e0524",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "5cd124df7b97331ca4c5d60aef26e8724937644bebefe2e813756191a18e0524",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "61994c81df6015e77613ecce7881e22db2e5fceb367e77a7ea5d97682ce1925c",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "61994c81df6015e77613ecce7881e22db2e5fceb367e77a7ea5d97682ce1925c"
+    }
+  },
+  "regressionScope": "The maintained model-administration journey passes before family-only responsive layout, neutral unknowns, honest identity description and write-success feedback follow-ups. Final desktop/touch probes pass after those follow-ups, with strict document and internal-card bounds. No shared component or protected Agent implementation changes.",
+  "initialFailures": "Probe 01 looked for an AdditionalPanels link inside the primary Identity panel. Probe 02 exposed a real 2 px mobile overflow after Save; visual review also found overflowing desktop operation grids. Family container queries and wrapping repair both; no assertions or timeouts were weakened.",
+  "ci": "not inspected or remediated",
+  "fullSolutionSuites": "not run; user requested focused validation",
+  "parallelIntegrationBeforeFinalCampaign": [
+    "07238cef",
+    "4ba7a3dd",
+    "b6eb38f4",
+    "8500115e"
+  ]
+}

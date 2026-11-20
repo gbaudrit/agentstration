@@ -14,25 +14,34 @@ internal sealed class GetAgentModelEndpoint : IModelManagementEndpoint
 
     private static Task<IResult> HandleAsync(
         string agentName,
+        string? scopeRef,
         AgentManagementService agents,
         ModelProfileManagementService profiles,
-        CancellationToken cancellationToken) => HandleCoreAsync(ResourceNamespace.Default, agentName, agents, profiles, cancellationToken);
+        IResourceScopeResolver scopes,
+        CancellationToken cancellationToken) => HandleCoreAsync(ResourceNamespace.Default, agentName, scopeRef, agents, profiles, scopes, cancellationToken);
 
     private static Task<IResult> HandleNamespacedAsync(
         string @namespace,
         string agentName,
+        string? scopeRef,
         AgentManagementService agents,
         ModelProfileManagementService profiles,
-        CancellationToken cancellationToken) => HandleCoreAsync(ResourceNamespace.Parse(@namespace), agentName, agents, profiles, cancellationToken);
+        IResourceScopeResolver scopes,
+        CancellationToken cancellationToken) => HandleCoreAsync(ResourceNamespace.Parse(@namespace), agentName, scopeRef, agents, profiles, scopes, cancellationToken);
 
     private static Task<IResult> HandleCoreAsync(
         ResourceNamespace @namespace,
         string agentName,
+        string? scopeRef,
         AgentManagementService agents,
         ModelProfileManagementService profiles,
+        IResourceScopeResolver scopes,
         CancellationToken cancellationToken) => ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var agent = await agents.GetAgentAsync(@namespace, agentName, cancellationToken)
+            ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef);
+            if (requestedScope is { } exact && await scopes.ResolveAsync(exact, cancellationToken) is null)
+                throw new ResourceNotFoundException(ResourceKey.Create(AgentResourceKinds.Agent, agentName, @namespace));
+            var agent = await agents.GetAgentAsync(@namespace, agentName, requestedScope, cancellationToken)
                 ?? throw new ResourceNotFoundException(ResourceKey.Create(AgentResourceKinds.Agent, agentName, @namespace));
             var agentScopeRef = agent.Value.ScopeRef
                 ?? throw new InvalidOperationException($"Agent '{agent.Value.Address}' has no ownership scope.");

@@ -3,3 +3,10 @@
     justify-items: start;
     gap: .25rem;
 }
+
+.knowledge-source-flow {
+    display: inline-block;
+    inline-size: 12rem;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+}

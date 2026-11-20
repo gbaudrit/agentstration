@@ -1,83 +1,37 @@
 @page "/storages"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IStoragesClient Client
 @inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
 <PageTitle>@T("Storages") · Agentstration</PageTitle>
-<PageHeader Title="@T("Storages")" Description="@T("List.Description")" TestId="storages-page">
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("Refresh")</button>@if (CanWrite) { <a class="button-primary" href="/storages/new" data-testid="storage-create">@T("Create")</a> }</Actions>
-</PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (!Context.HasPermission("resources/read")) { <p role="alert">@T("Error.Forbidden")</p> }
-else if (error is not null) { <StorageError Error="error" /> }
-else
-{
-    <section class="panel">
-        <ResourceToolbar Label="@T("Search")">
-            <FormField Label="@T("Search")"><ClearableText Type="search" @bind-Value="search" /></FormField>
-            <FormField Label="@T("Availability")"><ClearableSelect TValue="string" @bind-Value="status"><option value="">@T("AllStatuses")</option>@foreach (var value in Enum.GetValues<StorageAvailability>()) { <option value="@value">@T($"Availability.{value}")</option> }</ClearableSelect></FormField>
-        </ResourceToolbar>
-        @if (Filtered.Count == 0) { <EmptyState Title="@T("Empty.Title")" Message="@T("Empty.Description")" /> }
-        else
-        {
-            <CollectionView TItem="StorageResource" Items="Filtered" IdentityLabel="@T("Storage")" RowTestId="storage-row" InformationLabels="@(new[] { T("Type") })">
-                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@StorageLinks.Details(item)" IconName="database" data-testid="storage-name-link">
-                    <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@AvailabilityStatus(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
-                </CollectionIdentity></Identity>
-                <Information Context="item"><CollectionValue Label="@T("Type")"><code>@item.Definition.Type.Type.Name · @item.Definition.Type.Version</code></CollectionValue></Information>
-            </CollectionView>
-        }
-    </section>
-    <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2><a href="/storage-types" data-testid="storage-types-manage">@T("Type.Manage")</a></div><p>@T("TypeCatalog.Help")</p>
-        @if (types.Count == 0) { <p>@T("NoTypes")</p> }
-        @foreach (var type in types)
-        {
-            @foreach (var version in type.Definition.Versions)
-            {
-                <details data-testid="storage-type-evidence"><summary><span class="collection-identity storage-type-catalog-identity">
-                    <span class="collection-family-icon"><ResourceIcon IconName="database" /><span class="collection-icon-badges"><ResourceScopeBadge ScopeRef="type.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")" Status="@AvailabilityStatus(type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable)" IconOnly /><ManagedResourceBadge IsManaged="@type.Governance.IsManaged" IsReadOnly="@(type.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></span></span>
-                    <span class="collection-identity-text"><span class="collection-name-heading"><a class="resource-name-link" href="@StorageTypeLinks.Details(type)" title="@type.Definition.DisplayName">@type.Definition.DisplayName</a></span><span class="collection-qualified-name"><CopyableValue Value="@($"{type.Namespace}/{type.Name}")" /></span><span class="collection-identity-versions"><CollectionVersion Label="@T("Version")" Value="@version.Version" /></span></span>
-                </span></summary><StorageTypeEvidence Choice="new(type, version)" /></details>
-            }
-        }
-    </section>
-    <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="/connected-services">@T("ConnectedServices")</a><a href="/data-sources">@T("DataSources")</a><a href="/knowledge-sources">@T("KnowledgeSources")</a></nav>
-}
+<ResourceCollectionTemplate TItem="StorageResource" Title="@T("Storages")" Description="@T("List.Description")" TestId="storages-page"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" ContextKey="@contextKey" RowTestId="storage-row"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("Empty.Title")" EmptyMessage="@T("Empty.Description")"
+                            OnRefresh="ReloadAsync" OnRetry="RetryAsync">
+    <Actions>@if (Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { <a class="button-secondary" href="@Navigate("/storage-types")" data-testid="storage-types-manage">@T("Type.Browse")</a> }</Actions>
+</ResourceCollectionTemplate>
+
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<StorageResource> resources = [];
-    private IReadOnlyList<StorageTypeResource> types = [];
-    private bool loading = true;
-    private Exception? error;
-    private string search = string.Empty, status = string.Empty;
-    private bool CanWrite => Context.HasPermission("resources/write");
-    private IReadOnlyList<StorageResource> Filtered => resources.Where(value => (string.IsNullOrEmpty(search) || $"{value.Name} {value.Definition.DisplayName} {value.Definition.Type.Type.Name}".Contains(search, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrEmpty(status) || Availability(value).ToString() == status)).ToArray();
+    private string T(string key) => Localizer[key].Value;
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/storages/new")" data-testid="storage-create">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<StorageResource> IdentityColumn => new("identity", T("Storage"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Navigate(StorageLinks.Details(item))" IconName="database" data-testid="storage-name-link">
+        <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@AvailabilityStatus(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    // The primary collection endpoint has no global search/filter contract.
+    private IReadOnlyList<CollectionColumn<StorageResource>> Columns =>
+    [
+        new("type", T("Type"), item => @<code>@item.Definition.Type.Type.Name · @item.Definition.Type.Version</code>)
+    ];
     private static UiStatus AvailabilityStatus(StorageAvailability value) => value switch
     {
         StorageAvailability.Ready => UiStatus.Success,
         StorageAvailability.Unavailable or StorageAvailability.Stale => UiStatus.Warning,
         _ => UiStatus.Neutral
     };
-    private string T(string key) => Localizer[key].Value;
     private static StorageAvailability Availability(StorageResource value) => value.ObservedState?.Availability ?? (value.Definition.Enabled ? StorageAvailability.Unavailable : StorageAvailability.Disabled);
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
-    {
-        loading = true; error = null;
-        try
-        {
-            await Context.EnsureLoadedAsync(cancellation.Token);
-            if (!Context.HasPermission("resources/read")) return;
-            var scope = ResourceScopeRef.Parse(Context.Current!.SelectedScopeRef);
-            var resourcesTask = Client.GetStoragesAsync(scope, cancellation.Token);
-            var typesTask = Client.GetTypesAsync(scope, cancellation.Token);
-            await Task.WhenAll(resourcesTask, typesTask);
-            resources = await resourcesTask; types = await typesTask;
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { error = exception; }
-        finally { loading = false; }
-    }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
 }

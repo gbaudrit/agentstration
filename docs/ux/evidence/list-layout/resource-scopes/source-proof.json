@@ -1,0 +1,13 @@
+{
+  "baseCommit": "d516a94ca3d8edc952825a0f710f831c6a736878",
+  "route": "/settings/resource-scopes",
+  "uiChanged": false,
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor": "dbefb1e9cbf110923479d235a2401f8c64e55477",
+    "src/Agentstration.Console.Client/ResourceScopeInventoryApiClient.cs": "727863e8228cf9bd1f362c3d95909f8b032583d8",
+    "src/Agentstration.Resources.Api/Api/ResourceScopeEndpoints.cs": "20e9cd93258d1b94ba69bf981267484d461d3ad1",
+    "src/Agentstration.Infrastructure/Api/ResourceScopeApiService.cs": "9c96dd46e8e2cee77fcb90af31a49efa40281b88",
+    "src/Agentstration.Identity/ResourceScopeInventoryService.cs": "e3b153fe18196f3d377ce699f155a69d0fbbd17d",
+    "src/Agentstration.ResourceManagement/ResourceStore.cs": "d5062fa109745d95e362d8fa60cf2bd16ff58eaa"
+  }
+}

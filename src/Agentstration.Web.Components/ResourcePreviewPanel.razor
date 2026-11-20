@@ -1,0 +1,19 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="resource-preview-host">
+    <ModalFrame IsOpen="IsOpen" TitleId="@titleId" Class="resource-preview-panel" OnClose="OnClose" OnClosed="OnClosed">
+        <header class="resource-preview-heading">
+            <h2 id="@titleId">@Shared["Preview"]</h2>
+            <button type="button" class="icon-button" @onclick="OnClose" aria-label="@Shared["ClosePreview"]"><UiIcon Name="x" /></button>
+        </header>
+        <div class="resource-preview-content" data-testid="resource-preview-content">@ChildContent</div>
+    </ModalFrame>
+</div>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private readonly string titleId = $"resource-preview-{Guid.NewGuid():N}";
+}

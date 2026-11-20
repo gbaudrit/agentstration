@@ -1,0 +1,16 @@
+{
+  "baseCommit": "8c3683ecb8365e6efe41bda091e25c7fb842a3a1",
+  "synchronizedThrough": "8c3683ecb8365e6efe41bda091e25c7fb842a3a1",
+  "route": "/tools/definitions",
+  "host": "Existing GovernedInventoryHost; real Console/API/services/SQLite with deterministic discovery and isolated /tmp/ux-definitions-fixture data",
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor": "0b00b9ebdc7ab87f917961631e2031ceca24ee64",
+    "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor.cs": "7de1a8dcbccf147be5719a38f59d29e31068041b",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  }
+}

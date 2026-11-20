@@ -10,6 +10,18 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class CreationWizardTests
 {
     [TestMethod]
+    public async Task StepReadyRunsAfterTheAcceptedPaneFocusSoTheCallerCanFocusAValidationField()
+    {
+        using var context = Context();
+        string? ready = null; var paneFocusCompleted = false;
+        var cut = context.Render<CreationWizard>(p => p.Add(c => c.Steps, Steps())
+            .Add(c => c.OnStepReady, (string step) => { ready = step; paneFocusCompleted = context.JSInterop.Invocations.Any(call => call.Identifier == "Blazor._internal.domWrapper.focus"); }));
+        await cut.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.AreEqual("configuration", ready);
+        Assert.IsTrue(paneFocusCompleted);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Continue", "Previous", "Incomplete", "Complete")]
     [DataRow("fr-FR", "Continuer", "Précédent", "À compléter", "Complète")]
     public async Task StepsPreserveTheirContentAndFocusWhenNavigating(string culture, string next, string previous, string incomplete, string complete)

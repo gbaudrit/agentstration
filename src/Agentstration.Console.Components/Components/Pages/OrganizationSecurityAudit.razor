@@ -1,56 +1,31 @@
 @page "/settings/organization/security-audit"
+@implements IDisposable
 @using Agentstration.Security.Contracts
-@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@inject IIdentityAdministrationApiClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
 
 <PageTitle>@T("SecurityAudit") · @T("Organization") · Agentstration</PageTitle>
-<PageHeader Title="@T("SecurityAudit")" Description="@T("SecurityAudit.Description")" />
-<OrganizationSettingsNav />
-<div data-testid="console-admin-organization-security-audit">
-
-@if (loading)
-{
-    <LoadingState Message="@T("LoadingSecurityEvents")" />
-}
-else if (denied)
-{
-    <ErrorState Title="@T("PlatformAdminRequired")" Message="@T("PlatformAdminRequiredMessage")" />
-}
-else if (events.Count == 0)
-{
-    <EmptyState Title="@T("NoSecurityEvent")" Message="@T("NoSecurityEventMessage")" />
-}
-else
-{
-    <CollectionView TItem="Agentstration.Security.Contracts.SecurityAuditEvent" Items="events" InformationLabels="@(new string[] { T("Time"), T("Actor"), T("Target"), T("Correlation") })" IdentityLabel="@T("Action")" ScopeLabel="@T("Scope")" StateLabel="@T("Outcome")">
-        <Identity Context="entry">
-<strong>@T($"AuditAction.{entry.Action}")</strong>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <br /><small>@entry.ReasonCode</small> }</Identity>
-        <Scope Context="entry">
-@if (entry.WorkspaceId is not null) { <span>@T("Workspace") <code>@ShortId(entry.WorkspaceId)</code></span> } else if (entry.TenantId is not null) { <span>@T("Tenant") <code>@ShortId(entry.TenantId)</code></span> } else { <span>@T("Instance")</span> }</Scope>
-        <State Context="entry">
-<StatusBadge Text="@T($"AuditOutcome.{entry.Outcome}")" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : UiStatus.Warning)" /></State>
-        <Information Context="entry">
-            <CollectionValue Label="@T("Time")">@entry.OccurredAt.ToLocalTime().ToString("g")</CollectionValue>
-            <CollectionValue Label="@T("Actor")"><code>@ShortId(entry.ActorPrincipalId)</code></CollectionValue>
-            <CollectionValue Label="@T("Target")">@if (entry.TargetPrincipalId is not null) { <span>@T("Principal") <code>@ShortId(entry.TargetPrincipalId)</code></span> } else if (entry.TargetAccountId is not null) { <span>@T("Account") <code>@ShortId(entry.TargetAccountId)</code></span> } else { <span>—</span> }</CollectionValue>
-            <CollectionValue Label="@T("Correlation")"><code>@(string.IsNullOrWhiteSpace(entry.CorrelationId) ? "—" : entry.CorrelationId[..Math.Min(12, entry.CorrelationId.Length)])</code></CollectionValue>
-        </Information>
-    </CollectionView>
-}
-</div>
+<ResourceCollectionTemplate TItem="SecurityAuditEvent" Title="@T("SecurityAudit")" Description="@($"{T("SecurityAudit.Description")} {T("SecurityAudit.SnapshotHelp")}")" TestId="console-admin-organization-security-audit"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" ContextKey="@contextKey"
+                            Query="query" LoadState="loadState" Disabled="@(!interactive)" RowTestId="security-audit-event"
+                            EmptyTitle="@T("NoSecurityEvent")" EmptyMessage="@T("NoSecurityEventMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation><OrganizationSettingsNav /></Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private IReadOnlyList<Agentstration.Security.Contracts.SecurityAuditEvent> events = [];
-    private bool loading = true;
-    private bool denied;
     private string T(string key) => Localizer[key].Value;
-
-    protected override async Task OnInitializedAsync()
-    {
-        try { events = await Client.GetSecurityAuditEventsAsync(200, default); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { denied = true; }
-        finally { loading = false; }
-    }
-
-    private static string ShortId(Guid? value) => value is null ? "—" : value.Value.ToString("D")[..8];
+    private string ActionLabel(string action) { var value = Localizer[$"AuditAction.{action}"]; return value.ResourceNotFound ? T("AuditAction.Unknown") : value.Value; }
+    private CollectionColumn<SecurityAuditEvent> IdentityColumn => new("identity", T("Action"), entry => @<text>
+        <strong>@ActionLabel(entry.Action)</strong><code class="audit-action-code">@entry.Action</code>@if (!string.IsNullOrWhiteSpace(entry.ReasonCode)) { <small class="audit-action-code">@entry.ReasonCode</small> }
+    </text>);
+    private IReadOnlyList<CollectionColumn<SecurityAuditEvent>> Columns =>
+    [
+        new("scope", T("Scope"), entry => @<text>@if (entry.WorkspaceId is { } workspace) { <span>@T("Workspace")</span><br /><CopyableValue Value="@workspace.ToString("D")" /> } else if (entry.TenantId is { } tenant) { <span>@T("Tenant")</span><br /><CopyableValue Value="@tenant.ToString("D")" /> } else { <span>@T("Instance")</span> }</text>),
+        new("outcome", T("Outcome"), entry => @<StatusBadge Text="@T($"AuditOutcome.{(Enum.IsDefined(entry.Outcome) ? entry.Outcome.ToString() : "Unknown")}")" Status="@(entry.Outcome == SecurityAuditOutcome.Succeeded ? UiStatus.Success : entry.Outcome == SecurityAuditOutcome.Failed ? UiStatus.Warning : UiStatus.Neutral)" />),
+        new("time", T("Time"), entry => @<time datetime="@entry.OccurredAt.ToString("O")"><span class="audit-date">@entry.OccurredAt.ToLocalTime().ToString("d")</span> @entry.OccurredAt.ToLocalTime().ToString("t")</time>),
+        new("actor", T("Actor"), entry => @<text>@if (entry.ActorPrincipalId is { } actor) { <CopyableValue Value="@actor.ToString("D")" /> } else { <span>—</span> }</text>),
+        new("target", T("Target"), entry => @<text>@if (entry.TargetPrincipalId is { } principal) { <span>@T("Principal")</span><br /><CopyableValue Value="@principal.ToString("D")" /> } else if (entry.TargetAccountId is { } account) { <span>@T("Account")</span><br /><CopyableValue Value="@account.ToString("D")" /> } else { <span>—</span> }</text>),
+        new("correlation", T("Correlation"), entry => @<text>@if (!string.IsNullOrWhiteSpace(entry.CorrelationId)) { <CopyableValue Value="@entry.CorrelationId" /> } else { <span>—</span> }</text>)
+    ];
 }

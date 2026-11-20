@@ -853,6 +853,25 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    [DataRow("default")]
+    [DataRow("team.agents")]
+    public async Task AgentModelClientKeepsTheExactDefinitionOwner(string namespaceValue)
+    {
+        Uri? requested = null;
+        var owner = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var response = new AgentModelResponse(new(new("reasoning", "reasoning")), new(null, new("local-model"), new(new(), new(), new())), "ready", []);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync(new(namespaceValue), "concierge", owner, default);
+        var expectedPath = namespaceValue == "default" ? "/api/agents/concierge/model" : $"/api/namespaces/{namespaceValue}/agents/concierge/model";
+        Assert.AreEqual(expectedPath + "?scopeRef=" + Uri.EscapeDataString(owner.Value), requested!.PathAndQuery);
+    }
+
+    [TestMethod]
     public void AgentEditorMarksOnlyAnEffectiveModelProfileChange()
     {
         var model = new AgentEditorModel

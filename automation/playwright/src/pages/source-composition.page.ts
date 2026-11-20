@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { SourceLifecycleFixtures } from '../fixtures/source-lifecycle.js';
@@ -51,19 +52,19 @@ export class SourceCompositionPage {
     const source = `composed-${fixture.suffix}`;
     await api.source(fixture, source, {});
     const editor = new SourcePoliciesPage(this.page);
-    await editor.openDataset(base, source);
+    await editor.openDataset(base, source, 'definition/treatments');
     await this.page.getByTestId(TestIds.sourcePolicies.root).selectOption(`/instance|default|${custom}|2.0.0`);
     await editor.saveDataset(base, source, api);
     const empty = await this.acquire(base, source, api);
     expect(empty.content.dataset).toBe('redacted');
-    await editor.openDataset(base, source);
+    await editor.openDataset(base, source, 'definition/treatments');
     const sequence = this.page.getByTestId(TestIds.sourcePolicies.sequence).filter({ has: this.page.getByRole('heading', { name: 'redactedTransformations', exact: true }) });
     await this.append(sequence, nativeChild, 'first');
     await this.append(sequence, nativeChild, 'second');
     await sequence.getByTestId(TestIds.sourcePolicies.call).nth(1).getByTestId(TestIds.sourcePolicies.up).click();
     await expect(sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).locator('[data-schema-path="$.tag"] input')).toHaveValue('second');
     await editor.saveDataset(base, source, api);
-    await editor.openDataset(base, source);
+    await editor.openDataset(base, source, 'definition/treatments');
     await expect(sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).locator('[data-schema-path="$.tag"] input')).toHaveValue('second');
     await expect(sequence.getByTestId(TestIds.sourcePolicies.call).nth(1).locator('[data-schema-path="$.tag"] input')).toHaveValue('first');
     const transformed = await this.acquire(base, source, api);
@@ -86,7 +87,7 @@ export class SourceCompositionPage {
     });
     expect([400, 403, 422]).toContain(refused.status());
     expect((await refused.json()).type).toContain('data_source_composition_invalid');
-    await editor.openDataset(base, source);
+    await editor.openDataset(base, source, 'definition/treatments');
     await expect(sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).getByTestId(TestIds.sourcePolicies.flow)).not.toContainText(forbidden);
     await sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).getByTestId(TestIds.sourcePolicies.flow).selectOption(`/instance|default|${incompatible}`);
     await sequence.getByTestId(TestIds.sourcePolicies.call).nth(0).getByTestId(TestIds.sourcePolicies.target).selectOption(`/instance|default|${incompatible}|1.0.0`);
@@ -142,9 +143,11 @@ export class SourceCompositionPage {
     const editor = new SourcePoliciesPage(this.page);
     await editor.openKnowledge(base, source);
     const before = (await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value;
+    await selectResourceSection(this.page, 'definition/identity');
     const displayName = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName);
     const pendingName = `${before.definition.displayName}-unsaved`;
     await displayName.fill(pendingName); await displayName.blur();
+    await selectResourceSection(this.page, 'definition/configuration');
     const sequence = this.page.getByTestId(TestIds.sourcePolicies.composition).getByTestId(TestIds.sourcePolicies.sequence);
     const create = sequence.getByTestId(TestIds.sourcePolicies.createTransformation);
     await expect(create).toHaveText(SourcePolicyTextByLocale[locale].createTransformation);

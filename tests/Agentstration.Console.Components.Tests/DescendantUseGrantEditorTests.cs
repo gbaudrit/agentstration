@@ -13,6 +13,7 @@ public sealed class DescendantUseGrantEditorTests
     [TestMethod]
     public void CandidateAndSavedGrantShowScopeKindAndName()
     {
+        using var culture = new TestCultureScope("en-US");
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);
         var workspace = new ResourceScopeTargetResponse(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceScopeKind.Workspace, "Default", true);
         var grants = new List<DescendantUseGrant> { new(workspace.ScopeRef) };

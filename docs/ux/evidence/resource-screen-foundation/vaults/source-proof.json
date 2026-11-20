@@ -1,0 +1,53 @@
+{
+  "base": "217b40f4e7c19bb4385e3088ac1cac7ac9ae5a2c",
+  "sourceHashes": {
+    "automation/playwright/src/pages/descendant-secrets.page.ts": "6600ca10586fe9d3b3adee4026ad1d4a257da6e06b6353f0f68a8af04a612eca",
+    "docs/ux/component-contracts.md": "d38f144cb041e200e1a76a4cebd881b92203036d6fcd59e6d2cd058b1b5928dd",
+    "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor": "5fd91dca5d588e2ed67b6df2ccb17d68a7f80f7bdf452be6edf88346018ae24c",
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "0f7ce91150a6e493961b0ac7c6988e2470c1837a72ce4f643e14cd85e896fea2",
+    "src/Agentstration.Console.Components/Components/Shared/ResourceScopeFormField.razor": "0bfdcae493b7e367842e3b4d65fde1f05a4380188a5b28089b236bb0ae6d1644",
+    "src/Agentstration.Console.Components/Console/SecretEditorModels.cs": "bf32b2ed8236471dc0a0017f0ec951a75480cd955009aae317d8a73a7bd77038",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SecretStrings.fr-FR.resx": "037a112f953d12480e3bf656edc0382182239bfe2764cbde089de75d69809016",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SecretStrings.resx": "d38e7eb52a4cc2335fe6fb9beaddcf9dfed48edc98e9a1014860ac9226fd9e03",
+    "tests/Agentstration.Console.Components.Tests/VaultGrantPersistenceTests.cs": "38313aa06b1b613d439a4f0f2fec641f27af174e4b4fdcae02a5b584261b3eb9"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "1e1afbba742b83c0bbffbb9b1782942ff6ec7ad4bbab74f0198393a53abc9c88",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "1e1afbba742b83c0bbffbb9b1782942ff6ec7ad4bbab74f0198393a53abc9c88"
+  },
+  "phases": [
+    {
+      "name": "vault",
+      "exitCode": 0,
+      "seconds": 83.5
+    }
+  ],
+  "completed": true,
+  "running": null,
+  "relatedVerification": [
+    {
+      "name": "descendant-regression",
+      "exitCode": 0,
+      "seconds": 88.6
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 113.8
+    }
+  ],
+  "targetedDotNet": {
+    "passed": 57,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typescript": "passed",
+  "agentProtectedHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  }
+}

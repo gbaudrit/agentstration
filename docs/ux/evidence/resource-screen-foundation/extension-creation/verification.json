@@ -1,0 +1,165 @@
+{
+  "screen": "Extensions \u2014 inline registration creation wizard",
+  "nativeCases": [
+    {
+      "title": "Extension registration wizard preserves incomplete steps and exact scoped credentials ",
+      "project": "desktop-chromium",
+      "durationMs": 31861
+    },
+    {
+      "title": "Extension registration wizard preserves incomplete steps and exact scoped credentials @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 19233
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "85fcf61137d57f89334f9bf749d753bd0a406069",
+      "reportSha256": "3a6f3ca9ee7fba079c4ddf0944dad52229e04aa21b736727ae5ceaed290cb780",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/Extensions.razor": "15cb91cd8285d57e065e04c036e8ab7737a4e63169bb8710b4a38cb48e6a284e",
+        "src/Agentstration.Console.Components/Components/Pages/Extensions.razor.cs": "6a4ee15be8ee1107e20e922c88b29a042d55720230f350a08981607a2081089d",
+        "src/Agentstration.Console.Components/Components/Pages/Extensions.Creation.cs": "63ac26d8fefe978f378b26f6584c97c18764ad64d0255f5d54e8a2b41c35e0f3",
+        "tests/Agentstration.Console.Components.Tests/ExtensionsConsoleTests.Creation.cs": "01e98dfbf94f4ebc8dedc3ad1816bfd6d5c775cca16c731aaa74b9d0aec842d6",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ExtensionStrings.resx": "b5d5d05ed1ba5700e9f64567cf5a10399ee051f74f6a9f7c7da124b6bf06eff1",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ExtensionStrings.fr-FR.resx": "fc2fd8d013cf6981beb75ef8502cdcd04baec09ee43614bc4f7d6425730a9e29"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1"
+      },
+      "campaign": "screens-09"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "extensions-regression",
+      "passed": 3,
+      "sha256": "d857219725c63529385414549f9e2fe44cfb9d8913887159c74053f5ef571bad"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "extension-creation-incomplete-identity-desktop-en.png",
+      "sha256": "a0e987f5c4f57fe5ee03ecc1a4e55108953fd23e0e03e503ce6e7a094d5f7a7c"
+    },
+    {
+      "file": "extension-creation-connection-switch-desktop-en.png",
+      "sha256": "c293c7c0e494624d1328fdf9bbab7479a0e4e18282e3bf698dd45bb748be32f2"
+    },
+    {
+      "file": "extension-creation-invalid-scoped-reference-desktop-en.png",
+      "sha256": "87be4af8b5358a690b869449aeca81e43e4a9556ca6f7a16a014630f527045c6"
+    },
+    {
+      "file": "extension-creation-retained-tabs-refresh-desktop-en.png",
+      "sha256": "1580344727a77cd8b68c1c0ed3c1f15eb05afe578ea9bbfae5076a8bb4d34deb"
+    },
+    {
+      "file": "extension-creation-verification-desktop-en.png",
+      "sha256": "bd778570eced3f44ff549518faf7f6d7e95aca80b5f753bb8616b7b4989c5cca"
+    },
+    {
+      "file": "extension-creation-saved-catalog-desktop-en.png",
+      "sha256": "a04ac4559bfd90796d21dfb8719e804c2cba40d508848980b44b67898c08fb0c"
+    },
+    {
+      "file": "extension-creation-incomplete-identity-mobile-fr.png",
+      "sha256": "053003cd2a345d75be04ccb9b8f0df40ece8ddebf7a905fe2e9aa0b6c8d3b2ce"
+    },
+    {
+      "file": "extension-creation-connection-switch-mobile-fr.png",
+      "sha256": "0696762f59d6c77ec46d9f74486020c25d64863b548744a4579ed1a57620901d"
+    },
+    {
+      "file": "extension-creation-invalid-scoped-reference-mobile-fr.png",
+      "sha256": "340343ef00d6e440d8db129eac378e1a04741e18b6f5877101084a7dd175cfa3"
+    },
+    {
+      "file": "extension-creation-retained-tabs-refresh-mobile-fr.png",
+      "sha256": "6ef29f038210110bb81e33a7e5a57f98eaea922775ecff5aa4141f13abb7af01"
+    },
+    {
+      "file": "extension-creation-verification-mobile-fr.png",
+      "sha256": "a3199306e818d580ed064b61d7e8e32a304c459857bdb4b75f828c340a0558ee"
+    },
+    {
+      "file": "extension-creation-saved-catalog-mobile-fr.png",
+      "sha256": "c7f3a751bce23936999e9c2d64f60ac4b62e6e790bcd26c001bf342b16cecea7"
+    }
+  ],
+  "limits": [
+    "This previously omitted creation boundary adds one component to the historical 51-component inventory; the reconciled current inventory is 52, not 52 distinct routes.",
+    "The existing Tenant-context inventory endpoint refuses its Instance enrollment aggregate. This remains visible as catalog feedback. The independently authorized creator now works in the actual Tenant context despite that aggregate denial; the native smoke verifies the error, retained draft and exact persisted target/credential. No backend permission change or invented Tenant option in Instance was used.",
+    "ResourceIdentityFields plus the real Scope form field avoid a duplicate Scope label in the existing IdentityEditor slot; no shared framework or metadata-writing API is added.",
+    "The inherited catalogue description still uses older Workspace wording although the selected Console context and actual Tenant creation owner remain explicit. This migration corrects the creator ownership hint and records that separate pre-existing catalogue copy limit."
+  ],
+  "postSyncFocusedChecks": {
+    "extensions": {
+      "passed": 50,
+      "sha256": "dd16981c759f2f910e57677677d5278d736f6680e4cc8dc07d8485d3c2afa17c"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "a0ad5cb9d1a9737ed3e7f469699c4511e90651f19f28d3d18b8b636986f8d2fb"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "ca31a649db3aa32718e15d3d4ca45ce6bcbd50f74a265163855bd07b6b54199f"
+    },
+    "schema-composition": {
+      "passed": 27,
+      "sha256": "92c3b5adaadefe2347809ddf10e4947e13acaee2ddc4cadfb6998029464adc2e"
+    }
+  },
+  "validationNote": "These post-synchronization focused checks overlap earlier targetedGroupChecks; their counts must not be added as distinct tests.",
+  "finalExtensionChecks": {
+    "passed": 55,
+    "sha256": "338fb025ed31b0aea046d464cf9274afaaede54d9c954ce4da3dcee904993afe",
+    "overlapsEarlierChecks": true
+  }
+}

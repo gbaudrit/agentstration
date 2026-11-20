@@ -5,3 +5,5 @@
 
 .collection-actions-panel :is(.registry-row-actions, .studio-actions, .enrollment-actions, .inventory-contribution-actions) { display: grid; gap: .25rem; min-width: 0; }
 .collection-actions-panel :is(button, a) { white-space: normal; overflow-wrap: anywhere; }
+
+.content:has(.resource-details-template) { padding-top: var(--space-3); }

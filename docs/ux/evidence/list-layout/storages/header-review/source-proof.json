@@ -1,0 +1,17 @@
+{
+  "baseCommit": "ddf930fa4bd61871fcfe6b68c3ca11a7dc335b5a",
+  "route": "/storages",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor": "dee34a0317a6ecb87de85e658ac169ece1f5d1c4",
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor.cs": "a92ebc871f12f9782b6a98c3ed045a5ba988ba33",
+    "automation/playwright/src/pages/connected-storage-collection.page.ts": "2ffab7d86dd223510424e164faf173c310c5750a"
+  },
+  "removedSourceFiles": [
+    "src/Agentstration.Console.Components/Components/Pages/Storages.razor.css"
+  ],
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png"
+  ],
+  "targetedComponentCases": 55
+}

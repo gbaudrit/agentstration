@@ -29,7 +29,7 @@ public sealed partial class KnowledgeSourceEditorTests
         await using var context = CreateContext(client);
         var clock = new ProjectionClock();
         context.Services.AddSingleton<TimeProvider>(clock);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         var start = rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         rendered.WaitForAssertion(() => Assert.Contains(label, rendered.Find("[data-testid='knowledge-start-projection']").TextContent));
@@ -45,7 +45,7 @@ public sealed partial class KnowledgeSourceEditorTests
         await start;
         rendered.WaitForAssertion(() => Assert.AreEqual(0, rendered.FindAll("[data-testid='knowledge-projection-progress']").Count));
         Assert.IsFalse(rendered.Find("[data-testid='knowledge-start-projection']").HasAttribute("disabled"));
-        rendered.Find("[data-testid='knowledge-source-snapshots-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "snapshots");
         Assert.Contains(ExistingSnapshot().Snapshot.Name, rendered.Markup);
         await context.DisposeAsync();
         Assert.IsTrue(clock.TimerDisposed);
@@ -66,7 +66,7 @@ public sealed partial class KnowledgeSourceEditorTests
             throw new HttpRequestException("The projection request failed.");
         };
         await using var context = CreateContext(client);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         rendered.WaitForAssertion(() => Assert.AreEqual(1, rendered.FindAll("[data-testid='knowledge-projection-row']").Count));
@@ -88,14 +88,14 @@ public sealed partial class KnowledgeSourceEditorTests
         await using var context = CreateContext(client);
         var clock = new ProjectionClock();
         context.Services.AddSingleton<TimeProvider>(clock);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         Assert.IsNotNull(rendered.Find("[data-testid='knowledge-projection-progress']"));
         client.RejectProjectionRefresh = true;
         var reads = client.ProjectionReads;
         await rendered.InvokeAsync(clock.Tick);
         rendered.WaitForAssertion(() => Assert.IsTrue(client.ProjectionReads > reads));
-        rendered.WaitForAssertion(() => Assert.Contains("refresh", rendered.Find("[role='tabpanel']").TextContent.ToLowerInvariant()));
+        rendered.WaitForAssertion(() => Assert.Contains("refresh", rendered.Find(".resource-details-content").TextContent.ToLowerInvariant()));
         client.RejectProjectionRefresh = false;
         client.Projections[0] = completed;
         await rendered.InvokeAsync(clock.Tick);
@@ -115,7 +115,7 @@ public sealed partial class KnowledgeSourceEditorTests
         client.Projections.Clear();
         client.ProjectionStarter = (_, _) => { client.Projections.Add(failed); return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(failed, "etag")); };
         await using var context = CreateContext(client);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         Assert.Contains("Anonymization failed.", rendered.Markup);

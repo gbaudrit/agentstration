@@ -1,0 +1,32 @@
+{
+  "base": "7c2baabe92ff40474ecda163c4467787d8c6d64c",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor": "0f994fdef8cd77c9efeb131c35c3f80940ae702c664514d5390c2927d8309f98",
+    "src/Agentstration.Console.Components/Console/ToolSetInspectionModel.cs": "bf9d93417f99c85c158720f7d64dcbcec8c784786b7a01c9115a0c16ee788a52",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolSetsStrings.fr-FR.resx": "ff4a12329348d8edc6d581f06c16ccddb5a8b9a2e05153e2d29ada97ff8de2f1",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolSetsStrings.resx": "ce5928358624f7e7e2e0dd3692f3ed9925b0872a8af4fbee138993338b22bdd5",
+    "tests/Agentstration.Console.Components.Tests/ExtensionManagedResourcePresentationTests.cs": "39ae055323ff39eafb4d08c9d34e44f3fd589d4fcb4c7881e982877197a9a7d9"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "05c9225f97e73df3f1c906a080dc72e98c302726a9fc47c4a3a9e4e2b590ed65",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "3736ec6e96c439b609208e377bce86443a853c6212389bc3f49904f2357f79f3",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "05c9225f97e73df3f1c906a080dc72e98c302726a9fc47c4a3a9e4e2b590ed65",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "05c9225f97e73df3f1c906a080dc72e98c302726a9fc47c4a3a9e4e2b590ed65",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "3736ec6e96c439b609208e377bce86443a853c6212389bc3f49904f2357f79f3",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "3736ec6e96c439b609208e377bce86443a853c6212389bc3f49904f2357f79f3"
+  },
+  "phases": [
+    {
+      "name": "tool-set",
+      "exitCode": 1,
+      "seconds": 115.1
+    },
+    {
+      "name": "governed-inventory",
+      "exitCode": 0,
+      "seconds": 212.2
+    }
+  ],
+  "completed": true,
+  "running": []
+}

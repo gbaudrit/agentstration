@@ -17,8 +17,9 @@ public sealed class ParameterComponentTests
     [TestMethod]
     public void ListRendersVisibleTypedValueAndExactScope()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
         var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IParametersClient>(new StubClient(new ParameterResource
         {

@@ -383,6 +383,16 @@ public sealed class ModelProviderApiTests : ModelManagementApiTestBase
         var usages = await client.GetFromJsonAsync<ModelProviderUsagesResponse>("/api/modelproviders/ollama-local/usages");
         Assert.IsTrue(usages!.Count >= 1);
         Assert.IsTrue(usages.Value.Any(usage => usage.ResourceType == ModelResourceKinds.ModelProfile));
+        foreach (var usage in usages.Value)
+        {
+            Assert.IsNotNull(usage.Namespace);
+            Assert.IsNotNull(usage.ScopeRef);
+            var profile = await client.GetFromJsonAsync<ModelProfileResource>($"/api/modelprofiles/{Uri.EscapeDataString(usage.Name)}?resourceNamespace={Uri.EscapeDataString(usage.Namespace.Value.Value)}&scopeRef={Uri.EscapeDataString(usage.ScopeRef.Value.Value)}");
+            Assert.IsNotNull(profile);
+            Assert.AreEqual(profile.Namespace, usage.Namespace);
+            Assert.AreEqual(profile.ScopeRef, usage.ScopeRef);
+            Assert.AreEqual(profile.Definition.DisplayName, usage.DisplayName);
+        }
         using var deleted = await client.DeleteAsync("/api/modelproviders/ollama-local");
         Assert.AreEqual(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.AreEqual("application/problem+json", deleted.Content.Headers.ContentType?.MediaType);

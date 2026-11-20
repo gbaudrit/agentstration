@@ -15,7 +15,7 @@
   <data name="Runs" xml:space="preserve"><value>Exécutions</value></data>
   <data name="Deployments" xml:space="preserve"><value>Déploiements</value></data>
   <data name="EmptyTitle" xml:space="preserve"><value>Aucune définition de Flow</value></data>
-  <data name="EmptyMessage" xml:space="preserve"><value>Créez et publiez un Flow par l’API pour commencer.</value></data>
+  <data name="EmptyMessage" xml:space="preserve"><value>Créez un Flow pour commencer.</value></data>
   <data name="Namespace" xml:space="preserve"><value>Espace de noms</value></data>
   <data name="Kind" xml:space="preserve"><value>Type</value></data>
   <data name="Version" xml:space="preserve"><value>Version</value></data>

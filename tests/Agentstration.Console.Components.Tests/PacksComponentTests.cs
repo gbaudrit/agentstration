@@ -5,6 +5,7 @@ using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Bunit;
@@ -46,11 +47,11 @@ public sealed class PacksComponentTests
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         CollectionAssert.AreEqual(new[] { "1", "2", "0", "0" }, rendered.FindAll(".metric-card strong").Select(element => element.TextContent).ToArray());
-        await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.Find(".collection-identity-button").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
-        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant?view=definition", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
+        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant#definition/configuration", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
     }
 
     [TestMethod]
@@ -129,7 +130,7 @@ public sealed class PacksComponentTests
         var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
-        await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.Find(".collection-identity-button").ClickAsync(new());
         await rendered.FindAll("button").Single(button => button.TextContent.Trim().Equals("Fork", StringComparison.Ordinal)).ClickAsync(new());
 
         Assert.IsTrue(rendered.Markup.Contains("Source archive required", StringComparison.Ordinal));
@@ -143,6 +144,7 @@ public sealed class PacksComponentTests
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<PackComposer>();
+        rendered.WaitForElement("[data-wizard-step=resources]").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Daily Assistant", StringComparison.Ordinal)));
 
         Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains("Review selection", StringComparison.Ordinal)));
@@ -165,6 +167,7 @@ public sealed class PacksComponentTests
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<PackComposer>();
+        rendered.WaitForElement("[data-wizard-step=resources]").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Daily Assistant", StringComparison.Ordinal)));
 
         await rendered.FindAll("button").Single(button => button.GetAttribute("aria-label") == "Add Concierge to Pack").ClickAsync(new());
@@ -186,6 +189,9 @@ public sealed class PacksComponentTests
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
+        context.Services.AddSingleton<IConsoleContextProvider>(new ResourceListContextProvider());
+        context.Services.AddSingleton<ConsoleContextState>();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }
@@ -196,17 +202,22 @@ public sealed class PacksComponentTests
         using var context = CreateContext();
         context.Services.AddSingleton<IPacksClient>(new FakePacksClient());
         var rendered = context.Render<PackComposer>();
+        rendered.WaitForElement("[data-wizard-step=resources]").Click();
         rendered.WaitForElement(".composer-add");
         await rendered.Find("[data-testid=pack-project-publisher]").ChangeAsync(new() { Value = "example" });
         await rendered.Find("[data-testid=pack-project-display-name]").InputAsync(new() { Value = "Example pack" });
         await rendered.Find(".composer-add").ClickAsync(new());
+        rendered.Find("[data-wizard-step=review]").Click();
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled")));
+        rendered.Find("[data-wizard-step=identity]").Click();
         var audience = rendered.FindComponent<ClearableSelect<PackAudience>>();
         await audience.Find("button").ClickAsync(new());
         Assert.AreEqual(string.Empty, audience.Find("select").GetAttribute("value"));
+        rendered.Find("[data-wizard-step=review]").Click();
         Assert.IsTrue(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled"));
-        Assert.IsTrue(rendered.FindAll(".validation-errors li").Count > 0);
+        Assert.IsTrue(rendered.FindAll(".validation-message").Any(message => !string.IsNullOrWhiteSpace(message.TextContent)));
         await audience.Find("select").ChangeAsync(new() { Value = "Professional" });
+        rendered.Find("[data-wizard-step=review]").Click();
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=pack-project-create]").HasAttribute("disabled")));
     }
 

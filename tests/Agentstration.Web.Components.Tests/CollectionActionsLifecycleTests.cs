@@ -9,6 +9,42 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class CollectionActionsLifecycleTests
 {
     [TestMethod]
+    public void DestructiveActionsAreOptionalAndHidingThemAlsoRemovesTheirSeparator()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js").Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization();
+        var cut = context.Render<CollectionActions>(p => p.Add(c => c.ResourceName, "Resource")
+            .Add(c => c.Secondary, "<a href='/resource'>Open</a>"));
+        Assert.IsEmpty(cut.FindAll("hr, .collection-destructive-actions"));
+        cut.Render(p => p.Add(c => c.Destructive, "<button type='button'>Delete</button>"));
+        Assert.HasCount(1, cut.FindAll("hr"));
+        Assert.AreEqual("Delete", cut.Find(".collection-destructive-actions button").TextContent);
+        cut.Render(p => p.Add(c => c.ShowDestructiveActions, false));
+        Assert.IsEmpty(cut.FindAll("hr, .collection-destructive-actions, button"));
+        Assert.HasCount(1, cut.FindAll(".collection-actions-menu"));
+        Assert.HasCount(1, cut.FindAll("a[href='/resource']"));
+    }
+
+    [TestMethod]
+    public void HiddenDestructiveOnlyActionsLeaveNoEmptyMenuAndCanBeEnabledAgain()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js").Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization();
+        var cut = context.Render<CollectionActions>(p => p.Add(c => c.ResourceName, "Resource")
+            .Add(c => c.Destructive, "<button type='button'>Delete</button>").Add(c => c.ShowDestructiveActions, false));
+        Assert.IsEmpty(cut.FindAll(".collection-actions-menu"));
+        cut.Render(p => p.Add(c => c.ShowDestructiveActions, true));
+        Assert.HasCount(1, cut.FindAll(".collection-actions-menu button"));
+        Assert.IsEmpty(cut.FindAll("hr"));
+        cut.Render(p => p.Add(c => c.ShowDestructiveActions, false));
+        Assert.IsEmpty(cut.FindAll(".collection-actions-menu"));
+    }
+
+    [TestMethod]
     public async Task DisposalWaitsForPendingMenuUpdatesAndNeverUsesAReleasedModule()
     {
         using var context = new BunitContext();

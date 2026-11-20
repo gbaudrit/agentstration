@@ -57,3 +57,18 @@
 .agent-picker {
     scrollbar-gutter: stable;
 }
+
+/* Explain duplicate business IDs outside the compact, mobile-hidden metadata line. */
+.agent-option-explanation {
+    color: var(--muted);
+    font-size: .68rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.check-option.resource-enabled-toggle ::deep input[role="switch"] {
+    flex: 0 0 2.5rem;
+    width: 2.5rem !important;
+    min-height: 1.5rem !important;
+    height: 1.5rem;
+}

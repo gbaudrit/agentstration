@@ -4,7 +4,7 @@
     @ChildContent
     @if (MoreActions is not null)
     {
-        <details class="resource-more-actions"><summary class="button-secondary">@Shared["MoreActions"]</summary><div class="resource-more-actions-menu">@MoreActions</div></details>
+        <details class="resource-more-actions"><summary class="button-secondary" aria-label="@Shared["MoreActions"]" title="@Shared["MoreActions"]"><UiIcon Name="dots-vertical" /></summary><div class="resource-more-actions-menu">@MoreActions</div></details>
     }
 </div>
 @code {

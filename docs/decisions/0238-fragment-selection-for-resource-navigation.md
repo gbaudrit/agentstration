@@ -21,3 +21,11 @@ The maintainer selected a configurable two-level resource-local menu and explici
 Layouts can compose shared local navigation separately from headers, content and actions. Adopted screens update their link producers and keep models/editors alive across local navigation. Incoming obsolete section selectors do not determine the selected view. The component increment alone does not deliver the Agent layout/pilot or satisfy the deferred scenario #1234 gate.
 
 This decision concerns section selection and does not supersede ADR-0187's administrative-context/authorization rules.
+
+## Implementation follow-up — #1235
+
+The Agent pilot now adopts the component through `ResourceDetailsTemplate`, with a sticky right rail, expanded groups and a shared header trigger for the mobile drawer. The native-hash limitation recorded above was corrected during integration: cancellable native hash pushes use public Blazor navigation before committing browser history. Focused browser probes verify native hash selection and guarded Back with retained form and YAML drafts. Default-context normalization also notifies Blazor, and preferred-culture redirects preserve the fragment. The decision remains Proposed; deferred UX scenarios #1234 and #1236 still require maintainer UX validation and the implementation merge.
+
+The standard composition now reserves Overview, Definition/Configuration, conditional Access and final YAML. Families extend Definition with children and may supply additional primary sections before Access; the fragment IDs remain unchanged. The template owns standard panel order and retains visited section content, while family adapters retain permission checks, resource coordinates, editor state and commands. The legacy content/navigation contract remains available for existing adopters during migration.
+
+Agent and its template share one `ResourceSectionState`, updated by accepted navigation. `ConsoleResourceDetailsTemplate` supplies Access from the saved resource identity, combines policy/definition leave protection and hosts the shared YAML editor. Family code retains YAML parsing and resource commands; Web components acquire no Console dependency.

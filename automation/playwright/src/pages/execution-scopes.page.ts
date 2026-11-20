@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { ExpectedTextByLocale } from '../locales/expected-text.js';
@@ -147,7 +148,7 @@ export class ExecutionScopesPage {
       TestIds.flowObservability.flowDetails,
     );
     await expect(async () => {
-      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+      await selectResourceSection(this.page, 'runs');
       await expect(this.page.getByTestId(TestIds.flowObservability.flowRunOpen)).toBeVisible();
     }).toPass({ timeout: 30_000 });
     await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).click();
@@ -208,7 +209,7 @@ export class ExecutionScopesPage {
       );
       const openRun = this.page.getByTestId(TestIds.flowObservability.flowRunOpen);
       await expect(async () => {
-        await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+        await selectResourceSection(this.page, 'runs');
         await expect(openRun).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 20_000 });
       await openRun.click();
@@ -271,7 +272,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/runs/${encodeURIComponent(evidence.runtimeRunId)}?scopeRef=${encodeURIComponent(evidence.scopeRef)}`,
       TestIds.flowObservability.agentRunner,
     );
-    await expect(this.agentDefinitionScope).toContainText('Instance');
+    await selectResourceSection(this.page, 'execution/details');
+    await expect(this.agentRunDefinitionScope).toContainText('Instance');
   }
 
   public async openFlowRun(consoleUrl: string, evidence: ScopedExecutionEvidence): Promise<void> {
@@ -655,9 +657,15 @@ export class ExecutionScopesPage {
       .getAttribute('data-context-scope')
       .catch(() => null);
     if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
-    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
+    const previous = new URL(this.page.url());
+    const sameDocument = previous.origin === target.origin && previous.pathname === target.pathname && previous.search === target.search;
+    let response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
+    if (!response && sameDocument) response = await this.page.reload({ waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Execution-scope route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+    if (marker === TestIds.flowObservability.runDetails) {
+      await expect(this.page.locator('.resource-details-navigation .resource-navigation')).toHaveAttribute('data-navigation-ready', 'true');
+    }
     if (marker === TestIds.flowObservability.agentRunner) {
       await expect(this.page.getByTestId(marker)).toHaveAttribute('data-interactive', 'true');
     }

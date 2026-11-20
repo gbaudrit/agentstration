@@ -1,9 +1,8 @@
-@inject IServiceProvider Services
 @page "/triggers/new"
-@page "/triggers/{Name}/edit"
-@rendermode InteractiveServer
-@using System.ComponentModel.DataAnnotations
+@implements IDisposable
 @using System.Xml
+@using Agentstration.Triggers
+@inject IServiceProvider Services
 @inject ITriggerApiClient Client
 @inject IFlowApiClient Flows
 @inject NavigationManager Navigation
@@ -11,56 +10,66 @@
 @inject ConsoleContextState ContextState
 @inject TimeProvider TimeProvider
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
-<PageTitle>@(IsNew ? T("NewTrigger") : T("EditTrigger")) · Agentstration</PageTitle>
-@if (loading || model is null)
+@if (!Embedded)
 {
-    <LoadingState Message="@(IsNew ? T("PreparingEditor") : T("LoadingTrigger"))" />
+    <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
+    <PageTitle>@T(IsNew ? "NewTrigger" : "EditTrigger") · Agentstration</PageTitle>
+    <PageHeader CollectionHref="/triggers" CollectionLabel="@T("Triggers")" ScopeRef="TriggerUi.ContextScope(ContextState.Current)" Title="@(IsNew ? T("NewTrigger") : model.DisplayName.Length > 0 ? model.DisplayName : RequestedName ?? T("EditTrigger"))" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
+        <Actions>@if (!IsNew) { <a class="button-secondary" href="@BackUrl">@T("Cancel")</a> }</Actions>
+    </PageHeader>
 }
-else if (notFound)
-{
-    <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/triggers">@T("BackToTriggers")</a></EmptyState>
-}
+@if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
 else
 {
-    <PageHeader Title="@(IsNew ? T("NewTrigger") : model.DisplayName)" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
-        <Actions><a class="button-secondary" href="@(IsNew ? "/triggers" : ConsoleResourceUrls.WithOwnerScope($"/triggers/{Uri.EscapeDataString(model.Name)}?namespace={Uri.EscapeDataString(ResourceNamespace.Parse(NamespaceValue).Value)}", existing?.Value.ScopeRef))">@T("Cancel")</a></Actions>
-    </PageHeader>
-
-    @if (!CanManage) { <div class="form-alert form-alert-danger" role="alert">@T("ManagePermissionDenied")</div> }
-    @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert" data-testid="trigger-error">@error</div> }
-
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="trigger-editor" class="resource-form" @oninput="MarkDirty" @onchange="MarkDirty">
-        <DataAnnotationsValidator /><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
-        <ValidationSummary />
-
-        <FormSection Title="@T("TriggerResource")" Eyebrow="@T("Identity")"><Actions>@if (!IsNew) { <StatusBadge Text="@(existing!.Value.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(existing.Value.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /> }</Actions><ChildContent>
+    @if (!Embedded && !CanWrite) { <ResourceReadOnlyNotice Reason="@(ReadOnlyReason ?? (existing?.Value.Governance.IsManaged == true ? ResourceReadOnlyReason.Managed : ResourceReadOnlyReason.InsufficientPermissions))" /> }
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert" data-testid="trigger-error">@error</div> }
+    @if (flowsUnavailable) { <div class="form-alert form-alert-warning" role="status">@T("Editor.FlowsUnavailable")</div> }
+    <ResourceDefinitionForm @key="editContext" @ref="definitionForm" EditContext="editContext" Id="@FormId" FormName="trigger-editor"
+        FieldLabels="FieldLabels" Sections="@(SectionPresentations ?? DefinitionPresentations())" SectionState="SectionState" SectionContent="@(SectionState is null || IsNew ? null : DefinitionContent)" SectionRequested="SectionRequested"
+        OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmitAsync" InvalidInputChanged="value => invalidInput = value" Busy="saving" ReadOnly="@(!CanWrite)" data-testid="trigger-form" data-resource-etag="@existing?.ETag">
+        <ChildContent>
+        @if (IsNew)
+        {
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard @ref="wizard" Steps="CreationSteps" OnFinish="FinishAsync" OnStepReady="StepReadyAsync" Disabled="@(!CanWrite)" FinishLabel="@T(saving ? "Creating" : "CreateDisabledTrigger")" FinishTestId="trigger-create" />
+        }
+        else
+        {
+            @IdentityFields @ConfigurationFields
+            @if (!ExternalActions && CanWrite) { <FormActions><button class="button-primary" type="submit" disabled="@(!CanEdit)" data-testid="trigger-save">@T(saving ? "Saving" : "SaveChanges")</button></FormActions> }
+        }
+        </ChildContent>
+    </ResourceDefinitionForm>
+}
+@code {
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@TriggerResourceKinds.Trigger" NamePolicy="ResourceNamePolicy.Trigger" IsNew="IsNew" ReadOnly="@(!CanWrite)"
+        DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
+        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="model.ScopeRef" PresentationScopeRef="TriggerUi.ContextScope(ContextState.Current)" ScopeReadOnly="true"
+        Description="@model.Description" DescriptionChanged="value => model.Description = value" DescriptionExpression="@(() => model.Description)" DescriptionMaxLength="500"
+        Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" TestId="trigger-identity-editor" />;
+    private RenderFragment ConfigurationFields => @<div class="resource-editor-view">@TargetFields @ScheduleFields @InputFields</div>;
+    private RenderFragment<string> DefinitionContent => path => path == "definition/identity" ? IdentityFields : ConfigurationFields;
+    private RenderFragment TargetFields => @<FormSection Title="@T("PublishedFlow")" Eyebrow="@T("Target")"><ChildContent>
             <FormGrid>
-                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Policy="ResourceNamePolicy.Trigger" IsNew="@IsNew" TechnicalNameHelp="@T("ImmutableNameHelp")" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" />
-                <FormField Optional="true" Label="@T("Description")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Description" rows="3" /></ChildContent><Validation><ValidationMessage For="() => model.Description" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@model.FlowKey" ValueChanged="SelectFlow" ValueExpression="@(() => model.FlowKey)" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@if (model.FlowKey.Length > 0 && !availableFlows.Any(value => FlowKey(value) == model.FlowKey)) { <option value="@model.FlowKey" disabled>@T("Editor.SavedTargetUnavailable") · @model.FlowKey</option> }@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @T(flow.Status == "Active" ? "Enabled" : flow.Status == "Disabled" ? "Disabled" : "UnknownTriggerError") · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
             </FormGrid>
-        </ChildContent></FormSection>
-
-        <FormSection Title="@T("PublishedFlow")" Eyebrow="@T("Target")"><ChildContent>
-            <FormGrid>
-                <FormField Required="true" Label="@T("Flow")" Class="form-span-2"><ChildContent><ClearableSelect @bind-Value="model.FlowKey" data-testid="trigger-flow"><option value="">@T("SelectFlow")</option>@foreach (var flow in availableFlows) { <option value="@FlowKey(flow)">@flow.Name — @flow.ScopeRef · @flow.Namespace.Value/@flow.Id · @flow.Status · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect><small>@T("FlowResolutionHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.FlowKey" /></Validation></FormField>
-            </FormGrid>
-        </ChildContent></FormSection>
-
-        <FormSection Title="@T("Schedule")" Eyebrow="@T("When")"><Actions><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></Actions><ChildContent>
+        </ChildContent></FormSection>;
+    private RenderFragment ScheduleFields => @<FormSection Title="@T("Schedule")" Eyebrow="@T("When")"><Actions><button class="button-secondary" type="button" @onclick="PreviewAsync">@T("Preview")</button></Actions><ChildContent>
             <FormGrid>
                 <FormField Required="true" Label="@T("ScheduleType")"><ChildContent><ClearableSelect @bind-Value="model.ScheduleType"><option value="@TriggerScheduleType.Once">@T("ScheduleType.Once")</option><option value="@TriggerScheduleType.Interval">@T("ScheduleType.Interval")</option><option value="@TriggerScheduleType.Cron">@T("ScheduleType.Cron")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ScheduleType" /></Validation></FormField>
                 <FormField Required="true" Label="@T("TimeZone")"><ChildContent><ClearableSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</ClearableSelect><small>@T("TimeZoneHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.TimeZone" /></Validation></FormField>
                 @if (model.ScheduleType == TriggerScheduleType.Once)
                 {
-                    <label class="form-span-2"><span>@T("RunAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" data-testid="trigger-run-at" /><ValidationMessage For="() => model.LocalAt" /></label>
+                    <FormField Required="true" Label="@T("RunAt")" Id="@($"{FormId}-run-at")" Class="form-span-2"><ChildContent><InputDate id="@($"{FormId}-run-at")" aria-describedby="@($"{FormId}-run-at-messages")" aria-required="true" @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" data-testid="trigger-run-at" /></ChildContent><Validation><ValidationMessage For="() => model.LocalAt" /></Validation></FormField>
                 }
                 else if (model.ScheduleType == TriggerScheduleType.Interval)
                 {
                     <FormField Label="@T("RepeatEvery")"><ChildContent><ClearableNumber @bind-Value="model.IntervalValue" min="1" /></ChildContent><Validation><ValidationMessage For="() => model.IntervalValue" /></Validation></FormField>
                     <FormField Required="true" Label="@T("Unit")"><ChildContent><ClearableSelect @bind-Value="model.IntervalUnit"><option value="minutes">@T("Unit.Minutes")</option><option value="hours">@T("Unit.Hours")</option><option value="days">@T("Unit.Days")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.IntervalUnit" /></Validation></FormField>
-                    <label class="form-span-2"><span>@T("StartAt")</span><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /><ValidationMessage For="() => model.LocalAt" /></label>
+                    <FormField Required="true" Label="@T("StartAt")" Class="form-span-2"><ChildContent><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" /></ChildContent><Validation><ValidationMessage For="() => model.LocalAt" /></Validation></FormField>
                 }
                 else
                 {
@@ -70,164 +79,214 @@ else
                 <FormField Label="@T("MissedOccurrence")"><ChildContent><ClearableSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></ClearableSelect><small>@T("MisfireHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.MisfirePolicy" /></Validation></FormField>
                 <FormField Label="@T("PreviousWorkActive")"><ChildContent><ClearableSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">@T("Concurrency.Skip")</option><option value="@TriggerConcurrencyPolicy.Allow">@T("Concurrency.Allow")</option></ClearableSelect><small>@T("ConcurrencyHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.ConcurrencyPolicy" /></Validation></FormField>
             </FormGrid>
-            @if (!string.IsNullOrWhiteSpace(scheduleError)) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
+            @if (!string.IsNullOrWhiteSpace(scheduleError) && !editContext.GetValidationMessages(editContext.Field(nameof(model.ScheduleType))).Any()) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
             @if (preview.Count > 0)
             {
                 <div class="trigger-preview" aria-live="polite"><strong>@T("NextOccurrences")</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow(), Localizer)</li> }</ol></div>
             }
-        </ChildContent></FormSection>
-
-        <FormSection Title="@T("StaticInput")" Eyebrow="@T("What")"><Actions><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></Actions><ChildContent>
+        </ChildContent></FormSection>;
+    private RenderFragment InputFields => @<FormSection Title="@T("StaticInput")" Eyebrow="@T("What")"><Actions><button class="text-button" type="button" @onclick="FormatInput">@T("FormatJson")</button></Actions><ChildContent>
             <FormGrid>
                 <FormField Label="@T("JsonObject")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" data-testid="trigger-input" /><small>@T("StaticInputHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.InputJson" /></Validation></FormField>
             </FormGrid>
-            @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
-        </ChildContent></FormSection>
 
-        @if (IsNew)
-        {
-            <FormActions Busy="@saving"><a class="button-secondary" href="/triggers">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)" data-testid="trigger-create">@(saving ? T("Creating") : T("CreateDisabledTrigger"))</button></FormActions>
-        }
-        else
-        {
-            <UnsavedChangesBar IsVisible="@IsDirty" Message="@T("UnsavedMessage")">
-                <Actions><a class="button-secondary" href="@(ConsoleResourceUrls.WithOwnerScope($"/triggers/{Uri.EscapeDataString(model.Name)}?namespace={Uri.EscapeDataString(ResourceNamespace.Parse(NamespaceValue).Value)}", existing?.Value.ScopeRef))">@T("Discard")</a><button class="button-primary" type="submit" disabled="@(!CanManage || saving)">@(saving ? T("Saving") : T("SaveChanges"))</button></Actions>
-            </UnsavedChangesBar>
-        }
-    </EditForm>
-}
-
-@code {
-    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+        </ChildContent></FormSection>;
+    private RenderFragment ReviewFields => @<div class="resource-editor-view"><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Namespace="@model.Namespace" Description="@model.Description" Labels="existing?.Value.Metadata.Tags"><Scope><ResourceScopeBadge ScopeRef="TriggerUi.ContextScope(ContextState.Current)" /></Scope></ResourceIdentitySummary>
+        <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("Flow")</dt><dd><code>@model.FlowKey</code></dd><dt>@T("Schedule")</dt><dd>@ScheduleReview</dd><dt>@T("Enabled")</dt><dd>@T("No")</dd></dl><pre class="trigger-json">@model.InputJson</pre></FormSection></div>;
     [Parameter] public string? Name { get; set; }
-    private TriggerEditorModel? model;
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public ScopedResourceAddress? EmbeddedAddress { get; set; }
+    [Parameter] public ResourceSnapshot<TriggerResource>? InitialSnapshot { get; set; }
+    [Parameter] public ResourceSectionState? SectionState { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation>? SectionPresentations { get; set; }
+    [Parameter] public EventCallback<string> SectionRequested { get; set; }
+    [Parameter] public ResourceReadOnlyReason? ReadOnlyReason { get; set; }
+    [Parameter] public bool ExternalActions { get; set; }
+    [Parameter] public bool SaveBlocked { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public EventCallback<bool> SavingChanged { get; set; }
+    [Parameter] public EventCallback<ResourceSnapshot<TriggerResource>> SnapshotSaved { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly CancellationToken lifetimeToken;
+    public TriggerEditor() => lifetimeToken = lifetime.Token;
+    private TriggerEditorModel model = new();
     private ResourceSnapshot<TriggerResource>? existing;
     private IReadOnlyList<FlowSummary> availableFlows = [];
     private IReadOnlyList<string> timeZones = [];
     private IReadOnlyList<DateTimeOffset> preview = [];
-    private bool loading = true, notFound, saving;
-    private string? error, scheduleError, inputError;
-    private string cronPreset = "weekdayMorning";
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private ResourceDefinitionForm? definitionForm;
+    private CreationWizard? wizard;
+    private EditContext editContext = null!;
+    private ValidationMessageStore messages = null!;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private string? loadedKey, baseline, error, scheduleError, inputError;
+    private string cronPreset = "advanced";
+    private bool loading = true, saving, invalidInput, reportedDirty, flowsUnavailable, disposed;
+    private long loadVersion, previewVersion;
+    private bool revealValidation;
+    private string? pendingValidationStep;
+    public string FormId { get; } = $"trigger-form-{Guid.NewGuid():N}";
+    public string? Version => existing?.ETag;
+    public bool IsDirty => !disposed && baseline is not null && (JsonSerializer.Serialize(model) != baseline || invalidInput);
+    public bool CanEdit => CanWrite && !saving && !loading && !SaveBlocked;
+    private bool CanWrite => !disposed && ReadOnlyReason is null && existing?.Value.Governance.IsManaged != true
+        && ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite) && model.ScopeRef == PhysicalOwner;
+    private ResourceScopeRef? PhysicalOwner => ContextState.Current is { WorkspaceId: var workspace } && workspace != Guid.Empty ? ResourceScopeRef.Workspace(workspace) : null;
+    private bool IsNew => !Embedded && (string.IsNullOrWhiteSpace(Name) || Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath.TrimEnd('/').Equals("/triggers/new", StringComparison.OrdinalIgnoreCase));
+    private string? RequestedName => EmbeddedAddress?.Name ?? Name;
+    private ResourceNamespace RequestedNamespace => EmbeddedAddress?.Namespace ?? ResourceNamespace.Parse(NamespaceValue);
+    private string ContextKey => $"{IsNew}|{RequestedName}|{NamespaceValue}|{EmbeddedAddress}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private string BackUrl => existing is null ? ResourceOwnershipContext.PreserveNavigation("/triggers", Services) : ResourceOwnershipContext.Resource(Services, "/triggers", existing.Value.Name, existing.Value.Namespace, existing.Value.ScopeRef);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-
+    private string ScheduleReview { get { try { return TriggerUi.ScheduleLabel(model.BuildSchedule(), Localizer); } catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidOperationException or TimeZoneNotFoundException or InvalidTimeZoneException) { return "—"; } } }
+    public static IReadOnlyDictionary<string, ResourceSectionPresentation> DefinitionPresentations() => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(TriggerEditorModel.Name), nameof(TriggerEditorModel.DisplayName), nameof(TriggerEditorModel.Description), nameof(TriggerEditorModel.Namespace), nameof(TriggerEditorModel.ScopeRef), nameof(TriggerEditorModel.Tags)] },
+        ["definition/configuration"] = new() { HasRequiredFields = true, Fields = [nameof(TriggerEditorModel.FlowKey), nameof(TriggerEditorModel.ScheduleType), nameof(TriggerEditorModel.TimeZone), nameof(TriggerEditorModel.LocalAt), nameof(TriggerEditorModel.IntervalValue), nameof(TriggerEditorModel.IntervalUnit), nameof(TriggerEditorModel.CronExpression), nameof(TriggerEditorModel.MisfirePolicy), nameof(TriggerEditorModel.ConcurrencyPolicy), nameof(TriggerEditorModel.InputJson)] }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Description)] = T("Description"),
+        [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.ScopeRef)] = Shared["Scope"], [nameof(model.Tags)] = Shared["Labels"],
+        [nameof(model.FlowKey)] = T("Flow"), [nameof(model.ScheduleType)] = T("ScheduleType"), [nameof(model.TimeZone)] = T("TimeZone"),
+        [nameof(model.LocalAt)] = T(model.ScheduleType == TriggerScheduleType.Once ? "RunAt" : "StartAt"), [nameof(model.IntervalValue)] = T("RepeatEvery"), [nameof(model.IntervalUnit)] = T("Unit"),
+        [nameof(model.CronExpression)] = T("CronExpression"), [nameof(model.MisfirePolicy)] = T("MissedOccurrence"), [nameof(model.ConcurrencyPolicy)] = T("PreviousWorkActive"), [nameof(model.InputJson)] = T("JsonObject")
+    };
+    private IReadOnlyList<CreationWizardStep> CreationSteps => [new("identity", Shared["Identity"], IdentityFields) { IsComplete = model.FieldsValid(nameof(model.Name), nameof(model.DisplayName), nameof(model.Description)) }, new("target", T("Target"), TargetFields) { IsComplete = model.FieldsValid(nameof(model.FlowKey)) }, new("schedule", T("Schedule"), ScheduleFields) { IsComplete = ScheduleComplete }, new("input", T("StaticInput"), InputFields) { IsComplete = InputComplete }, new("review", Shared["Verification"], ReviewFields) { IsComplete = model.FieldsValid(nameof(model.Name), nameof(model.DisplayName), nameof(model.Description), nameof(model.FlowKey)) && ScheduleComplete && InputComplete }];
+    private bool ScheduleComplete => scheduleError is null && model.FieldsValid(nameof(model.TimeZone), nameof(model.IntervalValue), nameof(model.IntervalUnit), nameof(model.CronExpression));
+    private bool InputComplete { get { try { _ = model.ParseInput(T("StaticInputMustBeObject")); return true; } catch (Exception exception) when (exception is JsonException or FormatException) { return false; } } }
+    protected override void OnInitialized() => NewContext();
+    private void NewContext()
+    {
+        if (editContext is not null) editContext.OnFieldChanged -= FieldChanged;
+        editContext = new(model); messages = new(editContext); editContext.OnFieldChanged += FieldChanged;
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        messages.Clear(args.FieldIdentifier);
+        if (args.FieldIdentifier.FieldName == nameof(model.InputJson)) inputError = null;
+        else if (args.FieldIdentifier.FieldName is nameof(model.ScheduleType) or nameof(model.TimeZone) or nameof(model.LocalAt) or nameof(model.IntervalValue) or nameof(model.IntervalUnit) or nameof(model.CronExpression)) { scheduleError = null; preview = []; ++previewVersion; messages.Clear(editContext.Field(nameof(model.ScheduleType))); }
+        editContext.NotifyValidationStateChanged();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!disposed && revealValidation && !saving && !loading && definitionForm is { Busy: false }) { revealValidation = false; await definitionForm.RevealValidationAsync(); }
+        if (!disposed && reportedDirty != IsDirty) { reportedDirty = IsDirty; await DraftChanged.InvokeAsync(IsDirty); }
+    }
+    private string InvalidStep()
+    {
+        if (DefinitionPresentations()["definition/identity"].Fields.Any(field => editContext.GetValidationMessages(editContext.Field(field)).Any())) return "identity";
+        if (editContext.GetValidationMessages(editContext.Field(nameof(model.FlowKey))).Any()) return "target";
+        return editContext.GetValidationMessages(editContext.Field(nameof(model.InputJson))).Any() ? "input" : "schedule";
+    }
+    private async Task InvalidSubmitAsync(EditContext context) { if (IsNew && wizard is not null) await wizard.GoToStepAsync(InvalidStep()); definitionForm?.RequestValidationFocus(); }
+    private Task StepReadyAsync(string step)
+    {
+        if (disposed || !IsNew || pendingValidationStep != step || definitionForm is null) return Task.CompletedTask;
+        pendingValidationStep = null; definitionForm.RequestValidationFocus();
+        return InvokeAsync(StateHasChanged);
+    }
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        if (!CanEdit) return;
+        if (!editContext.Validate() || invalidInput) { finish.ReturnToStepId = pendingValidationStep = InvalidStep(); return; }
+        await SaveAsync();
+        if (editContext.GetValidationMessages().Any()) { finish.ReturnToStepId = pendingValidationStep = InvalidStep(); }
+    }
+    public async Task SubmitAsync() { if (!CanEdit) return; if (!editContext.Validate() || invalidInput) { if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; } await SaveAsync(); if (!disposed) await InvokeAsync(StateHasChanged); }
+    private Task RetryAsync() { if (saving || disposed) return Task.CompletedTask; loadedKey = null; return OnParametersSetAsync(); }
     protected override async Task OnParametersSetAsync()
     {
-        loading = true; error = null; notFound = false;
+        await ContextState.EnsureLoadedAsync(lifetimeToken);
+        if (disposed) return;
+        var key = ContextKey;
+        if (loadedKey == key) { if (InitialSnapshot is { } incoming && incoming.ETag != existing?.ETag) ApplySnapshot(incoming); return; }
+        loadedKey = key; var request = ++loadVersion; loading = true;
+        existing = null; baseline = null; model = new(); NewContext(); invalidInput = false; error = scheduleError = inputError = null; preview = []; availableFlows = []; flowsUnavailable = false;
+        loadState = new(ResourceLoadStatus.Loading);
         try
         {
+            if (PhysicalOwner is not { } owner || EmbeddedAddress is { } address && address.ScopeRef != owner) throw new InvalidOperationException(T("Error.OperationalWorkspaceUnavailable"));
             timeZones = TriggerUi.IanaTimeZones();
-            availableFlows = (await Flows.GetFlowsAsync(CancellationToken.None))
-                .Where(value => value.ActiveVersion is not null)
-                .OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
             if (IsNew)
             {
                 var zone = timeZones.Contains("Europe/Paris", StringComparer.Ordinal) ? "Europe/Paris" : timeZones[0];
-                model = new() { TimeZone = zone, LocalAt = TriggerUi.LocalInput(TimeProvider.GetUtcNow().AddHours(1), zone) };
+                model = new() { Namespace = RequestedNamespace.Value, ScopeRef = owner, TimeZone = zone, LocalAt = TriggerUi.LocalInput(TimeProvider.GetUtcNow().AddHours(1), zone) }; NewContext();
             }
             else
             {
-                existing = await Client.GetAsync(ResourceNamespace.Parse(NamespaceValue), Name!, CancellationToken.None);
-                if (existing is null) { notFound = true; return; }
-                model = From(existing.Value);
+                var saved = InitialSnapshot ?? await Client.GetAsync(RequestedNamespace, RequestedName!, lifetimeToken);
+                if (!Current(request, key)) return;
+                if (saved is null) { loadState = new(ResourceLoadStatus.NotFound) { Message = T("NotFoundMessage") }; return; }
+                if (!ValidSnapshot(saved)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+                Adopt(saved);
             }
-            await PreviewAsync();
+            try { var flows = await Flows.GetFlowsAsync(lifetimeToken); if (!Current(request, key)) return; availableFlows = flows.Where(value => value.ActiveVersion is not null).OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase).ToArray(); }
+            catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException) { if (!Current(request, key)) return; flowsUnavailable = true; availableFlows = []; }
+            if (!Current(request, key)) return;
+            await PreviewAsync(); if (!Current(request, key)) return;
+            baseline = JsonSerializer.Serialize(model); loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
-        finally { loading = false; savedFingerprint = Fingerprint; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException or ArgumentException or InvalidOperationException or FormatException or TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            if (!Current(request, key)) return;
+            existing = null; baseline = null; model = new(); NewContext();
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+            loadState = new(status) { ErrorId = (exception as AgentstrationApiException)?.ErrorId }; error = TriggerUi.ErrorMessage(exception, Localizer);
+        }
+        finally { if (Current(request, key)) loading = false; }
     }
-
-    private TriggerEditorModel From(TriggerResource resource)
+    private bool Current(long request, string? key) => !disposed && request == loadVersion && key == loadedKey && key == ContextKey;
+    private bool ValidSnapshot(ResourceSnapshot<TriggerResource> saved) => saved.Value.ScopeRef == PhysicalOwner && saved.Value.Namespace == RequestedNamespace && saved.Value.Name == RequestedName && saved.Value.Kind == TriggerResourceKinds.Trigger && saved.Value.Uid != Guid.Empty && (existing is null || saved.Value.Uid == existing.Value.Uid);
+    private void Adopt(ResourceSnapshot<TriggerResource> saved)
     {
-        var schedule = resource.Definition.Source.Schedule!;
-        var zone = schedule.TimeZone ?? TimeZoneInfo.Local.Id;
-        if (!timeZones.Contains(zone, StringComparer.Ordinal)) zone = "Europe/Paris";
-        var at = schedule.At ?? schedule.StartAt ?? TimeProvider.GetUtcNow().AddHours(1);
-        var duration = schedule.Every is null ? TimeSpan.FromHours(1) : XmlConvert.ToTimeSpan(schedule.Every);
-        var (intervalValue, intervalUnit) = duration.TotalDays >= 1 && duration.TotalDays == Math.Truncate(duration.TotalDays) ? ((int)duration.TotalDays, "days") : duration.TotalHours >= 1 && duration.TotalHours == Math.Truncate(duration.TotalHours) ? ((int)duration.TotalHours, "hours") : (Math.Max(1, (int)duration.TotalMinutes), "minutes");
-        cronPreset = PresetFor(schedule.Expression);
-        var flow = resource.Definition.Target.Flow!;
-        return new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, FlowKey = ExistingFlowKey(flow, resource.Namespace), ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = intervalValue, IntervalUnit = intervalUnit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
+        existing = saved; var resource = saved.Value; var schedule = resource.Definition.Source.Schedule!; var zone = schedule.TimeZone ?? TimeZoneInfo.Local.Id;
+        var at = schedule.At ?? schedule.StartAt ?? TimeProvider.GetUtcNow().AddHours(1); var duration = schedule.Every is null ? TimeSpan.FromHours(1) : XmlConvert.ToTimeSpan(schedule.Every);
+        var (interval, unit) = duration.TotalDays >= 1 && duration.TotalDays == Math.Truncate(duration.TotalDays) ? ((int)duration.TotalDays, "days") : duration.TotalHours >= 1 && duration.TotalHours == Math.Truncate(duration.TotalHours) ? ((int)duration.TotalHours, "hours") : (Math.Max(1, (int)duration.TotalMinutes), "minutes");
+        model = new() { Name = resource.Name, DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description, Namespace = resource.Namespace.Value, ScopeRef = resource.ScopeRef, Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")), FlowKey = TriggerEditorModel.TargetKey(resource.Definition.Target.Flow!, resource.Namespace), ScheduleType = schedule.Type, TimeZone = zone, LocalAt = TriggerUi.LocalInput(at, zone), IntervalValue = interval, IntervalUnit = unit, CronExpression = schedule.Expression ?? "0 0 8 ? * MON-FRI", MisfirePolicy = resource.Definition.MisfirePolicy, ConcurrencyPolicy = resource.Definition.ConcurrencyPolicy, InputJson = resource.Definition.Input.GetRawText() };
+        cronPreset = PresetFor(schedule.Expression); NewContext(); invalidInput = false; error = scheduleError = inputError = null; baseline = JsonSerializer.Serialize(model);
     }
-
-    private void MarkDirty() { }
-    private bool invalidInput;
-    private string savedFingerprint = string.Empty;
-    private string Fingerprint => JsonSerializer.Serialize(model);
-    private bool IsDirty => model is not null && CanManage && (Fingerprint != savedFingerprint || invalidInput);
+    public void ApplySnapshot(ResourceSnapshot<TriggerResource> saved, bool discard = false) { if (disposed || existing is null || !ValidSnapshot(saved) || !discard && IsDirty) return; Adopt(saved); StateHasChanged(); }
+    public void Discard() { if (!disposed && !saving && existing is { } saved) { Adopt(saved); StateHasChanged(); } }
+    public void ApplyOperationalSnapshot(ResourceSnapshot<TriggerResource> saved) { if (disposed || existing is null || !ValidSnapshot(saved)) return; existing = saved; StateHasChanged(); }
+    private void SelectFlow(string value) { if (!CanWrite || saving) return; model.FlowKey = value; model.TargetSelectionChanged = true; }
+    private static string FlowKey(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
     private async Task PreviewAsync()
     {
-        if (model is null) return;
-        scheduleError = null; preview = [];
-        try { preview = await Client.PreviewScheduleAsync(BuildSchedule(), 5, CancellationToken.None); }
-        catch (Exception exception) { scheduleError = exception.Message; }
-        await Task.CompletedTask;
+        if (disposed) return; var request = loadVersion; var key = loadedKey; var previewRequest = ++previewVersion; scheduleError = null; preview = [];
+        try { var values = await Client.PreviewScheduleAsync(model.BuildSchedule(), 5, lifetimeToken); if (Current(request, key) && previewRequest == previewVersion) preview = values; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException or ArgumentException or InvalidOperationException or FormatException or TimeZoneNotFoundException or InvalidTimeZoneException) { if (Current(request, key) && previewRequest == previewVersion) scheduleError = TriggerUi.ErrorMessage(exception, Localizer); }
     }
-
-    private TriggerSchedule BuildSchedule() => model!.ScheduleType switch
-    {
-        TriggerScheduleType.Cron => new() { Type = TriggerScheduleType.Cron, Expression = model.CronExpression.Trim(), TimeZone = model.TimeZone },
-        TriggerScheduleType.Interval => new() { Type = TriggerScheduleType.Interval, StartAt = TriggerUi.ParseLocalInstant(model.LocalAt, model.TimeZone), Every = model.IntervalUnit switch { "days" => $"P{model.IntervalValue}D", "hours" => $"PT{model.IntervalValue}H", _ => $"PT{model.IntervalValue}M" }, TimeZone = model.TimeZone },
-        _ => new() { Type = TriggerScheduleType.Once, At = TriggerUi.ParseLocalInstant(model.LocalAt, model.TimeZone), TimeZone = model.TimeZone }
-    };
-
-    private JsonElement ParseInput()
-    {
-        inputError = null;
-        try { using var document = JsonDocument.Parse(model!.InputJson); if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException(T("StaticInputMustBeObject")); return document.RootElement.Clone(); }
-        catch (Exception exception) when (exception is JsonException or FormatException) { inputError = exception.Message; throw; }
-    }
-
-    private void FormatInput() { try { var value = ParseInput(); model!.InputJson = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });  } catch (JsonException) { } }
-    private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") model!.CronExpression = CronFor(cronPreset);  _ = PreviewAsync(); }
+    private void FormatInput() { try { var value = model.ParseInput(T("StaticInputMustBeObject")); model.InputJson = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }); inputError = null; editContext.NotifyFieldChanged(editContext.Field(nameof(model.InputJson))); } catch (JsonException exception) { inputError = exception.Message; messages.Clear(editContext.Field(nameof(model.InputJson))); messages.Add(editContext.Field(nameof(model.InputJson)), inputError); editContext.NotifyValidationStateChanged(); } }
+    private void ApplyCronPreset(ChangeEventArgs args) { cronPreset = args.Value?.ToString() ?? "advanced"; if (cronPreset != "advanced") { model.CronExpression = CronFor(cronPreset); editContext.NotifyFieldChanged(editContext.Field(nameof(model.CronExpression))); } _ = PreviewAsync(); }
     private static string CronFor(string preset) => preset switch { "dailyMorning" => "0 0 8 ? * *", "weeklyMonday" => "0 0 9 ? * MON", _ => "0 0 8 ? * MON-FRI" };
     private static string PresetFor(string? expression) => expression switch { "0 0 8 ? * *" => "dailyMorning", "0 0 9 ? * MON" => "weeklyMonday", "0 0 8 ? * MON-FRI" => "weekdayMorning", _ => "advanced" };
-    private static string FlowKey(FlowSummary flow) => flow.ScopeRef is null ? string.Empty : $"{flow.ScopeRef.Value.Value}|{flow.Namespace.Value}|{flow.Id}";
-    private string ExistingFlowKey(TriggerFlowTarget target, ResourceNamespace owner)
-    {
-        var @namespace = target.Namespace ?? owner;
-        var scopeRef = target.ScopeRef ?? availableFlows.Where(value => value.Namespace == @namespace && value.Id == target.Name)
-            .Select(value => value.ScopeRef).SingleOrDefault();
-        return scopeRef is null ? string.Empty : $"{scopeRef.Value.Value}|{@namespace.Value}|{target.Name}";
-    }
-
     private async Task SaveAsync()
     {
-        if (model is null || !CanManage || saving) return;
-        saving = true; error = null;
+        if (!CanEdit) return;
+        var request = loadVersion; var key = loadedKey; saving = true; error = null; await SavingChanged.InvokeAsync(true);
         try
         {
-            await PreviewAsync(); if (scheduleError is not null) return;
-            var input = ParseInput();
-            var flowParts = model.FlowKey.Split('|', 3); if (flowParts.Length != 3) throw new InvalidOperationException(T("SelectFlowTarget"));
-            var flowScopeRef = ResourceScopeRef.Parse(flowParts[0]); var flowNamespace = ResourceNamespace.Parse(flowParts[1]); var flowName = flowParts[2];
-            var definition = new TriggerProperties { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Enabled = existing?.Value.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() }, Target = new() { Flow = new() { Name = flowName, Namespace = flowNamespace, ScopeRef = flowScopeRef } }, Input = input, MisfirePolicy = model.MisfirePolicy, ConcurrencyPolicy = model.ConcurrencyPolicy, ExecutionScope = existing?.Value.Definition.ExecutionScope };
-            var resource = new TriggerResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim() }, Definition = definition, ScopeRef = existing?.Value.ScopeRef };
-            var saved = await Client.SaveAsync(resource, IsNew ? null : existing!.ETag, CancellationToken.None);
+            await PreviewAsync(); if (!Current(request, key)) return;
+            if (scheduleError is not null) { messages.Clear(editContext.Field(nameof(model.ScheduleType))); messages.Add(editContext.Field(nameof(model.ScheduleType)), scheduleError); editContext.NotifyValidationStateChanged(); revealValidation = !IsNew; return; }
+            TriggerProperties definition;
+            try { definition = model.Definition(existing?.Value, T("SelectFlowTarget"), T("StaticInputMustBeObject")); }
+            catch (JsonException exception) { inputError = exception.Message; messages.Clear(editContext.Field(nameof(model.InputJson))); messages.Add(editContext.Field(nameof(model.InputJson)), inputError); editContext.NotifyValidationStateChanged(); revealValidation = !IsNew; return; }
+            var resource = existing?.Value is { } current ? current with { Definition = definition } : new TriggerResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = model.Name.Trim(), Namespace = ResourceNamespace.Parse(model.Namespace) }, Definition = definition, ScopeRef = PhysicalOwner };
+            var saved = await Client.SaveAsync(resource, existing?.ETag, lifetimeToken);
+            if (!Current(request, key)) return;
+            if (saved.Value.Name != resource.Name || saved.Value.Namespace != resource.Namespace || saved.Value.ScopeRef != PhysicalOwner || saved.Value.Kind != TriggerResourceKinds.Trigger || saved.Value.Uid == Guid.Empty || existing is not null && saved.Value.Uid != existing.Value.Uid) throw new InvalidOperationException(T("Editor.IdentityMismatch"));
             Notifications.Add(new(Guid.NewGuid(), IsNew ? T("Notification.Created") : T("Notification.Updated"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
-            savedFingerprint = Fingerprint;
-            Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/triggers", saved.Value.Name, saved.Value.Namespace, TriggerUi.DefinitionScope(saved.Value)));
+            Adopt(saved); await SnapshotSaved.InvokeAsync(saved);
+            if (!Embedded) Navigation.NavigateTo(BackUrl);
         }
-        catch (Exception exception) { error = TriggerUi.ErrorMessage(exception, Localizer); }
-        finally { saving = false; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException or ArgumentException or InvalidOperationException or FormatException or TimeZoneNotFoundException or InvalidTimeZoneException) { if (Current(request, key)) error = exception is HttpRequestException or TimeoutException ? T("Editor.OperationUnconfirmed") : TriggerUi.ErrorMessage(exception, Localizer); }
+        finally { if (!disposed && key == loadedKey) { saving = false; await SavingChanged.InvokeAsync(false); } }
     }
+    public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; if (editContext is not null) editContext.OnFieldChanged -= FieldChanged; lifetime.Cancel(); lifetime.Dispose(); }
 
-    private sealed class TriggerEditorModel
-    {
-        [Required, RegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")] public string Name { get; set; } = "";
-        [Required, StringLength(120)] public string DisplayName { get; set; } = "";
-        [StringLength(500)] public string? Description { get; set; }
-        [Required, Display(Name = "Flow")] public string FlowKey { get; set; } = "";
-        public TriggerScheduleType ScheduleType { get; set; } = TriggerScheduleType.Once;
-        [Required] public string TimeZone { get; set; } = "Europe/Paris";
-        public DateTime LocalAt { get; set; }
-        [Range(1, 100000)] public int IntervalValue { get; set; } = 6;
-        [Required] public string IntervalUnit { get; set; } = "hours";
-        [Required] public string CronExpression { get; set; } = "0 0 8 ? * MON-FRI";
-        public TriggerMisfirePolicy MisfirePolicy { get; set; } = TriggerMisfirePolicy.FireOnce;
-        public TriggerConcurrencyPolicy ConcurrencyPolicy { get; set; } = TriggerConcurrencyPolicy.Skip;
-        [Required] public string InputJson { get; set; } = "{}";
-    }
 }

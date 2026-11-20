@@ -1,44 +1,56 @@
-@inject IServiceProvider Services
 @page "/tools/sets"
+@implements IDisposable
+@inject IServiceProvider Services
 @inject IToolSetsClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-toolsets">
-    <Actions><a class="button-secondary" href="/knowledge-sources">@T("KnowledgeSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a class="active" href="/tools/sets">@T("ToolSets")</a><a href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (toolSets.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <CollectionView TItem="ToolSetResource" Items="toolSets" InformationLabels="@(new string[] { T("Members"), T("Category") })" RowTestId="toolset-row" IdentityLabel="@T("ToolSet")" StateLabel="@T("State")">
-        <Identity Context="toolSet">
-<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@toolSet.PublishedVersion" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(toolSet.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="toolSet">
-            <CollectionValue Label="@T("Members")">@toolSet.Definition.Members.Count</CollectionValue>
-            <CollectionValue Label="@T("Category")">@(toolSet.Definition.Category?.Name ?? "—")</CollectionValue>
-        </Information>
-        <Actions Context="toolSet">
-<CollectionActions ResourceName="@($"{toolSet.Definition.DisplayName} ({toolSet.Namespace}/{toolSet.Name}, {toolSet.ScopeRef})")"><a class="text-button" href="@DetailsUrl(toolSet)">@T("Inspect")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="ToolSetResource" Title="@T("Title")" Description="@T("Description")"
+                            TestId="resource-toolsets" RowTestId="toolset-row" ContextKey="@contextKey" IconName="layers"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation>
+        <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a class="active" href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
+    </Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private IReadOnlyList<ToolSetResource> toolSets = [];
-    private bool loading = true;
-    private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
+    private CollectionColumn<ToolSetResource> IdentityColumn => new("identity", T("ToolSet"), toolSet => @<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers">
+        <Versions><CollectionVersion Label="@T("Version")" Value="@toolSet.PublishedVersion" /></Versions>
+        <IconBadges><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(toolSet.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
     {
-        loading = true;
-        error = null;
-        try { toolSets = await Client.GetToolSetsAsync(); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
+        Filters = [new("enabled", T("State"), CollectionFilterKind.Choice)
+        {
+            Options = [new("true", T("Enabled")), new("false", T("Disabled"))]
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<ToolSetResource>> Columns =>
+    [
+        new("members", T("Members"), toolSet => @<span>@toolSet.Definition.Members.Count</span>)
+        {
+            Filters = [new("members", T("Members"), CollectionFilterKind.Number) { Advanced = true }]
+        },
+        new("category", T("Category"), toolSet => @<span>@(toolSet.Definition.Category?.Name ?? "—")</span>)
+        {
+            Filters = [new("category", T("Category"), CollectionFilterKind.Choice)
+            {
+                Options = (toolSets ?? []).Select(toolSet => toolSet.Definition.Category?.Name).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+            }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (toolSets ?? []).Select(toolSet => toolSet.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
     private string DetailsUrl(ToolSetResource value) => ResourceOwnershipContext.Resource(Services, "/tools/sets", value.Name, value.Namespace, value.ScopeRef);
 }

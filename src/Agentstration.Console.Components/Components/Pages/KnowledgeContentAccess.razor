@@ -78,6 +78,8 @@
 </section>
 @code {
     [Parameter, EditorRequired] public string SourceName { get; set; } = string.Empty;
+    [Parameter] public ResourceScopeRef? OwnerScopeRef { get; set; }
+    private IKnowledgeSourcesClient ScopedClient => Client.WithOwner(OwnerScopeRef);
     [Parameter] public bool SupportsStructured { get; set; }
     [Parameter] public ResourceNamespace SourceNamespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public IReadOnlyList<KnowledgeSnapshotView> Snapshots { get; set; } = [];
@@ -102,28 +104,28 @@
     {
         if (operation == "get_status")
         {
-            status = await Client.GetContentStatusAsync(SourceNamespace, SourceName, new(SelectedSnapshot), cancellation.Token);
+            status = await ScopedClient.GetContentStatusAsync(SourceNamespace, SourceName, new(SelectedSnapshot), cancellation.Token);
             result = null;
         }
         else if (operation == "query_documents")
         {
-            var description = await Client.DescribeDocumentsAsync(SourceNamespace, SourceName, SelectedSnapshot, cancellation.Token);
+            var description = await ScopedClient.DescribeDocumentsAsync(SourceNamespace, SourceName, SelectedSnapshot, cancellation.Token);
             var profile = description.QueryProfiles.FirstOrDefault() ?? throw new InvalidOperationException();
             using var query = JsonDocument.Parse(queryPayload);
-            result = await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
+            result = await ScopedClient.QueryDocumentsAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
                 PreparationId = result?.PreparationId, Profile = profile, Query = query.RootElement.Clone(), PageSize = Math.Min(50, description.Policy.MaximumPageSize) }, cancellation.Token);
         }
         else if (operation == "read")
-            result = await Client.ReadContentAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
+            result = await ScopedClient.ReadContentAsync(SourceNamespace, SourceName, new() { SnapshotId = SelectedSnapshot,
                 PreparationId = result?.PreparationId, DocumentId = selectedDocument, Range = selectedRange, MaxCharacters = maxCharacters }, cancellation.Token);
-        else result = await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Pattern = pattern,
+        else result = await ScopedClient.SearchRegexAsync(SourceNamespace, SourceName, new() { Pattern = pattern,
             SnapshotId = SelectedSnapshot, PreparationId = result?.PreparationId, Limit = limit }, cancellation.Token);
     });
     private Task NextAsync() => ExecuteAsync(async () => result = operation == "query_documents"
-        ? await Client.QueryDocumentsAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor }, cancellation.Token)
+        ? await ScopedClient.QueryDocumentsAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor }, cancellation.Token)
         : operation == "read"
-        ? await Client.ReadContentAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, MaxCharacters = maxCharacters }, cancellation.Token)
-        : await Client.SearchRegexAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, Limit = limit }, cancellation.Token));
+        ? await ScopedClient.ReadContentAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, MaxCharacters = maxCharacters }, cancellation.Token)
+        : await ScopedClient.SearchRegexAsync(SourceNamespace, SourceName, new() { Cursor = result!.NextCursor, Limit = limit }, cancellation.Token));
     private Task ReadMatchAsync(KnowledgeRegexMatch match)
     {
         snapshotId = result!.SnapshotId!; selectedDocument = match.DocumentId; selectedRange = match.ReadRange; operation = "read";

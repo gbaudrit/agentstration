@@ -240,4 +240,22 @@
   <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>L’exécution d’une opération documentaire nécessite le droit runs/execute dans le contexte sélectionné. Sélectionnez un contexte autorisé ou demandez ce droit.</value></data>
   <data name="Documents.RunQuery" xml:space="preserve"><value>Exécuter la requête</value></data>
   <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Saisissez un objet JSON de 8 Kio maximum et une taille de page respectant la limite affichée.</value></data>
+<data name="Error.IdentityMismatch"><value>Le stockage retourné ne correspond pas à l’identité demandée.</value></data>
+<data name="SavedCollectionsAndUsePolicy"><value>Collections de documents et politique d’utilisation descendante</value></data>
+<data name="Validation.Configuration"><value>Sélectionnez un type, configurez les liaisons obligatoires et corrigez les erreurs de configuration avant d’enregistrer.</value></data>
+<data name="Validation.DisplayNameRequired"><value>Saisissez un nom d’affichage.</value></data>
+<data name="Validation.TechnicalNameInvalid"><value>Utilisez 1 à 128 lettres minuscules, chiffres, points ou tirets, en commençant par une lettre ou un chiffre.</value></data>
+<data name="Type.IdentityMismatch"><value>Le type de stockage retourné ne correspond pas à l’identité demandée.</value></data>
+<data name="Validation.DisplayNameRange"><value>Utilisez un nom d’affichage de 1 à 200 caractères.</value></data>
+<data name="Validation.DescriptionRange"><value>Utilisez une description de 2 000 caractères au maximum.</value></data>
+<data name="Validation.NamespaceInvalid"><value>Saisissez un espace de noms valide.</value></data>
+<data name="Type.UseUnknown"><value>L’utilisation générique n’a pas été évaluée.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version enregistrée plus récente est disponible. Votre brouillon et sa révision d’origine sont conservés jusqu’à son abandon.</value></data>
+  <data name="Type.Usages" xml:space="preserve"><value>Utilisations découvrables</value></data>
+  <data name="Type.NoUsages" xml:space="preserve"><value>Aucune utilisation découvrable dans ce contexte.</value></data>
+  <data name="Type.UsagesUnknown" xml:space="preserve"><value>Les utilisations n’ont pas pu être chargées. Réessayez pour consulter les références découvrables.</value></data>
+  <data name="Type.Value" xml:space="preserve"><value>Valeur</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Politique d’utilisation descendante</value></data>
+  <data name="Availability.Unknown" xml:space="preserve"><value>Non observée</value></data>
+  <data name="Type.Browse" xml:space="preserve"><value>Types de stockage</value></data>
 </root>

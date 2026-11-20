@@ -1,5 +1,8 @@
+using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
+using Agentstration.Resources;
+using Agentstration.Schemas;
 using Agentstration.Web.Console;
 
 namespace Agentstration.Web.Tests;
@@ -44,6 +47,40 @@ public sealed class OrchestrationEditorModelTests
 
         model = CreateModel(FlowOrchestrationStrategy.Magentic);
         model.ManagerId = "agent-a";
+        Assert.Throws<InvalidOperationException>(() => model.CreateDefinition());
+    }
+
+    [TestMethod]
+    public void MetadataEditingPreservesEverySavedParticipantAndManagerReferenceCoordinate()
+    {
+        var owner = ResourceScopeRef.Parse("/instance");
+        var participant = new FlowTargetReference(FlowTargetKind.Agent, "agent-a", "1.2.3", ResourceNamespace.Parse("team-a"), owner, Guid.NewGuid(), Guid.NewGuid(), "participant-hash")
+        {
+            InputSchema = JsonSerializer.SerializeToElement(new { type = "object", required = new[] { "query" } }),
+            OutputSchema = JsonSerializer.SerializeToElement(new { type = "string" }),
+            OutputContract = new() { Mode = DataContractMode.Dynamic, Source = "input", MediaType = "application/json" }
+        };
+        var relative = new FlowTargetReference(FlowTargetKind.Agent, "agent-b");
+        var manager = new FlowTargetReference(FlowTargetKind.Agent, "manager", "2.0.0", ResourceNamespace.Parse("team-b"), owner, Guid.NewGuid(), Guid.NewGuid(), "manager-hash");
+        var original = new OrchestrationFlowDefinition([participant, relative], new MagenticOrchestrationPattern(manager, 12, 4, 3));
+        var now = DateTimeOffset.MinValue;
+        var response = new FlowResponse("review", "review", "Review", "1.0.0", true, null, original, new Dictionary<string, string>(), now, now);
+
+        var restored = OrchestrationEditorModel.From(response);
+        restored.Description = "Only metadata changes";
+
+        Assert.AreEqual(JsonSerializer.Serialize(original), JsonSerializer.Serialize(restored.CreateDefinition()));
+    }
+
+    [TestMethod]
+    [DataRow(FlowOrchestrationStrategy.Handoff)]
+    [DataRow(FlowOrchestrationStrategy.Magentic)]
+    public void AnIncompleteStrategyCanBePreviewedWhileItsFinalDefinitionRemainsInvalid(FlowOrchestrationStrategy strategy)
+    {
+        var model = new OrchestrationEditorModel { Strategy = strategy };
+        Assert.AreEqual(strategy, model.CreatePreviewDefinition().Strategy);
+        Assert.Throws<InvalidOperationException>(() => model.CreateDefinition());
+        model.ParticipantIds.AddRange(["agent-a", "agent-b"]);
         Assert.Throws<InvalidOperationException>(() => model.CreateDefinition());
     }
 

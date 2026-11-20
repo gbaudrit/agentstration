@@ -1,5 +1,6 @@
 @using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject NavigationManager Navigation
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
@@ -10,7 +11,7 @@
                 <label for="flow-agent-reference">@T("CalledAgent")</label>
                 @if (SelectedAgent is { } selectedAgent)
                 {
-                    <a class="inspector-resource-link" href="@AgentUrl(selectedAgent)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenAgentInNewTab")"><UiIcon Name="external-link" />@T("OpenAgent")</a>
+                    <a class="inspector-resource-link" href="@PreserveNavigationContext(AgentUrl(selectedAgent), Navigation.Uri)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenAgentInNewTab")"><UiIcon Name="external-link" />@T("OpenAgent")</a>
                 }
             </div>
             <ClearableSelect TValue="string" id="flow-agent-reference" disabled="@ReadOnly" Value="@Convert.ToString(SelectionValue, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => UpdateAgentAsync.InvokeAsync(new ChangeEventArgs { Value = changed })">

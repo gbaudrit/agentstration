@@ -47,6 +47,19 @@ test('responsive transitions report focus context without changing section ident
   const e = environment(); e.media.matches = true; e.mediaListeners.get('change')!();
   assert.deepEqual(e.calls, [['BreakpointChanged', true, true]]); e.registration.dispose();
 });
+
+test('native hash pushes use guarded Blazor navigation before committing a history entry', () => {
+  const e = environment(); let prevented = 0;
+  const destination = 'https://example.test/agents/a?namespace=demo&context=%2Finstance#definition/tools';
+  const event = { hashChange: true, cancelable: true, navigationType: 'push', destination: { url: destination }, preventDefault: () => prevented++ };
+  e.entryListeners.get('navigate')!(event);
+  assert.equal(prevented, 1);
+  assert.deepEqual(e.calls, [['NavigateLocation', destination]]);
+  for (const change of [{ navigationType: 'traverse' }, { hashChange: false }, { cancelable: false }])
+    e.entryListeners.get('navigate')!({ ...event, ...change });
+  assert.equal(prevented, 1);
+  e.registration.dispose(); assert.equal(e.entryListeners.size, 0);
+});
 test('focus remembered before CSS hides the rail transfers to the mobile trigger', () => {
   const e = environment(); e.media.matches = true; e.documentListeners.get('focusin')!();
   e.rail.contains = () => false; e.media.matches = false; e.mediaListeners.get('change')!();
@@ -94,4 +107,17 @@ test('query identity matches ASP.NET key casing/grouping without changing coordi
     assert.equal(module.navigate(target, true), target);
     assert.equal(module.navigate(target.replace('scopeRef=Owner', 'scopeRef=owner'), false), target);
   }
+});
+
+const contextSource = await fs.readFile(path.join(repositoryRoot, 'src/Agentstration.Web.Components/wwwroot/context-selector.js'), 'utf8');
+const contextModule = await import(`data:text/javascript;base64,${Buffer.from(contextSource).toString('base64')}`);
+test('context normalization notifies Blazor while preserving fragment and application history state', () => {
+  const calls: unknown[][] = [];
+  Object.assign(globalThis, { window: { location: { href: 'https://example.test/agents/a?namespace=demo#definition/tools' },
+    Blazor: { navigateTo: (...args: unknown[]) => calls.push(args) } } });
+  contextModule.ensureContextUrl('/instance', 'draft-owner');
+  assert.deepEqual(calls, [['https://example.test/agents/a?namespace=demo&context=%2Finstance#definition/tools', { replaceHistoryEntry: true, historyEntryState: 'draft-owner' }]]);
+  window.location.href = 'https://example.test/agents/a?context=%2Finstance#yaml';
+  contextModule.ensureContextUrl('/instance', 'draft-owner');
+  assert.equal(calls.length, 1);
 });

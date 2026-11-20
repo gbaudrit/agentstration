@@ -288,4 +288,11 @@
   <data name="MaterializationDiagnostic.planning_resource_name_collision" xml:space="preserve"><value>Deux éléments du plan ciblent le même nom de ressource.</value></data>
   <data name="Issue.BindingStale.Title" xml:space="preserve"><value>Liaison à actualiser</value></data>
   <data name="Issue.BindingStale.Description" xml:space="preserve"><value>Un profil ou un Tool choisi a changé. Actualisez la proposition, puis relancez la vérification.</value></data>
+  <data name="RevisionLabel"><value>Révision</value></data>
+  <data name="Status.Unknown"><value>Inconnu</value></data>
+  <data name="PlanRevision" xml:space="preserve"><value>Révision du plan</value></data>
+  <data name="SchemaVersion" xml:space="preserve"><value>Schéma du contenu</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version plus récente du plan ou des affectations est disponible. La revue actuelle est conservée ; abandonnez-la pour charger les dernières valeurs enregistrées.</value></data>
+  <data name="Goal" xml:space="preserve"><value>Objectif</value></data>
+  <data name="ChangeSetsBounded" xml:space="preserve"><value>Cette vue charge au plus 200 propositions enregistrées récentes.</value></data>
 </root>

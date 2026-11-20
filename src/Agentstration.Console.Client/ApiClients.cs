@@ -20,6 +20,8 @@ namespace Agentstration.Web.Console;
 public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
+    Task<AgentSummaryPage> GetAgentsPageAsync(int skip, int take, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Agent collection paging.");
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         GetAgentsAsync(cancellationToken);
     Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken);
@@ -41,12 +43,15 @@ public interface IManagementApiClient
 public interface IAgentRunnerManagementClient
 {
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
     Task<ResourceSnapshot<AgentResource>> GetAgentAsync(ResourceNamespace @namespace, string name, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support exact scoped Agent lookup.");
 }
 
 public interface IRuntimeApiClient
 {
+    Task<ExecutionSummaryPage> GetExecutionsPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<IReadOnlyList<ExecutionSummary>> GetExecutionsAsync(CancellationToken cancellationToken);
     Task<RuntimeRun> CreateRunAsync(CreateRuntimeRunRequest request, CancellationToken cancellationToken);
     Task<RuntimeRun> GetRunAsync(string runId, CancellationToken cancellationToken);

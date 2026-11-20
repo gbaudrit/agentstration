@@ -1,0 +1,14 @@
+.agent-resource-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: var(--form-section-gap);
+}
+
+.agent-resource-summary ::deep .resource-overview-additional { display: grid; min-width: 0; gap: var(--form-section-gap); }
+.agent-resource-summary ::deep .resource-configuration-summary .data-grid { table-layout: fixed; min-width: 0; }
+.agent-resource-summary ::deep .resource-configuration-summary .data-grid th:first-child { width: 30%; }
+.agent-resource-summary ::deep .resource-configuration-summary .data-grid th:last-child { width: 70%; }
+.agent-resource-summary ::deep .configuration-key { overflow-wrap: anywhere; }
+.agent-resource-summary ::deep .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }
+.agent-resource-summary ::deep .form-actions > :is(a, button) { gap: var(--space-2); }

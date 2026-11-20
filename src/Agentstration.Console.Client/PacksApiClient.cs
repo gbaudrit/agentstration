@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
@@ -9,6 +10,8 @@ public interface IPacksClient
 {
     Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<InstalledPackResource>> GetPackAtScopeAsync(ResourceScopeRef scopeRef, string publisher, string name, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support exact scoped Pack inspection.");
     Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<PackProjectSourceDocument>>([]);
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
@@ -45,6 +48,12 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
     public async Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(Path(publisher, name), cancellationToken);
+        return await ReadInstalledAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<InstalledPackResource>> GetPackAtScopeAsync(ResourceScopeRef scopeRef, string publisher, string name, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync($"{Path(publisher, name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
     }
 

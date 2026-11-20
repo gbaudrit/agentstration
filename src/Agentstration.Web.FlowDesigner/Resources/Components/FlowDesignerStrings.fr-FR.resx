@@ -251,4 +251,5 @@
   <data name="DraftChangedDuringSave" xml:space="preserve">
     <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
   </data>
+  <data name="IdentityMismatch"><value>Le Flow reçu ne correspond pas à l’espace de noms, au propriétaire, au nom ou à la version publiée demandés.</value></data>
 </root>

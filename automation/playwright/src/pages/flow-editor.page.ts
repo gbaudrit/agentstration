@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
@@ -31,6 +32,7 @@ export class FlowEditorPage {
   }
 
   public async fillIdentity(flow: Pick<HandoffFlowDefinition, 'name' | 'displayName' | 'description' | 'version'>): Promise<void> {
+    await this.page.getByTestId(TestIds.flowEditor.orchestrationKind).click();
     await fillAndCommit(this.page.getByTestId(TestIds.flowEditor.name), flow.name);
     await fillAndCommit(this.page.getByTestId(TestIds.flowEditor.displayName), flow.displayName);
     await fillAndCommit(this.page.getByTestId(TestIds.flowEditor.version), flow.version);
@@ -39,7 +41,7 @@ export class FlowEditorPage {
 
   public async chooseOrchestration(): Promise<void> {
     await this.page.getByTestId(TestIds.flowEditor.orchestrationKind).click();
-    await this.page.getByTestId(TestIds.flowEditor.continue).click();
+    await this.page.getByTestId(TestIds.creationWizard.next).click();
     await this.configuration.waitFor({ state: 'visible' });
   }
 
@@ -99,12 +101,13 @@ export class FlowEditorPage {
   }
 
   public async create(name: string): Promise<void> {
+    await this.page.getByTestId(TestIds.creationWizard.next).click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/flows/${encodeURIComponent(name)}`
-        && url.searchParams.get('view') === 'definition'
         && url.searchParams.has('scopeRef')),
       this.page.getByTestId(TestIds.flowEditor.create).click(),
     ]);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.orchestrationEditor.waitFor({ state: 'visible' });
   }
 

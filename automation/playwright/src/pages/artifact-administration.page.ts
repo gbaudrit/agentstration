@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Page } from '@playwright/test';
 import type { ExpectedText } from '../locales/expected-text.js';
 import { TestIds } from '../contracts/test-ids.js';
@@ -50,6 +51,10 @@ export class ArtifactAdministrationPage {
     await this.openStagedContent();
     await this.page.getByTestId(TestIds.artifacts.stagedReadPreview).click();
     await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toHaveText(smallText);
+    await selectResourceSection(this.page, 'overview');
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page).toHaveURL(url => url.hash === '#content');
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toHaveText(smallText);
     await expect(this.page.getByTestId(TestIds.artifacts.stagedContentStatus)).toBeVisible();
     await this.assertDownload(consoleUrl, small, TestIds.artifacts.stagedDownload, smallText);
 
@@ -72,7 +77,8 @@ export class ArtifactAdministrationPage {
     const durableSource = await this.createStaged(consoleUrl, `durable-${suffix}.txt`, 'text/plain', durableText);
     const durable = await this.persist(consoleUrl, durableSource);
     await this.openDurable(consoleUrl, durable.artifactId);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     await expect(this.page.getByTestId(TestIds.artifacts.durableOpenMaterialized)).toBeVisible({ timeout: 90_000 });
     await expect(this.page.getByTestId(TestIds.artifacts.durableMaterializationHistory)).toBeVisible();
@@ -103,9 +109,10 @@ export class ArtifactAdministrationPage {
   /** Inspect the exact durable Artifact published in a Knowledge Snapshot. */
   public async exerciseSnapshotArtifact(consoleUrl: string, artifactId: string, text: ExpectedText['governedKnowledge']): Promise<void> {
     await expect(this.page.getByTestId(TestIds.artifacts.durableDetails)).toBeVisible();
-    await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:\\?|$)`));
+    await expect(this.page).toHaveURL(new RegExp(`/artifacts/durable/${artifactId}(?:[?#]|$)`));
     await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toHaveCount(0);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     const materialized = this.page.getByTestId(TestIds.artifacts.durableOpenMaterialized);
     await expect(materialized).toBeVisible({ timeout: 90_000 });
@@ -160,10 +167,10 @@ export class ArtifactAdministrationPage {
     await this.page.reload();
     await expect(remove).toBeEnabled();
     await remove.click();
-    await this.page.getByRole('dialog').getByRole('button', { name: text.cancel, exact: true }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: text.cancel, exact: true }).click();
     expect((await read()).sha256).toBe(original.sha256);
     await remove.click();
-    await this.page.getByRole('dialog').getByRole('button', { name: text.confirmDelete, exact: true }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: text.confirmDelete, exact: true }).click();
     await expect(this.page.getByTestId(TestIds.artifacts.list)).toBeVisible();
     const purged = await read();
     expect(purged.status).toBe(7); // StagedArtifactStatus.Purged
@@ -187,26 +194,13 @@ export class ArtifactAdministrationPage {
   }
 
   private async openStagedContent(): Promise<void> {
-    await this.selectTab(TestIds.artifacts.stagedContentTab, TestIds.artifacts.stagedContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContentPanel)).toBeVisible();
   }
 
   private async openStagedRetention(label: string): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.governedKnowledge.stagedRetentionTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
-      await expect(this.page.getByLabel(label, { exact: true })).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
-  }
-
-  private async selectTab(tabTestId: string, panelTestId: string): Promise<void> {
-    const tab = this.page.getByTestId(tabTestId);
-    const panel = this.page.getByTestId(panelTestId);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
-      await expect(panel).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'retention');
+    await expect(this.page.getByLabel(label, { exact: true })).toBeVisible();
   }
 
   private async createStaged(consoleUrl: string, fileName: string, mediaType: string, content: string): Promise<StagedArtifact> {
@@ -309,7 +303,8 @@ export class ArtifactAdministrationPage {
 
   private async assertMaterializationFailure(consoleUrl: string, artifactId: string, secrets: readonly string[]): Promise<void> {
     await this.openDurable(consoleUrl, artifactId);
-    await this.selectTab(TestIds.artifacts.durableContentTab, TestIds.artifacts.durableContentPanel);
+    await selectResourceSection(this.page, 'content');
+    await expect(this.page.getByTestId(TestIds.artifacts.durableContentPanel)).toBeVisible();
     await this.page.getByTestId(TestIds.artifacts.durableMaterialize).click();
     const alert = this.page.getByRole('alert');
     await expect(alert).toBeVisible({ timeout: 90_000 });

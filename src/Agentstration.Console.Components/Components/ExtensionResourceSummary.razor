@@ -1,0 +1,75 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="extension-resource-summary" data-testid="extension-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]" TestId="extension-quick-actions">@QuickActions</ResourceQuickActions> }
+    @OperationalContent
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@DisplayName" TechnicalName="@(Resource?.Name ?? Item?.ExtensionId ?? string.Empty)" Namespace="@Resource?.Namespace.Value"
+            ResourceUid="Resource?.Uid" Description="@Item?.Extension?.Extension?.Description" Labels="Resource?.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="extension-identity-summary">
+            <Scope>@if (Resource?.ScopeRef is { } owner) { <ResourceScopeBadge ScopeRef="owner" /> }</Scope>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="extension-configuration-summary">
+        <CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch">
+            <Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity>
+            <Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (setting.Href is { } href) { <a class="text-button" href="@href" target="_blank" rel="noopener noreferrer">@setting.Value</a> } else { @setting.Value }</span></CollectionValue></Information>
+        </CollectionView>
+    </FormSection>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Resource? Resource { get; set; }
+    [Parameter] public ExtensionInventoryItemResponse? Item { get; set; }
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? OperationalContent { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string DisplayName => Resource switch
+    {
+        ExtensionRegistrationResource registration => registration.Definition.DisplayName,
+        AepEnrollmentRequestResource enrollment => enrollment.Definition.ExtensionName,
+        _ => Item?.DisplayName ?? string.Empty
+    };
+    private string T(string key) => Localizer[key];
+    private sealed record SavedSetting(string Label, string Value, string? Href = null);
+    private IReadOnlyList<SavedSetting> SavedConfiguration
+    {
+        get
+        {
+            var registration = Resource as ExtensionRegistrationResource;
+            var endpoint = registration?.Definition.Endpoint ?? Item?.Endpoint;
+            var values = new List<SavedSetting>();
+            if (Item is { } item)
+            {
+                values.Add(new(T("ExtensionId"), item.ExtensionId));
+                values.Add(new(T("ObservedVersion"), item.Version ?? "—"));
+                values.Add(new(T("Availability"), T($"Status.{item.AvailabilityStatus}")));
+                values.Add(new(T("Enrollment"), item.EnrollmentStatus is { } state ? T($"EnrollmentStatus.{state}") : "—"));
+                if (item.AnnouncedAt is { } announced) values.Add(new(T("AnnouncedAt"), announced.LocalDateTime.ToString("g")));
+            }
+            if (endpoint is not null) values.Add(new(T("AepEndpoint"), endpoint.AbsoluteUri, endpoint.AbsoluteUri));
+            if (registration is { } saved)
+            {
+                values.Add(new(T("Origin"), T($"Source.{JsonNamingPolicy.CamelCase.ConvertName(saved.Definition.Source.ToString())}")));
+                values.Add(new(T("Discovery"), T(saved.Definition.Enabled ? "Enabled" : "Disabled")));
+                values.Add(new(T("Registration"), $"{saved.Namespace}/{saved.Name}"));
+                values.Add(new(T("ExpectedExtensionId"), saved.Definition.ExpectedExtensionId ?? "—"));
+                values.Add(new(T("AuthenticationMode"), T($"Authentication.{saved.Definition.AuthenticationMode}")));
+                if (saved.Definition.Credential is { } credential)
+                    values.Add(new(T("CredentialName"), $"{credential.ScopeRef?.Value ?? saved.ScopeRef?.Value}/{credential.Namespace ?? saved.Namespace}/{credential.Name}"));
+            }
+            else if (Item is { } observed)
+            {
+                values.Add(new(T("Origin"), T($"Source.{observed.RegistrationSource}")));
+                values.Add(new(T("Discovery"), T(observed.RegistrationEnabled ? "Enabled" : "Disabled")));
+            }
+            return values;
+        }
+    }
+}

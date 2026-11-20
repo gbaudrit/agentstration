@@ -1,0 +1,76 @@
+{
+  "capturedAt": "2026-11-19",
+  "productCommit": "f592c6f2570d1ffb3b86b20f77aaf6648adec240",
+  "implementationCommit": "cdffbc03",
+  "origin": "Real standalone application. Temporary local probes reuse existing page objects; no generated images. Assemblies remained fixed throughout the campaign.",
+  "verified": "Creation review using the original standard fields, plus the maintained create-and-deploy regression with saved overview, save/discard, content-column actions and desktop/mobile bounds.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "consoleComponentSuiteAtProductCommit": {
+      "passed": 776,
+      "failed": 0
+    },
+    "maintainedBrowserRegressions": {
+      "passed": 2,
+      "failed": 0,
+      "specifications": [
+        "tests/create-agent.spec.ts"
+      ]
+    },
+    "focusedMobileReviewCapture": {
+      "passed": 1,
+      "failed": 0,
+      "preparation": "Wait for the real review-pane focus before scrolling to the top. The heading is asserted in the viewport. An earlier generic scroll preparation raced pending focus and was replaced by this focused capture."
+    }
+  },
+  "limits": "These captures cover desktop English dark and touch-capable mobile French light. They do not certify every owner/name combination, all keyboard paths, the complete smoke suite or final Fast/Integration lanes. No GitHub CI run is claimed.",
+  "captures": [
+    {
+      "file": "agent-overview-desktop-en.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "agent-overview-mobile-fr.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    },
+    {
+      "file": "agent-review-desktop-en.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "agent-review-mobile-fr.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    }
+  ]
+}

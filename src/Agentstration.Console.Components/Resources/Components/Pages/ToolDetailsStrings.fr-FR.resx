@@ -88,4 +88,8 @@
   <data name="AcquisitionTargetStale" xml:space="preserve"><value>Une nouvelle découverte est disponible. Ouvre la source, réconcilie la cible dans Découverte, puis relance le Tool. Si l’opération a changé, lance une nouvelle acquisition et crée un Tool à partir de celle-ci.</value></data>
   <data name="NewDefinition" xml:space="preserve"><value>Nouvelle définition</value></data>
   <data name="DataSourceQueryFailed" xml:space="preserve"><value>La requête de Data Source a échoué. Vérifiez sa version publiée, ses arguments, son contrat et les accès.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La réponse ne correspond pas à l’identité de la ressource demandée.</value></data>
+  <data name="InspectionOnly"><value>Cet écran présente la définition du catalogue. L’activation se contrôle dans le bandeau ; l’exécution et les accès conservent leurs propres droits.</value></data>
+  <data name="InputContractChanged"><value>Le contrat enregistré de l’outil a changé. Vos paramètres sont conservés. Réinitialisez-les explicitement pour utiliser le nouveau contrat avant l’exécution.</value></data>
+  <data name="ResetRunInput"><value>Réinitialiser les paramètres</value></data>
 </root>

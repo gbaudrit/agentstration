@@ -170,4 +170,17 @@
 <data name="Structure.CreateFailed"><value>Creation failed. Refresh the structure before trying again.</value></data>
 <data name="OpenTenant.Named"><value>Open Tenant {0}</value></data>
 <data name="OpenWorkspace.Named"><value>Open Workspace {0}</value></data>
-<data name="ToggleTenant" xml:space="preserve"><value>Expand or collapse tenant: {0}</value></data></root>
+<data name="ToggleTenant" xml:space="preserve"><value>Expand or collapse tenant: {0}</value></data><data name="Member.NotFound" xml:space="preserve"><value>The member is not available in this organization.</value></data>
+<data name="Member.LoadFailed" xml:space="preserve"><value>Unable to load member access.</value></data>
+<data name="Member.Refresh" xml:space="preserve"><value>Refresh</value></data>
+<data name="PrincipalKind.Human" xml:space="preserve"><value>Person</value></data>
+<data name="PrincipalKind.Workload" xml:space="preserve"><value>Workload</value></data>
+  <data name="SecurityAudit.SnapshotHelp"><value>Shows the latest available security events (up to 200). Older events are not included.</value></data>
+  <data name="AuditAction.Unknown"><value>Recorded action</value></data>
+  <data name="AuditOutcome.Unknown"><value>Unknown</value></data>
+  <data name="Access.EmptyTitle"><value>No role assignments</value></data>
+  <data name="Access.EmptyMessage"><value>Role assignments appear here when organization members receive access.</value></data>
+  <data name="Member.RefreshDraftConflict" xml:space="preserve"><value>Updated member access is available. Your pending role and authentication inputs are retained until you discard them.</value></data>
+  <data name="Member.Value" xml:space="preserve"><value>Value</value></data>
+  <data name="Member.OperationUnconfirmed" xml:space="preserve"><value>Could not confirm the member access change. Your pending inputs are retained. Refresh to inspect the saved state before retrying.</value></data>
+</root>

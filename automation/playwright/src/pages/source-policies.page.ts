@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { SourcePolicyFixtures, type SourcePolicyFixture } from '../fixtures/source-policies.js';
@@ -41,7 +42,7 @@ export class SourcePoliciesPage {
     const first = await this.project(base, knowledge, fixtures);
     expect(first.inputs[0].directInput).toBeTruthy();
     expect(first.inputs[1].storageInput).toBeTruthy();
-    await this.page.goto(`${base}/data-sources/${direct}?context=%2Finstance&scopeRef=%2Finstance&view=acquisitions`);
+    await this.page.goto(`${base}/data-sources/${direct}?context=%2Finstance&scopeRef=%2Finstance#acquisitions`);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.directResult).first()).toContainText(text.direct);
     await control.change({ advanceSeconds: 21 * 60 });
     expect((await fixtures.api('POST', `/api/knowledgesources/${knowledge}/content/status?scopeRef=%2Finstance`, {})).value.preparationRequired).toBe(true);
@@ -92,7 +93,11 @@ export class SourcePoliciesPage {
     await control.change({ advanceSeconds: 3601, reconcile: true });
     const retired = (await fixtures.api('GET', `/api/knowledgesources/${knowledge}/snapshots?scopeRef=%2Finstance`)).value;
     expect(String(retired.find((view: any) => view.snapshot.metadata.name === first.snapshotName).lifecycleState)).toMatch(/retired|3/i);
-    await this.page.goto(`${base}/knowledge-sources/${knowledge}?context=%2Finstance&view=snapshots`);
+    await this.page.goto(`${base}/knowledge-sources/${knowledge}?context=%2Finstance#snapshots`);
+    await selectResourceSection(this.page, "snapshots");
+    await this.page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await selectResourceSection(this.page, 'snapshots');
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshots)).toContainText(text.retired);
     await this.assertResponsive();
     await control.change({});
@@ -102,7 +107,7 @@ export class SourcePoliciesPage {
     await this.page.goto(`${base}/data-sources/new?composition=dataset&context=%2Finstance`);
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     const text = SourcePolicyTextByLocale[locale];
-    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
     await this.wizardSelect('review');
     for (const step of ['identity', 'acquisition', 'storage']) {
       await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
@@ -223,13 +228,17 @@ export class SourcePoliciesPage {
     expect(response.status()).toBe(404);
   }
 
-  public async openDataset(base: string, name: string): Promise<void> {
-    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance&view=definition`);
-    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+  public async openDataset(base: string, name: string, section = 'definition/configuration'): Promise<void> {
+    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance#${section}`);
+    await selectResourceSection(this.page, section);
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
+    await expect(this.page.locator(`[data-definition-section="${section}"]`)).toBeVisible();
   }
   public async openKnowledge(base: string, name: string): Promise<void> {
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=definition`);
-    await expect(this.definition).toHaveAttribute('data-interactive', 'true');
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#definition/configuration`);
+    await selectResourceSection(this.page, "definition/configuration");
+    await expect(this.definition).toBeEnabled();
+    await expect(this.page.locator('[data-definition-section="definition/configuration"]')).toBeVisible();
   }
   public async saveDataset(base: string, name: string, fixtures: SourcePolicyFixtures): Promise<void> {
     const before = (await fixtures.api('GET', `/api/datasources/${name}?scopeRef=%2Finstance`)).value.generation;
@@ -247,7 +256,8 @@ export class SourcePoliciesPage {
   public async project(base: string, name: string, fixtures: SourcePolicyFixtures, failed = false): Promise<any> {
     const path = `/api/knowledgesources/${name}/projections?scopeRef=%2Finstance`;
     const prior = (await fixtures.api('GET', path)).value.map((value: any) => value.metadata.name);
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=projections`);
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#projections`);
+    await selectResourceSection(this.page, "projections");
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceStartProjection).click();
     let selected: any;
@@ -256,7 +266,7 @@ export class SourcePoliciesPage {
       return Boolean(selected);
     }, { timeout: 90_000 }).toBe(true);
     expect(Boolean(selected.snapshotName), JSON.stringify(selected)).toBe(!failed);
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=projections`);
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#projections`);
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toContainText(selected.metadata.name.slice(0, 20));
     return selected;
   }

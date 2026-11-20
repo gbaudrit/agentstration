@@ -5,177 +5,55 @@
 @inject IConnectedServicesClient ConnectedServices
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
-@inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> StorageLocalizer
 
 <PageTitle>@(source?.Definition.DisplayName ?? T("CreateSource")) · Agentstration</PageTitle>
-<PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@(source?.Definition.Description ?? T("DatasetHelp"))" TestId="data-source-dataset-editor">
-    <Actions>
-        @if (source is not null && !loading && activeTab != DatasetTab.Definition)
-        {
-            <button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !interactive || readiness?.CanAcquire != true)" @onclick="StartAsync"><UiIcon Name="play-circle" />@T("StartAcquisition")</button>
-            @if (CanManage) { <button class="button-secondary" type="button" @onclick="() => SelectTab(DatasetTab.Definition)">@T("DatasetEdit")</button> }
-        }
-        <a class="button-secondary" href="/data-sources">@T("Back")</a>
-    </Actions>
-</PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else
-{
-    @if (error is not null)
-    {
-        <div class="form-alert form-alert-danger" role="alert">@error
+@{
+    var presentations = Presentations;
+    RenderFragment feedback = @<div>
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error
             @if (errorCode is not null) { <code data-testid="dataset-error-code">@errorCode</code> }
             @if (compositionErrorCode is not null) { <small>@T("CompositionValidationReason") <code data-testid="dataset-composition-error-code">@compositionErrorCode</code></small> }
             @if (errorId is not null) { <small>@T("DatasetErrorReference") <code>@errorId</code></small> }
-        </div>
-    }
-    @if (source is not null && scope is { } owner)
+        </div> }
+        @if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("SourceRefreshDraftConflict")</div> }
+    </div>;
+    RenderFragment form = @<ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="data-source-dataset-definition" FormName="data-source-dataset-definition"
+        SectionState="@(IsNew ? null : sectionState)" Sections="presentations" SectionContent="@(IsNew ? null : DefinitionContent)" SectionRequested="ShowSection" OnValidSubmit="SubmitDefinitionAsync" OnInvalidSubmit="InvalidDefinitionAsync"
+        Busy="busy" ReadOnly="@(!CanManage || !interactive)" FieldsTestId="dataset-definition-fields" data-definition-complete="@CanSave.ToString().ToLowerInvariant()" InvalidInputChanged="value => invalidInput = value" @oninput="MarkDirty" @onchange="MarkDirty">
+        <ChildContent>@if (IsNew) {
+            <div class="dataset-creation-options"><a class="text-button" href="/data-sources/new">@T("DatasetLegacyProfile")</a></div>
+            <CreationWizard @ref="creationWizard" Steps="CreationSteps" OnStepChanging="ClearStepError" OnFinish="CreateFromReviewAsync" OnStepReady="CreationStepReady"
+                Busy="busy" Disabled="@(!CanManage || !interactive)" FinishLabel="@T("WizardCreate")" FinishTestId="data-source-save" TestId="data-source-creation-wizard" />
+        }</ChildContent>
+    </ResourceDefinitionForm>;
+    if (IsNew)
     {
-        <InheritedResourceNotice OwnerScopeRef="owner" />
-        <div class="dataset-identity"><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><code>@source.Namespace/@source.Name</code><ResourceScopeBadge ScopeRef="source.ScopeRef" /><small>@T("Generation") @source.Generation</small></div>
-        <ResourceTabs Label="@T("DatasetSections")">
-            <div class="dataset-tab-list" role="tablist" aria-label="@T("DatasetSections")">
-                @foreach (var tab in AvailableTabs)
-                {
-                    <button @ref="tabButtons[(int)tab]" id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="@PanelId(tab)" tabindex="@(activeTab == tab ? 0 : -1)" class="@(activeTab == tab ? "active" : null)" data-testid="@($"dataset-{tab.ToString().ToLowerInvariant()}-tab")" @onclick="() => SelectTab(tab)" @onkeydown="args => HandleTabKeyAsync(args, tab)">@T(tab == DatasetTab.Content ? "DatasetContentTab" : tab.ToString())</button>
-                }
-            </div>
-        </ResourceTabs>
-        @if (activeTab == DatasetTab.Overview)
-        {
-            <div id="@PanelId(DatasetTab.Overview)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Overview)">
-                <section class="panel dataset-composition" aria-label="@T("DatasetComposition")">
-                    <div><span>@T("DatasetService")</span>@if (SavedService is { } service) { <a href="@ServiceDiscoveryUrl(service)">@service.Definition.DisplayName</a> } else { <strong>@T("DatasetPinnedUnavailable")</strong> }</div>
-                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
-                    <div><span>@T("DatasetOperation")</span><strong>@SavedOperationLabel</strong><small>@T("Generation") @source.Definition.Dataset!.Acquisition.Operation.Generation</small></div>
-                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
-                    <div><span>@T("DatasetDataSource")</span><strong>@source.Definition.DisplayName</strong></div>
-                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
-                    <div><span>@T("DatasetStorage")</span><strong>@SavedStorageLabel</strong></div>
-                </section>
-                <div class="dataset-summary-grid">
-                    <section class="panel form-section" data-testid="dataset-latest-acquisition">
-                        <h2>@T("LastAcquisition")</h2>
-                        @if (LatestAcquisition is { } latest)
-                        {
-                            <StatusBadge Text="@T($"AcquisitionState.{latest.State}")" Status="@AcquisitionTone(latest.State)" />
-                            <p>@latest.CreatedAt.ToLocalTime().ToString("g")</p>
-                            @if (latest.DirectResult is not null) { <p>@T("DirectResult")</p> }
-                            @if (latest.Content is { } content) { <p class="dataset-content-size">@Localizer["DatasetBytes", content.Length] · JSON</p> }
-                            <div class="form-actions">
-                                @if (latest.Content is not null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="() => ReadAsync(latest)">@T("DatasetReadContent")</button> }
-                                <a class="text-button" href="@FlowUrl(latest)">@T("DatasetViewFlowRun") <span aria-hidden="true">↗</span></a>
-                            </div>
-                        }
-                        else { <p class="muted">@T("NoAcquisitions")</p> }
-                    </section>
-                    <section class="panel form-section" data-testid="dataset-saved-configuration">
-                        <h2>@T("DatasetSavedConfiguration")</h2>
-                        <dl class="dataset-details"><dt>@T("DatasetService")</dt><dd>@(SavedService?.Definition.DisplayName ?? T("DatasetPinnedUnavailable"))</dd><dt>@T("DatasetOperation")</dt><dd>@SavedOperationLabel</dd><dt>@T("DatasetStorage")</dt><dd>@SavedStorageLabel</dd><dt>@T("DatasetPrefix")</dt><dd><code>@(string.IsNullOrEmpty(source.Definition.Dataset!.Rule.Prefix) ? "—" : source.Definition.Dataset.Rule.Prefix)</code></dd></dl>
-                        <StatusBadge Text="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" />
-                    </section>
-                </div>
-            </div>
-        }
+        <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+        <PageHeader CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Title="@T("CreateSource")" Description="@T("DatasetHelp")" TestId="data-source-dataset-editor"></PageHeader>
+        @feedback
+        @if (loading) { <LoadingState Message="@T("Loading")" /> } else { @form }
     }
-    <div id="@PanelId(DatasetTab.Definition)" role="@(source is null ? null : "tabpanel")" aria-labelledby="@(source is null ? null : TabId(DatasetTab.Definition))" hidden="@(source is not null && activeTab != DatasetTab.Definition)">
-        <EditForm @ref="definitionForm" Model="this" OnSubmit="SubmitDefinitionAsync" novalidate="@IsNew" FormName="data-source-dataset-definition" id="data-source-dataset-definition">
-            <fieldset class="resource-definition-fields" disabled="@(busy || !CanManage || !interactive)" data-testid="dataset-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-                @if (IsNew)
-                {
-                    <div class="dataset-creation-options"><a class="text-button" href="/data-sources/new">@T("DatasetLegacyProfile")</a></div>
-                    <CreationWizard @ref="creationWizard" Steps="CreationSteps" OnStepChanging="ClearStepError" OnFinish="CreateFromReviewAsync"
-                        Busy="busy" Disabled="@(!CanManage || !interactive)" FinishLabel="@T("WizardCreate")"
-                        FinishTestId="data-source-save" TestId="data-source-creation-wizard" />
-                }
-                else
-                {
-                <div class="dataset-form-toolbar"><h2>@T("Definition")</h2><div class="form-actions">
-                    <button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !CanSave)">@T("Save")</button>
-                    @if (source is not null) { <button class="button-secondary" type="button" @onclick="CancelDefinitionAsync">@T("DatasetCancel")</button> }
-                    else { <a class="button-secondary" href="/data-sources/new">@T("DatasetLegacyProfile")</a> }
-                </div></div>
+    else
+    {
+        <ConsoleResourceDetailsTemplate CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
+            Name="@(source?.Definition.DisplayName ?? Name!)" ResourceType="@T("DatasetDataSource")" Domain="data" IconName="database" Description="@source?.Definition.Description"
+            ResourceIdentity="@($"{loadedKey}|{source?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="BusinessSections"
+            LoadState="loadState" OnRetry="LoadInitialAsync" OnRefresh="RefreshAsync" Feedback="feedback" HasDraft="HasDraft"
+            DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)" Busy="@(busy || resourceRefreshing)"
+            Yaml="@ResourceYaml" YamlReadOnly="true" YamlTitle="@T("DataSourceYaml")" YamlDescription="@T("DatasetYamlHelp")" YamlInputTestId="dataset-yaml"
+            Enabled="@(source is null ? null : model.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanManage || busy || resourceRefreshing)" EnabledTestId="dataset-enabled"
+            SectionTestIdPrefix="dataset" TestId="data-source-dataset-editor">
+            <PrimaryActions>@if (source is not null) { <button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || resourceRefreshing || !interactive || readiness?.CanAcquire != true)" @onclick="StartAsync"><UiIcon Name="play-circle" />@T("StartAcquisition")</button> }</PrimaryActions>
 
-                    @IdentityContent
-                    <div class="dataset-definition-grid">@AcquisitionContent @StorageDestinationContent</div>
-                    @StoragePolicyContent
-                    @ContractsContent
-                    @TreatmentsContent
-                }
-            </fieldset>
-        </EditForm>
-    </div>
-    @if (source is not null)
-    {
-        @if (activeTab is DatasetTab.Overview or DatasetTab.Acquisitions)
-        {
-            <section class="panel form-section" id="@PanelId(DatasetTab.Acquisitions)" role="@(activeTab == DatasetTab.Acquisitions ? "tabpanel" : null)" aria-labelledby="@(activeTab == DatasetTab.Acquisitions ? TabId(DatasetTab.Acquisitions) : null)" data-testid="dataset-acquisitions">
-                <div class="panel-header"><div><h2>@T(activeTab == DatasetTab.Overview ? "DatasetRecentAcquisitions" : "AcquisitionHistory")</h2><p>@T("DatasetFixedCallHelp")</p></div><div class="form-actions">
-                    @if (activeTab == DatasetTab.Overview) { <button class="text-button" type="button" @onclick="() => SelectTab(DatasetTab.Acquisitions)">@T("DatasetAllHistory") <span aria-hidden="true">→</span></button> }
-                    <button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Refresh")</button>
-                </div></div>
-                @if (readiness?.Ready == false) { <p class="form-alert" role="status">@T("DatasetNotReady")</p> }
-                @if (readiness is { Ready: true, CanAcquire: false }) { <p role="status">@T("DatasetAcquisitionNotAuthorized")</p> }
-                @if (history.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> }
-                else
-                {
-                    <CollectionView TItem="DataSourceAcquisitionResource" Items="VisibleHistory" Compact RowTestId="data-source-acquisition-row" ItemAttributes="AcquisitionAttributes" IdentityLabel="@T("Created")" InformationLabels="@(new[] { T("DatasetContent"), T("FlowRun") })">
-                        <Identity Context="item"><CollectionIdentity DisplayName="@item.CreatedAt.ToLocalTime().ToString("g")" Name="@item.Name" IconName="download">
-                            <IconBadges><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges>
-                        </CollectionIdentity></Identity>
-                        <Information Context="item">
-                            <CollectionValue Label="@T("DatasetContent")">
-                                @if (item.DirectResult is { } directResult) { <span data-testid="dataset-direct-result">@T("DirectResult") · @Localizer["DatasetBytes", directResult.Length]</span><small>@T("DirectResultHelp")</small> }
-                                @if (item.ContentRetiredAt is not null) { <span data-testid="dataset-content-retired">@T("ContentRetired")</span> }
-                                else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
-                                @if (item.Content is not null && item.ContentRetiredAt is null) { <small>@Localizer["DatasetBytes", item.Content.Length]</small> }
-                                @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
-                                @if (item.ErrorCode is not null) { <span role="status">@FailureMessage(item.ErrorCode) <code>@item.ErrorCode</code>
-                                    @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
-                                </span> }
-                            </CollectionValue>
-                            <CollectionValue Label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></CollectionValue>
-                        </Information>
-                        <Actions Context="item">@if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button> }</Actions>
-                    </CollectionView>
-                }
-            </section>
-        }
-        else if (activeTab == DatasetTab.Content)
-        {
-            <section class="panel form-section" id="@PanelId(DatasetTab.Content)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Content)">
-                <div class="panel-header"><div><h2>@T("DatasetContent")</h2><p>@T("DatasetContentUntrusted")</p></div><button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Refresh")</button></div>
-                @if (!ContentAcquisitions.Any()) { <p class="muted">@T("DatasetNoContent")</p> }
-                else
-                {
-                    <FormField Label="@T("DatasetContentAcquisition")" Class="dataset-content-picker"><ClearableSelect TValue="string" Value="@contentAcquisitionKey" ValueExpression="@(() => contentAcquisitionKey)" ValueChanged="value => ChangeContentAcquisitionAsync(new ChangeEventArgs { Value = value })" Disabled="@(busy || !interactive)"><option value="">@T("Select")</option>@foreach (var item in ContentAcquisitions) { <option value="@item.Uid">@item.CreatedAt.ToLocalTime().ToString("g") · @item.Name</option> }</ClearableSelect></FormField>
-                }
-                @if (SelectedContentAcquisition is { Publication.Document: not null, ContentRetiredAt: null } selectedDocuments)
-                {
-                    <DataSourceAcquisitionDocuments @key="selectedDocuments.Uid" Acquisition="selectedDocuments" QuerySaved="() => SelectTab(DatasetTab.Queries)" />
-                }
-                @if (preview is not null)
-                {
-                    <div data-testid="dataset-content"><h3>@T("DatasetContent")</h3><pre class="runner-json">@preview</pre>@if (previewTruncated) { <p>@T("DatasetContentTruncated")</p> }<button class="button-secondary" type="button" @onclick="CloseContent">@T("DatasetCloseContent")</button></div>
-                }
-            </section>
-        }
-        else if (activeTab is DatasetTab.Queries or DatasetTab.Tools)
-        {
-            <section class="panel form-section" id="@PanelId(activeTab)" role="tabpanel" aria-labelledby="@TabId(activeTab)">
-                <DataSourceQueries @key="source.Uid" Source="source" ShowTools="@(activeTab == DatasetTab.Tools)" Acquisitions="history" />
-            </section>
-        }
-        else if (activeTab == DatasetTab.Access && CanManage && scope is { } accessScope)
-        {
-            <section class="panel form-section" id="@PanelId(DatasetTab.Access)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Access)"><h2>@T("Access")</h2><ResourceAccessPanel OwnerScopeRef="accessScope" Namespace="source.Namespace" Kind="@DataSourceResourceKinds.DataSource" Name="@source.Name" Generation="source.Generation" Governance="source.Governance" /></section>
-        }
-        else if (activeTab == DatasetTab.Yaml)
-        {
-            <section class="panel form-section" id="@PanelId(DatasetTab.Yaml)" role="tabpanel" aria-labelledby="@TabId(DatasetTab.Yaml)"><h2>@T("DataSourceYaml")</h2><p>@T("DatasetYamlHelp")</p><FormField Label="@T("DataSourceYaml")"><ClearableText Multiline class="form-code-editor runner-json" rows="24" ReadOnly aria-label="@T("DataSourceYaml")" data-testid="dataset-yaml" Value="@ResourceYaml" /></FormField></section>
-        }
+            <OverviewMetrics><MetricCard Label="@T("Generation")" Value="@source?.Generation.ToString()" /><MetricCard Label="@T("State")" Value="@(readiness is null ? "—" : T(readiness.Ready ? "Ready" : "NotReady"))" Status="@(readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning)" /></OverviewMetrics>
+            <OverviewConfiguration><CollectionView TItem="DatasetSetting" Items="SavedSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+            <OverviewContent>@OverviewContent</OverviewContent>
+            <DefinitionContent Context="path">@form</DefinitionContent>
+            <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "content") { @ContentView } else if (source is not null) { <FormSection Title="@T(path == "tools" ? "Tools" : "Queries")"><DataSourceQueries @key="source.Uid" Source="source" ShowTools="@(path == "tools")" Acquisitions="history" /></FormSection> }</AdditionalContent>
+            <DraftActions><button class="text-button" type="button" disabled="@(busy || resourceRefreshing)" @onclick="CancelDefinitionAsync">@T("SourceDiscard")</button><button class="button-primary" type="submit" form="data-source-dataset-definition" data-testid="data-source-save" disabled="@(busy || resourceRefreshing)">@T("Save")</button></DraftActions>
+        </ConsoleResourceDetailsTemplate>
     }
 }
 
@@ -183,25 +61,21 @@ else
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? Namespace { get; set; }
     [Parameter] public string? ScopeRef { get; set; }
-    [Parameter] public string? View { get; set; }
+
     private readonly CancellationTokenSource cancellation = new();
     private DataSourceResource? source;
     private DataSourceReadiness? readiness;
     private ResourceScopeRef? scope;
-    private string technicalName = "", displayName = "", resourceNamespace = "default", description = "", prefix = "", storageKey = "", operationKey = "", serviceKey = "";
     private string? etag, error, preview, errorCode, errorId, compositionErrorCode;
     private string savedServiceKey = "";
-    private bool loading = true, busy, enabled = true, parametersValid = true, previewTruncated;
+    private bool loading = true, busy, parametersValid = true, previewTruncated;
     private bool interactive;
-    private DatasetTab activeTab = DatasetTab.Overview;
-    private DatasetTab? focusAfterRender;
-    private readonly ElementReference[] tabButtons = new ElementReference[8];
+    private DatasetTab activeTab => sectionState.CurrentPath.StartsWith("definition/", StringComparison.Ordinal) ? DatasetTab.Definition
+        : Enum.TryParse<DatasetTab>(sectionState.CurrentPath, true, out var tab) ? tab : DatasetTab.Overview;
+
     private ConnectedServiceOperationResource? savedOperation;
     private string contentAcquisitionKey = "";
     private enum DatasetTab { Overview, Definition, Acquisitions, Content, Queries, Tools, Access, Yaml }
-    private IEnumerable<DatasetTab> AvailableTabs => Enum.GetValues<DatasetTab>().Where(tab =>
-        (tab != DatasetTab.Access || CanManage) && (tab is not (DatasetTab.Queries or DatasetTab.Tools)
-            || source?.Definition.Dataset?.DocumentCollectionUid is not null));
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
     private static IReadOnlyDictionary<string, object> AcquisitionAttributes(DataSourceAcquisitionResource item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() };
     private IReadOnlyList<DataSourceAcquisitionResource> VisibleHistory => (activeTab == DatasetTab.Overview ? OrderedHistory.Take(3) : OrderedHistory).ToArray();
@@ -219,25 +93,14 @@ else
         ?? source?.Definition.Dataset?.Storage?.Storage.ToString() ?? "—";
     private string ResourceYaml => source is null ? "" : ResourceManifestSerializer.ToYaml(new RawSource(source.ApiVersion, source.Kind, source.Metadata, source.ScopeRef, source.Definition));
     private sealed record RawSource(string ApiVersion, string Kind, ResourceMetadata Metadata, ResourceScopeRef? ScopeRef, DataSourceProperties Definition);
-    private static string TabId(DatasetTab tab) => $"dataset-tab-{tab.ToString().ToLowerInvariant()}";
-    private static string PanelId(DatasetTab tab) => $"dataset-panel-{tab.ToString().ToLowerInvariant()}";
-    private void SelectTab(DatasetTab tab) { if (AvailableTabs.Contains(tab)) activeTab = tab; }
-    private async Task HandleTabKeyAsync(KeyboardEventArgs args, DatasetTab tab)
-    {
-        var tabs = AvailableTabs.ToArray();
-        var index = Array.IndexOf(tabs, tab);
-        var next = args.Key switch { "ArrowRight" => (index + 1) % tabs.Length, "ArrowLeft" => (index + tabs.Length - 1) % tabs.Length, "Home" => 0, "End" => tabs.Length - 1, _ => -1 };
-        if (next < 0) return;
-        SelectTab(tabs[next]);
-        await FocusTabAsync(tabs[next]);
-    }
-    private ValueTask FocusTabAsync(DatasetTab tab) => JavaScript.InvokeVoidAsync("agentstrationDataSources.focusTab", tabButtons[(int)tab]);
+    private void SelectTab(DatasetTab tab) => ShowSection(tab == DatasetTab.Definition ? "definition/identity" : tab.ToString().ToLowerInvariant());
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
     private static UiStatus AcquisitionTone(DataSourceAcquisitionState state) => state switch
     { DataSourceAcquisitionState.Succeeded => UiStatus.Success, DataSourceAcquisitionState.Failed or DataSourceAcquisitionState.Cancelled or DataSourceAcquisitionState.TimedOut => UiStatus.Warning, _ => UiStatus.Info };
-    private async Task CancelDefinitionAsync()
+    private Task CancelDefinitionAsync()
     {
-        await OnParametersSetAsync();
-        if (error is null) activeTab = DatasetTab.Overview;
+        if (source is not null && !busy && !resourceRefreshing) ApplySnapshot(newerSnapshot ?? new(source, etag!));
+        return Task.CompletedTask;
     }
     private async Task ChangeContentAcquisitionAsync(ChangeEventArgs args)
     {
@@ -245,32 +108,30 @@ else
         if (item is null) CloseContent(); else await ReadAsync(item);
     }
     private void CloseContent() { preview = null; contentAcquisitionKey = ""; }
-    private JsonElement parameters = JsonSerializer.SerializeToElement(new { });
     private IReadOnlyList<StorageResource> storages = [];
     private IReadOnlyList<StorageTypeResource> storageTypes = [];
-    private Guid documentCollectionUid;
-    private StorageResource? SelectedStorage => storages.FirstOrDefault(s => StorageKey(s) == storageKey);
+    private StorageResource? SelectedStorage => storages.FirstOrDefault(s => StorageKey(s) == model.StorageKey);
     private bool RequiresDocumentCollection => SelectedStorage?.Definition.Type is { } type && storageTypes
         .FirstOrDefault(t => t.Uid == type.TypeUid)?.Definition.Versions.FirstOrDefault(v => v.Version == type.Version)
         is { Documents: not null } version && (!version.Capabilities.List || !version.Capabilities.Read || !version.Capabilities.Write);
     private static bool CompatibleDocumentCollection(StorageDocumentCollection c) => c.Enabled && c.Policy.Get && c.Policy.Query && c.Policy.Publish;
     private bool DocumentCollectionValid => SelectedStorage is null && source?.Definition.Dataset?.DocumentCollectionUid is { } savedCollection
-        && documentCollectionUid == savedCollection || (documentCollectionUid == Guid.Empty ? !RequiresDocumentCollection
-        : SelectedStorage?.Definition.Collections.Any(c => c.Uid == documentCollectionUid && CompatibleDocumentCollection(c)) == true);
+        && model.DocumentCollectionUid == savedCollection || (model.DocumentCollectionUid == Guid.Empty ? !RequiresDocumentCollection
+        : SelectedStorage?.Definition.Collections.Any(c => c.Uid == model.DocumentCollectionUid && CompatibleDocumentCollection(c)) == true);
     private IReadOnlyList<ConnectedServiceOperationResource> operations = [];
     private IReadOnlyList<ConnectedServiceResource> connectedServices = [];
     private IReadOnlyList<ConnectedServiceOperationTypeResource> operationTypes = [];
     private IReadOnlyList<DataSourceAcquisitionResource> history = [];
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private bool CanManage => Services.GetService<ConsoleContextState>()?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true
-        && (IsNew || scope is { } owner && ResourceOwnershipContext.CanManage(owner, Services));
-    private ConnectedServiceResource? SelectedService => connectedServices.FirstOrDefault(item => item.Uid.ToString() == serviceKey);
+        && (IsNew || source is { Governance.IsManaged: false } && scope is { } owner && ResourceOwnershipContext.CanManage(owner, Services));
+    private ConnectedServiceResource? SelectedService => connectedServices.FirstOrDefault(item => item.Uid.ToString() == model.ServiceKey);
     private IEnumerable<ConnectedServiceOperationResource> ServiceOperations => operations.Where(item => SelectedService is { } service
         && item.Definition.Service.ServiceUid == service.Uid && item.Definition.Service.Service.ScopeRef == service.ScopeRef
         && item.Definition.Service.Service.Address == service.Address);
-    private ConnectedServiceOperationResource? SelectedOperation => ServiceOperations.FirstOrDefault(item => OperationKey(item) == operationKey);
+    private ConnectedServiceOperationResource? SelectedOperation => ServiceOperations.FirstOrDefault(item => OperationKey(item) == model.OperationKey);
     private bool HasSavedOperationPin => source?.Definition.Dataset?.Acquisition.Operation is { } saved
-        && operationKey == $"{saved.OperationUid}:{saved.Generation}:{saved.DefinitionDigest}" && serviceKey == savedServiceKey;
+        && model.OperationKey == $"{saved.OperationUid}:{saved.Generation}:{saved.DefinitionDigest}" && model.ServiceKey == savedServiceKey;
     private bool HasOperationSelection => SelectedOperation is not null || HasSavedOperationPin;
     private ConnectedServiceOperationTypeVersionDescriptor? SelectedType
     {
@@ -309,140 +170,128 @@ else
     private static string StorageKey(StorageResource item) => $"{item.Uid}:{item.Generation}:{item.ObservedState?.BindingDigest}";
     private static string OperationKey(ConnectedServiceOperationResource item) => $"{item.Uid}:{item.Generation}:{item.Definition.DefinitionDigest}";
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnAfterRender(bool firstRender)
     {
         if (firstRender) { interactive = true; StateHasChanged(); }
-        if (focusAfterRender is { } tab)
-        {
-            focusAfterRender = null;
-            if (activeTab == tab) await FocusTabAsync(tab);
-        }
     }
-
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        activeTab = Enum.TryParse<DatasetTab>(View, true, out var requested) ? requested : DatasetTab.Overview;
-        loading = true; error = null; errorCode = null; errorId = null; compositionErrorCode = null;
+        var key = $"{Name}|{Namespace}|{ScopeRef}|{new Uri(Navigation.Uri).Query}";
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key;
+        return LoadInitialAsync();
+    }
+    private void ApplySnapshot(ResourceSnapshot<DataSourceResource> snapshot)
+    {
+        source = snapshot.Value; etag = snapshot.ETag; scope = source.ScopeRef; newerSnapshot = null;
+        var pin = source.Definition.Dataset!.Acquisition.Operation;
+        savedOperation = operations.Concat(savedOperation is null ? [] : new[] { savedOperation }).FirstOrDefault(item => item.Uid == pin.OperationUid
+            && item.ScopeRef == pin.Operation.ScopeRef && item.Address == pin.Operation.Address);
+        savedServiceKey = savedOperation?.Definition.Service.ServiceUid.ToString() ?? "";
+        model = DataSourceDatasetEditorModel.From(source, savedServiceKey);
+        baseline = Fingerprint; definitionTouched = invalidInput = false;
+    }
+    private async Task LoadInitialAsync()
+    {
+        var version = ++loadVersion; ClearPrivateState(); loading = true; busy = resourceRefreshing = false;
+        sectionState.Reset(loadedKey!); loadState = new(ResourceLoadStatus.Loading);
         try
         {
             scope = string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, scope!.Value, cancellation.Token);
-                source = snapshot.Value; etag = snapshot.ETag;
-                technicalName = source.Name; displayName = source.Definition.DisplayName; description = source.Definition.Description ?? "";
-                resourceNamespace = source.Namespace.Value; enabled = source.Definition.Enabled;
-                var saved = source.Definition.Dataset!;
-                lifecycleEnabled = saved.Lifecycle is not null;
-                allowDirect = saved.Lifecycle?.AllowDirect == true;
-                acquisitionTtl = LifecycleDuration.Format(saved.Lifecycle?.TimeToLive);
-                keepHistory = saved.Lifecycle?.KeepHistory == true;
-                historyRetention = LifecycleDuration.Format(saved.Lifecycle?.HistoryRetention);
-                acquisitionOutputBinding = saved.Acquisition.OutputSchemaBinding;
-                outputBinding = saved.OutputSchemaBinding;
-                orchestration = saved.Orchestration;
-                compositionPoints = saved.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-                if (saved.Transformations.Count > 0) compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>(compositionPoints) { ["transformations"] = saved.Transformations };
-                prefix = saved.Rule.Prefix; parameters = saved.Acquisition.Parameters.Clone();
-                documentCollectionUid = saved.DocumentCollectionUid ?? Guid.Empty;
-                storageKey = saved.Storage is { } savedStorage ? $"{savedStorage.StorageUid}:{savedStorage.Generation}:{savedStorage.BindingDigest}" : string.Empty;
-                operationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}";
-            }
-            connectedServices = await ConnectedServices.GetConnectedServicesAsync(cancellation.Token);
-            if (source?.Definition.Dataset is { } dataset)
-            {
-                // Resolve the parent from the pinned operation identity; never replace its saved revision on refresh.
-                operations = await Operations.GetAsync(cancellation.Token);
-                savedOperation = operations.FirstOrDefault(item => item.Uid == dataset.Acquisition.Operation.OperationUid
-                    && item.ScopeRef == dataset.Acquisition.Operation.Operation.ScopeRef && item.Address == dataset.Acquisition.Operation.Operation.Address);
-                serviceKey = savedOperation?.Definition.Service.ServiceUid.ToString() ?? "";
-                savedServiceKey = serviceKey;
+                if (disposed || version != loadVersion) return;
+                if (!Matches(snapshot.Value)) { ClearPrivateState(); loadState = new(ResourceLoadStatus.NotFound); return; }
+                var catalog = await Operations.GetAsync(cancellation.Token);
+                if (disposed || version != loadVersion) return;
+                savedOperation = catalog.FirstOrDefault(item => item.Uid == snapshot.Value.Definition.Dataset!.Acquisition.Operation.OperationUid
+                    && item.ScopeRef == snapshot.Value.Definition.Dataset.Acquisition.Operation.Operation.ScopeRef && item.Address == snapshot.Value.Definition.Dataset.Acquisition.Operation.Operation.Address);
+                ApplySnapshot(snapshot);
             }
             await RefreshCoreAsync();
-            if (!AvailableTabs.Contains(activeTab)) activeTab = DatasetTab.Overview;
+            if (disposed || version != loadVersion) return;
+            if (IsNew) { model.Scope = scope; baseline = Fingerprint; }
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = source is not null };
         }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetLoadFailed"); }
-        finally { loading = false; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { if (version == loadVersion && !disposed) { ClearPrivateState(); loadState = Failure(exception); } }
+        finally { if (version == loadVersion) loading = false; }
     }
-
     private async Task RefreshCoreAsync()
     {
-        connectedServices = await ConnectedServices.GetConnectedServicesAsync(cancellation.Token);
-        operationTypes = await Operations.GetTypesAsync(cancellation.Token);
-        operations = SelectedService is { } selectedService
-            ? await Operations.GetForServiceAsync(selectedService, cancellation.Token) : [];
-        if (scope is { } owner)
-        {
-            var storagesTask = Storages.GetStoragesAsync(owner, cancellation.Token);
-            var typesTask = Storages.GetTypesAsync(owner, cancellation.Token);
-            await Task.WhenAll(storagesTask, typesTask);
-            storages = await storagesTask; storageTypes = await typesTask;
-        }
-        if (source is not null)
-        {
-            readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, scope!.Value, cancellation.Token);
-            history = await Client.GetAcquisitionsAsync(source.Namespace, source.Name, scope.Value, cancellation.Token);
-        }
+        var version = loadVersion; var current = source; var owner = scope; var selection = model.ServiceKey;
+        var services = await ConnectedServices.GetConnectedServicesAsync(cancellation.Token);
+        var types = await Operations.GetTypesAsync(cancellation.Token);
+        var service = services.FirstOrDefault(item => item.Uid.ToString() == selection);
+        var choices = service is null ? [] : await Operations.GetForServiceAsync(service, cancellation.Token);
+        var stores = owner is null ? [] : await Storages.GetStoragesAsync(owner.Value, cancellation.Token);
+        var storeTypes = owner is null ? [] : await Storages.GetTypesAsync(owner.Value, cancellation.Token);
+        var state = current is null ? null : await Client.GetReadinessAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
+        var records = current is null ? [] : await Client.GetAcquisitionsAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
+        if (version != loadVersion || disposed || selection != model.ServiceKey) return;
+        connectedServices = services; operationTypes = types; operations = choices; storages = stores; storageTypes = storeTypes; readiness = state; history = records;
     }
-    private async Task RefreshAsync() => await RunAsync(RefreshCoreAsync);
-    private async Task ChangeScopeAsync(ResourceScopeRef? value) { scope = value; storageKey = ""; documentCollectionUid = Guid.Empty; serviceKey = ""; ResetOperation(); await RefreshAsync(); }
-    private async Task ChangeServiceAsync(ChangeEventArgs value) { serviceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
-    private void ResetOperation() { operationKey = ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
-    private void ChangeOperation(ChangeEventArgs value) { operationKey = value.Value?.ToString() ?? ""; parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
-    private bool lifecycleEnabled = true, allowDirect, keepHistory;
-    private string acquisitionTtl = string.Empty, historyRetention = string.Empty;
-    private bool LifecycleValid => !lifecycleEnabled || LifecycleDuration.TryParse(acquisitionTtl, out _) && (!keepHistory
-        || LifecycleDuration.TryParse(historyRetention, out var retention) && retention is not null)
-        && (!string.IsNullOrEmpty(storageKey) || string.IsNullOrWhiteSpace(acquisitionTtl) && !keepHistory);
-    private DataSourceAcquisitionPolicy? LifecycleSelection()
+    private async Task RefreshAsync()
     {
-        if (!lifecycleEnabled && !allowDirect) return null;
-        _ = LifecycleDuration.TryParse(acquisitionTtl, out var ttl);
-        _ = LifecycleDuration.TryParse(historyRetention, out var retention);
-        return new() { AllowDirect = allowDirect, TimeToLive = lifecycleEnabled ? ttl : null,
-            KeepHistory = lifecycleEnabled && keepHistory, HistoryRetention = lifecycleEnabled && keepHistory ? retention : null };
+        if (loading || busy || resourceRefreshing) return;
+        if (source is not { } current) { await RunAsync(RefreshCoreAsync); return; }
+        var version = ++loadVersion; resourceRefreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
+            if (disposed || version != loadVersion) return;
+            if (!Matches(snapshot.Value, current.Uid)) { ClearPrivateState(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasDraft) { if (snapshot.ETag != etag) newerSnapshot = snapshot; } else ApplySnapshot(snapshot);
+            await RefreshCoreAsync();
+            if (version == loadVersion && !disposed) loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            if (version != loadVersion || disposed) return;
+            var failure = Failure(exception);
+            if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearPrivateState();
+            loadState = failure with { HasContent = source is not null };
+        }
+        finally { if (version == loadVersion) resourceRefreshing = false; }
     }
-    private SchemaBinding? acquisitionOutputBinding, outputBinding;
-    private FlowCallReference? orchestration;
-    private IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> compositionPoints = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
-    private RenderFragment IdentityContent => @<div class="dataset-step-fields">
-<section class="panel form-section"><h2>@T("DatasetIdentity")</h2><div class="form-grid">
-                    @if (IsNew)
-                    {
-                        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="true" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
-                        <FormField Label="@T("Namespace")"><ClearableText UpdateOnInput="false" @bind-Value="resourceNamespace" data-testid="dataset-namespace" /></FormField>
-                        <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" Value="scope" ValueChanged="ChangeScopeAsync" />
-                    }
-                    else { <FormField Label="@T("DisplayName")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="displayName" required maxlength="200" data-testid="data-source-display-name" /></FormField> }
-                    <label class="checkbox-field"><FormCheckbox @bind-Value="enabled" /><span>@T("Enabled")</span></label>
-                    <FormField Label="@T("Description")" Class="form-field-wide"><ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="description" maxlength="2000" /></FormField>
-                </div></section>
-    </div>;
+    private async Task ChangeScopeAsync(ResourceScopeRef? value) { if (!IsNew) return; scope = model.Scope = value; model.StorageKey = ""; model.DocumentCollectionUid = Guid.Empty; model.ServiceKey = ""; ResetOperation(); await RefreshAsync(); }
+    private async Task ChangeServiceAsync(ChangeEventArgs value) { model.ServiceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
+    private void ResetOperation() { model.OperationKey = ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
+    private void ChangeOperation(ChangeEventArgs value) { model.OperationKey = value.Value?.ToString() ?? ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
+    private bool LifecycleValid => model.LifecycleValid;
+    private DataSourceAcquisitionPolicy? LifecycleSelection() => model.LifecycleSelection();
+    private RenderFragment IdentityContent => @<ResourceIdentityEditor ResourceKind="@DataSourceResourceKinds.DataSource"
+        @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" @bind-Namespace="model.Namespace" NamespaceEditable="IsNew" NamespaceUpdateOnInput="false"
+        ScopeRef="model.Scope" ScopeRefChanged="ChangeScopeAsync" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true"
+        IsNew="IsNew" ReadOnly="@(!CanManage)" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" NamespaceTestId="dataset-namespace">
+        <AdditionalPanels>@if (IsNew) { <FormSection Title="@T("Enabled")"><label class="checkbox-field resource-enabled-toggle"><FormCheckbox @bind-Value="model.Enabled" role="switch" /><span>@T("Enabled")</span></label></FormSection> }</AdditionalPanels>
+    </ResourceIdentityEditor>;
 
     private RenderFragment AcquisitionContent => @<div class="dataset-step-fields">
 <section class="panel form-section"><h2>@T("DatasetSavedAcquisition")</h2><div class="form-grid">
-                <FormField Label="@T("DatasetService")" Class="form-field-wide" Help="@T("DatasetServiceHelp")" Required="@(!HasSavedOperationPin)"><ClearableSelect TValue="string" Value="@serviceKey" ValueExpression="@(() => serviceKey)" ValueChanged="value => ChangeServiceAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
+                <FormField Label="@T("DatasetService")" Class="form-field-wide" Help="@T("DatasetServiceHelp")" Required="@(!HasSavedOperationPin)"><ClearableSelect TValue="string" Value="@model.ServiceKey" ValueExpression="@(() => model.ServiceKey)" ValueChanged="value => ChangeServiceAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var service in connectedServices) { <option value="@service.Uid.ToString()">@service.Definition.DisplayName · @service.ScopeRef · @service.Namespace/@service.Name</option> }
-                    @if (!string.IsNullOrEmpty(serviceKey) && SelectedService is null) { <option value="@serviceKey">@T("DatasetPinnedUnavailable")</option> }
+                    @if (!string.IsNullOrEmpty(model.ServiceKey) && SelectedService is null) { <option value="@model.ServiceKey">@T("DatasetPinnedUnavailable")</option> }
                 </ClearableSelect></FormField>
                 @if (SelectedService is { } selectedService)
                 {
                     <p class="form-field-wide"><a class="text-button" href="@ServiceDiscoveryUrl(selectedService)" data-testid="dataset-service-discovery-link">@T("DatasetManageOperations")</a></p>
                 }
-                <FormField Label="@T("DatasetOperation")" Class="form-field-wide" Help="@T("DatasetOperationHelp")" Required="true"><ClearableSelect TValue="string" Value="@operationKey" ValueExpression="@(() => operationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
+                <FormField Label="@T("DatasetOperation")" Class="form-field-wide" Help="@T("DatasetOperationHelp")" Required="true"><ChildContent><ClearableSelect TValue="string" Value="@model.OperationKey" ValueExpression="@(() => model.OperationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var operation in ServiceOperations) { <option value="@OperationKey(operation)">@operation.Definition.DisplayName · @operation.Generation · @T(operation.Enabled ? "Enabled" : "Disabled")</option> }
-                    @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != operationKey)) { <option value="@operationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
-                </ClearableSelect></FormField>
+                    @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != model.OperationKey)) { <option value="@model.OperationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
+                </ClearableSelect></ChildContent><Validation><ValidationMessage For="@(() => model.OperationKey)" /></Validation></FormField>
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
                 @if (SelectedOperation is not null && AcquisitionIssue is { } issue)
                 { <p class="form-field-wide form-alert" role="status" data-testid="dataset-operation-ineligible">@T(issue)</p> }
                 <div class="form-field-wide" data-testid="dataset-parameters"><span>@T("Parameters")</span>
-                    @if (string.IsNullOrEmpty(operationKey)) { <p>@T("DatasetSelectOperationFirst")</p> }
+                    @if (string.IsNullOrEmpty(model.OperationKey)) { <p>@T("DatasetSelectOperationFirst")</p> }
                     else if (AcquisitionIssue is not null && SelectedOperation is not null) { <p>@T("DatasetParametersUnavailable")</p> }
                     else if (NoConfiguration) { <p>@T("DatasetNoConfiguration")</p> }
-                    else { <JsonSchemaInputEditor Schema="InputSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="@(busy || !CanManage)" AllowAnyRoot="true" /> }
+                    else { <JsonSchemaInputEditor Schema="InputSchema" Value="model.Parameters" ValueChanged="value => model.Parameters = value" ValidationChanged="ParametersValidated" Disabled="@(busy || !CanManage)" AllowAnyRoot="true" /> }
                     <small>@T("DatasetParametersHelp")</small>
                 </div>
                     </div></section>
@@ -451,43 +300,43 @@ else
     private RenderFragment StorageContent => @<div class="dataset-step-fields">@StorageDestinationContent @StoragePolicyContent</div>;
     private RenderFragment StorageDestinationContent => @<div class="dataset-step-fields">
 <section class="panel form-section"><h2>@T("DatasetDestination")</h2><div class="form-grid">
-                <label class="checkbox-field form-field-wide"><FormCheckbox @bind-Value="allowDirect" data-testid="dataset-allow-direct" /><span>@T("DirectPermission")</span><small>@T("DirectPermissionHelp")</small></label>
-                <FormField Label="@T("DatasetStorage")" Class="form-field-wide" Help="@T("DatasetStorageHelp")" Required="@(!allowDirect)"><ClearableSelect TValue="string" @bind-Value="storageKey" @bind-Value:after="() => documentCollectionUid = Guid.Empty" data-testid="dataset-storage" required="@(!allowDirect)">
-                    <option value="">@T(allowDirect ? "DirectInput" : "Select")</option>
+                <label class="checkbox-field resource-enabled-toggle form-field-wide"><FormCheckbox @bind-Value="model.AllowDirect" role="switch" data-testid="dataset-allow-direct" /><span>@T("DirectPermission")</span><small>@T("DirectPermissionHelp")</small></label>
+                <FormField aria-invalid="@(StorageSelectionInvalid ? "true" : null)" Label="@T("DatasetStorage")" Class="form-field-wide" Help="@T("DatasetStorageHelp")" Required="@(!model.AllowDirect)"><ClearableSelect TValue="string" @bind-Value="model.StorageKey" @bind-Value:after="() => model.DocumentCollectionUid = Guid.Empty" data-testid="dataset-storage" required="@(!model.AllowDirect)">
+                    <option value="">@T(model.AllowDirect ? "DirectInput" : "Select")</option>
                     @foreach (var storage in storages) { <option value="@StorageKey(storage)">@storage.Definition.DisplayName · @storage.ScopeRef · @storage.Namespace/@storage.Name · @storage.Generation</option> }
-                    @if (source?.Definition.Dataset is { } saved && storages.All(value => StorageKey(value) != storageKey)) { <option value="@storageKey">@saved.Storage?.Storage · @T("DatasetPinnedUnavailable")</option> }
+                    @if (source?.Definition.Dataset is { } saved && storages.All(value => StorageKey(value) != model.StorageKey)) { <option value="@model.StorageKey">@saved.Storage?.Storage · @T("DatasetPinnedUnavailable")</option> }
                 </ClearableSelect></FormField>
-                @if (!RequiresDocumentCollection && documentCollectionUid == Guid.Empty)
+                @if (!RequiresDocumentCollection && model.DocumentCollectionUid == Guid.Empty)
                 {
-                    <FormField Label="@T("DatasetPrefix")" Class="form-field-wide" Help="@T("DatasetPrefixHelp")"><ClearableText UpdateOnInput="false" @bind-Value="prefix" maxlength="256" data-testid="dataset-prefix" /></FormField>
+                    <FormField Label="@T("DatasetPrefix")" Class="form-field-wide" Help="@T("DatasetPrefixHelp")"><ClearableText UpdateOnInput="false" @bind-Value="model.Prefix" maxlength="256" data-testid="dataset-prefix" /></FormField>
                 }
                     @if (SelectedStorage is { } documentStorage && (RequiresDocumentCollection || documentStorage.Definition.Collections.Count > 0))
                     {
-                        <FormField Label="@T("DatasetDocumentCollection")" Class="form-field-wide" Help="@T("DatasetDocumentHelp")" Required="@RequiresDocumentCollection"><ClearableSelect AllowClear="false" TValue="Guid" @bind-Value="documentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
-                        @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "&view=definition")">@T("DatasetConfigureStorage")</a></p> }
+                        <FormField aria-invalid="@(!DocumentCollectionValid ? "true" : null)" Label="@T("DatasetDocumentCollection")" Class="form-field-wide" Help="@T("DatasetDocumentHelp")" Required="@RequiresDocumentCollection"><ClearableSelect AllowClear="false" TValue="Guid" @bind-Value="model.DocumentCollectionUid" data-testid="dataset-document-collection"><option value="@Guid.Empty">@T(RequiresDocumentCollection ? "DatasetDocumentSelect" : "DatasetContentStorage")</option>@foreach (var collection in documentStorage.Definition.Collections.Where(CompatibleDocumentCollection)) { <option value="@collection.Uid">@collection.DisplayName · @collection.Name</option> }</ClearableSelect></FormField>
+                        @if (!DocumentCollectionValid) { <p class="form-alert form-alert-warning form-span-2" role="alert" data-testid="dataset-document-collection-required">@T("DatasetDocumentRequired") <a href="@(StorageLinks.Details(documentStorage) + "#definition/configuration")">@T("DatasetConfigureStorage")</a></p> }
                     }
-                    </div><p class="dataset-note"><UiIcon Name="layers" />@T(allowDirect && string.IsNullOrEmpty(storageKey) ? "DirectPermissionHelp" : "DatasetIsolatedContent")</p></section>
+                    </div><p class="dataset-note"><UiIcon Name="layers" />@T(model.AllowDirect && string.IsNullOrEmpty(model.StorageKey) ? "DirectPermissionHelp" : "DatasetIsolatedContent")</p></section>
     </div>;
     private RenderFragment StoragePolicyContent => @<div class="dataset-step-fields">
-<SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="lifecycleEnabled" @bind-TimeToLiveText="acquisitionTtl" @bind-KeepHistory="keepHistory" @bind-HistoryRetentionText="historyRetention" />
-                @if (lifecycleEnabled && string.IsNullOrEmpty(storageKey) && (!string.IsNullOrWhiteSpace(acquisitionTtl) || keepHistory)) { <p class="form-alert form-alert-danger" role="alert">@T("LifecycleStorageRequired")</p> }
+<SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="model.LifecycleEnabled" @bind-TimeToLiveText="model.AcquisitionTtl" @bind-KeepHistory="model.KeepHistory" @bind-HistoryRetentionText="model.HistoryRetention" />
+                @if (model.LifecycleEnabled && string.IsNullOrEmpty(model.StorageKey) && (!string.IsNullOrWhiteSpace(model.AcquisitionTtl) || model.KeepHistory)) { <p class="form-alert form-alert-danger" role="alert">@T("LifecycleStorageRequired")</p> }
     </div>;
 
     private RenderFragment TreatmentsContent => @<div class="dataset-step-fields">
-<SourceFlowCompositionEditor @bind-Orchestration="orchestration" @bind-Value="compositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
+<SourceFlowCompositionEditor @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
     </div>;
 
     private RenderFragment ContractsContent => @<div class="dataset-step-fields">
 <ReusableSchemaBindingEditor Title="@T("AcquisitionOutputSchema")" TestId="dataset-acquisition-schema"
-                    Binding="@acquisitionOutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
-                    ValueChanged="value => acquisitionOutputBinding = value.Binding" />
+                    Binding="@model.AcquisitionOutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
+                    ValueChanged="value => model.AcquisitionOutputBinding = value.Binding" />
                 <ReusableSchemaBindingEditor Title="@T("ProjectedOutputSchema")" TestId="dataset-output-schema"
-                    Binding="@outputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
-                    ValueChanged="value => outputBinding = value.Binding" />
+                    Binding="@model.OutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
+                    ValueChanged="value => model.OutputBinding = value.Binding" />
     </div>;
 
     private CreationWizard? creationWizard;
-    private Microsoft.AspNetCore.Components.Forms.EditForm? definitionForm;
+    private ResourceDefinitionForm? definitionForm;
     private IReadOnlyList<CreationWizardStep> CreationSteps =>
     [
         new("identity", T("WizardIdentity"), IdentityContent) { IsComplete = StepIssue("identity") is null },
@@ -497,60 +346,64 @@ else
         new("contracts", T("WizardContracts"), ContractsContent) { IsComplete = StepIssue("contracts") is null },
         new("review", T("WizardReview"), ReviewContent) { IsComplete = IdentityValid && CanSave }
     ];
-    private bool CanSave => DocumentCollectionValid && HasOperationSelection && (allowDirect || !string.IsNullOrEmpty(storageKey))
-        && LifecycleValid && (!enabled || parametersValid && AcquisitionIssue is null && SelectedOperation?.Enabled == true
-            && SelectedOperation.Definition.Service.Generation == SelectedService?.Generation);
+    private bool CanSave => model.CanSave(DocumentCollectionValid, HasOperationSelection, parametersValid,
+        AcquisitionIssue is null && SelectedOperation?.Enabled == true, SelectedOperation?.Definition.Service.Generation == SelectedService?.Generation);
 
     private string DraftNamespace
     {
         get
         {
-            try { return ResourceNamespace.Parse(resourceNamespace).Value; }
-            catch (ArgumentException) { return resourceNamespace; }
+            try { return ResourceNamespace.Parse(model.Namespace).Value; }
+            catch (ArgumentException) { return model.Namespace; }
         }
     }
 
-    private bool IdentityValid
-    {
-        get
-        {
-            if (scope is null || string.IsNullOrWhiteSpace(displayName) || displayName.Trim().Length > 200 || description.Length > 2000 || string.IsNullOrWhiteSpace(technicalName)) return false;
-            try { _ = ResourceNamespace.Parse(resourceNamespace); return true; }
-            catch (ArgumentException) { return false; }
-        }
-    }
+    private bool IdentityValid => scope is not null && model.IdentityValid;
     private string? StepIssue(string id) => id switch
     {
         "identity" when !IdentityValid => "WizardIdentityRequired",
         "acquisition" when !HasOperationSelection => "WizardAcquisitionRequired",
-        "acquisition" when enabled && AcquisitionIssue is not null => AcquisitionIssue,
-        "acquisition" when enabled && (!parametersValid || SelectedOperation?.Enabled != true
+        "acquisition" when model.Enabled && AcquisitionIssue is not null => AcquisitionIssue,
+        "acquisition" when model.Enabled && (!parametersValid || SelectedOperation?.Enabled != true
             || SelectedOperation.Definition.Service.Generation != SelectedService?.Generation) => "DatasetParametersInvalid",
-        "storage" when !allowDirect && string.IsNullOrEmpty(storageKey) => "WizardStorageRequired",
+        "storage" when !model.AllowDirect && string.IsNullOrEmpty(model.StorageKey) => "WizardStorageRequired",
         "storage" when !DocumentCollectionValid => "DatasetDocumentRequired",
         "storage" when !LifecycleValid => "WizardLifecycleInvalid",
         _ => null
     };
-    private void ClearStepError(CreationWizardStepChange _) => error = null;
-    private async Task SubmitDefinitionAsync(Microsoft.AspNetCore.Components.Forms.EditContext context)
+    private void ClearStepError(CreationWizardStepChange _) { error = null; creationValidationFocus = false; }
+    private void CreationStepReady(string _)
     {
-        if (!IsNew) { if (context.Validate()) await SaveAsync(); }
+        if (!creationValidationFocus) return;
+        creationValidationFocus = false; definitionForm?.RequestValidationFocus();
+    }
+    private Task InvalidDefinitionAsync(EditContext context) => IsNew ? SubmitDefinitionAsync(context) : Task.CompletedTask;
+    private async Task SubmitDefinitionAsync(EditContext context)
+    {
+        if (!IsNew) { ValidateFamily(); if (!context.GetValidationMessages().Any()) await SaveAsync(); else if (definitionForm is not null) await definitionForm.RevealValidationAsync(); }
         else if (creationWizard?.CurrentStepId == "review") await creationWizard.FinishAsync();
         else if (creationWizard is not null) await creationWizard.ContinueAsync();
     }
     private async Task CreateFromReviewAsync(CreationWizardFinish finish)
     {
         if (creationWizard?.CurrentStepId != "review" || !CanManage || busy) return;
+        _ = FormContext.Validate(); ValidateFamily();
         foreach (var step in CreationSteps)
         {
             if (StepIssue(step.Id) is not { } issue) continue;
             finish.ReturnToStepId = step.Id;
-            error = T(issue);
+            error = T(issue); creationValidationFocus = true;
             return;
         }
-        if (!CanSave || definitionForm?.EditContext?.Validate() != true)
+        if (!CanSave || FormContext.Validate() != true)
         {
             error = T("WizardFormInvalid");
+            if (ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) is { } invalidSection)
+            {
+                finish.ReturnToStepId = invalidSection switch { "definition/identity" => "identity", "definition/contracts" => "contracts", "definition/treatments" => "treatments", _ => "acquisition" };
+                creationValidationFocus = true;
+            }
+            else definitionForm?.RequestValidationFocus();
             return;
         }
         await SaveAsync();
@@ -563,55 +416,63 @@ else
     private RenderFragment ReviewContent => @<section class="panel form-section dataset-review" data-testid="data-source-creation-review">
         <h2>@T("WizardReviewTitle")</h2>
         <p>@T("WizardReviewHelp")</p>
-        <div class="dataset-review-row"><h3>@T("WizardIdentity")</h3><div><strong>@(string.IsNullOrWhiteSpace(displayName) ? T("WizardNotEntered") : displayName)</strong>@if (!string.IsNullOrWhiteSpace(technicalName)) { <CopyableValue Value="@($"{DraftNamespace}/{technicalName}")" /> } else { <p>@T("WizardNotEntered")</p> }<ResourceScopeBadge ScopeRef="scope" /><p>@T(enabled ? "Enabled" : "Disabled")</p>@if (!string.IsNullOrWhiteSpace(description)) { <p>@description</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("identity")' aria-label="@T("WizardEditIdentity")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardAcquisition")</h3><div>@if (SelectedService is { } selectedService) { <strong>@selectedService.Definition.DisplayName</strong><code>@selectedService.Namespace/@selectedService.Name</code><ResourceScopeBadge ScopeRef="selectedService.ScopeRef" /> } else { <strong>@T("WizardNotSelected")</strong> }@if (SelectedOperation is { } selectedOperation) { <p>@selectedOperation.Definition.DisplayName · @T("Generation") @selectedOperation.Generation</p><code>@selectedOperation.Namespace/@selectedOperation.Name</code><details><summary>@T("Parameters")</summary><pre>@parameters.GetRawText()</pre></details> } else { <p>@T("WizardNotSelected")</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("acquisition")' aria-label="@T("WizardEditAcquisition")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardStorage")</h3><div><strong>@(SelectedStorage?.Definition.DisplayName ?? T(allowDirect ? "DirectInput" : "WizardNotSelected"))</strong>@if (SelectedStorage is { } storage) { <code>@storage.Namespace/@storage.Name</code><ResourceScopeBadge ScopeRef="storage.ScopeRef" /><p>@T("Generation") @storage.Generation</p> }<p><code>@prefix</code></p>@if (documentCollectionUid != Guid.Empty) { <p>@T("DatasetDocumentCollection") · @SelectedStorage?.Definition.Collections.FirstOrDefault(item => item.Uid == documentCollectionUid)?.DisplayName</p> }<p>@T(lifecycleEnabled ? "LifecycleEnable" : "WizardLifecycleOff")</p>@if (lifecycleEnabled) { <p>@T("LifecycleTtl"): @(string.IsNullOrWhiteSpace(acquisitionTtl) ? T("WizardNoExpiry") : acquisitionTtl)</p><p>@T(keepHistory ? "LifecycleHistory" : "WizardNoHistory")</p>@if (keepHistory) { <p>@T("LifecycleRetention"): @historyRetention</p> } }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("storage")' aria-label="@T("WizardEditStorage")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardTreatments")</h3><div><strong>@(orchestration?.ResourceId ?? T("WizardStandardOrchestration"))</strong>@if (orchestration is not null) { <p>@orchestration.Namespace/@orchestration.ResourceId · @orchestration.Version</p> }<p>@Localizer["WizardTransformationCount", compositionPoints.Values.Sum(calls => calls.Count)]</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("treatments")' aria-label="@T("WizardEditTreatments")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardContracts")</h3><div><p>@T("AcquisitionOutputSchema"): @ContractSummary(acquisitionOutputBinding)</p><p>@T("ProjectedOutputSchema"): @ContractSummary(outputBinding)</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("contracts")' aria-label="@T("WizardEditContracts")">@T("WizardEdit")</button></div>
+        <div class="dataset-review-row"><h3>@T("WizardIdentity")</h3><div><strong>@(string.IsNullOrWhiteSpace(model.DisplayName) ? T("WizardNotEntered") : model.DisplayName)</strong>@if (!string.IsNullOrWhiteSpace(model.Name)) { <CopyableValue Value="@($"{DraftNamespace}/{model.Name}")" /> } else { <p>@T("WizardNotEntered")</p> }<ResourceScopeBadge ScopeRef="scope" /><p>@T(model.Enabled ? "Enabled" : "Disabled")</p>@if (!string.IsNullOrWhiteSpace(model.Description)) { <p>@model.Description</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("identity")' aria-label="@T("WizardEditIdentity")">@T("WizardEdit")</button></div>
+        <div class="dataset-review-row"><h3>@T("WizardAcquisition")</h3><div>@if (SelectedService is { } selectedService) { <strong>@selectedService.Definition.DisplayName</strong><code>@selectedService.Namespace/@selectedService.Name</code><ResourceScopeBadge ScopeRef="selectedService.ScopeRef" /> } else { <strong>@T("WizardNotSelected")</strong> }@if (SelectedOperation is { } selectedOperation) { <p>@selectedOperation.Definition.DisplayName · @T("Generation") @selectedOperation.Generation</p><code>@selectedOperation.Namespace/@selectedOperation.Name</code><details><summary>@T("Parameters")</summary><pre>@model.Parameters.GetRawText()</pre></details> } else { <p>@T("WizardNotSelected")</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("acquisition")' aria-label="@T("WizardEditAcquisition")">@T("WizardEdit")</button></div>
+        <div class="dataset-review-row"><h3>@T("WizardStorage")</h3><div><strong>@(SelectedStorage?.Definition.DisplayName ?? T(model.AllowDirect ? "DirectInput" : "WizardNotSelected"))</strong>@if (SelectedStorage is { } storage) { <code>@storage.Namespace/@storage.Name</code><ResourceScopeBadge ScopeRef="storage.ScopeRef" /><p>@T("Generation") @storage.Generation</p> }<p><code>@model.Prefix</code></p>@if (model.DocumentCollectionUid != Guid.Empty) { <p>@T("DatasetDocumentCollection") · @SelectedStorage?.Definition.Collections.FirstOrDefault(item => item.Uid == model.DocumentCollectionUid)?.DisplayName</p> }<p>@T(model.LifecycleEnabled ? "LifecycleEnable" : "WizardLifecycleOff")</p>@if (model.LifecycleEnabled) { <p>@T("LifecycleTtl"): @(string.IsNullOrWhiteSpace(model.AcquisitionTtl) ? T("WizardNoExpiry") : model.AcquisitionTtl)</p><p>@T(model.KeepHistory ? "LifecycleHistory" : "WizardNoHistory")</p>@if (model.KeepHistory) { <p>@T("LifecycleRetention"): @model.HistoryRetention</p> } }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("storage")' aria-label="@T("WizardEditStorage")">@T("WizardEdit")</button></div>
+        <div class="dataset-review-row"><h3>@T("WizardTreatments")</h3><div><strong>@(model.Orchestration?.ResourceId ?? T("WizardStandardOrchestration"))</strong>@if (model.Orchestration is not null) { <p>@model.Orchestration.Namespace/@model.Orchestration.ResourceId · @model.Orchestration.Version</p> }<p>@Localizer["WizardTransformationCount", model.CompositionPoints.Values.Sum(calls => calls.Count)]</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("treatments")' aria-label="@T("WizardEditTreatments")">@T("WizardEdit")</button></div>
+        <div class="dataset-review-row"><h3>@T("WizardContracts")</h3><div><p>@T("AcquisitionOutputSchema"): @ContractSummary(model.AcquisitionOutputBinding)</p><p>@T("ProjectedOutputSchema"): @ContractSummary(model.OutputBinding)</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("contracts")' aria-label="@T("WizardEditContracts")">@T("WizardEdit")</button></div>
     </section>;
 
     private async Task SaveAsync() => await RunAsync(async () =>
     {
         if (!CanManage || !CanSave || IsNew && !IdentityValid) return;
-        var storage = storages.SingleOrDefault(item => StorageKey(item) == storageKey);
+        var version = loadVersion; var creating = IsNew;
+        var storage = storages.SingleOrDefault(item => StorageKey(item) == model.StorageKey);
         var operation = SelectedOperation;
-        var storageReference = storage is null ? (string.IsNullOrEmpty(storageKey) ? null : source?.Definition.Dataset?.Storage) : new StorageRevisionReference(
+        var storageReference = storage is null ? (string.IsNullOrEmpty(model.StorageKey) ? null : source?.Definition.Dataset?.Storage) : new StorageRevisionReference(
             new(storage.ScopeRef!.Value, storage.Namespace, storage.Kind, storage.Name), storage.Uid, storage.Generation, storage.ObservedState!.BindingDigest!);
         var operationReference = operation is null ? source!.Definition.Dataset!.Acquisition.Operation : new ConnectedServiceOperationRevisionReference(
             new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
-        var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = prefix };
-        var definition = new DataSourceProperties { DisplayName = displayName.Trim(), Description = description, Enabled = enabled,
-            Dataset = new(storageReference, rule, new(operationReference, parameters) { OutputSchemaBinding = acquisitionOutputBinding }) { DocumentCollectionUid = documentCollectionUid == Guid.Empty ? null : documentCollectionUid, OutputSchemaBinding = outputBinding, Orchestration = orchestration, Compositions = compositionPoints, Lifecycle = LifecycleSelection() } };
-        var saved = IsNew ? await Client.CreateAsync(new(technicalName, definition, DraftNamespace, scope), cancellation.Token)
+        var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = model.Prefix };
+        var definition = new DataSourceProperties { DisplayName = model.DisplayName.Trim(), Description = model.Description, Enabled = model.Enabled,
+            Dataset = new(storageReference, rule, new(operationReference, model.Parameters) { OutputSchemaBinding = model.AcquisitionOutputBinding }) { DocumentCollectionUid = model.DocumentCollectionUid == Guid.Empty ? null : model.DocumentCollectionUid, OutputSchemaBinding = model.OutputBinding, Orchestration = model.Orchestration, Compositions = model.CompositionPoints, Lifecycle = LifecycleSelection() } };
+        var saved = IsNew ? await Client.CreateAsync(new(model.Name, definition, DraftNamespace, scope), cancellation.Token)
             : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
-        source = saved.Value; etag = saved.ETag; savedOperation = operation ?? savedOperation; savedServiceKey = serviceKey; activeTab = DatasetTab.Overview;
-        Navigation.NavigateTo($"/data-sources/{Uri.EscapeDataString(source.Name)}?scopeRef={Uri.EscapeDataString(source.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(source.Namespace.Value)}&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? source.ScopeRef.Value.Value)}");
+        if (disposed || version != loadVersion) return;
+        savedOperation = operation ?? savedOperation; ApplySnapshot(saved);
+        if (creating) Navigation.NavigateTo($"/data-sources/{Uri.EscapeDataString(saved.Value.Name)}?scopeRef={Uri.EscapeDataString(saved.Value.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(saved.Value.Namespace.Value)}&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? saved.Value.ScopeRef.Value.Value)}");
         await RefreshCoreAsync();
     });
     private async Task StartAsync() => await RunAsync(async () =>
     {
+        if (readiness?.CanAcquire != true || source is null) return;
+        var version = loadVersion;
         _ = await Client.StartAcquisitionAsync(source!.Namespace, source.Name, scope!.Value, new(), cancellation.Token);
+        if (disposed || version != loadVersion) return;
         await RefreshCoreAsync();
-        activeTab = DatasetTab.Acquisitions;
-        focusAfterRender = activeTab;
+        if (!disposed && version == loadVersion) SelectTab(DatasetTab.Acquisitions);
     });
     private async Task ReadAsync(DataSourceAcquisitionResource item) => await RunAsync(async () =>
     {
+        var version = loadVersion;
         var content = await Client.ReadContentAsync(item.Namespace, item.Name, cancellation.Token);
+        if (disposed || version != loadVersion) return;
         preview = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(content.ContentBase64));
         previewTruncated = !content.EndOfObject;
         contentAcquisitionKey = item.Uid.ToString();
-        activeTab = DatasetTab.Content;
-        focusAfterRender = activeTab;
+        SelectTab(DatasetTab.Content);
     });
     private async Task RunAsync(Func<Task> action)
     {
+        if (busy || resourceRefreshing || disposed) return;
+        var version = loadVersion;
         busy = true; error = null; errorCode = null; errorId = null; compositionErrorCode = null;
         try { await action(); }
         catch (AgentstrationApiException exception)
         {
-            const string prefix = "https://agentstration.dev/problems/";
-            var code = exception.ProblemType?.StartsWith(prefix, StringComparison.Ordinal) == true ? exception.ProblemType[prefix.Length..] : null;
+            if (disposed || version != loadVersion) return;
+            const string problemPrefix = "https://agentstration.dev/problems/";
+            var code = exception.ProblemType?.StartsWith(problemPrefix, StringComparison.Ordinal) == true ? exception.ProblemType[problemPrefix.Length..] : null;
             errorCode = code is { Length: > 0 and <= 96 } && code.All(value => char.IsAsciiLetterOrDigit(value) || value is '_' or '-') ? code : null;
             errorId = exception.ErrorId;
             compositionErrorCode = exception.CompositionErrorCode is { Length: > 0 and <= 96 } reason
@@ -630,10 +491,166 @@ else
                 _ => "DatasetActionFailed"
             });
         }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = T("DatasetActionFailed"); }
-        finally { busy = false; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { if (!disposed && version == loadVersion) error = T("DatasetActionFailed"); }
+        finally { if (version == loadVersion) busy = false; }
     }
-    private string ServiceDiscoveryUrl(ConnectedServiceResource service) => $"/connected-services/{Uri.EscapeDataString(service.Name)}?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}&view=discovery&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? service.ScopeRef.Value.Value)}";
+    private string ServiceDiscoveryUrl(ConnectedServiceResource service) => $"/connected-services/{Uri.EscapeDataString(service.Name)}?scopeRef={Uri.EscapeDataString(service.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(service.Namespace.Value)}&context={Uri.EscapeDataString(ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? service.ScopeRef.Value.Value)}#discovery";
     private static string FlowUrl(DataSourceAcquisitionResource item) => $"/flow-runs/{Uri.EscapeDataString(item.FlowRunId)}?scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.LogicalScopeRef?.Value ?? item.ScopeRef.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { disposed = true; loadVersion++; cancellation.Cancel(); cancellation.Dispose(); }
+
+    private DataSourceDatasetEditorModel model = new();
+    private EditContext? formContext;
+    private ValidationMessageStore? parameterErrors, familyErrors;
+    private DataSourceDatasetEditorModel? observedModel;
+    private EditContext FormContext { get { if (!ReferenceEquals(model, observedModel)) { observedModel = model; formContext = new(model); parameterErrors = new(formContext); familyErrors = new(formContext); } return formContext!; } }
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ResourceSnapshot<DataSourceResource>? newerSnapshot;
+    private string? loadedKey;
+    private string baseline = "";
+    private long loadVersion;
+    private bool disposed, resourceRefreshing, definitionTouched, invalidInput, creationValidationFocus;
+    private string Fingerprint => JsonSerializer.Serialize(new { model, scope });
+    private bool HasDraft => !loading && (IsNew || source is not null) && (definitionTouched || invalidInput || Fingerprint != baseline);
+    private void ParametersValidated(JsonSchemaInputValidationState state)
+    {
+        parametersValid = state.IsValid;
+        _ = FormContext; parameterErrors!.Clear();
+        if (!state.IsValid) parameterErrors.Add(FormContext.Field(nameof(model.Parameters)), T("DatasetParametersInvalid"));
+        FormContext.NotifyValidationStateChanged();
+    }
+    private void MarkDirty() { definitionTouched = true; familyErrors?.Clear(); FormContext.NotifyValidationStateChanged(); }
+    private bool StorageSelectionInvalid => string.IsNullOrEmpty(model.StorageKey) && (!model.AllowDirect
+        || model.LifecycleEnabled && (!string.IsNullOrWhiteSpace(model.AcquisitionTtl) || model.KeepHistory));
+    private void ValidateFamily()
+    {
+        _ = FormContext; familyErrors!.Clear();
+        if (!model.NamespaceValid) { familyErrors.Add(FormContext.Field(nameof(model.Namespace)), T("SourceNamespaceInvalid")); FormContext.NotifyValidationStateChanged(); return; }
+        var issue = StepIssue("acquisition");
+        var field = !parametersValid ? nameof(model.Parameters) : nameof(model.OperationKey);
+        if (issue is null)
+        {
+            issue = StepIssue("storage");
+            field = !DocumentCollectionValid ? nameof(model.DocumentCollectionUid) : StorageSelectionInvalid ? nameof(model.StorageKey)
+                : !LifecycleDuration.TryParse(model.AcquisitionTtl, out _) ? nameof(model.AcquisitionTtl) : nameof(model.HistoryRetention);
+        }
+        if (issue is not null && !FormContext.GetValidationMessages(FormContext.Field(field)).Any()) familyErrors.Add(FormContext.Field(field), T(issue));
+        FormContext.NotifyValidationStateChanged();
+    }
+    private bool Matches(DataSourceResource resource, Guid? uid = null) => resource.Name == Name && resource.Namespace == ResourceNamespace.Parse(Namespace)
+        && resource.ScopeRef == scope && resource.Definition.Dataset is not null && (uid is null || resource.Uid == uid);
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    { System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+      System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed);
+    private void ClearPrivateState()
+    {
+        source = null; newerSnapshot = null; readiness = null; etag = null; model = new(); baseline = "";
+        storages = []; storageTypes = []; connectedServices = []; operations = []; operationTypes = []; history = []; savedOperation = null;
+        preview = null; contentAcquisitionKey = ""; definitionTouched = invalidInput = false; error = errorCode = errorId = compositionErrorCode = null;
+    }
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>
+    { [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.OperationKey)] = T("DatasetOperation"), [nameof(model.Scope)] = T("Scope"), [nameof(model.Namespace)] = T("Namespace"), [nameof(model.Description)] = T("Description") };
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>
+    {
+        ["definition/identity"] = new() { HasRequiredFields = true, ReadOnly = !CanManage, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags), nameof(model.Scope)] },
+        ["definition/configuration"] = new() { HasRequiredFields = true, ReadOnly = !CanManage, Fields = [nameof(model.OperationKey), nameof(model.ServiceKey), nameof(model.Parameters), nameof(model.StorageKey), nameof(model.Prefix), nameof(model.DocumentCollectionUid), nameof(model.Enabled), nameof(model.AllowDirect), nameof(model.LifecycleEnabled), nameof(model.AcquisitionTtl), nameof(model.KeepHistory), nameof(model.HistoryRetention)] },
+        ["definition/contracts"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.AcquisitionOutputBinding), nameof(model.OutputBinding)] },
+        ["definition/treatments"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.Orchestration), nameof(model.CompositionPoints)] },
+        ["yaml"] = new() { ReadOnly = true }
+    };
+    private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/contracts", T("WizardContracts"), "code"), new("definition/treatments", T("WizardTreatments"), "code")];
+    private IReadOnlyList<ResourceNavigationItem> BusinessSections => [new("acquisitions", T("Acquisitions"), "download"), new("content", T("DatasetContentTab"), "file"),
+        new("queries", T("Queries"), "search") { Visible = source?.Definition.Dataset?.DocumentCollectionUid is not null }, new("tools", T("Tools"), "tool") { Visible = source?.Definition.Dataset?.DocumentCollectionUid is not null }];
+    private RenderFragment<string> DefinitionContent => path => path switch
+    { "definition/identity" => IdentityContent, "definition/contracts" => ContractsContent, "definition/treatments" => TreatmentsContent, _ => ConfigurationContent };
+    private RenderFragment ConfigurationContent => @<div class="resource-editor-view">@AcquisitionContent @StorageDestinationContent @StoragePolicyContent</div>;
+    private RenderFragment AcquisitionsContent => @<div class="resource-editor-view">            <section class="panel form-section" data-testid="dataset-acquisitions">
+                <div class="panel-header"><div><h2>@T(activeTab == DatasetTab.Overview ? "DatasetRecentAcquisitions" : "AcquisitionHistory")</h2><p>@T("DatasetFixedCallHelp")</p></div><div class="form-actions">
+                    @if (activeTab == DatasetTab.Overview) { <button class="text-button" type="button" @onclick="() => SelectTab(DatasetTab.Acquisitions)">@T("DatasetAllHistory") <span aria-hidden="true">→</span></button> }
+                    <button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Refresh")</button>
+                </div></div>
+                @if (readiness?.Ready == false) { <p class="form-alert" role="status">@T("DatasetNotReady")</p> }
+                @if (readiness is { Ready: true, CanAcquire: false }) { <p role="status">@T("DatasetAcquisitionNotAuthorized")</p> }
+                @if (history.Count == 0) { <p class="muted">@T("NoAcquisitions")</p> }
+                else
+                {
+                    <CollectionView TItem="DataSourceAcquisitionResource" Items="VisibleHistory" Compact RowTestId="data-source-acquisition-row" ItemAttributes="AcquisitionAttributes" IdentityLabel="@T("Created")" InformationLabels="@(new[] { T("DatasetContent"), T("FlowRun") })">
+                        <Identity Context="item"><CollectionIdentity DisplayName="@item.CreatedAt.ToLocalTime().ToString("g")" Name="@item.Name" IconName="download">
+                            <IconBadges><StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges>
+                        </CollectionIdentity></Identity>
+                        <Information Context="item">
+                            <CollectionValue Label="@T("DatasetContent")">
+                                @if (item.DirectResult is { } directResult) { <span data-testid="dataset-direct-result">@T("DirectResult") · @Localizer["DatasetBytes", directResult.Length]</span><small>@T("DirectResultHelp")</small> }
+                                @if (item.ContentRetiredAt is not null) { <span data-testid="dataset-content-retired">@T("ContentRetired")</span> }
+                                else if (item.ContentRetirementPending || item.ContentRetiringAt is not null) { <span>@T("ContentRetirementPending")</span> }
+                                @if (item.Content is not null && item.ContentRetiredAt is null) { <small>@Localizer["DatasetBytes", item.Content.Length]</small> }
+                                @foreach (var artifact in item.Manifest?.Artifacts ?? []) { <a class="text-button" data-testid="dataset-artifact-link" href="@($"/artifacts/durable/{Uri.EscapeDataString(artifact.ArtifactId)}")"><code>@artifact.ArtifactId</code></a> }
+                                @if (item.ErrorCode is not null) { <span role="status">@FailureMessage(item.ErrorCode) <code>@item.ErrorCode</code>
+                                    @if (item.ContractFailure is { } failure) { <code>@failure.Boundary · @failure.Path · @failure.Rule</code> }
+                                </span> }
+                            </CollectionValue>
+                            <CollectionValue Label="@T("FlowRun")"><a class="text-button" href="@FlowUrl(item)"><code>@item.FlowRunId</code></a></CollectionValue>
+                        </Information>
+                        <Actions Context="item">@if (item.Content is not null && item.ContentRetiredAt is null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" data-testid="dataset-read-content" @onclick="() => ReadAsync(item)">@T("DatasetReadContent")</button> }</Actions>
+                    </CollectionView>
+                }
+            </section>
+</div>;
+    private RenderFragment ContentView => @<div class="resource-editor-view">            <section class="panel form-section">
+                <div class="panel-header"><div><h2>@T("DatasetContent")</h2><p>@T("DatasetContentUntrusted")</p></div><button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="RefreshAsync">@T("Refresh")</button></div>
+                @if (!ContentAcquisitions.Any()) { <p class="muted">@T("DatasetNoContent")</p> }
+                else
+                {
+                    <FormField Label="@T("DatasetContentAcquisition")" Class="dataset-content-picker"><ClearableSelect TValue="string" Value="@contentAcquisitionKey" ValueExpression="@(() => contentAcquisitionKey)" ValueChanged="value => ChangeContentAcquisitionAsync(new ChangeEventArgs { Value = value })" Disabled="@(busy || !interactive)"><option value="">@T("Select")</option>@foreach (var item in ContentAcquisitions) { <option value="@item.Uid">@item.CreatedAt.ToLocalTime().ToString("g") · @item.Name</option> }</ClearableSelect></FormField>
+                }
+                @if (SelectedContentAcquisition is { Publication.Document: not null, ContentRetiredAt: null } selectedDocuments)
+                {
+                    <DataSourceAcquisitionDocuments @key="selectedDocuments.Uid" Acquisition="selectedDocuments" QuerySaved="() => SelectTab(DatasetTab.Queries)" />
+                }
+                @if (preview is not null)
+                {
+                    <div data-testid="dataset-content"><h3>@T("DatasetContent")</h3><pre class="runner-json">@preview</pre>@if (previewTruncated) { <p>@T("DatasetContentTruncated")</p> }<button class="button-secondary" type="button" @onclick="CloseContent">@T("DatasetCloseContent")</button></div>
+                }
+            </section>
+</div>;
+    private RenderFragment OverviewContent => @<div class="resource-editor-view">@AcquisitionsContent                <section class="panel dataset-composition" aria-label="@T("DatasetComposition")">
+                    <div><span>@T("DatasetService")</span>@if (SavedService is { } service) { <a href="@ServiceDiscoveryUrl(service)">@service.Definition.DisplayName</a> } else { <strong>@T("DatasetPinnedUnavailable")</strong> }</div>
+                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
+                    <div><span>@T("DatasetOperation")</span><strong>@SavedOperationLabel</strong><small>@T("Generation") @source!.Definition.Dataset!.Acquisition.Operation.Generation</small></div>
+                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
+                    <div><span>@T("DatasetDataSource")</span><strong>@source.Definition.DisplayName</strong></div>
+                    <span class="dataset-composition-arrow" aria-hidden="true">→</span>
+                    <div><span>@T("DatasetStorage")</span><strong>@SavedStorageLabel</strong></div>
+                </section>
+                <div class="dataset-summary-grid">
+                    <section class="panel form-section" data-testid="dataset-latest-acquisition">
+                        <h2>@T("LastAcquisition")</h2>
+                        @if (LatestAcquisition is { } latest)
+                        {
+                            <StatusBadge Text="@T($"AcquisitionState.{latest.State}")" Status="@AcquisitionTone(latest.State)" />
+                            <p>@latest.CreatedAt.ToLocalTime().ToString("g")</p>
+                            @if (latest.DirectResult is not null) { <p>@T("DirectResult")</p> }
+                            @if (latest.Content is { } content) { <p class="dataset-content-size">@Localizer["DatasetBytes", content.Length] · JSON</p> }
+                            <div class="form-actions">
+                                @if (latest.Content is not null) { <button class="button-secondary" type="button" disabled="@(busy || !interactive)" @onclick="() => ReadAsync(latest)">@T("DatasetReadContent")</button> }
+                                <a class="text-button" href="@FlowUrl(latest)">@T("DatasetViewFlowRun") <span aria-hidden="true">↗</span></a>
+                            </div>
+                        }
+                        else { <p class="muted">@T("NoAcquisitions")</p> }
+                    </section>
+
+                </div>
+</div>;
+    private sealed record DatasetSetting(string Label, string Value);
+    private IReadOnlyList<DatasetSetting> SavedSettings => source?.Definition.Dataset is not { } saved ? [] :
+    [new(T("DatasetService"), SavedService?.Definition.DisplayName ?? saved.Acquisition.Operation.Operation.ToString()), new(T("DatasetOperation"), SavedOperationLabel),
+     new(T("Parameters"), saved.Acquisition.Parameters.GetRawText()), new(T("DatasetStorage"), SavedStorageLabel), new(T("DatasetPrefix"), saved.Rule.Prefix),
+     new(T("AcquisitionOutputSchema"), ContractSummary(saved.Acquisition.OutputSchemaBinding)), new(T("ProjectedOutputSchema"), ContractSummary(saved.OutputSchemaBinding)),
+     new(T("LifecycleTitle"), JsonSerializer.Serialize(saved.Lifecycle)), new(T("WizardTreatments"), JsonSerializer.Serialize(new { saved.Orchestration, saved.Compositions, saved.Transformations }))];
+    private Task SetEnabledAsync(bool value)
+    {
+        if (!CanManage || busy || resourceRefreshing) return Task.CompletedTask;
+        model.Enabled = value; sectionState.Visit("definition/identity");
+        return Task.CompletedTask;
+    }
 }

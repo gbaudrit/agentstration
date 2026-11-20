@@ -1,0 +1,129 @@
+{
+  "base": "a7e1de901d1b9bca6e68caff73dabacaf3da1fea",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "88b6aebf06b2b8a40299c1e5cd092bb9e0fe6a38358476b0a8de32aa79266815",
+    "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor": "902032347113d59c8e04b9dd3bdc4cf82feb1ba4329222804c0ab63ab3e69f97",
+    "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor.css": "d622fea12060efafe86d90a59f4fb542109ecd87474bac6a50511ff942c74761",
+    "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor": "269b7011b7dfb58a2eb3aad7754174ed4222f35e9e406b565d6bbbb22051763f",
+    "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor.css": "3163ddbe3e047e69b38b17b26a39460622aa970058413f45821814ab92c24e3a",
+    "src/Agentstration.Console.Components/Console/StorageEditorModel.cs": "6b1113b47da9afe6e42ccffa69de82f7711339abfba2ce2ddc75a0fa0d88af49",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.fr-FR.resx": "5fa57e2ced20b9fafbcfc9ab78cdf585a318e1a3f1fdf7dd61d9c6ecc5342c63",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.resx": "a5a1673c9d68480ad8f0ce5b5bb84ee92e55c229fd1a8e21a7ae79f2bed79610",
+    "tests/Agentstration.Console.Components.Tests/StorageComponentTests.EditorFoundation.cs": "b32e0575240abd9c88fdb96da36e35bf4fe404b692455ef074801da319435d3d",
+    "tests/Agentstration.Console.Components.Tests/StorageComponentTests.cs": "c883e826c656c636e755ed5ba442c893f2d45fa8c86b2edd94bd8711d861d7cd",
+    "tests/Agentstration.Console.Components.Tests/StorageLocalizationTests.cs": "d4406650cec664433c13c06644b17451eb0d11ed2380addc1dd04eeed3cd6d9b",
+    "tests/Agentstration.Console.Components.Tests/StructuredDocumentComponentTests.cs": "c6d3f6671f3ad3bd3457f373b5be2735fcd11e79ba7f7dbec5f407ca0e61758b"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "07819b8fed3e26131c4b0b4ec9a01f1d6f8e7a2dabeb1082bf78b3ea0ab5fe00",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "f4e03bfdd1c651ce46fa37c20ab865ab6f18c63ce052cfbe8256143b2e4af659",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "e4981a2ee03d791d2f17f76e4ecc8eeed306693c7a58afc52802e57925afc784",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "07819b8fed3e26131c4b0b4ec9a01f1d6f8e7a2dabeb1082bf78b3ea0ab5fe00",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "07819b8fed3e26131c4b0b4ec9a01f1d6f8e7a2dabeb1082bf78b3ea0ab5fe00",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "f4e03bfdd1c651ce46fa37c20ab865ab6f18c63ce052cfbe8256143b2e4af659",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "f4e03bfdd1c651ce46fa37c20ab865ab6f18c63ce052cfbe8256143b2e4af659",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "e4981a2ee03d791d2f17f76e4ecc8eeed306693c7a58afc52802e57925afc784",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "e4981a2ee03d791d2f17f76e4ecc8eeed306693c7a58afc52802e57925afc784"
+  },
+  "phases": [
+    {
+      "name": "storage-editor",
+      "exitCode": 0,
+      "seconds": 88.2
+    },
+    {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 128.7
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "storage-editor-invalid-identity-desktop-en.png",
+      "sha256": "5627b3ca511a9e2e33fb4711fea62c8a7d81759044671dadaab1eaff9c5bd77b"
+    },
+    {
+      "file": "storage-editor-identity-desktop-en.png",
+      "sha256": "4dfb386b83d1243e4250c51848b3fd7137b7e0468d60a9f704fe6975c268d368"
+    },
+    {
+      "file": "storage-editor-invalid-configuration-desktop-en.png",
+      "sha256": "43ddd9816e1a63302fd9aa2c19097afe082d368f7b2fbcd63a1f4f9105b3ff0d"
+    },
+    {
+      "file": "storage-editor-collections-desktop-en.png",
+      "sha256": "d00cf275fffdb9e60442613380b1478bc4ba236e239826d01d6fe0639aeca5a7"
+    },
+    {
+      "file": "storage-editor-use-policy-desktop-en.png",
+      "sha256": "5ddb2ecc1e92fb85815367ede5f3a26b3d5a34ee3ea2f685eac19d4d9179617f"
+    },
+    {
+      "file": "storage-editor-review-desktop-en.png",
+      "sha256": "cd3f9a5f3a3f1ba45e422c4bf2852207671a593531050ea82a2b58a186530f49"
+    },
+    {
+      "file": "storage-editor-created-desktop-en.png",
+      "sha256": "7567c75b3779432c94207963e523039bd8fc8f93d3c28e5bb7f048831681a03a"
+    },
+    {
+      "file": "storage-editor-invalid-identity-mobile-fr.png",
+      "sha256": "d7a083441dbafa23d0bfe36e2d420aa39980717f331b752a2a7967fc2dbddf49"
+    },
+    {
+      "file": "storage-editor-identity-mobile-fr.png",
+      "sha256": "2f71a24ad7bab683e6ebe914f03744b13957b0b4826124769881c340b6135f4d"
+    },
+    {
+      "file": "storage-editor-invalid-configuration-mobile-fr.png",
+      "sha256": "a3ad2318d94df094548ad4489bc32a2717849690949f62adeb063b1365c39658"
+    },
+    {
+      "file": "storage-editor-collections-mobile-fr.png",
+      "sha256": "aac31f6f7661b7654527cd5aac653c599713f17768aaa68a2e9b57f8b7f30193"
+    },
+    {
+      "file": "storage-editor-use-policy-mobile-fr.png",
+      "sha256": "f88b44c729373ed2c948a45f092ad656ef283504dd48838e7581fe1da9ab1a3b"
+    },
+    {
+      "file": "storage-editor-review-mobile-fr.png",
+      "sha256": "6d3eb2827a07a34aede7608be5e2e8693931484b763d4ce6129051104b870646"
+    },
+    {
+      "file": "storage-editor-created-mobile-fr.png",
+      "sha256": "1327e109a0ac2d7663f05d17124a8af286a648fdbad3ec3515a6418840786dfe"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 55,
+    "logSha256": "71bb6028f6943f59af12c5f1b0b6a4ff82d1a5b5c54cde05635661d4c63f0384"
+  },
+  "maintainedRegression": {
+    "campaign": "storage-editor-03",
+    "base": "a7e1de901d1b9bca6e68caff73dabacaf3da1fea",
+    "phase": {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 128.7
+    },
+    "sourceHashesMatch": true,
+    "hostHashesMatch": true
+  },
+  "nativeProbeSha256": "7d6ec06676d2b5ca97a2791cce7fd0b929cc5d0e62e9d4222deca5f23bef1705",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ]
+}

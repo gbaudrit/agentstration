@@ -1,0 +1,17 @@
+.resource-identity-heading-actions { display: flex; align-items: flex-start; justify-content: flex-end; flex: 0 1 auto; gap: var(--space-3); min-width: 0; max-width: 100%; margin-left: auto; }
+.resource-identity-facts { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); margin: 0; }
+.resource-identity-facts dt { margin: 0; }
+.resource-identity-facts dd { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-family-sans); font-size: var(--font-size-md); font-weight: 400; line-height: 1.5; color: var(--text); }
+.resource-identity-facts dd ::deep code,
+.resource-identity-facts dd ::deep .resource-metadata-badge { font: inherit; color: inherit; }
+.resource-identity-facts dd + dt { margin-top: var(--space-2); padding-top: 0; border-top: 0; }
+.resource-identity-facts ::deep .copyable-value { display: flex; align-items: flex-start; flex-wrap: nowrap; width: 100%; min-width: 0; }
+.resource-identity-facts ::deep .copyable-value > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.resource-identity-facts ::deep .copy-value { flex: 0 0 auto; margin-left: auto; }
+.resource-identity-facts ::deep .copy-feedback { flex: 0 0 auto; white-space: nowrap; font-size: var(--font-size-xs); }
+.resource-identity-facts dt.resource-identity-labels-title { margin-top: var(--space-3); }
+.identity-labels-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-1); padding-bottom: var(--space-1); }
+.identity-labels-row > span { flex: 0 0 auto; }
+@media (hover: hover) and (pointer: fine) {
+    .resource-identity-facts ::deep .copy-value { width: 1.5rem; height: 1.5rem; min-height: 1.5rem; padding: .2rem; }
+}

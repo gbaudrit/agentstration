@@ -1,0 +1,19 @@
+{
+  "productBuildCommit": "050e9607ef2f53506aedab87cb43aa45aac71fe5",
+  "consoleComponentCasesPassed": 823,
+  "screenshots": [
+    "connected-service-review-desktop-en.png",
+    "connected-service-overview-desktop-en.png",
+    "connected-service-saved-desktop-en.png",
+    "connected-service-review-mobile-fr.png",
+    "connected-service-overview-mobile-fr.png",
+    "connected-service-saved-mobile-fr.png"
+  ],
+  "variants": [
+    "desktop en-US/dark 1440x1000",
+    "touch fr-FR/light 390x844"
+  ],
+  "journeySourceChanges": "Artifact and governed-knowledge page objects repaired during validation; record their final commit separately in the adoption matrix. Product binaries stayed unchanged throughout the browser campaigns. Organization member edits were not built and are not validated by these captures.",
+  "finalFunctionalLanesAndSmoke": "pending",
+  "maintainedJourneyRepairCommit": "ce308d23"
+}

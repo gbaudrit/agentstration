@@ -1,0 +1,18 @@
+{
+  "baseCommit": "094ce000cf604e8b603b8edcb6bcc7427b6e4011",
+  "route": "/settings/runtime-workers",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor": "bb4d6a85134a0eabdb3c7b6e45c580a7bd0ff502",
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor.cs": "f7fe274e54cb6956df9f260514392e0e37653b8b",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "removedSources": [
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor.css"
+  ],
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ],
+  "synchronizedWith": "7f03af964dde5c67758d1515e1dda7e934e1871f"
+}

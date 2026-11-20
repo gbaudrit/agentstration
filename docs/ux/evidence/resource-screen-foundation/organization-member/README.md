@@ -1,0 +1,37 @@
+# Organization member: scoped identity administration projection
+
+This surface consumes OrganizationMemberResponse, WorkspaceMemberResponse and explicit administration capabilities. They describe a principal, tenant/workspace memberships, assigned roles and external authentication identities; they are not a Resource definition envelope. The existing operational ResourceDetailsTemplate therefore retains Overview / Workspace membership / authorized External authentication / authorized Instance administration. No fictional namespace, owner badge, labels, generic resource policy, YAML, activation or publication lifecycle is introduced. Actual principal/membership metrics precede the actual Identity panel; saved workspace/membership/platform context uses the same wrapping setting/value CollectionView as resource screens. Tenant-scoped role assignment retains its inherited-role meaning rather than becoming an owner badge.
+
+The page now shares one ResourceSectionState with its navigation and uses typed initial loading, refresh, recoverable Retry, Forbidden and NotFound feedback. A missing member in the successful organization projection is presented as a recoverable failed lookup with its localized message, preserving the existing Retry contract; an actual HTTP 404 uses NotFound. Changed member/workspace-role snapshots are buffered rather than replacing pending role or issuer/subject inputs. Section changes and in-app refresh keep those inputs; explicit Discard adopts the saved snapshot. An unchanged refresh produces no false conflict. Inputs remain editable during a pending refresh while mutation buttons wait for completion. Loss of read access or mismatched member/tenant/workspace/operator capability data clears cached identity, inputs and action capabilities before further private queries.
+
+Membership writes, membership removal, external identity link/unlink and platform grants/revocations retain their independent authorization and exact captured member/workspace targets. The public identity APIs do not expose a resource ETag; no optimistic-locking or generic Resource save is fabricated. Their existing explicit membership save remains a last-write-wins command. Accepting a saved role or authentication result does not discard unrelated authentication/role inputs or later restore a stale buffered membership. Successful role writes and membership removal re-read the saved assigned-role projection to avoid stale roles in Overview, without replacing unrelated authentication inputs. Follow-up identity reads verify the same principal and tenant. Read denials there clear private content. Network failures retain pending inputs and produce localized unconfirmed-operation feedback rather than an unhandled callback. Platform capability, active-principal and self-revocation restrictions remain intact.
+
+No ResourceDefinitionForm/ResourceIdentityEditor is fabricated for this projection: it has no mutable resource identity/definition command. The existing common field controls retain family API validation and separate commands. This is a reviewed operational exception, rather than an excluded resource family or a parallel collection/form framework.
+
+21 focused component/localization cases, TypeScript and all three actual Release hosts pass with zero warnings/errors. Native English/dark desktop and French/light true-touch probes pass: actual local test-account creation within its existing 120-character display-name limit, exact principal/workspace, no fabricated Resource fields, complete ID copy without navigation, retained role and long issuer/subject values through unchanged and concurrently changed membership refresh, exact explicit role write and membership removal refreshing saved role assignments while preserving authentication inputs, successful external link, rejected incomplete link with inputs retained, unlink preserving an unrelated draft, explicit discard, leave cancellation, keyboard/touch, Escape/focus return and document bounds. The two affected maintained Console administration journeys pass on desktop with identical recorded source/host hashes: four browser cases pass in total. Initial probe preparation used a profile without local-account endpoints and an overlong fixture display name; both were corrected without changing product limits. The maintained page object now extracts the GUID from the URL pathname, preserving its context query and the strict identifier assertion. No assertion was removed and no timeout was extended. The 22 PNGs are unmodified captures of the running application; [verification.json](verification.json) records the actual tested base, exact hashes and maintained-regression campaign.
+
+No shared-foundation or protected Agent source/style/translation change. New reusable #1236 journeys remain deferred until explicit UX validation and implementation merge. Existing Console administration journeys remain maintained. Full solution suites are omitted in favor of focused checks and affected desktop/mobile smoke at maintainer request. CI failures were neither inspected nor handled.
+
+
+- [organization-member-overview-desktop-en.png](organization-member-overview-desktop-en.png)
+- [organization-member-role-draft-desktop-en.png](organization-member-role-draft-desktop-en.png)
+- [organization-member-authentication-draft-desktop-en.png](organization-member-authentication-draft-desktop-en.png)
+- [organization-member-retained-refresh-desktop-en.png](organization-member-retained-refresh-desktop-en.png)
+- [organization-member-role-saved-authentication-retained-desktop-en.png](organization-member-role-saved-authentication-retained-desktop-en.png)
+- [organization-member-identity-linked-desktop-en.png](organization-member-identity-linked-desktop-en.png)
+- [organization-member-invalid-link-retained-desktop-en.png](organization-member-invalid-link-retained-desktop-en.png)
+- [organization-member-unlink-keeps-draft-desktop-en.png](organization-member-unlink-keeps-draft-desktop-en.png)
+- [organization-member-explicit-discard-desktop-en.png](organization-member-explicit-discard-desktop-en.png)
+- [organization-member-administration-desktop-en.png](organization-member-administration-desktop-en.png)
+- [organization-member-membership-removed-desktop-en.png](organization-member-membership-removed-desktop-en.png)
+- [organization-member-overview-mobile-fr.png](organization-member-overview-mobile-fr.png)
+- [organization-member-role-draft-mobile-fr.png](organization-member-role-draft-mobile-fr.png)
+- [organization-member-authentication-draft-mobile-fr.png](organization-member-authentication-draft-mobile-fr.png)
+- [organization-member-retained-refresh-mobile-fr.png](organization-member-retained-refresh-mobile-fr.png)
+- [organization-member-role-saved-authentication-retained-mobile-fr.png](organization-member-role-saved-authentication-retained-mobile-fr.png)
+- [organization-member-identity-linked-mobile-fr.png](organization-member-identity-linked-mobile-fr.png)
+- [organization-member-invalid-link-retained-mobile-fr.png](organization-member-invalid-link-retained-mobile-fr.png)
+- [organization-member-unlink-keeps-draft-mobile-fr.png](organization-member-unlink-keeps-draft-mobile-fr.png)
+- [organization-member-explicit-discard-mobile-fr.png](organization-member-explicit-discard-mobile-fr.png)
+- [organization-member-administration-mobile-fr.png](organization-member-administration-mobile-fr.png)
+- [organization-member-membership-removed-mobile-fr.png](organization-member-membership-removed-mobile-fr.png)

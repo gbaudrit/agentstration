@@ -9,6 +9,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
@@ -23,6 +24,7 @@ namespace Agentstration.Web.Tests;
 [DoNotParallelize]
 public sealed partial class ModelProviderNavigationTests
 {
+    private static readonly Guid ProviderUid = Guid.Parse("b8049b46-4416-4cb6-8acd-7bc135dc26be");
     private static readonly ResourceNamespace ProviderNamespace = new("shared.models");
     private static readonly ResourceScopeRef WorkspaceScope = ResourceScopeRef.Workspace(Guid.Parse("b07e7249-b525-4c32-a7bb-5e805fc768e7"));
 
@@ -53,7 +55,7 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    public void ProviderDetailsOffersModelProfileCreationWithProviderContext()
+    public async Task ProviderDetailsOffersModelProfileCreationWithProviderContext()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = CreateContext(out _);
@@ -62,6 +64,9 @@ public sealed partial class ModelProviderNavigationTests
         var rendered = context.Render<ModelProviderDetails>(parameters => parameters
             .Add(component => component.Name, "ollama/local"));
 
+        rendered.WaitForElement(".resource-identity-summary");
+        Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
+        await ProviderSectionAsync(context, rendered, "models");
         rendered.WaitForAssertion(() =>
         {
             var link = rendered.FindAll("a").Single(element => element.TextContent.Contains("Create model profile", StringComparison.Ordinal));
@@ -75,15 +80,15 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(
                 "/models/ollama-local.qwen3-deadbeef?namespace=shared.models&context=%2Finstance",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
-            CollectionAssert.AreEqual(new[] { "Overview", "Configuration", "Access" }, rendered.FindAll("[role='tab']").Select(item => item.TextContent.Trim()).ToArray());
+            CollectionAssert.AreEqual(new[] { "overview", "definition/identity", "definition/configuration", "models", "usages", "access", "yaml" }, rendered.FindComponent<ResourceNavigation>().Instance.Items.Where(item => item.Navigable).Select(item => item.Path).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
         });
 
-        rendered.Find("#model-provider-configuration-tab").Click();
+        await ProviderSectionAsync(context, rendered, "definition/configuration");
         Assert.IsNotNull(rendered.Find("[data-testid='model-provider-form']"));
-        Assert.AreEqual("true", rendered.Find("#model-provider-configuration-tab").GetAttribute("data-interactive"));
-        Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-refresh\"", StringComparison.Ordinal));
-        rendered.Find("#model-provider-overview-tab").Click();
+        Assert.AreEqual("true", rendered.Find("[data-testid=model-provider-form]").GetAttribute("data-interactive"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=model-provider-refresh]"));
+        await ProviderSectionAsync(context, rendered, "models");
         rendered.Find("[data-testid='model-provider-refresh']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -93,7 +98,7 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
         });
 
-        rendered.Find("#model-provider-access-tab").Click();
+        await ProviderSectionAsync(context, rendered, "access");
         rendered.WaitForAssertion(() =>
         {
             Assert.IsNotNull(rendered.Find("[data-testid='resource-access-panel']"));
@@ -128,8 +133,8 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual("ollama-local", providers.RefreshedProvider);
             Assert.IsTrue(context.Services.GetRequiredService<NavigationManager>().Uri.Contains("/modelproviders/ollama-local", StringComparison.Ordinal));
             Assert.IsTrue(context.Services.GetRequiredService<NotificationState>().Items.Any(item => item.Title == "Initial model discovery complete"));
-            StringAssert.Contains(rendered.Find("[data-testid='model-discovery-result']").TextContent, "2 total");
-            Assert.AreEqual(1, rendered.FindAll("[data-testid='open-model-details']").Count);
+            Assert.AreEqual(1, providers.CreatedRequest is null ? 0 : 1);
+            Assert.AreEqual(ResourceScopeRef.Instance, providers.CreatedRequest!.ScopeRef);
         });
     }
 
@@ -174,7 +179,7 @@ public sealed partial class ModelProviderNavigationTests
             Contributions: [new ExtensionContributionResponse("model-provider", "typed")],
             OptionSets: [], Usages: [], Providers: [], Details: null, DiscoverySource: "manual",
             ValueRequirements: [new("model-provider", "typed", "apiVersion", false, "string", "standard", "API version")]);
-        using var context = CreateContext(out _, [extension]);
+        using var context = CreateContext(out var providers, [extension]);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
             "/modelproviders/new?extension=typed-extension&extensionNamespace=default&contributionId=typed");
         var rendered = context.Render<ModelProviderDetails>();
@@ -182,7 +187,11 @@ public sealed partial class ModelProviderNavigationTests
         rendered.Find("[data-testid='model-provider-display-name']").Change("Typed provider");
 
         await rendered.Find("[data-testid='model-provider-form']").SubmitAsync();
-        rendered.Find("#model-provider-configuration-tab").Click();
+        Assert.IsNotNull(providers.CreatedRequest);
+        providers.Replacement = new ModelProviderResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ModelResourceKinds.ModelProvider, Metadata = new() { Name = providers.CreatedRequest.Name }, ScopeRef = ResourceScopeRef.Instance, Definition = providers.CreatedRequest.Properties };
+        rendered.Render(parameters => parameters.Add(component => component.Name, providers.CreatedRequest.Name));
+        rendered.WaitForElement(".resource-identity-summary");
+        await ProviderSectionAsync(context, rendered, "definition/configuration");
 
         rendered.WaitForAssertion(() =>
         {
@@ -192,31 +201,21 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    public void ProviderDetailsKeepsConfigurationDisabledUntilRouteReloadIsConsistent()
+    public void ProviderDetailsSuppressesNavigationAndEditorsUntilRouteReloadIsConsistent()
     {
-        using var culture = new TestCultureScope("en-US");
         using var context = CreateContext(out var providers);
-        var rendered = context.Render<ModelProviderDetails>(parameters => parameters
-            .Add(component => component.Name, "ollama/local"));
-        rendered.WaitForElement("#model-provider-configuration-tab[data-interactive='true']");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/modelproviders/ollama%2Flocal?namespace=shared.models");
+        var rendered = context.Render<ModelProviderDetails>(parameters => parameters.Add(component => component.Name, "ollama/local"));
+        rendered.WaitForElement(".resource-identity-summary");
         providers.DelayUsages();
-
-        rendered.Render(parameters => parameters
-            .Add(component => component.Name, "ollama/reloaded"));
-
-        rendered.WaitForAssertion(() =>
-        {
-            var configuration = rendered.Find("#model-provider-configuration-tab");
-            Assert.AreEqual("false", configuration.GetAttribute("data-interactive"));
-            Assert.IsTrue(configuration.HasAttribute("disabled"));
-        });
-
+        rendered.Render(parameters => parameters.Add(component => component.Name, "ollama/reloaded"));
+        Assert.AreEqual(ResourceLoadStatus.Loading, rendered.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsEmpty(rendered.FindAll("form, .resource-navigation"));
         providers.CompleteUsages();
         rendered.WaitForAssertion(() =>
         {
-            var configuration = rendered.Find("#model-provider-configuration-tab");
-            Assert.AreEqual("true", configuration.GetAttribute("data-interactive"));
-            Assert.IsFalse(configuration.HasAttribute("disabled"));
+            Assert.AreEqual(ResourceLoadStatus.Ready, rendered.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+            Assert.IsNotNull(rendered.Find(".resource-identity-summary"));
         });
     }
 
@@ -347,8 +346,8 @@ public sealed partial class ModelProviderNavigationTests
         rendered.WaitForAssertion(() =>
         {
             var target = rendered.Find("[data-requirement-id='projectEndpoint'] [data-testid='model-provider-binding-target']");
-            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
-            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-projectendpoint", target.QuerySelector("option[selected]")?.GetAttribute("value"));
+            Assert.AreEqual($"{ResourceScopeRef.Instance.Value}|default|mp-foundry-projectendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
+            Assert.AreEqual($"{ResourceScopeRef.Instance.Value}|default|mp-foundry-projectendpoint", target.QuerySelector("option[selected]")?.GetAttribute("value"));
             StringAssert.Contains(target.TextContent, "projectEndpoint");
             Assert.IsFalse(rendered.Markup.Contains("contextual-parameter-creator", StringComparison.Ordinal));
         });
@@ -359,7 +358,7 @@ public sealed partial class ModelProviderNavigationTests
         rendered.WaitForAssertion(() =>
         {
             var target = rendered.Find("[data-requirement-id='inferenceEndpoint'] [data-testid='model-provider-binding-target']");
-            Assert.AreEqual($"{WorkspaceScope.Value}|default|mp-foundry-inferenceendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
+            Assert.AreEqual($"{ResourceScopeRef.Instance.Value}|default|mp-foundry-inferenceendpoint", ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
             Assert.HasCount(0, rendered.FindAll("[data-testid='contextual-parameter-creator']"));
         });
     }
@@ -388,7 +387,7 @@ public sealed partial class ModelProviderNavigationTests
         rendered.WaitForAssertion(() =>
         {
             var target = rendered.Find("[data-testid='model-provider-binding-target']");
-            var expected = $"{WorkspaceScope.Value}|default|mp-foundry-credential";
+            var expected = $"{ResourceScopeRef.Instance.Value}|default|mp-foundry-credential";
             Assert.AreEqual(expected, ((AngleSharp.Html.Dom.IHtmlSelectElement)target).Value);
             Assert.AreEqual(expected, target.QuerySelector("option[selected]")?.GetAttribute("value"));
             Assert.IsFalse(rendered.Markup.Contains("browser-secret-must-disappear", StringComparison.Ordinal));
@@ -458,7 +457,7 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    public void ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
+    public async Task ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = CreateContext(out var providers);
@@ -476,10 +475,11 @@ public sealed partial class ModelProviderNavigationTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
         });
-        Assert.AreEqual("true", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
-        rendered.Find("[data-testid='model-profile-edit-tab']").Click();
-        Assert.AreEqual("true", rendered.Find("#model-profile-page-edit").GetAttribute("aria-selected"));
-        Assert.AreEqual("false", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
+        Assert.AreEqual("page", rendered.Find("[data-resource-section='overview']").GetAttribute("aria-current"));
+        await rendered.InvokeAsync(() => context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#definition/identity"));
+        Assert.AreEqual("page", rendered.Find("[data-resource-section='definition/identity']").GetAttribute("aria-current"));
+        Assert.IsNull(rendered.Find("[data-resource-section='overview']").GetAttribute("aria-current"));
         rendered.Find("[data-testid='model-profile-review-usages']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -502,7 +502,7 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedResolutionContextScope);
             var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
                 .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
-            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance&tab=usages";
+            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance#usages";
             Assert.AreEqual(
                 $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}&context={Uri.EscapeDataString(WorkspaceScope.Value)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
                 workspaceLink.GetAttribute("href"));
@@ -516,7 +516,7 @@ public sealed partial class ModelProviderNavigationTests
         using var context = CreateContext(out var providers);
         context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}&tab=edit");
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}#definition/identity");
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
@@ -533,16 +533,16 @@ public sealed partial class ModelProviderNavigationTests
             Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-delete']"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-save']"));
-            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-access-tab']"));
+            Assert.IsEmpty(rendered.FindAll("[data-resource-section='access']"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Find("[data-testid='model-profile-definition-fields']")
                 .HasAttribute("disabled"));
-            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-usages-tab']"));
+            Assert.HasCount(1, rendered.FindAll("[data-resource-section='usages']"));
         });
     }
 
     [TestMethod]
-    public void ExistingModelProfileShowsLocalizedEmptyUsages()
+    public async Task ExistingModelProfileShowsLocalizedEmptyUsages()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = CreateContext(out _);
@@ -552,7 +552,8 @@ public sealed partial class ModelProviderNavigationTests
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
-        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+        await rendered.InvokeAsync(() => context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#usages"));
 
         rendered.WaitForAssertion(() =>
         {
@@ -563,10 +564,17 @@ public sealed partial class ModelProviderNavigationTests
         });
     }
 
+    private static Task ProviderSectionAsync(BunitContext context, IRenderedComponent<ModelProviderDetails> cut, string path) =>
+        cut.InvokeAsync(() => { var navigation = context.Services.GetRequiredService<NavigationManager>(); navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#" + path); });
+
     private static BunitContext CreateContext(out StubModelProvidersClient providers,
         IReadOnlyList<ExtensionResponse>? extensions = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigationModule = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        navigationModule.Mode = JSRuntimeMode.Loose;
+        navigationModule.Setup<string>("navigate", _ => true).SetResult("http://localhost/modelproviders/provider");
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         providers = new StubModelProvidersClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -592,14 +600,13 @@ public sealed partial class ModelProviderNavigationTests
         public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceScopeInventoryResponse([
                 new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", null, false,
-                    [new(Guid.Empty, ProviderNamespace, ModelResourceKinds.ModelProvider, "ollama/local", DateTimeOffset.UnixEpoch)]),
+                    [new(ProviderUid, ProviderNamespace, ModelResourceKinds.ModelProvider, "ollama/local", DateTimeOffset.UnixEpoch)]),
                 new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", ResourceScopeRef.Instance, true, [])
             ]));
         public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string kind, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([
-                new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true),
-                new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)
-            ]);
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>(kind == ModelResourceKinds.ModelProvider
+                ? [new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true)]
+                : [new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", true), new(WorkspaceScope, ResourceScopeKind.Workspace, "Default workspace", true)]);
     }
 
     private sealed class StubResourceAccessPolicyClient : IResourceAccessPolicyClient
@@ -625,6 +632,12 @@ public sealed partial class ModelProviderNavigationTests
         public int RefreshCalls { get; private set; }
         public string? RefreshedProvider { get; private set; }
         public bool FailRefresh { get; set; }
+        public AgentstrationApiException? ReadError { get; set; }
+        public ModelProviderResource? Replacement { get; set; }
+        public string ReadEtag { get; set; } = "\"provider-etag\"";
+        public string? UpdateEtag { get; private set; }
+        public PutModelProviderRequest? UpdatedRequest { get; private set; }
+        public Task<ResourceSnapshot<ModelProviderResource>>? PendingRead { get; set; }
         public CreateModelProviderRequest? CreatedRequest { get; private set; }
         private TaskCompletionSource<ModelProviderUsagesResponse>? usagesCompletion;
 
@@ -650,7 +663,7 @@ public sealed partial class ModelProviderNavigationTests
         }
 
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ModelProviderResource>(ProviderResource(providerName), "\"provider-etag\""));
+            ReadError is not null ? Task.FromException<ResourceSnapshot<ModelProviderResource>>(ReadError) : PendingRead ?? Task.FromResult(new ResourceSnapshot<ModelProviderResource>(Replacement ?? ProviderResource(providerName), ReadEtag));
 
         public Task<ModelProviderUsagesResponse> GetModelProviderUsagesAsync(string providerName, CancellationToken cancellationToken) =>
             usagesCompletion?.Task ?? Task.FromResult(new ModelProviderUsagesResponse([], 0));
@@ -703,12 +716,17 @@ public sealed partial class ModelProviderNavigationTests
 
             return Task.FromResult(new ModelDiscoveryDiffResponse(0, 1, 1, 0, 0, 2));
         }
-        public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken)
+        {
+            UpdateEtag = etag; UpdatedRequest = request;
+            return Task.FromResult(new ResourceSnapshot<ModelProviderResource>((Replacement ?? ProviderResource(providerName)) with { Definition = request.Properties }, "\"provider-updated\""));
+        }
         public Task DeleteModelProviderAsync(string providerName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         private static ModelProviderResource ProviderResource(string name) => new()
         {
+            Uid = ProviderUid,
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProvider,
             Metadata = new ResourceMetadata { Name = name, Namespace = ProviderNamespace },
@@ -768,6 +786,13 @@ public sealed partial class ModelProviderNavigationTests
             Metadata = new() { Name = "local-vault" },
             ScopeRef = WorkspaceScope,
             Definition = new VaultProperties { DisplayName = "Local vault", ProviderType = "local" }
+        }, "available"), new(new VaultResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "instance-vault" },
+            ScopeRef = ResourceScopeRef.Instance,
+            Definition = new VaultProperties { DisplayName = "Instance vault", ProviderType = "local" }
         }, "available")]);
         public Task<ResourceSnapshot<VaultResponse>> GetVaultAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<VaultResource>> CreateVaultAsync(CreateVaultRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -815,15 +840,21 @@ public sealed partial class ModelProviderNavigationTests
 
     private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
     {
+        public string ReadEtag { get; set; } = "\"profile-etag\"";
+        public AgentstrationApiException? ReadFailure { get; set; }
+        public PutModelProfileRequest? UpdatedRequest { get; private set; }
+        public string? UpdateEtag { get; private set; }
+        public ModelProfileUsagesResponse? UsagesOverride { get; set; }
         public Task<ModelProfileUsagesResponse>? PendingUsages { get; init; }
         public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
         public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
         public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
 
-        private static readonly ModelProfileResource Profile = new()
+        public ModelProfileResource Profile { get; set; } = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProfile,
+            Uid = Guid.Parse("eab7e957-a397-4bc0-ab45-8db6cc283005"),
             Metadata = new ResourceMetadata { Name = "shared-reasoning" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new ModelProfileProperties
@@ -844,7 +875,7 @@ public sealed partial class ModelProviderNavigationTests
         public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
             string profileName,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, "\"profile-etag\""));
+            ReadFailure is { } exception ? Task.FromException<ResourceSnapshot<ModelProfileResource>>(exception) : Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, ReadEtag));
 
         public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
             ResourceNamespace @namespace,
@@ -859,9 +890,9 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             string profileName,
-            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(hasUsages
+            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(UsagesOverride ?? (hasUsages
                 ? Usages
-                : new ModelProfileUsagesResponse([], 0));
+                : new ModelProfileUsagesResponse([], 0)));
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             ResourceNamespace @namespace,
@@ -899,7 +930,13 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken)
+        {
+            UpdatedRequest = request; UpdateEtag = etag;
+            Profile = Profile with { Definition = request.Properties, Generation = Profile.Generation + 1 };
+            ReadEtag = "\"profile-saved\"";
+            return Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, ReadEtag));
+        }
         public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

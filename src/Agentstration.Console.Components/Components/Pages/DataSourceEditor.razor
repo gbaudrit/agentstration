@@ -10,182 +10,61 @@
 
 @if (DatasetMode)
 {
-    <DataSourceDatasetEditor Name="@Name" Namespace="@Namespace" ScopeRef="@ScopeRef" View="@View" />
+    <DataSourceDatasetEditor Name="@Name" Namespace="@Namespace" ScopeRef="@ScopeRef" />
 }
 else
 {
-<PageTitle>@(source?.Definition.DisplayName ?? T(IsNew ? "CreateSource" : "DataSources")) · Agentstration</PageTitle>
-<PageHeader Title="@(source?.Definition.DisplayName ?? T("CreateSource"))" Description="@T("DataSourcesHelp")" TestId="data-source-editor">
-    <Actions>@if (!IsNew && CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
-</PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else
-{
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-    @if (operationsError is not null && (tab is Tab.Discovery or Tab.Acquisitions)) { <div class="form-alert form-alert-danger" role="alert" data-testid="data-source-operations-error">@operationsError</div> }
-    @if (!IsNew && selectedScope is not null) { <InheritedResourceNotice OwnerScopeRef="selectedScope.Value" /> }
-    @if (!IsNew) { <ResourceTabs Label="@T("DataSources")">@foreach (var value in Enum.GetValues<Tab>().Where(value => CanManage || value is not Tab.Access)) { <button type="button" role="tab" class="@(tab == value ? "active" : null)" @onclick="() => SelectTab(value)">@T(value.ToString())</button> }</ResourceTabs> }
-    @if (tab == Tab.Overview && !IsNew)
+    <PageTitle>@(source?.Definition.DisplayName ?? T("CreateSource")) · Agentstration</PageTitle>
+    var presentations = Presentations;
+    RenderFragment feedback = @<div>
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+        @if (operationsError is not null) { <div class="form-alert form-alert-danger" role="alert" data-testid="data-source-operations-error">@operationsError</div> }
+        @if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("SourceRefreshDraftConflict")</div> }
+    </div>;
+    RenderFragment form = @<ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" Id="data-source-definition" FormName="data-source-definition"
+        FieldLabels="FieldLabels" Sections="presentations" SectionState="@(IsNew ? null : sectionState)" SectionContent="@(IsNew ? null : DefinitionContent)" SectionRequested="ShowSection"
+        OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)"
+        @oninput="MarkDirty" @onchange="MarkDirty">
+        <ChildContent>@if (IsNew) { <CreationWizard @ref="creationWizard" Steps="CreationSteps" OnFinish="FinishCreationAsync" OnStepReady="CreationStepReady" Busy="busy" FinishLabel="@T("WizardCreate")" FinishTestId="data-source-save" /> }</ChildContent>
+    </ResourceDefinitionForm>;
+    @if (IsNew)
     {
-        <section class="metric-grid"><MetricCard Label="@T("State")" Value="@T(readiness?.Ready == true ? "Ready" : "NotReady")" Detail="@T(source!.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning)" /><MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source!.Definition.Profile?.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Status="@UiStatus.Info" Url="@ProfileUrl" /><MetricCard Label="@T("Generation")" Value="@source.Generation.ToString()" Detail="@($"{source.Namespace}/{source.Name}")" Status="@UiStatus.Info" /><MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? T("None") : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition is null ? T("AcquisitionCount", acquisitions.Count) : $"{T("AcquisitionCount", acquisitions.Count)} · {LatestAcquisition.CreatedAt.ToLocalTime():g}")" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@AcquisitionsUrl" /></section>
-        @if (readiness?.Issues.Count > 0) { <section class="panel form-section">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</section> }
-        @if (AcquisitionFlow is { } acquisitionFlow)
-        {
-            <section class="panel form-section data-source-flow-composition" data-testid="data-source-flow-composition">
-                <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("AcquisitionFlow")</h2><p>@T("AcquisitionFlowHelp")</p></div></div>
-                <a class="data-source-flow-card" href="@AcquisitionFlowUrl" data-testid="data-source-acquisition-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("AcquisitionFlow")</small><strong>@acquisitionFlow.Name</strong><code>@AcquisitionFlowIdentity</code></span><UiIcon Name="arrow-right" /></a>
-            </section>
-        }
+        <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+        <PageHeader CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Title="@T("CreateSource")" Description="@T("DataSourcesHelp")" TestId="data-source-editor"></PageHeader>
+        @feedback
+        @if (loading) { <LoadingState Message="@T("Loading")" /> } else { @form }
     }
-    else if (tab == Tab.Definition || IsNew)
+    else
     {
-        <EditForm Model="this" OnValidSubmit="SaveAsync" class="panel form-section"><fieldset class="resource-definition-fields" disabled="@(!CanManage)"><FormGrid>
-            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />
-            <FormField Label="@T("Namespace")"><ClearableText @bind-Value="sourceNamespace" Disabled="@(!IsNew)" /></FormField>
-            @if (IsNew) { <ResourceScopeFormField ResourceKind="@DataSourceResourceKinds.DataSource" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }
-            <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" maxlength="2000"></ClearableText></FormField>
-            <label class="data-source-choice form-span-2" data-testid="data-source-enabled-option"><FormCheckbox @bind-Value="enabled" /><span class="data-source-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("Enabled")</strong><small>@T("EnabledHelp")</small></span></label>
-            <FormField Label="@T("Profile")" Class="form-span-2" Required="true"><ClearableSelect TValue="string" Value="@profileKey" ValueExpression="@(() => profileKey)" ValueChanged="value => ChangeProfile(new ChangeEventArgs { Value = value })" required data-testid="data-source-profile"><option value="">@T("Select")</option>@foreach (var item in profiles) { <option value="@ProfileKey(item)">@item.Definition.DisplayName · @item.ActiveVersion · @item.ScopeRef</option> }@if (readiness?.Profile is { } resolvedProfile && profiles.All(item => ProfileKey(item) != ProfileKey(resolvedProfile))) { <option value="@ProfileKey(resolvedProfile)">@resolvedProfile.Definition.DisplayName · @resolvedProfile.Version · @resolvedProfile.ScopeRef</option> }</ClearableSelect></FormField>
-            <div class="form-field-wide schema-backed-input" data-testid="data-source-configuration"><span>@T("Configuration")</span><JsonSchemaInputEditor Schema="ConfigurationSchema" Value="configuration" ValueChanged="value => configuration = value" ValidationChanged="state => configurationValid = state.IsValid" Disabled="busy" /></div>
-        </FormGrid>@if (CanManage) { <FormActions><button class="button-primary" type="submit" data-testid="data-source-save" disabled="@(busy || !configurationValid)">@(busy ? T("Saving") : T("Save"))</button></FormActions> }</fieldset></EditForm>
+        <ConsoleResourceDetailsTemplate CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
+            Name="@(source?.Definition.DisplayName ?? Name!)" ResourceType="@T("DatasetDataSource")" Domain="data" IconName="database" Description="@source?.Definition.Description"
+            ResourceIdentity="@($"{loadedKey}|{source?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections"
+            LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshResourceAsync" Feedback="feedback" HasDraft="HasDraft" HasAdditionalDraft="@(businessTouched || toolAcquisition is not null)"
+            DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)" Busy="@(busy || resourceRefreshing)"
+            @bind-Yaml="rawYaml" YamlReadOnly="@(!CanManage || FormDirty)" YamlTitle="@T("DataSourceYaml")" YamlDescription="@T("DataSourceYamlHelp")"
+            Enabled="@(source is null ? null : model.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanManage || busy || resourceRefreshing)" EnabledTestId="data-source-enabled-option"
+            SectionTestIdPrefix="data-source" TestId="data-source-editor">
+            <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || resourceRefreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+            <OverviewMetrics>
+                <MetricCard Label="@T("State")" Value="@(readiness is null ? "—" : T(readiness.Ready ? "Ready" : "NotReady"))" Status="@(readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning)" />
+                <MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source?.Definition.Profile?.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Url="@ProfileUrl" />
+                <MetricCard Label="@T("Generation")" Value="@source?.Generation.ToString()" />
+                <MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? "—" : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition?.CreatedAt.ToLocalTime().ToString("g"))" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@(source is null ? null : AcquisitionsUrl)" />
+            </OverviewMetrics>
+            <OverviewConfiguration><CollectionView TItem="SourceSetting" Items="SavedSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")">@if (entry.Href is { } href) { <a class="configuration-value" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information></CollectionView></OverviewConfiguration>
+            <OverviewContent>
+                @if (readiness?.Issues.Count > 0) { <FormSection Title="@T("State")">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</FormSection> }
+                @if (AcquisitionFlow is { } flow) { <FormSection Title="@T("AcquisitionFlow")" Description="@T("AcquisitionFlowHelp")" TestId="data-source-flow-composition"><a class="data-source-flow-card" href="@AcquisitionFlowUrl" data-testid="data-source-acquisition-flow-link"><UiIcon Name="workflow" /><strong>@flow.Name</strong><code>@AcquisitionFlowIdentity</code></a></FormSection> }
+            </OverviewContent>
+            <DefinitionContent Context="path">@form</DefinitionContent>
+            <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "discovery") { @DiscoveryContent }</AdditionalContent>
+            <DraftActions><button class="text-button" type="button" disabled="@(busy || resourceRefreshing)" @onclick="Discard">@T("SourceDiscard")</button>
+                @if (sectionState.Is("yaml")) { <button class="button-primary" type="button" disabled="@(busy || resourceRefreshing || FormDirty)" @onclick="SaveYamlAsync">@T("SaveYaml")</button> }
+                else { <button class="button-primary" type="submit" form="data-source-definition" data-testid="data-source-save" disabled="@(busy || resourceRefreshing || !configurationValid)">@T("Save")</button> }
+            </DraftActions>
+        </ConsoleResourceDetailsTemplate>
     }
-    else if (tab == Tab.Acquisitions)
-    {
-        <section class="panel form-section data-source-acquisitions" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.Ready != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
-        @if (readiness?.Discovery is not null) { <FormField Label="@T("AcquisitionTarget")" Class="form-span-2"><ClearableSelect TValue="string" @bind-Value="selectedTarget" data-testid="data-source-acquisition-target"><option value="">@T("SelectTarget")</option>@foreach (var item in targets.Where(value => value.Target.Enabled)) { <option value="@item.Target.Name" disabled="@item.Stale">@item.Target.DisplayName @(item.Stale ? $"· {T("Stale")}" : string.Empty)</option> }</ClearableSelect></FormField> }
-        <div class="data-source-parameters" data-testid="data-source-acquisition-parameters"><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="AcquisitionParametersSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="busy" /><small>@T("ParametersHelp")</small></div>
-        @if (acquisitions.Count == 0)
-        {
-            <p class="muted">@T("NoAcquisitions")</p>
-        }
-        else
-        {
-            <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("FlowRun"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 })">
-                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" IconName="database" ><IconBadges><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges></CollectionIdentity></Identity>
-                <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" /></Scope>
-                <Information Context="item">
-                    <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
-                    <CollectionValue Label="@T("FlowRun")"><code>@item.FlowRunId</code></CollectionValue>
-                    <CollectionValue Label="@T("Version")"><code>@(item.Composition?.Profile.Version ?? item.Dataset?.OperationType.Version)</code></CollectionValue>
-                    <CollectionValue Label="@T("AcquiredArtifacts")">@(item.Manifest?.Artifacts.Count.ToString() ?? "—")</CollectionValue>
-                </Information>
-                <Actions Context="item"><CollectionActions ResourceName="@item.Name"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId">@T("FlowRun")</a>
-                            @if (item.Manifest is { Artifacts.Count: > 0 })
-                            {
-                                <div class="data-source-acquisition-actions">
-                                    <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">
-                                        @T(previewAcquisition == item.Uid ? "HideAcquiredArtifacts" : "ViewAcquiredArtifacts")
-                                    </button>
-                                    @if (CanCreateAcquisitionTool(item))
-                                    {
-                                        <button class="button-secondary" type="button" aria-haspopup="dialog" data-testid="data-source-create-tool" @onclick="() => toolAcquisition = item">
-                                            @T("CreateAcquisitionTool")
-                                        </button>
-                                    }
-                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition is AcquisitionToolDefinitionProperties { Acquisition: var binding }
-                                        && binding.TemplateId == item.Name && binding.TemplateNamespace == item.Namespace))
-                                    {
-                                        <a class="button-secondary" href="@AcquisitionToolUrl(linkedTool)" data-testid="data-source-linked-tool">@linkedTool.Definition.DisplayName</a>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                <span class="muted">—</span>
-                            }
-                        </CollectionActions></Actions>
-                <Details Context="item"><div class="data-source-acquisition-preview-row"><DataSourceAcquisitionArtifacts @key="item.Uid" Artifacts="item.Manifest!.Artifacts" ContextScope="CurrentConsoleScope" /></div></Details>
-            </CollectionView>
-        }
-        </section>
-        @if (toolAcquisition is { } template)
-        {
-            <DataSourceAcquisitionToolEditor @key="template.Uid" Acquisition="template"
-                SourceDisplayName="@source!.Definition.DisplayName" WorkspaceDisplayName="@ConsoleContext?.WorkspaceDisplayName"
-                ContextScope="CurrentConsoleScope" OnCancel="() => toolAcquisition = null" />
-        }
-    }
-    else if (tab == Tab.Discovery)
-    {
-        <section class="panel form-section data-source-discovery" data-testid="data-source-discovery">
-        <div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><FormActions>
-            <button class="button-secondary" type="button" disabled="@(busy || refreshing)" data-testid="data-source-refresh-discovery" @onclick="RefreshOperationsAsync">@T("Refresh")</button>
-            <button class="button-primary" type="button" data-testid="data-source-start-discovery" disabled="@(busy || HasActiveDiscovery || readiness?.Discovery is null)" @onclick="StartDiscoveryAsync">@T("StartDiscovery")</button>
-        </FormActions></div>
-        @if (readiness?.Discovery is { } discoveryFlow)
-        {
-            <a class="data-source-flow-card" href="@DiscoveryFlowUrl" data-testid="data-source-discovery-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("DiscoveryFlowTitle")</small><strong>@discoveryFlow.Name</strong><code>@discoveryFlow.ScopeRef · @discoveryFlow.Namespace/@discoveryFlow.Version</code></span><UiIcon Name="arrow-right" /></a>
-        }
-        <p class="muted">@T("DiscoveryLiveUpdates")</p>
-        <nav class="section-tabs" role="tablist" aria-label="@T("Discovery")">
-            <button id="discovery-results-tab" type="button" role="tab" aria-selected="@(!discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(!discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-results-tab" @onclick="() => discoveryHistorySelected = false">@T("DiscoveryResultsTab")</button>
-            <button id="discovery-history-tab" type="button" role="tab" aria-selected="@(discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-history-tab" @onclick="() => discoveryHistorySelected = true">@T("DiscoveryHistoryTab")</button>
-        </nav>
-        <div id="discovery-panel" role="tabpanel" aria-labelledby="@(discoveryHistorySelected ? "discovery-history-tab" : "discovery-results-tab")" tabindex="0">
-        @if (discoveryHistorySelected)
-        {
-        <section class="data-source-discovery-history" data-testid="data-source-discovery-history" aria-live="polite">
-            <h3>@T("DiscoveryHistory")</h3>
-            @if (discoveries.Count > 0)
-            {
-                <CollectionView TItem="DataSourceDiscoveryResource" Items="discoveries" InformationLabels="@(new string[] { T("FlowRun"), T("Version") })" RowTestId="data-source-discovery-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" IdentityLabel="@T("Created")" StateLabel="@T("State")">
-        <Identity Context="item">
-@item.CreatedAt.ToLocalTime().ToString("g")</Identity>
-        <State Context="item">
-<StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></State>
-        <Information Context="item">
-            <CollectionValue Label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></CollectionValue>
-            <CollectionValue Label="@T("Version")"><code>@item.Composition.Profile.Version</code></CollectionValue>
-        </Information>
-    </CollectionView>
-            }
-            else { <p class="muted">@T("NoDiscovery")</p> }
-        </section>
-        }
-        else
-        {
-        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <CollectionView TItem="DataSourceDiscoveryChoice" Items="manifest.Choices" InformationLabels="@(new string[] { T("Parent"), T("TargetName") })" RowTestId="data-source-discovery-choice" IdentityLabel="@T("Choice")" StateLabel="@T("State")">
-        <Identity Context="choice">
-<strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></Identity>
-        <State Context="choice">
-@(choice.Eligible ? T("Eligible") : T("Ineligible"))</State>
-        <Information Context="choice">
-            <CollectionValue Label="@T("Parent")">@(choice.ParentId ?? "—")</CollectionValue>
-            <CollectionValue Label="@T("TargetName")"><ClearableText Value="@PromotionName(choice)" aria-label="@T("TargetName")" ValueChanged="changed => promotionNames[choice.Id] = (new ChangeEventArgs { Value = changed }).Value?.ToString() ?? string.Empty" /></CollectionValue>
-        </Information>
-    <Actions Context="choice"><CollectionActions ResourceName="@choice.DisplayName"><Primary><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></Primary></CollectionActions></Actions></CollectionView> }
-        @if (targets.Count > 0)
-        {
-            <h3>@T("AcquisitionTargets")</h3>
-            @if (targets.Any(item => item.Stale)) { <p class="muted">@T("ReconcileHelp")</p> }
-            <CollectionView TItem="DataSourceAcquisitionTargetView" Items="targets" InformationLabels="@(new string[] { T("Choice") })" RowTestId="data-source-acquisition-target-row" IdentityLabel="@T("Name")" StateLabel="@T("State")">
-        <Identity Context="item">
-@item.Target.DisplayName<br/><code>@item.Target.Name</code></Identity>
-        <State Context="item">
-<span title="@(item.Stale && !CanReconcile(item) ? T("ReconcileUnavailable") : null)"><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></span></State>
-        <Information Context="item">
-            <CollectionValue Label="@T("Choice")">@item.Target.ChoiceDisplayName</CollectionValue>
-        </Information>
-    </CollectionView>
-        }
-        }
-        </div>
-        </section>
-    }
-    else if (tab == Tab.Access && CanManage)
-    {
-        <ResourceAccessPanel OwnerScopeRef="selectedScope!.Value" Namespace="source!.Namespace" Kind="@DataSourceResourceKinds.DataSource" Name="@source.Name" Generation="source.Generation" Governance="source.Governance" />
-    }
-    else if (tab == Tab.Yaml)
-    {
-        <FormSection Title="@T("DataSourceYaml")" Eyebrow="@T("RawResource")" Description="@T("DataSourceYamlHelp")" TestId="data-source-yaml-editor"><ChildContent>
-            <FormField Label="@T("ResourceManifest")" Class="data-source-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="28" aria-label="@T("ResourceManifest")" @bind-Value="rawYaml" ReadOnly="@(!CanManage)"></ClearableText></ChildContent></FormField>
-            @if (CanManage) { <FormActions><button class="button-primary" type="button" disabled="@busy" @onclick="SaveYamlAsync">@(busy ? T("Saving") : T("SaveYaml"))</button></FormActions> }
-        </ChildContent></FormSection>
-    }
-}
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
-
+    <ConfirmationDialog IsOpen="confirmDelete" Title="@T("Delete")" Message="@T("DeleteConfirm")" ConfirmLabel="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 }
 
 @code {
@@ -194,7 +73,7 @@ else
     private bool DatasetMode => Composition == "dataset" || source?.Definition.Dataset is not null;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
-    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceProfileResource> profiles = [];
     private IReadOnlyList<DataSourceAcquisitionResource> acquisitions = [];
@@ -209,16 +88,17 @@ else
     private Task polling = Task.CompletedTask;
     private long operationVersion;
     private bool refreshing, disposed;
-    private string technicalName = string.Empty, displayName = string.Empty, sourceNamespace = "default", description = string.Empty, profileKey = string.Empty, rawYaml = string.Empty, selectedTarget = string.Empty;
-    private JsonElement configuration = EmptyObject(), parameters = EmptyObject();
-    private bool enabled = true, loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
-    private Tab tab = Tab.Definition;
+    private DataSourceEditorModel model = new();
+    private string rawYaml = string.Empty, selectedTarget = string.Empty;
+    private JsonElement parameters = EmptyObject();
+    private bool loading = true, busy, confirmDelete, configurationValid = true, parametersValid = true;
+
     private bool discoveryHistorySelected;
     private Guid? previewAcquisition;
     private DataSourceAcquisitionResource? toolAcquisition;
     private IReadOnlyList<ToolDefinitionResource> acquisitionTools = [];
     private string AcquisitionToolUrl(ToolDefinitionResource tool) =>
-        $"/tools/{Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(tool.Name))}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}&view=execution";
+        $"/tools/{Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(tool.Name))}?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}#execution";
     private ConsoleContextSnapshot? ConsoleContext => Services.GetService<ConsoleContextState>()?.Current;
     private bool CanCreateAcquisitionTool(DataSourceAcquisitionResource item) =>
         item.State == DataSourceAcquisitionState.Succeeded
@@ -227,21 +107,20 @@ else
         && context.WorkspaceId == item.WorkspaceId
         && context.Permissions.Contains(AuthorizationPermissions.ResourcesWrite);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManage => IsNew || selectedScope is not null && ResourceOwnershipContext.CanManage(selectedScope.Value, Services);
+    private bool CanManage => (ConsoleContext is null || ConsoleContext.Permissions.Contains(AuthorizationPermissions.ResourcesWrite))
+        && (IsNew || source is { Governance.IsManaged: false } && selectedScope is { } owner && ResourceOwnershipContext.CanManage(owner, Services));
     private DataSourceAcquisitionResource? LatestAcquisition => acquisitions.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
     private DataSourceDiscoveryResource? LatestDiscovery => discoveries.OrderByDescending(value => value.CreatedAt).FirstOrDefault();
     private string? ProfileUrl => readiness?.Profile is not { } profile ? null
-        : $"/data-source-profiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace.Value)}&scopeRef={Uri.EscapeDataString(profile.ScopeRef.Value)}";
-    private string AcquisitionsUrl => $"{Url(source!)}&view=acquisitions";
+        : ResourceOwnershipContext.Resource(Services, "/data-source-profiles", profile.Name, profile.Namespace, profile.ScopeRef);
+    private string AcquisitionsUrl => $"{Url(source!)}#acquisitions";
     private ResolvedDataSourceFlowBinding? AcquisitionFlow => readiness?.Acquisition;
     private ResourceNamespace AcquisitionFlowNamespace => AcquisitionFlow?.Namespace ?? source!.Namespace;
     private string AcquisitionFlowIdentity => $"{AcquisitionFlowNamespace} · {AcquisitionFlow?.Version ?? "—"}";
-    private string? AcquisitionFlowUrl => AcquisitionFlow is null ? null : AcquisitionFlowNamespace.IsDefault
-        ? $"/flows/{Uri.EscapeDataString(AcquisitionFlow.Name)}"
-        : $"/namespaces/{Uri.EscapeDataString(AcquisitionFlowNamespace.Value)}/flows/{Uri.EscapeDataString(AcquisitionFlow.Name)}";
-    private JsonElement? ConfigurationSchema => readiness?.Profile is { } resolved && ProfileKey(resolved) == profileKey
+    private string? AcquisitionFlowUrl => AcquisitionFlow is null ? null : ResourceOwnershipContext.Resource(Services, "/flows", AcquisitionFlow.Name, AcquisitionFlowNamespace, AcquisitionFlow.ScopeRef ?? readiness?.Profile?.ScopeRef ?? selectedScope);
+    private JsonElement? ConfigurationSchema => readiness?.Profile is { } resolved && ProfileKey(resolved) == model.ProfileKey
         ? resolved.Definition.ConfigurationSchema
-        : profileSchemas.TryGetValue(profileKey, out var schema) ? schema : null;
+        : profileSchemas.TryGetValue(model.ProfileKey, out var schema) ? schema : null;
     private JsonElement? AcquisitionParametersSchema => JsonSchemaInputSchema.ObjectProperty(
         readiness?.Acquisition?.InputSchema, "parameters");
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
@@ -310,75 +189,245 @@ else
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or OperationCanceledException or JsonException)
         {
-            if (!disposed && version == operationVersion) operationsError = T("OperationalRefreshFailed");
+            if (!disposed && version == operationVersion)
+            {
+                if (Failure(exception).Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) { ClearPrivateState(); loadState = Failure(exception); }
+                else operationsError = T("OperationalRefreshFailed");
+            }
         }
         finally { refreshing = false; }
     }
-    protected override Task OnParametersSetAsync() => LoadAsync();
+    private string? returnAfterCommand;
+    private void AcquisitionToolCreated(string destination) { toolAcquisition = null; returnAfterCommand = destination; }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (returnAfterCommand is { } destination) { returnAfterCommand = null; Navigation.NavigateTo(destination); }
+    }
+    private DataSourceEditorModel? observedModel;
+    private EditContext? formContext;
+    private ValidationMessageStore? configurationErrors, identityErrors;
+    private EditContext FormContext
+    {
+        get
+        {
+            if (!ReferenceEquals(observedModel, model)) { observedModel = model; formContext = new(model); configurationErrors = new(formContext); identityErrors = new(formContext); }
+            return formContext!;
+        }
+    }
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceDefinitionForm? definitionForm;
+    private CreationWizard? creationWizard;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ResourceSnapshot<DataSourceResource>? newerSnapshot;
+    private string? loadedKey;
+    private string baseline = "", yamlBaseline = "";
+    private string? yamlEtag;
+    private long loadVersion;
+    private bool invalidInput, definitionTouched, resourceRefreshing, businessTouched, creationValidationFocus;
+    private bool FormDirty => definitionTouched || invalidInput || JsonSerializer.Serialize(model) != baseline;
+    private bool YamlDirty => rawYaml != yamlBaseline;
+    private bool HasDraft => !loading && (IsNew || source is not null) && (FormDirty || YamlDirty);
+    private string ContextKey => new Uri(Navigation.Uri).GetComponents(UriComponents.Query, UriFormat.UriEscaped);
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"),
+        [nameof(model.Scope)] = T("Scope"), [nameof(model.Namespace)] = T("Namespace"), [nameof(model.ProfileKey)] = T("Profile"),
+        [nameof(model.Description)] = T("Description"), [nameof(model.Configuration)] = T("Configuration")
+    };
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>
+    {
+        ["definition/identity"] = new() { ReadOnly = !CanManage, HasRequiredFields = true,
+            Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags), nameof(model.Scope)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanManage, HasRequiredFields = true,
+            Fields = [nameof(model.ProfileKey), nameof(model.Configuration), nameof(model.Enabled)] },
+        ["yaml"] = new() { ReadOnly = !CanManage }
+    };
+    private IReadOnlyList<ResourceNavigationItem> BusinessSections =>
+    [new("discovery", T("Discovery"), "search"), new("acquisitions", T("Acquisitions"), "download")];
+    private IReadOnlyList<CreationWizardStep> CreationSteps =>
+    [new("identity", T("DatasetIdentity"), IdentityContent) { IsComplete = model.IdentityComplete },
+     new("configuration", T("Configuration"), ConfigurationContent) { IsComplete = !string.IsNullOrWhiteSpace(model.ProfileKey) && configurationValid }];
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
+    private void ConfigurationValidated(JsonSchemaInputValidationState state)
+    {
+        configurationValid = state.IsValid;
+        _ = FormContext; configurationErrors!.Clear();
+        if (!state.IsValid) configurationErrors.Add(FormContext.Field(nameof(model.Configuration)), T("WizardFormInvalid"));
+        FormContext.NotifyValidationStateChanged();
+    }
+    private void MarkDirty() { definitionTouched = true; identityErrors?.Clear(); FormContext.NotifyValidationStateChanged(); }
+    private void CreationStepReady(string _)
+    {
+        if (!creationValidationFocus) return;
+        creationValidationFocus = false; definitionForm?.RequestValidationFocus();
+    }
+    private async Task FinishCreationAsync(CreationWizardFinish finish)
+    {
+        _ = FormContext; identityErrors!.Clear();
+        if (!model.NamespaceValid) identityErrors.Add(FormContext.Field(nameof(model.Namespace)), T("SourceNamespaceInvalid"));
+        FormContext.NotifyValidationStateChanged();
+        if (!FormContext.Validate()) { finish.ReturnToStepId = ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) == "definition/identity" ? "identity" : "configuration"; creationValidationFocus = true; return; }
+        if (!configurationValid) { finish.ReturnToStepId = "configuration"; creationValidationFocus = true; return; }
+        await SaveAsync();
+    }
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRef}|{Composition}|{ContextKey}";
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key;
+        return LoadAsync();
+    }
+    private void ClearPrivateState()
+    {
+        source = null; newerSnapshot = null; readiness = null; etag = null; profiles = []; profileSchemas = new Dictionary<string, JsonElement>();
+        acquisitions = []; discoveries = []; targets = []; promotionNames.Clear(); acquisitionTools = []; toolAcquisition = null;
+        parameters = EmptyObject(); selectedTarget = ""; rawYaml = yamlBaseline = baseline = "";
+        model = new(); invalidInput = definitionTouched = businessTouched = false; confirmDelete = false; error = operationsError = null;
+    }
     private async Task LoadAsync()
     {
-        operationVersion++;
-        previewAcquisition = null;
-        loading = true;
-        error = null;
-        operationsError = null;
-        readiness = null;
-        acquisitions = [];
-        discoveries = [];
-        targets = [];
-        promotionNames.Clear();
-        toolAcquisition = null;
-        acquisitionTools = [];
+        var version = ++loadVersion; operationVersion++; ClearPrivateState(); loading = true; busy = resourceRefreshing = false;
+        loadState = new(ResourceLoadStatus.Loading); sectionState.Reset(loadedKey!);
         try
         {
             if (DatasetMode) return;
-            await LoadProfilesAsync();
+            if (Services.GetService<ConsoleContextState>() is { } context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token);
+                if (disposed || version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            selectedScope = string.IsNullOrWhiteSpace(ScopeRef)
+                ? ResourceOwnershipContext.TryGetCurrent(Services) ?? (ConsoleContext is { } current ? ResourceScopeRef.Parse(current.SelectedScopeRef) : null)
+                : ResourceScopeRef.Parse(ScopeRef);
             if (!IsNew)
             {
-                selectedScope = ResourceScopeRef.Parse(ScopeRef!);
-                var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope.Value, cancellation.Token);
-                source = snapshot.Value;
-                etag = snapshot.ETag;
-                if (source.Definition.Dataset is not null) return;
-                LoadForm();
-                tab = View?.ToLowerInvariant() switch
-                {
-                    "definition" => Tab.Definition, "discovery" => Tab.Discovery,
-                    "acquisitions" => Tab.Acquisitions, "access" => Tab.Access,
-                    "yaml" => Tab.Yaml, _ => Tab.Overview
-                };
-                try
-                {
-                    readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token);
-                    acquisitions = (await Client.GetAcquisitionsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))
-                        .OrderByDescending(value => value.CreatedAt).ToArray();
-                    if (acquisitions.Count > 0 && Services.GetService<IToolDefinitionsClient>() is { } definitions)
-                        acquisitionTools = (await definitions.GetAsync(cancellation.Token))
-                            .Where(value => value.Definition is AcquisitionToolDefinitionProperties).ToArray();
-                    if (readiness.Discovery is not null)
-                    {
-                        discoveries = (await Client.GetDiscoveriesAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token))
-                            .OrderByDescending(value => value.CreatedAt).ToArray();
-                        targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token);
-                    }
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    error = T("OperationalLoadFailed");
-                }
+                var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope!.Value, cancellation.Token);
+                if (disposed || version != loadVersion) return;
+                if (!Matches(snapshot.Value)) { ClearPrivateState(); loadState = new(ResourceLoadStatus.NotFound); return; }
+                Adopt(snapshot);
+                if (DatasetMode) return;
+            }
+            await LoadProfilesAsync();
+            if (disposed || version != loadVersion) return;
+            if (IsNew) { model.Scope = selectedScope; baseline = JsonSerializer.Serialize(model); }
+            else await LoadOperationsAsync(version);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = source is not null };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == loadVersion && !disposed) { ClearPrivateState(); loadState = Failure(exception); if (IsNew) error = exception.Message; } }
+        finally { if (version == loadVersion) loading = false; }
+    }
+    private bool Matches(DataSourceResource resource, Guid? uid = null) => resource.Name == Name && resource.Namespace == ResourceNamespace.Parse(Namespace)
+        && resource.ScopeRef == selectedScope && (uid is null || resource.Uid == uid);
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed);
+    private void Adopt(ResourceSnapshot<DataSourceResource> snapshot, bool preserveYaml = false)
+    {
+        source = snapshot.Value; etag = snapshot.ETag; selectedScope = source.ScopeRef; newerSnapshot = null;
+        model = DataSourceEditorModel.From(source); baseline = JsonSerializer.Serialize(model); definitionTouched = invalidInput = false;
+        var yaml = ResourceManifestSerializer.ToYaml(new RawSource { ApiVersion = source.ApiVersion, Kind = source.Kind, Metadata = source.Metadata, ScopeRef = source.ScopeRef, Definition = source.Definition });
+        if (!preserveYaml) { rawYaml = yamlBaseline = yaml; yamlEtag = snapshot.ETag; }
+    }
+    private void Discard()
+    {
+        if (busy || resourceRefreshing || source is null) return;
+        Adopt(newerSnapshot ?? new(source, etag!)); error = null;
+    }
+    private Task RetryAsync() => source is null ? LoadAsync() : RefreshResourceAsync();
+    private async Task RefreshResourceAsync()
+    {
+        if (source is not { } current || busy || resourceRefreshing || loading) return;
+        var version = ++loadVersion; operationVersion++; resourceRefreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
+            if (disposed || version != loadVersion) return;
+            if (!Matches(snapshot.Value, current.Uid)) { ClearPrivateState(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasDraft) { if (snapshot.ETag != etag) newerSnapshot = snapshot; }
+            else Adopt(snapshot);
+            await LoadOperationsAsync(version);
+            if (version == loadVersion) loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellation.IsCancellationRequested)
+        {
+            if (disposed || version != loadVersion) return;
+            var failure = Failure(exception);
+            if (failure.Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearPrivateState();
+            loadState = failure with { HasContent = source is not null };
+        }
+        finally { if (version == loadVersion) resourceRefreshing = false; }
+    }
+    private async Task LoadOperationsAsync(long version)
+    {
+        if (source is not { } current) return;
+        try
+        {
+            var state = await Client.GetReadinessAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
+            var history = await Client.GetAcquisitionsAsync(current.Namespace, current.Name, current.ScopeRef.Value, cancellation.Token);
+            var discovery = state.Discovery is null ? [] : await Client.GetDiscoveriesAsync(current.Namespace, current.Name, current.ScopeRef.Value, cancellation.Token);
+            var choices = state.Discovery is null ? [] : await Client.GetAcquisitionTargetsAsync(current.Namespace, current.Name, current.ScopeRef.Value, cancellation.Token);
+            IReadOnlyList<ToolDefinitionResource> tools = [];
+            if (history.Count > 0 && Services.GetService<IToolDefinitionsClient>() is { } definitions)
+                tools = (await definitions.GetAsync(cancellation.Token)).Where(value => value.Definition is AcquisitionToolDefinitionProperties).ToArray();
+            if (disposed || version != loadVersion) return;
+            readiness = state; acquisitions = history.OrderByDescending(item => item.CreatedAt).ToArray(); discoveries = discovery; targets = choices; acquisitionTools = tools; operationsError = null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            if (version != loadVersion || disposed) return;
+            if (Failure(exception).Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) throw;
+            operationsError = T("OperationalLoadFailed");
+        }
+    }
+    private async Task LoadProfilesAsync()
+    {
+        var version = loadVersion;
+        var catalog = (await Profiles.GetAsync(cancellation.Token)).Where(value => value.ActiveVersion is not null && value.Definition.Enabled).ToArray();
+        var schemas = await Task.WhenAll(catalog.Select(async item =>
+        {
+            var revisions = await Profiles.GetRevisionsAsync(item.Namespace, item.Name, item.ScopeRef!.Value, cancellation.Token);
+            return new KeyValuePair<string, JsonElement>(ProfileKey(item), revisions.Single(value => value.Version == item.ActiveVersion).Definition.ConfigurationSchema.Clone());
+        }));
+        if (version != loadVersion || disposed) return;
+        profiles = catalog; profileSchemas = schemas.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+    }
+    private async Task SaveAsync()
+    {
+        if (!CanManage || busy || resourceRefreshing || !configurationValid) return;
+        var version = loadVersion; busy = true; error = null;
+        try
+        {
+            var definition = model.Properties(source);
+            if (IsNew)
+            {
+                var saved = await Client.CreateAsync(new(model.Name.Trim(), definition, ResourceNamespace.Parse(model.Namespace).Value, model.Scope), cancellation.Token);
+                if (version != loadVersion || disposed) return;
+                definitionTouched = invalidInput = false; baseline = JsonSerializer.Serialize(model); Navigation.NavigateTo(Url(saved.Value));
+            }
+            else
+            {
+                var saved = await Client.UpdateAsync(source!.Namespace, source.Name, selectedScope!.Value, new(definition), etag!, cancellation.Token);
+                if (version != loadVersion || disposed) return;
+                Adopt(saved, preserveYaml: YamlDirty); await LoadOperationsAsync(version);
             }
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
+        catch (Exception exception) { if (version == loadVersion && !disposed) error = exception.Message; }
+        finally { if (version == loadVersion) busy = false; }
     }
-    private async Task LoadProfilesAsync() { profiles = (await Profiles.GetAsync(cancellation.Token)).Where(value => value.ActiveVersion is not null && value.Definition.Enabled).ToArray(); var active = await Task.WhenAll(profiles.Select(async item => { var revisions = await Profiles.GetRevisionsAsync(item.Namespace, item.Name, item.ScopeRef!.Value, cancellation.Token); var revision = revisions.Single(value => string.Equals(value.Version, item.ActiveVersion, StringComparison.Ordinal)); return new KeyValuePair<string, JsonElement>(ProfileKey(item), revision.Definition.ConfigurationSchema.Clone()); })); profileSchemas = active.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal); }
-    private void LoadForm() { technicalName = source!.Name; displayName = source.Definition.DisplayName; sourceNamespace = source.Namespace.Value; description = source.Definition.Description ?? string.Empty; enabled = source.Definition.Enabled; configuration = source.Definition.Configuration.Clone(); var profile = profiles.FirstOrDefault(value => value.Name == source.Definition.Profile!.Name && (source.Definition.Profile!.Namespace ?? source.Namespace) == value.Namespace && (source.Definition.Profile!.ScopeRef is null || source.Definition.Profile!.ScopeRef == value.ScopeRef)); profileKey = profile is not null ? ProfileKey(profile) : source.Definition.Profile!.ScopeRef is { } profileScope ? $"{profileScope.Value}|{(source.Definition.Profile!.Namespace ?? source.Namespace).Value}|{source.Definition.Profile!.Name}" : string.Empty; rawYaml = ResourceManifestSerializer.ToYaml(new RawSource { ApiVersion = source.ApiVersion, Kind = source.Kind, Metadata = source.Metadata, ScopeRef = source.ScopeRef, Definition = source.Definition }); }
-    private DataSourceProperties Definition() { var profile = ParseProfile(profileKey); return new() { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Enabled = enabled, Profile = new(profile.Name, profile.Scope, profile.Namespace), Configuration = configuration.Clone() }; }
-    private async Task SaveAsync() { busy = true; error = null; try { if (IsNew) { if (selectedScope is null) throw new InvalidOperationException(T("Scope")); var saved = await Client.CreateAsync(new(technicalName.Trim(), Definition(), sourceNamespace.Trim(), selectedScope), cancellation.Token); Navigation.NavigateTo(Url(saved.Value)); } else { var saved = await Client.UpdateAsync(source!.Namespace, source.Name, selectedScope!.Value, new(Definition()), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
+    private Task SetEnabledAsync(bool value)
+    {
+        if (!CanManage || busy || resourceRefreshing) return Task.CompletedTask;
+        model.Enabled = value; sectionState.Visit("definition/identity");
+        return Task.CompletedTask;
+    }
     private async Task StartAsync()
     {
-        if (!parametersValid) return;
-        operationVersion++;
+        if (!parametersValid || readiness?.CanAcquire != true || busy || resourceRefreshing || source is null) return;
+        var version = ++operationVersion;
         busy = true;
         error = null;
         operationsError = null;
@@ -387,29 +436,32 @@ else
             var started = await Client.StartAcquisitionAsync(source!.Namespace, source.Name, selectedScope!.Value,
                 new() { Parameters = parameters.Clone(), DataSourceScopeRef = selectedScope,
                     TargetName = string.IsNullOrWhiteSpace(selectedTarget) ? null : selectedTarget }, cancellation.Token);
+            if (disposed || version != operationVersion) return;
             acquisitions = acquisitions.Where(item => item.Uid != started.Value.Uid).Prepend(started.Value)
                 .OrderByDescending(item => item.CreatedAt).ToArray();
             await RefreshOperationsAsync();
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
+        catch (Exception exception) { if (!disposed && version == operationVersion) error = exception.Message; }
+        finally { if (version == operationVersion) busy = false; }
     }
     private async Task StartDiscoveryAsync()
     {
+        if (busy || resourceRefreshing || source is null) return;
         busy = true;
         error = null;
         operationsError = null;
-        operationVersion++;
+        var version = ++operationVersion;
         try
         {
             var started = await Client.StartDiscoveryAsync(source!.Namespace, source.Name, selectedScope!.Value,
                 new() { DataSourceScopeRef = selectedScope }, cancellation.Token);
+            if (disposed || version != operationVersion) return;
             discoveries = discoveries.Where(item => item.Uid != started.Value.Uid).Prepend(started.Value)
                 .OrderByDescending(item => item.CreatedAt).ToArray();
             await RefreshOperationsAsync();
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
+        catch (Exception exception) { if (!disposed && version == operationVersion) error = exception.Message; }
+        finally { if (version == operationVersion) busy = false; }
     }
     private bool PromotionNameInUse(DataSourceDiscoveryChoice choice) =>
         targets.Any(item => string.Equals(item.Target.Name, PromotionName(choice), StringComparison.OrdinalIgnoreCase));
@@ -443,34 +495,38 @@ else
     private async Task PromoteAsync(DataSourceDiscoveryChoice choice)
     {
         if (!CanPromote(choice)) return;
-        operationVersion++;
+        var version = ++operationVersion;
         busy = true;
         error = null;
         try
         {
             await Client.PromoteTargetAsync(source!.Namespace, LatestDiscovery!.Name,
                 new(PromotionName(choice), choice.Id, choice.DisplayName, choice.Description), cancellation.Token);
-            targets = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+            if (disposed || version != operationVersion) return;
+            var result = await Client.GetAcquisitionTargetsAsync(source.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+            if (!disposed && version == operationVersion) targets = result;
         }
-        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { error = T("TargetNameInUse"); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
+        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { if (!disposed && version == operationVersion) error = T("TargetNameInUse"); }
+        catch (Exception exception) { if (!disposed && version == operationVersion) error = exception.Message; }
+        finally { if (version == operationVersion) busy = false; }
     }
     private async Task ReconcileTargetAsync(DataSourceAcquisitionTargetView item)
     {
         if (busy || HasActiveDiscovery || !CanReconcile(item)) return;
-        operationVersion++;
+        var version = ++operationVersion;
         busy = true;
         error = null;
         try
         {
             await Client.ReconcileTargetAsync(item.Target.Namespace, item.Target.Name,
                 new(LatestDiscovery!.Name, item.Target.ChoiceId), item.Target.ETag!, cancellation.Token);
-            targets = await Client.GetAcquisitionTargetsAsync(source!.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+            if (disposed || version != operationVersion) return;
+            var result = await Client.GetAcquisitionTargetsAsync(source!.Namespace, source.Name, selectedScope!.Value, cancellation.Token);
+            if (!disposed && version == operationVersion) targets = result;
         }
-        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { error = T("TargetConcurrencyConflict"); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
+        catch (AgentstrationApiException exception) when (exception.IsConcurrencyConflict) { if (!disposed && version == operationVersion) error = T("TargetConcurrencyConflict"); }
+        catch (Exception exception) { if (!disposed && version == operationVersion) error = exception.Message; }
+        finally { if (version == operationVersion) busy = false; }
     }
     private string PromotionName(DataSourceDiscoveryChoice choice)
     {
@@ -482,21 +538,39 @@ else
         promotionNames[choice.Id] = value;
         return value;
     }
-    private async Task SaveYamlAsync() { busy = true; error = null; try { var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml); if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef) throw new ArgumentException(T("IdentityImmutable")); var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), etag!, cancellation.Token); source = saved.Value; etag = saved.ETag; LoadForm(); readiness = await Client.GetReadinessAsync(source.Namespace, source.Name, selectedScope.Value, cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { busy = false; } }
-    private async Task DeleteAsync() { confirmDelete = false; await Client.DeleteAsync(source!.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/data-sources"); }
+    private async Task SaveYamlAsync()
+    {
+        if (!CanManage || busy || resourceRefreshing || FormDirty) return;
+        var version = loadVersion; busy = true; error = null;
+        try
+        {
+            var raw = ResourceManifestSerializer.FromYaml<RawSource>(rawYaml);
+            if (raw.Metadata.Name != source!.Name || raw.Metadata.Namespace != source.Namespace || raw.ScopeRef != source.ScopeRef || raw.Kind != source.Kind || raw.ApiVersion != source.ApiVersion)
+                throw new ArgumentException(T("IdentityImmutable"));
+            var saved = await Client.UpdateAsync(source.Namespace, source.Name, selectedScope!.Value, new(raw.Definition), yamlEtag!, cancellation.Token);
+            if (version == loadVersion && !disposed) { Adopt(saved); await LoadOperationsAsync(version); }
+        }
+        catch (Exception exception) { if (version == loadVersion && !disposed) error = exception.Message; }
+        finally { if (version == loadVersion) busy = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        if (!CanManage || source is null || busy || resourceRefreshing) return;
+        var version = loadVersion; confirmDelete = false; busy = true;
+        try { await Client.DeleteAsync(source.Namespace, source.Name, selectedScope!.Value, etag!, cancellation.Token); if (version == loadVersion && !disposed) { ClearPrivateState(); loadState = new(ResourceLoadStatus.NotFound); returnAfterCommand = "/data-sources"; } }
+        catch (Exception exception) { if (version == loadVersion && !disposed) error = exception.Message; }
+        finally { if (version == loadVersion) busy = false; }
+    }
     private void ToggleAcquisitionPreview(Guid uid) => previewAcquisition = previewAcquisition == uid ? null : uid;
 
-    private void SelectTab(Tab value) { tab = value; if (value == Tab.Yaml && source is not null) LoadForm(); }
-    private void ChangeProfile(ChangeEventArgs arguments) => profileKey = arguments.Value?.ToString() ?? string.Empty;
     private static string ProfileKey(DataSourceProfileResource item) => $"{item.ScopeRef!.Value.Value}|{item.Namespace.Value}|{item.Name}";
     private static string ProfileKey(ResolvedDataSourceProfile item) => $"{item.ScopeRef.Value}|{item.Namespace.Value}|{item.Name}";
     private static (ResourceScopeRef Scope, ResourceNamespace Namespace, string Name) ParseProfile(string key) { var parts = key.Split('|', 3); return (ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]), parts[2]); }
-    private static string Url(DataSourceResource item) => $"/data-sources/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
+    private string Url(DataSourceResource item) => $"/data-sources/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(CurrentConsoleScope.Value)}";
     private string AcquisitionStateLabel(DataSourceAcquisitionState state) => T($"AcquisitionState.{state}");
     private static UiStatus AcquisitionTone(DataSourceAcquisitionState? state) => state switch { DataSourceAcquisitionState.Succeeded => UiStatus.Success, DataSourceAcquisitionState.Failed or DataSourceAcquisitionState.Cancelled or DataSourceAcquisitionState.TimedOut => UiStatus.Warning, null => UiStatus.Neutral, _ => UiStatus.Info };
     private static JsonElement EmptyObject() => JsonSerializer.SerializeToElement(new { });
     private sealed record RawSource { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required ResourceMetadata Metadata { get; init; } public ResourceScopeRef? ScopeRef { get; init; } public required DataSourceProperties Definition { get; init; } }
-    private enum Tab { Overview, Definition, Discovery, Acquisitions, Access, Yaml }
     private static bool IsActive(DataSourceDiscoveryState state) => state is DataSourceDiscoveryState.Pending
         or DataSourceDiscoveryState.Running or DataSourceDiscoveryState.WaitingForInput or DataSourceDiscoveryState.WaitingForChild;
     private static UiStatus DiscoveryTone(DataSourceDiscoveryState state) => state switch
@@ -509,9 +583,145 @@ else
     public async ValueTask DisposeAsync()
     {
         if (disposed) return;
-        disposed = true;
+        disposed = true; loadVersion++; operationVersion++;
         await cancellation.CancelAsync();
         await polling;
         cancellation.Dispose();
     }
+
+    private RenderFragment IdentityContent => @<ResourceIdentityEditor ResourceKind="@DataSourceResourceKinds.DataSource"
+        @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" @bind-Namespace="model.Namespace" NamespaceEditable="IsNew"
+        @bind-ScopeRef="model.Scope" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true" IsNew="IsNew" ReadOnly="@(!CanManage)"
+        DisplayNameTestId="data-source-display-name" TechnicalNameTestId="data-source-name" />;
+    private RenderFragment ConfigurationContent => @<FormSection Title="@T("Configuration")"><FormGrid>
+        @if (IsNew) { <label class="checkbox-field resource-enabled-toggle"><FormCheckbox @bind-Value="model.Enabled" role="switch" /><span>@T("Enabled")</span></label> }
+        <FormField Label="@T("Profile")" Required="true"><ChildContent><ClearableSelect TValue="string" @bind-Value="model.ProfileKey" data-testid="data-source-profile"><option value="">@T("Select")</option>@foreach (var item in profiles) { <option value="@ProfileKey(item)">@item.Definition.DisplayName · @item.ActiveVersion · @item.ScopeRef</option> }@if (source?.Definition.Profile is not null && profiles.All(item => ProfileKey(item) != model.ProfileKey)) { <option value="@model.ProfileKey">@source.Definition.Profile.Name</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="@(() => model.ProfileKey)" /></Validation></FormField>
+        <div class="form-field-wide schema-backed-input" data-testid="data-source-configuration"><span>@T("Configuration")</span><JsonSchemaInputEditor Schema="ConfigurationSchema" Value="model.Configuration" ValueChanged="value => model.Configuration = value" ValidationChanged="ConfigurationValidated" Disabled="busy" /></div>
+    </FormGrid></FormSection>;
+    private RenderFragment<string> DefinitionContent => path => path == "definition/identity" ? IdentityContent : ConfigurationContent;
+    private sealed record SourceSetting(string Label, string Value, string? Href = null);
+    private string SavedProfileLabel => source?.Definition.Profile is not { } profile ? "—" : $"{profile.Namespace ?? source.Namespace}/{profile.Name}{(profile.ScopeRef is { } scope ? $" · {scope.Value}" : string.Empty)}";
+    private string? SavedProfileUrl => source?.Definition.Profile is { ScopeRef: { } owner } profile
+        ? ResourceOwnershipContext.Resource(Services, "/data-source-profiles", profile.Name, profile.Namespace ?? source.Namespace, owner) : null;
+    private IReadOnlyList<SourceSetting> SavedSettings => source is null ? [] :
+        [new(T("Enabled"), T(source.Definition.Enabled ? "Enabled" : "Disabled")), new(T("Profile"), SavedProfileLabel, SavedProfileUrl), new(T("Configuration"), source.Definition.Configuration.GetRawText())];
+    private RenderFragment AcquisitionsContent => @<div class="resource-editor-view">        <section class="panel form-section data-source-acquisitions" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.CanAcquire != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
+        @if (readiness?.Discovery is not null) { <FormField Label="@T("AcquisitionTarget")" Class="form-span-2"><ClearableSelect TValue="string" @bind-Value="selectedTarget" data-testid="data-source-acquisition-target"><option value="">@T("SelectTarget")</option>@foreach (var item in targets.Where(value => value.Target.Enabled)) { <option value="@item.Target.Name" disabled="@item.Stale">@item.Target.DisplayName @(item.Stale ? $"· {T("Stale")}" : string.Empty)</option> }</ClearableSelect></FormField> }
+        <div class="data-source-parameters" data-testid="data-source-acquisition-parameters" @oninput="() => businessTouched = true" @onchange="() => businessTouched = true"><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="AcquisitionParametersSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="busy" /><small>@T("ParametersHelp")</small></div>
+        @if (acquisitions.Count == 0 && operationsError is null)
+        {
+            <p class="muted">@T("NoAcquisitions")</p>
+        }
+        else
+        {
+            <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("FlowRun"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" IconName="database" ><IconBadges><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges></CollectionIdentity></Identity>
+                <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" /></Scope>
+                <Information Context="item">
+                    <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
+                    <CollectionValue Label="@T("FlowRun")"><code>@item.FlowRunId</code></CollectionValue>
+                    <CollectionValue Label="@T("Version")"><code>@(item.Composition?.Profile.Version ?? item.Dataset?.OperationType.Version)</code></CollectionValue>
+                    <CollectionValue Label="@T("AcquiredArtifacts")">@(item.Manifest?.Artifacts.Count.ToString() ?? "—")</CollectionValue>
+                </Information>
+                <Actions Context="item"><CollectionActions ResourceName="@item.Name"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId">@T("FlowRun")</a>
+                            @if (item.Manifest is { Artifacts.Count: > 0 })
+                            {
+                                <div class="data-source-acquisition-actions">
+                                    <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">
+                                        @T(previewAcquisition == item.Uid ? "HideAcquiredArtifacts" : "ViewAcquiredArtifacts")
+                                    </button>
+                                    @if (CanCreateAcquisitionTool(item))
+                                    {
+                                        <button class="button-secondary" type="button" aria-haspopup="dialog" data-testid="data-source-create-tool" @onclick="() => toolAcquisition = item">
+                                            @T("CreateAcquisitionTool")
+                                        </button>
+                                    }
+                                    @foreach (var linkedTool in acquisitionTools.Where(value => value.Definition is AcquisitionToolDefinitionProperties { Acquisition: var binding }
+                                        && binding.TemplateId == item.Name && binding.TemplateNamespace == item.Namespace))
+                                    {
+                                        <a class="button-secondary" href="@AcquisitionToolUrl(linkedTool)" data-testid="data-source-linked-tool">@linkedTool.Definition.DisplayName</a>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </CollectionActions></Actions>
+                <Details Context="item"><div class="data-source-acquisition-preview-row"><DataSourceAcquisitionArtifacts @key="item.Uid" Artifacts="item.Manifest!.Artifacts" ContextScope="CurrentConsoleScope" /></div></Details>
+            </CollectionView>
+        }
+        </section>
+        @if (toolAcquisition is { } template)
+        {
+            <DataSourceAcquisitionToolEditor @key="template.Uid" Acquisition="template"
+                SourceDisplayName="@source!.Definition.DisplayName" WorkspaceDisplayName="@ConsoleContext?.WorkspaceDisplayName"
+                ContextScope="CurrentConsoleScope" OnCreated="AcquisitionToolCreated" OnCancel="() => toolAcquisition = null" />
+        }
+</div>;
+    private RenderFragment DiscoveryContent => @<div class="resource-editor-view">        <section class="panel form-section data-source-discovery" data-testid="data-source-discovery">
+        <div class="panel-header"><div><p class="eyebrow">@T("Discovery")</p><h2>@T("DiscoveryTargets")</h2><p>@T("DiscoveryHelp")</p></div><FormActions>
+            <button class="button-secondary" type="button" disabled="@(busy || refreshing)" data-testid="data-source-refresh-discovery" @onclick="RefreshOperationsAsync">@T("Refresh")</button>
+            <button class="button-primary" type="button" data-testid="data-source-start-discovery" disabled="@(busy || HasActiveDiscovery || readiness?.Discovery is null)" @onclick="StartDiscoveryAsync">@T("StartDiscovery")</button>
+        </FormActions></div>
+        @if (readiness?.Discovery is { } discoveryFlow)
+        {
+            <a class="data-source-flow-card" href="@DiscoveryFlowUrl" data-testid="data-source-discovery-flow-link"><span class="data-source-composition-icon"><UiIcon Name="workflow" /></span><span><small>@T("DiscoveryFlowTitle")</small><strong>@discoveryFlow.Name</strong><code>@discoveryFlow.ScopeRef · @discoveryFlow.Namespace/@discoveryFlow.Version</code></span><UiIcon Name="arrow-right" /></a>
+        }
+        <p class="muted">@T("DiscoveryLiveUpdates")</p>
+        <nav class="section-tabs" role="tablist" aria-label="@T("Discovery")">
+            <button id="discovery-results-tab" type="button" role="tab" aria-selected="@(!discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(!discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-results-tab" @onclick="() => discoveryHistorySelected = false">@T("DiscoveryResultsTab")</button>
+            <button id="discovery-history-tab" type="button" role="tab" aria-selected="@(discoveryHistorySelected ? "true" : "false")" aria-controls="discovery-panel" class="@(discoveryHistorySelected ? "active" : null)" data-testid="data-source-discovery-history-tab" @onclick="() => discoveryHistorySelected = true">@T("DiscoveryHistoryTab")</button>
+        </nav>
+        <div id="discovery-panel" role="tabpanel" aria-labelledby="@(discoveryHistorySelected ? "discovery-history-tab" : "discovery-results-tab")" tabindex="0">
+        @if (discoveryHistorySelected)
+        {
+        <section class="data-source-discovery-history" data-testid="data-source-discovery-history" aria-live="polite">
+            <h3>@T("DiscoveryHistory")</h3>
+            @if (discoveries.Count > 0)
+            {
+                <CollectionView TItem="DataSourceDiscoveryResource" Items="discoveries" InformationLabels="@(new string[] { T("FlowRun"), T("Version") })" RowTestId="data-source-discovery-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" IdentityLabel="@T("Created")" StateLabel="@T("State")">
+        <Identity Context="item">
+@item.CreatedAt.ToLocalTime().ToString("g")</Identity>
+        <State Context="item">
+<StatusBadge Text="@T($"AcquisitionState.{item.State}")" Status="@DiscoveryTone(item.State)" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("FlowRun")"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId"><code>@item.FlowRunId</code></a></CollectionValue>
+            <CollectionValue Label="@T("Version")"><code>@item.Composition.Profile.Version</code></CollectionValue>
+        </Information>
+    </CollectionView>
+            }
+            else if (operationsError is null) { <p class="muted">@T("NoDiscovery")</p> }
+        </section>
+        }
+        else
+        {
+        @if (LatestDiscovery?.Manifest is not { } manifest) { <p class="muted">@T("NoDiscovery")</p> } else { <CollectionView TItem="DataSourceDiscoveryChoice" Items="manifest.Choices" InformationLabels="@(new string[] { T("Parent"), T("TargetName") })" RowTestId="data-source-discovery-choice" IdentityLabel="@T("Choice")" StateLabel="@T("State")">
+        <Identity Context="choice">
+<strong>@choice.DisplayName</strong><br/><code>@choice.Id</code></Identity>
+        <State Context="choice">
+@(choice.Eligible ? T("Eligible") : T("Ineligible"))</State>
+        <Information Context="choice">
+            <CollectionValue Label="@T("Parent")">@(choice.ParentId ?? "—")</CollectionValue>
+            <CollectionValue Label="@T("TargetName")"><ClearableText Value="@PromotionName(choice)" aria-label="@T("TargetName")" ValueChanged="changed => { promotionNames[choice.Id] = changed; businessTouched = true; }" /></CollectionValue>
+        </Information>
+    <Actions Context="choice"><CollectionActions ResourceName="@choice.DisplayName"><Primary><button class="button-secondary" type="button" disabled="@(!CanApplyChoice(choice))" data-testid="@(MatchingTarget(choice) is { Stale: true } ? "data-source-reconcile-target" : null)" title="@ChoiceActionHelp(choice)" @onclick="() => ApplyChoiceAsync(choice)">@T(ChoiceActionLabel(choice))</button></Primary></CollectionActions></Actions></CollectionView> }
+        @if (targets.Count > 0)
+        {
+            <h3>@T("AcquisitionTargets")</h3>
+            @if (targets.Any(item => item.Stale)) { <p class="muted">@T("ReconcileHelp")</p> }
+            <CollectionView TItem="DataSourceAcquisitionTargetView" Items="targets" InformationLabels="@(new string[] { T("Choice") })" RowTestId="data-source-acquisition-target-row" IdentityLabel="@T("Name")" StateLabel="@T("State")">
+        <Identity Context="item">
+@item.Target.DisplayName<br/><code>@item.Target.Name</code></Identity>
+        <State Context="item">
+<span title="@(item.Stale && !CanReconcile(item) ? T("ReconcileUnavailable") : null)"><StatusBadge Text="@(item.Stale ? T("Stale") : T("Current"))" Status="@(item.Stale ? UiStatus.Warning : UiStatus.Success)" /></span></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Choice")">@item.Target.ChoiceDisplayName</CollectionValue>
+        </Information>
+    </CollectionView>
+        }
+        }
+        </div>
+        </section>
+</div>;
 }

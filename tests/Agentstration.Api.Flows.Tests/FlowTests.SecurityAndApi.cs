@@ -64,6 +64,16 @@ public sealed partial class FlowTests
         Assert.IsInstanceOfType<DirectFlowDefinition>(created!.Definition);
         Assert.AreEqual("Direct SQL review", created.DisplayName);
         Assert.AreEqual(ResourceScopeKind.Workspace, created.ScopeRef?.Kind);
+        Assert.IsNotNull(created.Uid);
+        Assert.AreNotEqual(Guid.Empty, created.Uid.Value);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var stored = await scope.ServiceProvider.GetRequiredService<IFlowRepository>().GetExactAsync(
+                created.ScopeRef!.Value, new FlowId(created.Id, created.Namespace), default);
+            Assert.IsNotNull(stored);
+            Assert.AreEqual(stored.Value.Uid, created.Uid);
+        }
+
 
         using var versionResponse = await client.PostAsJsonAsync("/api/flows/direct-sql/versions", new CreateFlowVersionRequest("1.0.0"));
         Assert.AreEqual(HttpStatusCode.Created, versionResponse.StatusCode);
@@ -72,6 +82,8 @@ public sealed partial class FlowTests
         Assert.AreEqual(created.ScopeRef, version.ScopeRef);
 
         var get = await client.GetAsync("/api/flows/direct-sql");
+        var savedIdentity = await get.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual(created.Uid, savedIdentity!.Uid);
         var etag = get.Headers.ETag!.Tag;
         using var update = new HttpRequestMessage(HttpMethod.Put, "/api/flows/direct-sql")
         {
@@ -80,6 +92,8 @@ public sealed partial class FlowTests
         update.Headers.TryAddWithoutValidation("If-Match", etag);
         using var updated = await client.SendAsync(update);
         Assert.AreEqual(HttpStatusCode.OK, updated.StatusCode);
+        var updatedIdentity = await updated.Content.ReadFromJsonAsync<FlowResponse>(JsonOptions);
+        Assert.AreEqual(created.Uid, updatedIdentity!.Uid);
         var list = await client.GetFromJsonAsync<FlowPageResponse>("/api/flows");
         Assert.IsTrue(list!.Value.Any(value => value.Id == "direct-sql"));
         Assert.AreEqual(created.ScopeRef, list.Value.Single(value => value.Id == "direct-sql").ScopeRef);

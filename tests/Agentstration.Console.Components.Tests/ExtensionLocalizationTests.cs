@@ -22,6 +22,14 @@ public sealed class ExtensionLocalizationTests
             var strings = services.GetRequiredService<IStringLocalizer<ExtensionStrings>>();
 
             Assert.AreEqual("Enregistrer un point de terminaison", strings["RegisterEndpoint"].Value);
+            Assert.AreEqual("Extensions chargées", strings["LoadedExtensions"].Value);
+            Assert.AreEqual("Fermer l’enrôlement", strings["CloseEnrollment"].Value);
+            Assert.AreEqual("Gérer", strings["ManageEnrollmentAction"].Value);
+            Assert.AreEqual("Fermer", strings["CloseEnrollmentAction"].Value);
+            Assert.AreEqual("2 contributions", strings["ContributionCount.Many", 2].Value);
+            Assert.AreEqual("Origine d’association", strings["PairingOriginLabel"].Value);
+            Assert.AreEqual("Annuler la demande", strings["CancelEnrollmentRequest"].Value);
+            Assert.AreEqual("2 j", strings["DurationDays", 2].Value);
             Assert.AreEqual("Pris en charge", strings["Status.supported"].Value);
             Assert.AreEqual("Migrer vers 2.0", strings["MigrateTo", "2.0"].Value);
         }
