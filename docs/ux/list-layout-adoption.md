@@ -73,7 +73,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `RuntimeWorkers.razor` | `/settings/runtime-workers` | Adopted |
 | `Schemas.razor` | `/schemas` | Adopted |
 | `Secrets.razor` | `/secrets` | Adopted |
-| `Settings.razor` | `/settings` | Remaining; requires individual contract review |
+| `Settings.razor` | `/settings` | Reviewed outside top-level migration: fixed configuration summary, retained. [Contract review](evidence/list-layout/settings/README.md) |
 | `SourceProviders.razor` | `/sourceproviders` | Adopted |
 | `SourceRegistries.razor` | `/settings/source-registries` | Adopted via isolated list adapter; bounded 1,000-registration snapshot, API PlatformAdmin, commands/ETags preserved. [Evidence](evidence/list-layout/source-registries/README.md) |
 | `Sources.razor` | `/settings/sources` | Adopted; complete PlatformAdmin catalog, exact local pages; import and detail preserved. [Evidence](evidence/list-layout/sources/README.md) |

@@ -4996,6 +4996,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "af4c269b81a0a86c1c6d56981a9f5a8ae2e39377"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-fixed-embedded-configuration-summary",
+        "reason": "Four tuples from application options inside a settings dashboard; no resource collection or server paging contract.",
+        "review": "evidence/list-layout/settings/README.md",
+        "uiChanged": false
       }
     },
     {
