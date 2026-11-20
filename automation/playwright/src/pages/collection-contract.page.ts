@@ -98,19 +98,19 @@ export class CollectionContractPage {
       if (!await group.locator('.collection-actions-panel').count()) await expect(group.locator('details')).toHaveCount(0);
     }
     // Keep one visible icon and nonempty text per state, including bounded 200-row audits.
-    // Read the static presentation together instead of tracing hundreds of identical DOM round trips.
-    const stateCount = await states.count();
-    await expect.poll(() => states.evaluateAll(elements => elements.map(state => state.querySelectorAll('.ui-icon').length)))
-      .toEqual(Array<number>(stateCount).fill(1));
-    await expect(states.locator('.ui-icon:visible')).toHaveCount(stateCount);
-    const statePresentations = await states.evaluateAll(elements => elements.map(state => ({
-      text: state.textContent?.trim() ?? '',
-      neutral: state.classList.contains('status-neutral'),
-    })));
-    for (const state of statePresentations) {
-      expect(state.text).not.toBe('');
-      if (state.text === text.unknown) expect(state.neutral).toBe(true);
-    }
+    // Re-read the complete set on each attempt: live execution panels can add states during inspection.
+    await expect.poll(async () => {
+      const presentations = await states.evaluateAll(elements => elements.map(state => ({
+        icons: state.querySelectorAll('.ui-icon').length,
+        text: state.textContent?.trim() ?? '',
+        neutral: state.classList.contains('status-neutral'),
+      })));
+      const visibleIcons = await states.locator('.ui-icon:visible').count();
+      return {
+        invalidStates: presentations.filter(state => state.icons !== 1 || !state.text || state.text === text.unknown && !state.neutral),
+        allIconsVisible: visibleIcons === presentations.length,
+      };
+    }).toEqual({ invalidStates: [], allIconsVisible: true });
     const scopeSnapshots = await scopes.evaluateAll(elements => elements.map(element => {
       const button = element.querySelector('button');
       const letter = element.querySelector('.scope-letter');
