@@ -12,4 +12,5 @@
 <data name="ModelResolutionFailed"><value>Model resolution is unavailable: {0}</value></data>
 <data name="RuntimeReadinessFailed"><value>Runtime readiness is unavailable: {0}</value></data>
 <data name="ActivationFailed"><value>Generation {0} could not be activated (runtime state: {1}). The previous healthy generation remains active.</value></data>
+  <data name="NewerDefinition" xml:space="preserve"><value>The agent definition changed. Your pending execution request still uses the loaded generation. Discard the request to use the current definition.</value></data>
 </root>

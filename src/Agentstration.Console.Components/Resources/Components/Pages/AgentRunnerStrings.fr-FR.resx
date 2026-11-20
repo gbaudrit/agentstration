@@ -12,4 +12,5 @@
 <data name="ModelResolutionFailed"><value>La résolution du modèle est indisponible : {0}</value></data>
 <data name="RuntimeReadinessFailed"><value>La disponibilité du Runtime ne peut pas être vérifiée : {0}</value></data>
 <data name="ActivationFailed"><value>La génération {0} n’a pas pu être activée (état du Runtime : {1}). La génération précédente en bon état reste active.</value></data>
+  <data name="NewerDefinition" xml:space="preserve"><value>La définition de l’agent a changé. Votre demande d’exécution en attente utilise toujours la génération chargée. Abandonnez la demande pour utiliser la définition actuelle.</value></data>
 </root>
