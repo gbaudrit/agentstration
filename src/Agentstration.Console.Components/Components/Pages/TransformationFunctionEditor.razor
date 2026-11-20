@@ -14,7 +14,7 @@
 @if (IsNew)
 {
     <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
-    <PageHeader Title="@T("Create")" Description="@T("EditorHelp")" TestId="transformation-function-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="/transformation-functions" CollectionLabel="@T("Title")" Title="@T("Create")" Description="@T("EditorHelp")" TestId="transformation-function-editor"></PageHeader>
     <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" />
     @if (loadState.HasContent)
     {
@@ -27,12 +27,12 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="original" Name="@(original?.Definition.DisplayName ?? Name)" ResourceType="@T("Function")" Domain="function" IconName="cube"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Title")" Resource="original" Name="@(original?.Definition.DisplayName ?? Name)" ResourceType="@T("Function")" Domain="function" IconName="cube"
         Description="@original?.Definition.Description" Enabled="@(original is null ? null : model.Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(!CanEdit || busy || refreshing || !interactive)"
         LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations"
         DefinitionReadOnlyReason="@(Context.HasPermission("resources/write") ? null : ResourceReadOnlyReason.InsufficientPermissions)" HasDraft="HasDraft"
         Yaml="@SavedYaml" Busy="busy" TestId="transformation-function-editor" SectionTestIdPrefix="transformation-function">
-        <Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics>@if (original is not null) { <MetricCard Label="@T("Versions")" Value="@original.Definition.Versions.Count.ToString()" Detail="@T("ImmutableHelp")" /> }</OverviewMetrics>
         <OverviewConfiguration>@Configuration</OverviewConfiguration>
