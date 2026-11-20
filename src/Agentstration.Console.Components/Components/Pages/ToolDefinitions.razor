@@ -19,7 +19,7 @@
         <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a class="active" href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
     </Navigation>
     <ItemActions Context="definition">
-        <CollectionActions ResourceName="@($"{definition.Definition.DisplayName} ({definition.Namespace}/{definition.Name}, {definition.ScopeRef})")"><Primary><a class="text-button" href="@EditUrl(definition)">@T("Edit")</a></Primary></CollectionActions>
+        <CollectionActions ResourceName="@($"{definition.Definition.DisplayName} ({definition.Namespace}/{definition.Name}, {definition.ScopeRef})")"><Primary><a class="button-secondary" href="@EditUrl(definition)">@T("EditAction")</a></Primary></CollectionActions>
     </ItemActions>
 </ResourceCollectionTemplate>
 

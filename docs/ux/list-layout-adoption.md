@@ -107,3 +107,5 @@ The Storage types list header now uses the concise localized destination label S
 Tools user-requested list correction: Removed the redundant Providers header button and the Enabled information column. Existing family tabs remain. Enabled stays available as an additional filter under More filters; predicates still evaluate the complete authorized catalog. [Updated validation](evidence/list-layout/tools/controls-review/README.md).
 
 ToolSets user-requested list correction: Removed the Knowledge Sources header shortcut. Existing Tool-family tabs, published versions, member/category columns, complete-catalog criteria and permissions remain unchanged. [Updated validation](evidence/list-layout/tool-sets/header-review/README.md).
+
+ToolDefinitions user-requested list correction: The direct Edit action is now a standard secondary button with the localized Edit / Modifier label and no decorative arrow. The exact edit destination and immediate primary action remain unchanged. [Updated validation](evidence/list-layout/tool-definitions/actions-review/README.md).

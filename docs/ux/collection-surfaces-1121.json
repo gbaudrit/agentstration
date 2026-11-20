@@ -2799,6 +2799,10 @@
         "actions": "Existing direct primary Edit action retained as required by the maintained regression, along with exact resource-name links. Creation requires resources/write and preserves the existing NavigationContext.AddToUri destination.",
         "states": "Compatible refresh retains rows, selected view and stable query. Superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
         "validation": "ToolDefinitionCollectionTests and the existing direct-edit/list regression; deterministic desktop/mobile smoke and inventory limits in list-layout-adoption.md."
+      },
+      "actionsReview": {
+        "change": "Edit remains a direct exact-scoped link, styled as a standard secondary button with a localized plain Edit/Modifier label instead of an arrow-text shortcut.",
+        "evidence": "evidence/list-layout/tool-definitions/actions-review/README.md"
       }
     },
     {

@@ -168,4 +168,5 @@
   <data name="SchemaReferences" xml:space="preserve"><value>Références de schémas partagés</value></data>
   <data name="InputEnvelope" xml:space="preserve"><value>Enveloppe d’entrée</value></data>
   <data name="OriginVersion"><value>Version d’origine</value></data>
+  <data name="EditAction" xml:space="preserve"><value>Modifier</value></data>
 </root>
