@@ -3,7 +3,7 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-<ResourcePreviewPanel IsOpen="@(Enabled && address is not null)" OnClose="Close">
+<ResourcePreviewPanel IsOpen="@(Enabled && address is not null)" OnClose="Close" OnClosed="OnClosed">
     @if (Enabled && address is { } selected) { @ChildContent(selected) }
 </ResourcePreviewPanel>
 
@@ -12,6 +12,7 @@
     [Parameter, EditorRequired] public RenderFragment<ScopedResourceAddress> ChildContent { get; set; } = null!;
     [Parameter] public string? ContextKey { get; set; }
     [Parameter] public bool Enabled { get; set; } = true;
+    [Parameter] public EventCallback OnClosed { get; set; }
     private ScopedResourceAddress? address;
     private string? previousContext;
     private string collectionPath = string.Empty;
@@ -52,9 +53,11 @@
 
     public void Close()
     {
+        var wasOpen = address is not null;
         address = null;
-        if (!disposed && IsCollectionLocation() && Navigation.ToAbsoluteUri(Navigation.Uri).Fragment.StartsWith("#preview/", StringComparison.Ordinal))
+        if (!disposed && IsCollectionLocation() && (wasOpen || Navigation.ToAbsoluteUri(Navigation.Uri).Fragment.StartsWith("#preview/", StringComparison.Ordinal)))
             Navigation.NavigateTo(Navigation.Uri.Split('#')[0], replace: true);
+        if (!disposed) StateHasChanged();
     }
 
     private bool IsCollectionLocation() => string.Equals(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase);

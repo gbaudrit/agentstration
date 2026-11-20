@@ -24,6 +24,8 @@ public sealed class ExtensionLocalizationTests
             Assert.AreEqual("Enregistrer un point de terminaison", strings["RegisterEndpoint"].Value);
             Assert.AreEqual("Extensions chargées", strings["LoadedExtensions"].Value);
             Assert.AreEqual("Fermer l’enrôlement", strings["CloseEnrollment"].Value);
+            Assert.AreEqual("Gérer", strings["ManageEnrollmentAction"].Value);
+            Assert.AreEqual("Fermer", strings["CloseEnrollmentAction"].Value);
             Assert.AreEqual("2 contributions", strings["ContributionCount.Many", 2].Value);
             Assert.AreEqual("Origine d’association", strings["PairingOriginLabel"].Value);
             Assert.AreEqual("Annuler la demande", strings["CancelEnrollmentRequest"].Value);

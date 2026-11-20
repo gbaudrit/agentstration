@@ -3,6 +3,28 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
+      "id": "extension-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "host": "console",
+      "routes": ["/extensions", "/extensions/{RegistrationName}", "/extensions/enrollment/{EnrollmentInstanceId:guid}"],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": ["Saved"],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "ExtensionResourcePreviewTests / ExtensionsConsoleTests",
+        "domainSpecifications": ["tests/governed-extension-inventory.spec.ts"],
+        "sharedHostSpecifications": [],
+        "routeEvidence": [],
+        "interpretation": "The extracted saved configuration is shared by Extension details and an exact scoped registration Preview. Historical captures do not certify this new composition."
+      }
+    },
+    {
       "id": "agent-runner-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
       "line": 62,
@@ -18166,6 +18188,11 @@
       "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted Flow saved configuration retains its existing frame identity, shared by detail and on-demand Preview; topology and quick actions are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Saved Extension configuration is shared by the persisted overview and exact registration Preview. Quick actions are commands; pending enrollment controls remain in the collection's existing inline editor."
     }
   ],
   "reconciliation": {

@@ -18,10 +18,6 @@
         @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
     </div>;
     RenderFragment? actions = !CanDeleteRegistration ? null : @<button type="button" class="button-danger" @onclick="() => confirmDelete = true" disabled="@Busy">@T("Delete")</button>;
-    RenderFragment configuration = @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
-        <Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href" target="_blank" rel="noopener noreferrer">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information>
-    </CollectionView>;
     RenderFragment metrics = @<text><MetricCard Label="@T("Availability")" Value="@(item is null ? "—" : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))" />
         @if (item?.Extension is { } extension) { <MetricCard Label="@T("Contributions")" Value="@extension.Contributions.Count.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("BundleInstallations")" Value="@((extension.BundleInstallations?.Count ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture))" /> }</text>;
 }
@@ -37,8 +33,7 @@
         Enabled="@(RegistrationName is null ? null : registration?.Value.Definition.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanEditRegistration || Busy)" EnabledTestId="extension-enabled"
         Yaml="@SavedYaml" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("YamlReadOnlyProjection")" YamlReadOnly="true" MoreActions="actions">
         <OverviewMetrics>@metrics</OverviewMetrics>
-        <OverviewConfiguration>@configuration</OverviewConfiguration>
-        <OverviewContent>@FamilySection("connections")</OverviewContent>
+        <OverviewSummary Context="identity"><ExtensionResourceSummary Resource="SavedResource" Item="item" Identity="identity"><OperationalContent>@FamilySection("connections")</OperationalContent></ExtensionResourceSummary></OverviewSummary>
         <IdentityDetails>@if (item is not null) { <dt>@T("ExtensionId")</dt><dd><CopyableValue Value="@item.ExtensionId" PlainText /></dd> }</IdentityDetails>
         <DefinitionContent Context="path">
             <ResourceDefinitionForm @key="form" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="extension-registration-form" FormName="extension-registration"
@@ -58,8 +53,7 @@ else
         {
             <div class="resource-editor-view" hidden="@(!sectionState.Is("overview"))">
                 <div class="resource-overview-metrics">@metrics</div>
-                <ResourceIdentitySummary DisplayName="@item.DisplayName" TechnicalName="@item.ExtensionId" Description="@item.Extension?.Extension?.Description" TestId="extension-identity-summary" />
-                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@configuration</FormSection>
+                <ExtensionResourceSummary Resource="SavedResource" Item="item" />
             </div>
             @foreach (var section in AdditionalSections.Where(value => sectionState.HasVisited(value.Path))) { <div hidden="@(!sectionState.Is(section.Path))">@FamilySection(section.Path)</div> }
         }</Content>

@@ -66,4 +66,6 @@
   <data name="DurationDays" xml:space="preserve"><value>{0} j</value></data>
   <data name="DurationHours" xml:space="preserve"><value>{0} h</value></data>
   <data name="DurationMinutes" xml:space="preserve"><value>{0} min</value></data>
+<data name="ManageEnrollmentAction" xml:space="preserve"><value>Gérer</value></data>
+<data name="CloseEnrollmentAction" xml:space="preserve"><value>Fermer</value></data>
 </root>

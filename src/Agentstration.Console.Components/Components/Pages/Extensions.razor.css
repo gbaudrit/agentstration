@@ -1,4 +1,6 @@
-.enrollment-cell { display: flex; align-items: center; gap: var(--space-2); }
+.enrollment-cell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.enrollment-shortcut { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.enrollment-shortcut ::deep .ui-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
 .extension-endpoint { display: block; overflow-wrap: anywhere; }
 .enrollment-details { display: grid; gap: var(--space-4); min-width: 0; padding-block: var(--space-2); }
 .enrollment-details-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
@@ -22,8 +24,6 @@
     .extensions-list ::deep .extension-policy-dialog .form-actions { flex-direction: column-reverse; align-items: stretch; }
 }
 
-.enrollment-toggle { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-2); white-space: nowrap; }
-.enrollment-toggle ::deep .ui-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
 .enrollment-details ::deep .form-field-heading { min-height: 1.5rem; align-items: center; }
 .enrollment-origin-field { display: grid; grid-template-columns: minmax(0, 1fr) var(--field-height); align-items: center; gap: var(--space-2); min-width: 0; }
 .enrollment-origin-field .icon-button { width: var(--field-height); height: var(--field-height); }

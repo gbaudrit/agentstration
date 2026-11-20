@@ -71,8 +71,13 @@ public partial class ExtensionDetails
     };
     private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(form.Name)] = IdentityLocalizer["TechnicalName"], [nameof(form.DisplayName)] = IdentityLocalizer["DisplayName"], [nameof(form.Namespace)] = Shared["Namespace"],
-        [nameof(form.Description)] = Shared["Description"], [nameof(form.Tags)] = Shared["Labels"], [nameof(form.Endpoint)] = T("AepEndpoint"), [nameof(form.ExpectedExtensionId)] = T("ExpectedExtensionId")
+        [nameof(form.Name)] = IdentityLocalizer["TechnicalName"],
+        [nameof(form.DisplayName)] = IdentityLocalizer["DisplayName"],
+        [nameof(form.Namespace)] = Shared["Namespace"],
+        [nameof(form.Description)] = Shared["Description"],
+        [nameof(form.Tags)] = Shared["Labels"],
+        [nameof(form.Endpoint)] = T("AepEndpoint"),
+        [nameof(form.ExpectedExtensionId)] = T("ExpectedExtensionId")
     };
     private IReadOnlyList<ResourceNavigationItem> AdditionalSections =>
     [
@@ -81,39 +86,36 @@ public partial class ExtensionDetails
     ];
     private IReadOnlyList<ResourceNavigationItem> OperationalSections => [new("overview", Shared["Overview"], "layout-dashboard"), .. AdditionalSections];
     private sealed record ConfigurationEntry(string Label, string Value, string? Href = null);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration
-    {
-        get
-        {
-            if (item is null) return [];
-            var values = new List<ConfigurationEntry>
-            {
-                new(T("ExtensionId"), item.ExtensionId), new(T("AepEndpoint"), (registration?.Value.Definition.Endpoint ?? item.Endpoint).AbsoluteUri, (registration?.Value.Definition.Endpoint ?? item.Endpoint).AbsoluteUri),
-                new(T("ObservedVersion"), item.Version ?? "—"), new(T("Availability"), StatusLabel(item.AvailabilityStatus)),
-                new(T("Origin"), SourceLabel(item.RegistrationSource)), new(T("Discovery"), (registration?.Value.Definition.Enabled ?? item.RegistrationEnabled) ? T("Enabled") : T("Disabled")),
-                new(T("Enrollment"), item.EnrollmentStatus is { } state ? EnrollmentStatusLabel(state) : "—")
-            };
-            if (registration is { } saved)
-            {
-                values.Add(new(T("Registration"), $"{saved.Value.Namespace}/{saved.Value.Name}"));
-                values.Add(new(T("ExpectedExtensionId"), saved.Value.Definition.ExpectedExtensionId ?? "—"));
-                values.Add(new(T("AuthenticationMode"), T($"Authentication.{saved.Value.Definition.AuthenticationMode}")));
-                if (saved.Value.Definition.Credential is { } credential)
-                    values.Add(new(T("CredentialName"), $"{credential.ScopeRef?.Value ?? saved.Value.ScopeRef?.Value}/{credential.Namespace ?? saved.Value.Namespace}/{credential.Name}"));
-            }
-            if (item.AnnouncedAt is { } announced) values.Add(new(T("AnnouncedAt"), FormatDate(announced)));
-            return values;
-        }
-    }
     // An enrollment has private code verifier fields. Only its public inspection projection is exported.
     private string SavedYaml => RegistrationName is not null && registration is { } saved ? ResourceManifestSerializer.ToYaml(saved.Value)
         : enrollment is { } request ? ResourceManifestSerializer.ToYaml(new
         {
-            request.ApiVersion, request.Kind, request.Metadata, request.ScopeRef, request.Uid, request.Generation, request.Governance,
-            Definition = new { request.Definition.InstanceId, request.Definition.TargetScopeRef, request.Definition.TargetTenantId,
-                request.Definition.ExtensionId, request.Definition.ExtensionName, request.Definition.ExtensionVersion, request.Definition.Endpoint,
-                request.Definition.PairingUri, request.Definition.EnrollmentMode, request.Definition.State, request.Definition.AnnouncedAt,
-                request.Definition.CodeIssuedAt, request.Definition.CodeExpiresAt, request.Definition.AttemptCount, request.Definition.RegistrationName, request.Definition.Outcome }
+            request.ApiVersion,
+            request.Kind,
+            request.Metadata,
+            request.ScopeRef,
+            request.Uid,
+            request.Generation,
+            request.Governance,
+            Definition = new
+            {
+                request.Definition.InstanceId,
+                request.Definition.TargetScopeRef,
+                request.Definition.TargetTenantId,
+                request.Definition.ExtensionId,
+                request.Definition.ExtensionName,
+                request.Definition.ExtensionVersion,
+                request.Definition.Endpoint,
+                request.Definition.PairingUri,
+                request.Definition.EnrollmentMode,
+                request.Definition.State,
+                request.Definition.AnnouncedAt,
+                request.Definition.CodeIssuedAt,
+                request.Definition.CodeExpiresAt,
+                request.Definition.AttemptCount,
+                request.Definition.RegistrationName,
+                request.Definition.Outcome
+            }
         }) : string.Empty;
     protected override void OnInitialized()
     {
@@ -425,15 +427,15 @@ public partial class ExtensionDetails
         if (installations.Length == 0) return "NotMaterialized";
         if (installations.Any(value => value.State == ExtensionBundleInstallationState.Degraded)) return "Conflict";
         foreach (var installation in installations)
-        foreach (var binding in installation.ToolBindings)
-        {
-            var tools = extensionTools.Where(value => value.Definition.ExternalId == binding.Key).ToArray();
-            if (tools.Length > 1) return "Conflict";
-            if (tools.Length == 0 || tools[0].Name != binding.Value.Name
-                || tools[0].Namespace != (binding.Value.Namespace ?? ResourceNamespace.Default)
-                || tools[0].ScopeRef != (binding.Value.ScopeRef ?? installation.ScopeRef)
-                || !tools[0].Definition.Enabled || tools[0].Definition.Discovery?.Available != true) return "Unavailable";
-        }
+            foreach (var binding in installation.ToolBindings)
+            {
+                var tools = extensionTools.Where(value => value.Definition.ExternalId == binding.Key).ToArray();
+                if (tools.Length > 1) return "Conflict";
+                if (tools.Length == 0 || tools[0].Name != binding.Value.Name
+                    || tools[0].Namespace != (binding.Value.Namespace ?? ResourceNamespace.Default)
+                    || tools[0].ScopeRef != (binding.Value.ScopeRef ?? installation.ScopeRef)
+                    || !tools[0].Definition.Enabled || tools[0].Definition.Discovery?.Available != true) return "Unavailable";
+            }
         return installations.All(value => value.State == ExtensionBundleInstallationState.Installed)
             && item?.AvailabilityStatus == "available" && item.RegistrationEnabled ? "Available" : "Unavailable";
     }

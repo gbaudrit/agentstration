@@ -91,6 +91,8 @@ The Extension detail route `/extensions/{RegistrationName}` uses `ConsoleResourc
 
 Preserve the unified Extensions collection with its row enrollment editor and policy switches. Contribution-count links use the exact extension coordinates plus `#contributions`; details use the shared fragment navigation. The enrollment-management link supplies the instance ID so the collection opens that request, and an unavailable requested ID must never expand a different request. Registration metadata and associated enrollment reads remain independently authorized. A failure reading enrollment must not clear an otherwise authorized registration or its pending form.
 
+`ExtensionResourceSummary` owns the saved Identity/Configuration composition for both the overview and on-demand registration Preview. The detail supplies its existing operational connections panel and the template-owned identity region; forms, drafts, ETags and enrollment mutations remain in their existing screens. Preview uses the exact saved registration without fetching inventory pages or enrollment verifiers. Managed/inherited registrations expose inspection but no Edit shortcut. Row actions and Preview quick actions are supplied independently; an enrollment quick action returns to the existing inline editor rather than nesting an enrollment modal inside Preview.
+
 ## Inputs and named regions
 
 | Input/region | Required use |

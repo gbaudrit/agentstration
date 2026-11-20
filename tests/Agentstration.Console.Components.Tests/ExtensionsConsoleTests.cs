@@ -880,7 +880,7 @@ public sealed partial class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    public async Task EnrollmentDetailsFollowTheRowAcrossViewsWithoutAnEmptyActionMenu()
+    public async Task EnrollmentDetailsFollowTheRowAcrossViewsThroughTheSharedActionMenu()
     {
         using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -889,9 +889,13 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await OpenEnrollmentAsync(rendered);
+        var shortcut = rendered.WaitForElement("[data-testid=extension-enrollment-shortcut]");
+        Assert.IsNull(shortcut.Closest("details"), "Enrollment must remain directly accessible outside the action menu.");
+        await shortcut.ClickAsync(new());
         Assert.HasCount(1, rendered.FindAll(".collection-expanded [data-testid=enrollment-card]"));
-        Assert.IsEmpty(rendered.FindAll(".collection-actions-menu"));
+        Assert.HasCount(1, rendered.FindAll(".collection-actions-menu"));
+        Assert.HasCount(1, rendered.FindAll(".collection-actions-panel a[href$='#overview']"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-preview]"), "A missing owner must not be replaced by an inferred scope for Preview.");
         var contribution = rendered.Find("a.extension-contributions-link");
         StringAssert.Contains(contribution.TextContent, "1 contribution");
         StringAssert.Contains(contribution.GetAttribute("href"), "scopeRef=%2Finstance&context=%2Finstance#contributions");
@@ -899,9 +903,13 @@ public sealed partial class ExtensionsConsoleTests
         await rendered.FindAll(".collection-view-switch button")[1].ClickAsync(new());
         Assert.HasCount(1, rendered.FindAll(".collection-card"));
         Assert.HasCount(1, rendered.FindAll(".collection-expanded [data-testid=enrollment-card]"));
+        Assert.AreEqual("true", rendered.Find("[data-testid=extension-enrollment-shortcut]").GetAttribute("aria-expanded"));
         await rendered.Find("[data-testid=extension-enrollment-open]").ClickAsync(new());
         Assert.IsEmpty(rendered.FindAll("[data-testid=enrollment-card]"));
         Assert.AreEqual("false", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
+        Assert.AreEqual("false", rendered.Find("[data-testid=extension-enrollment-shortcut]").GetAttribute("aria-expanded"));
+        await rendered.Find("[data-testid=extension-enrollment-shortcut]").ClickAsync(new());
+        Assert.HasCount(1, rendered.FindAll(".collection-expanded [data-testid=enrollment-card]"));
     }
 
     [TestMethod]
@@ -918,7 +926,7 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.AddSingleton(new NotificationState());
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=extension-inventory-row]")));
-        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=enrollment-card]"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=extension-enrollment-shortcut], [data-testid=enrollment-card]"));
         Assert.IsGreaterThanOrEqualTo(1, client.EnrollmentCalls);
     }
 
@@ -936,7 +944,7 @@ public sealed partial class ExtensionsConsoleTests
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=extension-inventory-row]")));
         Assert.AreEqual(0, client.EnrollmentCalls);
         Assert.HasCount(2, rendered.FindAll(".collection-page-metrics .metric-card"));
-        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=extension-enrollment-settings], header button.button-primary"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=extension-enrollment-shortcut], [data-testid=extension-enrollment-settings], header button.button-primary"));
     }
 
     [TestMethod]
@@ -1010,6 +1018,50 @@ public sealed partial class ExtensionsConsoleTests
             Assert.HasCount(matches ? 1 : 0, rendered.FindAll("[data-testid=enrollment-card]"));
             Assert.AreEqual(matches ? "true" : "false", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
         });
+    }
+
+    [TestMethod]
+    public async Task PreviewQuickActionClosesTheModalAndOpensTheExactInlineEnrollment()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false, source: true);
+        var item = (await client.GetExtensionInventoryAsync(default))[0];
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.WaitForElement("[data-testid=extension-preview]").ClickAsync(new());
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<ExtensionResourceSummary>()));
+        Assert.Contains("#preview/ExtensionRegistration/%2Finstance/default/llama-cpp-local", context.Services.GetRequiredService<NavigationManager>().Uri);
+        Assert.IsEmpty(rendered.FindAll("[data-testid=enrollment-card], [data-testid=extension-preview-edit]"));
+        await rendered.Find("[data-testid=extension-preview-enrollment]").ClickAsync(new());
+        Assert.IsEmpty(rendered.FindComponents<ExtensionResourcePreview>());
+        Assert.HasCount(1, rendered.FindAll($"#extension-enrollment-{item.EnrollmentInstanceId:N}"));
+        Assert.AreEqual("true", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("#preview/", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
+    public async Task UnregisteredEnrollmentKeepsOpenAndEnrollmentWithoutInventingARegistrationPreview()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        var item = (await client.GetExtensionInventoryAsync(default))[0];
+        client.InventoryLoader = _ => Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([item with { RegistrationName = null, Extension = null }]);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=extension-enrollment-open]")));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-preview], a[href$='#definition/configuration']"));
+        Assert.HasCount(1, rendered.FindAll($".collection-actions-panel a[href='/extensions/enrollment/{item.EnrollmentInstanceId:D}#overview']"));
+        await OpenEnrollmentAsync(rendered);
+        Assert.HasCount(1, rendered.FindAll("[data-testid=enrollment-card]"));
+        Assert.AreEqual(0, client.RotateCalls, "Opening a menu or an enrollment editor is not an enrollment command.");
     }
 
     private static async Task OpenEnrollmentAsync(IRenderedComponent<Agentstration.Web.Components.Pages.Extensions> rendered)

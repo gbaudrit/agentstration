@@ -28,6 +28,8 @@ public partial class Extensions
     private Guid? expandedEnrollmentId;
     private bool showEnrollmentSettings;
     private bool requestedEnrollmentOpened;
+    private bool enrollmentFocusPending;
+    private ElementReference enrollmentPanel;
 
     private readonly CancellationTokenSource cancellation = new();
     private Task? initialLoad;
@@ -100,6 +102,7 @@ public partial class Extensions
             activePairingCode = null; activePairingExpiry = null; activePairingUri = null; activeEnrollmentId = null; enrollmentScopes.Clear();
             catalogContextKey = CurrentCatalogContext;
             expandedEnrollmentId = null; showEnrollmentSettings = false; requestedEnrollmentOpened = false;
+            enrollmentFocusPending = false;
             var pending = LoadAsync(); StateHasChanged(); await pending; StateHasChanged();
         });
     }
@@ -112,20 +115,23 @@ public partial class Extensions
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || initialLoad is null)
-            return;
-
-        try
+        if (firstRender && initialLoad is not null)
         {
-            await initialLoad;
-            if (!disposed)
+            try
             {
-                interactive = true;
-                await InvokeAsync(StateHasChanged);
+                await initialLoad;
+                if (!disposed)
+                {
+                    interactive = true;
+                    await InvokeAsync(StateHasChanged);
+                }
             }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        if (enrollmentFocusPending && !disposed)
         {
+            enrollmentFocusPending = false;
+            if (expandedEnrollmentId is not null) await enrollmentPanel.FocusAsync();
         }
     }
 
@@ -156,7 +162,12 @@ public partial class Extensions
     private AepEnrollmentRequestResource? EnrollmentFor(ExtensionInventoryItemResponse item) => CanAdministerEnrollments && item.EnrollmentInstanceId is { } id
         ? enrollments?.SingleOrDefault(enrollment => enrollment.Definition.InstanceId == id) : null;
     private bool IsEnrollmentExpanded(ExtensionInventoryItemResponse item) => expandedEnrollmentId is { } id && item.EnrollmentInstanceId == id && EnrollmentFor(item) is not null;
-    private void ToggleEnrollment(ExtensionInventoryItemResponse item) => expandedEnrollmentId = IsEnrollmentExpanded(item) ? null : item.EnrollmentInstanceId;
+    private void ToggleEnrollment(ExtensionInventoryItemResponse item)
+    {
+        if (loading || pairingBusy || EnrollmentFor(item) is null) return;
+        expandedEnrollmentId = IsEnrollmentExpanded(item) ? null : item.EnrollmentInstanceId;
+        enrollmentFocusPending = expandedEnrollmentId is not null;
+    }
     private static string EnrollmentPanelId(AepEnrollmentRequestResource enrollment) => $"extension-enrollment-{enrollment.Definition.InstanceId:N}";
     private void OpenEnrollmentSettings()
     {

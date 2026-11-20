@@ -26,6 +26,22 @@ public sealed class ResourceCollectionPreviewTests
     }
 
     [TestMethod]
+    public async Task ExternalCloseBeforeBrowserAcknowledgmentClearsTheSelectionAndPendingFragment()
+    {
+        using var context = Context();
+        var navigation = new DeferredNavigation();
+        context.Services.AddSingleton<NavigationManager>(navigation);
+        var cut = Render(context);
+        await cut.InvokeAsync(() => cut.Instance.Open(Target));
+        Assert.HasCount(1, cut.FindAll("dialog"));
+        await cut.InvokeAsync(cut.Instance.Close);
+        Assert.IsEmpty(cut.FindAll("dialog"));
+        await cut.InvokeAsync(navigation.Acknowledge);
+        Assert.AreEqual(string.Empty, new Uri(navigation.Uri).Fragment);
+        Assert.IsEmpty(cut.FindAll("dialog"));
+    }
+
+    [TestMethod]
     public async Task ReturningToTheAnchoredCollectionReopensTheExactPreviewWithoutChangingTheQuery()
     {
         using var context = Context();
@@ -130,6 +146,7 @@ public sealed class ResourceCollectionPreviewTests
         private string? pending;
         public DeferredNavigation() => Initialize("https://agentstration.test/", "https://agentstration.test/agents");
         protected override void NavigateToCore(string uri, bool forceLoad) => pending = ToAbsoluteUri(uri).AbsoluteUri;
+        protected override void NavigateToCore(string uri, NavigationOptions options) => pending = ToAbsoluteUri(uri).AbsoluteUri;
         public void Acknowledge()
         {
             Uri = pending!;

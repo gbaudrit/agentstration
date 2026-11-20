@@ -134,6 +134,23 @@ export class DistributionPage {
   public async inspectDirectEnrollmentActions(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions?tab=enrollments&context=%2Finstance', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    if ((this.page.viewportSize()?.width ?? 0) <= 760) await expect(this.page.locator('.collection-card').first()).toBeVisible();
+    const command = this.page.getByTestId(TestIds.distribution.extensionEnrollmentOpen).first();
+    await expect(command).toHaveAttribute('aria-expanded', 'true');
+    const shortcut = this.page.getByTestId(TestIds.distribution.extensionEnrollmentShortcut).first();
+    await expect(shortcut).toBeVisible();
+    await expect(shortcut.locator('xpath=ancestor::details')).toHaveCount(0);
+    await shortcut.click();
+    await expect(command).toHaveAttribute('aria-expanded', 'false');
+    await shortcut.click();
+    await expect(command).toHaveAttribute('aria-expanded', 'true');
+    const rowActions = command.locator('xpath=ancestor::details');
+    await rowActions.locator('summary').click();
+    await expect(command).toBeVisible();
+    await command.click();
+    await rowActions.locator('summary').click();
+    await command.click();
+    await expect(this.page.getByTestId(TestIds.distribution.extensionEnrollmentCard)).toBeVisible();
     const primary = this.page.locator('.enrollment-actions .collection-primary-actions button').first();
     await expect(primary).toBeVisible();
     await expect(primary.locator('xpath=ancestor::details')).toHaveCount(0);
