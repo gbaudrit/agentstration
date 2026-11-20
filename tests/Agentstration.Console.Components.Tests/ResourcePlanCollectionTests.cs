@@ -127,7 +127,9 @@ public sealed class ResourcePlanCollectionTests
             call => call == 1 ? oldReview.Task : call == 2 ? Task.FromResult(EmptyReview()) : Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)));
         using var context = Context(handler, provider);
         var cut = context.Render<ResourcePlans>();
-        cut.WaitForAssertion(() => Assert.AreEqual(1, handler.ReviewRequests));
+        // Review discovery runs independently of rendering; await the HTTP boundary itself.
+        await handler.FirstReviewRequested.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.AreEqual(1, handler.ReviewRequests);
         Assert.IsFalse(cut.Markup.Contains("Proposal not checked yet", StringComparison.Ordinal));
         provider.WorkspaceId = Guid.NewGuid();
         await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
@@ -212,6 +214,7 @@ public sealed class ResourcePlanCollectionTests
     {
         public List<Uri> Requests { get; } = [];
         public int ReviewRequests { get; private set; }
+        public TaskCompletionSource FirstReviewRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int ValidationRequests { get; private set; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -228,6 +231,7 @@ public sealed class ResourcePlanCollectionTests
             if (uri.AbsolutePath.EndsWith("/change-sets", StringComparison.Ordinal))
             {
                 ReviewRequests++;
+                FirstReviewRequested.TrySetResult();
                 return review?.Invoke(ReviewRequests) ?? Task.FromResult(EmptyReview());
             }
             Requests.Add(uri);
