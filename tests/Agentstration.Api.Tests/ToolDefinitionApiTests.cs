@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Api.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Schemas;
@@ -73,6 +75,99 @@ public sealed class ToolDefinitionApiTests : ModelManagementApiTestBase
         Assert.AreNotEqual(business.WorkspaceId, run.Value.Scope.WorkspaceId.Value);
         var inUse = await Assert.ThrowsAsync<FlowValidationException>(() => flows.DeleteExactAsync(owner, new("administrative-tool-flow"), null, false, default));
         Assert.AreEqual("flow_in_use_by_tool_definition", inUse.Code);
+    }
+
+    [TestMethod]
+    public async Task ToolDefinitionHistoryAndConsumersUseTheRequestedOwnerDespiteAWorkspaceHomonym()
+    {
+        await using var factory = Factory();
+        var business = await GetBootstrapContextAsync(factory);
+        var topology = factory.Services.GetRequiredService<IOperationalTopologyProvisioner>();
+        var operations = await topology.GetInstanceOperationsWorkspaceAsync(default);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var flows = factory.Services.GetRequiredService<FlowService>();
+        var definitions = factory.Services.GetRequiredService<ToolDefinitionService>();
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { message = new { type = "string" } } });
+        var owners = new[] { ResourceScopeRef.Instance, ResourceScopeRef.Workspace(business.WorkspaceId) };
+        var expected = new Dictionary<ResourceScopeRef, Guid>();
+        var shadows = new Dictionary<ResourceScopeRef, (Guid Uid, string ETag)>();
+        foreach (var owner in owners)
+        {
+            using var request = owner.Kind == ResourceScopeKind.Instance
+                ? scopes.PushInstance(new(business.PrincipalId, operations.TenantId, operations.Id)) : scopes.Push(business);
+            await flows.CreateExactAsync(owner, new("history-source", null, "1.0.0", true, GraphOnlyDefinition(), Graph: Graph(schema, schema)), ResourceNamespace.Default, default);
+            await flows.PublishVersionExactAsync(owner, new("history-source"), "1.0.0", true, default);
+            var properties = Properties("Scoped history", "history-source", schema, schema) with
+            {
+                Version = owner.Kind == ResourceScopeKind.Instance ? "1.0.0" : "2.0.0",
+                Flow = new() { Name = "history-source", ScopeRef = owner, Version = "1.0.0", UseActiveVersion = false }
+            };
+            var saved = await definitions.PutAsync(Resource("same-definition", owner, properties), null, true, default);
+            expected.Add(owner, saved.Value.Uid);
+            var shadow = await definitions.PutAsync(Resource("unpublished-shadow", owner, properties with { Publish = false }), null, true, default);
+            shadows.Add(owner, (shadow.Value.Uid, shadow.ETag));
+            if (owner.Kind == ResourceScopeKind.Instance)
+            {
+                var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+                var previous = await policies.GetAsync(saved.Value.Uid, default);
+                await policies.PutAsync(new ResourceAccessPolicy(new(saved.Value.Uid, owner, saved.Value.Namespace, saved.Value.Kind, saved.Value.Generation),
+                    (previous?.Policy.Grants ?? []).Append(new(owners[1], [ResourceAccessAction.Discover])).ToArray()), previous?.ETag, default);
+                // A full historical snapshot retains its own discovery policy; parent discovery alone grants metadata only.
+                var publication = (await definitions.ListVersionsAsync("same-definition", ResourceNamespace.Default, owner, default)).Single();
+                await policies.PutAsync(new ResourceAccessPolicy(new(publication.Uid, owner, publication.Namespace, publication.Kind, publication.Generation),
+                    [new(owners[1], [ResourceAccessAction.Discover])]), null, default);
+                await policies.PutAsync(new ResourceAccessPolicy(new(shadow.Value.Uid, owner, shadow.Value.Namespace, shadow.Value.Kind, shadow.Value.Generation),
+                    [new(owners[1], [ResourceAccessAction.Discover])]), null, default);
+            }
+            if (owner.Kind == ResourceScopeKind.Workspace)
+                await definitions.PutAsync(Resource("workspace-only-definition", owner, properties with { Publish = false }), null, true, default);
+        }
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", owners[1].Value);
+        foreach (var owner in owners)
+        {
+            using var definition = await client.GetAsync("/api/tooldefinitions/same-definition?scopeRef=" + Uri.EscapeDataString(owner.Value));
+            Assert.AreEqual(HttpStatusCode.OK, definition.StatusCode, await definition.Content.ReadAsStringAsync());
+            Assert.AreEqual(expected[owner], (await definition.Content.ReadFromJsonAsync<ToolDefinitionResource>())!.Uid);
+            using var response = await client.GetAsync("/api/tooldefinitions/same-definition/versions?scopeRef=" + Uri.EscapeDataString(owner.Value));
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
+            var body = await response.Content.ReadFromJsonAsync<ValueResponse<ToolDefinitionVersionResource>>();
+            var publication = body!.Value.Single();
+            Assert.AreEqual(owner, publication.ScopeRef);
+            Assert.AreEqual(expected[owner], publication.DefinitionUid);
+            Assert.AreEqual(owner.Kind == ResourceScopeKind.Instance ? "1.0.0" : "2.0.0", publication.Definition.Version);
+        }
+        using var workspaceBefore = await client.GetAsync("/api/tooldefinitions/same-definition?scopeRef=" + Uri.EscapeDataString(owners[1].Value));
+        var before = (await workspaceBefore.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        using var toggle = new HttpRequestMessage(HttpMethod.Put, "/api/tooldefinitions/same-definition/enabled") { Content = JsonContent.Create(new SetToolDefinitionEnabledRequest(false)) };
+        toggle.Headers.IfMatch.Add(workspaceBefore.Headers.ETag!);
+        using var toggled = await client.SendAsync(toggle);
+        Assert.AreEqual(HttpStatusCode.OK, toggled.StatusCode, await toggled.Content.ReadAsStringAsync());
+        var working = (await toggled.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        Assert.AreEqual(owners[1], working.ScopeRef); Assert.IsFalse(working.Definition.Enabled);
+        Assert.AreEqual(before.Generation + 1, working.Generation);
+        using var republished = await client.PostAsJsonAsync("/api/tooldefinitions/same-definition/versions", new PublishToolDefinitionRequest("2.0.0", toggled.Headers.ETag!.ToString()));
+        Assert.AreEqual(HttpStatusCode.Created, republished.StatusCode, await republished.Content.ReadAsStringAsync());
+        Assert.AreEqual(expected[owners[1]], (await republished.Content.ReadFromJsonAsync<ToolDefinitionVersionResource>())!.DefinitionUid);
+        using var afterPublish = await client.GetAsync("/api/tooldefinitions/same-definition?scopeRef=" + Uri.EscapeDataString(owners[1].Value));
+        var after = (await afterPublish.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        Assert.AreEqual(working.Generation, after.Generation, "Publishing must not reset or invent the working generation.");
+        Assert.IsFalse(after.Definition.Enabled, "Publication must preserve the independently disabled working definition.");
+        using var parent = await client.GetAsync("/api/tooldefinitions/same-definition?scopeRef=%2Finstance");
+        var parentDefinition = (await parent.Content.ReadFromJsonAsync<ToolDefinitionResource>())!;
+        Assert.AreEqual(expected[owners[0]], parentDefinition.Uid); Assert.IsTrue(parentDefinition.Definition.Enabled);
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/tooldefinitions/unpublished-shadow");
+        delete.Headers.IfMatch.Add(System.Net.Http.Headers.EntityTagHeaderValue.Parse(shadows[owners[1]].ETag));
+        using var deleted = await client.SendAsync(delete);
+        Assert.AreEqual(HttpStatusCode.NoContent, deleted.StatusCode, await deleted.Content.ReadAsStringAsync());
+        using var ancestorShadow = await client.GetAsync("/api/tooldefinitions/unpublished-shadow?scopeRef=%2Finstance");
+        Assert.AreEqual(HttpStatusCode.OK, ancestorShadow.StatusCode);
+        Assert.AreEqual(shadows[owners[0]].Uid, (await ancestorShadow.Content.ReadFromJsonAsync<ToolDefinitionResource>())!.Uid);
+        foreach (var child in new[] { "versions", "usages" })
+        {
+            using var response = await client.GetAsync($"/api/tooldefinitions/workspace-only-definition/{child}?scopeRef=%2Finstance");
+            Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode, await response.Content.ReadAsStringAsync());
+        }
     }
 
     [TestMethod]

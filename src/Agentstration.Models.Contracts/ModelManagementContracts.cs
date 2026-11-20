@@ -49,7 +49,11 @@ public sealed record CreateModelProviderRequest(
     string Namespace = "default",
     ResourceScopeRef? ScopeRef = null);
 public sealed record PutModelProviderRequest(ModelProviderProperties Properties);
-public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName);
+public sealed record ModelProviderUsageResponse(string ResourceType, string ResourceId, string Name, string DisplayName)
+{
+    public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 public sealed record ModelProviderUsagesResponse(IReadOnlyList<ModelProviderUsageResponse> Value, int Count);
 public sealed record PreviewModelProfileOptionMigrationRequest(string TargetVersion);
 public sealed record ModelProfileOptionMigrationPreviewResponse(

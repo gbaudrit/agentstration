@@ -3,6 +3,7 @@ using System.Net;
 using Agentstration.Models;
 using Agentstration.Models.Contracts;
 using Agentstration.Resources;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -13,7 +14,7 @@ namespace Agentstration.Web.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class ModelDetailsTests
+public sealed partial class ModelDetailsTests
 {
     [TestMethod]
     public async Task PageShowsFriendlyEffectiveSummaryAndCanonicalObservedYaml()
@@ -28,6 +29,7 @@ public sealed class ModelDetailsTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
 
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters
             .Add(component => component.Name, FakeModelsClient.ResourceName));
 
@@ -35,18 +37,18 @@ public sealed class ModelDetailsTests
         Assert.AreEqual(FakeModelsClient.ResourceName, models.RequestedName);
         Assert.AreEqual(new ResourceNamespace("shared.models"), providers.RequestedNamespace);
         Assert.AreEqual("foundry", providers.RequestedProvider);
-        CollectionAssert.AreEqual(new[] { "Overview", "Overrides", "YAML" }, rendered.FindAll("[role='tab']").Select(value => value.TextContent.Trim()).ToArray());
-        Assert.AreEqual("true", rendered.Find("#model-overview-tab").GetAttribute("aria-selected"));
-        Assert.AreEqual(4, rendered.FindAll(".model-detail-metrics .metric-card").Count);
+        CollectionAssert.AreEqual(new[] { "overview", "definition/identity", "definition/configuration", "overrides", "observation", "access", "yaml" }, rendered.FindComponent<ResourceNavigation>().Instance.Items.Where(value => value.Navigable).Select(value => value.Path).ToArray());
+        Assert.AreEqual("overview", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
+        Assert.AreEqual(4, rendered.FindAll(".resource-overview-metrics .metric-card").Count);
         Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Not specified", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Supported", StringComparison.Ordinal));
         Assert.IsFalse(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Native", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find("[data-testid='model-capabilities']").TextContent.Contains("Provider override", StringComparison.Ordinal));
-        Assert.AreEqual("/modelproviders/foundry?namespace=shared.models", rendered.FindAll("a").First(link => link.TextContent.Contains("Open model provider", StringComparison.Ordinal)).GetAttribute("href"));
+        Assert.AreEqual("/modelproviders/foundry?namespace=shared.models&scopeRef=%2Finstance&context=%2Finstance", rendered.FindAll("a").First(link => link.TextContent.Contains("Open model provider", StringComparison.Ordinal)).GetAttribute("href"));
 
-        await rendered.Find("#model-yaml-tab").ClickAsync(new());
+        await ModelSectionAsync(context, rendered, "yaml");
 
-        var yaml = rendered.Find("[data-testid='model-yaml'] textarea");
+        var yaml = rendered.Find("[data-testid='model-yaml-editor'] textarea");
         Assert.IsTrue(yaml.HasAttribute("readonly"));
         Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains($"name: {FakeModelsClient.ResourceName}", StringComparison.Ordinal));
         Assert.IsTrue((yaml.GetAttribute("value") ?? string.Empty).Contains("externalId: gpt-5", StringComparison.Ordinal));
@@ -72,6 +74,7 @@ public sealed class ModelDetailsTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
 
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters
             .Add(component => component.Name, FakeModelsClient.ResourceName));
 
@@ -91,10 +94,11 @@ public sealed class ModelDetailsTests
         context.Services.AddSingleton<IModelProvidersClient>(providers);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
-        Assert.AreEqual("true", rendered.Find("#model-overrides-tab").GetAttribute("aria-selected"));
+        Assert.AreEqual("overrides", rendered.FindComponent<ResourceNavigation>().Instance.CurrentPath);
         var editorText = rendered.Find("[data-testid='model-override-editor']").TextContent;
         StringAssert.Contains(editorText, "Discovery:");
         StringAssert.Contains(editorText, "Not specified");
@@ -105,7 +109,7 @@ public sealed class ModelDetailsTests
             .Any(option => string.Equals(option.TextContent.Trim(), "Inherit", StringComparison.Ordinal)));
         await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
         Assert.AreEqual("64000", rendered.Find("[data-testid='model-override-context-tokens']").GetAttribute("value"));
-        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+        await rendered.Find("#model-provider-override-form").SubmitAsync();
 
         rendered.WaitForAssertion(() =>
         {
@@ -127,6 +131,7 @@ public sealed class ModelDetailsTests
         context.Services.AddSingleton<IModelProvidersClient>(providers);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
@@ -140,7 +145,7 @@ public sealed class ModelDetailsTests
         Assert.AreEqual(ModelFeatureSupport.Native.ToString(), tools.QuerySelectorAll("select")[0].GetAttribute("value"));
         StringAssert.Contains(rendered.Find("[data-testid='model-override-interaction-message']").TextContent, "automatically marked as supported");
 
-        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+        await rendered.Find("#model-provider-override-form").SubmitAsync();
 
         var saved = providers.UpdatedRequest!.Properties.SpecificationOverrides["gpt-5"].Features.Tools!;
         Assert.AreEqual(ModelFeatureSupport.Native, saved.Support);
@@ -157,6 +162,7 @@ public sealed class ModelDetailsTests
         context.Services.AddSingleton<IModelProvidersClient>(providers);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
@@ -180,16 +186,17 @@ public sealed class ModelDetailsTests
         context.Services.AddSingleton<IModelProvidersClient>(providers);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/models/{FakeModelsClient.ResourceName}?namespace=shared.models");
+        ConfigureNavigation(context);
         var rendered = context.Render<ModelDetails>(parameters => parameters.Add(component => component.Name, FakeModelsClient.ResourceName));
 
         await rendered.Find("[data-testid='edit-model-override']").ClickAsync(new());
         await rendered.Find("[data-testid='model-override-context-tokens']").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "64000" });
-        await rendered.Find("[data-testid='save-model-override']").ClickAsync(new());
+        await rendered.Find("#model-provider-override-form").SubmitAsync();
 
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid='model-override-error']").TextContent, "changed while you were editing");
-            StringAssert.Contains(rendered.Find("[data-testid='model-override-error']").TextContent, "Reload current version");
+            StringAssert.Contains(rendered.Find("[data-testid='model-override-error']").TextContent, "Refresh");
         });
     }
 
@@ -215,23 +222,41 @@ public sealed class ModelDetailsTests
         Assert.AreEqual("Disponible", localizer["Operation.Add"].Value);
     }
 
+    private static void ConfigureNavigation(BunitContext context)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var current = context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0];
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "overrides", "observation", "access", "yaml" })
+            module.Setup<string>("navigate", call => call.Arguments[0] is string uri && uri.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(current + "#" + path);
+    }
+    private static Task ModelSectionAsync(BunitContext context, IRenderedComponent<ModelDetails> cut, string path) =>
+        cut.InvokeAsync(() => { var nav = context.Services.GetRequiredService<NavigationManager>(); nav.NavigateTo(nav.Uri.Split('#')[0] + "#" + path); });
+
     private sealed class FakeModelsClient(ModelObservationState state, bool toolsUnknown = false) : IModelsClient
     {
         public const string ResourceName = "foundry.gpt-5-1234567890abcdef";
         public ResourceNamespace RequestedNamespace { get; private set; }
         public string? RequestedName { get; private set; }
+        public ModelResource? Replacement { get; set; }
+        public AgentstrationApiException? ReadError { get; set; }
+        public Task<ResourceSnapshot<ModelResource>>? PendingRead { get; set; }
+        public string ReadEtag { get; set; } = "\"model-etag\"";
 
         public Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
             RequestedName = modelName;
+            if (ReadError is not null) return Task.FromException<ResourceSnapshot<ModelResource>>(ReadError);
+            if (PendingRead is not null) return PendingRead;
             var observedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
-            return Task.FromResult(new ResourceSnapshot<ModelResource>(new ModelResource
+            return Task.FromResult(new ResourceSnapshot<ModelResource>(Replacement ?? new ModelResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ModelResourceKinds.Model,
+                Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
                 Metadata = new ResourceMetadata { Name = ResourceName, Namespace = @namespace },
-                ScopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+                ScopeRef = ResourceScopeRef.Instance,
                 Generation = 3,
                 Definition = new ModelProperties
                 {
@@ -250,7 +275,7 @@ public sealed class ModelDetailsTests
                         LastAttemptedAt = state == ModelObservationState.Available ? observedAt : observedAt.AddHours(2)
                     }
                 }
-            }, "\"model-etag\""));
+            }, ReadEtag));
         }
     }
 
@@ -262,11 +287,17 @@ public sealed class ModelDetailsTests
         public string? RequestedProvider { get; private set; }
         public PutModelProviderRequest? UpdatedRequest { get; private set; }
         public bool FailWithConcurrency { get; init; }
+        public ModelProviderResource Resource { get => provider; set => provider = value; }
+        public string ReadEtag { get => etag; set => etag = value; }
+        public string? UpdateEtag { get; private set; }
+        public AgentstrationApiException? ReadError { get; set; }
+        public AgentstrationApiException? InventoryError { get; set; }
 
         public Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
             RequestedProvider = providerName;
+            if (InventoryError is not null) return Task.FromException<IReadOnlyList<AvailableModelResponse>>(InventoryError);
             if (!includeEffectiveModel) return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([]);
             provider.Definition.SpecificationOverrides.TryGetValue("gpt-5", out var @override);
             return Task.FromResult<IReadOnlyList<AvailableModelResponse>>([new(
@@ -284,13 +315,13 @@ public sealed class ModelDetailsTests
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
             GetModelProviderAsync(ResourceNamespace.Default, providerName, cancellationToken);
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ModelProviderResource>(provider, etag));
+            ReadError is not null ? Task.FromException<ResourceSnapshot<ModelProviderResource>>(ReadError) : Task.FromResult(new ResourceSnapshot<ModelProviderResource>(provider, etag));
         public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string currentEtag, CancellationToken cancellationToken) =>
             UpdateModelProviderAsync(ResourceNamespace.Default, providerName, request, currentEtag, cancellationToken);
         public Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(ResourceNamespace @namespace, string providerName, PutModelProviderRequest request, string currentEtag, CancellationToken cancellationToken)
         {
-            UpdatedRequest = request;
+            UpdatedRequest = request; UpdateEtag = currentEtag;
             if (FailWithConcurrency) throw new AgentstrationApiException("The provider was modified by another administrator.", "conflict", HttpStatusCode.PreconditionFailed);
             provider = provider with { Definition = request.Properties };
             etag = "\"provider-etag-2\"";
@@ -320,8 +351,9 @@ public sealed class ModelDetailsTests
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ModelResourceKinds.ModelProvider,
+                Uid = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                 Metadata = new ResourceMetadata { Name = "foundry", Namespace = new ResourceNamespace("shared.models") },
-                ScopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+                ScopeRef = ResourceScopeRef.Instance,
                 Definition = new ModelProviderProperties
                 {
                     DisplayName = "Foundry",

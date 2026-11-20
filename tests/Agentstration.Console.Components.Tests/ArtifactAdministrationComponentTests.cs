@@ -1,5 +1,6 @@
 using System.Text;
 using Agentstration.Artifacts.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Web.Components.State;
@@ -10,12 +11,12 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ArtifactAdministrationComponentTests
+public sealed partial class ArtifactAdministrationComponentTests
 {
     [TestMethod]
     public void ArtifactIdentityCopiesTheCompleteIdentifierOutsideTheNavigationLink()
     {
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         const string identifier = "artifact-0123456789abcdef0123456789abcdef";
         var rendered = context.Render<Agentstration.Web.Components.Pages.ArtifactReference>(parameters => parameters
@@ -35,7 +36,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactDetailsKeepTheAdministrativeContextInContentAndDownloadLinks(string scopeRef)
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("downloadable");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -43,13 +44,14 @@ public sealed class ArtifactAdministrationComponentTests
         context.Services.AddSingleton<IConsoleNavigationContext>(new ArtifactNavigationContext(scopeRef));
         var durable = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
-        durable.WaitForElement("[data-testid=durable-artifact-content-tab]").Click();
+        SelectSection(context, "content");
         durable.WaitForAssertion(() => Assert.Contains("context=" + Uri.EscapeDataString(scopeRef),
             durable.Find("[data-testid=durable-artifact-download]").GetAttribute("href")!));
         Assert.AreEqual(ResourceScopeRef.Parse(scopeRef), durable.FindComponent<Agentstration.Web.Components.Pages.DurableArtifactContent>().Instance.ContextScope);
         var staged = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
-        staged.WaitForElement("[data-testid=staged-artifact-content-tab]").Click();
+        Assert.Contains(Uri.EscapeDataString(scopeRef), staged.Find("[data-testid=artifact-producer-flow-run]").GetAttribute("href")!);
+        SelectSection(context, "content");
         staged.WaitForAssertion(() => Assert.Contains("context=" + Uri.EscapeDataString(scopeRef),
             staged.Find("[data-testid=staged-artifact-download]").GetAttribute("href")!));
     }
@@ -60,7 +62,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void TransformedArtifactsLinkTheirExactInputAndProcessingRun(string language, string inputLabel, string processingLabel)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("redacted");
         var inputId = Guid.NewGuid().ToString("N");
         client.Durable = client.Durable with
@@ -88,10 +90,33 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.AreEqual("/flow-runs/flowrun-processing", rendered.Find("[data-testid='artifact-processing-run']").GetAttribute("href"));
     }
 
+    private static BunitContext CreateContext()
+    {
+        var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#overview");
+        module.Setup<string>("navigate", _ => true).SetResult("http://localhost/#overview");
+        return context;
+    }
+
+    private static void AddListContext(BunitContext context)
+    {
+        context.WithResourceListContext(new() { Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ArtifactsInspect } });
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    private static void SelectSection(BunitContext context, string section)
+    {
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#" + section);
+    }
+
     private sealed class ArtifactNavigationContext(string scopeRef) : IConsoleNavigationContext
     {
         public string? ScopeRef => scopeRef;
-        public string AddToUri(string uri) => uri;
+        public string AddToUri(string uri) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(uri, "context", scopeRef);
     }
 
     [TestMethod]
@@ -101,7 +126,8 @@ public sealed class ArtifactAdministrationComponentTests
         string producerLabel, string keyLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("produced content");
         var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
         var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "output-storage"),
@@ -128,7 +154,7 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.Contains("/storages/output-storage", rendered.Find("[data-testid=artifact-storage-link]").GetAttribute("href")!);
         Assert.Contains("acquisition-alpha", rendered.Markup);
         Assert.IsEmpty(rendered.FindAll("a[href^='/artifacts/staged/']"));
-        rendered.Find("[data-testid=durable-artifact-storage-tab]").Click();
+        SelectSection(context, "storage");
         Assert.Contains(keyLabel, rendered.Markup);
         Assert.Contains("datasets/alpha/acquisition.json", rendered.Markup);
         Assert.Contains("version-exact", rendered.Markup);
@@ -139,10 +165,10 @@ public sealed class ArtifactAdministrationComponentTests
     }
 
     [TestMethod]
-    public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesTabs()
+    public void StagedArtifactContentIsOnlyReadAfterExplicitActionAndUsesResourceSections()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("governed preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -154,10 +180,10 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(0, client.ContentReadCount);
-            Assert.AreEqual(3, rendered.FindAll("[role='tab']").Count);
+            Assert.AreEqual(3, rendered.FindAll(".resource-navigation-rail a[data-resource-section]").Count);
         });
 
-        rendered.Find("[data-testid='staged-artifact-content-tab']").Click();
+        SelectSection(context, "content");
         rendered.Find("[data-testid='staged-artifact-read-preview']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -172,7 +198,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactCanLoadCompleteContentInBoundedChunks()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         const string expected = "complete governed artifact content";
         var client = new ArtifactClient(expected, maximumBackendChunk: 8);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -185,7 +211,7 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.WaitForAssertion(() =>
             Assert.AreEqual(0, client.ContentReadCount));
 
-        rendered.Find("[data-testid='staged-artifact-content-tab']").Click();
+        SelectSection(context, "content");
         rendered.Find("[data-testid='staged-artifact-read-full']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -200,7 +226,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisablesInlineFullContentWhenArtifactIsTooLarge()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("preview", declaredLength: 4L * 1024 * 1024 + 1);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -209,8 +235,8 @@ public sealed class ArtifactAdministrationComponentTests
         var rendered = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
 
-        rendered.WaitForElement("[data-testid='staged-artifact-overview-tab']");
-        rendered.Find("[data-testid='staged-artifact-content-tab']").Click();
+        rendered.WaitForElement("a[data-resource-section=overview]");
+        SelectSection(context, "content");
 
         var fullContentButton = rendered.Find("[data-testid='staged-artifact-read-full']");
         Assert.IsTrue(fullContentButton.HasAttribute("disabled"));
@@ -222,7 +248,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactMovesDeleteToHeaderAndRequiresALaterRetentionDate()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -234,7 +260,7 @@ public sealed class ArtifactAdministrationComponentTests
         rendered.WaitForElement("[data-testid='staged-artifact-delete']");
         Assert.AreEqual("Delete", rendered.Find("[data-testid='staged-artifact-delete']").TextContent.Trim());
 
-        rendered.Find("[data-testid='staged-artifact-retention-tab']").Click();
+        SelectSection(context, "retention");
         var extend = rendered.FindAll("button").Single(value => value.TextContent.Trim() == "Extend retention");
         Assert.IsTrue(extend.HasAttribute("disabled"));
         StringAssert.Contains(rendered.Markup, "Current expiration");
@@ -247,7 +273,8 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactListUsesReadableClickableReferencesForStagedAndDurableArtifacts()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -255,7 +282,7 @@ public sealed class ArtifactAdministrationComponentTests
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
         rendered.WaitForElement("[data-testid='durable-artifact-row']");
-        Assert.IsNotNull(rendered.Find($"a[href='/artifacts/durable/{client.Durable.ArtifactId}']"));
+        Assert.IsNotNull(rendered.Find($"a[href^='/artifacts/durable/{client.Durable.ArtifactId}']"));
         StringAssert.Contains(rendered.Markup, "index.html");
         Assert.AreEqual(client.Durable.ArtifactId.ToString(),
             rendered.Find("[data-testid='durable-artifact-row'] .collection-identity-cell .copyable-value code").TextContent);
@@ -279,7 +306,8 @@ public sealed class ArtifactAdministrationComponentTests
     public void ArtifactTerminologyExplainsAvailabilityInFrench()
     {
         using var culture = new TestCultureScope("fr-FR");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
+        AddListContext(context);
         var client = new ArtifactClient("aperçu");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -297,8 +325,8 @@ public sealed class ArtifactAdministrationComponentTests
 
         var details = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
-        details.WaitForElement("[data-testid='durable-artifact-content-tab']");
-        details.Find("[data-testid='durable-artifact-content-tab']").Click();
+        details.WaitForElement("a[data-resource-section=content]");
+        SelectSection(context, "content");
         StringAssert.Contains(details.Markup, "copie locale");
         Assert.IsFalse(details.Markup.Contains("matérialis", StringComparison.OrdinalIgnoreCase));
     }
@@ -307,7 +335,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactDisplaysMegabytesAndKeepsTheExactByteCount()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("preview", declaredLength: 19_343);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -327,7 +355,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void StagedArtifactProvenanceLinksToGovernedResources()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -352,7 +380,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void DurableArtifactHasGovernedMetadataDetails()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("preview");
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(TimeProvider.System);
@@ -361,11 +389,11 @@ public sealed class ArtifactAdministrationComponentTests
         var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
 
-        rendered.WaitForElement("[data-testid='durable-artifact-overview-tab']");
+        rendered.WaitForElement("a[data-resource-section=overview]");
         StringAssert.Contains(rendered.Markup, "index.html");
         Assert.IsNotNull(rendered.Find($"a[href='/artifacts/staged/{client.Artifact.ArtifactId}']"));
 
-        rendered.Find("[data-testid='durable-artifact-content-tab']").Click();
+        SelectSection(context, "content");
         StringAssert.Contains(rendered.Markup, "local copy");
         rendered.WaitForAssertion(() =>
         {
@@ -379,7 +407,7 @@ public sealed class ArtifactAdministrationComponentTests
             Assert.AreEqual(0, rendered.FindAll("[data-testid='durable-artifact-materialize']").Count);
         });
 
-        rendered.Find("[data-testid='durable-artifact-storage-tab']").Click();
+        SelectSection(context, "storage");
         StringAssert.Contains(rendered.Markup, "Immutable storage receipt");
         Assert.IsFalse(rendered.Markup.Contains("opaque-reference", StringComparison.Ordinal));
     }
@@ -390,7 +418,7 @@ public sealed class ArtifactAdministrationComponentTests
     public void RecordMetadataNeedsNoContentReadAndExplicitFailureKeepsTheMetadata(string language, string title, string action, string contractLabel)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext().WithCollectionPresentation();
+        using var context = CreateContext();
         var client = new ArtifactClient("{\"id\":2}");
         var owner = ResourceScopeRef.Workspace(client.Durable.WorkspaceId.Value);
         var storage = new StorageRevisionReference(new(owner, ResourceNamespace.Default, "Storage", "records"), Guid.NewGuid(), 1, "binding");
@@ -426,6 +454,64 @@ public sealed class ArtifactAdministrationComponentTests
         Assert.Contains(title, rendered.Markup);
         Assert.Contains(contractLabel, rendered.Markup);
         Assert.AreEqual(2, rendered.FindAll("[data-testid=artifact-records] tbody tr").Count);
+    }
+
+    [TestMethod]
+    public void DurableArtifactRetainsItsVisitedContentAndDoesNotReloadForSectionChanges()
+    {
+        using var context = CreateContext();
+        var client = new ArtifactClient("retained content");
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.FlowRunArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        rendered.WaitForElement(".resource-identity-summary");
+        Assert.Contains(client.Durable.ArtifactId.ToString(), rendered.Find(".resource-identity-summary").TextContent);
+        Assert.IsEmpty(rendered.FindComponents<Agentstration.Web.Components.Pages.DurableArtifactContent>());
+        SelectSection(context, "content");
+        var content = rendered.FindComponent<Agentstration.Web.Components.Pages.DurableArtifactContent>().Instance;
+        SelectSection(context, "storage");
+        Assert.IsTrue(rendered.Find("[data-artifact-section=content]").HasAttribute("hidden"));
+        SelectSection(context, "content");
+        Assert.AreSame(content, rendered.FindComponent<Agentstration.Web.Components.Pages.DurableArtifactContent>().Instance);
+        rendered.Render(parameters => parameters.Add(value => value.Id, client.Durable.ArtifactId.ToString()));
+        Assert.AreEqual(1, client.DurableReadCount);
+        Assert.AreEqual(0, client.ContentReadCount);
+        Assert.AreEqual(0, client.RecordReadCount);
+    }
+
+    [TestMethod]
+    public void StagedArtifactRetainsExpirationAndContentAcrossSectionsBeforeExtendingTheExactArtifact()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = CreateContext();
+        var client = new ArtifactClient("retained local content");
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IArtifactsClient>(client);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
+            parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+        rendered.WaitForElement(".resource-identity-summary");
+        Assert.Contains(client.Artifact.ArtifactId.ToString(), rendered.Find(".resource-identity-summary").TextContent);
+        Assert.IsEmpty(rendered.FindComponents<Agentstration.Web.Components.Pages.StagedArtifactContent>());
+        Assert.IsEmpty(rendered.FindAll(".resource-header .resource-scope-badge"));
+        SelectSection(context, "retention");
+        var requested = client.Artifact.ExpiresAt.AddHours(1).ToLocalTime().ToString("yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        rendered.Find("input[type=datetime-local]").Change(requested);
+        SelectSection(context, "content");
+        var content = rendered.FindComponent<Agentstration.Web.Components.Pages.StagedArtifactContent>().Instance;
+        SelectSection(context, "overview");
+        Assert.IsTrue(rendered.Find("[data-artifact-section=content]").HasAttribute("hidden"));
+        SelectSection(context, "retention");
+        Assert.AreEqual(requested, rendered.Find("input[type=datetime-local]").GetAttribute("value"));
+        Assert.AreSame(content, rendered.FindComponent<Agentstration.Web.Components.Pages.StagedArtifactContent>().Instance);
+        rendered.Find(".artifact-retention-editor button.button-primary").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual(requested, client.Artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture)));
+        rendered.Render(parameters => parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+        Assert.AreEqual(1, client.StagedReadCount);
+        Assert.AreEqual(1, client.RetentionWriteCount);
+        Assert.AreEqual(0, client.ContentReadCount);
     }
 
     internal sealed class ArtifactClient : IArtifactsClient
@@ -468,15 +554,22 @@ public sealed class ArtifactAdministrationComponentTests
             };
         }
 
-        public StagedArtifactView Artifact { get; }
+        public StagedArtifactView Artifact { get; set; }
+        public Exception? StagedReadError { get; set; }
+        public TaskCompletionSource<StagedArtifactView?>? NextStagedRead { get; set; }
         public FlowRunArtifactResource Durable { get; set; }
         public int ContentReadCount { get; private set; }
+        public int DurableReadCount { get; private set; }
+        public int StagedReadCount { get; private set; }
+        public int RetentionWriteCount { get; private set; }
         public IReadOnlyList<FlowRunArtifactResource>? DurableCatalog { get; set; }
         public bool RejectDurableCatalog { get; set; }
         public bool HasLocalCopy { get; set; } = true;
         public int RecordReadCount { get; private set; }
         public string? SelectedRecord { get; private set; }
         public bool RejectRecordRead { get; set; }
+        public Exception? DurableReadError { get; set; }
+        public TaskCompletionSource<FlowRunArtifactResource?>? NextDurableRead { get; set; }
 
         public Task<ArtifactRecordContent> ReadRecordAsync(FlowRunArtifactId id, string memberId, CancellationToken cancellationToken = default)
         {
@@ -489,8 +582,13 @@ public sealed class ArtifactAdministrationComponentTests
         public Task<IReadOnlyList<StagedArtifactView>> GetStagedAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<StagedArtifactView>>([Artifact]);
 
-        public Task<StagedArtifactView?> GetStagedAsync(StagedArtifactId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<StagedArtifactView?>(id == Artifact.ArtifactId ? Artifact : null);
+        public Task<StagedArtifactView?> GetStagedAsync(StagedArtifactId id, CancellationToken cancellationToken = default)
+        {
+            StagedReadCount++;
+            if (NextStagedRead is { } pending) { NextStagedRead = null; return pending.Task; }
+            if (StagedReadError is { } error) return Task.FromException<StagedArtifactView?>(error);
+            return Task.FromResult<StagedArtifactView?>(id == Artifact.ArtifactId ? Artifact : null);
+        }
 
         public Task<ArtifactContentChunk> ReadContentAsync(StagedArtifactId id, long offset, int length, CancellationToken cancellationToken = default)
         {
@@ -507,8 +605,13 @@ public sealed class ArtifactAdministrationComponentTests
 
         public string GetDownloadUrl(StagedArtifactId id) => $"/api/artifacts/staged/{id}/download";
 
-        public Task<StagedArtifactView> ExtendRetentionAsync(StagedArtifactId id, DateTimeOffset expiresAt, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<StagedArtifactView> ExtendRetentionAsync(StagedArtifactId id, DateTimeOffset expiresAt, CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(Artifact.ArtifactId, id);
+            RetentionWriteCount++;
+            Artifact = Artifact with { ExpiresAt = expiresAt };
+            return Task.FromResult(Artifact);
+        }
 
         public Task PurgeAsync(StagedArtifactId id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -516,8 +619,13 @@ public sealed class ArtifactAdministrationComponentTests
         public Task<IReadOnlyList<FlowRunArtifactResource>> GetDurableAsync(CancellationToken cancellationToken = default) =>
             RejectDurableCatalog ? throw new HttpRequestException("Catalogue unavailable") : Task.FromResult<IReadOnlyList<FlowRunArtifactResource>>(DurableCatalog ?? [Durable]);
 
-        public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
+        public Task<FlowRunArtifactResource?> GetDurableAsync(FlowRunArtifactId id, CancellationToken cancellationToken = default)
+        {
+            DurableReadCount++;
+            if (NextDurableRead is { } pending) { NextDurableRead = null; return pending.Task; }
+            if (DurableReadError is { } error) return Task.FromException<FlowRunArtifactResource?>(error);
+            return Task.FromResult<FlowRunArtifactResource?>(id == Durable.ArtifactId ? Durable : null);
+        }
 
         public Task<FlowRunArtifactMaterialization> StartMaterializationAsync(FlowRunArtifactId id,
             CancellationToken cancellationToken = default)

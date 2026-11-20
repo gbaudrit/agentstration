@@ -79,11 +79,12 @@ export async function startProductHosts(
   sourcePolicyFixture = false,
   initialBootstrapEnabled = true,
   formPendingFixture = false,
+  bootstrapProvenanceFixture = false,
 ): Promise<ProductHosts> {
   if (formPendingFixture && !organizationStructureFixture) throw new Error('Pending form data requires the organization fixture.');
   if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   return await withReservedLoopbackPorts(7, ports => startProductHostsOnPorts(
-    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, ports,
+    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture, ports,
   ));
 }
 
@@ -96,6 +97,7 @@ async function startProductHostsOnPorts(
   sourcePolicyFixture: boolean,
   initialBootstrapEnabled: boolean,
   formPendingFixture: boolean,
+  bootstrapProvenanceFixture: boolean,
   ports: readonly LoopbackPortReservation[],
 ): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
@@ -115,6 +117,9 @@ async function startProductHostsOnPorts(
   const bootstrapPath = path.join(workDirectory, 'bootstrap-profiles');
   await fs.cp(path.join(repositoryRoot, 'deploy', 'bootstrap', 'profiles'), bootstrapPath, { recursive: true });
   await fs.cp(path.join(automationRoot, 'fixtures', 'bootstrap-profiles'), bootstrapPath, { recursive: true });
+  if (bootstrapProvenanceFixture) {
+    await fs.cp(path.join(automationRoot, 'fixtures', 'bootstrap-provenance'), bootstrapPath, { recursive: true });
+  }
   const runtimeProxy = await startControlledRuntimeProxy(consoleUrl);
   const workerAuthorityProxy = await startControlledWorkerAuthorityProxy(consoleUrl);
   const workerId = randomUUID();

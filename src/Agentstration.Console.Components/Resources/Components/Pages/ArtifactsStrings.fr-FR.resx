@@ -62,4 +62,15 @@
   <data name="RecordOrdinal" xml:space="preserve"><value>Ligne</value></data>
   <data name="ReadRecord" xml:space="preserve"><value>Lire la ligne</value></data>
   <data name="RecordReadFailed" xml:space="preserve"><value>La ligne n’a pas pu être lue ou vérifiée. Ses métadonnées restent disponibles.</value></data>
+  <data name="MetadataYamlHelp" xml:space="preserve"><value>Métadonnées de l’artefact et identifiants de provenance en lecture seule. Consultez Contenu et Stockage pour leurs éléments propres.</value></data>
+  <data name="SizeBytes"><value>Taille (octets)</value></data>
+  <data name="SizeKilobytes"><value>{0:0.0} Ko</value></data>
+  <data name="Status.Unknown"><value>Inconnu</value></data>
+  <data name="StatusHelp.Unknown"><value>L’état de cette copie locale est inconnu.</value></data>
+  <data name="ProducerKind.FlowRun"><value>Exécution de Flow</value></data>
+  <data name="ProducerKind.RuntimeRun"><value>Exécution Runtime</value></data>
+  <data name="ProducerKind.Agent"><value>Agent</value></data>
+  <data name="ProducerKind.Tool"><value>Outil</value></data>
+  <data name="ProducerKind.Unknown"><value>Inconnu</value></data>
+  <data name="RetentionRefreshDraft" xml:space="preserve"><value>Des métadonnées actualisées sont disponibles. Votre saisie de rétention est conservée. Abandonnez-la pour adopter la copie actualisée.</value></data>
 </root>

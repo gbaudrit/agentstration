@@ -30,7 +30,7 @@ const sharedComponentSpecifications: Readonly<Record<string, readonly string[]>>
 /** Source/route reconciliation is an assertion map, not an automatic coverage claim. */
 export const collectionSurfaces = [...collectionManifest.frames, ...collectionManifest.specialized].map(surface => ({
   ...surface,
-  contract: surface.mounting === 'unmounted-legacy' ? 'unmounted-legacy' : surface.renderer === 'CollectionView' ? 'shared-frame' : 'native-applicable',
+  contract: surface.mounting === 'unmounted-legacy' ? 'unmounted-legacy' : ['CollectionView', 'ResourceCollectionTemplate'].includes(surface.renderer) ? 'shared-frame' : 'native-applicable',
   pageObject: 'src/pages/collection-contract.page.ts',
   specification: 'tests/collection-contract.spec.ts',
   populatedSpecification: surface.host === 'workplace' || /PackProject/.test(surface.source) ? 'tests/collection-seeded-workflows.spec.ts' : 'tests/collection-workflows.spec.ts',

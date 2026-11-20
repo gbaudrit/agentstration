@@ -86,4 +86,8 @@
   <data name="Discovery.Timeout" xml:space="preserve"><value>The provider did not respond in time. You can continue editing its configuration.</value></data>
   <data name="Discovery.RetryAt" xml:space="preserve"><value>Next automatic attempt: {0}.</value></data>
   <data name="MetadataUnavailable" xml:space="preserve"><value>Extension details are temporarily unavailable. You can still view the saved provider and its model catalog.</value></data>
+  <data name="SpecificationOverrides" xml:space="preserve"><value>Model specification overrides</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved version is available. Discard your draft to load it.</value></data>
+  <data name="ObservationUnavailable" xml:space="preserve"><value>The available model catalog could not be loaded. Refresh to try again.</value></data>
+  <data name="UsagesUnavailable" xml:space="preserve"><value>Model profile usages could not be verified. Refresh before deleting this provider.</value></data>
 </root>

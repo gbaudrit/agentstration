@@ -1,0 +1,137 @@
+{
+  "screen": "Flow Designer \u2014 preserved specialized workshop",
+  "nativeCases": [
+    {
+      "title": "Flow Designer preserves an invalid raw draft across modes and fragment navigation ",
+      "project": "desktop-chromium",
+      "durationMs": 20210
+    },
+    {
+      "title": "Flow Designer preserves an invalid raw draft across modes and fragment navigation @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 20802
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+      "reportSha256": "8b799719f0e3cbfe13992a78cb426e2f0b55fde5b000dd67c4f6ca881a338e16",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/FlowDesigner.razor": "32d128573a67836a5c6ffe42e3184e9ba5bf2065bd99575fe2fe87a2dc90e9f3",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor": "3a9b3d52f0d12695b20602e5478b4249e1daadd081c83507463e7ab5aa0b0ccd",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor.cs": "901c4aaebe22b10e6f8def5917ddec2ac4b3202b48b005658cb4d2bcf02c846e",
+        "src/Agentstration.Web.FlowDesigner/State/FlowEditorStore.cs": "d162e03ad62a3531155a0404e021970b5e91e285154450a668fad81e78c0ab3e",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowInspectorPresentation.cs": "d1a05708e112c202bda6a12951eb984745b051ea3b9c74181555e37e18a6047e",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowAgentInspector.razor": "4d65c7bf3b8b7f72ee4251ef6e8949f6b39dd2d6c5a04bc17d65456b2715eec5",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor": "fa6e6ffa0112b09a16042334edc274498426b1f928c3bc1cffc8d9f2fc71fe12",
+        "src/Agentstration.Web.FlowDesigner/Resources/Components/FlowDesignerStrings.resx": "3e6002c2669bbd81866dfb74e4d5fdf37ac978406d596f08e83e04b4992da533",
+        "src/Agentstration.Web.FlowDesigner/Resources/Components/FlowDesignerStrings.fr-FR.resx": "3969e897ae137f0ee8242e4afcc47c141176bbf767c886615a9b45dbdf804e70",
+        "tests/Agentstration.Web.FlowDesigner.Tests/FlowDesignerReadOnlyTests.cs": "3bad40bee0294aa66046c952d6e84539c59bed3ffd0dd3c90096f875a9f0bb38",
+        "tests/Agentstration.Web.FlowDesigner.Tests/FlowDesignerReadOnlyTests.Saving.cs": "cc4402cdc3f46c94173efa2758284c4a113d5fa3557c49298d4dcf832f314795",
+        "tests/Agentstration.Web.FlowDesigner.Tests/FlowDesignerReadOnlyTests.SessionFoundation.cs": "e42f1f3d50862f55535be6b9fd35925ab42c45c6cbb65b667e5b23713d887e02",
+        "tests/Agentstration.Web.FlowDesigner.Tests/FlowDesignerSessionFoundationTests.cs": "7e49d8092278d8cb3c02b06b23942d02eb293a1a6fe46580f643c619b07dfa80",
+        "tests/Agentstration.Console.Components.Tests/FlowDesignerRouteFoundationTests.cs": "21d8b23131ca65d932b5c33a744eb4546e865acd6ff1257ef4412b7145e7ac8d",
+        "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.Saving.cs": "bbc37037a4884dd410fd5c512411de7b3e416f3475743b326f8f425a3e1f941d"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada"
+      },
+      "campaign": "screens-05"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "flows-agent-regression",
+      "passed": 6,
+      "sha256": "a8162993379ffcd399c9fedabb1f9d6aaac6226d7531ea0c5ff238e994347b65"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "flow-designer-canvas-desktop-en.png",
+      "sha256": "4a7cda5933e95b5e147c09eec61fc4545dfb037ae3fc8d87233ada330c6b147f"
+    },
+    {
+      "file": "flow-designer-invalid-raw-draft-desktop-en.png",
+      "sha256": "aafcdbd56075db4c0d8fa331ec9ea4c3b9ae62beb1df5df319ff03888d7ae092"
+    },
+    {
+      "file": "flow-designer-retained-split-desktop-en.png",
+      "sha256": "2ec972a848a4545fcbd5bac91dfb41cec1006413da6063660cdd23cacd1bd17b"
+    },
+    {
+      "file": "flow-designer-cancel-leave-desktop-en.png",
+      "sha256": "f593f2cfe8c3b7ae4a0fda5731d42976b33fe033e5fcc05b9ba10e954b622a68"
+    },
+    {
+      "file": "flow-designer-canvas-mobile-fr.png",
+      "sha256": "f1c329e3741fdbe675ad466c51402f7abfddc1a653f1aec977faa8e2ca650f73"
+    },
+    {
+      "file": "flow-designer-invalid-raw-draft-mobile-fr.png",
+      "sha256": "332be43de52f06a32e6b2625f8a01b893011da7b743f7f8767298c5c56075970"
+    },
+    {
+      "file": "flow-designer-retained-split-mobile-fr.png",
+      "sha256": "1db36b86e4d7794e1d4b658a382bcf9fe84e504159a87dcb9820632964cb4292"
+    },
+    {
+      "file": "flow-designer-cancel-leave-mobile-fr.png",
+      "sha256": "1db36b86e4d7794e1d4b658a382bcf9fe84e504159a87dcb9820632964cb4292"
+    }
+  ],
+  "limits": [
+    "A resource creation wizard or standard persisted-resource shell would misrepresent this dedicated editor; the ordinary Flow detail screen supplies that resource frame.",
+    "An initial temporary fragment probe resolved against base href and then placed its mobile link below the app footer. The final probe uses an absolute same-document URL and a normally positioned short link in the content toolbar, with real click/tap and unchanged path/query/draft assertions. No product fix, forced action or timeout increase was used for those probe errors."
+  ],
+  "finalDeltaChecks": {
+    "passed": 121,
+    "overlapsEarlierGroupChecks": true,
+    "sha256": "0bb660e41b6f539e5ac21f1504a56763dc6c2330ae6d5d552eed50bdbe1553c4"
+  }
+}

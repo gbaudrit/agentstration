@@ -87,10 +87,23 @@
 .collection-actions-menu { display: inline-block; }
 .collection-actions-menu > summary { display: inline-flex; align-items: center; gap: .3rem; list-style: none; cursor: pointer; }
 .collection-actions-menu > summary::-webkit-details-marker { display: none; }
+.collection-actions-menu > summary:focus { box-shadow: none; outline: none; }
+.collection-actions-menu > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
 .collection-actions-panel, .full-value-panel { position: fixed; inset: auto; margin: 0; padding: .4rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); box-shadow: var(--shadow); max-width: calc(100vw - 1rem); }
-.collection-actions-panel { min-width: 11rem; }
-.collection-actions-panel a, .collection-actions-panel button { display: flex; width: 100%; text-align: start; padding: .55rem .65rem; background: transparent; border: 0; font: inherit; text-decoration: none; cursor: pointer; border-radius: var(--radius-sm); }
-.collection-actions-panel a:hover, .collection-actions-panel button:hover, .collection-actions-panel :focus-visible { background: var(--surface-2); outline: 2px solid var(--primary); outline-offset: -2px; }
+.collection-actions-panel { min-width: 13rem; max-height: calc(100dvh - 1rem); overflow-y: auto; padding: .35rem; border-radius: var(--radius-lg); box-shadow: none; }
+.collection-actions-panel:popover-open { display: grid; gap: .125rem; }
+.collection-actions-panel :is(a, button) { display: flex; align-items: center; gap: .65rem; width: 100%; min-height: 2.5rem; text-align: start; padding: .55rem .7rem; background: transparent; color: var(--text); border: 0; font: inherit; font-size: var(--font-size-sm); font-weight: 500; line-height: 1.35; text-decoration: none; cursor: pointer; border-radius: var(--radius-sm); }
+.collection-actions-panel a:visited { color: var(--text); }
+.collection-actions-panel :is(a, button) > .ui-icon { flex: 0 0 1rem; width: 1rem; height: 1rem; color: var(--muted); }
+.collection-actions-panel :is(a, button):not(:disabled):hover { background: var(--surface-2); }
+.collection-actions-panel :is(a, button):focus-visible { background: var(--primary-soft); outline: 2px solid var(--primary); outline-offset: -2px; }
+.collection-actions-panel :is(a, button):disabled { color: var(--muted); opacity: .55; cursor: not-allowed; }
+.collection-actions-panel :is(a, button).danger-text, .collection-destructive-actions :is(a, button) { color: var(--color-danger); }
+.collection-destructive-actions :is(a, button) > .ui-icon { color: inherit; }
+.collection-actions-panel :is(a, button).danger-text:not(:disabled):hover, .collection-destructive-actions :is(a, button):not(:disabled):hover { background: color-mix(in srgb, var(--color-danger) 9%, var(--surface)); }
+.collection-actions-separator { width: auto; height: 0; margin: .3rem .35rem; border: 0; border-top: 1px solid var(--border); }
+.collection-destructive-actions { display: grid; gap: .125rem; }
+@media (pointer: coarse) { .collection-actions-panel :is(a, button) { min-height: 2.75rem; } }
 .managed-resource-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; color: var(--muted); margin-top: .3rem; }
 .value-disclosure { display: inline-block; min-width: 0; max-width: 12rem; }
 .disclosure-trigger { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); background: transparent; border: 0; padding: .2rem; font: inherit; cursor: pointer; }
@@ -113,7 +126,6 @@
 .flow-compact-list .data-grid th:first-child { width: auto; }
 .flow-compact-list .data-grid th:nth-child(2) { width: 10rem; }
 .flow-compact-list .data-grid th:nth-child(3) { width: 12rem; }
-.flow-compact-list .data-grid th:last-child { width: 8rem; }
 .flow-compact-list .data-grid td { padding-block: .35rem; }
 .flow-compact-list .collection-identity-cell .collection-identity { width: 100%; }
 .collection-identity { align-items: center; gap: .4rem; }
@@ -145,6 +157,7 @@
 /* Corner disclosures keep 24px targets while their visual markers stay discreet. */
 .collection-family-icon { display: inline-flex; position: relative; flex: 0 0 auto; margin: .4rem .5rem .4rem .4rem; }
 .collection-icon-badges { position: absolute; inset: 0; pointer-events: none; }
+.collection-icon-badges .value-disclosure { display: flex; }
 .collection-icon-badges :is(.resource-owner-icon, .status-icon-only, .managed-icon-only) { position: absolute; width: 1.5rem; height: 1.5rem; margin: 0; background: transparent; pointer-events: auto; }
 .collection-icon-badges .resource-owner-icon { top: -.75rem; inset-inline-start: -.75rem; }
 .collection-icon-badges .status-icon-only { top: -.75rem; inset-inline-end: -.75rem; }

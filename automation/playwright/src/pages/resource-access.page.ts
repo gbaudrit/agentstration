@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 
 export interface ResourceAccessIdentity {
@@ -15,12 +16,12 @@ export class ResourceAccessPage {
   public get panel(): Locator { return this.page.getByTestId(TestIds.resourceAccess.panel); }
 
   public async openVaultAccess(): Promise<void> {
-    await this.page.getByTestId('vault-access-tab').click();
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
   }
 
   public async openSecretAccess(): Promise<void> {
-    await this.page.getByTestId('secret-access-tab').click();
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
   }
 
@@ -101,11 +102,7 @@ export class ResourceAccessPage {
       await this.page.getByTestId(TestIds.resourceAdministration.toolDetails).waitFor({ state: 'visible' });
     }).toPass({ timeout: 30_000 });
     await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
-    const accessTab = this.page.getByTestId('tool-access-tab');
-    await expect(async () => {
-      await accessTab.click();
-      expect(await accessTab.getAttribute('aria-selected')).toBe('true');
-    }).toPass({ timeout: 15_000 });
+    await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
     await expect(this.panel).toHaveAttribute('data-resource-managed', 'true');
     await expect(this.panel).toHaveAttribute('data-resource-origin', 'Extension');

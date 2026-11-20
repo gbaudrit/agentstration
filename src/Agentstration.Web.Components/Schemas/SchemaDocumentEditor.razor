@@ -89,7 +89,7 @@
     {
         <div role="tabpanel" class="schema-definition-source" hidden="@(mode != EditorMode.Source)">
             <label><span>@Localizer["DefinitionSource"]</span></label>
-            <SchemaSourceEditor Value="@source" ValueChanged="value => source = value" ReadOnly="EditorDisabled" />
+            <SchemaSourceEditor Value="@source" ValueChanged="SourceChangedAsync" ReadOnly="EditorDisabled" />
             @if (!ReadOnly)
             {
                 <FormActions><button type="button" class="button-secondary" disabled="@Disabled" data-testid="schema-apply-source" @onclick="ApplySourceAsync">@Localizer["ApplySource"]</button></FormActions>
@@ -109,6 +109,7 @@
     [Parameter] public string? Dialect { get; set; }
     [Parameter] public JsonElement Value { get; set; }
     [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
     [Parameter] public SchemaFormatDescriptor? Descriptor { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
@@ -154,6 +155,7 @@
         sourceError = null;
     }
 
+    private async Task SourceChangedAsync(string value) { source = value; await DraftChanged.InvokeAsync(source != Pretty(valueKey)); }
     private async Task ApplySourceAsync()
     {
         sourceError = null;
@@ -197,6 +199,7 @@
         source = Pretty(valueKey);
         visualSupported = IsJsonSchema && SupportsVisual(document);
         await ValueChanged.InvokeAsync(next);
+        await DraftChanged.InvokeAsync(false);
         await ValidateDefinitionAsync();
     }
 

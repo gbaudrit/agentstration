@@ -1,0 +1,32 @@
+{
+  "base": "ed06997fa47d9e4cc294c910355cf45662fd81a5",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor": "bf2d64720515f78a957db3c23a9dce88a67ae35f06a85e6e9ea818f4db179524",
+    "src/Agentstration.Console.Components/Console/ToolInspectionModel.cs": "eff7fe9cc65c1b64c78fce2350548c2f61604ffa0a7631da27bfae5f012620a4",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolDetailsStrings.fr-FR.resx": "f2cb538fb6bcdbecea0f1cdca94debcb87f8ced7bfc56851c90b97b299d2b6b8",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolDetailsStrings.resx": "3d80b90a25bf93a3238969ee47a97f9700cb09a5533e899dbcad92fc511bfe31",
+    "tests/Agentstration.Console.Components.Tests/ToolDetailsComponentTests.cs": "5b74e76988e5ccdcd1f59a08ab88feca8937142fa9b4aad23aa4c5f075847911"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "ca8ba9284059017a438228a045601052ea2bf5feda771b1a4e289a073bc105ed",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "4d5881398c873e1efc946fb886afd440cc06292a378611840176a12c4babe6e0",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "ca8ba9284059017a438228a045601052ea2bf5feda771b1a4e289a073bc105ed",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "ca8ba9284059017a438228a045601052ea2bf5feda771b1a4e289a073bc105ed",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "4d5881398c873e1efc946fb886afd440cc06292a378611840176a12c4babe6e0",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "4d5881398c873e1efc946fb886afd440cc06292a378611840176a12c4babe6e0"
+  },
+  "phases": [
+    {
+      "name": "tool-details",
+      "exitCode": 0,
+      "seconds": 120.8
+    },
+    {
+      "name": "governed-inventory",
+      "exitCode": 0,
+      "seconds": 219.9
+    }
+  ],
+  "completed": true,
+  "running": []
+}

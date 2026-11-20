@@ -15,10 +15,19 @@ public sealed class ConnectedServiceEditorModel
     public string Name { get; set; } = string.Empty;
     [Required] public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [Required] public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+    [Required] public ResourceScopeRef? ScopeRef { get; set; }
+    [Required] public string TypeKey { get; set; } = string.Empty;
+    public string Tags { get; set; } = string.Empty;
+    private ConnectedServiceTypeReference? originalType;
     public bool Enabled { get; set; } = true;
     public JsonElement Options { get; set; } = JsonSerializer.SerializeToElement(new { });
     public List<ConnectedServiceBindingEditorModel> Bindings { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
+
+    public IReadOnlyList<string> MissingRequiredBindings(IEnumerable<ConnectedServiceInputDescriptor> inputs) => inputs
+        .Where(input => input.Required && !Bindings.Any(binding => binding.InputId == input.Id && binding.IsConfigured))
+        .Select(input => input.Id).ToArray();
 
     public ConnectedServiceProperties Properties(ConnectedServiceTypeResource type,
         ConnectedServiceTypeVersionDescriptor version) => new()
@@ -26,15 +35,18 @@ public sealed class ConnectedServiceEditorModel
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
             Enabled = Enabled,
-            Type = new()
-            {
-                Type = new ResourceReference(type.Name,
+            Type = originalType is { } original && original.TypeUid == type.Uid && original.Type.Name == type.Name
+                && (original.Type.Namespace ?? ResourceNamespace.Parse(Namespace)) == type.Namespace
+                && original.Type.ScopeRef == type.ScopeRef && original.Version == version.Version && original.SchemaDigest == version.SchemaDigest
+                ? original : new()
+                {
+                    Type = new ResourceReference(type.Name,
                 type.ScopeRef ?? throw new InvalidOperationException("The Connected Service type has no exact scope."),
                 type.Namespace),
-                TypeUid = type.Uid,
-                Version = version.Version,
-                SchemaDigest = version.SchemaDigest
-            },
+                    TypeUid = type.Uid,
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest
+                },
             Options = Options.Clone(),
             Bindings = Bindings.Where(value => value.IsConfigured).Select(value => value.ToBinding()).ToArray(),
             UsePolicy = new() { Grants = UseGrants.ToArray() }
@@ -43,6 +55,10 @@ public sealed class ConnectedServiceEditorModel
     public static ConnectedServiceEditorModel From(ConnectedServiceResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
+        originalType = resource.Definition.Type,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Enabled = resource.Definition.Enabled,

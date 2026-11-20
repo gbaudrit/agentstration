@@ -6,20 +6,27 @@
 
 @if (EffectiveKind is { } kind)
 {
-    <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null)" data-scope-ref="@ScopeRef?.Value">
-        @if (IconOnly)
-        {
-            <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" Marker="@(kind switch { ResourceScopeKind.Instance => "I", ResourceScopeKind.Tenant => "T", _ => "W" })" />
-        }
-        else
-        {
-        <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null)" title="@ScopeRef?.Value">@Localizer[$"ResourceScope.{kind}"].Value</span>
-        @if (ShowName && ReadableName is { } name)
-        {
-            <ValueDisclosure Value="@name" />
-        }
-        }
-    </span>
+    @if (IdentityScopeAsText)
+    {
+        <span class="resource-scope-text">@if (CopyIdentityFacts) { <CopyableValue Value="@TextLabel(kind)" PlainText /> } else { @TextLabel(kind) }</span>
+    }
+    else
+    {
+        <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null) @(JoinedName ? "resource-owner-joined" : null)" data-scope-ref="@ScopeRef?.Value">
+            @if (IconOnly)
+            {
+                <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" Marker="@(kind switch { ResourceScopeKind.Instance => "I", ResourceScopeKind.Tenant => "T", _ => "W" })" />
+            }
+            else
+            {
+                <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null) @(JoinedName ? "resource-scope-badge-named" : null)" title="@(JoinedName ? TextLabel(kind) : ScopeRef?.Value)">@(JoinedName ? TextLabel(kind) : Localizer[$"ResourceScope.{kind}"].Value)</span>
+                @if (!JoinedName && ShowName && ReadableName is { } name)
+                {
+                    <ValueDisclosure Value="@name" />
+                }
+            }
+        </span>
+    }
 }
 
 @code {
@@ -28,26 +35,20 @@
     [Parameter] public bool Compact { get; set; }
     [Parameter] public bool ShowName { get; set; } = true;
     [Parameter] public bool IconOnly { get; set; }
+    [Parameter] public bool JoinedName { get; set; }
     [Parameter] public string? DisplayName { get; set; }
+    [CascadingParameter(Name = "ResourceIdentityScopeAsText")] private bool IdentityScopeAsText { get; set; }
+    [CascadingParameter(Name = "ResourceIdentityCopyFacts")] private bool CopyIdentityFacts { get; set; }
     private ConsoleContextState? context;
     private WorkplaceContextState? workplaceContext;
     private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
-    // Only names already authorized in the shared context snapshot may be disclosed.
-    private string? ReadableName
+    private string? ReadableName => ResourceScopeDisplayName.Resolve(ScopeRef, DisplayName, context?.Current, workplaceContext?.Current);
+    private string TextLabel(ResourceScopeKind kind)
     {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(DisplayName)) return DisplayName;
-            if (ScopeRef is not { } scope || scope.Kind == ResourceScopeKind.Instance) return null;
-            var current = context?.Current;
-            var option = current?.Contexts.FirstOrDefault(value => value.ScopeRef == scope.Value);
-            if (option is not null) return option.DisplayName;
-            if (current is not null && scope.Value == current.SelectedScopeRef)
-                return scope.Kind == ResourceScopeKind.Tenant ? current.TenantDisplayName : current.WorkspaceDisplayName;
-            if (workplaceContext?.Current is { WorkspaceId: { } workspaceId } workplace
-                && scope == ResourceScopeRef.Workspace(workspaceId)) return workplace.WorkspaceDisplayName;
-            return null;
-        }
+        var label = Localizer[JoinedName && kind == ResourceScopeKind.Workspace ? "ResourceScopeBadge.Workspace" : $"ResourceScope.{kind}"].Value;
+        return ShowName && kind != ResourceScopeKind.Instance && !string.IsNullOrWhiteSpace(ReadableName)
+            ? JoinedName ? Localizer["NamedResourceScope", label, ReadableName].Value : $"{label} · {ReadableName}"
+            : label;
     }
     protected override void OnInitialized()
     {

@@ -114,7 +114,7 @@ public sealed partial class ToolDefinitionService(
         var stored = await store.PutAsync(value, ifMatch ?? existing?.ETag,
             ifNoneMatch || (existing is null && ifMatch is null), cancellationToken);
         if (stored.Value.Definition.Publish)
-            _ = await PublishAsync(stored.Value.Name, stored.Value.Namespace, stored.Value.Definition.Version, cancellationToken, stored.ETag);
+            _ = await PublishAsync(scopeRef, stored.Value.Name, stored.Value.Namespace, stored.Value.Definition.Version, cancellationToken, stored.ETag);
         return stored;
     }
 
@@ -143,6 +143,27 @@ public sealed partial class ToolDefinitionService(
         var current = await GetAsync(name, @namespace, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
         await store.DeleteAsync(new ResourceKey(ToolResourceKinds.ToolDefinition, name, @namespace), ifMatch ?? current.ETag, cancellationToken);
+    }
+
+    public async Task<StoredResource<ToolDefinitionResource>> SetEnabledAsync(ResourceScopeRef ownerScope, string name,
+        ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken)
+    {
+        var current = await GetExactAsync(name, @namespace, ownerScope, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
+        return await store.PutAsync(current.Value with
+        {
+            Generation = checked(current.Value.Generation + 1),
+            Definition = current.Value.Definition with { Enabled = enabled, Publish = false }
+        }, ifMatch ?? current.ETag, false, cancellationToken);
+    }
+
+    public async Task DeleteAsync(ResourceScopeRef ownerScope, string name, ResourceNamespace @namespace,
+        string? ifMatch, CancellationToken cancellationToken)
+    {
+        var current = await GetExactAsync(name, @namespace, ownerScope, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
+        await store.DeleteExactAsync(ScopedResourceAddress.Create(ownerScope, @namespace, ToolResourceKinds.ToolDefinition, name),
+            ifMatch ?? current.ETag, cancellationToken);
     }
 
     public static void ValidateContract(ToolDefinitionProperties definition, ResolvedToolDefinitionFlowContract flow)

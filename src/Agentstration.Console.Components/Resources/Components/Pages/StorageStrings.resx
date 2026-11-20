@@ -240,4 +240,22 @@
   <data name="Documents.ExecutePermissionRequired" xml:space="preserve"><value>Executing a document operation requires runs/execute in the selected context. Select an authorized context or request this permission.</value></data>
   <data name="Documents.RunQuery" xml:space="preserve"><value>Run query</value></data>
   <data name="Documents.QueryInputInvalid" xml:space="preserve"><value>Enter a JSON object of at most 8 KiB and a page size within the displayed limit.</value></data>
+<data name="Error.IdentityMismatch"><value>The returned Storage does not match the requested identity.</value></data>
+<data name="SavedCollectionsAndUsePolicy"><value>Document collections and descendant use policy</value></data>
+<data name="Validation.Configuration"><value>Select a type, configure the required bindings and correct the configuration errors before saving.</value></data>
+<data name="Validation.DisplayNameRequired"><value>Enter a display name.</value></data>
+<data name="Validation.TechnicalNameInvalid"><value>Use 1–128 lowercase letters, digits, dots or hyphens, starting with a letter or digit.</value></data>
+<data name="Type.IdentityMismatch"><value>The returned Storage type does not match the requested identity.</value></data>
+<data name="Validation.DisplayNameRange"><value>Use a display name of 1–200 characters.</value></data>
+<data name="Validation.DescriptionRange"><value>Use a description of at most 2,000 characters.</value></data>
+<data name="Validation.NamespaceInvalid"><value>Enter a valid namespace.</value></data>
+<data name="Type.UseUnknown"><value>Generic Use has not been evaluated.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved version is available. Your draft and its original revision are retained until you discard it.</value></data>
+  <data name="Type.Usages" xml:space="preserve"><value>Discoverable usages</value></data>
+  <data name="Type.NoUsages" xml:space="preserve"><value>No discoverable usages in this context.</value></data>
+  <data name="Type.UsagesUnknown" xml:space="preserve"><value>Usages could not be loaded. Retry to inspect the discoverable references.</value></data>
+  <data name="Type.Value" xml:space="preserve"><value>Value</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Descendant use policy</value></data>
+  <data name="Availability.Unknown" xml:space="preserve"><value>Not observed</value></data>
+  <data name="Type.Browse" xml:space="preserve"><value>Storage types</value></data>
 </root>

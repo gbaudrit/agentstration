@@ -1,10 +1,25 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
 
 <nav class="collection-pager" aria-label="@Localizer["Page", Page]">
+    @if (PageSizeChanged.HasDelegate && PageSizes.Count > 0)
+    {
+        <FormField Id="@PageSizeId" Label="@Localizer["CollectionPageSize"]" Class="collection-page-size">
+            <ClearableSelect TValue="int" Value="PageSize" ValueChanged="ChangeSizeAsync" AllowClear="false" disabled="@Busy">
+                @foreach (var size in PageSizes) { <option value="@size">@size</option> }
+            </ClearableSelect>
+        </FormField>
+    }
     @if (Total is { } count) { <span role="status">@Localizer["Results", count]</span> }
-    <button class="button-secondary" type="button" disabled="@(Busy || Page <= 1)" @onclick="() => PageChanged.InvokeAsync(Page - 1)">@Localizer["Previous"]</button>
-    <span>@Localizer["Page", Page]</span>
-    <button class="button-secondary" type="button" disabled="@(Busy || !HasMore)" @onclick="() => PageChanged.InvokeAsync(Page + 1)">@Localizer["Next"]</button>
+    <button class="button-secondary" type="button" disabled="@(Busy || !(HasPrevious ?? Page > 1))" @onclick="() => ChangePageAsync(Page - 1)">@Localizer["Previous"]</button>
+    @if (SupportsDirectNavigation && PageCount is > 1 and var pages)
+    {
+        @foreach (var number in VisiblePages(pages))
+        {
+            <button class="button-secondary collection-page-number" type="button" aria-label="@Localizer["Page", number]" aria-current="@(number == Page ? "page" : null)" disabled="@Busy" @onclick="() => ChangePageAsync(number)">@number</button>
+        }
+    }
+    else { <span>@Localizer["Page", Page]</span> }
+    <button class="button-secondary" type="button" disabled="@(Busy || !HasMore)" @onclick="() => ChangePageAsync(Page + 1)">@Localizer["Next"]</button>
 </nav>
 
 @code {
@@ -13,4 +28,26 @@
     [Parameter] public bool HasMore { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public bool? HasPrevious { get; set; }
+    [Parameter] public bool SupportsDirectNavigation { get; set; }
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public IReadOnlyList<int> PageSizes { get; set; } = [];
+    [Parameter] public string? PageSizeId { get; set; }
+    [Parameter] public EventCallback<int> PageSizeChanged { get; set; }
+    private int? PageCount => Total is { } total && PageSize > 0 ? Math.Max(1, (int)Math.Ceiling((double)total / PageSize)) : null;
+    private IEnumerable<int> VisiblePages(int count)
+    {
+        var current = Math.Clamp(Page, 1, count);
+        var first = Math.Max(1, current - 2);
+        var last = (int)Math.Min(count, (long)current + 2);
+        return new[] { 1, count }.Concat(Enumerable.Range(first, last - first + 1)).Distinct().Order();
+    }
+    private Task ChangeSizeAsync(int size) => !Busy && PageSizes.Contains(size) ? PageSizeChanged.InvokeAsync(size) : Task.CompletedTask;
+    private Task ChangePageAsync(int page)
+    {
+        if (Busy || page < 1 || page == Page) return Task.CompletedTask;
+        var permitted = page == Page - 1 && (HasPrevious ?? Page > 1) || page == Page + 1 && HasMore
+            || SupportsDirectNavigation && PageCount is { } count && page <= count;
+        return permitted ? PageChanged.InvokeAsync(page) : Task.CompletedTask;
+    }
 }

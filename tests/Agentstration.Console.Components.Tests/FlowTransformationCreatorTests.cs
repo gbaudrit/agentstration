@@ -29,7 +29,7 @@ public sealed partial class KnowledgeSourceEditorTests
         };
         using var context = CreateContext(new KnowledgeClientStub(source));
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
-        rendered.WaitForAssertion(() => Assert.Contains("default/redact:2.0.0 → default/verify:1.0.0", rendered.Find("tbody").TextContent));
+        rendered.WaitForAssertion(() => Assert.Contains("default/redact:2.0.0 → default/verify:1.0.0", rendered.Find(".knowledge-flow-composition tbody").TextContent));
     }
 
     [TestMethod]

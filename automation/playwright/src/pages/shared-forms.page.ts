@@ -29,10 +29,11 @@ export class SharedFormsPage {
 
   public async assertAssociations(): Promise<void> {
     const failures = await this.page.locator('.workspace .form-field').evaluateAll(fields => fields.flatMap(field => {
-      const controls = [...field.querySelectorAll<HTMLInputElement>('input, textarea, select')].filter(control => control.type !== 'hidden');
+      const controls = [...field.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')].filter(control => control.type !== 'hidden');
       return controls.flatMap(control => {
         const problems: string[] = [];
-        if (!control.id || ![...field.querySelectorAll('label')].some(label => label.htmlFor === control.id)) problems.push(`Missing associated label: ${control.id}`);
+        // Native labels include both explicit `for` associations and wrapping labels.
+        if (![...(control.labels ?? [])].some(label => label.textContent?.trim())) problems.push(`Missing associated label: ${control.id}`);
         for (const id of (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)) {
           if (!document.getElementById(id)) problems.push(`Missing field description: ${id}`);
         }
@@ -57,9 +58,13 @@ export class SharedFormsPage {
     const original = await select.inputValue();
     expect(original).not.toBe('');
     await this.clearField(select, locale);
-    await expect(this.page.locator('.validation-errors')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
+    const messages = select.locator('..').locator('..').locator('.form-field-messages');
+    await expect(messages).toContainText(SharedFormTextByLocale[locale].selectionRequired);
     const url = this.page.url();
-    await this.page.locator('.resource-form button[type=submit]').click();
+    await this.page.locator('[data-wizard-step=refresh]').click();
+    await this.page.getByTestId(TestIds.distribution.sourceRegistryCreate).click();
+    await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
+    await expect(messages).toContainText(SharedFormTextByLocale[locale].selectionRequired);
     await expect(this.page).toHaveURL(url);
     await select.selectOption(original);
     await expect(select).toHaveValue(original);

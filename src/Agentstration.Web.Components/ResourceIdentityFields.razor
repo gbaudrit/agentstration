@@ -60,6 +60,8 @@
         if (!automatic) return;
         currentTechnicalName = ResourceNameDerivation.Derive(value, Policy);
         await TechnicalNameChanged.InvokeAsync(currentTechnicalName);
+        if (CurrentEditContext is not null && TechnicalNameExpression is not null)
+            CurrentEditContext.NotifyFieldChanged(FieldIdentifier.Create(TechnicalNameExpression));
     }
 
     private Task DisplayNameInput(ChangeEventArgs args) => DisplayNameInput(args.Value?.ToString() ?? string.Empty);

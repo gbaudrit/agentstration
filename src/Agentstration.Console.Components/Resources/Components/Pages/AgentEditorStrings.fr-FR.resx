@@ -121,4 +121,22 @@
   <data name="OutputResolution.Parent" xml:space="preserve"><value>Dynamique : utiliser l’attente de sortie du parent</value></data>
   <data name="OutputMediaType" xml:space="preserve"><value>Type MIME de sortie (facultatif)</value></data>
   <data name="OutputResolution.Fixed" xml:space="preserve"><value>Fixe : schéma ou type MIME déclaré</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="ConfigurationEntry" xml:space="preserve"><value>Réglage</value></data>
+  <data name="ConfigurationValue" xml:space="preserve"><value>Valeur ou ressource</value></data>
+  <data name="Behaviors" xml:space="preserve"><value>Comportements</value></data>
+  <data name="Middleware" xml:space="preserve"><value>Intergiciels</value></data>
+  <data name="ContextProviders" xml:space="preserve"><value>Fournisseurs de contexte</value></data>
+  <data name="ModelAndExecution" xml:space="preserve"><value>Modèle et exécution</value></data>
+  <data name="CreationScopeRequired" xml:space="preserve"><value>Sélectionnez le périmètre propriétaire de la ressource.</value></data>
+  <data name="ScopeImmutable" xml:space="preserve"><value>Le périmètre propriétaire ne peut pas être modifié en YAML.</value></data>
+  <data name="CreationIdentityInvalid" xml:space="preserve"><value>Corrigez les étiquettes dans Identité avant de continuer.</value></data>
+  <data name="DesiredGeneration" xml:space="preserve"><value>Génération souhaitée</value></data>
+  <data name="ActiveGeneration" xml:space="preserve"><value>Génération active</value></data>
+  <data name="NoActiveGeneration" xml:space="preserve"><value>Aucune</value></data>
+  <data name="Deployment" xml:space="preserve"><value>Déploiement</value></data>
+  <data name="ApplyPending" xml:space="preserve"><value>À appliquer</value></data>
+  <data name="DeploymentFailed" xml:space="preserve"><value>En erreur</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une définition plus récente est disponible. Votre brouillon et sa version d’origine sont conservés. Annulez les modifications pour charger cette nouvelle définition.</value></data>
+<data name="QuickActions" xml:space="preserve"><value>Actions rapides</value></data>
 </root>

@@ -1,0 +1,188 @@
+{
+  "base": "f5d790f3fafcb1240da91b5400661b88d5de8af9",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "9b013c5f856aae2f4fd063d9af0302e513cb21b59ee1cd5023a49521ed52ec68",
+    "automation/playwright/src/pages/connected-storage-collection.page.ts": "b2f6e0533026aa8ba6ddd735b4226f847510efaf7e8aa922108111465c41f51a",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor": "9a54a6d4e50a2167a541816947feb892be1c57cbe25970daa8bc258df66b0b07",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor.css": "8431aef3b099df60bbab6ab9f2b31dd982f12561fd1d8b8245ed93b1d5692f4f",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor": "863da7ebbfecf6195bc9e6081f22345b51440d3ec4127fec000a05dfea3a12e1",
+    "src/Agentstration.Console.Components/Console/ConnectedServiceEditorModel.cs": "32b1995ac91094352aa90a6365db120e2d324aeaca412b1663e5a1b4dcc37259",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConnectedServiceStrings.fr-FR.resx": "72f4322c59135cf65a5abfaaa250084d58062b939c0d39f1f57388e7a0531009",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConnectedServiceStrings.resx": "07bdd5255c916989e1f090febc87fbd9fd88864638e14e83d0f54160e44bd61e",
+    "src/Agentstration.Web.Components/ResourceDefinitionForm.razor": "38c6ac7fcab5b66c56091f4a52aa9994fb47d8221ef2ed93157b46d622adf585",
+    "tests/Agentstration.Console.Components.Tests/ConnectedServiceComponentTests.Details.cs": "05bb1788945b6bbafb1cddd47f0b13cf35d3fd76a796226a405b5f789a91ee65",
+    "tests/Agentstration.Console.Components.Tests/ConnectedServiceComponentTests.cs": "8d575001a4e57acbc02504c54e99037ea563bb0536b4b8dd51ff33d56e2ce9ec",
+    "tests/Agentstration.Web.Components.Tests/ResourceDefinitionFormTests.cs": "babeb4839d029bfbba95fe98ab34f747ed8188bf843b762f1582ad74e2160875"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "8797c2dc2b9012ae4cdee7e05efb58eb761e91ed79c13abdbc618594c92ba6c7",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "b1e597105e7bab7fb32b66a4db304d419ac3d2ded06b294323e3d1b3f478f7b8",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "84d52036bbc96e1d77b306634d962056b474ba69c6dc3cab9041e527ae5eb968",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "8797c2dc2b9012ae4cdee7e05efb58eb761e91ed79c13abdbc618594c92ba6c7",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "8797c2dc2b9012ae4cdee7e05efb58eb761e91ed79c13abdbc618594c92ba6c7",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "b1e597105e7bab7fb32b66a4db304d419ac3d2ded06b294323e3d1b3f478f7b8",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "b1e597105e7bab7fb32b66a4db304d419ac3d2ded06b294323e3d1b3f478f7b8",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "84d52036bbc96e1d77b306634d962056b474ba69c6dc3cab9041e527ae5eb968",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "84d52036bbc96e1d77b306634d962056b474ba69c6dc3cab9041e527ae5eb968"
+  },
+  "phases": [
+    {
+      "name": "connected-details",
+      "exitCode": 0,
+      "seconds": 83.0
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "connected-details-overview-desktop-en.png",
+      "sha256": "2330632845adf3ad0e449e11a664c0ae7125b171cc5c88b41e532185d2e67d19"
+    },
+    {
+      "file": "connected-details-identity-desktop-en.png",
+      "sha256": "02be112b77a129ebe5bced661c6429d45fa7b9cb768815e9d288a3b98939285c"
+    },
+    {
+      "file": "connected-details-invalid-field-desktop-en.png",
+      "sha256": "2d43f11af63ab79d52033470efb800e482c608e50f65dbdb4c494b3e5ee8d73c"
+    },
+    {
+      "file": "connected-details-invalid-options-desktop-en.png",
+      "sha256": "ed1ba6d8b24976291acf0117403993a81d610fac64063118a8fd9bb0b92cef17"
+    },
+    {
+      "file": "connected-details-retained-refresh-desktop-en.png",
+      "sha256": "399501aef6069ae8fdf4f0d161f19fddb325b4a27768c622272225941b18af00"
+    },
+    {
+      "file": "connected-details-yaml-desktop-en.png",
+      "sha256": "d9d2fbaff54f70d01032768f208904a8f63dc002305af85c4e5c39739b6b7efd"
+    },
+    {
+      "file": "connected-details-etag-conflict-desktop-en.png",
+      "sha256": "e05f044e2a318a41c3d0244374672b84ac15a79b2060329ea6baa2fb12c5292b"
+    },
+    {
+      "file": "connected-details-saved-identity-desktop-en.png",
+      "sha256": "b435ae31462b9252b83fc53c9fb8fd7c714305d50b2b02a4e0b82a4e9b2c5ff6"
+    },
+    {
+      "file": "connected-details-activation-cancel-desktop-en.png",
+      "sha256": "2dc64603f8a7442b96f2cb3dd7011095209bb22ed4b48bb7ba3c6ba1ed35951b"
+    },
+    {
+      "file": "connected-details-use-policy-desktop-en.png",
+      "sha256": "1a2a681bbc0a8c6d24ce16fd7652a56ab2357537d862760f34e34fa507a8fd67"
+    },
+    {
+      "file": "connected-details-discovery-desktop-en.png",
+      "sha256": "b3baa7cb04f19483b71fb73d057b9483bd5ad937391351ccdf38e835ba1c2fb5"
+    },
+    {
+      "file": "connected-details-dependents-desktop-en.png",
+      "sha256": "69a793aca0905f89a7ba10f4198952caace00fd06b7d1e374a82109ae4408daf"
+    },
+    {
+      "file": "connected-details-access-desktop-en.png",
+      "sha256": "bb95a8edc32041e56f9784a596e7a2bde1fbd1a65c013817384b172d9fb87080"
+    },
+    {
+      "file": "connected-details-overview-mobile-fr.png",
+      "sha256": "dfc0473de459caee30382e123c9b9e34a076832e64258fdaee0bc7466028cee0"
+    },
+    {
+      "file": "connected-details-identity-mobile-fr.png",
+      "sha256": "836a69265e4fafea47306f383588610fad2e8f8d8310865c7fae604a13843376"
+    },
+    {
+      "file": "connected-details-invalid-field-mobile-fr.png",
+      "sha256": "b7fe423b2ae803412fa7871474946efd8b7a07a5f81ebc29ab5a73aa7494fa6d"
+    },
+    {
+      "file": "connected-details-invalid-options-mobile-fr.png",
+      "sha256": "0eff4644d0b37ad21f37b9fb4d458af7b14e4b85227b5d0fafacb97b7a95c378"
+    },
+    {
+      "file": "connected-details-retained-refresh-mobile-fr.png",
+      "sha256": "72b47690937351da3e193e6f7c0877f3dc7b720e95ec45c021f8e09bd739af67"
+    },
+    {
+      "file": "connected-details-yaml-mobile-fr.png",
+      "sha256": "e81111e3b50ca2d6507296d1a46659c9f365b4fe4348afa3af5df94676f1b368"
+    },
+    {
+      "file": "connected-details-etag-conflict-mobile-fr.png",
+      "sha256": "71aa334ece7ae97a1ee979b2e17b979e441bc0eda78330089b9ace4e56b8d072"
+    },
+    {
+      "file": "connected-details-saved-identity-mobile-fr.png",
+      "sha256": "9050b1df4d9b8a366435e4d87fcfc528ad5978a69de23321a313e160258219a5"
+    },
+    {
+      "file": "connected-details-activation-cancel-mobile-fr.png",
+      "sha256": "0fe95f28187a4ac5b5cfc3328fb9fdba9cb31d3fb85224a9930a54a8ec14f987"
+    },
+    {
+      "file": "connected-details-use-policy-mobile-fr.png",
+      "sha256": "50c721d917e349c028c532cfa39288cbe16d343b527ff890eec9825b74edc7c1"
+    },
+    {
+      "file": "connected-details-discovery-mobile-fr.png",
+      "sha256": "66c3440f6327c5d6fb8b06024a2b659f2589c7c4d657dbd232114fe0ac273a96"
+    },
+    {
+      "file": "connected-details-dependents-mobile-fr.png",
+      "sha256": "2482d5a4292145556e612a0e194ff482a348e6ee799ac28d792e624f92b9aebf"
+    },
+    {
+      "file": "connected-details-access-mobile-fr.png",
+      "sha256": "878314ddfa59c3c3768e6e0cc9a5ff980f113bb1abc4fc76974e398cea534bf2"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "connected-details-tests.log": {
+      "sha256": "3d444e601a01884f7c87f489ad83dc52511d26963b716703a4c4fc8d310cc5fb",
+      "passed": 38
+    },
+    "connected-details-shared-tests.log": {
+      "sha256": "f521f84e480874707746ad023fb0c9bbb46f108f3da63a836c83334a06f55f73",
+      "passed": 9
+    }
+  },
+  "maintainedRegressionCampaign": {
+    "base": "f5d790f3fafcb1240da91b5400661b88d5de8af9",
+    "phases": [
+      {
+        "name": "connected-storage-regression",
+        "exitCode": 0,
+        "seconds": 122.1
+      },
+      {
+        "name": "agent-regression",
+        "exitCode": 0,
+        "seconds": 117.5
+      }
+    ],
+    "sharedFormSourceSha256": "38c6ac7fcab5b66c56091f4a52aa9994fb47d8221ef2ed93157b46d622adf585",
+    "note": "Maintained desktop/mobile journeys passed before adding the Connected Service localized concurrency message. Protected Agent and the shared form source are unchanged between these campaigns."
+  },
+  "nativeProbeSha256": "cf86cd986327dc4f057717eaacb29499e1a44ce517fbeae37c3cdaf239053708",
+  "limits": [
+    "No CI investigation or remediation.",
+    "Focused component tests and modified desktop/mobile smoke only; full solution lanes were not run at the maintainer request.",
+    "New reusable #1236 scenario remains deferred until explicit UX validation and implementation merge."
+  ],
+  "integrationHeads": [
+    "351dad816ae199c37aabaad48533862bf1c5c7f4"
+  ],
+  "integrationNote": "Parallel Agent collection adoption was fast-forwarded after local browser validation. This evidence verifies the recorded tested base and unchanged Connected Service/shared-form/protected Agent sources; it does not claim browser coverage of the parallel collection change."
+}

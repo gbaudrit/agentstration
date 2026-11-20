@@ -1,0 +1,96 @@
+{
+  "capturedAt": "2026-11-19",
+  "productCommit": "41522385906ad435267e740e0c21018801edd6d4",
+  "implementationCommit": "77c60082",
+  "origin": "Real local application; assemblies held fixed throughout the campaign. Temporary local probe, no generated images.",
+  "verified": "Create an Agent in its exact Workspace, build a real Pack, explicitly bind the authorized Model and Runtime profiles, install it, and consult the managed Agent. Verify saved Identity/configuration, original read-only source, model/runtime bindings, access target UID and read-only YAML. Mobile uses touch-enabled Chromium.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "consoleComponents": {
+      "passed": 791,
+      "failed": 0
+    },
+    "releaseBuild": {
+      "warnings": 0,
+      "errors": 0
+    }
+  },
+  "limits": "Desktop English dark and mobile French light only. Preparation commands, failure recovery and all owner/homonym combinations are not certified by these captures. Final smoke and Fast/Integration lanes remain pending. No CI result is claimed. Earlier failed fixture preparation omitted required Pack bindings and raced context navigation; no product fix is claimed for those fixture errors.",
+  "captures": [
+    {
+      "file": "managed-agent-definition-desktop-en.png",
+      "sha256": "4331e37e330db28658ccf093098a845cb92cfbb744f4c4b9c04346340df4797e",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "managed-agent-definition-mobile-fr.png",
+      "sha256": "f61b557c54a3a0302cb0a8af2fc253ba62f99bc89f2d1bccdb3d6de0e19351a3",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    },
+    {
+      "file": "managed-agent-overview-desktop-en.png",
+      "sha256": "e35230c3aedd2de769d19db62b28e264223f6f3e7f65592d02176f06241e7356",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "managed-agent-overview-mobile-fr.png",
+      "sha256": "8a50ba58dd5d940a23623938b74e034a6d7553770e183200564db7f36d844a1e",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    },
+    {
+      "file": "managed-agent-yaml-desktop-en.png",
+      "sha256": "0d4d565a91e1a82e1af810fb3399b53ce1857c3e3a9da7936f03cd1fb1dc75df",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "managed-agent-yaml-mobile-fr.png",
+      "sha256": "0d7e5ae8c77e43101e9c6b502553792df4f0b646db35156aa48a423e443e6b11",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    }
+  ]
+}

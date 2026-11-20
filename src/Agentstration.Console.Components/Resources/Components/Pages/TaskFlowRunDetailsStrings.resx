@@ -8,4 +8,7 @@
   <data name="Status.Pending" xml:space="preserve"><value>Pending</value></data><data name="Status.Running" xml:space="preserve"><value>Running</value></data><data name="Status.WaitingForInput" xml:space="preserve"><value>Waiting for input</value></data><data name="Status.WaitingForChild" xml:space="preserve"><value>Waiting for child Flow</value></data><data name="Status.Succeeded" xml:space="preserve"><value>Succeeded</value></data><data name="Status.Failed" xml:space="preserve"><value>Failed</value></data><data name="Status.Cancelled" xml:space="preserve"><value>Cancelled</value></data><data name="DefinitionState.Published" xml:space="preserve"><value>Published</value></data><data name="DefinitionState.Draft" xml:space="preserve"><value>Draft</value></data>
   <data name="Error.ModelOutputTokenLimit"><value>The model reached its generation token limit without producing a final answer. Increase the output token budget or review the reasoning settings.</value></data>
   <data name="Error.ModelEmptyResponse"><value>The model completed without producing a final answer. Review the model response and generation settings.</value></data>
+  <data name="RunId"><value>Run ID</value></data>
+  <data name="Task"><value>Task</value></data>
+  <data name="ExecutionScope"><value>Execution scope</value></data>
 </root>

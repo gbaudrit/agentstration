@@ -100,7 +100,7 @@ export class SchemaContractsPage {
     await this.open(`${consoleUrl}/agents/${encodeURIComponent(fixtures.agentName)}?namespace=default`, TestIds.agentEditor.overview);
     await new AgentEditorPage(this.page).openEdit();
     await this.page.locator(`[data-testid="${TestIds.agentEditor.form}"][data-interactive="true"]`).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.schemaContracts.agentTab).click();
+    await new AgentEditorPage(this.page).selectSection('definition/contracts');
     await expect(this.page.getByTestId(TestIds.schemaContracts.agentSection)).toBeVisible();
     const input = this.page.getByTestId(TestIds.schemaContracts.agentInput);
     await expect(input.getByTestId(`${TestIds.schemaContracts.agentInput}-mode-shared`)).toHaveClass(/active/);
@@ -117,7 +117,7 @@ export class SchemaContractsPage {
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).fill('Contract Tool');
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).blur();
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateFlowKind).click();
-    await this.page.getByTestId(TestIds.schemaContracts.toolCreateContinue).click();
+    await this.page.getByTestId(TestIds.creationWizard.next).click();
     const flow = this.page.getByTestId(TestIds.schemaContracts.toolFlow);
     const flowValue = await flow.locator('option').filter({ hasText: `Contract flow ${fixtures.flowName}` }).getAttribute('value');
     if (!flowValue) throw new Error(`The ToolDefinition editor did not list Flow '${fixtures.flowName}'.`);

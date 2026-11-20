@@ -16,6 +16,7 @@
     [Parameter] public string? Class { get; set; }
     [Parameter] public string Role { get; set; } = "dialog";
     [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     private ElementReference dialog;
     private IJSObjectReference? module;
@@ -37,7 +38,7 @@
                 if (disposed) { await module.DisposeAsync(); module = null; return; }
                 if (!IsOpen) return;
                 var next = await module.InvokeAsync<IJSObjectReference>("openDialog", dialog);
-                if (disposed || !IsOpen) { await ReleaseAsync(next); return; }
+                if (disposed || !IsOpen) { await ReleaseAsync(next); if (!disposed) await OnClosed.InvokeAsync(); return; }
                 registration = next;
                 opened = true;
             }
@@ -46,9 +47,10 @@
         }
         else if (!IsOpen && opened && module is not null)
         {
+            opened = false;
             var previous = registration; registration = null;
             await ReleaseAsync(previous);
-            opened = false;
+            if (!disposed && !IsOpen) await OnClosed.InvokeAsync();
         }
     }
     private Task CloseAsync() => Busy ? Task.CompletedTask : OnClose.InvokeAsync();

@@ -9,6 +9,7 @@ namespace Agentstration.Web.Console;
 
 public interface IStoragesClient
 {
+    Task<PagedResponse<StorageResource>> GetStoragesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) => throw new NotSupportedException();
     Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token);
     Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token);
     Task<IReadOnlyList<ResourceScopeTargetResponse>> GetScopeTargetsAsync(CancellationToken token);
@@ -28,6 +29,7 @@ public interface IStoragesClient
 
 public interface IStorageTypesClient
 {
+    Task<PagedResponse<StorageTypeResource>> GetTypesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) => throw new NotSupportedException();
     Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token);
     Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token);
     Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token);
@@ -61,8 +63,16 @@ public sealed class StoragesApiClient(HttpClient httpClient) : IStoragesClient, 
         using var response = await httpClient.SendAsync(request, token);
         await ApiResponse.EnsureSuccessAsync(response, token);
     }
+    public Task<PagedResponse<StorageTypeResource>> GetTypesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) =>
+        ApiResponse.ReadAsync<PagedResponse<StorageTypeResource>>(httpClient,
+            $"api/storage-types?scopeRef={Uri.EscapeDataString(scope.Value)}&skip={skip}&take={take}", token);
+
     public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) =>
         ReadPagesAsync<StorageTypeResource>("api/storage-types", scope, token);
+
+    public Task<PagedResponse<StorageResource>> GetStoragesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) =>
+        ApiResponse.ReadAsync<PagedResponse<StorageResource>>(httpClient,
+            $"api/storages?scopeRef={Uri.EscapeDataString(scope.Value)}&skip={skip}&take={take}", token);
 
     public Task<IReadOnlyList<StorageResource>> GetStoragesAsync(ResourceScopeRef scope, CancellationToken token) =>
         ReadPagesAsync<StorageResource>("api/storages", scope, token);

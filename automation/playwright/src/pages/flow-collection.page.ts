@@ -42,7 +42,7 @@ export class FlowCollectionPage {
       await expect(this.root().getByRole('columnheader').nth(0)).toHaveText(text.resource);
       await expect(this.root().getByRole('columnheader').nth(1)).toContainText(text.version);
       await expect(this.root().getByRole('columnheader').nth(2)).toHaveText(text.updated);
-      await expect(this.root().getByRole('columnheader').nth(3)).toHaveText(text.actions);
+      await expect(row.locator('.collection-actions')).toHaveCount(1);
     }
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
@@ -200,17 +200,14 @@ export class FlowCollectionPage {
     await copy.click();
     await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`default/${id}`);
     expect(this.page.url()).toBe(before);
-    const menu = row.locator('.collection-actions-menu summary');
-    await menu.focus();
-    await menu.press('ArrowDown');
-    await expect(row.locator('.collection-actions-panel a').first()).toBeFocused();
-    await this.page.keyboard.press('Escape');
-    await expect(menu).toBeFocused();
+    await expect(row.locator('.collection-actions')).toHaveCount(1);
     expect(this.page.url()).toBe(before);
     const link = row.locator('a.resource-name-link');
-    const destination = new URL((await link.getAttribute('href'))!, before).href;
-    await link.click();
-    await expect(this.page).toHaveURL(destination);
+    const destination = new URL((await link.getAttribute('href'))!, before);
+    destination.hash = 'overview';
+    if (touch) await link.tap();
+    else { await link.focus(); await link.press('Enter'); }
+    await expect(this.page).toHaveURL(destination.href);
     await expect(this.page.getByTestId(TestIds.flowObservability.flowDetails)).toBeVisible();
     await this.page.goto(before, { waitUntil: 'domcontentloaded' });
     await this.assertCompactStructure(locale);

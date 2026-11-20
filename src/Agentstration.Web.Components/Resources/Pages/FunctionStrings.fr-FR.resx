@@ -39,4 +39,11 @@
   <data name="OptionalSchemaParameterHelp" xml:space="preserve"><value>Facultatif. Sans schéma, la structure métier des valeurs produites n’est pas validée. Choisissez un schéma inline ou une version publiée exacte d’un schéma partagé, avec un sous-schéma éventuel. Ce choix est résolu et figé à la sauvegarde de la Source ou à la publication du Flow.</value></data>
   <data name="Native.json.explode.Description" xml:space="preserve"><value>Sélectionne un tableau non vide d’objets JSON au chemin JSON Pointer et valide chaque ligne avec un itemSchema exact. Conserve un seul artefact logique, avec des lignes JSONB interrogeables séparément en Storage document ou des fichiers JSON distincts en Storage local. Limites : 100 lignes et 64 Kio par artefact. Accepte le JSON d’acquisition ou un manifeste d’artefacts.</value></data>
   <data name="Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="Function" xml:space="preserve"><value>Fonction de transformation</value></data>
+  <data name="Versions" xml:space="preserve"><value>Versions</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une définition enregistrée plus récente est disponible. Votre brouillon et son ETag initial sont conservés. Abandonnez les modifications pour charger la définition enregistrée.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>Ce YAML présente la fonction enregistrée. Modifiez sa définition dans le formulaire.</value></data>
+  <data name="ScopeRequired" xml:space="preserve"><value>Un périmètre propriétaire est requis.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La fonction retournée ne correspond pas à l’identité demandée.</value></data>
+  <data name="SelectionUnavailable" xml:space="preserve"><value>Le type de fonction ou l’implémentation native sélectionné n’est plus disponible.</value></data>
 </root>

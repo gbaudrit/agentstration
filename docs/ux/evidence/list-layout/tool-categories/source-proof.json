@@ -1,0 +1,14 @@
+{
+  "baseCommit": "a191e31bb2a26d7d646e3c3f9d649cd0c66be04f",
+  "route": "/tools/categories",
+  "host": "Real Development Agentstration.Web, deterministic AI, isolated SQLite, disposable admin/admin fixture",
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor": "7dc1f7e49a4b351dcc8aa14565df6257d73262e7",
+    "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor.cs": "22e7bd4345d182b22f5d2729ac6838ece643dc1d",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  }
+}

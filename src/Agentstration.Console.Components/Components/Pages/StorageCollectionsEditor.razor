@@ -13,12 +13,12 @@
                 DisplayNameTestId="@($"collection-{row}-display-name")" TechnicalNameTestId="@($"collection-{row}-name")" />
             @if (!IdentityValid(collection)) { <p class="field-validation-error form-span-2" role="alert">@T("Documents.IdentityRequired")</p> }
             <label><span>@T("Uid")</span><code>@(collection.Uid == Guid.Empty ? T("Documents.NewUid") : collection.Uid.ToString())</code></label>
-            <FormField Label="@T("Enabled")"><FormCheckbox Value="@collection.Enabled" ValueChanged="(bool value) => SetAsync(row, collection with { Enabled = value })" /></FormField>
-            <FormField Label="@T("Documents.Get")"><FormCheckbox Value="@collection.Policy.Get" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Get = value } })" /></FormField>
-            <FormField Label="@T("Documents.Put")"><FormCheckbox Value="@collection.Policy.Put" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Put = value } })" /></FormField>
-            <FormField Label="@T("Documents.Delete")"><FormCheckbox Value="@collection.Policy.Delete" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Delete = value } })" /></FormField>
-            <FormField Label="@T("Documents.Query")"><FormCheckbox Value="@collection.Policy.Query" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Query = value } })" /></FormField>
-            <FormField Label="@T("Documents.Publish")"><FormCheckbox Value="@collection.Policy.Publish" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Publish = value } })" /></FormField>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Enabled" ValueChanged="(bool value) => SetAsync(row, collection with { Enabled = value })" /><span>@T("Enabled")</span></label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Policy.Get" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Get = value } })" /><span>@T("Documents.Get")</span></label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Policy.Put" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Put = value } })" /><span>@T("Documents.Put")</span></label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Policy.Delete" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Delete = value } })" /><span>@T("Documents.Delete")</span></label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Policy.Query" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Query = value } })" /><span>@T("Documents.Query")</span></label>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@collection.Policy.Publish" ValueChanged="(bool value) => SetAsync(row, collection with { Policy = collection.Policy with { Publish = value } })" /><span>@T("Documents.Publish")</span></label>
             <FormField Label="@T("Documents.PageSize")"><ClearableNumber TValue="int" min="1" max="100" Value="@collection.Policy.MaximumPageSize" ValueExpression="@(() => collection.Policy.MaximumPageSize)" ValueChanged="value => PageAsync(row, new ChangeEventArgs { Value = value })" /></FormField>
             <FormField Label="@T("Documents.Profiles")" Class="form-span-2" Help="@string.Join(", ", Capabilities.QueryProfiles.Select(p => p.Id + "/" + p.Version + " (" + p.Encoding + ")"))"><ClearableText Value="@string.Join(',', collection.Policy.QueryProfiles ?? [])" ValueChanged="value => SetAsync(row, collection with { Policy = collection.Policy with { QueryProfiles = (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) } })" /></FormField>
             @if (collection.SchemaBinding?.Reference is not null)
@@ -35,8 +35,8 @@
             }
             else
             {
-            <FormField Label="@T("Documents.Schema")" Class="form-span-2"><ClearableText Multiline class="form-code-editor" rows="8" UpdateOnInput="false" Value="@(drafts.GetValueOrDefault(row) ?? collection.Schema.GetRawText())" ValueChanged="value => SchemaAsync(row, new ChangeEventArgs { Value = value })" /></FormField>
-            @if (invalid.Contains(row)) { <p role="alert">@T("Documents.InvalidJson")</p> }
+            <FormField Label="@T("Documents.Schema")" Class="form-span-2" aria-invalid="@(invalid.Contains(row) ? "true" : null)"><ClearableText Multiline class="form-code-editor" rows="8" UpdateOnInput="false" Value="@(drafts.GetValueOrDefault(row) ?? collection.Schema.GetRawText())" ValueChanged="value => SchemaAsync(row, new ChangeEventArgs { Value = value })" /></FormField>
+            @if (invalid.Contains(row)) { <p class="field-validation-error" role="alert">@T("Documents.InvalidJson")</p> }
                 @if (!ReadOnly) { <button type="button" class="button-secondary" @onclick="() => SharedAsync(row)">@T("Documents.UseSharedSchema")</button> }
             }
             @if (!ReadOnly) { <button type="button" class="button-danger" @onclick="() => RemoveAsync(row)">@T("Documents.Remove")</button> }

@@ -1,37 +1,50 @@
-@inject IServiceProvider Services
 @page "/data-sources"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IDataSourcesClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("DataSources") · Agentstration</PageTitle>
-<PageHeader Title="@T("DataSources")" Description="@T("DataSourcesHelp")" TestId="resource-data-sources">
-    <Actions><a class="button-primary" href="/data-sources/new?composition=dataset">@T("Create")</a><a class="button-secondary" href="/data-source-profiles">@T("Profiles")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (items.Count == 0) { <EmptyState Title="@T("DataSources")" Message="@T("EmptySources")"><a class="button-primary" href="/data-sources/new?composition=dataset">@T("Create")</a></EmptyState> }
-else
-{
-    <CollectionView TItem="DataSourceResource" Items="items" InformationLabels="@(new string[] { T("DatasetStorageOrProfile") })" IdentityLabel="@T("Name")" StateLabel="@T("State")">
-        <Identity Context="item">
-<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("DatasetStorageOrProfile")"><code>@(item.Definition.Dataset is { Storage: null } ? T("DirectInput") : item.Definition.Dataset?.Storage?.Storage.Name ?? item.Definition.Profile?.Name)</code></CollectionValue>
-        </Information>
-        <Actions Context="item">
-<CollectionActions ResourceName="@($"{item.Definition.DisplayName} ({item.Namespace}/{item.Name}, {item.ScopeRef})")"><a class="text-button" href="@Url(item)">@T("Open")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="DataSourceResource" Title="@T("DataSources")" Description="@T("DataSourcesHelp")" TestId="resource-data-sources"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("DataSources")" EmptyMessage="@T("EmptySources")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Actions><a class="button-secondary" href="@Navigate("/data-source-profiles")">@T("Profiles")</a></Actions>
+</ResourceCollectionTemplate>
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<DataSourceResource> items = [];
-    private bool loading = true;
-    private string? error;
-    private string T(string key) => Localizer[key];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetAsync(cancellation.Token); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
+    private string T(string key) => Localizer[key].Value;
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/data-sources/new?composition=dataset")">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<DataSourceResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database">
+        <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("enabled", T("State"), CollectionFilterKind.Choice) { Options = [new("true", T("Enabled")), new("false", T("Disabled"))] }]
+    };
+    private IReadOnlyList<CollectionColumn<DataSourceResource>> Columns =>
+    [
+        new("binding", T("DatasetStorageOrProfile"), item => @<code>@BindingText(item)</code>)
+        {
+            Filters = [new("binding", T("DatasetStorageOrProfile"), CollectionFilterKind.Text) { Advanced = true }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", T("Namespace"), CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(item => item.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        },
+        new("scope", Shared["Scope"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(item => item.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
+        }
+    ];
+    private string BindingText(DataSourceResource item) => item.Definition.Dataset is { Storage: null } ? T("DirectInput") : item.Definition.Dataset?.Storage?.Storage.Name ?? item.Definition.Profile?.Name ?? "—";
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
     private string Url(DataSourceResource item) => ResourceOwnershipContext.Resource(Services, "/data-sources", item.Name, item.Namespace, item.ScopeRef);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

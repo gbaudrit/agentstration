@@ -14,15 +14,21 @@ public sealed class ModalFrameTests
         var runtime = new DelayedRuntime();
         context.Services.AddSingleton<IJSRuntime>(runtime);
         var registration = new DialogRegistration();
+        var closedAfterRelease = false;
         var cut = context.Render<ModalFrame>(parameters => parameters
-            .Add(value => value.IsOpen, true).Add(value => value.TitleId, "title"));
+            .Add(value => value.IsOpen, true).Add(value => value.TitleId, "title")
+            .Add(value => value.OnClosed, () => closedAfterRelease = registration.Releases == 1 && registration.Disposals == 1));
         cut.Render(parameters => parameters.Add(value => value.Busy, true));
         try { Assert.AreEqual(1, runtime.Module.Opens); }
         finally { runtime.Module.Ready.SetResult(registration); }
         await cut.InvokeAsync(() => { });
         cut.Render(parameters => parameters.Add(value => value.IsOpen, false));
-        cut.WaitForAssertion(() => Assert.AreEqual(1, registration.Releases));
-        Assert.AreEqual(1, registration.Disposals);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.AreEqual(1, registration.Releases);
+            Assert.AreEqual(1, registration.Disposals);
+            Assert.IsTrue(closedAfterRelease, "The next editor can receive focus only after the modal has released its focus-restoration handle.");
+        });
     }
 
     private sealed class DelayedRuntime : IJSRuntime

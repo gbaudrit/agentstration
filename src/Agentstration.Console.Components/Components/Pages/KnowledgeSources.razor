@@ -1,60 +1,59 @@
-@inject IServiceProvider Services
 @page "/knowledge-sources"
+@implements IDisposable
+@inject IServiceProvider Services
 @inject IKnowledgeSourcesClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-sources">
-    <Actions><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a><a class="button-secondary" href="/artifacts">@T("OpenArtifacts")</a><a class="button-secondary" href="/tools/sets">@T("OpenToolSets")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (sources.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/knowledge-sources/new">@T("CreateSource")</a></EmptyState> }
-else
-{
-    <CollectionView TItem="KnowledgeSourceResource" Items="sources" InformationLabels="@(new string[] { T("DataSources"), T("ProjectionFlow"), T("RetrievalFlow") })" RowTestId="knowledge-source-row" IdentityLabel="@T("KnowledgeSource")" StateLabel="@T("State")">
-        <Identity Context="source">
-<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link"><IconBadges><ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="source">
-            <CollectionValue Label="@T("DataSources")">@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</CollectionValue>
-            <CollectionValue Label="@T("ProjectionFlow")">@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(projection)</a> } else { <span>—</span> }</CollectionValue>
-            <CollectionValue Label="@T("RetrievalFlow")">@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button" href="@FlowUrl(source, retrieval)">@Flow(retrieval)</a> } else { <span>—</span> }</CollectionValue>
-        </Information>
-        <Actions Context="source">
-<CollectionActions ResourceName="@($"{source.Definition.DisplayName} ({source.Namespace}/{source.Name}, {source.ScopeRef})")"><a class="text-button" href="@DetailsUrl(source)">@T("Inspect")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="KnowledgeSourceResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-knowledge-sources"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey" RowTestId="knowledge-source-row"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Actions><a class="button-secondary" href="@Navigate("/artifacts")">@T("OpenArtifacts")</a><a class="button-secondary" href="@Navigate("/tools/sets")">@T("OpenToolSets")</a></Actions>
+</ResourceCollectionTemplate>
 
 @code {
-    private IReadOnlyList<KnowledgeSourceResource> sources = [];
-    private bool loading = true;
-    private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/knowledge-sources/new")">@T("CreateSource")</a></PermissionGate> : null;
+    private CollectionColumn<KnowledgeSourceResource> IdentityColumn => new("identity", T("KnowledgeSource"), source => @<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link">
+        <IconBadges><ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(source.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
     {
-        loading = true;
-        error = null;
-        try { sources = await Client.GetAsync(); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
-    private static string Flow(KnowledgeFlowTarget? value) => value is null ? "—" : $"{value.Namespace ?? ResourceNamespace.Default}/{value.Name}:{value.Version ?? "active"}";
+        Filters = [new("enabled", T("State"), CollectionFilterKind.Choice) { Options = [new("true", T("Enabled")), new("false", T("Disabled"))] }]
+    };
+    private IReadOnlyList<CollectionColumn<KnowledgeSourceResource>> Columns =>
+    [
+        new("inputs", T("DataSources"), source => @<text>@if (source.Definition.DataSources.Count > 0) { <span class="knowledge-source-inputs">@foreach (var binding in source.Definition.DataSources) { <a class="text-button" href="@DataSourceUrl(source, binding.DataSource)" data-testid="knowledge-source-data-source-link">@binding.DataSource.Name</a> }</span> } else { <span>—</span> }</text>)
+        {
+            Filters = [new("inputs", T("DataSources"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("projection", T("ProjectionFlow"), source => @<text>@if (source.Definition.ProjectionFlow is { } projection) { <a class="text-button knowledge-source-flow" href="@FlowUrl(source, projection)" data-testid="knowledge-source-projection-flow-link">@Flow(source, projection)</a> } else { <span>—</span> }</text>)
+        {
+            Filters = [new("projection", T("ProjectionFlow"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("retrieval", T("RetrievalFlow"), source => @<text>@if (source.Definition.RetrievalFlow is { } retrieval) { <a class="text-button knowledge-source-flow" href="@FlowUrl(source, retrieval)">@Flow(source, retrieval)</a> } else { <span>—</span> }</text>)
+        {
+            Filters = [new("retrieval", T("RetrievalFlow"), CollectionFilterKind.Text) { Advanced = true }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(source => source.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        },
+        new("scope", T("Scope"), CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(source => source.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
+    private string Flow(KnowledgeSourceResource source, KnowledgeFlowTarget value) => $"{value.Namespace ?? source.Namespace}/{value.Name}:{value.Version ?? T("ActiveVersionLabel")}";
     private string DetailsUrl(KnowledgeSourceResource value) => ResourceOwnershipContext.Resource(Services, "/knowledge-sources", value.Name, value.Namespace, value.ScopeRef);
-    private static string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value)
-    {
-        var ns = value.Namespace ?? source.Namespace;
-        var scope = value.ScopeRef ?? source.ScopeRef;
-        var query = $"namespace={Uri.EscapeDataString(ns.Value)}";
-        if (scope is not null) query += $"&scopeRef={Uri.EscapeDataString(scope.Value.Value)}";
-        return $"/data-sources/{Uri.EscapeDataString(value.Name)}?{query}";
-    }
-    private static string FlowUrl(KnowledgeSourceResource source, KnowledgeFlowTarget value)
-    {
-        var ns = value.Namespace ?? source.Namespace;
-        return ns.IsDefault
-            ? $"/flows/{Uri.EscapeDataString(value.Name)}"
-            : $"/namespaces/{Uri.EscapeDataString(ns.Value)}/flows/{Uri.EscapeDataString(value.Name)}";
-    }
+    private string DataSourceUrl(KnowledgeSourceResource source, ResourceReference value) => ResourceOwnershipContext.Resource(Services, "/data-sources", value.Name, value.Namespace ?? source.Namespace, value.ScopeRef ?? source.ScopeRef);
+    private string FlowUrl(KnowledgeSourceResource source, KnowledgeFlowTarget value) => Navigate(ConsoleResourceUrls.Flow(new FlowId(value.Name, value.Namespace ?? source.Namespace), value.ScopeRef ?? source.ScopeRef));
 }

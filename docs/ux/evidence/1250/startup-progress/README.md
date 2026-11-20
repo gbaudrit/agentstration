@@ -73,3 +73,8 @@ The first delivery observes the current process-local startup attempt. It does
 not persist a startup journal, add a new worker-readiness barrier or retry a
 terminal failed bootstrap from the UI. The broader #1250 follow-ups and reusable
 journey #1251 remain open.
+
+## Shared UX synchronization
+
+[Fresh captures and compatibility checks after merged PR #1238](main-1238-sync/README.md)
+record the integration with main `51969396`; the captures above precede that merge.

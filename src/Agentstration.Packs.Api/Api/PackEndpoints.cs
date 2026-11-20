@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agentstration.Packs;
 using Agentstration.Packs.Contracts;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Management;
@@ -115,12 +116,23 @@ internal sealed class PackEndpoints : IManagementEndpoint
     private static Task<IResult> GetAsync(
         string publisher,
         string name,
+        string? scopeRef,
         HttpResponse response,
         PackManagementService service,
         CancellationToken cancellationToken) =>
         PacksApiHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(new(publisher, name), cancellationToken) ?? throw new PackNotFoundException(new(publisher, name));
+            var identity = new PackIdentity(publisher, name);
+            ResourceScopeRef? owner = null;
+            if (scopeRef is not null)
+            {
+                if (!ResourceScopeRef.TryParse(scopeRef, out var parsed))
+                    throw new PackValidationException("pack_scope_invalid", "Pack inspection requires a canonical scopeRef.");
+                owner = parsed;
+            }
+            var stored = (owner is { } exact
+                ? await service.GetExactAsync(exact, identity, cancellationToken)
+                : await service.GetAsync(identity, cancellationToken)) ?? throw new PackNotFoundException(identity);
             return PacksApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });
 

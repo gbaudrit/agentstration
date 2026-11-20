@@ -1,11 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { ResourcePlanReviewPage } from './resource-plan-review.page.mjs';
 
 test('review a Resource Plan from intent through changes, graph, validation, activity and stale state', async ({ page }) => {
+  const review = new ResourcePlanReviewPage(page);
   await page.goto('/login');
   await page.locator('#Input_UserName').fill('admin');
   await page.locator('#Input_Password').fill('admin');
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('[data-testid=console-shell]')).toHaveAttribute('data-preferences-ready', 'true');
 
   const suffix = Date.now().toString(36);
   const extensionName = `review-extension-${suffix}`;
@@ -69,11 +72,12 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   expect(ready.ok(), await ready.text()).toBeTruthy();
 
   await page.goto('/resource-plans');
+  await expect(page.locator('[data-testid=console-shell]')).toHaveAttribute('data-preferences-ready', 'true');
   const row = page.locator('tr', { hasText: title });
   await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('combobox', { name: 'Rows per page', exact: true })).toBeEnabled();
   await row.getByRole('link', { name: title }).click();
-  await expect(page.getByRole('tab')).toHaveCount(6, { timeout: 30_000 });
-  await expect(page.getByRole('tab', { name: 'Application' })).toBeVisible();
+  await review.expectSections();
   await expect(page.getByText('Route support requests')).toBeVisible();
 
   await expect(page.getByRole('button', { name: 'Refresh proposal' })).toBeDisabled();
@@ -87,13 +91,13 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   const partialDraft = await page.request.get(`/api/resource-plans/${plan.id.value}/bindings`);
   expect(partialDraft.ok(), await partialDraft.text()).toBeTruthy();
   expect((await partialDraft.json()).bindings[0].modelProfile.name).toBe(modelName);
-  await page.getByRole('link', { name: 'Back to plans' }).click();
+  await review.returnToList();
   await page.locator('tr', { hasText: title }).getByRole('link', { name: title }).click();
   await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
   await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue('');
   await page.getByRole('combobox', { name: 'Triage agent · Runtime profile' }).selectOption(runtimeChoice);
   await expect(page.getByRole('button', { name: 'Review plan proposal' })).toBeEnabled();
-  await page.getByRole('link', { name: 'Back to plans' }).click();
+  await review.returnToList();
   await page.locator('tr', { hasText: title }).getByRole('link', { name: title }).click();
   await expect(page.getByRole('combobox', { name: 'Triage agent · Model profile' })).toHaveValue(modelChoice);
   await expect(page.getByRole('combobox', { name: 'Triage agent · Runtime profile' })).toHaveValue(runtimeChoice);
@@ -114,18 +118,18 @@ test('review a Resource Plan from intent through changes, graph, validation, act
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  await page.getByRole('tab', { name: 'Graph' }).click();
+  await review.selectSection('graph');
   await expect(page.locator('.topology-node')).toHaveCount(2);
   await expect(page.locator('.topology-edge')).toHaveCount(1);
   await page.locator('.topology-node').first().click();
   await expect(page.locator('.resource-plan-graph-details')).toContainText('triage');
-  await page.getByRole('tab', { name: 'Verification' }).click();
+  await review.selectSection('validation');
   await page.getByRole('button', { name: 'Check proposal' }).click();
   await expect(page.locator('.resource-plan-validation-summary')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.getByRole('tab', { name: 'Activity' }).click();
+  await review.selectSection('activity');
   await expect(page.locator('a[href="/flow-runs/e2e-flow-run"]')).toBeVisible();
 
   const latest = await page.request.get(`/api/resource-plans/${plan.id.value}`);
@@ -135,14 +139,13 @@ test('review a Resource Plan from intent through changes, graph, validation, act
     data: { title, goal: 'Improve support routing again', content: { schemaVersion: 'resource-planning.agentstration.io/v1', document: content } },
   });
   expect(refined.ok()).toBeTruthy();
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({ timeout: 30_000 });
-  await expect(page.getByText('ChangeSet belongs to an earlier revision')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('tab', { name: 'Verification' }).click();
+  await review.reloadSavedPlan();
+  await review.expectStaleRevision();
+  await review.selectSection('validation');
   await expect(page.getByRole('button', { name: 'Check proposal' })).toBeDisabled();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('tab', { name: 'Graph' }).click();
+  await review.selectSection('graph');
   await expect(page.locator('.topology-viewport')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });

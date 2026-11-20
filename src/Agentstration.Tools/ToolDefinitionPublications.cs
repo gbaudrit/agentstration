@@ -11,13 +11,16 @@ public sealed partial class ToolDefinitionService
 {
     public static string VersionName(string name, string version) => $"{name}.v{version}";
 
+    public Task<IReadOnlyList<ToolDefinitionUsage>> ListUsagesAsync(string name, ResourceNamespace @namespace,
+        CancellationToken cancellationToken) => ListUsagesAsync(name, @namespace, null, cancellationToken);
+
     public async Task<IReadOnlyList<ToolDefinitionUsage>> ListUsagesAsync(string name, ResourceNamespace @namespace,
-        CancellationToken cancellationToken)
+        ResourceScopeRef? ownerScope, CancellationToken cancellationToken)
     {
-        var definition = await GetAsync(name, @namespace, cancellationToken)
+        var definition = await (ownerScope is { } exactOwner ? GetExactAsync(name, @namespace, exactOwner, cancellationToken) : GetAsync(name, @namespace, cancellationToken))
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
         return usages is null ? [] : await usages.ReadAsync(definition.Value,
-            await ListVersionsAsync(name, @namespace, cancellationToken), cancellationToken);
+            await ListVersionsAsync(name, @namespace, definition.Value.ScopeRef, cancellationToken), cancellationToken);
     }
 
     public async Task<IReadOnlyList<StoredResource<ToolDefinitionResource>>> ListPublishedAsync(CancellationToken cancellationToken)
@@ -41,10 +44,13 @@ public sealed partial class ToolDefinitionService
         return result;
     }
 
+    public Task<IReadOnlyList<ToolDefinitionVersionResource>> ListVersionsAsync(string name,
+        ResourceNamespace @namespace, CancellationToken cancellationToken) => ListVersionsAsync(name, @namespace, null, cancellationToken);
+
     public async Task<IReadOnlyList<ToolDefinitionVersionResource>> ListVersionsAsync(string name,
-        ResourceNamespace @namespace, CancellationToken cancellationToken)
+        ResourceNamespace @namespace, ResourceScopeRef? ownerScope, CancellationToken cancellationToken)
     {
-        var definition = await GetAsync(name, @namespace, cancellationToken)
+        var definition = await (ownerScope is { } exactOwner ? GetExactAsync(name, @namespace, exactOwner, cancellationToken) : GetAsync(name, @namespace, cancellationToken))
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
         return (await store.ListAllAsync<ToolDefinitionVersionResource>(ToolResourceKinds.ToolDefinitionVersion, cancellationToken))
             .Select(value => value.Value).Where(value => value.DefinitionUid == definition.Value.Uid
@@ -80,11 +86,19 @@ public sealed partial class ToolDefinitionService
         store.GetExactAsync<ToolDefinitionVersionResource>(ScopedResourceAddress.Create(scope, @namespace,
             ToolResourceKinds.ToolDefinitionVersion, name), cancellationToken);
 
-    public async Task<ToolDefinitionVersionResource> PublishAsync(string name, ResourceNamespace @namespace,
-        string version, CancellationToken cancellationToken, string? expectedETag = null)
+    public Task<ToolDefinitionVersionResource> PublishAsync(string name, ResourceNamespace @namespace,
+        string version, CancellationToken cancellationToken, string? expectedETag = null) =>
+        PublishCoreAsync(name, @namespace, version, null, expectedETag, cancellationToken);
+
+    public Task<ToolDefinitionVersionResource> PublishAsync(ResourceScopeRef ownerScope, string name, ResourceNamespace @namespace,
+        string version, CancellationToken cancellationToken, string? expectedETag = null) =>
+        PublishCoreAsync(name, @namespace, version, ownerScope, expectedETag, cancellationToken);
+
+    private async Task<ToolDefinitionVersionResource> PublishCoreAsync(string name, ResourceNamespace @namespace,
+        string version, ResourceScopeRef? ownerScope, string? expectedETag, CancellationToken cancellationToken)
     {
         ValidateVersion(version);
-        var draft = await GetAsync(name, @namespace, cancellationToken)
+        var draft = await (ownerScope is { } exactOwner ? GetExactAsync(name, @namespace, exactOwner, cancellationToken) : GetAsync(name, @namespace, cancellationToken))
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolDefinition, name, @namespace));
         if (expectedETag is not null && draft.ETag != expectedETag)
             throw new ResourceConcurrencyException("The draft changed after publication review. Reload and review its changes.");

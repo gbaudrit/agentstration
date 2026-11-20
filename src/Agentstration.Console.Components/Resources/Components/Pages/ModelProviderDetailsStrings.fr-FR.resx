@@ -86,4 +86,8 @@
   <data name="Discovery.Timeout" xml:space="preserve"><value>Le fournisseur n’a pas répondu dans le délai prévu. Vous pouvez continuer à modifier sa configuration.</value></data>
   <data name="Discovery.RetryAt" xml:space="preserve"><value>Prochaine tentative automatique : {0}.</value></data>
   <data name="MetadataUnavailable" xml:space="preserve"><value>Les détails de l’extension sont temporairement indisponibles. Le fournisseur enregistré et son catalogue de modèles restent consultables.</value></data>
+  <data name="SpecificationOverrides" xml:space="preserve"><value>Surcharges des spécifications des modèles</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version enregistrée plus récente est disponible. Abandonnez votre brouillon pour la charger.</value></data>
+  <data name="ObservationUnavailable" xml:space="preserve"><value>Le catalogue des modèles disponibles n’a pas pu être chargé. Actualisez pour réessayer.</value></data>
+  <data name="UsagesUnavailable" xml:space="preserve"><value>Les utilisations par les profils de modèle n’ont pas pu être vérifiées. Actualisez avant de supprimer ce fournisseur.</value></data>
 </root>

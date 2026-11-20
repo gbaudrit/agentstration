@@ -9,7 +9,7 @@ test('every collection adapter and native renderer has a unique assertion mappin
   expect(collectionSurfaces.length).toBe(collectionManifest.frames.length + collectionManifest.specialized.length);
   for (const surface of collectionSurfaces) {
     expect(fs.existsSync(path.join(repositoryRoot, surface.source)), surface.id).toBe(true);
-    expect(surface.contract).toBe(surface.mounting === 'unmounted-legacy' ? 'unmounted-legacy' : surface.renderer === 'CollectionView' ? 'shared-frame' : 'native-applicable');
+    expect(surface.contract).toBe(surface.mounting === 'unmounted-legacy' ? 'unmounted-legacy' : ['CollectionView', 'ResourceCollectionTemplate'].includes(surface.renderer) ? 'shared-frame' : 'native-applicable');
     if (!surface.routes.length && surface.mounting !== 'unmounted-legacy')
       expect(surface.sharedHostSpecifications.length, `${surface.id}: explicit live host mapping`).toBeGreaterThan(0);
     if (surface.mounting === 'unmounted-legacy') expect(surface.sharedHostSpecifications).toEqual([]);
@@ -43,7 +43,9 @@ test('new repeated-item sources and shared frames cannot silently escape the inv
       const source = path.relative(repositoryRoot, file).replaceAll(path.sep, '/');
       const markup = fs.readFileSync(file, 'utf8');
       if (/@for(?:each)?\s*\(/.test(markup)) expect(audited.has(source), source).toBe(true);
-      for (const frame of markup.matchAll(/<CollectionView\b[^>]*\bTItem="([^"]+)"/g))
+      // The generic page template delegates to CollectionView; concrete adapters remain the counted surfaces.
+      if (source === 'src/Agentstration.Web.Components/ResourceCollectionTemplate.razor') continue;
+      for (const frame of markup.matchAll(/<(?:CollectionView|ResourceCollectionTemplate)\b[^>]*\bTItem="([^"]+)"/g))
         discoveredFrames.push({ source, itemType: frame[1] });
     }
   }

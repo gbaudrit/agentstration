@@ -64,13 +64,17 @@ public sealed class ThemeStaticAssetTests
     }
 
     [TestMethod]
-    public async Task AgentYamlEditorUsesTheAvailablePanelWidth()
+    public async Task SharedYamlEditorUsesTheAvailablePanelWidth()
     {
-        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "AgentEditor.razor.css"));
+        var css = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "ResourceYamlEditor.razor.css"));
 
-        StringAssert.Contains(css, ".agent-yaml-field {");
+        StringAssert.Contains(css, ".resource-yaml-editor {");
         StringAssert.Contains(css, "display: grid;");
+        StringAssert.Contains(css, "min-width: 0;");
+        StringAssert.Contains(css, ".resource-yaml-editor ::deep .form-code-editor {");
+        StringAssert.Contains(css, "box-sizing: border-box;");
         StringAssert.Contains(css, "width: 100%;");
+        StringAssert.Contains(css, "overflow: auto;");
         StringAssert.Contains(css, "white-space: pre;");
     }
 

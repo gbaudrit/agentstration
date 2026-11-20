@@ -14,6 +14,23 @@ namespace Agentstration.Workplace.Components.Tests;
 public sealed class PendingActionPanelTests
 {
     [TestMethod]
+    public void OptionalDraftNotificationTracksRawTypingAndClearWithoutSubmitting()
+    {
+        using var context = CreateContext();
+        var changes = new List<bool>();
+        var action = new RequestInputAction("Response", null,
+            [new EntryFieldDefinition { Name = "answer", Type = EntryFieldType.Textarea }], PendingActionId.New(), "fixture-token");
+        var rendered = context.Render<PendingActionPanel>(parameters => parameters
+            .Add(value => value.Action, action)
+            .Add(value => value.DraftChanged, EventCallback.Factory.Create<bool>(this, value => changes.Add(value))));
+        rendered.Find("textarea").Input("response before blur");
+        CollectionAssert.AreEqual(new[] { true }, changes);
+        Assert.AreEqual("response before blur", rendered.Find("textarea").GetAttribute("value"));
+        rendered.Find("textarea").Input("");
+        CollectionAssert.AreEqual(new[] { true, false }, changes);
+    }
+
+    [TestMethod]
     public async Task ChoiceActionRendersInlineWithAdaptiveOptions()
     {
         using var context = CreateContext();

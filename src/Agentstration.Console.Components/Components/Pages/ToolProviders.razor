@@ -1,22 +1,67 @@
-@inject IServiceProvider Services
 @page "/tools/providers"
+@implements IDisposable
+@inject IServiceProvider Services
 @inject IToolsClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolProvidersStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tool-providers"><Actions><a class="button-secondary" href="/tools">@T("Catalog")</a><a class="button-primary" href="/tools/providers/new">@T("AddProvider")</a></Actions></PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a href="/tools/sets">@T("ToolSets")</a><a href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a class="active" href="/tools/providers">@T("Providers")</a></ResourceTabs>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (providers.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else { <CollectionView TItem="ToolProviderResource" Items="providers" InformationLabels="@(new string[] { T("Type"), T("Tools"), T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
-        <Identity Context="provider">
-<CollectionIdentity DisplayName="@provider.Definition.DisplayName" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Definition.Discovery.Status)" Status="@Tone(provider.Definition.Discovery.Status)" IconOnly /><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="provider">
-            <CollectionValue Label="@T("Type")">@provider.Definition.ProviderType</CollectionValue>
-            <CollectionValue Label="@T("Tools")">@provider.Definition.Discovery.ToolCount</CollectionValue>
-            <CollectionValue Label="@T("Enabled")">@BooleanLabel(provider.Definition.Enabled)</CollectionValue>
-        </Information>
-        <Actions Context="provider">
-<CollectionActions ResourceName="@($"{provider.Definition.DisplayName} ({provider.Namespace}/{provider.Name}, {provider.ScopeRef})")"><a class="text-button" href="@ProviderUrl(provider)">@T("Manage")</a></CollectionActions></Actions>
-    </CollectionView> }
-@code { private string ProviderUrl(ToolProviderResource provider) => ResourceOwnershipContext.Resource(Services, "/tools/providers", provider.Name, provider.Namespace, provider.ScopeRef); private IReadOnlyList<ToolProviderResource> providers = []; private bool loading = true; private string T(string key, params object[] arguments) => Localizer[key, arguments]; private string BooleanLabel(bool value) => T(value ? "Yes" : "No"); private string StatusLabel(string status) { var value = Localizer[$"Status.{status}"]; return value.ResourceNotFound ? Localizer["Status.unknown"].Value : value.Value; } protected override async Task OnInitializedAsync() { providers = await Client.GetProvidersAsync(default); loading = false; } private static UiStatus Tone(string status) => status == "connected" ? UiStatus.Success : status == "error" ? UiStatus.Danger : UiStatus.Neutral; }
+<ResourceCollectionTemplate TItem="ToolProviderResource" Title="@T("Title")" Description="@T("Description")"
+                            TestId="resource-tool-providers" ContextKey="@contextKey" IconName="server"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation>
+        <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a class="active" href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
+    </Navigation>
+</ResourceCollectionTemplate>
+
+@code {
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+    private string StatusLabel(string status) => T($"Status.{StatusValue(status)}");
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/tools/providers/new")">@T("AddProvider")</a></PermissionGate> : null;
+    private CollectionColumn<ToolProviderResource> IdentityColumn => new("identity", T("Name"), provider => @<CollectionIdentity DisplayName="@provider.Definition.DisplayName" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server">
+        <IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Definition.Discovery.Status)" Status="@Tone(provider.Definition.Discovery.Status)" IconOnly /><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("status", T("Status"), CollectionFilterKind.Choice)
+        {
+            Options = new[] { "connected", "error", "notDiscovered", "unknown" }.Select(value => new CollectionFilterOption(value, StatusLabel(value))).ToArray()
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<ToolProviderResource>> Columns =>
+    [
+        new("type", T("Type"), provider => @<span>@T($"Type.{provider.Definition.ProviderType}")</span>)
+        {
+            Filters = [new("type", T("Type"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<ToolProviderType>().Select(value => new CollectionFilterOption(value.ToString(), T($"Type.{value}"))).ToArray()
+            }]
+        },
+        new("tools", T("Tools"), provider => @<span>@provider.Definition.Discovery.ToolCount</span>)
+        {
+            Filters = [new("tools", T("Tools"), CollectionFilterKind.Number) { Advanced = true }]
+        }
+
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("enabled", T("Enabled"), CollectionFilterKind.Choice)
+        {
+            Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))]
+        },
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (providers ?? []).Select(provider => provider.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
+    private static string StatusValue(string status) => status.ToLowerInvariant() switch { "connected" => "connected", "error" => "error", "notdiscovered" => "notDiscovered", _ => "unknown" };
+    private static UiStatus Tone(string status) => StatusValue(status) switch { "connected" => UiStatus.Success, "error" => UiStatus.Danger, _ => UiStatus.Neutral };
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private string ProviderUrl(ToolProviderResource provider) => ResourceOwnershipContext.Resource(Services, "/tools/providers", provider.Name, provider.Namespace, provider.ScopeRef);
+}

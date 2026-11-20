@@ -6,11 +6,11 @@ import { test } from '../src/fixtures/test.js';
 
 test.use({ sourcePolicyFixture: true });
 for (const locale of ['en-US', 'fr-FR'] as const) {
-  test(`Source freshness fallback and history ${locale} @smoke`, async ({ page, product }) => {
+  test(`Source freshness fallback and history ${locale} @smoke @creation-wizard`, async ({ page, product }) => {
     test.setTimeout(420_000);
     await exerciseSourcePolicies({ ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, { locale });
   });
-  test(`Source freshness fallback and history ${locale} on mobile @smoke @responsive`, async ({ page, product }) => {
+  test(`Source freshness fallback and history ${locale} on mobile @smoke @responsive @creation-wizard`, async ({ page, product }) => {
     test.setTimeout(420_000);
     await exerciseSourcePolicies({ ...product, pages: new ProductPages(page), checkpoint: ignoreCheckpoints }, { locale });
   });

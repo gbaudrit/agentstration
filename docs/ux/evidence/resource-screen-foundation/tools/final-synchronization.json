@@ -1,0 +1,17 @@
+{
+  "testedBase": "ed06997fa47d9e4cc294c910355cf45662fd81a5",
+  "finalSynchronizedBase": "a191e31bb2a26d7d646e3c3f9d649cd0c66be04f",
+  "parallelTestOnlyFiles": [
+    "tests/Agentstration.Console.Components.Tests/DataSourceProfileCollectionTests.cs",
+    "tests/Agentstration.Console.Components.Tests/ExtensionsConsoleTests.cs"
+  ],
+  "productAndOwnTestSourceHashesUnchanged": true,
+  "protectedAgentHashes": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  }
+}

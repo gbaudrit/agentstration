@@ -115,12 +115,14 @@ public partial class MainLayout
     private bool focusCommandInput;
     private bool searchingResources;
     private bool themeReady;
+    private bool disposed;
     private bool contextSelectorOpen;
     private bool switchingContext;
     private string contextQuery = string.Empty;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
     private Task? platformStatusRefresh;
+    private Task? shellInitialization;
     private IReadOnlyList<CommandItem> fallbackCommands = [];
     private CancellationTokenSource? resourceSearchCancellation;
     private readonly CancellationTokenSource lifetimeCancellation = new();
@@ -214,29 +216,52 @@ public partial class MainLayout
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (disposed) return;
         if (firstRender)
         {
-            commandModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/command-palette.js");
-            contextModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/context-selector.js");
+            shellInitialization = InitializeShellAsync(lifetimeCancellation.Token);
+            await shellInitialization;
+        }
+
+        if (!disposed && focusCommandInput && commandRegistration is not null)
+        {
+            focusCommandInput = false;
+            try { await commandRegistration.InvokeVoidAsync("focus", lifetimeCancellation.Token, commandInput); }
+            catch (OperationCanceledException) when (disposed) { }
+            catch (JSDisconnectedException) when (disposed) { }
+        }
+    }
+
+    private async Task InitializeShellAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            commandModule = await JS.InvokeAsync<IJSObjectReference>("import", cancellationToken, "./_content/Agentstration.Web.Components/command-palette.js");
+            cancellationToken.ThrowIfCancellationRequested();
+            contextModule = await JS.InvokeAsync<IJSObjectReference>("import", cancellationToken, "./_content/Agentstration.Web.Components/context-selector.js");
+            cancellationToken.ThrowIfCancellationRequested();
             if (ContextState.Current is { } context)
-                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
-            themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/theme-preferences.js");
-            navigationTooltipModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/navigation-tooltips.js");
-            Preferences.SetSystemTheme(await themeModule.InvokeAsync<bool>("prefersDarkTheme"));
+                await contextModule.InvokeVoidAsync("ensureContextUrl", cancellationToken, context.SelectedScopeRef, NavigationManager.HistoryEntryState);
+            cancellationToken.ThrowIfCancellationRequested();
+            themeModule = await JS.InvokeAsync<IJSObjectReference>("import", cancellationToken, "./_content/Agentstration.Web.Components/theme-preferences.js");
+            cancellationToken.ThrowIfCancellationRequested();
+            navigationTooltipModule = await JS.InvokeAsync<IJSObjectReference>("import", cancellationToken, "./_content/Agentstration.Web.Components/navigation-tooltips.js");
+            cancellationToken.ThrowIfCancellationRequested();
+            var systemTheme = await themeModule.InvokeAsync<bool>("prefersDarkTheme", cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            Preferences.SetSystemTheme(systemTheme);
             themeReady = true;
             StateHasChanged();
             selfReference = DotNetObjectReference.Create(this);
             if (EnableCommandPalette)
-                commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
-            navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", shellElement);
-            if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;
+                commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", cancellationToken, selfReference);
+            cancellationToken.ThrowIfCancellationRequested();
+            navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", cancellationToken, shellElement);
+            cancellationToken.ThrowIfCancellationRequested();
+            CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language);
         }
-
-        if (focusCommandInput && commandRegistration is not null)
-        {
-            focusCommandInput = false;
-            await commandRegistration.InvokeVoidAsync("focus", commandInput);
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (JSDisconnectedException) when (disposed) { }
     }
 
     [JSInvokable]
@@ -398,7 +423,7 @@ public partial class MainLayout
             await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             if (contextModule is not null && ContextState.Current is { } context && !ContextState.IsLoading
                 && ContextState.Error is null && string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal))
-                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef);
+                await contextModule.InvokeVoidAsync("ensureContextUrl", context.SelectedScopeRef, NavigationManager.HistoryEntryState);
         }
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
@@ -412,6 +437,8 @@ public partial class MainLayout
 
     public async ValueTask DisposeAsync()
     {
+        if (disposed) return;
+        disposed = true;
         Navigation.Changed -= StateHasChanged;
         Preferences.Changed -= StateHasChanged;
         Notifications.Changed -= StateHasChanged;
@@ -420,6 +447,7 @@ public partial class MainLayout
         NavigationManager.LocationChanged -= OnLocationChanged;
         locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();
+        if (shellInitialization is not null) await shellInitialization;
         if (platformStatusRefresh is not null)
         {
             try { await platformStatusRefresh; }

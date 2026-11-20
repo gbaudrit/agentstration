@@ -1,0 +1,16 @@
+{
+  "baseCommit": "07238cef76690eef57ba09a8f3ad1e84408f3f65",
+  "route": "/knowledge-sources",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor": "0962c30f9e5226f1c1f36ce560a6dba5d6d49d97",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor.cs": "6c5b2cf8f13f087909e73ee29a428c851ea0c633",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor.css": "f9aadea62a5718ae82a1294c5063cbb6787397eb",
+    "src/Agentstration.Knowledge/KnowledgeSourceManagementService.cs": "9ad1f57c82e27425422eb63d4c68a005d79e3a81",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

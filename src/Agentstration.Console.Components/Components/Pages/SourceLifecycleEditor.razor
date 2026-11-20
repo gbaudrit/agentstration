@@ -2,15 +2,15 @@
 
 <section class="panel form-section" data-testid="source-lifecycle-editor">
     <h2>@Title</h2>
-    <label class="checkbox-field"><FormCheckbox Value="@Enabled" ValueChanged="EnabledChanged" data-testid="lifecycle-enable" /><span>@T("LifecycleEnable")</span></label>
+    <label class="checkbox-field resource-enabled-toggle"><FormCheckbox Value="@Enabled" ValueChanged="EnabledChanged" role="switch" data-testid="lifecycle-enable" /><span>@T("LifecycleEnable")</span></label>
     @if (Enabled)
     {
         <FormGrid>
-            <FormField Label="@T("LifecycleTtl")" Help="@T("LifecycleTtlHelp")"><ClearableText UpdateOnInput="false" Value="@TimeToLiveText" ValueChanged="TimeToLiveTextChanged" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-ttl" /></FormField>
-            <label class="checkbox-field"><FormCheckbox Value="@KeepHistory" ValueChanged="KeepHistoryChanged" data-testid="lifecycle-history" /><span>@T("LifecycleHistory")</span></label>
+            <FormField Label="@T("LifecycleTtl")" Help="@T("LifecycleTtlHelp")"><ClearableText UpdateOnInput="false" Value="@TimeToLiveText" ValueChanged="TimeToLiveTextChanged" placeholder="hh:mm:ss" inputmode="numeric" aria-invalid="@(!TtlValid ? "true" : null)" data-testid="lifecycle-ttl" /></FormField>
+            <label class="checkbox-field resource-enabled-toggle"><FormCheckbox Value="@KeepHistory" ValueChanged="KeepHistoryChanged" role="switch" data-testid="lifecycle-history" /><span>@T("LifecycleHistory")</span></label>
             @if (KeepHistory)
             {
-                <FormField Label="@T("LifecycleRetention")"><ClearableText UpdateOnInput="false" Value="@HistoryRetentionText" ValueChanged="HistoryRetentionTextChanged" placeholder="hh:mm:ss" inputmode="numeric" data-testid="lifecycle-retention" /></FormField>
+                <FormField Label="@T("LifecycleRetention")"><ClearableText UpdateOnInput="false" Value="@HistoryRetentionText" ValueChanged="HistoryRetentionTextChanged" placeholder="hh:mm:ss" inputmode="numeric" aria-invalid="@(!RetentionValid ? "true" : null)" data-testid="lifecycle-retention" /></FormField>
             }
         </FormGrid>
         <p>@T("LifecycleHistoryHelp")</p>
@@ -27,6 +27,8 @@
     [Parameter] public EventCallback<bool> KeepHistoryChanged { get; set; }
     [Parameter] public string HistoryRetentionText { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> HistoryRetentionTextChanged { get; set; }
-    private bool Valid => LifecycleDuration.TryParse(TimeToLiveText, out _) && (!KeepHistory || LifecycleDuration.TryParse(HistoryRetentionText, out var retention) && retention is not null);
+    private bool TtlValid => LifecycleDuration.TryParse(TimeToLiveText, out _);
+    private bool RetentionValid => !KeepHistory || LifecycleDuration.TryParse(HistoryRetentionText, out var retention) && retention is not null;
+    private bool Valid => TtlValid && RetentionValid;
     private string T(string key) => Localizer[key];
 }

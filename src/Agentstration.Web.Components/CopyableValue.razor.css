@@ -1,0 +1,5 @@
+@media (hover: hover) and (pointer: fine) {
+    .copyable-value .copy-value { opacity: 0; }
+    .copyable-value:hover .copy-value,
+    .copyable-value:focus-within .copy-value { opacity: 1; }
+}

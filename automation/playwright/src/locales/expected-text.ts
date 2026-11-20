@@ -1,6 +1,21 @@
 export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
+export const AgentOverviewMetricsByLocale = {
+  'en-US': ['Desired generation', 'Active generation', 'Deployment'],
+  'fr-FR': ['Génération souhaitée', 'Génération active', 'Déploiement'],
+} as const;
+
+export const ResourceSectionTextByLocale = {
+  'en-US': { agentList: 'Back to agents', identity: 'Identity', labels: 'Labels', required: '* Required fields', actions: 'Section actions', applyYaml: 'Apply to form' },
+  'fr-FR': { agentList: 'Retour aux agents', identity: 'Identité', labels: 'Étiquettes', required: '* Champs obligatoires', actions: 'Actions de la section', applyYaml: 'Appliquer au formulaire' },
+} as const;
+
+export const AgentValidationTextByLocale = {
+  'en-US': { displayNameRequired: 'Display name is required.', instructionsRequired: 'Instructions is required.' },
+  'fr-FR': { displayNameRequired: 'Le champ Nom d’affichage est obligatoire.', instructionsRequired: 'Le champ Instructions est obligatoire.' },
+} as const;
+
 export const GovernedInventoryTextByLocale = {
   'en-US': {
     resources: 'Managed resources', contributions: 'Contributions', installed: 'Installed', degraded: 'Degraded',
@@ -10,7 +25,7 @@ export const GovernedInventoryTextByLocale = {
     kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
     bundleVersion: 'Bundle version', extensionVersion: 'Extension version',
     mutations: ['Delete', 'Save', 'Save changes', 'Publish', 'Activate', 'Apply YAML'],
-    yamlEditor: 'Open YAML editor',
+    yamlEditor: 'Open Flow editor',
     delete: 'Delete', save: 'Save',
   },
   'fr-FR': {
@@ -21,7 +36,7 @@ export const GovernedInventoryTextByLocale = {
     kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',
     bundleVersion: 'Version du bundle', extensionVersion: 'Version de l’extension',
     mutations: ['Supprimer', 'Enregistrer', 'Enregistrer les modifications', 'Publier', 'Activer', 'Appliquer le YAML'],
-    yamlEditor: 'Ouvrir l’éditeur YAML',
+    yamlEditor: 'Ouvrir l’éditeur du Flow',
     delete: 'Supprimer', save: 'Enregistrer',
   },
 } as const;
@@ -71,6 +86,7 @@ export interface ExpectedText {
   };
   acquisitionFailure: { errorLegend: string; showErrorDetails: string };
   governedKnowledge: {
+    accessDenied: string; resourceForbidden: string;
     notReadyHelp: string;
     deleteToolSet: string; confirmToolSetDelete: string; draftSaved: string; publishExposure: string; openToolSet: string; pinnedHelp: string; activeHelp: string;
     newExpiration: string; extendRetention: string; cancel: string; confirmDelete: string;
@@ -100,6 +116,8 @@ export interface ExpectedText {
   inheritedResource: {
     title: string;
     message: string;
+    definitionTitle: string;
+    definitionMessage: string;
     changeScope: string;
   };
   flowDiagnostics: {
@@ -161,7 +179,7 @@ export const ExpectedTextByLocale = {
       input: 'Input',
     },
     acquisitionFailure: { errorLegend: 'Error', showErrorDetails: 'Show error details' },
-    governedKnowledge: { notReadyHelp: 'The source requires a compatible published projection Flow and valid input dependencies before its Tools can be exposed.', deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
+    governedKnowledge: { accessDenied: 'Access denied', resourceForbidden: 'You do not have permission to view this resource in the selected context.', notReadyHelp: 'The source requires a compatible published projection Flow and valid input dependencies before its Tools can be exposed.', deleteToolSet: 'Delete', confirmToolSetDelete: 'Delete ToolSet', draftSaved: 'saved without changing the active deployment.', publishExposure: 'Publish Tool exposure', openToolSet: 'Open ToolSet', pinnedHelp: 'Version 1.0.0 will be pinned; later additions do not extend a published Agent revision.', activeHelp: 'This immutable evidence controls the Tools available to the active Agent revision.', newExpiration: 'New expiration', extendRetention: 'Extend retention', cancel: 'Cancel', confirmDelete: 'Delete permanently' },
     sourceLifecycle: { displayName: 'Display name', technicalName: 'Technical name', acquisitionFlow: 'Acquisition Flow', configurationSchema: 'Configuration schema (JSON)', save: 'Save', yaml: 'YAML', revisions: 'Revisions', definition: 'Definition', version: 'Version', publish: 'Publish', activate: 'Activate', enabled: 'Enabled', requiredInput: 'Required input', addDataSource: 'Add a Data Source', notReady: 'Not ready', updateDependencies: 'Update dependencies', confirmDependencyUpdate: 'Save and update', dependencyUpdateHelp: 'Published Snapshots keep their original references.', cancel: 'Cancel' },
     schemaDrivenSources: {
       formMode: 'Form',
@@ -182,6 +200,8 @@ export const ExpectedTextByLocale = {
     inheritedResource: {
       title: 'View only',
       message: 'To modify this resource, go to its owner scope.',
+      definitionTitle: 'Read-only definition',
+      definitionMessage: 'This resource belongs to another scope. Switch to its owner scope to edit its definition.',
       changeScope: 'Change scope',
     },
     flowDiagnostics: {
@@ -241,7 +261,7 @@ export const ExpectedTextByLocale = {
       input: 'Entrées',
     },
     acquisitionFailure: { errorLegend: 'Erreur', showErrorDetails: 'Afficher les détails de l’erreur' },
-    governedKnowledge: { notReadyHelp: 'La source doit disposer d’un Flow de projection publié compatible et de dépendances d’entrée valides avant la publication de ses Tools.', deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
+    governedKnowledge: { accessDenied: 'Accès refusé', resourceForbidden: 'Vous n’avez pas l’autorisation de consulter cette ressource dans le contexte sélectionné.', notReadyHelp: 'La source doit disposer d’un Flow de projection publié compatible et de dépendances d’entrée valides avant la publication de ses Tools.', deleteToolSet: 'Supprimer', confirmToolSetDelete: 'Supprimer le ToolSet', draftSaved: 'enregistrée sans modifier le déploiement actif.', publishExposure: 'Publier l’exposition des Tools', openToolSet: 'Ouvrir le ToolSet', pinnedHelp: 'La version 1.0.0 sera figée ; les ajouts ultérieurs n’étendent pas une révision d’Agent déjà publiée.', activeHelp: 'Cette preuve immuable contrôle les outils disponibles pour la révision active de l’Agent.', newExpiration: 'Nouvelle expiration', extendRetention: 'Prolonger la rétention', cancel: 'Annuler', confirmDelete: 'Supprimer définitivement' },
     sourceLifecycle: { displayName: 'Nom d’affichage', technicalName: 'Nom technique', acquisitionFlow: 'Flow d’acquisition', configurationSchema: 'Schéma de configuration (JSON)', save: 'Enregistrer', yaml: 'YAML', revisions: 'Révisions', definition: 'Définition', version: 'Version', publish: 'Publier', activate: 'Activer', enabled: 'Activée', requiredInput: 'Entrée requise', addDataSource: 'Ajouter une source de données', notReady: 'Non prête', updateDependencies: 'Mettre à jour les dépendances', confirmDependencyUpdate: 'Enregistrer et mettre à jour', dependencyUpdateHelp: 'Les Snapshots déjà publiés conservent leurs références d’origine.', cancel: 'Annuler' },
     schemaDrivenSources: {
       formMode: 'Formulaire',
@@ -262,6 +282,8 @@ export const ExpectedTextByLocale = {
     inheritedResource: {
       title: 'Consultation uniquement',
       message: 'Pour modifier cette ressource, acc\u00e9dez \u00e0 son p\u00e9rim\u00e8tre propri\u00e9taire.',
+      definitionTitle: 'Définition en lecture seule',
+      definitionMessage: 'Cette ressource appartient à un autre périmètre. Passez dans son périmètre propriétaire pour modifier sa définition.',
       changeScope: 'Changer de p\u00e9rim\u00e8tre',
     },
     flowDiagnostics: {
@@ -307,8 +329,8 @@ export const OrganizationStructureTextByLocale = {
 
 /** Independent collection vocabulary; deliberately not derived from product RESX. */
 export const CollectionTextByLocale = {
-  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
-  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
+  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'], joinedScopeTypes: ['Instance', 'Tenant', 'Workspace'] },
+  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'], joinedScopeTypes: ['Instance', 'Tenant', 'Workspace'] },
 } as const;
 
 export const CollectionVersionTextByLocale = {
@@ -329,10 +351,10 @@ export const FlowCollectionTextByLocale = {
 
 /** Independent acceptance text for the #1116/#1118 lifecycle/composition delta. */
 export const SourcePolicyTextByLocale = {
-  'en-US': { createTransformation: 'Create a transformation Flow', createdTransformation: 'Draft created.', ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
+  'en-US': { wizardIdentityRequired: 'Enter a display name, technical name, valid namespace and owner scope.', wizardIncomplete: 'Incomplete', wizardComplete: 'Complete', datasetStorageRequired: 'Freshness and acquisition history require an input Storage.', wizardEditAcquisition: 'Edit acquisition', wizardStorageRequired: 'Select a Storage or explicitly allow direct acquisition.', createTransformation: 'Create a transformation Flow', createdTransformation: 'Draft created.', ttl: 'Freshness duration (hh:mm:ss)', history: 'Keep previous successful versions',
     direct: 'Direct result', composition: 'Flow composition', failed: 'Failed', retired: 'Retired',
     storageRequired: 'Freshness and history require an input Storage.', fallback: 'Allow an older acquisition after a failed refresh' },
-  'fr-FR': { createTransformation: 'Créer un flow de transformation', createdTransformation: 'Brouillon créé.', ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
+  'fr-FR': { wizardIdentityRequired: 'Renseignez le nom d’affichage, le nom technique, un espace de noms valide et le périmètre propriétaire.', wizardIncomplete: 'À compléter', wizardComplete: 'Complète', datasetStorageRequired: 'La fraîcheur et l’historique des acquisitions nécessitent un Storage d’entrée.', wizardEditAcquisition: 'Modifier : acquisition', wizardStorageRequired: 'Sélectionnez un Storage ou autorisez explicitement l’acquisition directe.', createTransformation: 'Créer un flow de transformation', createdTransformation: 'Brouillon créé.', ttl: 'Durée de fraîcheur (hh:mm:ss)', history: 'Conserver les versions précédentes réussies',
     direct: 'Résultat direct', composition: 'Composition des Flows', failed: 'Échec', retired: 'Retiré',
     storageRequired: 'La fraîcheur et la conservation nécessitent un Storage d’entrée.', fallback: 'Autoriser une ancienne acquisition après un échec de rafraîchissement' },
 } as const;

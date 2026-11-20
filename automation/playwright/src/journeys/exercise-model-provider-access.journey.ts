@@ -83,7 +83,7 @@ export const exerciseModelProviderAccess: Journey<ExerciseModelProviderAccessInp
   await context.checkpoint({
     name: Checkpoints.modelProviderAccess.siblingDenied,
     page: context.pages.page,
-    target: context.pages.agentEditor.behaviorSection,
+    target: context.pages.agentEditor.modelSection,
   });
 
   await workspaces.selectInstance();

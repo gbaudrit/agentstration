@@ -1,0 +1,70 @@
+{
+  "sourceCommit": "04b0659b3759d7ceb92fecfccc49fbd92fb03f3c",
+  "captureDate": "2026-11-19",
+  "origin": "Local compiled Console application; real authenticated API fixtures",
+  "variants": [
+    {
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "interaction": "Actual Playwright tap() for navigation, switches, dialog and save actions"
+    }
+  ],
+  "browserResults": {
+    "savedDefinitions": {
+      "passed": 2,
+      "failed": 0
+    },
+    "maintainedSchemaContracts": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "images": [
+    {
+      "file": "flow-tool-overview-desktop-en.png",
+      "sha256": "532a2ae07f9c1c4aee2e1f8b02753c9fa28db22ee63000d4f0e0f0ddf78798f4"
+    },
+    {
+      "file": "flow-tool-overview-mobile-fr.png",
+      "sha256": "fdb4ae59d44f2ca8a5ae887f8bb86296b79833a9b0b844707709720d652d0d91"
+    },
+    {
+      "file": "relay-contracts-desktop-en.png",
+      "sha256": "2fc299aa2458b0e1f8de7878cd828aa0cb86c5f2d09b68cd0458a9c5518f99ea"
+    },
+    {
+      "file": "relay-contracts-mobile-fr.png",
+      "sha256": "80e19d840ee94bf745911f0005ad74f46780001e0258cb3f85df472efcc0f0c4"
+    },
+    {
+      "file": "relay-overview-desktop-en.png",
+      "sha256": "8ebe3d16bd3cbf0e7c4c846fb9f9f2f817b0ec5d2b83a58a50f262336f15aa5d"
+    },
+    {
+      "file": "relay-overview-mobile-fr.png",
+      "sha256": "3d24975cd53c5167be31d5a2cdddfb05119d15b656dd1155b2baba7a70a4cb57"
+    },
+    {
+      "file": "relay-publication-desktop-en.png",
+      "sha256": "0a2a882aff95df1e03e97c1add5810a61f4ccd2258f3cc69372894e4e0e4a049"
+    },
+    {
+      "file": "relay-publication-mobile-fr.png",
+      "sha256": "87be06757ace5053c77b059b5ecdd5a55a188c2d1e3f4615280e2667df19d2a4"
+    }
+  ]
+}

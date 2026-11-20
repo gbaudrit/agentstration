@@ -17,7 +17,7 @@
     }
     @if (rawMode || !analysis.CanRender)
     {
-        <FormField Label="@Localizer["JsonValue"]"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="11" Value="@rawText" ReadOnly="@ReadOnly" Disabled="@Disabled" aria-invalid="@(!state.IsValid)" ValueChanged="changed => ChangeRawAsync(new ChangeEventArgs { Value = changed })"></ClearableText></ChildContent></FormField>
+        <FormField Label="@Localizer["JsonValue"]" aria-invalid="@(!state.IsValid ? "true" : null)"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="11" Value="@rawText" ReadOnly="@ReadOnly" Disabled="@Disabled" aria-invalid="@(!state.IsValid)" ValueChanged="changed => ChangeRawAsync(new ChangeEventArgs { Value = changed })"></ClearableText></ChildContent></FormField>
         @foreach (var issue in state.Issues) { <span class="field-validation-error" role="alert">@IssueText(issue)</span> }
     }
     else if (analysis.Root is not null)

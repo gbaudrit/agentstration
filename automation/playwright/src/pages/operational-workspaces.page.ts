@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import type { ExecutionScopeFixture } from './execution-scopes.page.js';
@@ -112,7 +113,7 @@ export class OperationalWorkspacesPage {
     );
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope', logicalScopeRef);
     await expect(async () => {
-      await this.page.getByTestId(TestIds.flowObservability.flowRunsTab).click();
+      await selectResourceSection(this.page, 'runs');
       await expect(this.page.getByTestId(TestIds.flowObservability.flowRunOpen)).toBeVisible();
     }).toPass({ timeout: 30_000 });
     await this.page.getByTestId(TestIds.flowObservability.flowRunOpen).click();

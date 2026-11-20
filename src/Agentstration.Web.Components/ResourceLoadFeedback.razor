@@ -1,0 +1,47 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+@if (State.Status == ResourceLoadStatus.Refreshing)
+{
+    <div class="resource-refresh-status" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>@(RefreshingMessage ?? Shared["ResourceRefreshing"])</span></div>
+}
+else if (State.Status == ResourceLoadStatus.Loading)
+{
+    <LoadingState Message="@(State.Message ?? Shared["ResourceLoading"])" />
+}
+else if (State.Status != ResourceLoadStatus.Ready)
+{
+    @if (State.HasContent && State.Status == ResourceLoadStatus.Failed)
+    {
+        <div class="form-alert form-alert-danger resource-refresh-error" role="alert">
+            <div><strong>@(RefreshFailureTitle ?? Shared["ResourceRefreshFailed"])</strong><span>@Message</span>@if (!string.IsNullOrWhiteSpace(State.ErrorId)) { <small>@Shared["ErrorId"]: <code>@State.ErrorId</code></small> }</div>
+            @RetryAction
+        </div>
+    }
+    else
+    {
+        <ErrorState Title="@ResolvedTitle" Message="@Message" ErrorId="@State.ErrorId">@RetryAction</ErrorState>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public ResourceLoadState State { get; set; } = new(ResourceLoadStatus.Ready);
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public string? RetryTestId { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? RefreshingMessage { get; set; }
+    [Parameter] public string? RefreshFailureTitle { get; set; }
+    private string ResolvedTitle => Title ?? Shared[State.Status switch
+    {
+        ResourceLoadStatus.NotFound => "ResourceNotFound",
+        ResourceLoadStatus.Forbidden => "ResourceForbidden",
+        _ => "ResourceLoadFailed"
+    }];
+    private string Message => State.Message ?? Shared[State.Status switch
+    {
+        ResourceLoadStatus.NotFound => "ResourceNotFoundMessage",
+        ResourceLoadStatus.Forbidden => "ResourceForbiddenMessage",
+        _ => "ResourceLoadFailedMessage"
+    }];
+    private RenderFragment? RetryAction => State.CanRetry && OnRetry.HasDelegate
+        ? @<button type="button" class="button-secondary" @onclick="OnRetry" data-testid="@RetryTestId">@Shared["RetryResourceLoad"]</button> : null;
+}

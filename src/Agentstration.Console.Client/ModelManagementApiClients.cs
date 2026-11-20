@@ -286,6 +286,8 @@ public interface IAgentsModelClient
     Task<AgentModelResponse> GetAgentModelResolutionAsync(string agentName, CancellationToken cancellationToken);
     Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetAgentModelResolutionAsync(agentName, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Agents.");
+    Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support exact scoped Agent model resolution.");
 }
 
 public interface IRuntimeProfilesClient
@@ -630,11 +632,14 @@ public sealed class AgentsModelApiClient(HttpClient httpClient) : IAgentsModelCl
         GetAgentModelResolutionAsync(ResourceNamespace.Default, agentName, cancellationToken);
 
     public Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, CancellationToken cancellationToken) =>
-        ApiResponse.ReadAsync<AgentModelResponse>(httpClient,
-            @namespace.IsDefault
-                ? $"api/agents/{Uri.EscapeDataString(agentName)}/model"
-                : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}/model",
-            cancellationToken);
+        ApiResponse.ReadAsync<AgentModelResponse>(httpClient, ModelPath(@namespace, agentName), cancellationToken);
+
+    public Task<AgentModelResponse> GetAgentModelResolutionAsync(ResourceNamespace @namespace, string agentName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<AgentModelResponse>(httpClient, $"{ModelPath(@namespace, agentName)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
+
+    private static string ModelPath(ResourceNamespace @namespace, string agentName) => @namespace.IsDefault
+        ? $"api/agents/{Uri.EscapeDataString(agentName)}/model"
+        : $"api/namespaces/{Uri.EscapeDataString(@namespace.Value)}/agents/{Uri.EscapeDataString(agentName)}/model";
 }
 
 public sealed class RuntimeProfilesApiClient(HttpClient httpClient) : IRuntimeProfilesClient

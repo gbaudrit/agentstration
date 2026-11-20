@@ -283,7 +283,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)
 
-238. [ADR-0238 — Bootstrap policies assign SharedKeyFile extension installations](0238-bootstrap-policies-assign-shared-key-extensions.md)
+238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
 
 239. [ADR-0239 — Bootstrap resolves public extension and contribution identities](0239-bootstrap-resolves-public-extension-contribution-identities.md)
 
@@ -295,3 +295,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 243. [ADR-0243 — Standalone startup always runs in phases](0243-standalone-startup-always-runs-in-phases.md)
 244. [ADR-0244 — Observe startup through an administrator-only progress screen](0244-authenticated-startup-progress-and-admission.md)
+
+245. [ADR-0245 — Bootstrap policies assign SharedKeyFile extension installations](0245-bootstrap-policies-assign-shared-key-extensions.md)

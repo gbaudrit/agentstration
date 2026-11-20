@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimePlacementStrings> Localizer
 
@@ -65,36 +66,41 @@ else if (unavailable)
     [Parameter, EditorRequired] public string RunId { get; set; } = string.Empty;
     [Parameter, EditorRequired] public ResourceScopeRef ScopeRef { get; set; }
 
+    [Parameter] public bool Active { get; set; } = true;
+    private readonly CancellationTokenSource lifetime = new();
     private RuntimeAssignmentPlacementResponse? placement;
-    private bool loading;
-    private bool unavailable;
+    private bool loading, unavailable;
+    private long loadVersion;
+    private (RuntimeAssignmentTargetKind Kind, string Id, ResourceScopeRef Scope)? loadedIdentity;
 
     protected override async Task OnParametersSetAsync()
     {
-        loading = true;
-        unavailable = false;
-        var runtimeClient = Services.GetService(typeof(IRuntimeApiClient)) as IRuntimeApiClient;
-        if (runtimeClient is null)
+        var identity = (TargetKind, RunId, ScopeRef);
+        if (!Active)
         {
-            loading = false;
-            placement = null;
+            if (loadedIdentity != identity) { ++loadVersion; loadedIdentity = null; placement = null; loading = unavailable = false; }
             return;
         }
+        var revision = ++loadVersion;
+        loadedIdentity = identity; loading = true; unavailable = false;
+        var runtimeClient = Services.GetService(typeof(IRuntimeApiClient)) as IRuntimeApiClient;
+        if (runtimeClient is null) { loading = false; placement = null; return; }
         try
         {
-            placement = await runtimeClient.GetPlacementAsync(TargetKind, RunId, ScopeRef, CancellationToken.None);
+            var loaded = await runtimeClient.GetPlacementAsync(identity.TargetKind, identity.RunId, identity.ScopeRef, lifetime.Token);
+            if (revision != loadVersion) return;
+            if (loaded is not null && (loaded.RunId != identity.RunId || loaded.TargetKind != identity.TargetKind.ToString()
+                || loaded.ExecutionScopeRef is { } owner && owner != identity.ScopeRef))
+            { placement = null; unavailable = true; return; }
+            placement = loaded;
         }
-        catch (HttpRequestException)
-        {
-            placement = null;
-            unavailable = true;
-        }
-        finally
-        {
-            loading = false;
-        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException)
+        { if (revision == loadVersion) { placement = null; unavailable = true; } }
+        finally { if (revision == loadVersion) loading = false; }
     }
+    public void Dispose() { ++loadVersion; lifetime.Cancel(); lifetime.Dispose(); }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private static string WorkerUrl(Guid workerId) => $"/settings/runtime-workers/{workerId:D}";
+    private string WorkerUrl(Guid workerId) => ResourceOwnershipContext.PreserveNavigation($"/settings/runtime-workers/{workerId:D}", Services);
 }

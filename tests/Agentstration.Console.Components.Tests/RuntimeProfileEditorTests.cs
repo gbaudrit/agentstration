@@ -1,10 +1,12 @@
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
@@ -17,7 +19,7 @@ public sealed class RuntimeProfileEditorTests
         Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
 
     [TestMethod]
-    public void ExistingProfileExposesLocalizedAccessManagement()
+    public async Task ExistingProfileExposesLocalizedAccessManagement()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext().WithCollectionPresentation();
@@ -28,16 +30,18 @@ public sealed class RuntimeProfileEditorTests
         var policies = new AccessPolicyClientStub();
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
 
+        ConfigureNavigation(context);
         var rendered = context.Render<RuntimeProfileEditor>(parameters => parameters
             .Add(component => component.Name, "maf-builtin"));
 
-        rendered.WaitForElement("[data-testid='runtime-profile-access-tab']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("Accès", rendered.Find("[data-testid='runtime-profile-access-tab']").TextContent.Trim());
+            Assert.AreEqual("Accès", rendered.Find("a[data-resource-section=access]").TextContent.Trim());
             StringAssert.Contains(rendered.Find(".access-identity").TextContent, ResourceUid.ToString());
-            Assert.AreEqual(0, rendered.FindAll("[data-testid='runtime-profile-form']").Count);
+            Assert.IsNotNull(rendered.Find("[data-testid=runtime-profile-form]").Closest("[hidden]"));
         });
 
         rendered.Find("[data-testid='resource-access-target']").Change(TenantScope.Value);
@@ -52,10 +56,201 @@ public sealed class RuntimeProfileEditorTests
         });
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Runtime options must be a JSON object.")]
+    [DataRow("fr-FR", "Les options d’exécution doivent former un objet JSON.")]
+    public async Task WizardKeepsInvalidOptionsAndValidatesBeforeCreating(string locale, string invalid)
+    {
+        using var culture = new TestCultureScope(locale);
+        var client = new RuntimeProfilesClientStub();
+        using var context = Context(client, true);
+        var cut = context.Render<RuntimeProfileEditor>();
+        var wizard = cut.FindComponent<CreationWizard>().Instance;
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("identity", wizard.CurrentStepId);
+        cut.Find("[data-testid=runtime-profile-display-name]").Change("My runtime");
+        cut.Find("[data-testid=runtime-profile-name]").Change("my-runtime");
+        Assert.IsTrue(cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceEditable);
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceIdentityEditor>().Instance.NamespaceChanged.InvokeAsync("  Custom-Runtime  "));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceScopeFormField>().Instance.ValueChanged.InvokeAsync(ResourceScopeRef.Instance));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("options"));
+        cut.Find("textarea.form-code-editor").Change("{");
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual("options", wizard.CurrentStepId);
+        Assert.AreEqual(0, client.Writes);
+        Assert.Contains(invalid, cut.Find(".validation-message").TextContent);
+        Assert.AreEqual("{", cut.Find("textarea.form-code-editor").GetAttribute("value"));
+        cut.Find("textarea.form-code-editor").Change("{\"trace\":true}");
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("review"));
+        await cut.InvokeAsync(wizard.FinishAsync);
+        Assert.AreEqual(1, client.Writes);
+        Assert.IsTrue(client.Profile.Definition.RuntimeOptions["trace"].GetBoolean());
+        Assert.AreEqual("custom-runtime", client.Profile.Namespace.Value);
+        Assert.Contains("/runtimeprofiles/my-runtime", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Identity")]
+    [DataRow("fr-FR", "Identité")]
+    public async Task OverviewRetainsTheEditorRoutesInvalidHiddenOptionsAndPreservesEtag(string locale, string identity)
+    {
+        using var culture = new TestCultureScope(locale);
+        var client = new RuntimeProfilesClientStub();
+        using var context = Context(client, false);
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/options"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        cut.Find("textarea.form-code-editor").Change("{");
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.Contains("Microsoft Agent Framework", cut.Find(".resource-identity-summary").TextContent);
+        await cut.Find("#runtime-profile-resource-form").SubmitAsync();
+        Assert.AreEqual("definition/options", navigation.CurrentPath);
+        Assert.HasCount(1, cut.FindAll(".validation-message"));
+        Assert.AreEqual(0, client.Writes);
+        cut.Find(".unsaved-changes-bar .button-secondary").Click();
+        Assert.IsEmpty(cut.FindAll(".validation-message"));
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        cut.Find("[data-testid=runtime-profile-display-name]").Change("Updated runtime");
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.DoesNotContain("Updated runtime", cut.Find(".resource-identity-summary").TextContent);
+        await cut.Find("#runtime-profile-resource-form").SubmitAsync();
+        Assert.AreEqual(1, client.Writes);
+        Assert.AreEqual("\"runtime-profile\"", client.LastEtag);
+        Assert.AreEqual("Updated runtime", client.Profile.Definition.DisplayName);
+    }
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(true, true)]
+    public async Task ManagedDefinitionsAndInheritedViewsKeepAccessCapabilitiesSeparate(bool managed, bool inherited)
+    {
+        using var context = Context(new RuntimeProfilesClientStub(managed), false, inherited ? TenantScope : ResourceScopeRef.Instance);
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.AreEqual(managed || inherited, cut.Find("[data-testid=runtime-profile-definition-fields]").HasAttribute("disabled"));
+        Assert.AreEqual(inherited ? 0 : 1, cut.FindAll("a[data-resource-section=access]").Count);
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+    }
+
+    [TestMethod]
+    public async Task AccessDraftSurvivesSectionChangesAndSavingANewDefinitionGeneration()
+    {
+        var client = new RuntimeProfilesClientStub();
+        var policies = new AccessPolicyClientStub();
+        using var context = Context(client, false, policies: policies);
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        cut.Find("[data-testid=runtime-profile-display-name]").Change("Updated runtime");
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        var panel = cut.FindComponent<ResourceAccessPanel>().Instance;
+        cut.Find("[data-testid=resource-access-target]").Change(TenantScope.Value);
+        cut.Find("[data-testid=resource-access-add]").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        await cut.Find("#runtime-profile-resource-form").SubmitAsync();
+        Assert.AreEqual(3L, client.Profile.Generation);
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        Assert.AreSame(panel, cut.FindComponent<ResourceAccessPanel>().Instance);
+        Assert.HasCount(1, cut.FindAll("[data-testid=resource-access-grant]"));
+        Assert.IsNull(policies.Saved);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.AreEqual(TenantScope, policies.Saved!.Grants.Single().TargetScopeRef);
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task RefreshRetainsInvalidOptionsAndOriginalEtagUntilExplicitDiscard(bool discard)
+    {
+        var client = new RuntimeProfilesClientStub(); using var context = Context(client, false);
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/options"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        cut.Find("textarea.form-code-editor").Change("{");
+        await cut.Find("#runtime-profile-resource-form").SubmitAsync();
+        Assert.HasCount(1, cut.FindAll(".validation-message"));
+        var newer = client.Profile with { Generation = 3, Definition = client.Profile.Definition with { DisplayName = "New server profile" } };
+        client.Loader = () => Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(newer, "\"external\""));
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.AreEqual("{", cut.Find("textarea.form-code-editor").GetAttribute("value"));
+        Assert.HasCount(1, cut.FindAll(".validation-message"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
+        Assert.Contains("Microsoft Agent Framework", cut.Find(".resource-identity-summary").TextContent);
+        if (discard) cut.Find(".unsaved-changes-bar .button-secondary").Click();
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/options"));
+        cut.Find("textarea.form-code-editor").Change("{\"trace\":true}");
+        await cut.Find("#runtime-profile-resource-form").SubmitAsync();
+        Assert.AreEqual(discard ? "\"external\"" : "\"runtime-profile\"", client.LastEtag);
+        Assert.AreEqual(discard ? "New server profile" : "Microsoft Agent Framework", client.Profile.Definition.DisplayName);
+        Assert.IsTrue(client.Profile.Definition.RuntimeOptions["trace"].GetBoolean());
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionState, cut.FindComponent<ResourceDefinitionForm>().Instance.SectionState);
+        Assert.AreSame(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionPresentations, cut.FindComponent<ResourceDefinitionForm>().Instance.Sections);
+    }
+
+    [TestMethod]
+    public async Task ConfirmedRuntimeProfileDeletionReleasesItsPendingPolicyDraft()
+    {
+        var client = new RuntimeProfilesClientStub(); using var context = Context(client, false);
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<RuntimeProfileEditor>(p => p.Add(c => c.Name, "maf-builtin"));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.Deletes);
+        Assert.AreEqual("/runtimeprofiles", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
+    private sealed class NavigationContext(ResourceScopeRef scope) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scope.Value;
+        public string AddToUri(string uri) => uri;
+    }
+
+    private static BunitContext Context(RuntimeProfilesClientStub client, bool create, ResourceScopeRef? contextScope = null, AccessPolicyClientStub? policies = null)
+    {
+        var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.AddSingleton<IRuntimeProfilesClient>(client);
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new ScopeInventoryClientStub());
+        if (contextScope is { } scope) context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(scope));
+        if (policies is not null) context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(create ? "/runtimeprofiles/new" : "/runtimeprofiles/maf-builtin");
+        ConfigureNavigation(context);
+        return context;
+    }
+    private static void ConfigureNavigation(BunitContext context)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        if (navigation.Uri == "http://localhost/") navigation.NavigateTo("/runtimeprofiles/maf-builtin");
+        var uri = navigation.Uri.Split('#')[0];
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "definition/options", "deployments", "access", "yaml" })
+        {
+            var target = uri + "#" + section;
+            module.Setup<string>("navigate", i => i.Arguments[0] is string value && value.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(target);
+        }
+    }
+
     private sealed class RuntimeProfilesClientStub : IRuntimeProfilesClient
     {
-        private static readonly RuntimeProfileResource Profile = new()
+        public Func<Task<ResourceSnapshot<RuntimeProfileResource>>>? Loader { get; set; }
+        public RuntimeProfilesClientStub(bool managed = false) { if (managed) Profile = Profile with { Governance = ResourceGovernance.Core("runtime") }; }
+        public RuntimeProfileResource Profile { get; private set; } = new()
         {
+            Uid = ResourceUid,
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             Metadata = new ResourceMetadata { Name = "maf-builtin" },
@@ -72,14 +267,25 @@ public sealed class RuntimeProfileEditorTests
             Task.FromResult<IReadOnlyList<RuntimeProfileSummaryResponse>>([]);
 
         public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(string profileName, CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"runtime-profile\""));
+            Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"runtime-profile\""));
 
         public Task<RuntimeProfileUsagesResponse> GetRuntimeProfileUsagesAsync(string profileName, CancellationToken cancellationToken) =>
             Task.FromResult(new RuntimeProfileUsagesResponse([], 0));
 
-        public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task DeleteRuntimeProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public int Writes { get; private set; }
+        public int Deletes { get; private set; }
+        public string? LastEtag { get; private set; }
+        public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken)
+        {
+            Writes++; Profile = Profile with { Metadata = new() { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) }, ScopeRef = request.ScopeRef, Definition = request.Properties };
+            return Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"created\""));
+        }
+        public Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken)
+        {
+            Writes++; LastEtag = etag; Profile = Profile with { Definition = request.Properties, Generation = Profile.Generation + 1 };
+            return Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"updated\""));
+        }
+        public Task DeleteRuntimeProfileAsync(string profileName, string etag, CancellationToken cancellationToken) { Deletes++; return Task.CompletedTask; }
     }
 
     private sealed class ScopeInventoryClientStub : IResourceScopeInventoryClient

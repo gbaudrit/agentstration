@@ -1,64 +1,50 @@
-@inject IServiceProvider Services
 @page "/schemas"
+@implements IDisposable
 @using Agentstration.Schemas
+@inject IServiceProvider Services
 @inject ISchemasClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SchemasStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-schemas">
-    <Actions><a class="button-primary" href="/schemas/new">@T("Create")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-
-<ResourceToolbar Label="@T("Filters")">
-    <label><span>@T("Scope")</span><select data-testid="schema-scope-filter" @bind="scopeFilter"><option value="">@T("AllScopes")</option>@foreach (var scope in scopes) { <option value="@scope.Value">@scope.Value</option> }</select></label>
-    <label><span>@T("Namespace")</span><input data-testid="schema-namespace-filter" @bind="namespaceFilter" placeholder="@T("AllNamespaces")" /></label>
-</ResourceToolbar>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (Filtered.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <CollectionView TItem="SchemaResource" Items="Filtered" InformationLabels="@(new string[] { T("Format"), T("Dialect") })" RowTestId="schema-row">
-        <Identity Context="schema"><CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@EditUrl(schema)" IconName="schema" Domain="neutral" data-testid="schema-details-link"><Versions><CollectionVersion Label="@T("Generation")" Value="@(schema.Generation.ToString())" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="schema.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@schema.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(schema.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="schema">
-            <CollectionValue Label="@T("Format")"><code>@schema.Definition.Format</code></CollectionValue>
-            <CollectionValue Label="@T("Dialect")"><code>@(schema.Definition.Dialect ?? "—")</code></CollectionValue>
-        </Information>
-        <Actions Context="schema"><CollectionActions ResourceName="@($"{schema.Definition.DisplayName} ({schema.Namespace}/{schema.Name}, {schema.ScopeRef})")"><a href="@EditUrl(schema)">@T("Open")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="SchemaResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-schemas"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey" RowTestId="schema-row"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
 
 @code {
-    private IReadOnlyList<SchemaResource> schemas = [];
-    private IReadOnlyList<ResourceScopeRef> scopes = [];
-    private string scopeFilter = string.Empty;
-    private string namespaceFilter = string.Empty;
-    private bool loading = true;
-    private string? error;
-    private IReadOnlyList<SchemaResource> Filtered => schemas.Where(value =>
-        (string.IsNullOrEmpty(scopeFilter) || value.ScopeRef?.Value == scopeFilter)
-        && (string.IsNullOrWhiteSpace(namespaceFilter)
-            || value.Namespace.Value.Contains(namespaceFilter.Trim(), StringComparison.OrdinalIgnoreCase)))
-        .OrderBy(value => value.Namespace.Value, StringComparer.Ordinal)
-        .ThenBy(value => value.Name, StringComparer.Ordinal)
-        .ToArray();
-    private string T(string key) => Localizer[key];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync()
-    {
-        loading = true;
-        error = null;
-        try
+    private string T(string key) => Localizer[key].Value;
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/schemas/new")">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<SchemaResource> IdentityColumn => new("identity", T("Schema"), schema => @<CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@EditUrl(schema)" IconName="schema" Domain="neutral" data-testid="schema-details-link">
+        <Versions><CollectionVersion Label="@T("Generation")" Value="@(schema.Generation.ToString())" /></Versions>
+        <IconBadges><ResourceScopeBadge ScopeRef="schema.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@schema.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(schema.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<SchemaResource>> Columns =>
+    [
+        new("format", T("Format"), schema => @<code>@schema.Definition.Format</code>)
         {
-            schemas = await Client.GetSchemasAsync();
-            scopes = schemas.Where(value => value.ScopeRef is not null).Select(value => value.ScopeRef!.Value)
-                .Distinct().OrderBy(value => value.Value, StringComparer.Ordinal).ToArray();
+            Filters = [new("format", T("Format"), CollectionFilterKind.Choice)
+            {
+                Options = (items ?? []).Select(item => item.Definition.Format).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+            }]
+        },
+        new("dialect", T("Dialect"), schema => @<code>@(schema.Definition.Dialect ?? "—")</code>)
+        {
+            Filters = [new("dialect", T("Dialect"), CollectionFilterKind.Text) { Advanced = true }]
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
-    private static string EditUrl(SchemaResource value) => $"/schemas/{Uri.EscapeDataString(value.Name)}"
-        + $"?scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}"
-        + $"&namespace={Uri.EscapeDataString(value.Namespace.Value)}";
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("scope", Shared["Scope"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(item => item.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
+        },
+        new("namespace", T("Namespace"), CollectionFilterKind.Text) { Placeholder = T("AllNamespaces") }
+    ];
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private string EditUrl(SchemaResource schema) => Navigate($"/schemas/{Uri.EscapeDataString(schema.Name)}?scopeRef={Uri.EscapeDataString(schema.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(schema.Namespace.Value)}");
 }

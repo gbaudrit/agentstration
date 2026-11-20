@@ -1,20 +1,37 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Identity
-<section class="panel form-section resource-identity-summary" data-testid="@TestId">
-    <div class="panel-header"><h2>@Shared["Identity"]</h2>@Badges</div>
-    <dl class="resource-details">
-        <dt>@Identity["DisplayName"]</dt><dd>@DisplayName</dd>
-        <dt>@Identity["TechnicalName"]</dt><dd><CopyableValue Value="@TechnicalName" /></dd>
-        <dt>@Shared["Description"]</dt><dd class="resource-text">@(string.IsNullOrWhiteSpace(Description) ? Shared["NotProvided"] : Description)</dd>
-        @if (Scope is not null) { <dt>@Shared["Scope"]</dt><dd>@Scope</dd> }
-        @if (!string.IsNullOrWhiteSpace(Namespace)) { <dt>@Shared["Namespace"]</dt><dd><code>@Namespace</code></dd> }
-    </dl>
-</section>
+<FormSection Title="@Shared["Identity"]" Class="resource-identity-summary" TestId="@TestId" Collapsible="@(Collapsible ?? HeaderOwnsIdentity)" InitiallyCollapsed="@(InitiallyCollapsed ?? HeaderOwnsIdentity)">
+    <Actions>@if (Badges is not null) { <div class="resource-identity-heading-actions">@Badges</div> }</Actions>
+    <ChildContent>
+        <dl class="resource-details resource-identity-facts">
+            @if (ResourceUid is { } uid && uid != Guid.Empty) { <dt>@Shared["ResourceUid"]</dt><dd class="resource-identity-uid"><CopyableValue Value="@uid.ToString("D")" PlainText /></dd> }
+            @if (!HeaderOwnsIdentity) { <dt>@Identity["DisplayName"]</dt><dd>@if (CopyFacts) { <CopyableValue Value="@DisplayName" PlainText /> } else { @DisplayName }</dd> }
+            <dt>@Identity["TechnicalName"]</dt><dd><CopyableValue Value="@TechnicalName" PlainText /></dd>
+            @if (!string.IsNullOrWhiteSpace(Namespace)) { <dt>@Shared["Namespace"]</dt><dd><CopyableValue Value="@Namespace" PlainText /></dd> }
+            <dt>@Shared["Description"]</dt><dd class="resource-text">@if (CopyFacts && !string.IsNullOrWhiteSpace(Description)) { <CopyableValue Value="@Description" PlainText /> } else { @(string.IsNullOrWhiteSpace(Description) ? Shared["NotProvided"] : Description) }</dd>
+            @if (!HeaderOwnsIdentity && Scope is not null) { <dt>@Shared["Scope"]</dt><dd><CascadingValue TValue="bool" Name="ResourceIdentityScopeAsText" Value="true" IsFixed="true"><CascadingValue TValue="bool" Name="ResourceIdentityCopyFacts" Value="CopyFacts">@Scope</CascadingValue></CascadingValue></dd> }
+            @if (!string.IsNullOrWhiteSpace(Version)) { <dt>@(VersionDescription ?? Shared["VersionLabel"])</dt><dd>@if (CopyFacts) { <CopyableValue Value="@Version" PlainText /> } else { @Version }</dd> }
+            @if (Labels is not null || HeaderOwnsIdentity) { <dt class="resource-identity-labels-title">@Shared["Labels"]</dt><dd>@if (Labels is null) { <span>—</span> } else { <div class="identity-labels-row"><LabelsSummary Values="Labels" />@if (CopyFacts) { <span><CopyableValue Value="@JsonSerializer.Serialize(Labels)" HideValue /></span> }</div> }</dd> }
+            @AdditionalDetails
+        </dl>
+        @AdditionalContent
+    </ChildContent>
+</FormSection>
 @code {
     [Parameter, EditorRequired] public string DisplayName { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? Namespace { get; set; }
+    [Parameter] public Guid? ResourceUid { get; set; }
+    [Parameter] public bool HeaderOwnsIdentity { get; set; }
+    [Parameter] public bool? Collapsible { get; set; }
+    [Parameter] public bool? InitiallyCollapsed { get; set; }
+    [Parameter] public bool CopyFacts { get; set; }
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? VersionDescription { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Labels { get; set; }
+    [Parameter] public RenderFragment? AdditionalDetails { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
     [Parameter] public RenderFragment? Scope { get; set; }
     [Parameter] public RenderFragment? Badges { get; set; }
     [Parameter] public string? TestId { get; set; }

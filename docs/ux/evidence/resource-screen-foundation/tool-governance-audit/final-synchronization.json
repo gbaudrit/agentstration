@@ -1,0 +1,19 @@
+{
+  "browserBase": "c545af2703676b760feabaf0fe62bdec4cfe4e17",
+  "commitBase": "f48a5f3fbf50cf78fb052b74e07d122b70f1b22c",
+  "parallelChanges": [
+    "docs/ux/collection-surfaces-1121.json",
+    "docs/ux/evidence/list-layout/tool-providers/README.md",
+    "docs/ux/evidence/list-layout/tool-providers/desktop-en.png",
+    "docs/ux/evidence/list-layout/tool-providers/mobile-fr.png",
+    "docs/ux/evidence/list-layout/tool-providers/source-proof.json",
+    "docs/ux/list-layout-adoption.md",
+    "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
+    "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor.cs",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolProvidersStrings.fr-FR.resx",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ToolProvidersStrings.resx",
+    "tests/Agentstration.Console.Components.Tests/ToolProviderCollectionTests.cs"
+  ],
+  "auditSourcesMatchBrowser": true,
+  "protectedAgentUnchanged": true
+}

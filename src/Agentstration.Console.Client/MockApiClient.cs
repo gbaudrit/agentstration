@@ -25,6 +25,12 @@ public sealed class MockApiClient(TimeProvider timeProvider, IReadOnlyList<FlowR
     private readonly IReadOnlyList<FlowRun> flowRuns = configuredFlowRuns ?? [];
     private DateTimeOffset Now => timeProvider.GetUtcNow();
 
+    public async Task<AgentSummaryPage> GetAgentsPageAsync(int skip, int take, CancellationToken cancellationToken)
+    {
+        var values = await GetAgentsAsync(cancellationToken);
+        return new(values.Skip(skip).Take(take).ToArray(), skip + take < values.Count, true);
+    }
+
     public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -2,40 +2,60 @@
 @implements IDisposable
 @inject IServiceProvider Services
 @inject IRuntimeProfilesClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfilesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-runtime-profiles">
-    <Actions><a class="button-primary" href="/runtimeprofiles/new">@T("CreateProfile")</a></Actions>
-</PageHeader>
-
-@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
-else if (profiles is null) { <LoadingState Message="@T("Loading")" /> }
-else if (profiles.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/runtimeprofiles/new">@T("CreateProfile")</a></EmptyState> }
-else
-{
-    <CollectionView TItem="RuntimeProfileSummaryResponse" Items="profiles" InformationLabels="@(new[] { T("Runtime"), T("Session"), T("Streaming"), T("Usage") })">
-        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime"><IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="profile">
-            <CollectionValue Label="@T("Runtime")"><code>@profile.Properties.RuntimeType</code></CollectionValue>
-            <CollectionValue Label="@T("Session")">@SessionLabel(profile.Properties.Execution.SessionMode)</CollectionValue>
-            <CollectionValue Label="@T("Streaming")">@StreamingLabel(profile.Properties.Execution.Streaming)</CollectionValue>
-            <CollectionValue Label="@T("Usage")">@DeploymentCount(profile.UsageCount)</CollectionValue>
-        </Information>
-        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")"><a href="@Url(profile)">@T("Open")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="RuntimeProfileSummaryResponse" Title="@T("Title")" Description="@T("Description")"
+                            TestId="resource-runtime-profiles" ContextKey="@contextKey" IconName="server"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<RuntimeProfileSummaryResponse>? profiles;
-    private AgentstrationApiException? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DeploymentCount(int count) => T(count == 1 ? "DeploymentCount.One" : "DeploymentCount.Many", count);
     private string SessionLabel(RuntimeSessionMode value) => Localizer[$"Session.{value}"];
     private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { error = null; try { profiles = await Client.GetRuntimeProfilesAsync(cancellation.Token); } catch (AgentstrationApiException exception) { error = exception; } }
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/runtimeprofiles/new", Services)">@T("CreateProfile")</a></PermissionGate> : null;
+    private CollectionColumn<RuntimeProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime">
+        <IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<RuntimeProfileSummaryResponse>> Columns =>
+    [
+        new("runtime", T("Runtime"), profile => @<code>@profile.Properties.RuntimeType</code>)
+        {
+            Filters = [new("runtime", T("Runtime"), CollectionFilterKind.Choice)
+            {
+                Options = (profiles ?? []).Select(profile => profile.Properties.RuntimeType).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+            }]
+        },
+        new("session", T("Session"), profile => @<span>@SessionLabel(profile.Properties.Execution.SessionMode)</span>)
+        {
+            Filters = [new("session", T("Session"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<RuntimeSessionMode>().Select(value => new CollectionFilterOption(value.ToString(), SessionLabel(value))).ToArray()
+            }]
+        },
+        new("streaming", T("Streaming"), profile => @<span>@StreamingLabel(profile.Properties.Execution.Streaming)</span>)
+        {
+            Filters = [new("streaming", T("Streaming"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<StreamingMode>().Select(value => new CollectionFilterOption(value.ToString(), StreamingLabel(value))).ToArray()
+            }]
+        },
+        new("usage", T("Usage"), profile => @<span>@DeploymentCount(profile.UsageCount)</span>)
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", T("Namespace"), CollectionFilterKind.Choice)
+        {
+            Options = (profiles ?? []).Select(profile => profile.Namespace).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
     private string Url(RuntimeProfileSummaryResponse profile) => ResourceOwnershipContext.PreserveNavigation($"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}", Services);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

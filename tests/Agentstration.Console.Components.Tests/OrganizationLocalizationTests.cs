@@ -27,6 +27,7 @@ public sealed class OrganizationLocalizationTests
             var rendered = context.Render<OrganizationSettingsNav>();
 
             Assert.AreEqual("Créer un espace de travail", strings["CreateWorkspace"].Value);
+            foreach (var key in new[] { "Member.RefreshDraftConflict", "Member.Value", "Member.OperationUnconfirmed" }) Assert.IsFalse(strings[key].ResourceNotFound, key);
             Assert.AreEqual("Désactivé", strings["Status.Disabled"].Value);
             Assert.AreEqual("Compte local créé", strings["AuditAction.local-account.created"].Value);
             Assert.AreEqual("Compte local alice créé.", strings["AccountCreated", "alice"].Value);

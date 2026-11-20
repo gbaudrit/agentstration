@@ -1,0 +1,11 @@
+# Tool Providers list composition
+
+Fresh ad hoc checks against the real deterministic `Agentstration.Web` executable and isolated SQLite. The normal development Bootstrap supplied the Workspace and built-in provider. Twenty-five MCP provider fixtures were saved through the ordinary API in that Workspace, including enabled and disabled definitions. Their internal MCP configuration requires no external process or remote discovery. The wider AEP/MCP mix and discovery-state variations are covered by the component cases, not claimed from these browser images. No reusable #1242 journey is implemented.
+
+- [Desktop, English, 1440×1000](desktop-en.png), explicitly selected table view.
+- [Mobile, French, 390×844](mobile-fr.png), automatic cards and touch controls.
+- [Source proof](source-proof.json): base and synchronized revision, plus exact adapter/template/localization blobs used for the captures.
+
+Both browser checks passed: complete-catalog search; page two has five matching fixture rows; MCP filtering resets to page one; Enabled finds all 16 enabled fixtures; not-discovered status retains those matching definitions; no-match reset restores results; refresh preserves the view; five legitimate family destinations remain; no redundant row Actions or document horizontal overflow. Mobile interactions wait for the existing card renderer to confirm Blazor readiness. Captures show the reset, refreshed catalog. System Chromium was used through the project's installed Playwright.
+
+Six targeted component cases pass, including EN/FR and exact Workspace-qualified links; AEP/MCP, namespace and count filters; retained cards through no matches; failed refresh/retry and snapshot shrink; stale/context-replaced responses; denied reads and permission-gated creation; disabled providers and neutral unknown discovery statuses. EN/FR RESX catalogs are valid, duplicate-free and key-symmetric. The Release Web build passes without warnings/errors, targeted full dotnet format passes, and three existing inventory assertions pass. Incoming `c545af27` changes Web/YAML tests only and requires no new list retest. Full functional lanes and complete browser journeys were not rerun for this screen; #1242 remains blocked pending explicit UX validation and merge.

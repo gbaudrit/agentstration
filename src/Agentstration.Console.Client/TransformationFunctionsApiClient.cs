@@ -12,8 +12,13 @@ public sealed record FunctionChoice(string DisplayName, ResolvedTransformationFu
     public string? Description { get; init; }
     public bool IsBuiltIn { get; init; }
 }
+public sealed record FunctionCatalogPage<T>(IReadOnlyList<T> Items, bool HasMore);
 public interface ITransformationFunctionsClient
 {
+    Task<FunctionCatalogPage<TransformationFunctionResource>> ListPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) =>
+        throw new NotSupportedException("This client does not support function collection paging.");
+    Task<FunctionCatalogPage<FunctionKindResource>> ListKindsPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) =>
+        throw new NotSupportedException("This client does not support function-kind collection paging.");
     Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct);
     Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct);
     Task<IReadOnlyList<NativeFunctionDescriptor>> ImplementationsAsync(CancellationToken ct);
@@ -26,6 +31,21 @@ public interface ITransformationFunctionsClient
 
 public sealed class TransformationFunctionsApiClient(HttpClient http) : ITransformationFunctionsClient
 {
+    public Task<FunctionCatalogPage<TransformationFunctionResource>> ListPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) =>
+        ReadPageAsync<TransformationFunctionResource>("api/transformation-functions", scope, skip, take, ct);
+    public Task<FunctionCatalogPage<FunctionKindResource>> ListKindsPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) =>
+        ReadPageAsync<FunctionKindResource>("api/function-kinds", scope, skip, take, ct);
+    private async Task<FunctionCatalogPage<T>> ReadPageAsync<T>(string path, ResourceScopeRef? scope, int skip, int take, CancellationToken ct)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(skip, 1_000_000);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(take, 99);
+        var owner = scope is { } exact ? $"&scopeRef={Uri.EscapeDataString(exact.Value)}" : string.Empty;
+        var page = await ApiResponse.ReadAsync<ValueResponse<T>>(http, $"{path}?skip={skip}&take={take + 1}{owner}", ct);
+        return new(page.Value.Take(take).ToArray(), page.Value.Count > take && skip + take <= 1_000_000);
+    }
+
     public async Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) =>
         (await ApiResponse.ReadAsync<ValueResponse<TransformationFunctionResource>>(http, "api/transformation-functions" + Query(scope), ct)).Value;
     public async Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) =>

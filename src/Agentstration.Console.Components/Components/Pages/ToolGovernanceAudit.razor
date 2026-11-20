@@ -1,29 +1,30 @@
 @page "/tool-governance/{Owner}/{RunId}"
 @implements IDisposable
 @inject IToolGovernanceAuditClient Client
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolGovernanceAuditStrings> Localizer
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tool-governance-audit">
+<ResourceDetailsTemplate Name="@RunId" ResourceType="@T("Title")" Domain="audit" IconName="shield" Description="@T("Description")"
+                         Sections="Sections" ResourceIdentity="@resourceKey" DefaultSection="audit" SelectionChanged="SelectSection" TestId="resource-tool-governance-audit">
     <Actions><a class="button-secondary" href="@BackUrl">@T("BackToRun")</a></Actions>
-</PageHeader>
-
-<section class="panel governance-context">
-    <div><span>@T("Owner")</span><strong>@OwnerLabel</strong></div>
-    <div><span>@T("Run")</span><code>@RunId</code></div>
-    <div><span>@T("Arguments")</span><strong>@T("OptInRetention")</strong></div>
-</section>
-
+    <Content>
+    <div hidden="@(section != "overview")">
+        <FormSection Title="@Shared["Identity"]" Class="resource-identity-summary"><dl class="governance-identities"><dt>@T("Owner")</dt><dd>@OwnerLabel</dd><dt>@T("Run")</dt><dd><a href="@BackUrl"><code>@RunId</code></a></dd>@if (ScopeRef is { } scope) { <dt>@Shared["Scope"]</dt><dd><code>@scope.Value</code></dd> }</dl></FormSection>
+        <FormSection Title="@Shared["Configuration"]"><dl class="governance-identities"><dt>@T("Arguments")</dt><dd>@T("OptInRetention")</dd></dl></FormSection>
+    </div>
+    <div hidden="@(section != "audit")">
 <section class="panel governance-filters">
     <div class="panel-header"><div><p class="eyebrow">@T("AuditFilters")</p><h2>@T("PhysicalAttempts")</h2></div></div>
-    <div class="filter-grid">
-        <label><span>@T("LogicalToolCall")</span><input @bind="toolCallId" placeholder="ToolCallId" /></label>
-        <label><span>@T("PhysicalInvocation")</span><input @bind="invocationId" placeholder="InvocationId" /></label>
-        <label><span>@T("Tool")</span><input @bind="toolId" placeholder="@T("ToolResourceId")" /></label>
-        <label><span>@T("Hook")</span><input @bind="hookId" placeholder="@T("HookOrResourceId")" /></label>
-        <label><span>@T("ResourceGeneration")</span><input @bind="resourceGeneration" inputmode="numeric" placeholder="@T("AnyGeneration")" /></label>
-        <label><span>@T("Decision")</span><select @bind="decision"><option value="">@T("AllDecisions")</option>@foreach (var value in Enum.GetValues<ToolExecutionHookEvaluationKind>()) { <option value="@value">@DecisionLabel(value)</option> }</select></label>
-    </div>
+    <FormGrid>
+        <FormField Label="@T("LogicalToolCall")"><ClearableText @bind-Value="toolCallId" /></FormField>
+        <FormField Label="@T("PhysicalInvocation")"><ClearableText @bind-Value="invocationId" /></FormField>
+        <FormField Label="@T("Tool")"><ClearableText @bind-Value="toolId" placeholder="@T("ToolResourceId")" /></FormField>
+        <FormField Label="@T("Hook")"><ClearableText @bind-Value="hookId" placeholder="@T("HookOrResourceId")" /></FormField>
+        <FormField Label="@T("ResourceGeneration")"><ClearableText @bind-Value="resourceGeneration" inputmode="numeric" placeholder="@T("AnyGeneration")" /></FormField>
+        <FormField Label="@T("Decision")"><ClearableSelect @bind-Value="decision"><option value="">@T("AllDecisions")</option>@foreach (var value in Enum.GetValues<ToolExecutionHookEvaluationKind>()) { <option value="@value">@DecisionLabel(value)</option> }</ClearableSelect></FormField>
+    </FormGrid>
     <div class="button-row"><button class="button-primary" @onclick="ApplyAsync" disabled="@loading">@T("ApplyFilters")</button><button class="button-secondary" @onclick="ClearAsync" disabled="@loading">@T("Clear")</button></div>
     @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
 </section>
@@ -93,6 +94,10 @@ else
     }
 }
 
+    </div>
+    </Content>
+</ResourceDetailsTemplate>
+
 @code {
     [Parameter] public string Owner { get; set; } = string.Empty;
     [Parameter] public string RunId { get; set; } = string.Empty;
@@ -105,6 +110,11 @@ else
     [SupplyParameterFromQuery(Name = "decision")] public string? RequestedDecision { get; set; }
 
     private readonly CancellationTokenSource cancellation = new();
+    private string section = "audit";
+    private void SelectSection(string? value) => section = value ?? "audit";
+    private string? resourceKey, loadedKey;
+    private long loadVersion;
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("audit", T("PhysicalAttempts"), "list-check")];
     private readonly List<ToolGovernanceAuditRecord> records = [];
     private ToolExecutionOwnerKind ownerKind;
     private long? nextSequence;
@@ -119,7 +129,7 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DecisionLabel(ToolExecutionHookEvaluationKind value) => Localizer[$"Decision.{value}"];
     private string SourceLabel(ToolExecutionHookSource value) => Localizer[$"Source.{value}"];
-    private string OwnerLabel => ownerKind == ToolExecutionOwnerKind.FlowRun ? T("FlowRun") : T("RuntimeRun");
+    private string OwnerLabel => ownerKind switch { ToolExecutionOwnerKind.FlowRun => T("FlowRun"), ToolExecutionOwnerKind.RuntimeRun => T("RuntimeRun"), _ => T("UnknownOwner") };
     private ResourceScopeRef? ScopeRef => string.IsNullOrWhiteSpace(RequestedScopeRef)
         ? null
         : ResourceScopeRef.Parse(RequestedScopeRef);
@@ -127,12 +137,18 @@ else
         ? RunUrl("flow-runs")
         : RunUrl("runs");
 
-    private string RunUrl(string segment) => ScopeRef is { } scopeRef
+    private string RunUrl(string segment) => ResourceOwnershipContext.PreserveNavigation(ScopeRef is { } scopeRef
         ? $"/{segment}/{Uri.EscapeDataString(RunId)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}"
-        : $"/{segment}/{Uri.EscapeDataString(RunId)}";
+        : $"/{segment}/{Uri.EscapeDataString(RunId)}", Services);
 
     protected override async Task OnParametersSetAsync()
     {
+        var identity = $"{Owner}|{RunId}|{RequestedScopeRef}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        var key = $"{identity}|{RequestedToolCallId}|{RequestedInvocationId}|{RequestedToolId}|{RequestedHookId}|{RequestedResourceGeneration}|{RequestedDecision}";
+        if (loadedKey == key) return;
+        loadedKey = key;
+        if (resourceKey != identity) { records.Clear(); nextSequence = null; section = "audit"; }
+        resourceKey = identity;
         ownerKind = Owner.ToLowerInvariant() switch
         {
             "runtime" or "runtimerun" => ToolExecutionOwnerKind.RuntimeRun,
@@ -159,22 +175,23 @@ else
         await LoadAsync(append: false);
     }
 
-    private Task LoadMoreAsync() => LoadAsync(append: true);
+    private Task LoadMoreAsync() => loading || nextSequence is null ? Task.CompletedTask : LoadAsync(append: true);
 
     private async Task LoadAsync(bool append)
     {
+        var request = ++loadVersion;
         error = null;
         if (ownerKind == ToolExecutionOwnerKind.Unspecified)
         {
             records.Clear();
-            error = T("UnknownOwner");
+            loading = false; error = T("UnknownOwner");
             return;
         }
         long? generation = null;
         if (!string.IsNullOrWhiteSpace(resourceGeneration)
             && (!long.TryParse(resourceGeneration, out var parsed) || parsed <= 0))
         {
-            error = T("InvalidGeneration");
+            loading = false; error = T("InvalidGeneration");
             return;
         }
         else if (!string.IsNullOrWhiteSpace(resourceGeneration)) generation = long.Parse(resourceGeneration, System.Globalization.CultureInfo.InvariantCulture);
@@ -198,16 +215,27 @@ else
                     Decision = Enum.TryParse<ToolExecutionHookEvaluationKind>(decision, ignoreCase: true, out var parsedDecision) ? parsedDecision : null
                 },
                 cancellation.Token);
+            if (request != loadVersion) return;
             if (!append) records.Clear();
             records.AddRange(page.Items);
             nextSequence = page.NextSequence;
         }
         catch (Exception exception) when (exception is AgentstrationApiException or ArgumentException)
         {
-            if (!append) records.Clear();
+            if (request != loadVersion) return;
+            if (!append || exception is AgentstrationApiException
+                {
+                    StatusCode: System.Net.HttpStatusCode.Unauthorized
+                        or System.Net.HttpStatusCode.Forbidden
+                        or System.Net.HttpStatusCode.NotFound
+                })
+            {
+                records.Clear();
+                nextSequence = null;
+            }
             error = exception.Message;
         }
-        finally { loading = false; }
+        finally { if (request == loadVersion) loading = false; }
     }
 
     private static ToolExecutionHookEvaluationKind OverallDecision(ToolGovernanceAuditRecord record) =>
@@ -228,6 +256,7 @@ else
 
     public void Dispose()
     {
+        loadVersion++;
         cancellation.Cancel();
         cancellation.Dispose();
     }

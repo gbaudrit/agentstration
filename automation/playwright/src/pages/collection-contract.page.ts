@@ -59,13 +59,16 @@ export class CollectionContractPage {
         if (state >= 0 && scope >= 0) expect(state).toBe(scope + 1);
         if (actions >= 0) expect(actions).toBe(values.length - 1);
       }
-      for (const row of await frame.locator('tbody > tr:not(.collection-expanded), .collection-card').all()) {
-        const action = row.locator('.collection-actions');
+      const rows = frame.locator('tbody > tr:not(.collection-expanded), .collection-card');
+      const rowPresentations = await rows.evaluateAll(elements => elements.map(row => ({
+        hasAction: [...row.querySelectorAll('.collection-actions')].some(action => action.children.length > 0),
+        identity: row.querySelector('.collection-identity-cell, :scope > .collection-identity')?.textContent ?? null,
+      })));
+      for (const [index, row] of rowPresentations.entries()) {
         // Some rows have no applicable command even when the collection has an Actions column.
-        if (await action.locator(':scope > *').count()) await expect(action).toBeVisible();
+        if (row.hasAction) await expect(rows.nth(index).locator('.collection-actions')).toBeVisible();
         // Business fields may contain links; the item identity remains in the first cell/card block.
-        const firstIdentity = row.locator('.collection-identity-cell, :scope > .collection-identity').first();
-        if (await firstIdentity.count()) expect((await firstIdentity.textContent())?.trim()).not.toBe('');
+        if (row.identity !== null) expect(row.identity.trim()).not.toBe('');
       }
     }
     for (const identity of await identities.all()) {
@@ -94,11 +97,20 @@ export class CollectionContractPage {
       for (const command of await commands.all()) await expect(command).toBeVisible();
       if (!await group.locator('.collection-actions-panel').count()) await expect(group.locator('details')).toHaveCount(0);
     }
-    for (const state of await states.all()) {
-      await expect(state.locator('.ui-icon')).toBeVisible();
-      expect((await state.textContent())?.trim()).not.toBe('');
-      if ((await state.textContent())?.trim() === text.unknown) await expect(state).toHaveClass(/status-neutral/);
-    }
+    // Keep one visible icon and nonempty text per state, including bounded 200-row audits.
+    // Re-read the complete set on each attempt: live execution panels can add states during inspection.
+    await expect.poll(async () => {
+      const presentations = await states.evaluateAll(elements => elements.map(state => ({
+        icons: state.querySelectorAll('.ui-icon').length,
+        text: state.textContent?.trim() ?? '',
+        neutral: state.classList.contains('status-neutral'),
+      })));
+      const visibleIcons = await states.locator('.ui-icon:visible').count();
+      return {
+        invalidStates: presentations.filter(state => state.icons !== 1 || !state.text || state.text === text.unknown && !state.neutral),
+        allIconsVisible: visibleIcons === presentations.length,
+      };
+    }).toEqual({ invalidStates: [], allIconsVisible: true });
     const scopeSnapshots = await scopes.evaluateAll(elements => elements.map(element => {
       const button = element.querySelector('button');
       const letter = element.querySelector('.scope-letter');
@@ -133,7 +145,11 @@ export class CollectionContractPage {
       }
       const kind = scope.locator('.resource-scope-badge');
       await expect(kind).toBeVisible();
-      expect(text.scopeTypes).toContain((await kind.textContent())?.trim());
+      const label = (await kind.textContent())?.trim() ?? '';
+      if ((await kind.getAttribute('class'))?.includes('resource-scope-badge-named')) {
+        expect(text.joinedScopeTypes.some(type => label === type || label.startsWith(type + ': ') || label.startsWith(type + ' : '))).toBe(true);
+        await expect(kind).toHaveAttribute('title', label);
+      } else expect(text.scopeTypes).toContain(label);
       const disclosure = scope.locator('.disclosure-trigger');
       if (await disclosure.count()) {
         expect((await disclosure.textContent())?.trim()).not.toBe('');
@@ -302,7 +318,9 @@ export class CollectionContractPage {
       await expect(this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor)).toBeVisible();
       expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(namespace);
       const overview = this.page.getByTestId(TestIds.collections.modelProfileOverview);
-      await expect(overview).toContainText('Shared profile');
+      await expect(this.page.locator('.resource-header h1')).toHaveText('Shared profile');
+      const identity = overview.locator('.resource-identity-summary .panel-disclosure');
+      if (await identity.getAttribute('aria-expanded') === 'false') await identity.click();
       await expect(overview.getByText(namespace, { exact: true })).toBeVisible();
       await open();
     }

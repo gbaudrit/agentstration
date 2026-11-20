@@ -9,7 +9,7 @@ public enum ModelOverrideOperation
     Remove
 }
 
-public sealed class ModelSpecificationOverrideEditorModel
+public class ModelSpecificationOverrideEditorModel
 {
     public Dictionary<ModelContentType, ModelOverrideOperation> Input { get; } = EnumValues<ModelContentType>();
     public Dictionary<ModelContentType, ModelOverrideOperation> Output { get; } = EnumValues<ModelContentType>();
@@ -62,24 +62,56 @@ public sealed class ModelSpecificationOverrideEditorModel
         Limits = new ModelLimitOverrides { ContextTokens = ContextTokens, MaxOutputTokens = MaxOutputTokens }
     };
 
-    public static ModelSpecificationOverrideEditorModel From(ModelSpecificationOverride? value)
+    public ModelSpecificationOverrideEditorModel() { }
+
+    protected ModelSpecificationOverrideEditorModel(ModelSpecificationOverride? value)
     {
-        var result = new ModelSpecificationOverrideEditorModel();
-        if (value is null) return result;
-        Apply(result.Input, value.Input);
-        Apply(result.Output, value.Output);
-        result.StreamingSupport = value.Features.Streaming?.Support;
-        result.ToolsSupport = value.Features.Tools?.Support;
-        Apply(result.ToolModes, value.Features.Tools?.Modes?.Add.Keys, value.Features.Tools?.Modes?.Remove);
-        result.StructuredOutputSupport = value.Features.StructuredOutput?.Support;
-        Apply(result.OutputFormats, value.Features.StructuredOutput?.Formats?.Add.Keys, value.Features.StructuredOutput?.Formats?.Remove);
+        if (value is null) return;
+        Apply(Input, value.Input);
+        Apply(Output, value.Output);
+        StreamingSupport = value.Features.Streaming?.Support;
+        ToolsSupport = value.Features.Tools?.Support;
+        Apply(ToolModes, value.Features.Tools?.Modes?.Add.Keys, value.Features.Tools?.Modes?.Remove);
+        StructuredOutputSupport = value.Features.StructuredOutput?.Support;
+        Apply(OutputFormats, value.Features.StructuredOutput?.Formats?.Add.Keys, value.Features.StructuredOutput?.Formats?.Remove);
         if (value.Features.StructuredOutput?.Formats?.Add is { } formats)
-            foreach (var format in formats) result.OutputFormatStrict[format.Key] = format.Value.SupportsStrict;
-        result.ReasoningSupport = value.Features.Reasoning?.Support;
-        Apply(result.ReasoningEfforts, value.Features.Reasoning?.Efforts?.Add.Keys, value.Features.Reasoning?.Efforts?.Remove);
-        result.ContextTokens = value.Limits.ContextTokens;
-        result.MaxOutputTokens = value.Limits.MaxOutputTokens;
-        return result;
+            foreach (var format in formats) OutputFormatStrict[format.Key] = format.Value.SupportsStrict;
+        ReasoningSupport = value.Features.Reasoning?.Support;
+        Apply(ReasoningEfforts, value.Features.Reasoning?.Efforts?.Add.Keys, value.Features.Reasoning?.Efforts?.Remove);
+        ContextTokens = value.Limits.ContextTokens;
+        MaxOutputTokens = value.Limits.MaxOutputTokens;
+    }
+
+    public static ModelSpecificationOverrideEditorModel From(ModelSpecificationOverride? value) => new(value);
+
+    public static bool SetFeatureSupport<TEnum>(ModelFeatureSupport? value, ModelFeatureSupport? discovered,
+        Dictionary<TEnum, ModelOverrideOperation> details, Action<ModelFeatureSupport?> setter) where TEnum : struct, Enum
+    {
+        var cleared = (value == ModelFeatureSupport.Unsupported || value is null && discovered is null or ModelFeatureSupport.Unknown)
+            && details.Values.Any(operation => operation == ModelOverrideOperation.Add);
+        if (cleared)
+            foreach (var detail in details.Where(item => item.Value == ModelOverrideOperation.Add).Select(item => item.Key).ToArray()) details[detail] = ModelOverrideOperation.Inherit;
+        setter(value);
+        return cleared;
+    }
+
+    public static ModelOverrideInteraction SetDetailOperation<TEnum>(TEnum value, ModelOverrideOperation operation,
+        Dictionary<TEnum, ModelOverrideOperation> target, ModelFeatureSupport? discovered, Func<ModelFeatureSupport?> support,
+        Action<ModelFeatureSupport?> setSupport) where TEnum : struct, Enum
+    {
+        var interaction = ModelOverrideInteraction.None;
+        if (operation == ModelOverrideOperation.Add)
+        {
+            if (discovered == ModelFeatureSupport.Unsupported) return ModelOverrideInteraction.DiscoveredUnsupported;
+            if (support() == ModelFeatureSupport.Unsupported) return ModelOverrideInteraction.OverriddenUnsupported;
+            if (support() is null && discovered is null or ModelFeatureSupport.Unknown)
+            {
+                setSupport(ModelFeatureSupport.Native);
+                interaction = ModelOverrideInteraction.ParentSupportEnabled;
+            }
+        }
+        target[value] = operation;
+        return interaction;
     }
 
     private static bool IsInherited(ModelOverrideOperation value) => value == ModelOverrideOperation.Inherit;
@@ -132,4 +164,12 @@ public sealed class ModelSpecificationOverrideEditorModel
         if (add is not null) foreach (var item in add) target[item] = ModelOverrideOperation.Add;
         if (remove is not null) foreach (var item in remove) target[item] = ModelOverrideOperation.Remove;
     }
+}
+
+public enum ModelOverrideInteraction
+{
+    None,
+    DiscoveredUnsupported,
+    OverriddenUnsupported,
+    ParentSupportEnabled
 }

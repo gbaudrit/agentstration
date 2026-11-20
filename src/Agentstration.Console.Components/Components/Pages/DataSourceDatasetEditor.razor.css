@@ -46,3 +46,15 @@ h2 { margin-top: 0; }
     .dataset-details { grid-template-columns: minmax(0, 1fr); gap: .4rem; }
     .dataset-details dd { margin-bottom: .65rem; }
 }
+
+.dataset-creation-options { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.dataset-step-fields { min-width: 0; }
+.dataset-review-row { display: grid; grid-template-columns: minmax(7rem, .6fr) minmax(0, 2fr) auto; gap: 1rem; border-top: 1px solid var(--border); padding: 1.25rem 0; align-items: start; }
+.dataset-review-row > div { display: grid; gap: .4rem; min-width: 0; }
+.dataset-review-row h3, .dataset-review-row p { margin: 0; }
+.dataset-review-row code { display: block; }
+.dataset-review-row details { min-width: 0; }
+.dataset-review-row summary { cursor: pointer; }
+@media (max-width: 640px) { .dataset-review-row { grid-template-columns: minmax(0, 1fr) auto; } .dataset-review-row h3 { grid-column: 1; } .dataset-review-row > div { grid-row: 2; grid-column: 1 / -1; } .dataset-review-row > button { grid-row: 1; grid-column: 2; } }
+.dataset-step-fields .checkbox-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; column-gap: .6rem; row-gap: .4rem; }
+.dataset-step-fields .checkbox-field > small { grid-column: 2; }

@@ -1,0 +1,134 @@
+@namespace Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+@if (saved is not null)
+{
+    <FormSection Title="@(saved.Kind + "/" + saved.Name)" Description="@saved.Path" TestId="pack-source-editor">
+        <Actions>
+            @if (SupportsForm) { <button type="button" class="text-button" aria-pressed="@(formView ? "true" : "false")" @onclick="() => ShowModeAsync(true)">@T("Form")</button> }
+            <button type="button" class="text-button" aria-pressed="@(!formView ? "true" : "false")" @onclick="() => ShowModeAsync(false)">@T("Yaml")</button>
+            <button type="button" class="icon-button" @onclick="Hide" aria-label="@T("CloseSourceEditor")">×</button>
+        </Actions>
+        <ChildContent>
+            @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+            @if (newer is not null) { <p class="form-alert form-alert-warning" role="status">@T("Project.RefreshDraftConflict")</p> }
+            @if (SupportsForm)
+            {
+                <div hidden="@(!formView)"><PackAgentDefinitionForm @ref="agentForm" Source="@formSource" ReadOnly="@(ReadOnly || Busy)" DraftChanged="FormDraftChanged" /></div>
+            }
+            <div hidden="@formView"><FormField Label="@T("PackSourceYaml")"><ClearableText Multiline Value="@raw" ValueChanged="RawChanged" rows="30" class="form-code-editor runner-json" ReadOnly="ReadOnly" Disabled="Busy" data-testid="pack-project-source-yaml" /></FormField></div>
+            @if (!ReadOnly && SupportsForm)
+            {
+                <FormActions>
+                    @if (formView) { <button type="button" class="button-secondary" disabled="@Busy" @onclick="ApplyFormToYamlAsync">@T("Project.ApplyToYaml")</button> }
+                    else { <button type="button" class="button-secondary" disabled="@Busy" @onclick="ApplyYamlToFormAsync">@T("ApplyToForm")</button> }
+                </FormActions>
+            }
+            <FormActions>
+                <button type="button" class="button-secondary" disabled="@(Busy || !IsDirty)" @onclick="DiscardAsync">@Shared["Discard"]</button>
+                @if (!ReadOnly) { <button type="button" class="button-primary" disabled="@(Busy || !CurrentViewDirty)" @onclick="SaveAsync" data-testid="pack-project-source-save">@T("SaveResource")</button> }
+            </FormActions>
+        </ChildContent>
+    </FormSection>
+}
+<ConfirmationDialog IsOpen="@(pending is not null)" Title="@T("Project.ReplaceSourceDraftTitle")" Message="@T("Project.ReplaceSourceDraftMessage")" ConfirmLabel="@T("Project.UseCurrentSource")" OnConfirm="ConfirmAsync" OnCancel="() => pending = null" TestId="pack-project-source-confirmation" />
+
+@code {
+    [Parameter, EditorRequired] public PackProjectSourceDocument Document { get; set; } = default!;
+    [Parameter] public bool InitialForm { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public EventCallback<UpdatePackProjectSourceCommand> SaveRequested { get; set; }
+    [Parameter] public EventCallback Hide { get; set; }
+    private PackProjectSourceDocument? saved, newer;
+    private PackAgentDefinitionForm? agentForm;
+    private string raw = string.Empty, formSource = string.Empty;
+    private string? error;
+    private bool formView, formDirty, supportsForm, disposed;
+    private PendingSource? pending;
+    public bool IsDirty => !disposed && saved is not null && (RawDirty || FormDirty);
+    private bool RawDirty => saved is not null && raw != saved.Source;
+    private bool FormDirty => saved is not null && (formDirty || agentForm?.IsDirty == true || formSource != saved.Source);
+    private bool CurrentViewDirty => formView ? FormDirty : RawDirty;
+    private bool SupportsForm => supportsForm;
+    private string T(string key) => Localizer[key].Value;
+    protected override void OnParametersSet()
+    {
+        if (disposed) return;
+        if (saved is null || saved.Path != Document.Path) { Reset(Document); return; }
+        if (Document.Source == saved.Source) return;
+        if (IsDirty) newer = Document; else Reset(Document);
+    }
+    private void Reset(PackProjectSourceDocument document) { saved = document; raw = formSource = document.Source; newer = null; error = null; formDirty = false; pending = null; supportsForm = document.Kind == AgentResourceKinds.Agent && CanReadAgent(document.Source); formView = InitialForm && SupportsForm; }
+    public Task ShowModeAsync(bool useForm) { if (!disposed) { formView = useForm && SupportsForm; StateHasChanged(); } return Task.CompletedTask; }
+    private async Task RawChanged(string value) { if (disposed || ReadOnly || Busy) return; raw = value; error = null; await DraftChanged.InvokeAsync(IsDirty); }
+    private Task FormDraftChanged(bool value) { if (disposed) return Task.CompletedTask; formDirty = value; return DraftChanged.InvokeAsync(IsDirty); }
+    private static bool CanReadAgent(string source)
+    {
+        try { var value = ResourceManifestSerializer.FromYaml<JsonElement>(source); return value.ValueKind == JsonValueKind.Object && value.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == AgentResourceKinds.Agent && value.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object && value.TryGetProperty("definition", out var definition) && definition.ValueKind == JsonValueKind.Object; }
+        catch (Exception exception) when (exception is JsonException or FormatException or InvalidOperationException or ArgumentException or YamlDotNet.Core.YamlException) { return false; }
+    }
+    private bool TryForm(out string source)
+    {
+        source = formSource;
+        if (agentForm is null) return false;
+        if (agentForm.TryBuildSource(out source, out var problem)) return true;
+        error = problem; return false;
+    }
+    private async Task ApplyFormToYamlAsync()
+    {
+        if (disposed || ReadOnly || Busy || !TryForm(out var source)) return;
+        if (RawDirty && raw != source) { pending = new(SourceOperation.ToYaml, source); return; }
+        raw = source; formView = false; error = null; await DraftChanged.InvokeAsync(IsDirty);
+    }
+    private async Task ApplyYamlToFormAsync()
+    {
+        if (disposed || ReadOnly || Busy) return;
+        if (!CanReadAgent(raw)) { error = T("AgentSourceMustBeObject"); return; }
+        if (FormDirty && (formDirty || agentForm?.IsDirty == true || raw != formSource)) { pending = new(SourceOperation.ToForm, raw); return; }
+        await AdoptFormAsync(raw);
+    }
+    private async Task AdoptFormAsync(string source)
+    {
+        formSource = source; formDirty = false; formView = true; error = null;
+        if (agentForm is not null) await agentForm.AcknowledgeAsync(source);
+        if (!disposed) await DraftChanged.InvokeAsync(IsDirty);
+    }
+    private async Task SaveAsync()
+    {
+        if (disposed || ReadOnly || Busy || saved is null || !CurrentViewDirty) return;
+        var source = raw;
+        if (formView && !TryForm(out source)) return;
+        if ((formView ? RawDirty && raw != source : FormDirty && (formDirty || agentForm?.IsDirty == true || formSource != source))) { pending = new(SourceOperation.Save, source); return; }
+        await SaveRequested.InvokeAsync(new(saved.Path, source));
+    }
+    private async Task ConfirmAsync()
+    {
+        var command = pending; pending = null;
+        if (disposed || ReadOnly || Busy || command is null || saved is null) return;
+        switch (command.Operation)
+        {
+            case SourceOperation.ToForm: await AdoptFormAsync(command.Source); break;
+            case SourceOperation.ToYaml: raw = command.Source; formView = false; error = null; await DraftChanged.InvokeAsync(IsDirty); break;
+            case SourceOperation.Save: await SaveRequested.InvokeAsync(new(saved.Path, command.Source)); break;
+        }
+    }
+    public async Task AcknowledgeAsync(PackProjectSourceDocument document)
+    {
+        if (disposed || saved?.Path != document.Path) return;
+        var previousMode = formView; Reset(document); formView = previousMode && SupportsForm;
+        if (agentForm is not null) await agentForm.AcknowledgeAsync(formSource);
+        if (!disposed) { await DraftChanged.InvokeAsync(false); await InvokeAsync(StateHasChanged); }
+    }
+    public async Task DiscardAsync()
+    {
+        if (disposed || Busy || saved is null) return;
+        await AcknowledgeAsync(newer ?? saved);
+    }
+    public void Dispose() { disposed = true; pending = null; }
+    private enum SourceOperation { ToForm, ToYaml, Save }
+    private sealed record PendingSource(SourceOperation Operation, string Source);
+}

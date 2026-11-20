@@ -14,12 +14,13 @@
                     <div class="agent-picker">
                         @foreach (var agent in FilteredAgents)
                         {
-                            var selected = Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal);
-                            <label class="agent-option @(selected ? "is-selected" : null)">
+                            var selected = IsSelected(agent);
+                            var duplicate = Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal) && !selected;
+                            <label @key="AgentKey(agent)" class="agent-option @(selected ? "is-selected" : null)">
                                 <span class="agent-avatar">@Initial(agent.Name)</span>
-                                <span class="agent-copy"><strong>@agent.Name</strong><small><code>@agent.Id</code><span>@agent.ModelProfile</span></small></span>
+                                <span class="agent-copy"><strong>@agent.Name</strong><small><code>@agent.Namespace/@agent.Id</code><ResourceScopeBadge ScopeRef="agent.ScopeRef" Compact /><span>@agent.ModelProfile</span></small>@if (duplicate) { <span class="agent-option-explanation">@T("ParticipantNameAlreadySelected")</span> }</span>
                                 <span class="agent-status">@agent.Status</span>
-                                <FormCheckbox Value="@selected" aria-label="@agent.Name" data-testid="flow-participant" data-agent-id="@agent.Id" ValueChanged="changed => ToggleParticipant(agent.Id, new ChangeEventArgs { Value = changed })" />
+                                <FormCheckbox Value="@selected" aria-label="@agent.Name" data-testid="flow-participant" data-agent-id="@agent.Id" data-agent-namespace="@agent.Namespace.Value" data-agent-scope="@agent.ScopeRef" Disabled="@duplicate" ValueChanged="changed => ToggleParticipant(agent, changed)" />
                             </label>
                         }
                         @if (!FilteredAgents.Any())
@@ -36,10 +37,10 @@
                         @foreach (var participant in Model.ParticipantIds.ToArray())
                         {
                             var index = Model.ParticipantIds.IndexOf(participant);
-                            <li>
+                            <li @key="participant">
                                 <span class="order-index">@(index + 1)</span>
-                                <span class="order-copy"><strong>@AgentName(participant)</strong><code>@participant</code></span>
-                                <span class="order-actions"><button type="button" disabled="@(index == 0)" @onclick="() => Move(participant, -1)" aria-label="@T("MoveUp", participant)">↑</button><button type="button" disabled="@(index == Model.ParticipantIds.Count - 1)" @onclick="() => Move(participant, 1)" aria-label="@T("MoveDown", participant)">↓</button></span>
+                                <span class="order-copy"><strong>@AgentName(participant)</strong><code>@(Model.ParticipantReference(participant).Namespace ?? OwnerNamespace)/@participant</code></span>
+                                <span class="order-actions"><button type="button" disabled="@(index == 0)" @onclick="() => Move(participant, -1)" aria-label="@T("MoveUp", participant)">↑</button><button type="button" disabled="@(index == Model.ParticipantIds.Count - 1)" @onclick="() => Move(participant, 1)" aria-label="@T("MoveDown", participant)">↓</button><button type="button" class="button-danger" @onclick="() => RemoveParticipant(participant)" aria-label="@T("RemoveParticipant", AgentName(participant))">×</button></span>
                             </li>
                         }
                     </ol>
@@ -58,25 +59,25 @@
                     @switch (Model.Strategy)
                     {
                         case FlowOrchestrationStrategy.Sequential:
-                            <label class="check-option"><FormCheckbox @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
+                            <label class="check-option resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Model.IncludeFullHistory" /><span><strong>@T("IncludeFullHistory")</strong><small>@T("IncludeFullHistoryHelp")</small></span></label>
                             break;
                         case FlowOrchestrationStrategy.Concurrent:
                             <p class="strategy-note"><UiIcon Name="activity" />@T("ConcurrentHelp")</p>
                             break;
                         case FlowOrchestrationStrategy.Handoff:
-                            <FormField Label="@T("InitialParticipant")"><ChildContent><ClearableSelect @bind-Value="Model.InitialParticipant" data-testid="flow-initial-participant">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect></ChildContent></FormField>
+                            <FormField Label="@T("InitialParticipant")"><ChildContent><ClearableSelect @bind-Value="Model.InitialParticipant" data-testid="flow-initial-participant">@foreach (var id in Model.ParticipantIds) { <option @key="id" value="@id">@AgentName(id)</option> }</ClearableSelect></ChildContent></FormField>
                             <div class="panel-header handoff-heading"><div><h3>@T("HandoffRoutes")</h3><p>@T("HandoffRoutesHelp")</p></div><button type="button" class="button-secondary" disabled="@(Model.ParticipantIds.Count < 2)" @onclick="AddRoute" data-testid="flow-add-route">@T("AddRoute")</button></div>
                             @for (var routeIndex = 0; routeIndex < Model.Handoffs.Count; routeIndex++)
                             {
                                 var route = Model.Handoffs[routeIndex];
                                 <div class="handoff-route" data-testid="flow-handoff-route" data-route-index="@routeIndex" @key="route">
-                                    <ClearableSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect>
+                                    <ClearableSelect @bind-Value="route.From" data-testid="flow-handoff-from">@foreach (var id in Model.ParticipantIds) { <option @key="id" value="@id">@AgentName(id)</option> }</ClearableSelect>
                                     <span>→</span>
-                                    <ClearableSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option value="@id">@AgentName(id)</option> }</ClearableSelect>
+                                    <ClearableSelect @bind-Value="route.To" data-testid="flow-handoff-to">@foreach (var id in Model.ParticipantIds) { <option @key="id" value="@id">@AgentName(id)</option> }</ClearableSelect>
                                     <button type="button" class="button-danger" @onclick="() => Model.Handoffs.Remove(route)" aria-label="@T("DeleteRoute")" data-testid="flow-remove-route">×</button>
                                 </div>
                             }
-                            <label class="check-option"><FormCheckbox @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
+                            <label class="check-option resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Model.Autonomous" data-testid="flow-autonomous-handoffs" /><span><strong>@T("AutonomousHandoffs")</strong></span></label>
                             <FormField Label="@T("MaximumTurns")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumTurnsPerParticipant" data-testid="flow-maximum-turns" /></ChildContent></FormField>
                             <FormField Label="@T("TerminationPhrase")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="Model.TerminationPhrase" data-testid="flow-termination-phrase" /></ChildContent></FormField>
                             break;
@@ -84,7 +85,7 @@
                             <FormField Label="@T("MaximumIterations")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumIterations" /></ChildContent></FormField>
                             break;
                         case FlowOrchestrationStrategy.Magentic:
-                            <FormField Label="@T("Manager")"><ChildContent><ClearableSelect @bind-Value="Model.ManagerId"><option value="">@T("SelectAgent")</option>@foreach (var agent in AvailableManagers) { <option value="@agent.Id">@agent.Name (@agent.Id)</option> }</ClearableSelect>
+                            <FormField Label="@T("Manager")"><ChildContent><ClearableSelect TValue="string" Value="@ManagerChoice" ValueChanged="SelectManager" ValueExpression="@(() => Model.ManagerId)"><option value="">@T("SelectAgent")</option>@if (!string.IsNullOrEmpty(Model.ManagerId) && SelectedManager is null) { <option value="@ManagerChoice">@(Model.ManagerTarget.Namespace ?? OwnerNamespace)/@Model.ManagerId · @Model.ManagerTarget.ScopeRef</option> }@foreach (var agent in AvailableManagers) { <option @key="AgentKey(agent)" value="@AgentKey(agent)">@agent.Name (@agent.Namespace/@agent.Id · @agent.ScopeRef)</option> }</ClearableSelect>
                             </ChildContent></FormField>
                             <div class="form-columns"><FormField Label="@T("MaximumRounds")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumRounds" /></ChildContent></FormField><FormField Label="@T("MaximumStalls")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumStalls" /></ChildContent></FormField><FormField Label="@T("MaximumResets")"><ChildContent><ClearableNumber @bind-Value="Model.MaximumResets" /></ChildContent></FormField></div>
                             break;
@@ -96,31 +97,68 @@
     </fieldset>
     <section class="panel orchestration-preview-panel" data-testid="flow-execution-preview">
         <div class="panel-header orchestration-preview-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div><StatusBadge Text="@Label(Model.Strategy)" Status="UiStatus.Info" /></div>
-        <OrchestrationPreview Model="Model" Agents="Agents" />
+        <OrchestrationPreview Model="Model" Agents="Agents" OwnerNamespace="OwnerNamespace" OwnerScope="OwnerScope" />
     </section>
 </div>
 
 @code {
+    [Parameter] public EventCallback Changed { get; set; }
+    private string? reportedDefinition;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = JsonSerializer.Serialize(Model);
+        if (reportedDefinition == current) return;
+        var initialized = reportedDefinition is not null;
+        reportedDefinition = current;
+        if (initialized) await Changed.InvokeAsync();
+    }
+
     [Parameter, EditorRequired] public OrchestrationEditorModel Model { get; set; } = null!;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SelectedCount(int count) => T(count == 1 ? "SelectedCount.One" : "SelectedCount.Many", count);
     [Parameter] public IReadOnlyList<AgentSummary> Agents { get; set; } = [];
     [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public ResourceNamespace OwnerNamespace { get; set; } = ResourceNamespace.Default;
+    [Parameter] public ResourceScopeRef? OwnerScope { get; set; }
     private string agentSearch = string.Empty;
     private IEnumerable<AgentSummary> FilteredAgents => string.IsNullOrWhiteSpace(agentSearch)
         ? Agents
-        : Agents.Where(agent => agent.Name.Contains(agentSearch, StringComparison.OrdinalIgnoreCase) || agent.Id.Contains(agentSearch, StringComparison.OrdinalIgnoreCase));
+        : Agents.Where(agent => agent.Name.Contains(agentSearch, StringComparison.OrdinalIgnoreCase) || agent.Id.Contains(agentSearch, StringComparison.OrdinalIgnoreCase) || agent.Namespace.Value.Contains(agentSearch, StringComparison.OrdinalIgnoreCase));
     private IEnumerable<AgentSummary> AvailableManagers => Agents.Where(agent => !Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal));
-    private string AgentName(string id) => Agents.FirstOrDefault(agent => agent.Id == id)?.Name ?? id;
-    private static string Initial(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
-
-    private void ToggleParticipant(string id, ChangeEventArgs eventArgs)
+    private bool Matches(AgentSummary agent, FlowTargetReference reference) => ReferenceEquals(agent,
+        OrchestrationEditorModel.FindCatalogAgent(reference, Agents, OwnerNamespace, OwnerScope));
+    private bool IsSelected(AgentSummary agent) => Model.ParticipantIds.Contains(agent.Id, StringComparer.Ordinal) && Matches(agent, Model.ParticipantReference(agent.Id));
+    private string AgentName(string id) => Agents.FirstOrDefault(agent => Matches(agent, Model.ParticipantReference(id)))?.Name ?? id;
+    private static string AgentKey(AgentSummary agent) => $"{agent.ScopeRef}|{agent.Namespace}|{agent.Id}";
+    private AgentSummary? SelectedManager => AvailableManagers.FirstOrDefault(agent => Matches(agent, Model.ManagerTarget));
+    private string ManagerChoice => string.IsNullOrEmpty(Model.ManagerId) ? string.Empty : SelectedManager is { } agent ? AgentKey(agent) : $"{Model.ManagerTarget.ScopeRef}|{Model.ManagerTarget.Namespace ?? OwnerNamespace}|{Model.ManagerId}";
+    private void SelectManager(string? key)
     {
         if (IsReadOnly) return;
-        if (eventArgs.Value is true && !Model.ParticipantIds.Contains(id, StringComparer.Ordinal)) Model.ParticipantIds.Add(id);
-        else if (eventArgs.Value is false) Model.ParticipantIds.Remove(id);
+        var agent = AvailableManagers.SingleOrDefault(value => AgentKey(value) == key);
+        Model.SelectManager(agent is null ? null : Target(agent));
+    }
+    private static FlowTargetReference Target(AgentSummary agent) => new(FlowTargetKind.Agent, agent.Id, Namespace: agent.Namespace, ScopeRef: agent.ScopeRef);
+    private static string Initial(string name) => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
+
+    private void ToggleParticipant(AgentSummary agent, bool selected)
+    {
+        if (IsReadOnly) return;
+        if (selected) Model.SelectParticipant(Target(agent));
+        else if (IsSelected(agent)) Model.RemoveParticipant(agent.Id);
+        NormalizeParticipants();
+    }
+
+    private void RemoveParticipant(string id)
+    {
+        if (IsReadOnly) return;
+        Model.RemoveParticipant(id);
+        NormalizeParticipants();
+    }
+
+    private void NormalizeParticipants()
+    {
         Model.Handoffs.RemoveAll(route => !Model.ParticipantIds.Contains(route.From, StringComparer.Ordinal) || !Model.ParticipantIds.Contains(route.To, StringComparer.Ordinal));
-        if (Model.ManagerId == id && Model.ParticipantIds.Contains(id, StringComparer.Ordinal)) Model.ManagerId = string.Empty;
         Model.EnsureStrategyDefaults();
     }
 

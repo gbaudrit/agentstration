@@ -5,8 +5,8 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <div class="model-profile-picker" data-testid="model-profile-picker">
-    <h3 class="model-profile-label" id="@labelId">@T("ModelProfile")</h3>
-    <section class="model-summary-card model-profile-summary" role="group" aria-labelledby="@labelId">
+    @if (ShowHeading) { <h3 class="model-profile-label" id="@labelId">@T("ModelProfile")</h3> }
+    <section class="model-summary-card model-profile-summary" role="group" aria-labelledby="@(ShowHeading ? labelId : null)" aria-label="@(ShowHeading ? null : T("ModelProfile"))" aria-describedby="@Field?.DescriptionId">
         <div class="model-profile-summary-header">
             <div class="model-profile-identity">
                 <span class="model-profile-symbol" aria-hidden="true"><UiIcon Name="layers" /></span>
@@ -25,7 +25,7 @@
                 </div>
             </div>
             <div class="model-profile-summary-actions">
-                <button type="button" class="button-secondary model-profile-toggle" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@catalogId" @onclick="ToggleCatalog" @ref="toggle" data-testid="model-profile-toggle">
+                <button id="@Field?.Id" type="button" class="button-secondary model-profile-toggle" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@catalogId" @onclick="ToggleCatalog" @ref="toggle" data-testid="model-profile-toggle">
                     <UiIcon Name="search" /><span>@(expanded ? T("CloseChoices") : string.IsNullOrWhiteSpace(Value) ? T("BrowseProfiles") : T("ChangeProfile"))</span>
                 </button>
                 @if (!string.IsNullOrWhiteSpace(Value)) { <FieldClearButton Label="@Shared["ClearField", T("ModelProfile")]" OnClear="ClearAsync" /> }
@@ -77,6 +77,8 @@
     [Parameter] public string Namespace { get; set; } = ResourceNamespace.Default.Value;
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool ShowHeading { get; set; } = true;
+    [CascadingParameter] private FormFieldPresentation? Field { get; set; }
     [Parameter] public EventCallback<ModelProfileSummaryResponse?> SelectedChanged { get; set; }
     [Parameter] public bool SelectFirstWhenMissing { get; set; }
     private readonly CancellationTokenSource cancellation = new();

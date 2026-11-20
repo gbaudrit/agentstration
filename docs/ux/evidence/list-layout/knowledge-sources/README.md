@@ -1,0 +1,9 @@
+# Knowledge Sources list composition
+
+Real deterministic Development Web executable with SQLite and public disposable local bootstrap. Twenty-five disabled Knowledge Sources were created through the API in Instance scope and namespace `list-layout`. A real REST-profile Data Source and the built-in published projection/retrieval Flows provide authorized exact dependency pins. The reserved `example.test` input is metadata only: no acquisition, projection, content read or Tool exposure was executed.
+
+[Desktop English, 1440×1000](desktop-en.png), [mobile French controls, 390×844](mobile-fr.png), [mobile results](mobile-fr-results.png), [source proof](source-proof.json).
+
+Both checks pass: 20 + 5 pages, name search, enabled and advanced Data Source/projection/retrieval/namespace/scope filters, no-match reset, refresh, no redundant Inspect-only menu, exact qualified source/reference links and no document horizontal overflow. References retain their own namespace/scope, falling back to the source when omitted. Creation is permission-gated and related Artifacts/ToolSets destinations retain context. Existing cell styling is retained; Flow reference content has a bounded preferred width so long names remain readable in the final desktop column while fitting cards.
+
+Six new component cases plus the existing clickable-name/reference regression pass: EN/FR, full-catalog filtering/cards/paging, refresh failure/shrink, stale context rejection, forbidden clearing, read/create permissions and distinct reference scopes/namespaces. Release Web build has no warnings. Full targeted format verification and two catalog assertions pass; the known incoming TransformationFunctionEditor inventory omission was not redundantly rerun. Full functional lanes and new reusable #1242 journey remain deferred.

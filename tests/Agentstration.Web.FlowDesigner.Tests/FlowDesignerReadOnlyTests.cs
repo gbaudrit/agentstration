@@ -136,6 +136,9 @@ public sealed partial class FlowDesignerReadOnlyTests
         public Func<FlowDesignerTarget, Task<FlowSourceResponse>>? ReadSource { get; set; }
         public List<string> SavedETags { get; } = [];
         public int SaveCount { get; private set; }
+        public int RunCount { get; private set; }
+        public FlowDesignerTarget? LastRunTarget { get; private set; }
+        public Func<FlowDesignerTarget, CreateFlowRunRequest, Task<FlowRun>>? RunOverride { get; set; }
         public int ValidationCount { get; private set; }
         public FlowGraphDefinition? LastSavedDefinition { get; private set; }
         public string? LastReplacementSource { get; private set; }
@@ -150,7 +153,7 @@ public sealed partial class FlowDesignerReadOnlyTests
             if (LoadOverride is not null) return LoadOverride(target);
             if (target.ResourceId == FailingLoadTarget) throw new InvalidOperationException("Flow load unavailable");
             var value = draft.Value;
-            return Task.FromResult(new FlowDesignerLoadResult(new(value.FlowId, value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
+            return Task.FromResult(new FlowDesignerLoadResult(new(new(target.ResourceId, target.Namespace), value.DisplayName, value.Description, value.Tags, value.Definition) { ScopeRef = target.ScopeRef ?? value.ScopeRef }, source, ETag: readOnly ? null : draft.ETag, PublishedVersion: readOnly ? "2.1.0" : null));
         }
         public Task<FlowSourceResponse> GetSourceAsync(FlowDesignerTarget target, CancellationToken cancellationToken) =>
             ReadSource?.Invoke(target) ?? Task.FromResult(new FlowSourceResponse(source, "yaml", draft.Value.Revision));
@@ -187,7 +190,11 @@ public sealed partial class FlowDesignerReadOnlyTests
                 new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent-id")),
                 new Dictionary<string, string>(), DateTimeOffset.UnixEpoch));
         }
-        public Task<FlowRun> RunDraftAsync(FlowDesignerTarget target, CreateFlowRunRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<FlowRun> RunDraftAsync(FlowDesignerTarget target, CreateFlowRunRequest request, CancellationToken cancellationToken)
+        {
+            RunCount++; LastRunTarget = target;
+            return RunOverride?.Invoke(target, request) ?? throw new NotSupportedException();
+        }
 
         private static FlowDraftResponse CreateDraft(FlowGraphDefinition? definition = null)
         {

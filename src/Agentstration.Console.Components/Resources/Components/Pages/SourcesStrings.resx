@@ -84,4 +84,21 @@
   <data name="ResolvedRevision" xml:space="preserve"><value>Resolved revision</value></data>
   <data name="ChannelContract" xml:space="preserve"><value>Binding {0} · option set {1}@{2}</value></data>
   <data name="UnavailableLocaleFallback" xml:space="preserve"><value>{0} · {1} (fallback)</value></data>
+  <data name="PublishedYamlHelp" xml:space="preserve"><value>The exact immutable published Source Version manifest. Local display, provider bindings and scheduling are configured in Definition.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Newer saved settings are available. Your form, invalid input and original ETag are retained. Discard to adopt the latest settings.</value></data>
+  <data name="SavedReceiptPending" xml:space="preserve"><value>The last command was accepted. Its saved settings must be confirmed by Refresh before another write; pending edits have been retained.</value></data>
+  <data name="InstalledPacksUnavailable" xml:space="preserve"><value>Installed Pack status is unavailable. Refresh this page before installing a Pack.</value></data>
+  <data name="RetainedProvider" xml:space="preserve"><value>Saved reference unavailable in current choices</value></data>
+  <data name="PolicySummary" xml:space="preserve"><value>{0} · interval {1}s · timeout {2}s · attempts {3} · backoff {4}–{5}s · jitter {6}s</value></data>
+  <data name="RefreshBackoffOrder" xml:space="preserve"><value>Maximum backoff must be greater than or equal to initial backoff.</value></data>
+  <data name="RefreshJitterBound" xml:space="preserve"><value>Jitter cannot exceed half the interval or 3,600 seconds.</value></data>
+  <data name="DefinitionSaved" xml:space="preserve"><value>The changed local Source settings were saved.</value></data>
+  <data name="SourceRefreshFinished" xml:space="preserve"><value>The published Source definition refresh finished.</value></data>
+  <data name="ImportManifest" xml:space="preserve"><value>Manifest</value></data>
+  <data name="ImportDestination" xml:space="preserve"><value>Destination</value></data>
+  <data name="ImportReview" xml:space="preserve"><value>Review import</value></data>
+  <data name="ImportManifestRequired" xml:space="preserve"><value>Enter an HTTP(S) manifest URL or paste a published Source Version manifest.</value></data>
+  <data name="ImportScopeRequired" xml:space="preserve"><value>Choose the destination scope.</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="PackPreviewMismatch" xml:space="preserve"><value>The returned Pack does not match the requested Source selection. Refresh the preview before continuing.</value></data>
 </root>

@@ -25,6 +25,7 @@ public sealed class ResourceAccessPanelTests
         Assert.AreEqual(cancelLabel, cut.Find("[data-testid='resource-access-open-add']").TextContent);
         Assert.AreEqual(addLabel, cut.Find("[data-testid='resource-access-add']").TextContent);
         cut.Find("[data-testid='resource-access-target']").Change(tenant.Value);
+        Assert.HasCount(1, cut.FindAll(".access-add input[role=switch]"));
         cut.FindAll(".access-add input[type='checkbox']")[2].Change(true);
         Assert.IsFalse(cut.Find("[data-testid='resource-access-save']").HasAttribute("disabled"));
         cut.Find("[data-testid='resource-access-save']").Click();
@@ -126,6 +127,43 @@ public sealed class ResourceAccessPanelTests
         context.Services.AddSingleton<IResourceScopeInventoryClient>(scopes);
         context.Services.AddSingleton<IResourceAccessPolicyClient>(policies);
         return context;
+    }
+
+    [TestMethod]
+    public void ExactResourceGenerationRefreshPreservesPendingPolicyAndReportsItsDraft()
+    {
+        var uid = Guid.NewGuid(); var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var policies = new FakePolicies(); var changes = new List<bool>();
+        using var context = Context(policies, new FakeScopes(uid, tenant));
+        var cut = context.Render<ResourceAccessPanel>(p => p
+            .Add(c => c.OwnerScopeRef, ResourceScopeRef.Instance).Add(c => c.Namespace, ResourceNamespace.Default)
+            .Add(c => c.Kind, "Agent").Add(c => c.Name, "managed-agent").Add(c => c.ResourceUid, uid)
+            .Add(c => c.Generation, 1).Add(c => c.DraftChanged, (bool value) => changes.Add(value)));
+        cut.Find("[data-testid=resource-access-open-add]").Click();
+        cut.Find("[data-testid=resource-access-target]").Change(tenant.Value);
+        cut.Find("[data-testid=resource-access-add]").Click();
+        Assert.IsTrue(changes.Last());
+        cut.Render(p => p.Add(c => c.Generation, 2));
+        Assert.HasCount(1, cut.FindAll("[data-testid=resource-access-grant]"));
+        Assert.AreEqual(1, policies.GetCalls);
+        Assert.IsNull(policies.Saved);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.AreEqual(tenant, policies.Saved!.Grants.Single().TargetScopeRef);
+        Assert.AreEqual(2L, policies.Saved.Resource.Generation);
+        Assert.IsFalse(changes.Last());
+    }
+
+    [TestMethod]
+    public void ExpectedIdentityMismatchNeverLoadsAnotherResourcesPolicy()
+    {
+        var policies = new FakePolicies();
+        using var context = Context(policies, new FakeScopes(Guid.NewGuid(), ResourceScopeRef.Tenant(Guid.NewGuid())));
+        var cut = context.Render<ResourceAccessPanel>(p => p
+            .Add(c => c.OwnerScopeRef, ResourceScopeRef.Instance).Add(c => c.Namespace, ResourceNamespace.Default)
+            .Add(c => c.Kind, "Agent").Add(c => c.Name, "managed-agent").Add(c => c.ResourceUid, Guid.NewGuid()));
+        Assert.IsEmpty(cut.FindAll(".access-identity"));
+        Assert.IsEmpty(cut.FindAll("[data-testid=resource-access-save]"));
+        Assert.AreEqual(0, policies.GetCalls);
     }
 
     private static IRenderedComponent<ResourceAccessPanel> RenderPanel(BunitContext context) => context.Render<ResourceAccessPanel>(parameters => parameters
@@ -331,7 +369,8 @@ public sealed class ResourceAccessPanelTests
         public ResourceAccessPolicy? Saved { get; private set; }
         public int PutCalls { get; private set; }
         public string? ReceivedEtag { get; private set; }
-        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) => Task.FromResult(Existing is null ? null : Existing with { ETag = CurrentEtag ?? Existing.ETag });
+        public int GetCalls { get; private set; }
+        public Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken) { GetCalls++; return Task.FromResult(Existing is null ? null : Existing with { ETag = CurrentEtag ?? Existing.ETag }); }
         public Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag, CancellationToken cancellationToken)
         {
             PutCalls++;

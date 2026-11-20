@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import { selectResourceSection } from './resource-sections.js';
 
 type FlowObservabilityMarker = keyof Pick<typeof TestIds.flowObservability,
   'flows' | 'flowDetails' | 'designer' | 'runs' | 'runDetails' | 'agentRunner' |
@@ -12,6 +13,7 @@ export class FlowObservabilityPage {
   public async open(consoleUrl: string, path: string, marker: FlowObservabilityMarker): Promise<void> {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Flow observability route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(TestIds.flowObservability[marker]).waitFor({ state: 'visible' });
   }
 
@@ -66,7 +68,7 @@ export class FlowObservabilityPage {
   }
 
   public async inspectCausalOutputs(): Promise<void> {
-    await this.page.getByRole('tab', { name: 'Causality', exact: true }).click();
+    await selectResourceSection(this.page, 'causality');
     const tree = this.page.locator('.causality-tree');
     await expect(tree.locator('.causality-node').first()).toBeVisible();
     const link = tree.locator('.causality-meta a[href^="/flow-runs/"]').first();
@@ -78,17 +80,15 @@ export class FlowObservabilityPage {
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await link.click();
     await expect(this.page.getByTestId(TestIds.flowObservability.runDetails)).toBeVisible();
-    await this.page.getByRole('tab', { name: 'Summary', exact: true }).click();
+    await selectResourceSection(this.page, 'overview');
     await expect(this.page.getByTestId(TestIds.flowObservability.runTokenUsage)).toBeVisible();
   }
 
   public async openManualRunDialog(consoleUrl: string, expectWide: boolean): Promise<void> {
     await this.open(consoleUrl, '/flows/universal-router', 'flowDetails');
     const openRun = this.page.getByTestId(TestIds.flowObservability.runOpen);
-    await expect(async () => {
-      await this.page.getByRole('button', { name: 'Runs', exact: true }).click();
-      await expect(openRun).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'runs');
+    await expect(openRun).toBeVisible();
     await openRun.click();
     const dialog = this.page.getByTestId(TestIds.flowObservability.runDialog);
     await expect(dialog).toBeVisible();
@@ -108,13 +108,17 @@ export class FlowObservabilityPage {
 
   public async openFirstTaskFlowRun(taskId: string): Promise<string> {
     requireIdentifier(taskId, 'task');
+    await selectResourceSection(this.page, 'execution');
     const link = this.page.locator(`a[href^="/tasks/${attributeValue(taskId)}/flowruns/"]`).first();
     await link.waitFor({ state: 'visible' });
     const href = await link.getAttribute('href');
     if (!href) throw new Error(`Task '${taskId}' does not expose a Flow Run link.`);
-    const runId = decodeURIComponent(href.split('/').at(-1)!);
+    const runId = decodeURIComponent(new URL(href, this.page.url()).pathname.split('/').at(-1)!);
     await link.click();
     await this.page.getByTestId(TestIds.flowObservability.taskRunDetails).waitFor({ state: 'visible' });
+    await expect(this.page.locator('[data-task-run-section=overview]')).toContainText(runId);
+    await selectResourceSection(this.page, 'execution');
+    await expect(this.page.locator('[data-task-run-section=execution] .topology-shell')).toBeVisible();
     return runId;
   }
 

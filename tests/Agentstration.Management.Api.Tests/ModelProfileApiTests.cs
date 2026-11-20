@@ -701,6 +701,60 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.AreEqual(profileNamespace.Value, resolution.Declared.ModelProfile.Namespace);
     }
 
+    [TestMethod]
+    [DataRow("default")]
+    [DataRow("team.agents")]
+    public async Task ExactAgentModelResolutionDistinguishesHomonymsAcrossOwners(string namespaceValue)
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        AgentResource inheritedAgent = null!;
+        var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var resourceNamespace = new ResourceNamespace(namespaceValue);
+        var inheritedProfile = Profile("ancestor-reasoning", ResourceScopeRef.Instance);
+        var ownedProfile = Profile("owned-reasoning", workspace);
+        using (scopes.PushInstance(context))
+        {
+            inheritedProfile = (await profiles.CreateAsync(inheritedProfile, default)).Value;
+            var agent = Agent("owner-homonym", ResourceScopeRef.Instance, new(inheritedProfile.Name, ResourceScopeRef.Instance, inheritedProfile.Namespace)) with { Metadata = new() { Name = "owner-homonym", Namespace = resourceNamespace } };
+            inheritedAgent = (await agents.PutAgentAsync(agent, null, true, default)).Value;
+        }
+        using (scopes.Push(context))
+        {
+            ownedProfile = (await profiles.CreateAsync(ownedProfile, default)).Value;
+            var agent = Agent("owner-homonym", workspace, new(ownedProfile.Name, workspace, ownedProfile.Namespace)) with { Metadata = new() { Name = "owner-homonym", Namespace = resourceNamespace } };
+            await agents.PutAgentAsync(agent, null, true, default);
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, workspace);
+        var path = resourceNamespace.IsDefault ? "/api/agents/owner-homonym/model" : $"/api/namespaces/{resourceNamespace.Value}/agents/owner-homonym/model";
+        using var hidden = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode, "An undiscoverable exact ancestor must not fall back to the visible homonym.");
+        using (scopes.PushInstance(context))
+        {
+            await policies.PutAsync(new ResourceAccessPolicy(new(inheritedAgent.Uid, ResourceScopeRef.Instance, inheritedAgent.Namespace, AgentResourceKinds.Agent, inheritedAgent.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]), null, default);
+            await policies.PutAsync(new ResourceAccessPolicy(new(inheritedProfile.Uid, ResourceScopeRef.Instance, inheritedProfile.Namespace, ModelResourceKinds.ModelProfile, inheritedProfile.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]), null, default);
+        }
+        using var inheritedReply = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        Assert.AreEqual(HttpStatusCode.OK, inheritedReply.StatusCode, await inheritedReply.Content.ReadAsStringAsync());
+        var inherited = await inheritedReply.Content.ReadFromJsonAsync<AgentModelResponse>();
+        using var ownedReply = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(workspace.Value));
+        Assert.AreEqual(HttpStatusCode.OK, ownedReply.StatusCode, await ownedReply.Content.ReadAsStringAsync());
+        var owned = await ownedReply.Content.ReadFromJsonAsync<AgentModelResponse>();
+        Assert.AreEqual(inheritedProfile.Name, inherited!.Declared.ModelProfile.Name);
+        Assert.AreEqual(ResourceScopeRef.Instance, inherited.Declared.ModelProfile.ScopeRef);
+        Assert.AreEqual(ownedProfile.Name, owned!.Declared.ModelProfile.Name);
+        Assert.AreEqual(workspace, owned.Declared.ModelProfile.ScopeRef);
+        using var absent = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Workspace(Guid.NewGuid()).Value));
+        Assert.AreEqual(HttpStatusCode.NotFound, absent.StatusCode);
+    }
+
     private static ModelProfileResource Profile(string name, ResourceScopeRef scopeRef) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -729,7 +783,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
                 DisplayName = name,
                 Instructions = "Use the selected model profile.",
                 ModelProfile = modelProfile,
-                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance, ResourceNamespace.Default)
             }
         };
 

@@ -1,0 +1,169 @@
+{
+  "screen": "Flow definition \u2014 shared Console resource screen",
+  "nativeCases": [
+    {
+      "title": "Flow metadata keeps invalid and concurrent drafts in the shared resource frame ",
+      "project": "desktop-chromium",
+      "durationMs": 17056
+    },
+    {
+      "title": "Flow metadata keeps invalid and concurrent drafts in the shared resource frame @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 16315
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+      "reportSha256": "8b799719f0e3cbfe13992a78cb426e2f0b55fde5b000dd67c4f6ca881a338e16",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor": "42940774a7262fcfcf2493079542a7fafc71cfbd514077943e40250cc7c1d6cd",
+        "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor.cs": "125a2b25f59b604fe6ce8a31e79373939f30a05b2d6d61374d1b9913202a7300",
+        "src/Agentstration.Console.Components/Console/FlowDefinitionEditorModel.cs": "d40a3cce7c646a0a3d4b24040a94ecdc2571f002bd7b8c6a20c164aacd76f268",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/FlowDetailsStrings.resx": "5c3b1593c4a3257052826206617e5e1134fdc45ab6cde416e247abe24b49df29",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/FlowDetailsStrings.fr-FR.resx": "d36df5a5f6a10c7b6d8435537b671f4f15802c604f43479da71d6eebba3ca3ea",
+        "tests/Agentstration.Console.Components.Tests/FlowDetailsDesignerTests.cs": "fbf0866a5b3a3170d88693a7cabb4a774db0addaf66c69c8f6bd8163f09e2fac",
+        "tests/Agentstration.Console.Components.Tests/FlowDetailsDesignerTests.DetailsFoundation.cs": "31cdacb0c89bacd1352a27afed53d42eed060ca9daa796c352d4c10b35ce51ba"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada"
+      },
+      "campaign": "screens-05"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "flows-agent-regression",
+      "passed": 6,
+      "sha256": "a8162993379ffcd399c9fedabb1f9d6aaac6226d7531ea0c5ff238e994347b65"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "flow-details-saved-overview-desktop-en.png",
+      "sha256": "823e716613ebd1400e5b4213788dd4dcd815439ab9620ed73faac61087f3d14b"
+    },
+    {
+      "file": "flow-details-invalid-identity-desktop-en.png",
+      "sha256": "98196363061bff1f61e642d3d8a9c196af148e597eac045bb79ee212cc518200"
+    },
+    {
+      "file": "flow-details-read-only-yaml-desktop-en.png",
+      "sha256": "eecec038abef01c91b670ee4a819906655a20bf5ecd67eb67dd077d2c0dd66bd"
+    },
+    {
+      "file": "flow-details-retained-invalid-labels-desktop-en.png",
+      "sha256": "fc92a38b9fce30ecec263aa9d310ac66319b5fd75f3e4847be49cc8a6bbfb992"
+    },
+    {
+      "file": "flow-details-concurrent-draft-and-activation-desktop-en.png",
+      "sha256": "07263518ad9bc26d1e9648edf1f45c1013d9048ecd4a25c237b24aa1519a0b1c"
+    },
+    {
+      "file": "flow-details-rejected-stale-save-desktop-en.png",
+      "sha256": "0a60463d193aaedbbae0c04e815164e3e2aab619157876ce74970ed3020f3fb0"
+    },
+    {
+      "file": "flow-details-explicit-discard-desktop-en.png",
+      "sha256": "c610f68fa9e4d55f1293e9e2e6d5a2c65fe54c3fbc19995e3ccedb2070d720ab"
+    },
+    {
+      "file": "flow-details-independent-access-desktop-en.png",
+      "sha256": "0e93f267f3c9adf15432452006639412a3a991d8d29a9d3c158389e68c03d6e2"
+    },
+    {
+      "file": "flow-details-saved-identity-after-draft-desktop-en.png",
+      "sha256": "9e7a5f07b3f171067f2b6ce81fabfbdeb81838949e3c3b8d7a834f690a55700d"
+    },
+    {
+      "file": "flow-details-saved-overview-mobile-fr.png",
+      "sha256": "7dd57b04011e0fb3a0480085d8f04309771ae947ad82477692f69063629c0a51"
+    },
+    {
+      "file": "flow-details-invalid-identity-mobile-fr.png",
+      "sha256": "c84c9db4ca8d1dbaaeb0c9c7e5311f4fe7dd82f266edfec29bda23ba0019964a"
+    },
+    {
+      "file": "flow-details-read-only-yaml-mobile-fr.png",
+      "sha256": "226a60460314e96d3e1aa7516d85319ca29bddcd6af6bb852d521d491ca7b010"
+    },
+    {
+      "file": "flow-details-retained-invalid-labels-mobile-fr.png",
+      "sha256": "4e123c93e4910b2bef0e6f4536c2f744ac2f54050659a57c4b5fcd24b3362204"
+    },
+    {
+      "file": "flow-details-concurrent-draft-and-activation-mobile-fr.png",
+      "sha256": "a0a38a441450c9cfe32d53f566a4beda87812d59142cd1fb8105eb7d5afca610"
+    },
+    {
+      "file": "flow-details-rejected-stale-save-mobile-fr.png",
+      "sha256": "8c46834f6bb88bc73572ea01f8738451145e015b4c0235bb8d4f230d4abc574b"
+    },
+    {
+      "file": "flow-details-explicit-discard-mobile-fr.png",
+      "sha256": "6eb041b269ee674c458b3d557cfcc1832c93fa10180606f3602fa9a82f8761a3"
+    },
+    {
+      "file": "flow-details-independent-access-mobile-fr.png",
+      "sha256": "49c98f6646e5ee1c4de440fcf3dda5b62df5aed7c2ae88e79d7c5a9993f68bd0"
+    },
+    {
+      "file": "flow-details-saved-identity-after-draft-mobile-fr.png",
+      "sha256": "fa61fc7b24093f3e1a2436a7b6b306d387e79d3593d5628ac1e9baa7b6326faf"
+    }
+  ],
+  "limits": [
+    "Flow metadata and the saved published header remain distinct until actual publication; no draft revision is placed in a publication-version column.",
+    "The specialized shared topology still contains inherited English generated descriptions and raw technical participant statuses. This migration preserves that renderer and does not claim its complete localization."
+  ],
+  "finalDeltaChecks": {
+    "passed": 121,
+    "overlapsEarlierGroupChecks": true,
+    "sha256": "0bb660e41b6f539e5ac21f1504a56763dc6c2330ae6d5d552eed50bdbe1553c4"
+  }
+}

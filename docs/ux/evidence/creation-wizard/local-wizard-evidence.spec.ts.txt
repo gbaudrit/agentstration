@@ -1,0 +1,31 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { test, expect } from '../src/fixtures/test.js';
+import { TestIds } from '../src/contracts/test-ids.js';
+import { ProductPages } from '../src/pages/product.pages.js';
+import { prepareConsoleJourney } from '../src/journeys/prepare-console.journey.js';
+import type { JourneyContext } from '../src/journeys/journey.js';
+import { ignoreCheckpoints } from '../src/journeys/journey.js';
+import { repositoryRoot } from '../src/fixtures/repository.js';
+
+test.use({ sourcePolicyFixture: true });
+test('maintained Source creation wizard and lifecycle @smoke', async ({ page, product }, info) => {
+  test.setTimeout(420_000);
+  if (!product.sourcePolicy) throw new Error('Source policy host required');
+  const mobile = info.project.name === 'wizard-touch';
+  const locale = mobile ? 'fr-FR' : 'en-US';
+  const theme = mobile ? 'light' : 'dark';
+  const pages = new ProductPages(page);
+  const context: JourneyContext = { ...product, pages, checkpoint: ignoreCheckpoints, theme };
+  await prepareConsoleJourney(context, {});
+  await pages.consoleAdministration.restoreLanguage(product.consoleUrl, locale);
+  await pages.ensureTheme(theme);
+  const directory = path.join(repositoryRoot, 'docs/ux/evidence/creation-wizard');
+  await fs.mkdir(directory, { recursive: true });
+  await pages.sourcePolicies.exerciseLifecycle(product.consoleUrl, product.sourcePolicy, locale, async step => {
+    await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-theme', theme);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(directory, `${locale}-${theme}-${step}.png`), fullPage: !mobile });
+    if (mobile) await page.screenshot({ path: path.join(directory, `${locale}-${theme}-${step}-full.png`), fullPage: true });
+  });
+});

@@ -350,8 +350,8 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
   planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1122, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
-  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], ['name']),
-  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
+  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}', '/triggers/{Name}/edit'], ['name']),
+  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new'], []),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
   {

@@ -1,0 +1,27 @@
+{
+  "base": "c93773c5a5c8a32ef3421e059d0007d47e5bac00",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/TaskFlowRunDetails.razor": "cd5ef0ed631522ee194cfbdbf33e3765a41cedaa32afd24c2d9e4da54d1b087d",
+    "tests/Agentstration.Console.Components.Tests/TaskFlowRunDetailsTests.Foundation.cs": "5f1e999234e00075fc3f9c8b085eac903b073406dc570967d9cdac6a51995f18",
+    "tests/Agentstration.Console.Components.Tests/TaskFlowRunDetailsTests.cs": "4864ff2297bafe106459c94bc167af28dcc6c1a2f57476b08043778b2a659d12"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "f2219d8566dc38884727abd6f680f4f2159cf71859561567116cfdac4499e643",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "6c47c71d38f319b44d11958050d6fe913bc9296bb3965925d7b862b480802293",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "f2219d8566dc38884727abd6f680f4f2159cf71859561567116cfdac4499e643",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "f2219d8566dc38884727abd6f680f4f2159cf71859561567116cfdac4499e643",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "6c47c71d38f319b44d11958050d6fe913bc9296bb3965925d7b862b480802293",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "6c47c71d38f319b44d11958050d6fe913bc9296bb3965925d7b862b480802293"
+  },
+  "phases": [
+    {
+      "name": "task-run",
+      "exitCode": 0,
+      "seconds": 70.3
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "focusedTests": 11,
+  "typeScript": "npm exec tsc -- --noEmit: exit 0"
+}

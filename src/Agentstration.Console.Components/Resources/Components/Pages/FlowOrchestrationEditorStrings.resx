@@ -82,4 +82,11 @@
   <data name="ModelProfile"><value>Model profile</value></data>
   <data name="Status"><value>Status</value></data>
   <data name="Capabilities"><value>Capabilities</value></data>
+<data name="IdentityMismatch" xml:space="preserve"><value>The returned Flow does not match this resource.</value></data>
+<data name="Validation.DisplayName" xml:space="preserve"><value>Enter a display name of 1 to 200 characters.</value></data>
+<data name="Validation.Version" xml:space="preserve"><value>Enter a valid semantic definition version.</value></data>
+<data name="Validation.Configuration" xml:space="preserve"><value>Review the orchestration participants, routes and limits before saving.</value></data>
+<data name="Validation.PublishVersion" xml:space="preserve"><value>Enter the version to publish.</value></data>
+  <data name="ParticipantNameAlreadySelected" xml:space="preserve"><value>Another Agent with this technical name is already selected. Remove it before choosing this Agent.</value></data>
+  <data name="RemoveParticipant" xml:space="preserve"><value>Remove participant {0}</value></data>
 </root>

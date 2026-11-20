@@ -1,0 +1,42 @@
+{
+  "capturedAt": "2026-11-19",
+  "productCommit": "f592c6f2570d1ffb3b86b20f77aaf6648adec240",
+  "implementationCommit": "cc5fccd6",
+  "origin": "Real standalone application. Temporary local probes reuse existing page objects; no generated images. Assemblies remained fixed throughout the campaign.",
+  "verified": "Runtime creation, saved overview, invalid options retained through section navigation and explicit discard.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "consoleComponentSuiteAtProductCommit": {
+      "passed": 776,
+      "failed": 0
+    }
+  },
+  "limits": "These captures cover desktop English dark and touch-capable mobile French light. They do not certify every owner/name combination, all keyboard paths, the complete smoke suite or final Fast/Integration lanes. No GitHub CI run is claimed.",
+  "captures": [
+    {
+      "file": "runtime-overview-desktop-en.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true
+    },
+    {
+      "file": "runtime-overview-mobile-fr.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true
+    }
+  ]
+}

@@ -1,76 +1,91 @@
-@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/artifacts"
+@implements IDisposable
 @inject IArtifactsClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts"><Actions><a class="button-secondary" href="/knowledge-sources">@T("KnowledgeSources")</a><button class="button-secondary" type="button" @onclick="LoadAsync">@T("Refresh")</button></Actions></PageHeader>
-<ResourceTabs Label="@T("Sections")"><button type="button" class="@(showDurable ? "active" : null)" @onclick="() => showDurable = true">@T("Durable") <span>@durable.Count</span></button><button type="button" class="@(showDurable ? null : "active")" @onclick="() => showDurable = false">@T("Staged") <span>@staged.Count</span></button></ResourceTabs>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (!showDurable)
+@if (showDurable)
 {
-    @if (staged.Count == 0) { <EmptyState Title="@T("NoStaged")" Message="@T("NoStagedHelp")" /> }
-    else
-    {
-        <CollectionView TItem="StagedArtifactView" Items="staged" InformationLabels="@(new string[] { T("Producer"), T("Size"), T("Expires") })" RowTestId="staged-artifact-row" IdentityLabel="@T("Artifact")" StateLabel="@T("State")">
-        <Identity Context="item">
-<ArtifactReference Href="@StagedUrl(item)" Name="@item.FileName" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></Identity>
-        <State Context="item">
-
-                        <span class="artifact-status">
-                            <StatusBadge Text="@T($"Status.{item.Status}")" Status="@Tone(item.Status)" />
-                            <HelpTooltip Text="@T($"StatusHelp.{item.Status}")" OpenToLeft />
-                        </span>
-                    </State>
-        <Information Context="item">
-            <CollectionValue Label="@T("Producer")"><ArtifactReference Href="@ProducerUrl(item.Producer)" Name="@item.Producer.Kind.ToString()" Identifier="@ProducerIdentity(item.Producer)" IdentifierLabel="@T("Identifier")" /></CollectionValue>
-            <CollectionValue Label="@T("Size")">@Size(item.Length)</CollectionValue>
-            <CollectionValue Label="@T("Expires")">@item.ExpiresAt.ToLocalTime().ToString("g")</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@item.FileName"><a href="@StagedUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
-    </CollectionView>
-    }
+    <ResourceCollectionTemplate TItem="FlowRunArtifactResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts" ContextKey="@($"{contextKey}|durable")"
+                                IdentityColumn="DurableIdentity" Columns="DurableColumns" Items="DurableItems" RowTestId="durable-artifact-row"
+                                Query="durableQuery" QueryChanged="ChangeDurableQueryAsync" Pagination="DurablePagination" LoadState="loadState" Disabled="@(!interactive)"
+                                SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                                EmptyTitle="@T("NoDurable")" EmptyMessage="@T("NoDurableHelp")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+        <Navigation>@Sections</Navigation><Actions>@RelatedAction</Actions>
+    </ResourceCollectionTemplate>
 }
 else
 {
-    @if (durable.Count == 0) { <EmptyState Title="@T("NoDurable")" Message="@T("NoDurableHelp")" /> }
-    else
-    {
-        <CollectionView TItem="FlowRunArtifactResource" Items="durable" InformationLabels="@(new string[] { T("FlowRun"), T("Producer"), T("Storage"), T("MediaType"), T("Size"), T("Created") })" RowTestId="durable-artifact-row" IdentityLabel="@T("Artifact")">
-        <Identity Context="item">
-<ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" /></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("FlowRun")"><ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" /></CollectionValue>
-            <CollectionValue Label="@T("Producer")">@if (item.ProducerResource is { } producer) { <a class="text-button" href="@ArtifactResourceLinks.Producer(producer)">@producer.Name</a> }<code>@item.ProducerFlowStepId</code></CollectionValue>
-            <CollectionValue Label="@T("Storage")">@if (item.Receipt.Materialization is { } location) { <a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a> }</CollectionValue>
-            <CollectionValue Label="@T("MediaType")">@item.Receipt.MediaType</CollectionValue>
-            <CollectionValue Label="@T("Size")">@Size(item.Receipt.Length)</CollectionValue>
-            <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@DurableName(item)"><a href="@DurableUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
-    </CollectionView>
-    }
+    <ResourceCollectionTemplate TItem="StagedArtifactView" Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts" ContextKey="@($"{contextKey}|staged")"
+                                IdentityColumn="StagedIdentity" Columns="StagedColumns" Items="StagedItems" RowTestId="staged-artifact-row"
+                                Query="stagedQuery" QueryChanged="ChangeStagedQueryAsync" Pagination="StagedPagination" LoadState="loadState" Disabled="@(!interactive)"
+                                SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                                EmptyTitle="@T("NoStaged")" EmptyMessage="@T("NoStagedHelp")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+        <Navigation>@Sections</Navigation><Actions>@RelatedAction</Actions>
+    </ResourceCollectionTemplate>
 }
 
 @code {
-    private IReadOnlyList<StagedArtifactView> staged = [];
-    private IReadOnlyList<FlowRunArtifactResource> durable = [];
-    private bool loading = true, showDurable = true;
-    private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { var stagedTask = Client.GetStagedAsync(); var durableTask = Client.GetDurableAsync(); await Task.WhenAll(stagedTask, durableTask); staged = (await stagedTask).OrderByDescending(value => value.CreatedAt).ToArray(); durable = (await durableTask).OrderByDescending(value => value.CreatedAt).ToArray(); } catch (Exception exception) { error = exception.Message; } finally { loading = false; } }
-    private static string StagedUrl(StagedArtifactView artifact) => $"/artifacts/staged/{artifact.ArtifactId}";
-    private static string DurableUrl(FlowRunArtifactResource artifact) => $"/artifacts/durable/{artifact.ArtifactId}";
-    private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
-    private static string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
-        ? FlowRunUrl(producer.FlowRunId)
-        : producer.RuntimeRunId is not null ? $"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}" : null;
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private RenderFragment RelatedAction => @<a class="button-secondary" href="@Navigate("/knowledge-sources")">@T("KnowledgeSources")</a>;
+    private RenderFragment Sections => @<ResourceTabs Label="@T("Sections")"><button type="button" class="@(showDurable ? "active" : null)" disabled="@(!interactive)" @onclick="() => showDurable = true">@T("Durable") @if (durable is not null) { <span>@durable.Count</span> }</button><button type="button" class="@(showDurable ? null : "active")" disabled="@(!interactive)" @onclick="() => showDurable = false">@T("Staged") @if (staged is not null) { <span>@staged.Count</span> }</button></ResourceTabs>;
+    private CollectionColumn<FlowRunArtifactResource> DurableIdentity => new("identity", T("Artifact"), item => @<ArtifactReference Href="@DurableUrl(item)" Name="@DurableName(item)" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" />);
+    private IReadOnlyList<CollectionColumn<FlowRunArtifactResource>> DurableColumns =>
+    [
+        new("run", T("FlowRun"), item => @<ArtifactReference Href="@FlowRunUrl(item.ProducerFlowRunId)" Name="@T("FlowRun")" Identifier="@item.ProducerFlowRunId" IdentifierLabel="@T("Identifier")" />)
+        {
+            Filters = [new("run", T("FlowRun"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("producer", T("Producer"), item => @<text>@if (item.ProducerResource is { } producer) { <a class="text-button" href="@(ArtifactResourceLinks.Producer(producer) is { } url ? Navigate(url) : null)">@producer.Name</a><br /> }<code>@item.ProducerFlowStepId</code></text>)
+        {
+            Filters = [new("producer", T("Producer"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("storage", T("Storage"), item => @<text>@if (item.Receipt.Materialization is { } location) { <a class="text-button" href="@Navigate(ArtifactResourceLinks.Storage(location))">@location.Target.Storage.Storage.Name</a> }</text>)
+        {
+            Filters = [new("storage", T("Storage"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("media", T("MediaType"), item => @<span>@item.Receipt.MediaType</span>)
+        {
+            Filters = [new("media", T("MediaType"), CollectionFilterKind.Choice) { Options = (durable ?? []).Select(item => item.Receipt.MediaType).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray() }]
+        },
+        new("size", T("Size"), item => @<span>@Size(item.Receipt.Length)</span>)
+        {
+            Filters = [new("size", T("SizeBytes"), CollectionFilterKind.Number) { Advanced = true }]
+        },
+        new("created", T("Created"), item => @<time datetime="@item.CreatedAt.ToString("O")">@item.CreatedAt.ToLocalTime().ToString("g")</time>)
+    ];
+    private CollectionColumn<StagedArtifactView> StagedIdentity => new("identity", T("Artifact"), item => @<text>
+        <ArtifactReference Href="@StagedUrl(item)" Name="@item.FileName" Identifier="@item.ArtifactId.ToString()" IdentifierLabel="@T("Identifier")" />
+        <span class="artifact-status"><StatusBadge Text="@T($"Status.{StatusKey(item.Status)}")" Status="@Tone(item.Status)" /><HelpTooltip Text="@T($"StatusHelp.{StatusKey(item.Status)}")" OpenToLeft /></span>
+    </text>)
+    {
+        Filters = [new("status", T("State"), CollectionFilterKind.Choice) { Options = Enum.GetValues<StagedArtifactStatus>().Select(value => new CollectionFilterOption(value.ToString(), T($"Status.{value}"))).Append(new("Unknown", T("Status.Unknown"))).ToArray() }]
+    };
+    private IReadOnlyList<CollectionColumn<StagedArtifactView>> StagedColumns =>
+    [
+        new("producer", T("Producer"), item => @<ArtifactReference Href="@ProducerUrl(item.Producer)" Name="@ProducerLabel(item.Producer.Kind)" Identifier="@ProducerIdentity(item.Producer)" IdentifierLabel="@T("Identifier")" />)
+        {
+            Filters = [new("producer", T("ProducerId"), CollectionFilterKind.Text) { Advanced = true }, new("kind", T("ProducerKind"), CollectionFilterKind.Choice) { Options = Enum.GetValues<ArtifactProducerKind>().Select(value => new CollectionFilterOption(value.ToString(), ProducerLabel(value))).ToArray() }]
+        },
+        new("size", T("Size"), item => @<span>@Size(item.Length)</span>)
+        {
+            Filters = [new("size", T("SizeBytes"), CollectionFilterKind.Number) { Advanced = true }]
+        },
+        new("expires", T("Expires"), item => @<time datetime="@item.ExpiresAt.ToString("O")">@item.ExpiresAt.ToLocalTime().ToString("g")</time>)
+    ];
+    private string StagedUrl(StagedArtifactView artifact) => Navigate($"/artifacts/staged/{artifact.ArtifactId}");
+    private string DurableUrl(FlowRunArtifactResource artifact) => Navigate($"/artifacts/durable/{artifact.ArtifactId}");
+    private string FlowRunUrl(string id) => Navigate($"/flow-runs/{Uri.EscapeDataString(id)}");
+    private string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
+        ? FlowRunUrl(producer.FlowRunId) : producer.RuntimeRunId is not null ? Navigate($"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}") : null;
     private static string ProducerIdentity(ArtifactProducer producer) => producer.FlowRunId ?? producer.RuntimeRunId ?? producer.Id;
-    private static string DurableName(FlowRunArtifactResource artifact) => artifact.Receipt.Provenance.TryGetValue("fileName", out var fileName)
-        && !string.IsNullOrWhiteSpace(fileName) ? fileName : artifact.ArtifactId.ToString();
-    private static UiStatus Tone(StagedArtifactStatus status) => status switch { StagedArtifactStatus.Sealed or StagedArtifactStatus.Persisted => UiStatus.Success, StagedArtifactStatus.Failed or StagedArtifactStatus.Expired => UiStatus.Warning, StagedArtifactStatus.Purged or StagedArtifactStatus.Discarded => UiStatus.Neutral, _ => UiStatus.Info };
-    private static string Size(long value) => value < 1024 ? $"{value} B" : value < 1024 * 1024 ? $"{value / 1024d:F1} KB" : $"{value / 1024d / 1024d:F1} MB";
+    private static string DurableName(FlowRunArtifactResource artifact) => artifact.Receipt.Provenance.TryGetValue("fileName", out var fileName) && !string.IsNullOrWhiteSpace(fileName) ? fileName : artifact.ArtifactId.ToString();
+    private static string StatusKey(StagedArtifactStatus status) => Enum.IsDefined(status) ? status.ToString() : "Unknown";
+    private string ProducerLabel(ArtifactProducerKind kind) => T($"ProducerKind.{(Enum.IsDefined(kind) ? kind.ToString() : "Unknown")}");
+    private static UiStatus Tone(StagedArtifactStatus status) => status switch { StagedArtifactStatus.Sealed or StagedArtifactStatus.Persisted => UiStatus.Success, StagedArtifactStatus.Failed or StagedArtifactStatus.Expired => UiStatus.Warning, StagedArtifactStatus.Purged or StagedArtifactStatus.Discarded => UiStatus.Neutral, StagedArtifactStatus.Open or StagedArtifactStatus.Persisting or StagedArtifactStatus.Purging => UiStatus.Info, _ => UiStatus.Neutral };
+    private string Size(long value) => value < 1024 ? T("ExactBytes", value) : value < 1024 * 1024 ? T("SizeKilobytes", value / 1024d) : T("SizeMegabytes", value / 1024d / 1024d);
 }

@@ -1,5 +1,6 @@
 @using static Agentstration.Web.FlowDesigner.Components.FlowInspectorPresentation
 @inject IStringLocalizer<FlowDesignerStrings> Localizer
+@inject NavigationManager Navigation
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
@@ -10,7 +11,7 @@
                 <label for="flow-call-reference">@T("CalledFlow")</label>
                 @if (SelectedFlow is { } selectedFlow)
                 {
-                    <a class="inspector-resource-link" href="@FlowUrl(selectedFlow)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
+                    <a class="inspector-resource-link" href="@PreserveNavigationContext(FlowUrl(selectedFlow), Navigation.Uri)" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenFlowInNewTab")"><UiIcon Name="external-link" />@T("OpenFlow")</a>
                 }
             </div>
             <ClearableText UpdateOnInput="false" id="flow-call-reference" data-testid="flow-call-reference" Disabled="@ReadOnly" list="flow-targets" Value="@SelectionValue" ValueChanged="changed => UpdateFlowTargetAsync.InvokeAsync(new ChangeEventArgs { Value = changed })" />

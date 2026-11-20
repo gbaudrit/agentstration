@@ -1,17 +1,27 @@
 @page "/settings/organization/members"
-@inject Agentstration.Web.Console.IIdentityAdministrationApiClient Client
+@implements IDisposable
+@inject IIdentityAdministrationApiClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<OrganizationStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Members") · @T("Organization") · Agentstration</PageTitle>
-<PageHeader Title="@T("Members")" Description="@T("Members.Description")" />
-<OrganizationSettingsNav />
-<div data-testid="console-admin-organization-members">
+<ResourceCollectionTemplate TItem="OrganizationMemberResponse" Title="@T("Members")" Description="@T("Members.Description")" TestId="console-admin-organization-members" ContextKey="@contextKey"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="PageItems" RowTestId="organization-member-row"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive || savingAccount)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("NoMembers")" EmptyMessage="@T("NoMembersMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation><OrganizationSettingsNav /></Navigation>
+    <PrimaryActions>@if (canManageLocalAccounts) { <a class="button-primary" href="#organization-local-accounts">@T("CreateLocalAccount")</a> }</PrimaryActions>
+</ResourceCollectionTemplate>
 
+<div id="organization-local-accounts">
 @if (canManageLocalAccounts)
 {
     <FormSection Title="@T("LocalAccounts")" style="margin-bottom:18px"><ChildContent>
         @if (!string.IsNullOrWhiteSpace(accountMessage)) { <p class="form-alert @(accountError ? "form-alert-danger" : "form-alert-success")">@accountMessage</p> }
-        <CascadingValue Value="AccountContext"><FormDraftMonitor InvalidInputChanged="value => invalidAccount = value" /><ValidationSummary />
+        <CascadingValue @key="AccountContext" Value="AccountContext"><FormDraftMonitor InvalidInputChanged="value => invalidAccount = value" /><ValidationSummary />
         <FormGrid>
             <FormField Label="@T("Username")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newUserName" autocomplete="off" /></ChildContent></FormField>
             <FormField Label="@T("DisplayName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="newDisplayName" /></ChildContent></FormField>
@@ -38,58 +48,23 @@
     </ChildContent></FormSection>
 }
 
-@if (view is null) { <LoadingState Message="@T("LoadingMembers")" /> }
-else if (view.Members.Count == 0) { <EmptyState Title="@T("NoMembers")" Message="@T("NoMembersMessage")" /> }
-else
-{
-    <CollectionView TItem="Agentstration.Identity.Contracts.OrganizationMemberResponse" Items="view.Members" InformationLabels="@(new string[] { T("Identity"), T("AssignedAccess") })" IdentityLabel="@T("Member")" StateLabel="@T("Membership")">
-        <Identity Context="member">
-<CollectionIdentity DisplayName="@member.Principal.DisplayName" Name="@member.Principal.Id.ToString()" Href="@($"/settings/organization/members/{member.Principal.Id:D}")" IconName="user" ><IconBadges><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="UiStatus.Success" IconOnly /></IconBadges></CollectionIdentity><small>@(member.Principal.Email ?? T("NoEmail"))</small></Identity>
-        <Information Context="member">
-            <CollectionValue Label="@T("Identity")">@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</CollectionValue>
-            <CollectionValue Label="@T("AssignedAccess")">@if(member.Roles.Count == 0){<span>@T("None")</span>}else{@foreach(var assigned in member.Roles){<div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div>}}</CollectionValue>
-        </Information>
-    </CollectionView>
-}
 </div>
 
 @code {
-    private Agentstration.Identity.Contracts.OrganizationAdministrationResponse? view;
-    private IReadOnlyList<Agentstration.Identity.Contracts.LocalAccountResponse> localAccounts = [];
-    private bool canManageLocalAccounts; private bool savingAccount; private bool accountError;
-    private string newUserName = ""; private string newDisplayName = ""; private string? newEmail; private string newPassword = "";
-    private EditContext? accountContext;
-    private EditContext AccountContext => accountContext ??= new(this);
-    private bool invalidAccount;
-    private Guid newWorkspaceId; private string newRole = Agentstration.Identity.Contracts.BuiltInIdentityRoleNames.Member; private string? accountMessage;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    protected override async Task OnInitializedAsync()
+    private CollectionColumn<OrganizationMemberResponse> IdentityColumn => new("member", T("Member"), member => @<text><CollectionIdentity DisplayName="@member.Principal.DisplayName" Name="@member.Principal.Id.ToString("D")" Href="@MemberUrl(member)" IconName="user"><IconBadges><StatusBadge Text="@T($"Status.{member.Membership.Status}")" Status="@(member.Membership.Status == MembershipStatus.Active ? UiStatus.Success : UiStatus.Warning)" IconOnly /></IconBadges></CollectionIdentity><small>@(member.Principal.Email ?? T("NoEmail"))</small></text>)
     {
-        view = await Client.GetOrganizationAsync(default);
-        var capabilities = await Client.GetCapabilitiesAsync(default);
-        newWorkspaceId = capabilities.WorkspaceId;
-        canManageLocalAccounts = capabilities.SupportsLocalAccounts && capabilities.IsPlatformAdministrator;
-        if (canManageLocalAccounts) localAccounts = await Client.GetLocalAccountsAsync(default);
-    }
-    private async Task CreateAccountAsync()
-    {
-        if (invalidAccount) return;
-        savingAccount = true; accountMessage = null;
-        try
+        Filters = [new("membership", T("Membership"), CollectionFilterKind.Choice) { Options = [new("Active", T("Status.Active")), new("Suspended", T("Status.Suspended"))] }]
+    };
+    private IReadOnlyList<CollectionColumn<OrganizationMemberResponse>> Columns =>
+    [
+        new("identity", T("Identity"), member => @<text>@(member.ExternalIdentities.Count == 0 ? T("Unlinked") : T("ExternalIdentityCount", member.ExternalIdentities.Count))</text>),
+        new("access", T("AssignedAccess"), member => @<text>@if (member.Roles.Count == 0) { <span>@T("None")</span> } else { @foreach (var assigned in member.Roles) { <div><strong>@assigned.Role.DisplayName</strong> <small>@ScopeLabel(assigned.Scope)</small></div> } }</text>)
         {
-            var account = await Client.CreateLocalAccountAsync(new(newUserName, newPassword, newDisplayName, newEmail, newWorkspaceId, newRole), default);
-            accountError = false; accountMessage = T("AccountCreated", account.UserName);
-            newUserName = newDisplayName = newPassword = ""; newEmail = null;
-            localAccounts = await Client.GetLocalAccountsAsync(default);
-            view = await Client.GetOrganizationAsync(default);
+            Filters = [new("role", T("Role"), CollectionFilterKind.Choice) { Options = (view?.Members ?? []).SelectMany(member => member.Roles).Select(assigned => assigned.Role).DistinctBy(role => role.Id).OrderBy(role => role.DisplayName, StringComparer.OrdinalIgnoreCase).Select(role => new CollectionFilterOption(role.Id.ToString("D"), role.DisplayName)).ToArray() },
+                       new("scope", T("Scope"), CollectionFilterKind.Choice) { Advanced = true, Options = (view?.Members ?? []).SelectMany(member => member.Roles).Select(assigned => assigned.Scope).Distinct(StringComparer.Ordinal).Order().Select(scope => new CollectionFilterOption(scope, ScopeLabel(scope))).ToArray() }]
         }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { accountError = true; accountMessage = exception.Message; }
-        finally { savingAccount = false; }
-    }
-    private async Task SetEnabledAsync(Agentstration.Identity.Contracts.LocalAccountResponse account, bool enabled)
-    {
-        try { await Client.SetLocalAccountEnabledAsync(account.AccountId, enabled, default); localAccounts = await Client.GetLocalAccountsAsync(default); accountError = false; accountMessage = T(enabled ? "AccountEnabled" : "AccountDisabled", account.UserName); }
-        catch (Agentstration.Web.Console.AgentstrationApiException exception) { accountError = true; accountMessage = exception.Message; }
-    }
+    ];
+    private string MemberUrl(OrganizationMemberResponse member) => ResourceOwnershipContext.PreserveNavigation($"/settings/organization/members/{member.Principal.Id:D}", Services);
     private string ScopeLabel(string scope) => scope.StartsWith("/tenants/", StringComparison.Ordinal) ? T("TenantInherited") : view?.Workspaces.FirstOrDefault(workspace => scope == AuthorizationScopes.Workspace(workspace.Id)) is { } workspace ? T("WorkspaceScope", workspace.DisplayName) : scope;
 }

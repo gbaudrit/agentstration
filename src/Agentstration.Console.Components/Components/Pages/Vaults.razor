@@ -1,37 +1,53 @@
-@inject IServiceProvider Services
 @page "/vaults"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject ISecretsClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Vaults") · Agentstration</PageTitle>
-<PageHeader Title="@T("Vaults")" Description="@T("Vaults.Description")" TestId="resource-vaults"><Actions><a class="button-primary" href="/vaults/new">@T("CreateVault")</a></Actions></PageHeader>
-<ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
-@if (loading) { <LoadingState Message="@T("LoadingVaults")" /> }
-else if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
-else if (items.Count == 0) { <EmptyState Title="@T("NoVaults")" Message="@T("NoVaultsMessage")" /> }
-else
-{
-    <CollectionView TItem="VaultResponse" Items="items" InformationLabels="@(new string[] { T("Provider"), T("Location") })" >
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral" ><IconBadges><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Provider")">@ProviderText(item.Resource.Definition.ProviderType)</CollectionValue>
-            <CollectionValue Label="@T("Location")">@T("Local")</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Resource.Definition.DisplayName} ({item.Resource.Namespace}/{item.Resource.Name}, {item.Resource.ScopeRef})")"><a href="@ResourceUrl(item.Resource)">@T("ManageArrow")</a></CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="VaultResponse" Title="@T("Vaults")" Description="@T("Vaults.Description")" TestId="resource-vaults"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("NoVaults")" EmptyMessage="@T("NoVaultsMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation><ResourceTabs Label="@T("SecretManagement")"><a href="@Navigate("/secrets")">@T("Secrets")</a><a class="active" href="@Navigate("/vaults")">@T("Vaults")</a></ResourceTabs></Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<VaultResponse> items = [];
-    private bool loading = true;
-    private Exception? error;
     private string T(string key) => Localizer[key].Value;
-    private string StatusText(string status) => status.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T("Status.Unknown") };
-    private string ProviderText(string provider) => T($"Provider.{provider}");
-    private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
-    protected override async Task OnInitializedAsync() { try { items = await Client.GetVaultsAsync(cancellation.Token); } catch (Exception ex) { error = ex; } finally { loading = false; } }
+    private string StatusText(string status) => T($"Status.{StatusValue(status)}");
+    private string ProviderText(string provider) { var text = Localizer[$"Provider.{provider}"]; return text.ResourceNotFound ? provider : text.Value; }
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/vaults/new")">@T("CreateVault")</a></PermissionGate> : null;
+    private CollectionColumn<VaultResponse> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral">
+        <IconBadges><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Resource.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("status", T("Status"), CollectionFilterKind.Choice)
+        {
+            Options = new[] { "Available", "Unavailable", "Uninitialized", "Unknown" }.Select(value => new CollectionFilterOption(value, StatusText(value))).ToArray()
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<VaultResponse>> Columns =>
+    [
+        new("provider", T("Provider"), item => @<span>@ProviderText(item.Resource.Definition.ProviderType)</span>)
+        {
+            Filters = [new("provider", T("Provider"), CollectionFilterKind.Choice)
+            {
+                Options = (items ?? []).Select(item => item.Resource.Definition.ProviderType).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, ProviderText(value))).ToArray()
+            }]
+        },
+        new("location", T("Location"), item => @<span>@T("Local")</span>)
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters => [new("scope", Shared["Scope"], CollectionFilterKind.Choice)
+    {
+        Options = (items ?? []).Select(item => item.Resource.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
+    }];
+    private static string StatusValue(string status) => status.ToLowerInvariant() switch { "available" => "Available", "unavailable" => "Unavailable", "uninitialized" => "Uninitialized", _ => "Unknown" };
     private static UiStatus Tone(string value) => value.ToLowerInvariant() switch { "available" => UiStatus.Success, "unavailable" or "uninitialized" => UiStatus.Danger, _ => UiStatus.Neutral };
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private string ResourceUrl(VaultResource resource) => Navigate($"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}");
 }

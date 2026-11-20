@@ -23,6 +23,12 @@ public sealed class TaskDetailsLocalizationTests
             var run = services.GetRequiredService<IStringLocalizer<TaskFlowRunDetailsStrings>>();
 
             Assert.AreEqual("Annuler cette tâche ?", task["CancelTitle"].Value);
+            Assert.AreEqual("Tâche", task["Task"].Value);
+            Assert.AreEqual("Terminée", task["ActionStatus.Completed"].Value);
+            Assert.AreEqual("Saisie requise", task["ActionKind.InputRequired"].Value);
+            Assert.AreEqual("Résultat structuré", task["ResultKind.Structured"].Value);
+            Assert.AreEqual("Tâche terminée", task["ActivityType.TaskCompleted"].Value);
+            StringAssert.Contains(task["OperationUnconfirmed"].Value, "Votre réponse est conservée");
             Assert.AreEqual("Ouvrir la tâche dans le Workplace", task["OpenTaskInWorkplace"].Value);
             Assert.AreEqual("FlowRun introuvable", run["NotFoundTitle"].Value);
             Assert.AreEqual("Entrée résolue", run["ResolvedInput"].Value);

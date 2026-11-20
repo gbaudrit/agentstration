@@ -1,10 +1,12 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
-<div class="search-box"><label class="sr-only" for="@controlId">@(Label ?? Localizer["Search"])</label><span aria-hidden="true">⌕</span><ClearableText Type="search" id="@controlId" Value="@Value" ValueChanged="Changed" placeholder="@(Placeholder ?? Localizer["Search"])" /></div>
+<div class="search-box"><label class="sr-only" for="@controlId">@(Label ?? Localizer["Search"])</label><span aria-hidden="true">⌕</span><ClearableText Type="search" id="@controlId" Value="@Value" ValueChanged="Changed" Disabled="Disabled" UpdateOnInput="UpdateOnInput" placeholder="@(Placeholder ?? Localizer["Search"])" /></div>
 @code {
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? Placeholder { get; set; }
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool UpdateOnInput { get; set; } = true;
     private readonly string controlId = $"search-{Guid.NewGuid():N}";
     private Task Changed(string? value) => ValueChanged.InvokeAsync(value ?? string.Empty);
 }

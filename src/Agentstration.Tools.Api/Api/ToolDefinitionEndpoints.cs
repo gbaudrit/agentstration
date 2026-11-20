@@ -55,20 +55,28 @@ internal static class ToolDefinitionEndpoints
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
     }
 
-    private static Task<IResult> UsagesAsync(string name, string? @namespace, ToolDefinitionService service,
-        CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
-            Results.Ok(new ValueResponse<ToolDefinitionUsage>(await service.ListUsagesAsync(name,
-                ResourceNamespace.Parse(@namespace), cancellationToken))));
+    private static Task<IResult> UsagesAsync(string name, string? @namespace, string? scopeRef, ToolDefinitionService service,
+        ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+        {
+            var target = string.IsNullOrWhiteSpace(scopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(target, current, scopes);
+            return Results.Ok(new ValueResponse<ToolDefinitionUsage>(await service.ListUsagesAsync(name,
+                ResourceNamespace.Parse(@namespace), target, cancellationToken)));
+        });
 
-    private static Task<IResult> VersionsAsync(string name, string? @namespace, ToolDefinitionService service,
-        CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
-            Results.Ok(new ValueResponse<ToolDefinitionVersionResource>(await service.ListVersionsAsync(name,
-                ResourceNamespace.Parse(@namespace), cancellationToken))));
+    private static Task<IResult> VersionsAsync(string name, string? @namespace, string? scopeRef, ToolDefinitionService service,
+        ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+        {
+            var target = string.IsNullOrWhiteSpace(scopeRef) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(target, current, scopes);
+            return Results.Ok(new ValueResponse<ToolDefinitionVersionResource>(await service.ListVersionsAsync(name,
+                ResourceNamespace.Parse(@namespace), target, cancellationToken)));
+        });
 
     private static Task<IResult> PublishAsync(string name, string? @namespace, PublishToolDefinitionRequest body,
-        ToolDefinitionService service, CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
+        ToolDefinitionService service, IResourceScopeOperations scopeOperations, CancellationToken cancellationToken) => ToolsApiHttp.ExecuteAsync(async () =>
             Results.Created($"/api/tooldefinitions/{Uri.EscapeDataString(name)}/versions/{Uri.EscapeDataString(body.Version)}",
-                await service.PublishAsync(name, ResourceNamespace.Parse(@namespace), body.Version, cancellationToken, body.ExpectedETag)));
+                await service.PublishAsync(scopeOperations.DefaultScopeRef(ToolResourceKinds.ToolDefinition), name, ResourceNamespace.Parse(@namespace), body.Version, cancellationToken, body.ExpectedETag)));
 
     private static Task<IResult> ListAsync(string? @namespace, ToolDefinitionService service, ICurrentRequestContext current,
         IRequestContextScopeFactory scopes, CancellationToken cancellationToken) =>
@@ -160,19 +168,21 @@ internal static class ToolDefinitionEndpoints
         HttpRequest request,
         HttpResponse response,
         ToolDefinitionService service,
+        IResourceScopeOperations scopeOperations,
         CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () => ToolsApiHttp.ResourceResult(
-            await service.SetEnabledAsync(name, ResourceNamespace.Parse(@namespace), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
+            await service.SetEnabledAsync(scopeOperations.DefaultScopeRef(ToolResourceKinds.ToolDefinition), name, ResourceNamespace.Parse(@namespace), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
 
     private static Task<IResult> DeleteAsync(
         string name,
         string? @namespace,
         HttpRequest request,
         ToolDefinitionService service,
+        IResourceScopeOperations scopeOperations,
         CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
-            await service.DeleteAsync(name, ResourceNamespace.Parse(@namespace), ToolsApiHttp.IfMatch(request), cancellationToken);
+            await service.DeleteAsync(scopeOperations.DefaultScopeRef(ToolResourceKinds.ToolDefinition), name, ResourceNamespace.Parse(@namespace), ToolsApiHttp.IfMatch(request), cancellationToken);
             return Results.NoContent();
         });
 

@@ -2,136 +2,84 @@
 @implements IDisposable
 @inject IServiceProvider Services
 @inject IModelProfilesClient Client
-@inject IModelProvidersClient ProvidersClient
+@inject ConsoleContextState Context
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-model-profiles">
-    <Actions><a class="button-primary" href="/modelprofiles/new">@T("CreateModelProfile")</a></Actions>
-</PageHeader>
-
-<FilterBar>
-    <SearchBox Value="@search" ValueChanged="SearchChanged" Placeholder="@T("SearchPlaceholder")" />
-    <select @bind="providerFilter" aria-label="@T("FilterByProvider")"><option value="">@T("AllProviders")</option>@foreach (var provider in providers) { <option value="@provider.Name">@provider.Properties.DisplayName</option> }</select>
-    <select @bind="statusFilter" aria-label="@T("FilterByStatus")"><option value="">@T("AllStatuses")</option><option value="available">@T("Status.Available")</option><option value="unavailable">@T("Status.Unavailable")</option><option value="incompatible">@T("Status.Incompatible")</option><option value="unknown">@T("Status.Unknown")</option></select>
-    <button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@T("ApplyFilters")</button>
-</FilterBar>
-
-@if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (loading && profiles is null)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (FilteredProfiles.Count == 0)
-{
-    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/modelprofiles/new">@T("CreateModelProfile")</a></EmptyState>
-}
-else
-{
-    <CollectionView TItem="ModelProfileSummaryResponse" Items="FilteredProfiles" InformationLabels="@(new[] { T("Provider"), T("Model"), T("Usage") })">
-        <Identity Context="profile"><CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model"><IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="profile">
-            <CollectionValue Label="@T("Provider")">@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</CollectionValue>
-            <CollectionValue Label="@T("Model")"><code>@profile.Properties.Model.Name</code></CollectionValue>
-            <CollectionValue Label="@T("Usage")">@(profile.Properties.UsageCount is { } count ? AgentCount(count) : "—")</CollectionValue>
-        </Information>
-        <Actions Context="profile"><CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")">
-            <a href="@DetailsUrl(profile)">@T("Open")</a>
-            @if (!profile.IsManaged && ResourceOwnershipContext.CanManage(profile.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></PermissionGate> }
-        </CollectionActions></Actions>
-    </CollectionView>
-}
-
-@if (deleteConflictUsages.Count > 0)
-{
-    <section class="panel resource-section"><div class="panel-header"><h2>@T("DeleteConflictTitle")</h2></div><p>@T("DeleteConflictMessage", AgentCount(deleteConflictUsages.Count))</p><ul>@foreach (var usage in deleteConflictUsages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent"><IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges></CollectionIdentity></li> }</ul></section>
-}
+<ResourceCollectionTemplate TItem="ModelProfileSummaryResponse" Title="@T("Title")" Description="@T("Description")" TestId="resource-model-profiles"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey" ItemActions="RowActions"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive || operationBusy)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="RefreshAsync" OnRetry="RetryAsync" Feedback="OperationFeedback" />
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteDialogTitle")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ModelProfileSummaryResponse>? profiles; private IReadOnlyList<ModelProviderResponse> providers = [];
-    private IReadOnlyList<ModelProfileUsageResponse> deleteConflictUsages = [];
-    private ModelProfileSummaryResponse? pendingDelete; private AgentstrationApiException? error;
-    private string search = string.Empty; private string providerFilter = string.Empty; private string statusFilter = string.Empty; private bool loading;
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string DeleteMessage => pendingDelete is null ? string.Empty : T("DeleteMessage", pendingDelete.Name);
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
+    private RenderFragment? OperationFeedback => operationFailed || deleteConflictUsages.Count > 0 ? @<text>
+        @if (operationFailed) { <ErrorState Title="@T("OperationFailedTitle")" Message="@T("OperationFailedMessage")" ErrorId="@operationErrorId" /> }
+        @if (deleteConflictUsages.Count > 0)
+        {
+            <section class="panel resource-section"><div class="panel-header"><h2>@T("DeleteConflictTitle")</h2></div><p>@T("DeleteConflictMessage", AgentCount(deleteConflictUsages.Count))</p><ul>@foreach (var usage in deleteConflictUsages) { <li><CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent"><IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges></CollectionIdentity></li> }</ul></section>
+        }
+    </text> : null;
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/modelprofiles/new")">@T("CreateModelProfile")</a></PermissionGate> : null;
+    private CollectionColumn<ModelProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model">
+        <IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("status", T("Status"), CollectionFilterKind.Choice)
+        {
+            Options = new[] { "Available", "Unavailable", "Incompatible", "Ready", "ProviderUnavailable", "ModelUnavailable", "InvalidConfiguration", "Unknown" }.Select(value => new CollectionFilterOption(value, StatusLabel(value))).ToArray()
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<ModelProfileSummaryResponse>> Columns =>
+    [
+        new("provider", T("Provider"), profile => @<span>@(profile.Properties.Provider.DisplayName ?? profile.Properties.Provider.Name)</span>)
+        {
+            Filters = [new("provider", T("Provider"), CollectionFilterKind.Choice)
+            {
+                Options = (items ?? []).Select(profile => profile.Properties.Provider).GroupBy(provider => provider.Name, StringComparer.Ordinal).OrderBy(group => group.Key, StringComparer.Ordinal).Select(group => new CollectionFilterOption(group.Key, group.First().DisplayName ?? group.Key)).ToArray()
+            }]
+        },
+        new("model", T("Model"), profile => @<code>@profile.Properties.Model.Name</code>)
+        {
+            Filters = [new("model", T("Model"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("usage", T("Usage"), profile => @<span>@(profile.Properties.UsageCount is { } count ? AgentCount(count) : "—")</span>)
+        {
+            Filters = [new("usage", T("Usage"), CollectionFilterKind.Number) { Advanced = true }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", T("Namespace"), CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(profile => profile.Namespace).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        },
+        new("scope", Shared["Scope"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(profile => profile.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
+        }
+    ];
+    private RenderFragment<ModelProfileSummaryResponse>? RowActions => (items ?? []).Any(CanDelete) ? profile => @<text>
+        @if (CanDelete(profile)) { <CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")"><button class="danger-text" type="button" disabled="@(operationBusy || loadState.Status == ResourceLoadStatus.Refreshing)" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></CollectionActions> }
+    </text> : null;
     private static string StatusKey(string? status) => status?.ToLowerInvariant() switch
     {
-        "available" => "Available", "unavailable" => "Unavailable", "incompatible" => "Incompatible",
-        "ready" => "Ready", "providerunavailable" => "ProviderUnavailable",
-        "modelunavailable" => "ModelUnavailable", "invalidconfiguration" => "InvalidConfiguration", _ => "Unknown"
+        "available" => "Available", "unavailable" => "Unavailable", "incompatible" => "Incompatible", "ready" => "Ready",
+        "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "invalidconfiguration" => "InvalidConfiguration", _ => "Unknown"
     };
-    private IReadOnlyList<ModelProfileSummaryResponse> FilteredProfiles => ModelManagementUi.FilterProfiles(profiles ?? [], search)
-        .Where(profile => (string.IsNullOrEmpty(providerFilter) || string.Equals(profile.Properties.Provider.Name, providerFilter, StringComparison.Ordinal))
-            && (string.IsNullOrEmpty(statusFilter) || StatusKey(profile.Properties.Status) == StatusKey(statusFilter)))
-        .ToArray();
-    private string StatusLabel(string? status) => Localizer[$"Status.{StatusKey(status)}"];
+    private string StatusLabel(string? status) => T($"Status.{StatusKey(status)}");
     private static UiStatus StatusTone(string? status) => StatusKey(status) == "Unknown" ? UiStatus.Neutral : ModelManagementUi.Status(status);
-    protected override async Task OnInitializedAsync() { try { providers = await ProvidersClient.GetModelProvidersAsync(cancellation.Token); } catch (AgentstrationApiException) { } await LoadAsync(); }
-    private async Task SearchChanged(string value) { search = value; await LoadAsync(); }
-    private async Task LoadAsync()
-    {
-        loading = true; error = null;
-        try { profiles = await Client.GetModelProfilesAsync(search, providerFilter, statusFilter, cancellation.Token); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
-    }
-    private async Task RequestDeleteAsync(ModelProfileSummaryResponse profile)
-    {
-        deleteConflictUsages = [];
-        try
-        {
-            var usages = profile.ScopeRef is { } scope
-                ? await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(profile.Namespace), profile.Name, scope, cancellation.Token)
-                : await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(profile.Namespace), profile.Name, cancellation.Token);
-            if (usages.Count > 0) { deleteConflictUsages = usages.Value; return; }
-            pendingDelete = profile;
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-    }
-    private void CancelDelete() => pendingDelete = null;
-    private async Task DeleteAsync()
-    {
-        if (pendingDelete is null) return;
-        var selected = pendingDelete; pendingDelete = null;
-        try
-        {
-            var @namespace = ResourceNamespace.Parse(selected.Namespace);
-            var snapshot = selected.ScopeRef is { } scope
-                ? await Client.GetModelProfileAsync(@namespace, selected.Name, scope, cancellation.Token)
-                : await Client.GetModelProfileAsync(@namespace, selected.Name, cancellation.Token);
-            if (selected.ScopeRef is { } deleteScope)
-                await Client.DeleteModelProfileAsync(@namespace, selected.Name, deleteScope, snapshot.ETag, cancellation.Token);
-            else
-                await Client.DeleteModelProfileAsync(@namespace, selected.Name, snapshot.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), selected.Name, DateTimeOffset.Now, UiStatus.Success));
-            await LoadAsync();
-        }
-        catch (AgentstrationApiException exception)
-        {
-            error = exception;
-            if (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
-            {
-                try
-                {
-                    deleteConflictUsages = selected.ScopeRef is { } scope
-                        ? (await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(selected.Namespace), selected.Name, scope, cancellation.Token)).Value
-                        : (await Client.GetModelProfileUsagesAsync(ResourceNamespace.Parse(selected.Namespace), selected.Name, cancellation.Token)).Value;
-                }
-                catch (AgentstrationApiException) { }
-            }
-        }
-    }
-    private string DetailsUrl(ModelProfileSummaryResponse profile) =>
-        ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef), Services);
-    private static string AgentUrl(ModelProfileUsageResponse usage) =>
-        ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private Task RefreshAsync() { operationFailed = false; operationErrorId = null; deleteConflictUsages = []; return LoadAsync(); }
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private string DetailsUrl(ModelProfileSummaryResponse profile) => Navigate(ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef));
+    private static string AgentUrl(ModelProfileUsageResponse usage) => ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
 }

@@ -1,0 +1,121 @@
+{
+  "capturedAt": "2026-11-19",
+  "productCommit": "c27c8c821b82bb1faf43a36c72e781b6d2cb85fa",
+  "implementationCommit": "34325262",
+  "origin": "Original real-application screenshots. Temporary local probes, no generated images. Assemblies remained fixed throughout the campaign.",
+  "verified": "Creation with incomplete navigation, exact namespace and owner, retained Tool selection, saved overview and discard restoring membership.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "consoleComponentSuite": {
+      "passed": 795,
+      "failed": 0
+    },
+    "releaseBuild": {
+      "warnings": 0,
+      "errors": 0
+    }
+  },
+  "limits": "Desktop English dark and mobile French light in a touch-enabled browser. These captures establish rendering and the stated operations; they do not certify real touch events for every control, all keyboard/owner combinations, the complete smoke suite or final Fast/Integration lanes. No CI run is claimed.",
+  "captures": [
+    {
+      "file": "category-members-desktop-en.png",
+      "sha256": "5baeb2cc5c4a65ffadb46cf7c5c7594a4e0757288c975ac583b781090b4ebcb0",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true,
+      "pngSize": {
+        "width": 1440,
+        "height": 3354
+      }
+    },
+    {
+      "file": "category-members-mobile-fr.png",
+      "sha256": "5e0e11a0d87f9ccfc14d732f0d3467776430629d78102f4a7e896ad75d512b29",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true,
+      "pngSize": {
+        "width": 390,
+        "height": 8922
+      }
+    },
+    {
+      "file": "category-overview-desktop-en.png",
+      "sha256": "872bce5afb3bdd7420f2448ea30b6b194aa8f81364fd828fa8bd38cfcb02c406",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true,
+      "pngSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "category-overview-mobile-fr.png",
+      "sha256": "f3d805e4caa452d112bb9dd717802c8e24be57f7f78e738003a551ea82cfbed9",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true,
+      "pngSize": {
+        "width": 390,
+        "height": 1353
+      }
+    },
+    {
+      "file": "category-review-desktop-en.png",
+      "sha256": "0faf648078a739112256418c632f1da4e2d46f912ab3ebd2d34a936364f5e5db",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true,
+      "pngSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "category-review-mobile-fr.png",
+      "sha256": "5c013ea9d2b8afdf91157eacfd019eb588c9d289dc1edc00397a2a6f9c59ace2",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true,
+      "pngSize": {
+        "width": 390,
+        "height": 977
+      }
+    }
+  ],
+  "preparationCorrection": "The initial probe incorrectly searched the Identity panel for concatenated namespace/name. The successful probe separately checks both fields and the qualified header identity; no product change or timeout increase was used."
+}

@@ -147,7 +147,7 @@ export class AgentInstanceObservabilityPage {
   }
 
   public async followAgentLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
-    await this.instanceRow(instance.instanceId).locator(`a[href="/agents/${instance.agentName}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a[href^="/agents/${encodeURIComponent(instance.agentName)}?"]`).click();
     await this.expectContextualPath(consoleUrl, `/agents/${instance.agentName}`);
   }
 
@@ -158,7 +158,7 @@ export class AgentInstanceObservabilityPage {
   }
 
   public async followWorkerLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
-    await this.instanceRow(instance.instanceId).locator(`a[href="/settings/runtime-workers/${instance.workerId}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a[href^="/settings/runtime-workers/${instance.workerId}?"]`).click();
     await this.expectContextualPath(consoleUrl, `/settings/runtime-workers/${instance.workerId}`);
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.details)).toBeVisible();
   }

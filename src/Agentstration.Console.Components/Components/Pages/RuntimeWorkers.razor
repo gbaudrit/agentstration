@@ -1,41 +1,67 @@
-@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @page "/settings/runtime-workers"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IRuntimeApiClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("RuntimeWorkers") · Agentstration</PageTitle>
-<PageHeader Title="@T("RuntimeWorkers")" Description="@T("Description")" TestId="runtime-workers" />
-@if (items is null) { <LoadingState Message="@T("Loading")" /> }
-else if (items.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <section class="runtime-workers-grid">
-    <CollectionView TItem="RuntimeWorkerSummaryResponse" Items="items" InformationLabels="@(new string[] { T("Session"), T("Version"), T("Capacity"), T("Capabilities"), T("LastSeen") })" RowTestId="runtime-worker-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-worker-id"] = item.WorkerId.ToString("D"), ["data-presence"] = item.Presence.ToString(), ["data-session-id"] = item.SessionId?.ToString("D") ?? string.Empty })" IdentityLabel="@T("Worker")" StateLabel="@T("Presence")">
-        <Identity Context="item">
-<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString()" Href="@WorkerUrl(item)" IconName="server" ><IconBadges><StatusBadge Text="@T($"Presence.{item.Presence}")" Status="@PlatformDashboardService.ToStatus(item.Presence.ToString())" IconOnly /></IconBadges><Badges><small>@T($"Enrollment.{item.EnrollmentState}")</small></Badges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Session")"><code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code></CollectionValue>
-            <CollectionValue Label="@T("Version")"><span class="runtime-primary">@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</CollectionValue>
-            <CollectionValue Label="@T("Capacity")"><span class="runtime-primary">@(item.MaximumConcurrentAssignments?.ToString() ?? "—")</span><small>@T("ActiveAssignments", item.ActiveAssignments)</small></CollectionValue>
-            <CollectionValue Label="@T("Capabilities")">@string.Join(", ", item.Capabilities.Select(FormatCapability))</CollectionValue>
-            <CollectionValue Label="@T("LastSeen")">@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@item.DisplayName"><a href="@WorkerUrl(item)">@Shared["OpenItem"]</a></CollectionActions></Actions>
-    </CollectionView>
-    </section>
-}
+<ResourceCollectionTemplate TItem="RuntimeWorkerSummaryResponse" Title="@T("RuntimeWorkers")" Description="@T("Description")" TestId="runtime-workers"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="PageItems" ContextKey="@contextKey" RowTestId="runtime-worker-row" ItemAttributes="WorkerAttributes"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("Empty")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<RuntimeWorkerSummaryResponse>? items;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    protected override async Task OnInitializedAsync() => items = await Client.GetRuntimeWorkersAsync(cancellation.Token);
-    private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) =>
-        $"{capability.RuntimeKind} {capability.CapabilityVersion} · material {string.Join('/', capability.ExecutionMaterialVersions)}"
+    private CollectionColumn<RuntimeWorkerSummaryResponse> IdentityColumn => new("identity", T("Worker"), item => @<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString("D")" Href="@WorkerUrl(item)" IconName="server">
+        <IconBadges><StatusBadge Text="@T($"Presence.{PresenceKey(item.Presence)}")" Status="@PlatformDashboardService.ToStatus(PresenceKey(item.Presence))" IconOnly /></IconBadges>
+        <Badges><small>@EnrollmentText(item.EnrollmentState)</small></Badges>
+    </CollectionIdentity>)
+    {
+        Filters =
+        [
+            new("presence", T("Presence"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<RuntimeWorkerPresenceState>().Select(value => new CollectionFilterOption(value.ToString(), T($"Presence.{value}"))).ToArray()
+            },
+            new("enrollment", T("Enrollment"), CollectionFilterKind.Choice)
+            {
+                Options = (items ?? []).Select(item => item.EnrollmentState).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, EnrollmentText(value))).ToArray()
+            }
+        ]
+    };
+    private IReadOnlyList<CollectionColumn<RuntimeWorkerSummaryResponse>> Columns =>
+    [
+        new("session", T("Session"), item => @<code class="runtime-token" title="@item.SessionId?.ToString("D")">@(item.SessionId?.ToString("D") ?? "—")</code>)
+        {
+            Filters = [new("session", T("Session"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("version", T("Version"), item => @<text><span>@SoftwareVersion(item.SoftwareVersion)</span>@if (SoftwareBuild(item.SoftwareVersion) is { } build) { <br /><small class="runtime-token" title="@item.SoftwareVersion">+@build</small> }</text>)
+        {
+            Filters = [new("version", T("Version"), CollectionFilterKind.Text) { Advanced = true }]
+        },
+        new("capacity", T("Capacity"), item => @<text><strong>@(item.MaximumConcurrentAssignments?.ToString() ?? "—")</strong><br /><small>@T("ActiveAssignments", item.ActiveAssignments)</small></text>),
+        new("capability", T("Capabilities"), item => @<span>@string.Join(", ", item.Capabilities.Select(FormatCapability))</span>)
+        {
+            Filters = [new("capability", T("Capabilities"), CollectionFilterKind.Choice)
+            {
+                Options = (items ?? []).SelectMany(item => item.Capabilities).Select(capability => capability.RuntimeKind).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+            }]
+        },
+        new("lastSeen", T("LastSeen"), item => @<span>@(item.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")</span>)
+    ];
+    private string EnrollmentText(string state) => T($"Enrollment.{(state is "Pending" or "PairingCodeIssued" or "Active" or "Revoked" ? state : "Unknown")}");
+    private static string PresenceKey(RuntimeWorkerPresenceState state) => Enum.IsDefined(state) ? state.ToString() : nameof(RuntimeWorkerPresenceState.Unknown);
+    private string FormatCapability(RuntimeWorkerCapabilityResponse capability) =>
+        T("CapabilityFormat", capability.RuntimeKind, capability.CapabilityVersion, string.Join('/', capability.ExecutionMaterialVersions))
         + (string.IsNullOrWhiteSpace(capability.RuntimeImplementationVersion) ? string.Empty : $" · {capability.RuntimeImplementationVersion}");
     private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
     private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
-    private static string WorkerUrl(RuntimeWorkerSummaryResponse worker) => $"/settings/runtime-workers/{worker.WorkerId:D}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private string WorkerUrl(RuntimeWorkerSummaryResponse worker) => ResourceOwnershipContext.PreserveNavigation($"/settings/runtime-workers/{worker.WorkerId:D}", Services);
+    private static IReadOnlyDictionary<string, object> WorkerAttributes(RuntimeWorkerSummaryResponse item) => new Dictionary<string, object>
+    {
+        ["data-worker-id"] = item.WorkerId.ToString("D"), ["data-presence"] = item.Presence.ToString(), ["data-session-id"] = item.SessionId?.ToString("D") ?? string.Empty
+    };
 }

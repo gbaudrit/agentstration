@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { revealCollectionAction } from './collection-actions.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -16,6 +17,7 @@ export class DescendantSecretsPage {
 
   public async openVault(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
     await this.open(`${consoleUrl}/vaults/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`, this.vaultEditor);
+    await selectResourceSection(this.page, 'definition/configuration');
   }
 
   public async openNewSecret(consoleUrl: string): Promise<void> {
@@ -24,9 +26,11 @@ export class DescendantSecretsPage {
 
   public async openSecret(consoleUrl: string, name: string, scopeRef: string): Promise<void> {
     await this.open(`${consoleUrl}/secrets/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`, this.secretEditor);
+    await selectResourceSection(this.page, 'definition/configuration');
   }
 
   public async selectScope(kind: SecretResourceScope): Promise<string> {
+    await this.page.locator('[data-wizard-step=identity]').click();
     const picker = this.page.getByTestId(TestIds.secretGrants.scopePicker);
     const prefix = kind === 'instance' ? '/instance' : kind === 'tenant' ? '/tenants/' : '/workspaces/';
     await picker.locator(`option[value^="${prefix}"]`).first().waitFor({ state: 'attached' });
@@ -47,8 +51,8 @@ export class DescendantSecretsPage {
   }
 
   public async initializeVault(): Promise<void> {
-    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
-    const initialize = this.page.locator('.resource-form .form-section .button-primary');
+    await selectResourceSection(this.page, 'master-key');
+    const initialize = this.page.getByTestId(TestIds.secretGrants.vaultInitialize);
     await initialize.waitFor({ state: 'visible' });
     await initialize.click();
     const confirmation = this.page.getByRole('alertdialog');
@@ -59,21 +63,26 @@ export class DescendantSecretsPage {
   }
 
   public async createSecret(name: string, displayName: string, vaultName: string, vaultScopeRef: string): Promise<void> {
-    const option = await this.waitForVaultOption(vaultName, vaultScopeRef);
+    await this.page.locator('[data-wizard-step=identity]').click();
     const displayNameInput = this.page.getByTestId(TestIds.secretGrants.secretDisplayName);
     await displayNameInput.fill(displayName);
     await displayNameInput.press('Tab');
     await expect(this.page.getByTestId(TestIds.secretGrants.secretName)).toHaveValue(name);
     await expect(this.page.getByTestId(TestIds.secretGrants.secretVaultKey)).toHaveValue(name);
+    await this.page.locator('[data-wizard-step=vault]').click();
+    const option = await this.waitForVaultOption(vaultName, vaultScopeRef);
     await this.page.getByTestId(TestIds.secretGrants.secretVault).selectOption(option);
     await this.saveNew('secrets', name);
   }
 
   public async vaultIsOffered(name: string, scopeRef: string): Promise<boolean> {
+    await this.page.locator('[data-wizard-step=vault]').click();
     return (await this.vaultOption(name, scopeRef)) !== undefined;
   }
 
   public async selectedVault(): Promise<string> {
+    if (await this.page.locator('.creation-wizard').count()) await this.page.locator('[data-wizard-step=vault]').click();
+    else await selectResourceSection(this.page, 'definition/configuration');
     return this.page.getByTestId(TestIds.secretGrants.secretVault).inputValue();
   }
 
@@ -98,18 +107,18 @@ export class DescendantSecretsPage {
   }
 
   public scopeBadge(scopeRef: string): Locator {
-    return this.page.locator(`.resource-form .resource-scope-badge[title="${scopeRef}"]`);
+    return this.page.locator(`.resource-header [data-scope-ref="${scopeRef}"]`);
   }
 
   public async saveChanges(): Promise<void> {
-    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    const bar = this.page.locator('.unsaved-changes-bar');
     await bar.waitFor({ state: 'visible' });
     await bar.locator('button[type="submit"]').click();
     await bar.waitFor({ state: 'hidden' });
   }
 
   public async saveChangesIfPresent(): Promise<void> {
-    const bar = this.page.locator('.resource-form .unsaved-changes-bar');
+    const bar = this.page.locator('.unsaved-changes-bar');
     await bar.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
     if (await bar.isVisible()) await this.saveChanges();
   }
@@ -134,15 +143,18 @@ export class DescendantSecretsPage {
 
   private async openAccessTab(): Promise<void> {
     const target = this.page.getByTestId(TestIds.secretGrants.grantTarget);
-    if (await target.count() > 0) return;
-    await this.page.locator('[data-testid="vault-access-tab"], [data-testid="secret-access-tab"]').click();
+    if (await target.isVisible()) return;
+    if (await this.page.locator('.creation-wizard').count()) await this.page.locator('[data-wizard-step=grants]').click();
+    else await selectResourceSection(this.page, new URL(this.page.url()).pathname.startsWith('/vaults/') ? 'definition/configuration' : 'definition/use-policy');
     await target.waitFor({ state: 'visible' });
   }
 
   private async saveNew(kind: 'vaults' | 'secrets', name: string): Promise<void> {
-    await this.page.locator('.resource-form button[type="submit"]').click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await this.page.getByTestId(TestIds.creationWizard.finish).click();
     await this.page.waitForURL(url => url.pathname === `/${kind}/${name}`);
     await (kind === 'vaults' ? this.vaultEditor : this.secretEditor).waitFor({ state: 'visible' });
+    await selectResourceSection(this.page, 'definition/configuration');
   }
 
   private async open(url: string, marker: Locator): Promise<void> {
@@ -157,7 +169,10 @@ export class DescendantSecretsPage {
     }
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Secret management route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await marker.waitFor({ state: 'visible' });
-    await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
+    if (!target.pathname.endsWith('/new'))
+      await expect(this.page.locator('.resource-details-navigation .resource-navigation')).toHaveAttribute('data-navigation-ready', 'true');
+    else await this.page.locator('.resource-form[data-interactive="true"]').waitFor({ state: 'visible' });
   }
 }

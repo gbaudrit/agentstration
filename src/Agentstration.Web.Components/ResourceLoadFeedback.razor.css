@@ -1,0 +1,5 @@
+.resource-refresh-status { display: flex; align-items: center; gap: var(--space-3); color: var(--muted); font-size: var(--font-size-sm); }
+.resource-refresh-status .spinner { width: 1rem; height: 1rem; flex: 0 0 auto; }
+.resource-refresh-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.resource-refresh-error > div { display: grid; gap: var(--space-2); }
+@media (max-width: 620px) { .resource-refresh-error { align-items: flex-start; flex-direction: column; } }

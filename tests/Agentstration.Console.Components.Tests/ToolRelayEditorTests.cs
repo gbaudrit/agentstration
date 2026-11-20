@@ -19,10 +19,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ToolRelayEditorTests
+public sealed partial class ToolRelayEditorTests
 {
     [TestMethod]
-    public void EditingAFlatRelayPreservesItsEnvelopeAndPublicPreview()
+    public async Task EditingAFlatRelayPreservesItsEnvelopeAndPublicPreview()
     {
         using var handler = new ApiHandler("""{"type":"object","properties":{"source":{"type":"string"},"request":{"type":"object","properties":{"snapshotId":{"type":"string"},"query":{"type":"object"}},"additionalProperties":false}},"required":["source","request"],"additionalProperties":false}""")
         {
@@ -30,12 +30,12 @@ public sealed class ToolRelayEditorTests
             InitialBindings = [new LiteralToolArgumentBinding { Path = "/source", Value = JsonSerializer.SerializeToElement("fixed") }]
         };
         using var context = Context(handler);
-        var page = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var page = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         var preview = page.WaitForElement("[data-testid='relay-public-schema']");
         var schema = JsonSerializer.Deserialize<JsonElement>(preview.TextContent);
         Assert.IsFalse(schema.GetProperty("properties").TryGetProperty("request", out _));
         Assert.IsTrue(schema.GetProperty("properties").TryGetProperty("snapshotId", out _));
-        page.Find("[data-testid='relay-save-draft']").Click();
+        await page.Find("#relay-resource-form").SubmitAsync();
         page.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         Assert.AreEqual("request", Assert.IsInstanceOfType<RelayToolDefinitionProperties>(handler.Saved!.Properties).InputEnvelope);
     }
@@ -48,24 +48,24 @@ public sealed class ToolRelayEditorTests
             Usages = [new("Flow", "same-name", ResourceNamespace.Parse("team"), Scope, "4.2.0", "1.2.0")]
         };
         using var context = Context(handler);
-        var page = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        var page = await RenderRelay(context, p => p.Add(c => c.Name, "relay"));
         page.WaitForElement("[data-testid=relay-version]");
-        await page.FindAll(".resource-tabs button")[1].ClickAsync();
+        await page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection("versions"));
         var versions = page.FindComponent<CollectionView<ToolDefinitionVersionResource>>();
         await page.InvokeAsync(() => versions.Instance.SetNarrow(true));
-        Assert.HasCount(1, page.FindAll(".collection-cards > li"));
-        Assert.Contains("1.2.0", page.Find(".collection-cards").TextContent);
-        Assert.Contains("2.4.0", page.Find(".collection-cards").TextContent);
-        Assert.AreEqual("default/source.v2.4.0", page.Find(".copyable-value code").TextContent);
-        Assert.IsFalse(page.Find(".collection-actions button").HasAttribute("disabled"));
-        await page.FindAll(".resource-tabs button")[2].ClickAsync();
+        Assert.HasCount(1, page.FindAll("[data-relay-section=versions] .collection-cards > li"));
+        Assert.Contains("1.2.0", page.Find("[data-relay-section=versions] .collection-cards").TextContent);
+        Assert.Contains("2.4.0", page.Find("[data-relay-section=versions] .collection-cards").TextContent);
+        Assert.AreEqual("default/source.v2.4.0", page.Find("[data-relay-section=versions] .copyable-value code").TextContent);
+        Assert.IsFalse(page.Find("[data-relay-section=versions] .collection-actions button").HasAttribute("disabled"));
+        await page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection("usages"));
         var usages = page.FindComponent<CollectionView<ToolDefinitionUsage>>();
         await page.InvokeAsync(() => usages.Instance.SetNarrow(true));
-        Assert.AreEqual("team/same-name", page.Find(".copyable-value code").TextContent);
-        Assert.AreEqual($"/flows/same-name?namespace=team&context={Uri.EscapeDataString(Scope.Value)}", page.Find(".resource-name-link").GetAttribute("href"));
-        Assert.Contains("4.2.0", page.Find(".collection-cards").TextContent);
-        Assert.Contains("1.2.0", page.Find(".collection-cards").TextContent);
-        Assert.IsEmpty(page.FindAll(".collection-actions"));
+        Assert.AreEqual("team/same-name", page.Find("[data-relay-section=usages] .copyable-value code").TextContent);
+        Assert.AreEqual($"/flows/same-name?namespace=team&scopeRef={Uri.EscapeDataString(Scope.Value)}&context={Uri.EscapeDataString(Scope.Value)}", page.Find("[data-relay-section=usages] .resource-name-link").GetAttribute("href"));
+        Assert.Contains("4.2.0", page.Find("[data-relay-section=usages] .collection-cards").TextContent);
+        Assert.Contains("1.2.0", page.Find("[data-relay-section=usages] .collection-cards").TextContent);
+        Assert.IsEmpty(page.FindAll("[data-relay-section=usages] .collection-actions"));
         Assert.IsEmpty(handler.Writes);
     }
 
@@ -74,13 +74,13 @@ public sealed class ToolRelayEditorTests
     [TestMethod]
     [DataRow("en-US", "Hide")]
     [DataRow("fr-FR", "Masquer")]
-    public void OptionalObjectCanBeHiddenSavedAndReopenedWithoutItsRequiredChildren(string culture, string label)
+    public async Task OptionalObjectCanBeHiddenSavedAndReopenedWithoutItsRequiredChildren(string culture, string label)
     {
         using var currentCulture = new TestCultureScope(culture);
         using var handler = new ApiHandler("""{"type":"object","properties":{"acquisition":{"type":"object","properties":{"id":{"type":"string"},"uid":{"type":"string"}},"required":["id","uid"]},"query":{"type":"string"}},"required":["query"]}""")
         { InitialBindings = [] };
         using var context = Context(handler);
-        var page = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        var page = await RenderRelay(context, p => p.Add(c => c.Name, "relay"));
         page.WaitForElement("[data-requirement-id='/acquisition'] [data-testid='relay-binding-kind']");
         Assert.AreEqual(label, page.Find("[data-requirement-id='/acquisition'] option[value='Omitted']").TextContent);
         Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/id'] option[value='Omitted']"));
@@ -88,13 +88,13 @@ public sealed class ToolRelayEditorTests
         page.Find("[data-requirement-id='/acquisition'] [data-testid='relay-binding-kind']").Change("Omitted");
         page.WaitForAssertion(() => Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/id']")));
         Assert.HasCount(0, page.FindAll("[data-requirement-id='/acquisition/uid']"));
-        page.Find("[data-testid='relay-save-draft']").Click();
+        await page.Find("#relay-resource-form").SubmitAsync();
         page.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         var binding = ((RelayToolDefinitionProperties)handler.Saved!.Properties).Bindings.Single();
         Assert.IsInstanceOfType<OmittedToolArgumentBinding>(binding);
         Assert.AreEqual("/acquisition", binding.Path);
         page.Dispose();
-        var reopened = context.Render<ToolRelayEditor>(p => p.Add(c => c.Name, "relay"));
+        var reopened = await RenderRelay(context, p => p.Add(c => c.Name, "relay"));
         reopened.WaitForAssertion(() => Assert.AreEqual(ValueBindingSourceKind.Omitted,
             reopened.FindComponents<ValueBindingRequirementEditor>().Single(c => c.Instance.Requirement.Id == "/acquisition").Instance.Selection.Kind));
         Assert.HasCount(0, reopened.FindAll("[data-requirement-id='/acquisition/id']"));
@@ -104,12 +104,12 @@ public sealed class ToolRelayEditorTests
     [TestMethod]
     [DataRow("en-US", "ToolDefinition version", "Target source Tool version / revision")]
     [DataRow("fr-FR", "Version de la ToolDefinition", "Version / révision du Tool source ciblée")]
-    public void EditorSeparatesRelayAndSourceVersionsAndShowsValueSources(string locale, string relayLabel, string sourceLabel)
+    public async Task EditorSeparatesRelayAndSourceVersionsAndShowsValueSources(string locale, string relayLabel, string sourceLabel)
     {
         using var culture = new TestCultureScope(locale);
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, relayLabel);
@@ -129,17 +129,17 @@ public sealed class ToolRelayEditorTests
     [DataRow("{\"type\":\"number\"}", "1.5")]
     [DataRow("{\"type\":\"array\",\"items\":{\"type\":\"integer\"}}", "[1,2]")]
     [DataRow("{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"},\"items\":{\"type\":\"array\",\"items\":{\"type\":\"boolean\"}}}}", "{\"value\":\"keep this property\",\"items\":[true,false]}")]
-    public void SharedLiteralSavesAndReopensTheActualJsonValue(string propertySchema, string json)
+    public async Task SharedLiteralSavesAndReopensTheActualJsonValue(string propertySchema, string json)
     {
         using var handler = new ApiHandler("{\"type\":\"object\",\"properties\":{\"query\":" + propertySchema + "}}") { InitialBindings = [] };
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change("Literal");
         Assert.IsTrue(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
         Assert.IsTrue(rendered.FindComponent<ValueBindingRequirementEditor>().Instance.Requirement.Required);
         EnterLiteral(rendered, "/query", json);
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled")));
-        rendered.Find("[data-testid='relay-save-draft']").Click();
+        await rendered.Find("#relay-resource-form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         var saved = (RelayToolDefinitionProperties)handler.Saved!.Properties;
         var literal = (LiteralToolArgumentBinding)saved.Bindings.Single();
@@ -150,7 +150,7 @@ public sealed class ToolRelayEditorTests
         Assert.AreEqual(0, handler.Publications);
 
         using var reopenedContext = Context(handler);
-        var reopened = reopenedContext.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var reopened = await RenderRelay(reopenedContext, parameters => parameters.Add(value => value.Name, "relay"));
         reopened.WaitForAssertion(() =>
         {
             var editor = reopened.FindComponents<ValueBindingRequirementEditor>().Single(value => value.Instance.Requirement.Id == "/query");
@@ -161,11 +161,11 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void MalformedRawLiteralBlocksSavingAndPublicationAcrossParentRenders()
+    public async Task MalformedRawLiteralBlocksSavingAndPublicationAcrossParentRenders()
     {
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-testid='relay-publish-review']").Click();
         EnterLiteral(rendered, "/store", "{broken");
         Assert.IsTrue(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
@@ -178,7 +178,7 @@ public sealed class ToolRelayEditorTests
         Assert.AreEqual(0, handler.Publications);
         rendered.Find("[data-binding-path='/store'] textarea").Input("{\"id\":\"updated\"}");
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled")));
-        rendered.Find("[data-testid='relay-save-draft']").Click();
+        await rendered.Find("#relay-resource-form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         Assert.AreEqual("updated", ((LiteralToolArgumentBinding)((RelayToolDefinitionProperties)handler.Saved!.Properties).Bindings.Single()).Value.GetProperty("id").GetString());
     }
@@ -191,7 +191,7 @@ public sealed class ToolRelayEditorTests
     {
         using var handler = new ApiHandler("""{"type":"object","properties":{"query":{"type":"string","default":"do not silently use this"}}}""") { InitialBindings = [] };
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters
+        var rendered = await RenderRelay(context, parameters => parameters
             .Add(value => value.CreationIdentity, new() { Name = "relay", DisplayName = "Relay", ScopeRef = Scope })
             .Add(value => value.Source, handler.Source.Name));
         rendered.WaitForElement("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change("Literal");
@@ -203,11 +203,11 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void ChangingSourceClearsMalformedLiteralAndDoesNotRestoreItsOldPayload()
+    public async Task ChangingSourceClearsMalformedLiteralAndDoesNotRestoreItsOldPayload()
     {
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         EnterLiteral(rendered, "/store", "{broken");
         rendered.Find("[data-requirement-id='/store'] [data-testid='relay-binding-kind']").Change("Caller");
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled")));
@@ -218,16 +218,16 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void ReadOnlyRelayDisablesSharedLiteralControls()
+    public async Task ReadOnlyRelayDisablesSharedLiteralControls()
     {
         using var handler = new ApiHandler();
         using var context = Context(handler, ResourceScopeRef.Instance);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForAssertion(() =>
         {
             Assert.IsTrue(rendered.FindComponents<ValueBindingRequirementEditor>().All(value => value.Instance.Disabled));
             Assert.IsTrue(rendered.Find("[data-binding-path='/store'] [data-testid='schema-raw-mode']").HasAttribute("disabled"));
-            Assert.IsTrue(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
+            Assert.IsEmpty(rendered.FindAll("[data-testid='relay-save-draft'], [data-testid='relay-publish-review']"));
         });
         Assert.HasCount(0, handler.Writes);
     }
@@ -239,11 +239,11 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void SharedRequirementRetainsUnionAndUnconstrainedTypeMetadata()
+    public async Task SharedRequirementRetainsUnionAndUnconstrainedTypeMetadata()
     {
         using var handler = new ApiHandler("""{"type":"object","properties":{"query":{"type":["string","null"]},"dynamic":{}}}""") { InitialBindings = [] };
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForAssertion(() =>
         {
             var editors = rendered.FindComponents<ValueBindingRequirementEditor>();
@@ -255,18 +255,18 @@ public sealed class ToolRelayEditorTests
     [TestMethod]
     [DataRow("Parameter")]
     [DataRow("Secret")]
-    public void SharedResourceSelectionSavesTheExactReferenceAndCallerRemovesIt(string kind)
+    public async Task SharedResourceSelectionSavesTheExactReferenceAndCallerRemovesIt(string kind)
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         var address = kind == "Parameter" ? handler.Parameter.Address : handler.Secret.Resource.Address;
         var scope = kind == "Parameter" ? handler.Parameter.ScopeRef!.Value : handler.Secret.Resource.ScopeRef!.Value;
         rendered.WaitForElement("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change(kind);
         Assert.IsTrue(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
         rendered.Find("[data-testid='relay-binding-target']").Change($"{scope.Value}|{address.Namespace.Value}|{address.Name}");
-        rendered.Find("[data-testid='relay-save-draft']").Click();
+        await rendered.Find("#relay-resource-form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         var saved = (RelayToolDefinitionProperties)handler.Saved!.Properties;
         var binding = saved.Bindings.Single(value => value.Path == "/query");
@@ -283,7 +283,7 @@ public sealed class ToolRelayEditorTests
         Assert.IsFalse(saved.Publish);
 
         rendered.Find("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change("Caller");
-        rendered.Find("[data-testid='relay-save-draft']").Click();
+        await rendered.Find("#relay-resource-form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.HasCount(1, ((RelayToolDefinitionProperties)handler.Saved!.Properties).Bindings));
         Assert.HasCount(0, rendered.FindAll("[data-testid='relay-binding-target']"));
         StringAssert.Contains(rendered.Find("[data-testid='relay-public-schema']").TextContent, "\"query\"");
@@ -291,13 +291,13 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void UnavailableReferenceKeepsItsIdentityAndBlocksSavingUntilExplicitlyDiscarded()
+    public async Task UnavailableReferenceKeepsItsIdentityAndBlocksSavingUntilExplicitlyDiscarded()
     {
         using var culture = new TestCultureScope("en-US");
         var missing = new ParameterReference(ResourceAddress.Create(ResourceNamespace.Parse("other"), ParameterResourceKinds.Parameter, "missing"), ResourceScopeRef.Instance);
         using var handler = new ApiHandler { InitialBindings = [new ParameterToolArgumentBinding { Path = "/query", Parameter = missing }] };
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         var target = rendered.WaitForElement("[data-testid='relay-binding-target'] option[selected][disabled]");
         StringAssert.Contains(target.TextContent, "other/missing");
         var editor = rendered.FindComponents<ValueBindingRequirementEditor>().Single(value => value.Instance.Requirement.Id == "/query");
@@ -309,14 +309,15 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void SharedCreatorRefreshesOptionsAndSavesItsNewExactReference()
+    public async Task SharedCreatorRefreshesOptionsAndSavesItsNewExactReference()
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change("Parameter");
         rendered.Find("[data-testid='relay-binding-create']").Click();
+        Assert.IsNull(rendered.Find("[data-testid=contextual-parameter-create]").Closest("[role=dialog]")!.Closest("form"), "The contextual creator must remain outside the relay form.");
         rendered.Find("[data-testid='contextual-parameter-display-name']").Change("Search query");
         rendered.Find("[data-testid='contextual-parameter-name']").Change("search-query");
         rendered.Find("[data-testid='contextual-parameter-value']").Change("hr");
@@ -326,10 +327,10 @@ public sealed class ToolRelayEditorTests
             Assert.IsNotNull(handler.CreatedParameter);
             Assert.AreEqual(Scope, handler.CreatedParameter.ScopeRef);
             Assert.IsTrue(handler.ParameterReads >= 2);
-            Assert.HasCount(0, rendered.FindAll("[role='dialog']"));
+            Assert.HasCount(0, rendered.FindAll("[data-testid=contextual-parameter-create]"));
             Assert.IsFalse(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
         });
-        rendered.Find("[data-testid='relay-save-draft']").Click();
+        await rendered.Find("#relay-resource-form").SubmitAsync();
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Saved));
         var binding = (ParameterToolArgumentBinding)((RelayToolDefinitionProperties)handler.Saved!.Properties).Bindings.Single(value => value.Path == "/query");
         Assert.AreEqual("search-query", binding.Parameter.Address.Name);
@@ -342,12 +343,12 @@ public sealed class ToolRelayEditorTests
     [DataRow("/instance")]
     [DataRow("/tenants/22222222-2222-2222-2222-222222222222")]
     [DataRow("/workspaces/11111111-1111-1111-1111-111111111111")]
-    public void SharedCreatorUsesTheRelayOwnerScope(string owner)
+    public async Task SharedCreatorUsesTheRelayOwnerScope(string owner)
     {
         using var handler = new ApiHandler();
         using var context = Context(handler);
         var scope = ResourceScopeRef.Parse(owner);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters
+        var rendered = await RenderRelay(context, parameters => parameters
             .Add(value => value.CreationIdentity, new() { Name = "relay", DisplayName = "Relay", ScopeRef = scope })
             .Add(value => value.Source, handler.Source.Name));
         rendered.WaitForAssertion(() =>
@@ -360,12 +361,12 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void IncompatibleSourceRetainsTheMissingBindingAndBlocksPublication()
+    public async Task IncompatibleSourceRetainsTheMissingBindingAndBlocksPublication()
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-testid='relay-source']").Change($"{handler.Incompatible.Uid:D}:1");
         rendered.WaitForAssertion(() =>
         {
@@ -377,12 +378,12 @@ public sealed class ToolRelayEditorTests
     }
 
     [TestMethod]
-    public void PublicationReviewRequiresExplicitConfirmationAndNeverWritesConsumers()
+    public async Task PublicationReviewRequiresExplicitConfirmationAndNeverWritesConsumers()
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new ApiHandler();
         using var context = Context(handler);
-        var rendered = context.Render<ToolRelayEditor>(parameters => parameters.Add(value => value.Name, "relay"));
+        var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-testid='relay-version']").Change("1.3.0");
         rendered.Find("[data-testid='relay-publish-review']").Click();
         Assert.AreEqual(0, handler.Publications);
@@ -399,14 +400,76 @@ public sealed class ToolRelayEditorTests
         Assert.IsFalse(handler.Writes.Any(path => path.Contains("agents", StringComparison.Ordinal) || path.Contains("toolsets", StringComparison.Ordinal) || path.Contains("flows", StringComparison.Ordinal)));
     }
 
-    private static BunitContext Context(ApiHandler handler, ResourceScopeRef? navigationScope = null)
+    [TestMethod]
+    public async Task InvalidRelayBindingsSurviveNavigationAndDiscardRestoresTheSavedDefinition()
+    {
+        using var culture = new TestCultureScope("en-US"); using var handler = new ApiHandler(); using var context = Context(handler);
+        var cut = await RenderRelay(context, p => p.Add(c => c.Name, "relay"));
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        EnterLiteral(cut, "/store", "{broken");
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        Assert.Contains("HR relay", cut.Find(".resource-identity-summary").TextContent);
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("versions"));
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.IsTrue(cut.Find("[data-testid=relay-save-draft]").HasAttribute("disabled"));
+        await cut.Find(".unsaved-changes-bar .button-secondary").ClickAsync();
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/configuration"));
+        var binding = cut.FindComponents<ValueBindingRequirementEditor>().Single(c => c.Instance.Requirement.Id == "/store");
+        Assert.AreEqual("hr", binding.Instance.Selection.Literal!.Value.GetProperty("id").GetString());
+        Assert.IsNull(handler.Saved);
+    }
+
+    [TestMethod]
+    public async Task RelayHeaderActivationAcknowledgesOnlyActivationAndRetainsInvalidBindings()
+    {
+        using var culture = new TestCultureScope("en-US"); using var handler = new ApiHandler(); using var context = Context(handler);
+        var cut = await RenderRelay(context, p => p.Add(c => c.Name, "relay"));
+        var editContext = cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext;
+        EnterLiteral(cut, "/store", "{broken");
+        await cut.Find(".resource-header input[role=switch]").ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = false });
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        var enabled = cut.FindAll(".resource-configuration-summary tr").Single(row => row.QuerySelector(".configuration-key")?.TextContent == "Enabled");
+        Assert.Contains("No", enabled.TextContent);
+        Assert.IsFalse(handler.Enabled!.Value);
+        Assert.IsNull(handler.Saved);
+        Assert.AreSame(editContext, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
+        Assert.AreEqual("{broken", cut.Find("[data-binding-path='/store'] textarea").GetAttribute("value"));
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        await cut.Find(".unsaved-changes-bar .button-secondary").ClickAsync();
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.IsFalse(cut.Find(".resource-header input[role=switch]").HasAttribute("checked"));
+        Assert.AreEqual(0, handler.Publications);
+    }
+
+    private static async Task<IRenderedComponent<ToolRelayEditor>> RenderRelay(BunitContext context, Action<ComponentParameterCollectionBuilder<ToolRelayEditor>> parameters)
+    {
+        var page = context.Render<ToolRelayEditor>(parameters);
+        if (page.Instance.CreationIdentity is null)
+        {
+            page.WaitForElement("[data-testid=relay-version]");
+            foreach (var path in new[] { "definition/bindings", "definition/contracts", "definition/configuration" })
+                await page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection(path));
+        }
+        return page;
+    }
+
+    private static BunitContext Context(ApiHandler handler, ResourceScopeRef? navigationScope = null, ConsoleContextState? state = null)
     {
         var context = new BunitContext();
+        if (state is not null) context.Services.AddSingleton(state);
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
         foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
             module.SetupVoid(method, _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var resourceNavigation = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        resourceNavigation.Mode = JSRuntimeMode.Loose;
+        resourceNavigation.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#definition/configuration");
+        foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "definition/bindings", "definition/contracts", "versions", "usages", "access", "yaml" })
+            resourceNavigation.Setup<string>("navigate", invocation => invocation.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/#" + path);
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(navigationScope ?? Scope));
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
         context.Services.AddSingleton<IToolDefinitionsClient>(new ToolDefinitionsApiClient(http));
@@ -433,6 +496,7 @@ public sealed class ToolRelayEditorTests
         public string? InputEnvelope { get; init; }
         public IReadOnlyList<ToolDefinitionUsage> Usages { get; init; } = [];
         public int Publications { get; private set; }
+        public bool? Enabled { get; private set; }
         public PutToolDefinitionRequest? Saved { get; private set; }
         public List<string> Writes { get; } = [];
         public IReadOnlyList<ToolArgumentBinding> InitialBindings { get; init; } = [new LiteralToolArgumentBinding { Path = "/store", Value = JsonSerializer.SerializeToElement(new { id = "hr" }) }];
@@ -486,6 +550,12 @@ public sealed class ToolRelayEditorTests
                 Bindings = InitialBindings,
                 InputEnvelope = InputEnvelope
             };
+            if (path.EndsWith("/enabled", StringComparison.Ordinal))
+            {
+                var command = await request.Content!.ReadFromJsonAsync<SetToolDefinitionEnabledRequest>(cancellationToken);
+                Enabled = command!.Enabled;
+            }
+            properties = properties with { Enabled = Enabled ?? properties.Enabled };
             if (path.EndsWith("/versions", StringComparison.Ordinal))
             {
                 var version = new ToolDefinitionVersionResource
@@ -504,7 +574,7 @@ public sealed class ToolRelayEditorTests
                 return Ok(new { value = new[] { version } });
             }
             if (path.EndsWith("/usages", StringComparison.Ordinal)) return Ok(new { value = Usages });
-            if (request.Method == HttpMethod.Put) Saved = await request.Content!.ReadFromJsonAsync<PutToolDefinitionRequest>(cancellationToken);
+            if (request.Method == HttpMethod.Put && !path.EndsWith("/enabled", StringComparison.Ordinal)) Saved = await request.Content!.ReadFromJsonAsync<PutToolDefinitionRequest>(cancellationToken);
             return Ok(new ToolDefinitionResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,

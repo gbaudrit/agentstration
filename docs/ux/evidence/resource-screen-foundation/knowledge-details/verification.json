@@ -1,0 +1,78 @@
+{
+  "browser": "154.0.8037.57",
+  "captures": [
+    "overview-desktop-en.png",
+    "invalid-retained-desktop-en.png",
+    "independent-yaml-desktop-en.png",
+    "yaml-stale-etag-desktop-en.png",
+    "concurrent-retained-desktop-en.png",
+    "projections-desktop-en.png",
+    "snapshots-desktop-en.png",
+    "tools-retained-desktop-en.png",
+    "access-desktop-en.png",
+    "overview-mobile-fr.png",
+    "navigation-drawer-mobile-fr.png",
+    "invalid-retained-mobile-fr.png",
+    "independent-yaml-mobile-fr.png",
+    "yaml-stale-etag-mobile-fr.png",
+    "concurrent-retained-mobile-fr.png",
+    "projections-mobile-fr.png",
+    "snapshots-mobile-fr.png",
+    "tools-retained-mobile-fr.png",
+    "access-mobile-fr.png"
+  ],
+  "checks": [
+    "desktop-en: actual deterministic projection/snapshot; keyboard/touch fragments and drawer; final focus; invalid lifecycle refresh; independent YAML original ETag rejection with unchanged server; concurrent draft/discard; retained tool publication input; access; bounds",
+    "mobile-fr: actual deterministic projection/snapshot; keyboard/touch fragments and drawer; final focus; invalid lifecycle refresh; independent YAML original ETag rejection with unchanged server; concurrent draft/discard; retained tool publication input; access; bounds"
+  ],
+  "productBaseHead": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+  "capturedSourceSha256": {
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor": "a7adcf72216905f446c1bde49d487c8f4e33607b3bd634efc8349199170ed857",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor": "37934ce18076a4b0f72f86b607b12d2c9986ac9b87524cee3de10ba797882933",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor": "7d8f386e65c7f7a51f2d9c69f8eec91e7fd735b6f77ac0b9215dd3c13233d142",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor": "e2045825ad0c2db36a053693c11ca6762d0ca2aaa712c0bbc9bdef24341acea4",
+    "src/Agentstration.Console.Components/Console/KnowledgeSourceEditorModel.cs": "c3b21c43203c0780875f73754396f5058aacb2a7a20948aabdbeeebbdb75b0d2",
+    "src/Agentstration.Console.Components/Console/KnowledgeSourceDetailsModel.cs": "3a93a8e9407efac169bf9883b253af1f43a14c7ffadced31b9b5ab7edd5a3d3f"
+  },
+  "capturedHostSha256": {
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.dll": "093d0acda9cf869b637838c65126be0c44ba58506dfac1f09637e478acc3dbb5",
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "fa52284ff14a907999827ae25a8b558842a4f6691025ff26b7256515b8bbfd84",
+    "automation/playwright/fixtures/SourcePolicyHost/bin/Release/net10.0/SourcePolicyHost.dll": "b3029e67a25b8d030b8ec638ba15a3d90790d74cc4101936c5d9763ee2b199ab"
+  },
+  "deliveredSourceSha256": {
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor": "a7adcf72216905f446c1bde49d487c8f4e33607b3bd634efc8349199170ed857",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor": "1cc1f0da773da27aa0e33655cffdf10399b9257e0bbf0f9005d40b0f88191086",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor": "04688f582ada8a7dc3095ce478fcea935c27fe55835f40648f82477e16125641",
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor": "e2045825ad0c2db36a053693c11ca6762d0ca2aaa712c0bbc9bdef24341acea4",
+    "src/Agentstration.Console.Components/Console/KnowledgeSourceEditorModel.cs": "c3b21c43203c0780875f73754396f5058aacb2a7a20948aabdbeeebbdb75b0d2",
+    "src/Agentstration.Console.Components/Console/KnowledgeSourceDetailsModel.cs": "3a93a8e9407efac169bf9883b253af1f43a14c7ffadced31b9b5ab7edd5a3d3f"
+  },
+  "captureSha256": {
+    "overview-desktop-en.png": "72590636f1938a68db517f864b76a83bceda6a53622b4d9bedeaa46c6d7beab2",
+    "invalid-retained-desktop-en.png": "4c61f8303caea9295b9c440fd834c3015c5a46ba054c93d96a4b26218cfbb2a8",
+    "independent-yaml-desktop-en.png": "c97a29d8a1fc56dd2b7b62a07cf7c91bebf58f3aa265de92870a2315dc81220b",
+    "yaml-stale-etag-desktop-en.png": "081b6346f8a7d4bcd113e465429c19e5fe5ce2d26b6d7c5c3b49152052b3e133",
+    "concurrent-retained-desktop-en.png": "5cfb41d200935268c9b857a9ecc666bc59024a27ca14ebed35fe9ac8cf35723e",
+    "projections-desktop-en.png": "5e3959ffe7e5f5445b6f522752d59d98dae92d205d24e7734506cff8ae36921e",
+    "snapshots-desktop-en.png": "53f51db0c10be2120fe2e48e6bff88a40cdd8494f74b785821d3af344615564f",
+    "tools-retained-desktop-en.png": "28575c8b3bd314e7daebe511d05aca2f6c0f0b4f5ddccc57279236f55163dcf7",
+    "access-desktop-en.png": "be689291d245a5e4f33a25905f5b94ab85bd3f796798714555022501eb65a060",
+    "overview-mobile-fr.png": "092812094b9a784f20d5ead80b076cad2cd88dca79496c3edf474cbe52116009",
+    "navigation-drawer-mobile-fr.png": "b2fdbd688abae554cce62170b22b4561501b75d6aa21f6c7178b6c36bd6faf03",
+    "invalid-retained-mobile-fr.png": "9ceb8051440d1db91c3f2b7115ffadd45c421d83493c9cc4ab570f6785608ea9",
+    "independent-yaml-mobile-fr.png": "e5e9b17743ef0dabbeeb08c7805e99ec0a38918a3f4a987ff1ab7d40abfe0e36",
+    "yaml-stale-etag-mobile-fr.png": "50c7c856c0533e62ed34b26e465ac688a1feeea9ba97f1164249d00acb6fa25b",
+    "concurrent-retained-mobile-fr.png": "4cd1344b4758882f3507770f160a52acbccbd776294ae4be68f7506da6c85a4b",
+    "projections-mobile-fr.png": "5ca3c5f749170e845b2258426a9b5d69566e832f79fefdc40b464b74c9f42350",
+    "snapshots-mobile-fr.png": "e2088e09a89fe8942c4f4286ab526dbda968be70a822feb854a2a365f0955505",
+    "tools-retained-mobile-fr.png": "1a3e508c02d6d828d3caccad31eec05dae0ca409b2c8fceec3aad282f5f55f78",
+    "access-mobile-fr.png": "4d39f0cad48620e2e7c2be680e4dc9d5eb81886b33713d156d624a1d46134640"
+  },
+  "validation": {
+    "maintainedFamilyBrowserCases": 6,
+    "nativeModes": 2,
+    "typescript": "passed",
+    "releaseBuild": "0 warnings, 0 errors",
+    "chronology": "Native captures precede final denied-save cleanup and obsolete-command guards; targeted component cases cover those final paths."
+  }
+}

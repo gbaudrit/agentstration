@@ -2,11 +2,11 @@
 <section class="entry-renderer" data-entry-role="@Role.ToString().ToLowerInvariant()" data-testid="workplace-entry" data-entry-id="@Definition.Id.Value" data-entry-namespace="@Definition.Id.Namespace.Value">
     @if (Definition.Presentation.Kind == EntryPresentationKind.Prompt)
     {
-        <PromptEntry Definition="Definition" InitialValue="@PrimaryInitialValue" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy"><Header>@ResourceHeader</Header></PromptEntry>
+        <PromptEntry Definition="Definition" InitialValue="@PrimaryInitialValue" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy" DraftChanged="DraftChanged"><Header>@ResourceHeader</Header></PromptEntry>
     }
     else if (Definition.Presentation.Kind == EntryPresentationKind.Form)
     {
-        <FormEntry Definition="Definition" InitialValues="InitialValues" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy"><Header>@ResourceHeader</Header></FormEntry>
+        <FormEntry Definition="Definition" InitialValues="InitialValues" OnSubmit="OnSubmit" Disabled="Disabled" Busy="Busy" DraftChanged="DraftChanged"><Header>@ResourceHeader</Header></FormEntry>
     }
     else
     {
@@ -26,6 +26,7 @@
     [Parameter, EditorRequired] public required EntryResource Definition { get; set; }
     [Parameter] public DashboardItemRole Role { get; set; } = DashboardItemRole.Standard;
     [Parameter, EditorRequired] public required EventCallback<IReadOnlyDictionary<string, JsonElement>> OnSubmit { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public IReadOnlyDictionary<string, JsonElement> InitialValues { get; set; } = new Dictionary<string, JsonElement>();

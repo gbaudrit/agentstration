@@ -65,7 +65,7 @@
                             <div class="access-actions" aria-label="@T("AllowedActions")">
                                 <label><FormCheckbox Value="@grant.Discover" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Discover, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Discover")</label>
                                 <label><FormCheckbox Value="@grant.Use" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Use, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Use")</label>
-                                <label><FormCheckbox Value="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" ValueChanged="changed => SetPropagation(grant, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("IncludeDescendants")</label>
+                                <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" ValueChanged="changed => SetPropagation(grant, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("IncludeDescendants")</label>
                             </div>
                             @if (canManage) { <CollectionActions ResourceName="@TargetName(grant.TargetScopeRef)"><button class="button-secondary" type="button" disabled="@saving" data-testid="resource-access-remove" @onclick="() => Remove(grant)">@T("Remove")</button></CollectionActions> }
                         </div>
@@ -83,7 +83,7 @@
                     <div class="access-actions">
                         <label><FormCheckbox @bind-Value="addDiscover" disabled="@saving" />@T("Discover")</label>
                         <label><FormCheckbox @bind-Value="addUse" disabled="@saving" />@T("Use")</label>
-                        <label><FormCheckbox @bind-Value="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
+                        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="addDescendants" disabled="@(saving || ResourceScopeRef.TryParse(selectedTarget, out var targetScope) && targetScope.Kind == ResourceScopeKind.Workspace)" />@T("IncludeDescendants")</label>
                     </div>
                     <small>@T("PendingGrantHelp")</small>
                     <button class="button-secondary" type="button" data-testid="resource-access-add" disabled="@(saving || string.IsNullOrWhiteSpace(selectedTarget) || (!addDiscover && !addUse))" @onclick="Add">@T("AddToList")</button>
@@ -157,6 +157,8 @@
     [Parameter, EditorRequired] public ResourceNamespace Namespace { get; set; }
     [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public Guid? ResourceUid { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
     [Parameter] public long? Generation { get; set; }
     [Parameter] public string? Version { get; set; }
     [Parameter] public ResourceGovernance Governance { get; set; } = ResourceGovernance.User;
@@ -190,10 +192,24 @@
             && grants.All(grant => grant.TargetScopeRef != value.ScopeRef))
         .OrderBy(value => ScopeRank(value.Kind)).ThenBy(value => value.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
 
+    private bool? reportedDraft;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var draft = dirty || HasPendingGrant;
+        if (reportedDraft == draft) return;
+        reportedDraft = draft;
+        await DraftChanged.InvokeAsync(draft);
+    }
+
     protected override async Task OnParametersSetAsync()
     {
-        var key = $"{OwnerScopeRef.Value}|{Namespace.Value}|{Kind}|{Name}|{Generation}|{Version}";
-        if (string.Equals(key, loadedKey, StringComparison.Ordinal)) return;
+        var resourceKey = ResourceUid is { } uid && uid != Guid.Empty ? uid.ToString("D") : Generation?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var key = $"{OwnerScopeRef.Value}|{Namespace.Value}|{Kind}|{Name}|{resourceKey}|{Version}";
+        if (string.Equals(key, loadedKey, StringComparison.Ordinal))
+        {
+            if (identity is not null) identity = identity with { Generation = Generation };
+            return;
+        }
         loadedKey = key;
         await LoadAsync();
     }
@@ -217,7 +233,7 @@
                 .SingleOrDefault(value => value.Namespace == Namespace
                     && string.Equals(value.Kind, Kind, StringComparison.Ordinal)
                     && string.Equals(value.Name, Name, StringComparison.Ordinal));
-            if (resource is null) { identity = null; return; }
+            if (resource is null || ResourceUid is { } expected && expected != Guid.Empty && resource.Uid != expected) { identity = null; return; }
             identity = new(resource.Uid, OwnerScopeRef, Namespace, Kind, Generation, Version);
             var snapshot = await Policies.GetAsync(resource.Uid, cancellation.Token);
             etag = snapshot?.ETag;

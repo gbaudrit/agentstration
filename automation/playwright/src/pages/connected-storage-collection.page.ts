@@ -3,6 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { ConnectedStorageCollectionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 import { CollectionContractPage } from './collection-contract.page.js';
+import { selectResourceSection } from './resource-sections.js';
 
 interface Descriptor { version: string; schemaDigest: string; contractDigest: string }
 interface TypeResource { metadata: { name: string; namespace: string }; scopeRef: string; uid: string; definition: { versions: Descriptor[] } }
@@ -79,8 +80,8 @@ export class ConnectedStorageCollectionPage {
     await row.getByTestId(TestIds.connectedStorageCollections.storageName).click();
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.storageDetails)).toBeVisible();
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
-    await this.cancelConfirmation(this.page.getByTestId(TestIds.connectedStorageCollections.storageDeactivate), locale);
-    await this.page.getByTestId(TestIds.connectedStorageCollections.storageDefinition).click();
+    await this.cancelConfirmation(this.page.getByTestId(TestIds.connectedStorageCollections.storageEnabled), locale);
+    await selectResourceSection(this.page, 'definition/identity');
     await this.clearAndRestore(this.page.getByTestId(TestIds.connectedStorageCollections.storageDisplayName), fixture.title);
     await this.assertNoOverflow();
   }
@@ -100,6 +101,17 @@ export class ConnectedStorageCollectionPage {
       await expect(usage).toHaveCount(1);
       await this.identity(usage, `${namespace}/${fixture.name}`, fixture.name, namespace, false);
     }
+    for (const section of ['definition/identity', 'definition/configuration', 'versions', 'yaml']) {
+      await selectResourceSection(this.page, section);
+      if (section === 'definition/identity') {
+        await expect(this.page.getByTestId(TestIds.storageTypeEditor.name)).toBeDisabled();
+        await expect(this.page.getByTestId(TestIds.storageTypeEditor.displayName)).toBeVisible();
+      }
+      if (section === 'versions') await expect(this.page.getByTestId(TestIds.storageTypeEditor.versionSelect)).toHaveValue('1.0.0');
+      if (section === 'yaml') await expect(this.page.getByTestId(TestIds.storageTypeEditor.yaml)).toHaveAttribute('readonly', '');
+      await this.assertNoOverflow();
+    }
+    await selectResourceSection(this.page, 'overview');
     await this.assertNoOverflow();
   }
 
@@ -112,8 +124,18 @@ export class ConnectedStorageCollectionPage {
     await row.getByTestId(TestIds.connectedStorageCollections.serviceName).click();
     const header = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDetails);
     await expect(header).toBeVisible();
-    await this.cancelConfirmation(header.getByRole('button', { name: ConnectedStorageCollectionTextByLocale[locale].deactivate, exact: true }), locale);
-    await this.page.getByTestId(TestIds.connectedStorageCollections.serviceDefinition).click();
+    const activation = header.getByRole('switch');
+    await expect(activation).toBeChecked();
+    await this.cancelConfirmation(activation, locale);
+    await expect(activation).toBeChecked();
+    for (const section of ['overview', 'discovery', 'access', 'yaml']) {
+      await selectResourceSection(this.page, section);
+      await expect(activation).toBeVisible();
+      await expect(activation).toBeChecked();
+      await this.assertNoOverflow();
+    }
+    await expect(this.page.getByTestId(TestIds.connectedStorageCollections.serviceYamlViewer).locator('textarea[readonly]')).toBeVisible();
+    await selectResourceSection(this.page, 'definition/identity');
     const field = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDisplayName);
     await expect(field).toBeVisible();
     await this.clearAndRestore(field, await field.inputValue());
@@ -148,28 +170,16 @@ export class ConnectedStorageCollectionPage {
   }
 
   private async inspectCatalog(consoleUrl: string, fixture: ConnectedStorageFixture): Promise<void> {
-    const qualified = `${fixture.namespaces[0]}/${fixture.type}`;
-    const evidence = this.page.locator('details').filter({
-      has: this.page.locator('.collection-qualified-name').filter({ hasText: qualified }),
-    });
-    await expect(evidence).toHaveCount(1);
-    await expect(evidence).toHaveJSProperty('open', false);
-    const summary = evidence.locator('summary');
-    const copy = summary.locator('.copy-value');
-    const before = this.page.url();
-    await copy.focus();
-    await copy.click();
-    await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(qualified);
-    expect(this.page.url()).toBe(before);
-    await expect(evidence).toHaveJSProperty('open', false);
-    await summary.focus();
-    await summary.press('Enter');
-    await expect(evidence).toHaveJSProperty('open', true);
-    await summary.press('Enter');
-    await expect(evidence).toHaveJSProperty('open', false);
-    await summary.locator('.resource-name-link').click();
+    const navigate = this.page.getByTestId(TestIds.connectedStorageCollections.storageTypesManage);
+    await expect(navigate).toHaveClass(/button-secondary/);
+    await expect(navigate).toHaveAttribute('href', /context=%2Finstance/);
+    await navigate.click();
+    await expect(this.page).toHaveURL(url => url.pathname === '/storage-types');
+    const row = this.page.getByTestId(TestIds.connectedStorageCollections.storageTypeRow)
+      .filter({ hasText: `${fixture.namespaces[0]}/${fixture.type}` });
+    await expect(row).toHaveCount(1);
+    await row.getByTestId(TestIds.connectedStorageCollections.storageTypeName).click();
     await expect(this.page).toHaveURL(url => url.pathname === `/storage-types/${fixture.type}`);
-    expect(new URL(this.page.url()).pathname).toBe(`/storage-types/${fixture.type}`);
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
     expect(new URL(this.page.url()).searchParams.get('scopeRef')).toBe('/instance');
     await this.open(consoleUrl, '/storages');

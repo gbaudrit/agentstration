@@ -11,6 +11,37 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ApiClientTests
 {
     [TestMethod]
+    public async Task ProviderCommandsRetainExactCoordinatesAndEtag()
+    {
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid()); var ns = new ResourceNamespace("shared.providers");
+        var requests = new List<(HttpMethod Method, string Path, string? Etag)>();
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            requests.Add((request.Method, request.RequestUri!.PathAndQuery, request.Headers.IfMatch.SingleOrDefault()?.ToString()));
+            var response = new HttpResponseMessage(HttpStatusCode.OK);
+            response.Content = request.Method == HttpMethod.Put ? JsonContent.Create(new ToolProviderResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolProvider,
+                ScopeRef = scope,
+                Metadata = new() { Name = "same", Namespace = ns },
+                Definition = new() { DisplayName = "Saved", ProviderType = ToolProviderType.Mcp }
+            }) : request.RequestUri!.AbsolutePath.EndsWith("/test", StringComparison.Ordinal)
+                ? JsonContent.Create(new ToolConnectionTestResponse("connected", 0, new Dictionary<string, bool>(), new Dictionary<string, string>()))
+                : JsonContent.Create(new ToolDiscoveryDiffResponse(0, 0, 0, 0, 0));
+            response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"updated\""); return response;
+        }))
+        { BaseAddress = new("http://localhost/") };
+        var client = new ToolsApiClient(http);
+        _ = await client.UpdateProviderAsync(scope, ns, "same", new(new() { DisplayName = "Saved", ProviderType = ToolProviderType.Mcp }), "\"original\"", default);
+        _ = await client.TestAsync(scope, ns, "same", default);
+        _ = await client.RefreshAsync(scope, ns, "same", default);
+        var query = $"?resourceNamespace=shared.providers&scopeRef={Uri.EscapeDataString(scope.Value)}";
+        CollectionAssert.AreEqual(new[] { "/api/toolproviders/same" + query, "/api/toolproviders/same/test" + query, "/api/toolproviders/same/refresh" + query }, requests.Select(r => r.Path).ToArray());
+        Assert.AreEqual("\"original\"", requests[0].Etag); Assert.AreEqual(HttpMethod.Put, requests[0].Method);
+    }
+
+    [TestMethod]
     public async Task ToolClientListsDesignerToolsInTheExplicitFlowContext()
     {
         var scope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));

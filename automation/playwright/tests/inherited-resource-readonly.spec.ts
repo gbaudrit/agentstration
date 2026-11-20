@@ -6,7 +6,7 @@ import { test } from '../src/fixtures/test.js';
 test.use({ authenticationMode: 'Local' });
 test.setTimeout(360_000);
 
-test('inherited resources remain usable but read-only outside their owner scope @smoke', async ({ page, product }) => {
+test('inherited resources remain usable but read-only outside their owner scope and restore owner draft commands @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await exerciseInheritedResourceReadOnly({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });
