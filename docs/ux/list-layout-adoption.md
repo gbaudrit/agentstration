@@ -105,3 +105,5 @@ Storages received a subsequent user-requested correction: supplementary type pan
 The Storage types list header now uses the concise localized destination label Stockages / Storages in place of Retour aux stockages / Back to Storages. [EN/FR desktop/mobile validation](evidence/list-layout/storage-types/header-review/README.md) covers reciprocal navigation with preserved context.
 
 Tools user-requested list correction: Removed the redundant Providers header button and the Enabled information column. Existing family tabs remain. Enabled stays available as an additional filter under More filters; predicates still evaluate the complete authorized catalog. [Updated validation](evidence/list-layout/tools/controls-review/README.md).
+
+ToolSets user-requested list correction: Removed the Knowledge Sources header shortcut. Existing Tool-family tabs, published versions, member/category columns, complete-catalog criteria and permissions remain unchanged. [Updated validation](evidence/list-layout/tool-sets/header-review/README.md).

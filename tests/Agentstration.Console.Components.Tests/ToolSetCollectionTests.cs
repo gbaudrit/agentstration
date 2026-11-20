@@ -26,7 +26,7 @@ public sealed class ToolSetCollectionTests
         using var context = Context(handler);
         var cut = context.Render<ToolSets>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.IsEmpty(cut.FindAll(".collection-actions, header a"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/sets/set-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         Assert.HasCount(5, cut.FindAll(".resource-tabs a"));

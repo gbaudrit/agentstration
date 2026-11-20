@@ -792,6 +792,10 @@
         "navigation": "Legitimate Tool-family destinations and Knowledge Sources action retained with context; exact owner-qualified name links replace redundant Inspect-only actions. No creation workflow invented.",
         "states": "Retained rows/view and stable query on compatible refresh; superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
         "validation": "ToolSetCollectionTests; deterministic desktop/mobile fixture smoke and source proof recorded in list-layout-adoption.md."
+      },
+      "headerReview": {
+        "change": "Knowledge Sources header shortcut removed by user request; five family tabs and all catalog information/filters retained.",
+        "evidence": "evidence/list-layout/tool-sets/header-review/README.md"
       }
     },
     {

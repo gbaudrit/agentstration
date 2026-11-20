@@ -13,7 +13,6 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
-    <Actions><a class="button-secondary" href="@Navigate("/knowledge-sources")">@T("KnowledgeSources")</a></Actions>
     <Navigation>
         <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a class="active" href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
     </Navigation>
