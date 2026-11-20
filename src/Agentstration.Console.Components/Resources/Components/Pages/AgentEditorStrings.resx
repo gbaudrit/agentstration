@@ -138,4 +138,5 @@
   <data name="ApplyPending" xml:space="preserve"><value>Changes to apply</value></data>
   <data name="DeploymentFailed" xml:space="preserve"><value>Error</value></data>
   <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer definition is available. Your draft and its original version are preserved. Discard changes to load the newer definition.</value></data>
+<data name="QuickActions" xml:space="preserve"><value>Quick actions</value></data>
 </root>

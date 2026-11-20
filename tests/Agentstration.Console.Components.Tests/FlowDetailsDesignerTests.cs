@@ -376,12 +376,12 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings>>();
 
         var headers = rendered.FindAll("thead th").Select(header => header.TextContent.Trim()).ToArray();
-        Assert.HasCount(3, headers);
+        Assert.HasCount(4, headers);
         Assert.AreEqual(strings["Updated"].Value, headers[2]);
         Assert.AreEqual("Active", rendered.Find("tbody .status-icon-only button").GetAttribute("aria-label"));
         var link = rendered.Find("tbody .resource-name-link");
         Assert.AreEqual("Multi-agent review", link.TextContent.Trim());
-        Assert.AreEqual("/namespaces/samples/flows/review", link.GetAttribute("href"));
+        Assert.AreEqual("/namespaces/samples/flows/review#overview", link.GetAttribute("href"));
         Assert.IsEmpty(rendered.FindAll("tbody .text-button"));
     }
 

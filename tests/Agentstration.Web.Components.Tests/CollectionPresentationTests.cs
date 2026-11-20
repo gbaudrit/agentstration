@@ -9,6 +9,23 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class CollectionPresentationTests
 {
     [TestMethod]
+    public async Task HiddenViewSwitchHasNoEmptyToolbarAndKeepsAutomaticResponsiveRendering()
+    {
+        using var context = Context();
+        var cut = context.Render<CollectionView<string>>(p => p.Add(c => c.Items, ["Setting"])
+            .Add(c => c.Identity, item => builder => builder.AddContent(0, item)).Add(c => c.InformationLabels, ["Value"])
+            .Add(c => c.Information, _ => builder => builder.AddContent(0, "Saved value")).Add(c => c.ShowViewSwitch, false));
+        Assert.IsEmpty(cut.FindAll(".collection-view-switch, .collection-toolbar"));
+        Assert.AreEqual(1, cut.Find(".resource-collection").ChildElementCount);
+        Assert.HasCount(1, cut.FindAll("table"));
+        await cut.InvokeAsync(() => cut.Instance.SetNarrow(true));
+        Assert.HasCount(1, cut.FindAll(".collection-card"));
+        Assert.IsEmpty(cut.FindAll(".collection-view-switch"));
+        await cut.InvokeAsync(() => cut.Instance.SetNarrow(false));
+        Assert.HasCount(1, cut.FindAll("table"));
+    }
+
+    [TestMethod]
     public async Task ViewSwitchPreservesIdentityAndInformationAndOmitsInapplicableState()
     {
         using var culture = new TestCultureScope("en-US");

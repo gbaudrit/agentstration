@@ -1,0 +1,113 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject IServiceProvider Services
+@inject ConsoleContextState ContextState
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="agent-resource-summary" data-testid="agent-summary">
+    @if (CanRun || CanApply || QuickActions is not null)
+    {
+        <ResourceQuickActions Title="@T("QuickActions")" TestId="agent-quick-actions" Busy="Busy">
+                @QuickActions
+                @if (CanRun) { <a class="button-primary" href="@RunHref" data-testid="agent-summary-run"><UiIcon Name="play-circle" />@T("Run")</a> }
+                @if (CanApply) { <button type="button" class="button-secondary" disabled="@(Busy || HasDraft)" title="@(HasDraft ? T("SaveBeforeApply") : null)" @onclick="OnReconcile" data-testid="agent-summary-reconcile"><UiIcon Name="refresh" />@T("ReconcileDeployment")</button> }
+        </ResourceQuickActions>
+    }
+    @if (ShowModelResolution || ActiveRevision?.Definition.ToolSetAssignments.Count > 0)
+    {
+    <div class="resource-overview-additional">
+        @if (ActiveRevision?.Definition.ToolSetAssignments.Count > 0)
+        {
+            <FormSection Title="@T("PinnedToolSetAssignments")" Eyebrow="@T("ActiveRevision")" Description="@T("PinnedToolSetAssignmentsHelp")" TestId="agent-active-toolsets"><Actions><code>@ActiveRevision.Metadata.Name</code></Actions><ChildContent>
+                <CollectionView TItem="ResolvedAgentToolSetAssignment" Items="ActiveRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal).ToArray()" InformationLabels="@(new[] { T("DefinitionHash"), T("EffectiveMembers") })">
+                    <Identity Context="assignment"><CollectionIdentity DisplayName="@assignment.ToolSetName" Namespace="@assignment.ToolSetNamespace.Value" Name="@assignment.ToolSetName" Href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(assignment.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="assignment.ToolSetScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(assignment.ToolSetScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+                    <Information Context="assignment"><CollectionValue Label="@T("DefinitionHash")"><code>@assignment.DefinitionHash</code></CollectionValue><CollectionValue Label="@T("EffectiveMembers")">@string.Join(", ", assignment.Members)</CollectionValue></Information>
+                    <Actions Context="assignment"><CollectionActions ResourceName="@assignment.ToolSetName"><a href="@ResourceOwnershipContext.Resource(Services, "/tools/sets", assignment.ToolSetName, assignment.ToolSetNamespace, assignment.ToolSetScopeRef)">@T("InspectToolSet")</a></CollectionActions></Actions>
+                </CollectionView>
+            </ChildContent></FormSection>
+        }
+        @if (ShowModelResolution)
+        {
+            <FormSection Title="@T("DeclaredAndResolved")"><Actions>@if (AgentModel is not null) { <StatusBadge Text="@ModelStatusLabel(AgentModel.Status)" Status="@ModelManagementUi.Status(AgentModel.Status)" /> }</Actions><ChildContent>
+                <div class="declaration-resolution-grid">
+                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@if (AgentModel is not null) { <a class="resource-name-link" href="@ProfileUrl(AgentModel)">@(AgentModel.Declared.ModelProfile.DisplayName ?? Resource.Definition.ModelProfile.Name)</a> } else { @Resource.Definition.ModelProfile.Name }</dd><dt>@T("Name")</dt><dd><code>@Resource.Definition.ModelProfile.Name</code></dd></dl></article>
+                    <article><h3>@T("ResolvedConfiguration")</h3>@if (AgentModel is null) { <p class="inline-warning">@ModelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@if (AgentModel.Resolved.Provider is { } provider) { <a class="resource-name-link" href="@ProviderUrl(AgentModel)">@(provider.DisplayName ?? provider.Name)</a> } else { @T("NotResolved") }</dd><dt>@T("Contribution")</dt><dd>@(AgentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@AgentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(AgentModel.Status)</dd></dl>}</article>
+                </div>
+            </ChildContent></FormSection>
+        }
+    </div>
+    }
+    @Identity
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="agent-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed">
+        <div><CollectionView TItem="ConfigurationEntry" Items="ConfigurationEntries" IdentityLabel="@T("ConfigurationEntry")" InformationLabels="@(new[] { T("ConfigurationValue") })" ShowViewSwitch="ShowConfigurationViewSwitch">
+                <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
+                <Information Context="entry"><CollectionValue Label="@T("ConfigurationValue")">@if (entry.Href is { } href) { <a class="resource-name-link configuration-value" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information>
+            </CollectionView></div>
+    </FormSection>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AgentResource Resource { get; set; } = null!;
+    [Parameter, EditorRequired] public RenderFragment Identity { get; set; } = null!;
+    [Parameter, EditorRequired] public string RunHref { get; set; } = string.Empty;
+    [Parameter] public AgentRevision? ActiveRevision { get; set; }
+    [Parameter] public AgentModelResponse? AgentModel { get; set; }
+    [Parameter] public string? ModelResolutionWarning { get; set; }
+    [Parameter] public bool CanReconcile { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool HasDraft { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ShowModelResolution { get; set; } = true;
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    [Parameter] public EventCallback OnReconcile { get; set; }
+    private bool CanRun => Resource.Namespace.IsDefault && ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    private bool CanApply => CanReconcile && ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private sealed record ConfigurationEntry(string Label, string Value, string? Href = null);
+    private IReadOnlyList<ConfigurationEntry> ConfigurationEntries
+    {
+        get
+        {
+            if (Resource is null) return [];
+            var definition = Resource.Definition;
+            var modelAddress = definition.ModelProfile.Resolve(Resource.Namespace, ModelResourceKinds.ModelProfile);
+            var runtimeAddress = definition.RuntimeProfile.Resolve(Resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
+            var rows = new List<ConfigurationEntry>
+            {
+                new(T("Handler"), definition.Handler),
+                new(T("Instructions"), definition.Instructions),
+                new(T("ModelProfile"), $"{modelAddress.Namespace}/{modelAddress.Name}", ResourceOwnershipContext.Resource(Services, "/modelprofiles", modelAddress.Name, modelAddress.Namespace, definition.ModelProfile.ScopeRef)),
+                new(T("RuntimeProfile"), $"{runtimeAddress.Namespace}/{runtimeAddress.Name}", ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", runtimeAddress.Name, runtimeAddress.Namespace, definition.RuntimeProfile.ScopeRef)),
+                new(T("Tools"), definition.Tools.Count == 0 ? Shared["NotProvided"] : string.Join("\n", definition.Tools.Select(value => $"{value.Namespace ?? Resource.Namespace}/{value.Name}"))),
+                new(T("GovernedToolSets"), definition.ToolSets.Count == 0 ? Shared["NotProvided"] : string.Join("\n", definition.ToolSets.Select(value => $"{value.ToolSet.Namespace ?? Resource.Namespace}/{value.ToolSet.Name}@{value.Version}")))
+            };
+            if (definition.InputSchemaBinding is not null || definition.InputSchema is not null)
+                rows.Add(new(T("InputContract"), JsonSerializer.Serialize((object?)definition.InputSchemaBinding ?? definition.InputSchema)));
+            if (definition.OutputSchemaBinding is not null || definition.OutputSchema is not null || definition.OutputContract is not null)
+                rows.Add(new(T("OutputContract"), JsonSerializer.Serialize((object?)definition.OutputSchemaBinding ?? (object?)definition.OutputContract ?? definition.OutputSchema)));
+            if (definition.Behaviors.Count > 0) rows.Add(new(T("Behaviors"), string.Join("\n", definition.Behaviors)));
+            if (definition.Middleware.Count > 0) rows.Add(new(T("Middleware"), string.Join("\n", definition.Middleware)));
+            if (definition.ContextProviders.Count > 0) rows.Add(new(T("ContextProviders"), string.Join("\n", definition.ContextProviders)));
+            foreach (var setting in definition.Settings.OrderBy(value => value.Key, StringComparer.Ordinal))
+                rows.Add(new(setting.Key, setting.Value.ToString()));
+            return rows;
+        }
+    }
+
+    private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
+    private static string ProfileUrl(AgentModelResponse value)
+    {
+        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef);
+    }
+
+
+    private static string ProviderUrl(AgentModelResponse value)
+    {
+        var provider = value.Resolved.Provider!;
+        return $"/modelproviders/{Uri.EscapeDataString(provider.ResourceId)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+    }
+
+
+}

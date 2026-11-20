@@ -69,8 +69,9 @@ public sealed partial class FlowDetailsDesignerTests
         context.WithResourceListContext();
         var cut = context.Render<Agentstration.Web.Components.Pages.Flows>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.HasCount(3, cut.FindAll("th"));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(4, cut.FindAll("th"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions-menu"));
+        Assert.IsEmpty(cut.FindAll(".collection-destructive-actions"));
         Assert.AreEqual("Resource", cut.FindAll("th")[0].TextContent);
         Assert.AreEqual("Version", cut.FindAll("th")[1].QuerySelector(".flow-version-heading")!.ChildNodes[0].TextContent.Trim());
         Assert.IsEmpty(cut.FindAll(".collection-qualified-name > svg"));

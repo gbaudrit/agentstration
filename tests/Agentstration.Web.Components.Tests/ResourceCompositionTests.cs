@@ -122,6 +122,27 @@ public sealed class ResourceCompositionTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task IdentityDisclosureCanStartOpenIndependentlyOfHeaderIdentity(bool headerOwnsIdentity)
+    {
+        using var context = Context();
+        var summary = context.Render<ResourceIdentitySummary>(p => p.Add(c => c.DisplayName, "Example")
+            .Add(c => c.TechnicalName, "example").Add(c => c.HeaderOwnsIdentity, headerOwnsIdentity)
+            .Add(c => c.Collapsible, true).Add(c => c.InitiallyCollapsed, false));
+        var toggle = summary.Find(".panel-disclosure");
+        Assert.AreEqual("true", toggle.GetAttribute("aria-expanded"));
+        await toggle.ClickAsync(new());
+        Assert.AreEqual("false", toggle.GetAttribute("aria-expanded"));
+        Assert.IsTrue(summary.Find(".form-section-body").HasAttribute("hidden"));
+        summary.Render();
+        Assert.AreEqual("false", toggle.GetAttribute("aria-expanded"));
+        await toggle.ClickAsync(new());
+        Assert.AreEqual("true", toggle.GetAttribute("aria-expanded"));
+        Assert.AreEqual(!headerOwnsIdentity, summary.FindAll("dd").Any(value => value.TextContent == "Example"));
+    }
+
+    [TestMethod]
     public void HeadersShowExactOwnerAndOmitTheProductEyebrow()
     {
         const string scopeLabel = "Instance";
