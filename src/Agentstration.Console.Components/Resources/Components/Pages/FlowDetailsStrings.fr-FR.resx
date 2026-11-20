@@ -94,4 +94,6 @@
 <data name="Metadata" xml:space="preserve"><value>Métadonnées enregistrées</value></data>
 <data name="IdentityMismatch" xml:space="preserve"><value>Le Flow renvoyé ne correspond pas à cette ressource.</value></data>
 <data name="Back" xml:space="preserve"><value>Retour aux Flows</value></data>
+  <data name="RefreshDraftConflict"><value>Le Flow enregistré ou son brouillon de métadonnées a changé ailleurs. Vos saisies sont conservées ; abandonnez-les pour charger la version plus récente.</value></data>
+  <data name="HistoryUnavailable"><value>Les versions publiées ou les exécutions récentes n’ont pas pu être chargées. Actualisez pour réessayer.</value></data>
 </root>

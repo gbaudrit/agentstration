@@ -26,7 +26,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `EntryEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ExtensionDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `FlowDesigner.razor` | Previously remaining | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
-| `FlowDetails.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `FlowDetails.razor` | New foundation migrated; verification below | Actual Flow identity and retained delegated or graph metadata forms; independent execution/Access and final family YAML | Not applicable |
 | `FlowOrchestrationEditor.razor` | Delegated definition reconciled; verification below | Shared retained form and exact owning Flow state/presentation dictionary; specialized references and independent publication draft preserved | Not applicable |
 | `FlowRunArtifactDetails.razor` | New foundation migrated; local verification below | Actual immutable Resource, retained content/storage and safe public metadata inspection | Not applicable |
 | `FlowRunDetails.razor` | Reviewed operational execution; shared states and verification below | Scoped FlowRun record, retained response/replay/causality rather than an editable Resource definition | Not applicable |
@@ -424,3 +424,12 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - New duplicate orchestration scenario **Not applicable**; transverse #1236 remains deferred. Protected Agent source/styles/translations are unchanged; no CI investigation or full solution lanes. This delegated screen is paired with the separately committed owning Flow detail migration.
 
 - Current reconciliation: **44/51** components verified; 7 remaining. The Agent reference is protected.
+
+### FlowDetails — saved Flow identity and independent execution
+
+- ConsoleResourceDetailsTemplate orders actual status/version/history metrics before saved Identity/tags and wrapping Configuration, followed by the specialized topology. Standard Definition exposes Identity then Configuration; runs/deployments and independently authorized Access precede final read-only family YAML. One presentation dictionary instance and ResourceSectionState feed the retained form or delegated orchestration editor; real Fields drive validation navigation/focus.
+- A private presentation envelope reuses the existing Flow contributor's actual UID/namespace/owner/governance/tags; its generation zero is never displayed as a business count. Draft metadata retains the original graph/ETag and unchanged exact tag values. Existing trimmed 200-character display-name validation is preserved. Changed reads buffer until explicit discard; activation retains unrelated invalid metadata/publication drafts. Denied history leaves independently authorized Flow inspection available with an unknown count; replaced/private/disposed targets reject late work.
+- 96 Console Flow and 104 designer/store cases pass within 397 coordinated checks. The overlapping final 121-case rerun and warning-free Release hosts validate the localized Save caption. Native EN/dark desktop and FR/light true-touch checks plus six maintained Flow/Agent cases pass: [18 real captures and exact hashes](evidence/resource-screen-foundation/flow-details/README.md). The topology's inherited generated English description/raw technical statuses remain an explicit limit.
+- Family metadata and published identity remain distinct until actual publication. No backend API, fictitious version/revision or generic loader was added. New duplicate Flow journey **Not applicable**; #1236 remains deferred. Protected Agent source/styles/translations are unchanged; no CI remediation or full solution lanes.
+
+- Current reconciliation: **45/51** components verified; 6 remaining. The Agent reference is protected.
