@@ -76,7 +76,7 @@ export class FormAdaptersPage {
     const choice = composer.locator('.composer-metadata select').first();
     const original = await choice.inputValue();
     await this.fields.clearField(choice, locale);
-    await expect(composer.locator('.validation-errors')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
+    await expect(choice.locator('..').locator('..').locator('.form-field-messages')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
     await composer.locator('[data-wizard-step=review]').click();
     await expect(create).toBeDisabled();
     await composer.locator('[data-wizard-step=identity]').click();
@@ -88,8 +88,12 @@ export class FormAdaptersPage {
 
   public async exerciseRegistryRequiredSelection(base: string, locale: SupportedTestLocale): Promise<void> {
     const before = await this.count(base, '/api/sourceregistries');
-    await this.page.goto(`${base}/settings/source-registries/new`);
-    await this.page.locator('.resource-form .form-field input').first().fill('Unsubmitted registry');
+    await this.page.goto(`${base}/settings/source-registries/new?context=%2Finstance`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const displayName = this.page.locator('.resource-form .form-field input').first();
+    await displayName.fill('Unsubmitted registry');
+    await displayName.press('Tab');
+    await expect(displayName).toHaveValue('Unsubmitted registry');
     await this.page.locator('[data-wizard-step=configuration]').click();
     const endpoint = this.page.locator('.resource-form input[type=url]');
     await endpoint.fill('https://example.test/index.json');
