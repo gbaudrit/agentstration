@@ -2,6 +2,7 @@
 @page "/runtimeprofiles/{Name}"
 @implements IDisposable
 @inject IRuntimeProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfilesStrings> CollectionLabels
 @inject NotificationState Notifications
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
@@ -20,7 +21,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("CreateProfile")" Description="@T("Description")" TestId="resource-runtime-profile-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Title="@T("CreateProfile")" Description="@T("Description")" TestId="resource-runtime-profile-editor"></PageHeader>
     @if (loading) { <LoadingState Message="@T("Loading")" /> }
     else
     {
@@ -34,7 +35,7 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="resource"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Resource="resource"
         Name="@(resource?.Definition.DisplayName ?? Name!)" ResourceType="@T("RuntimeProfile")" Domain="runtime" IconName="server"
         LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
         ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" DefinitionSections="DefinitionSections"
@@ -48,7 +49,7 @@ else
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
             OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
         <AdditionalContent Context="path">@Deployments</AdditionalContent>
-        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="runtime-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="runtime-profile-delete">@T("Delete")</button> }</Actions>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="runtime-profile-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="runtime-profile-save">@(busy ? T("Saving") : T("SaveChanges"))</button> }</DraftActions>
     </ConsoleResourceDetailsTemplate>
 }
