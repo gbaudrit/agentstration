@@ -11,10 +11,10 @@ sections; asynchronous discovery updates only cached observations and preserves
 the form draft, EditContext and original ETag. Unavailable extension metadata
 does not delay the saved provider overview or erase its stored bindings.
 
-A startup redirect exposed a layout lifetime race while JavaScript initialization
-was pending. Initialization now shares the layout cancellation token and finishes
-before module disposal; regressions cover both a delayed import and a delayed
-theme read, including prevention of late registrations and repeated disposal.
+General shell and FlowCanvas lifecycle fixes and global responsive shell overrides
+were withdrawn during scope review. The final change keeps Bootstrap-specific
+shell slots and the shared UX from main. Captures and smoke observations below
+record an earlier branch revision; they are not validation of the final PR head.
 
 ## Browser smoke
 
