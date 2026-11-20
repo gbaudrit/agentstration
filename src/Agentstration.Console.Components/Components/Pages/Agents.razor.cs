@@ -12,7 +12,7 @@ public partial class Agents
     private CancellationTokenSource? pending;
     private IReadOnlyList<AgentSummary>? items;
     private AgentstrationApiException? error;
-    private AgentSummary? pendingDelete, selected;
+    private AgentSummary? pendingDelete;
     private CollectionQuery query = new();
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private string? contextKey;
@@ -61,7 +61,6 @@ public partial class Agents
             var result = await Client.GetAgentsPageAsync(checked((requested.Page - 1) * requested.PageSize), requested.PageSize, token);
             if (!IsCurrent(requestRevision, scope)) return;
             items = result.Items; loadedPage = requested.Page; loadedSize = requested.PageSize; hasMore = result.HasMore; deploymentWindowComplete = result.DeploymentWindowComplete;
-            if (selected is not null) selected = items.FirstOrDefault(item => SameIdentity(item, selected));
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -74,10 +73,9 @@ public partial class Agents
             loadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed) { HasContent = items is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
         }
     }
-    private static bool SameIdentity(AgentSummary left, AgentSummary right) => left.ScopeRef == right.ScopeRef && left.Namespace == right.Namespace && left.Id == right.Id;
     private bool IsCurrent(long requestRevision, string scope) => !disposed && revision == requestRevision && CurrentContextKey == scope;
     private async Task RetryAsync() { if (Context.Error is not null) await Context.LoadAsync(cancellation.Token); await LoadAsync(); }
-    private void ClearCatalog() { items = null; selected = pendingDelete = null; error = null; hasMore = false; loadedPage = 1; loadedSize = 20; deploymentWindowComplete = true; }
+    private void ClearCatalog() { items = null; pendingDelete = null; preview?.Close(); error = null; hasMore = false; loadedPage = 1; loadedSize = 20; deploymentWindowComplete = true; }
     private void ContextChanged()
     {
         if (!initialized || disposed) return;
@@ -118,6 +116,8 @@ public partial class Agents
         finally { if (!disposed) deleting = false; }
     }
     private string EditUrl(AgentSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
+    private string OverviewUrl(AgentSummary item) => EditUrl(item).Split('#')[0] + "#overview";
+    private string DefinitionUrl(AgentSummary item) => EditUrl(item).Split('#')[0] + "#definition/configuration";
     private string RunUrl(AgentSummary item)
     {
         var url = EditUrl(item); var query = url.IndexOf('?');

@@ -9,4 +9,5 @@
   <data name="List.DeploymentUpdated"><value>Deployment updated</value></data>
   <data name="List.NoDeploymentObserved"><value>No deployment observed</value></data>
   <data name="List.DeploymentWindowLimited"><value>Deployment information may be incomplete. A missing observed match does not mean that an Agent is undeployed.</value></data>
+<data name="Preview" xml:space="preserve"><value>Preview</value></data>
 </root>

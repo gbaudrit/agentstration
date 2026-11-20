@@ -51,21 +51,13 @@
                 <MetricCard Label="@T("RecentRuns")" Value="@(runsKnown ? runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")" Detail="@(runsKnown ? SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded)) : T("HistoryUnavailable"))" Status="UiStatus.Neutral" />
             }
         </OverviewMetrics>
-        <OverviewConfiguration>
-            <CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-                <Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity>
-                <Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information>
-            </CollectionView>
-        </OverviewConfiguration>
-        <OverviewContent>
+        <OverviewSummary Context="identity">
             @if (flow is not null)
             {
-                <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible>
-                    <Actions>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</Actions>
-                    <ChildContent><FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" /></ChildContent>
-                </FormSection>
+                <FlowResourceSummary Resource="flow" Identity="identity" HeaderOwnsIdentity="true" PublishedVersion="@PublishedVersion" ReadOnly="@(!IsOwnerContext)"
+                    LastPublication="@(!versionsKnown || versions.Count == 0 ? null : versions.Max(value => value.PublishedAt))" />
             }
-        </OverviewContent>
+        </OverviewSummary>
         <DefinitionContent Context="path">
             @if (flow is not null && IsOrchestration)
             {

@@ -70,13 +70,10 @@ public partial class FlowDetails
     private static string? NormalizeDescription(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => version.Version == runVersion);
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
-    private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
     private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string StrategyLabel(FlowOrchestrationStrategy strategy) => Localizer[$"Strategy.{strategy}"];
     private string SucceededRunCount(int count) => T(count == 1 ? "SucceededRunCount.One" : "SucceededRunCount.Many", count);
-    private sealed record SavedSetting(string Label, string Value);
-    private IReadOnlyList<SavedSetting> SavedConfiguration => flow is null ? [] : [new(T("Kind"), FlowLabels[$"Kind.{flow.Definition.Kind}"]), new(Shared["Enabled"], Shared[flow.Enabled ? "Enabled" : "Disabled"]), new(T("PublishedVersion"), PublishedVersion ?? "—"), new(T("LastPublication"), !versionsKnown || versions.Count == 0 ? "—" : versions.Max(value => value.PublishedAt).LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture))];
 
     // Flow owns its repository and does not expose a Core Resource document. This presentation-only
     // envelope carries its existing identity/policy coordinates and published metadata verbatim.

@@ -85,6 +85,8 @@ public sealed class AgentResourceTemplateTests
         var cut = context.Render<AgentEditor>(p => p.Add(c => c.Name, "welcome"));
         cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("[data-testid=agent-resource-details]")));
         var sections = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.SectionState;
+        Assert.HasCount(1, cut.FindComponents<AgentResourceSummary>());
+        Assert.HasCount(1, cut.FindAll("[data-testid=agent-summary] [data-testid=agent-identity-summary]"));
         Assert.AreSame(sections, cut.FindComponent<ResourceDetailsTemplate>().Instance.SectionState);
         Assert.AreEqual(identity, cut.Find("[data-testid=agent-identity-summary] h2").TextContent);
         Assert.HasCount(3, cut.FindComponents<MetricCard>());
@@ -609,7 +611,7 @@ public sealed class AgentResourceTemplateTests
 
     private static BunitContext Context(HttpClient http, ResourceScopeRef? scope = null)
     {
-        var context = new BunitContext().WithCollectionPresentation();
+        var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
         foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "definition/model-execution", "definition/tools", "definition/contracts", "yaml", "access" })

@@ -1,0 +1,20 @@
+@namespace Agentstration.Web.Components
+@implements IDisposable
+@inject IFlowApiClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Pages.FlowDetailsStrings> Localizer
+
+<div class="flow-resource-preview" aria-busy="@((loadState.Status == ResourceLoadStatus.Loading).ToString().ToLowerInvariant())" data-testid="flow-preview-body">
+    @if (resource is null) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="flow-preview-retry" /> }
+    else
+    {
+        <FlowResourceSummary Resource="resource" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false" ShowLastPublication="false" ReadOnly="@(resource.ScopeRef?.Value != Context.Current?.SelectedScopeRef)">
+            <QuickActions>
+                <a class="button-secondary" href="@OverviewHref" data-testid="flow-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+                @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="flow-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+                @if (CanEdit && resource.Definition is not OrchestrationFlowDefinition) { <a class="button-primary" href="@DesignerHref" data-enhance-nav="false" data-testid="flow-preview-designer"><UiIcon Name="workflow" />@Localizer["OpenFlowDesigner"]</a> }
+            </QuickActions>
+        </FlowResourceSummary>
+    }
+</div>

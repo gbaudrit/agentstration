@@ -3,6 +3,8 @@
 @inject IJSRuntime JS
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 <div class="resource-collection @(Compact ? "collection-compact" : null)" @ref="root">
+    @if (Toolbar is not null || ShowViewSwitch)
+    {
     <div class="@(Toolbar is null ? null : "collection-toolbar")">
     @Toolbar
     @if (ShowViewSwitch)
@@ -13,6 +15,7 @@
     </div>
     }
     </div>
+    }
     @BeforeResults
     @if (!ShowItems)
     {

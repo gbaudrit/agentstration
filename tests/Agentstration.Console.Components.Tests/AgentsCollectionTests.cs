@@ -71,18 +71,21 @@ public sealed class AgentsCollectionTests
     }
 
     [TestMethod]
-    public async Task ContextNotificationClearsRowsInspectorAndRejectsLateResponseAndDenial()
+    public async Task ContextNotificationClearsRowsPreviewAndRejectsLateResponseAndDenial()
     {
         var old = new TaskCompletionSource<HttpResponseMessage>();
         var next = new TaskCompletionSource<HttpResponseMessage>();
         using var handler = new Handler((skip, take, call) => call switch { 1 => Task.FromResult(Page(skip, take, 1)), 2 => old.Task, 3 => next.Task, _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)) });
         using var context = Context(handler);
         var cut = context.Render<AgentsPage>();
-        await cut.FindAll(".collection-actions-menu button").Last().ClickAsync(new());
-        Assert.HasCount(1, cut.FindAll(".quick-inspector"));
+        Assert.AreEqual(0, handler.DetailReads);
+        await cut.Find("[data-testid=agent-preview]").ClickAsync(new());
+        Assert.HasCount(1, cut.FindAll("[data-testid=resource-preview-content]"));
+        Assert.HasCount(1, cut.FindComponents<Agentstration.Web.Components.AgentResourceSummary>());
+        Assert.AreEqual(1, handler.DetailReads);
         var refresh = cut.Find("[data-testid=resource-agents-refresh]").ClickAsync(new());
         await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
-        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll("[data-testid=agent-row], .quick-inspector")));
+        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll("[data-testid=agent-row], [data-testid=resource-preview-content]")));
         next.SetResult(Page(0, 20, 2));
         cut.WaitForAssertion(() => Assert.HasCount(2, cut.FindAll("[data-testid=agent-row]")));
         old.SetResult(Page(0, 20, 4));

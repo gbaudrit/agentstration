@@ -75,12 +75,13 @@
     },
     {
       "id": "flow-details-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
-      "line": 34,
+      "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
+      "line": 25,
       "host": "console",
       "routes": [
         "/flows/{FlowId}",
-        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/flows"
       ],
       "renderer": "CollectionView",
       "itemType": "SavedSetting",
@@ -99,22 +100,23 @@
           "tests/flow-observability.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+        "interpretation": "The same saved configuration renderer is used by the full Flow overview and on-demand Preview on /flows. Focused component checks and local browser smoke are reported in agents-summary-poc.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
-        "domainSemantics": "Saved Flow settings preserve actual kind, enablement and known publication data; definition and metadata remain explicit disclosures. Settings are not resource identities and gain no owner or row actions.",
+        "domainSemantics": "Saved Flow settings preserve actual kind, enablement and known publication data. Full detail uses its real publication history; on-demand Preview omits the unavailable publication date. Settings are not resource identities and gain no owner or row actions.",
         "evidenceStatus": "Source reconciliation verified by collection-surface-catalog.spec.ts; fresh browser results are reported separately."
       },
       "discoveredDuring": "2026-11-18 codex/ux-corrections resource-detail reconciliation"
     },
     {
       "id": "agent-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
-      "line": 62,
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "line": 43,
       "host": "console",
       "routes": [
-        "/agents/{Name}"
+        "/agents/{Name}",
+        "/agents"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -133,7 +135,7 @@
           "tests/create-agent.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "The current source and existing family regression mapping are recorded; historical captures are not proof of this populated configuration summary."
+        "interpretation": "The saved configuration renderer is shared by the full Agent overview and on-demand Preview on /agents. Focused component cases and local desktop/mobile smoke are recorded in agents-summary-poc.md; no new reusable UX journey is claimed."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -602,11 +604,10 @@
     },
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",
-      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
-      "line": 70,
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "line": 23,
       "host": "console",
       "routes": [
-        "/agents/new",
         "/agents/{Name}"
       ],
       "renderer": "CollectionView",
@@ -1922,7 +1923,7 @@
       "identityLabel": "CollectionResource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Version",
         "Updated"
@@ -1989,7 +1990,8 @@
         "kindPlacement": "name suffix",
         "versionPlacement": "dedicated column; active or definition version and existing workspace draft revision",
         "pagination": "server skip/top; 20/50/100 rows; nextLink-backed hasMore; total unknown",
-        "validation": "awaiting maintainer UX validation before wider adoption"
+        "validation": "awaiting maintainer UX validation before wider adoption",
+        "actions": "Independent Open, authorized Edit and on-demand Preview; no new mutation command."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -2099,7 +2101,7 @@
     {
       "id": "flow-details-flow-version-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
-      "line": 84,
+      "line": 92,
       "host": "console",
       "routes": [
         "/flows/{FlowId}",
@@ -17568,7 +17570,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
       "classification": "inventoried",
-      "reason": "Functional datasets include the current resource-detail configuration summary, explicitly enumerated in the shared frames. Navigation and fixed form choices remain controls."
+      "reason": "Definition navigation and fixed form choices remain controls. Saved overview configuration and pinned ToolSet collections now live in AgentResourceSummary."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
@@ -17713,7 +17715,7 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
       "classification": "inventoried",
-      "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."
+      "reason": "Publication history remains mapped above; saved configuration moved into FlowResourceSummary shared by detail and on-demand Preview. Definition and navigation options retain native semantics."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
@@ -18154,6 +18156,16 @@
       "source": "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor",
       "classification": "non-collection-control",
       "reason": "Generic resource-detail section mounting and navigation declarations are layout controls. Family-provided configuration collections retain their own concrete frame inventory."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted Agents overview configuration and pinned ToolSet collections retain their existing frame identities; quick actions are commands, not a dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted Flow saved configuration retains its existing frame identity, shared by detail and on-demand Preview; topology and quick actions are not datasets."
     }
   ],
   "reconciliation": {

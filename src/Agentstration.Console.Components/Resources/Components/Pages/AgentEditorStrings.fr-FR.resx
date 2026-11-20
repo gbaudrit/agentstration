@@ -138,4 +138,5 @@
   <data name="ApplyPending" xml:space="preserve"><value>À appliquer</value></data>
   <data name="DeploymentFailed" xml:space="preserve"><value>En erreur</value></data>
   <data name="RefreshDraftConflict" xml:space="preserve"><value>Une définition plus récente est disponible. Votre brouillon et sa version d’origine sont conservés. Annulez les modifications pour charger cette nouvelle définition.</value></data>
+<data name="QuickActions" xml:space="preserve"><value>Actions rapides</value></data>
 </root>

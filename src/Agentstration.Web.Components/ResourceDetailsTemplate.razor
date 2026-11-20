@@ -43,10 +43,13 @@
                     {
                         <div class="resource-overview" hidden="@(SectionState.CurrentPath != "overview")" data-testid="@SectionTestId("overview")">
                             @if (OverviewMetrics is not null) { <div class="resource-overview-metrics">@OverviewMetrics</div> }
-                            @OverviewContent
-                            <ResourceIdentitySummary DisplayName="@Name" TechnicalName="@(TechnicalName!)" Namespace="@Namespace" Description="@Description"
-                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" AdditionalContent="@IdentityContent" ResourceUid="ResourceUid" HeaderOwnsIdentity Scope="@(ScopeRef is null ? null : IdentityScope)" TestId="@SectionTestId("identity-summary")" />
-                            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")" Collapsible InitiallyCollapsed>@OverviewConfiguration</FormSection>
+                            @if (OverviewSummary is not null) { @OverviewSummary(SavedIdentity) }
+                            else
+                            {
+                                @OverviewContent
+                                @SavedIdentity
+                                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")" Collapsible InitiallyCollapsed>@OverviewConfiguration</FormSection>
+                            }
                         </div>
                         @if (SectionState.HasVisitedDefinition)
                         {
@@ -144,6 +147,7 @@
     [Parameter] public Guid? ResourceUid { get; set; }
     [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; }
     [Parameter] public RenderFragment? OverviewConfiguration { get; set; }
+    [Parameter] public RenderFragment<RenderFragment>? OverviewSummary { get; set; }
     [Parameter] public RenderFragment? OverviewContent { get; set; }
     [Parameter] public RenderFragment<string>? DefinitionContent { get; set; }
     [Parameter] public IReadOnlyList<ResourceNavigationItem> DefinitionSections { get; set; } = [];
@@ -161,6 +165,8 @@
     private ResourceNavigation? navigation;
     private bool drawerOpen;
     private bool UsesStandardSections => Content is null;
+    private RenderFragment SavedIdentity => @<ResourceIdentitySummary DisplayName="@Name" TechnicalName="@(TechnicalName!)" Namespace="@Namespace" Description="@Description"
+        Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" AdditionalContent="@IdentityContent" ResourceUid="ResourceUid" HeaderOwnsIdentity Scope="@(ScopeRef is null ? null : IdentityScope)" TestId="@SectionTestId("identity-summary")" />;
     private bool BlocksContent => LoadState?.BlocksContent == true;
     private bool ShowNavigation => NavigationSections.Count > 0 && !BlocksContent;
     private RenderFragment IdentityScope => @<ResourceScopeBadge ScopeRef="ScopeRef" />;
@@ -211,7 +217,9 @@
     {
         if (UsesStandardSections)
         {
-            if (!BlocksContent && (OverviewConfiguration is null || DefinitionContent is null || YamlContent is null || string.IsNullOrWhiteSpace(TechnicalName)))
+            if (OverviewSummary is not null && (OverviewConfiguration is not null || OverviewContent is not null))
+                throw new ArgumentException("A family summary owns overview content and configuration.", nameof(OverviewSummary));
+            if (!BlocksContent && ((OverviewSummary is null && OverviewConfiguration is null) || DefinitionContent is null || YamlContent is null || string.IsNullOrWhiteSpace(TechnicalName)))
                 throw new ArgumentException("Standard resource sections require saved identity, overview configuration, definition and YAML content.");
             if (Sections.Count > 0 || DefaultSection is not null)
                 throw new ArgumentException("Standard resource sections own the navigation and default destination.");
@@ -223,7 +231,7 @@
                 throw new ArgumentException("Section presentation must name a declared navigable destination.", nameof(SectionPresentations));
             if (!string.IsNullOrWhiteSpace(ResourceIdentity)) SectionState.Reset(ResourceIdentity);
         }
-        else if (DefinitionContent is not null || OverviewConfiguration is not null || YamlContent is not null || SectionPresentations.Count > 0)
+        else if (DefinitionContent is not null || OverviewSummary is not null || OverviewConfiguration is not null || YamlContent is not null || SectionPresentations.Count > 0)
             throw new ArgumentException("Use either standard resource regions or legacy content, not both.");
         if (NavigationSections.Count > 0 && string.IsNullOrWhiteSpace(ResourceIdentity))
             throw new ArgumentException("Resource navigation requires an exact resource/context identity.", nameof(ResourceIdentity));

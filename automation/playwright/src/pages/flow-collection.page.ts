@@ -38,11 +38,11 @@ export class FlowCollectionPage {
     expect(qualified).toMatch(/^[^\s]+\/[^\s]+$/);
     if (await this.root().locator('table').isVisible()) {
       const text = FlowCollectionTextByLocale[locale];
-      await expect(this.root().getByRole('columnheader')).toHaveCount(3);
+      await expect(this.root().getByRole('columnheader')).toHaveCount(4);
       await expect(this.root().getByRole('columnheader').nth(0)).toHaveText(text.resource);
       await expect(this.root().getByRole('columnheader').nth(1)).toContainText(text.version);
       await expect(this.root().getByRole('columnheader').nth(2)).toHaveText(text.updated);
-      await expect(this.root().locator('.collection-actions')).toHaveCount(0);
+      await expect(row.locator('.collection-actions')).toHaveCount(1);
     }
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
@@ -200,7 +200,7 @@ export class FlowCollectionPage {
     await copy.click();
     await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(`default/${id}`);
     expect(this.page.url()).toBe(before);
-    await expect(row.locator('.collection-actions')).toHaveCount(0);
+    await expect(row.locator('.collection-actions')).toHaveCount(1);
     expect(this.page.url()).toBe(before);
     const link = row.locator('a.resource-name-link');
     const destination = new URL((await link.getAttribute('href'))!, before);
