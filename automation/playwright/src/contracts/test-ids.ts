@@ -5,7 +5,7 @@ export const TestIds = {
     nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
   storageEditor: {
-    root: 'storage-editor', form: 'storage-form', fields: 'storage-definition-fields', identity: 'storage-identity-editor',
+    root: 'storage-editor', details: 'storage-details', refresh: 'storage-refresh', yaml: 'storage-yaml', form: 'storage-form', fields: 'storage-definition-fields', identity: 'storage-identity-editor',
     name: 'storage-name', displayName: 'storage-display-name', enabled: 'storage-enabled', type: 'storage-type',
     service: 'storage-service', configuration: 'storage-configuration', envelope: 'storage-envelope', save: 'storage-save',
   },

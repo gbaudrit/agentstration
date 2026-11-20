@@ -256,4 +256,5 @@
   <data name="Type.UsagesUnknown" xml:space="preserve"><value>Les utilisations n’ont pas pu être chargées. Réessayez pour consulter les références découvrables.</value></data>
   <data name="Type.Value" xml:space="preserve"><value>Valeur</value></data>
   <data name="DescendantUsePolicy" xml:space="preserve"><value>Politique d’utilisation descendante</value></data>
+  <data name="Availability.Unknown" xml:space="preserve"><value>Non observée</value></data>
 </root>

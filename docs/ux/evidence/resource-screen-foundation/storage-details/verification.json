@@ -1,0 +1,189 @@
+{
+  "base": "7a771c8261972a1e23cc216d075f40ae2682017d",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "f440bcb0de827ac332693dabb5d29192e6785cc5e994817aa150e4327d872086",
+    "automation/playwright/src/pages/connected-storage-collection.page.ts": "7f7df9b3a2c10d120e41a5aa5b7b040d5b8af316b57ee49c11bdf4ccb3d3ad32",
+    "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor": "eace538aaca4ce76175edc95029a1054db235cc4e3f69aa9734aff16ac0002bf",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.fr-FR.resx": "e9776180028badef5f4e2a870410544c964ef265469955fa22a6c8bf363446e7",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.resx": "19634d6d95c103e5cf0390f575d2109e1fee754a2a6e2a3a1148cc44b214c65d",
+    "tests/Agentstration.Console.Components.Tests/StorageComponentTests.DetailsFoundation.cs": "8f3b2f21705627897e7e8c3bcc58554607447d8d9a9021707a05c5f78ed1f29a",
+    "tests/Agentstration.Console.Components.Tests/StorageComponentTests.cs": "e8c8ca343f17cb1fa9552774980114642b2583b6c6796986be96986ad6937bc6",
+    "tests/Agentstration.Console.Components.Tests/StorageLocalizationTests.cs": "69a61a8c09238744d53bc9e3bfc0ea19431110de378820d7dccb2efeb4be77a2"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "c8ee7e92f1bfbb0628d0d6ace807282810052532b551dc1b7b2fa9e62bbf75a8",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "6b781e1b3f63d6118209ff4f126e7aac51592fc41c2283ee649122b62b366657",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "9a86192519ad153cb632cc1702282aed0e39b3b8428fa2e886f3d5e147e7fbc8",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "c8ee7e92f1bfbb0628d0d6ace807282810052532b551dc1b7b2fa9e62bbf75a8",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "c8ee7e92f1bfbb0628d0d6ace807282810052532b551dc1b7b2fa9e62bbf75a8",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "6b781e1b3f63d6118209ff4f126e7aac51592fc41c2283ee649122b62b366657",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "6b781e1b3f63d6118209ff4f126e7aac51592fc41c2283ee649122b62b366657",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "9a86192519ad153cb632cc1702282aed0e39b3b8428fa2e886f3d5e147e7fbc8",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "9a86192519ad153cb632cc1702282aed0e39b3b8428fa2e886f3d5e147e7fbc8"
+  },
+  "phases": [
+    {
+      "name": "storage-details",
+      "exitCode": 0,
+      "seconds": 127.7
+    },
+    {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 150.5
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "storage-details-overview-desktop-en.png",
+      "sha256": "36c4716a02e4521464d8a0050721146e0c1fe69ae7e069e7164430cb3591e0dc"
+    },
+    {
+      "file": "storage-details-invalid-identity-desktop-en.png",
+      "sha256": "c26c41eb7f2f48079d810a0ba73cc8aa35be4fd4cd9c8e75e305a8e425e44fc8"
+    },
+    {
+      "file": "storage-details-invalid-configuration-desktop-en.png",
+      "sha256": "73467ce238faeaa3a5f2a5a4153a04ecd85d2cc6b7d9897290832ed9fe7e0479"
+    },
+    {
+      "file": "storage-details-invalid-json-desktop-en.png",
+      "sha256": "aa62bb385be5f20ab0ff48d9ce1433507c240446f70ad192d162cc0c27e9d389"
+    },
+    {
+      "file": "storage-details-retained-refresh-desktop-en.png",
+      "sha256": "674538cdd3834387b545b460ede199711c04ad7493ff523ed695c29e51fae295"
+    },
+    {
+      "file": "storage-details-yaml-desktop-en.png",
+      "sha256": "afb708d190321991cad40678b52e12c61bf70542e8723c5b0c32f51c5726a263"
+    },
+    {
+      "file": "storage-details-retained-policy-desktop-en.png",
+      "sha256": "309330f2e5774d939b0651a60df707dd6672f753a9ed8aad6df09a980fbae0ee"
+    },
+    {
+      "file": "storage-details-etag-conflict-desktop-en.png",
+      "sha256": "7d62b061fda0159112340eb983e4f3638b72813b065df0fa9aa78f4689e68d21"
+    },
+    {
+      "file": "storage-details-rebind-cancel-desktop-en.png",
+      "sha256": "fcbe170c1ab66850ace4ab336030f1f503c3ae1b45cb3a56e1d48937faecbb81"
+    },
+    {
+      "file": "storage-details-rebound-desktop-en.png",
+      "sha256": "e001f8e699669c354523911e0cd989bddb790b2ebd54fd1a1d45dbc796a71da1"
+    },
+    {
+      "file": "storage-details-activation-cancel-desktop-en.png",
+      "sha256": "a1ca36eee2f38fd0769cf9e7123edb6e5dde6059b71b9c57a3020c983c4b4e31"
+    },
+    {
+      "file": "storage-details-activation-saved-desktop-en.png",
+      "sha256": "626ecc67583a54f9d4449aaf32b21e06a712e8c4f9b90698689349c3945d5092"
+    },
+    {
+      "file": "storage-details-use-policy-desktop-en.png",
+      "sha256": "e9fd8c55dcab923d6f4d01b9e0f355ba19abfe2ea42a86f4d21f9bd1ea2b6e33"
+    },
+    {
+      "file": "storage-details-diagnostics-desktop-en.png",
+      "sha256": "ff1b07fd7aaf0520356ff90af68a9b60c7ab11639edfec7cb4e75be54004e614"
+    },
+    {
+      "file": "storage-details-dependents-desktop-en.png",
+      "sha256": "ec30a3598ba814dc1587a26cdbaba8c0eecdb50b87cceccc496d3d25a3439ed9"
+    },
+    {
+      "file": "storage-details-overview-mobile-fr.png",
+      "sha256": "0adf348393e47f89ecd5378b14623aee14bd202d936a34d4c9deb69b2f0b33d2"
+    },
+    {
+      "file": "storage-details-invalid-identity-mobile-fr.png",
+      "sha256": "a5bec9fd66a510515faf93dff9741450a637a9fff4b10823b663b5406a007551"
+    },
+    {
+      "file": "storage-details-invalid-configuration-mobile-fr.png",
+      "sha256": "06a99af07d6b3c90ee3b4ba7e2d66d642a38e3a028757fefe3c08e72ccf0fa04"
+    },
+    {
+      "file": "storage-details-invalid-json-mobile-fr.png",
+      "sha256": "d3234ef5d3c66a437dca4279b3c89d5d1cc8549523981563b919d642ff7171bd"
+    },
+    {
+      "file": "storage-details-retained-refresh-mobile-fr.png",
+      "sha256": "cd3d6592aeef67beabda360615d9d1f01a170cfc5997fcd6dbdc34c787febd80"
+    },
+    {
+      "file": "storage-details-yaml-mobile-fr.png",
+      "sha256": "034ffad7b88b41d7fdc4db4f33221e7ff2f5372744c33161a15544cc58579305"
+    },
+    {
+      "file": "storage-details-retained-policy-mobile-fr.png",
+      "sha256": "621e4e6cf70f65022b82334f94dfc046b72f47eae6327c977fc1fe74a4d93c26"
+    },
+    {
+      "file": "storage-details-etag-conflict-mobile-fr.png",
+      "sha256": "58fecd5ed247f23649fd09b37d22588ca86de220175bcd464a81a9ff67b56da2"
+    },
+    {
+      "file": "storage-details-rebind-cancel-mobile-fr.png",
+      "sha256": "b470c2aaf9a2b515c8ca92ee6adddf3637eba1e8f246e6c764f052b0e51e62f9"
+    },
+    {
+      "file": "storage-details-rebound-mobile-fr.png",
+      "sha256": "b7af2bec568fa5fcd7996da84548923d626467382cac568a34fb6a76b1b3a5a7"
+    },
+    {
+      "file": "storage-details-activation-cancel-mobile-fr.png",
+      "sha256": "afa1a9c45017a884c60f792f503255543bcc2861319e00c553414137914ba9d9"
+    },
+    {
+      "file": "storage-details-activation-saved-mobile-fr.png",
+      "sha256": "959019e6d51e747c4c78b7e827aab67432972ce7047190aaea9cffaa41b5ae62"
+    },
+    {
+      "file": "storage-details-use-policy-mobile-fr.png",
+      "sha256": "54cec1081ebc5e746975f271a4617621dc244678b20d9b82adcbd19893222fd9"
+    },
+    {
+      "file": "storage-details-diagnostics-mobile-fr.png",
+      "sha256": "20c6469c4564fc5812c2f7b6e6716abecd924175181c0c759a5d1c6c10db84e9"
+    },
+    {
+      "file": "storage-details-dependents-mobile-fr.png",
+      "sha256": "e7843364e7b5cf47d8b824ed24674542725f2ea23f660c570eac76e0f8a553a5"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 65,
+    "logSha256": "3eb93892d32edeb4a35f31faa686b7bdc7486cb1c3befee372ef12cf65df1a51"
+  },
+  "maintainedRegression": {
+    "campaign": "storage-details-03",
+    "base": "7a771c8261972a1e23cc216d075f40ae2682017d",
+    "phase": {
+      "name": "connected-storage-regression",
+      "exitCode": 0,
+      "seconds": 150.5
+    },
+    "sourceHashesMatch": true,
+    "hostHashesMatch": true
+  },
+  "nativeProbeSha256": "5a31f3160ce5255dc511293bf1528b54fc3035798a935e6903c92bd032c72662",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ]
+}

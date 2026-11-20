@@ -81,7 +81,7 @@ export class ConnectedStorageCollectionPage {
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.storageDetails)).toBeVisible();
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
     await this.cancelConfirmation(this.page.getByTestId(TestIds.connectedStorageCollections.storageEnabled), locale);
-    await selectResourceSection(this.page, 'definition/configuration');
+    await selectResourceSection(this.page, 'definition/identity');
     await this.clearAndRestore(this.page.getByTestId(TestIds.connectedStorageCollections.storageDisplayName), fixture.title);
     await this.assertNoOverflow();
   }
