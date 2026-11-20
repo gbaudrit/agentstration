@@ -52,7 +52,7 @@ public sealed partial class ExtensionsConsoleTests
         Assert.HasCount(2, page.FindAll("[data-testid=creation-wizard-next], [data-testid=creation-wizard-next-top]"));
     }
     [TestMethod]
-    public async Task RegistrationWizardRetainsDraftAndEditContextAcrossTabsAndCatalogRefresh()
+    public async Task RegistrationWizardRetainsDraftAndEditContextAcrossStepsAndCatalogRefresh()
     {
         var client = new RegistrationCreationClient();
         using var context = ExtensionCreationContext(client);
@@ -63,8 +63,8 @@ public sealed partial class ExtensionsConsoleTests
         await page.InvokeAsync(() => page.FindComponent<CreationWizard>().Instance.GoToStepAsync("authentication"));
         await page.Find("[data-testid=extension-registration-authentication]").ChangeAsync(AepTransportAuthenticationMode.StaticBearer.ToString());
         page.Find("[data-testid=extension-registration-credential-name]").Input("keep-reference");
-        await page.Find("[data-testid=extensions-tab-summary]").ClickAsync(new());
-        await page.Find("[data-testid=extensions-tab-catalog]").ClickAsync(new());
+        await page.InvokeAsync(() => page.FindComponent<CreationWizard>().Instance.GoToStepAsync("identity"));
+        await page.InvokeAsync(() => page.FindComponent<CreationWizard>().Instance.GoToStepAsync("authentication"));
         await page.Find("[data-testid=extensions-catalog-refresh]").ClickAsync(new());
         Assert.AreSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
         Assert.AreEqual("authentication", page.FindComponent<CreationWizard>().Instance.CurrentStepId);

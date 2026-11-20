@@ -57,7 +57,7 @@ public partial class ExtensionDetails
     private string RouteKey => $"{RegistrationName}|{EnrollmentInstanceId}|{ResourceNamespaceValue}|{ScopeRefValue}|{ContextKey}";
     private string SavedDisplayName => RegistrationName is not null ? registration?.Value.Definition.DisplayName ?? RegistrationName : enrollment?.Definition.ExtensionName ?? item?.DisplayName ?? T("Extension");
     private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/extensions", Services);
-    private string EnrollmentManagementUrl => ResourceOwnershipContext.PreserveNavigation("/extensions?tab=enrollments", Services);
+    private string EnrollmentManagementUrl => ResourceOwnershipContext.PreserveNavigation(item?.EnrollmentInstanceId is { } instanceId ? $"/extensions?tab=enrollments&enrollment={instanceId:D}" : "/extensions?tab=enrollments", Services);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
     private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");

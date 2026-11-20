@@ -105,6 +105,14 @@ Flows also omits its former Actions/Open-only column: the primary resource-name 
 
 Future query support belongs to the family API/application boundary. Add an explicit filter declaration only once its evaluation over the declared query is real and tested.
 
+## Integrated operational list (Extensions POC)
+
+Use the existing `Metrics` slot for summary cards above a single collection. Avoid a separate summary tab that repeats counts and statuses already visible in the list. Extensions demonstrates this composition with loaded extensions, pending enrollments, connections and enrollment modes. Counts describe the loaded bounded inventory, not a global total; the snapshot limit is available through the metric's help tooltip. No search, filter or pagination capability is implied by this presentation.
+
+Use `ItemActions` for meaningful commands and `Details` with `IsExpanded` to reveal a row's operational form. This works in both table and card views. The screen owns selection and the exact domain identifier used to match the detail; Extensions matches an enrollment by its instance ID, never by a display name or endpoint. Keep mutations, permissions, scope choices and refresh cancellation in the family adapter. Shared components must not know about enrollment or AEP. Do not supply an empty secondary-action fragment, which would create a useless overflow menu.
+
+Use a compact contribution-count link to open the extension’s Contributions section, preserving the exact namespace, scope and context. This avoids increasing row height and gives access to existing resource links without guessing a destination from a contribution identifier. Use `ValueDisclosure` for long values that have no detail destination. Use the shared `ModalFrame` for occasional page-wide settings or registration forms; the enrollment policy must respect configuration locks and existing authorization. Old direct enrollment links may open the corresponding row without reintroducing page tabs.
+
 ## Validation and adoption
 
 Maintain affected existing component and browser regressions. Focused template tests cover column/additional filters, explicit apply, dates/numbers, reset, localized empty/error states, retained view, known totals and continuation controls. Pilot cases cover complete-catalog filtering, snapshot shrink, failed refresh/page retry, permissions, superseded responses and context replacement. Verify desktop/mobile against the deterministic executable and report actual checks and limitations.

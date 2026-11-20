@@ -72,7 +72,7 @@ public partial class Extensions
     private void StartCreate()
     {
         if (disposed || loading || saving || editing || !CanRegister) return;
-        activeTab = ExtensionTab.Catalog; creating = editing = true; form = new(); etag = null; InitializeRegistrationTracking();
+        creating = editing = true; form = new(); etag = null; InitializeRegistrationTracking();
     }
     private void RegistrationScopeChanged(ResourceScopeRef? scope)
     {

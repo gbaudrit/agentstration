@@ -40,7 +40,7 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions?tab=catalog");
         var cut = context.Render<Agentstration.Web.Components.Pages.Extensions>();
         cut.WaitForAssertion(() => Assert.HasCount(26, cut.FindAll("[data-testid=extension-inventory-row]")));
-        Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-pager, .collection-actions"));
+        Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-pager"));
         StringAssert.Contains(cut.Markup, help);
         await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
         client.InventoryLoader = _ => throw new HttpRequestException("Private transport detail");
@@ -103,7 +103,7 @@ public sealed partial class ExtensionsConsoleTests
         snapshot.SetResult(await new WritableContextProvider().GetAsync(default));
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("true", rendered.Find("[data-testid='extensions-tab-enrollments']").GetAttribute("aria-selected"));
+            Assert.AreEqual("true", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
             Assert.HasCount(2, rendered.FindAll(".enrollment-management-actions .collection-primary-actions button"));
             Assert.HasCount(1, rendered.FindAll(".enrollment-management-actions .collection-actions-panel button"));
             Assert.AreEqual(1, client.EnrollmentCalls);
@@ -138,7 +138,7 @@ public sealed partial class ExtensionsConsoleTests
     }
 
     [TestMethod]
-    public async Task ExtensionSectionsUseAccessibleTabs()
+    public async Task ExtensionListCombinesMetricsAndEnrollmentWithoutTabs()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = new BunitContext().WithCollectionPresentation();
@@ -155,28 +155,18 @@ public sealed partial class ExtensionsConsoleTests
 
         rendered.WaitForAssertion(() =>
         {
-            var tabs = rendered.FindAll("[role='tab']");
-            Assert.HasCount(3, tabs);
-            Assert.AreEqual("Synthèse", tabs[0].TextContent.Trim());
-            Assert.AreEqual("Extensions", tabs[1].TextContent.Trim());
-            Assert.AreEqual("Enrôlements", tabs[2].TextContent.Trim());
-            Assert.AreEqual("true", tabs[0].GetAttribute("aria-selected"));
-            _ = rendered.Find("#extensions-panel-summary");
-            var metrics = rendered.FindAll("#extensions-panel-summary .metric-card-link");
+            Assert.IsEmpty(rendered.FindAll("[role=tab]"));
+            var metrics = rendered.FindAll(".collection-page-metrics .metric-card");
             Assert.HasCount(4, metrics);
-            Assert.AreEqual("/extensions?tab=catalog", metrics[0].GetAttribute("href"));
-            Assert.AreEqual("/extensions?tab=enrollments", metrics[1].GetAttribute("href"));
-            Assert.AreEqual("/extensions?tab=catalog", metrics[2].GetAttribute("href"));
-            Assert.AreEqual("/extensions?tab=enrollments", metrics[3].GetAttribute("href"));
-            Assert.IsEmpty(rendered.FindAll("#extensions-panel-summary .panel-actions"));
+            StringAssert.Contains(metrics[0].TextContent, "Extensions chargées");
+            Assert.HasCount(1, rendered.FindAll("[data-testid=extensions-catalog] table"));
             Assert.AreEqual(0, client.ExtensionCalls, "The inventory already contains the extension projection; loading it separately duplicates live AEP inspections.");
         });
 
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            _ = rendered.Find("#extensions-panel-catalog");
+            _ = rendered.Find("[data-testid=extensions-catalog]");
             Assert.ThrowsExactly<ElementNotFoundException>(() => rendered.Find("[data-testid='extensions-tab-endpoints']"));
             Assert.AreEqual("Enregistrer un point de terminaison", rendered.Find("header button.button-primary").TextContent.Trim());
             StringAssert.Contains(rendered.Find("table").TextContent, "Enrôlement");
@@ -200,11 +190,11 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        await rendered.Find("[data-testid=extension-enrollment-settings]").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            var inputs = rendered.FindAll("section input[type='checkbox']");
+            var inputs = rendered.FindAll("dialog input[role=switch]");
             Assert.HasCount(2, inputs);
             Assert.IsTrue(inputs[0].HasAttribute("disabled"));
             Assert.IsFalse(inputs[1].HasAttribute("disabled"));
@@ -229,18 +219,18 @@ public sealed partial class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        await OpenEnrollmentAsync(rendered);
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Markup, "En attente");
             var card = rendered.Find("[data-testid='enrollment-card']");
-            _ = card.QuerySelector(".enrollment-status") ?? throw new AssertFailedException("The enrollment status stack is missing.");
+            _ = card.QuerySelector(".enrollment-details-heading .status-badge") ?? throw new AssertFailedException("The enrollment status stack is missing.");
             _ = card.QuerySelector(".enrollment-action-layout") ?? throw new AssertFailedException("The enrollment action layout is missing.");
             Assert.AreEqual("Enrôler l’extension", card.QuerySelector("button.button-primary")?.TextContent.Trim());
             Assert.IsNull(card.QuerySelector(".enrollment-actions details"), "Enrollment commands must be directly available.");
-            StringAssert.Contains(card.QuerySelector(".collection-identity-versions")!.TextContent, "1.0.0");
-            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", card.QuerySelector("a.resource-name-link")?.GetAttribute("href"));
-            Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/']"));
+            StringAssert.Contains(rendered.Find(".collection-identity-versions")!.TextContent, "1.0.0");
+            Assert.AreEqual("/extensions/llama-cpp-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", rendered.Find("a.resource-name-link")?.GetAttribute("href"));
+            Assert.IsNotNull(rendered.Find("a[href='http://localhost:5270/']"));
             Assert.IsNotNull(card.QuerySelector("a[href='http://localhost:5260/aep/enrollment/pair']"));
         });
 
@@ -354,7 +344,6 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.AddSingleton(contextState);
 
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -444,7 +433,6 @@ public sealed partial class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -470,7 +458,7 @@ public sealed partial class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        await OpenEnrollmentAsync(rendered);
 
         var actions = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions button");
         Assert.HasCount(3, actions);
@@ -503,7 +491,7 @@ public sealed partial class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        await OpenEnrollmentAsync(rendered);
         var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
@@ -531,15 +519,14 @@ public sealed partial class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-enrollments']").ClickAsync(new());
+        await OpenEnrollmentAsync(rendered);
         var unenroll = rendered.WaitForElements("[data-testid='enrollment-card'] .enrollment-management-actions .collection-primary-actions button")[1];
         await unenroll.ClickAsync(new());
         await rendered.Find("[role='alertdialog'] button.button-danger").ClickAsync(new());
-        await rendered.Find("[data-testid='extensions-tab-summary']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
-            var enrollmentMetric = rendered.FindAll("#extensions-panel-summary .metric-card-link")[1];
+            var enrollmentMetric = rendered.FindAll(".collection-page-metrics .metric-card")[1];
             StringAssert.Contains(enrollmentMetric.TextContent, "Enrôlements");
             StringAssert.Contains(enrollmentMetric.TextContent, "1 en cours");
             Assert.AreEqual("1", enrollmentMetric.QuerySelector("strong")?.TextContent.Trim());
@@ -558,7 +545,6 @@ public sealed partial class ExtensionsConsoleTests
         context.Services.AddSingleton<ISourceProvidersClient>(new FakeSourceProvidersClient());
         context.Services.AddSingleton(new NotificationState());
         var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
-        await rendered.Find("[data-testid='extensions-tab-catalog']").ClickAsync(new());
 
         rendered.WaitForAssertion(() =>
         {
@@ -893,6 +879,145 @@ public sealed partial class ExtensionsConsoleTests
         };
     }
 
+    [TestMethod]
+    public async Task EnrollmentDetailsFollowTheRowAcrossViewsWithoutAnEmptyActionMenu()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(false));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await OpenEnrollmentAsync(rendered);
+        Assert.HasCount(1, rendered.FindAll(".collection-expanded [data-testid=enrollment-card]"));
+        Assert.IsEmpty(rendered.FindAll(".collection-actions-menu"));
+        var contribution = rendered.Find("a.extension-contributions-link");
+        StringAssert.Contains(contribution.TextContent, "1 contribution");
+        StringAssert.Contains(contribution.GetAttribute("href"), "scopeRef=%2Finstance&context=%2Finstance#contributions");
+        Assert.AreEqual("model-provider:llama.cpp", contribution.GetAttribute("title"));
+        await rendered.FindAll(".collection-view-switch button")[1].ClickAsync(new());
+        Assert.HasCount(1, rendered.FindAll(".collection-card"));
+        Assert.HasCount(1, rendered.FindAll(".collection-expanded [data-testid=enrollment-card]"));
+        await rendered.Find("[data-testid=extension-enrollment-open]").ClickAsync(new());
+        Assert.IsEmpty(rendered.FindAll("[data-testid=enrollment-card]"));
+        Assert.AreEqual("false", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
+    }
+
+    [TestMethod]
+    public async Task EnrollmentCommandsRequireWritePermissionAndAnExactInstanceMatch()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        var seed = (await client.GetExtensionInventoryAsync(default))[0];
+        client.InventoryLoader = _ => Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([seed with { EnrollmentInstanceId = Guid.NewGuid() }]);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=extension-inventory-row]")));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=enrollment-card]"));
+        Assert.IsGreaterThanOrEqualTo(1, client.EnrollmentCalls);
+    }
+
+    [TestMethod]
+    public void ReadOnlyInventoryDoesNotReadOrExposeEnrollmentAdministration()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=extension-inventory-row]")));
+        Assert.AreEqual(0, client.EnrollmentCalls);
+        Assert.HasCount(2, rendered.FindAll(".collection-page-metrics .metric-card"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=extension-enrollment-open], [data-testid=extension-enrollment-settings], header button.button-primary"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void ContributionsLinkOpensTheRequestedSection(string locale)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IExtensionsClient>(new FakeExtensionsClient(configured: true));
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions/llama-cpp-local?namespace=default#contributions");
+        ConfigureExtensionNavigation(context);
+        var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters.Add(value => value.RegistrationName, "llama-cpp-local"));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("page", rendered.Find("[data-resource-section=contributions]").GetAttribute("aria-current"));
+            var contribution = rendered.Find("[data-testid=extension-contribution-list] [data-contribution-id='llama.cpp']");
+            Assert.IsNotNull(contribution.QuerySelector("a[href='/modelproviders/llama-cpp-local?namespace=default']"));
+        });
+    }
+
+    [TestMethod]
+    public async Task EnrollmentSwitchesKeepSavedValuesOnCancelAndSubmitTheExistingSettingsEtag()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false, new(true, true, true, true, "settings-etag"));
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        await rendered.WaitForElement("[data-testid=extension-enrollment-settings]").ClickAsync(new());
+        var switches = rendered.FindAll("dialog input[role=switch]");
+        switches[0].Change(false);
+        Assert.IsTrue(switches[1].HasAttribute("checked"));
+        StringAssert.Contains(rendered.FindAll(".metric-card")[3].TextContent, "2/2");
+        await rendered.Find("dialog .form-actions .button-secondary").ClickAsync(new());
+        Assert.IsNull(client.UpdatedSettings);
+        await rendered.Find("[data-testid=extension-enrollment-settings]").ClickAsync(new());
+        Assert.IsTrue(rendered.Find("dialog input[role=switch]").HasAttribute("checked"));
+        rendered.Find("dialog input[role=switch]").Change(false);
+        await rendered.Find("dialog .form-actions .button-primary").ClickAsync(new());
+        Assert.AreEqual((false, true, "settings-etag"), client.UpdatedSettings!.Value);
+        Assert.IsEmpty(rendered.FindAll("dialog"));
+        StringAssert.Contains(rendered.FindAll(".metric-card")[3].TextContent, "1/2");
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task DirectEnrollmentLinkOpensOnlyTheRequestedInstance(bool matches)
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        var seed = (await client.GetExtensionInventoryAsync(default))[0];
+        var requested = matches ? seed.EnrollmentInstanceId : Guid.NewGuid();
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/extensions?tab=enrollments&enrollment={requested:D}");
+        var rendered = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.HasCount(matches ? 1 : 0, rendered.FindAll("[data-testid=enrollment-card]"));
+            Assert.AreEqual(matches ? "true" : "false", rendered.Find("[data-testid=extension-enrollment-open]").GetAttribute("aria-expanded"));
+        });
+    }
+
+    private static async Task OpenEnrollmentAsync(IRenderedComponent<Agentstration.Web.Components.Pages.Extensions> rendered)
+    {
+        var toggle = rendered.WaitForElement("[data-testid=extension-enrollment-open]");
+        if (toggle.GetAttribute("aria-expanded") != "true") await toggle.ClickAsync(new());
+    }
+
     private sealed class FakeExtensionsClient(bool configured, AepEnrollmentSettingsSnapshot? settings = null, bool completesPairing = false, bool source = false, bool availableEnrollment = false) : IExtensionsClient
     {
         private readonly Guid enrollmentId = Guid.NewGuid();
@@ -903,6 +1028,7 @@ public sealed partial class ExtensionsConsoleTests
         public int RotateCalls { get; private set; }
         public int ExtensionCalls { get; private set; }
         public int UnenrollmentCalls { get; private set; }
+        public (bool PairingCodeEnabled, bool SharedKeyFileEnabled, string? ETag)? UpdatedSettings { get; private set; }
 
         public Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken)
         {
@@ -961,6 +1087,12 @@ public sealed partial class ExtensionsConsoleTests
 
         public Task<AepEnrollmentSettingsSnapshot> GetEnrollmentSettingsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(settings ?? new AepEnrollmentSettingsSnapshot(true, true, true, true, null));
+
+        public Task<AepEnrollmentSettingsSnapshot> UpdateEnrollmentSettingsAsync(bool pairingCodeEnabled, bool sharedKeyFileEnabled, string? etag, CancellationToken cancellationToken)
+        {
+            UpdatedSettings = (pairingCodeEnabled, sharedKeyFileEnabled, etag);
+            return Task.FromResult(new AepEnrollmentSettingsSnapshot(pairingCodeEnabled, sharedKeyFileEnabled, true, true, "updated-settings-etag"));
+        }
 
         public Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken)
         {

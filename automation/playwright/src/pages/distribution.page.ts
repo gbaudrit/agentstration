@@ -134,7 +134,6 @@ export class DistributionPage {
   public async inspectDirectEnrollmentActions(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions?tab=enrollments&context=%2Finstance', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.distribution.extensionEnrollmentsTab).click();
     const primary = this.page.locator('.enrollment-actions .collection-primary-actions button').first();
     await expect(primary).toBeVisible();
     await expect(primary.locator('xpath=ancestor::details')).toHaveCount(0);
@@ -148,7 +147,7 @@ export class DistributionPage {
       await expect(trigger).toBeFocused();
       await expect(menu).not.toHaveAttribute('open', '');
     }
-    const identity = this.page.locator('.enrollment-identity .collection-identity').first();
+    const identity = this.page.getByTestId(TestIds.distribution.extensionInventoryRow).locator('.collection-identity').first();
     await expect(identity.locator('.collection-version')).toBeVisible();
     const viewport = await this.page.evaluate(() => ({
       width: innerWidth,
@@ -179,8 +178,7 @@ export class DistributionPage {
     await this.open(consoleUrl, '/extensions', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     this.referenceContext = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
-    await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
-    const detail = this.page.locator('#extensions-panel-catalog a.resource-name-link[href^="/extensions/"]').first();
+    const detail = this.page.getByTestId(TestIds.distribution.extensionCatalog).locator('a.resource-name-link[href^="/extensions/"]').first();
     await detail.waitFor({ state: 'visible' });
     await detail.click();
     await this.page.getByTestId(TestIds.distribution.extensionDetails).waitFor({ state: 'visible' });

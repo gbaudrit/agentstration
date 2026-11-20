@@ -18,6 +18,7 @@ public sealed class ExtensionRegistrationEditorModel
     public static ExtensionRegistrationEditorModel From(Resource? resource, ExtensionInventoryItemResponse item) => new()
     {
         Name = resource?.Name ?? string.Empty,
+        Description = item.Extension?.Extension?.Description,
         Namespace = resource?.Namespace.Value ?? ResourceNamespace.DefaultValue,
         Tags = resource is null ? string.Empty : string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(value => value.Key, StringComparer.Ordinal).Select(value => $"{value.Key}={value.Value}")),
         DisplayName = resource is ExtensionRegistrationResource saved ? saved.Definition.DisplayName : resource is AepEnrollmentRequestResource request ? request.Definition.ExtensionName : item.DisplayName,

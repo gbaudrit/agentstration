@@ -17,30 +17,29 @@
         @if (commandError is not null) { <div class="form-alert form-alert-danger" role="alert">@commandError</div> }
         @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
     </div>;
-    RenderFragment actions = @<text>@if (CanEditRegistration) { <button type="button" class="button-secondary" @onclick="EditIdentity">@T("Edit")</button> }
-        @if (CanDeleteRegistration) { <button type="button" class="button-danger" @onclick="() => confirmDelete = true" disabled="@Busy">@T("Delete")</button> }
-        <a class="button-secondary" href="@BackUrl">@T("BackToExtensions")</a></text>;
+    RenderFragment? actions = !CanDeleteRegistration ? null : @<button type="button" class="button-danger" @onclick="() => confirmDelete = true" disabled="@Busy">@T("Delete")</button>;
     RenderFragment configuration = @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
         <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
         <Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href" target="_blank" rel="noopener noreferrer">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information>
     </CollectionView>;
-    RenderFragment metrics = @<text><MetricCard Label="@T("ObservedVersion")" Value="@(item?.Version ?? "—")" />
+    RenderFragment metrics = @<text><MetricCard Label="@T("Availability")" Value="@(item is null ? "—" : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))" />
         @if (item?.Extension is { } extension) { <MetricCard Label="@T("Contributions")" Value="@extension.Contributions.Count.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("BundleInstallations")" Value="@((extension.BundleInstallations?.Count ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture))" /> }</text>;
 }
 @if (SavedResource is not null || loadState.BlocksContent)
 {
-    <ConsoleResourceDetailsTemplate Resource="SavedResource" Name="@SavedDisplayName" ResourceType="@(RegistrationName is null ? T("Enrollment") : T("Extension"))" Domain="extension" IconName="puzzle"
+    <ConsoleResourceDetailsTemplate Resource="SavedResource" Name="@SavedDisplayName" ResourceType="@(RegistrationName is null ? T("Enrollment") : T("Extension"))" Domain="extension" IconName="puzzle" Version="@item?.Version" VersionDescription="@T("ObservedVersion")"
+        CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")"
         Description="@item?.Extension?.Extension?.Description" StatusText="@(item is null ? null : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" AdditionalContent="FamilySection"
         NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" SectionTestIdPrefix="extension" TestId="distribution-extension-details"
         HasDraft="HasDefinitionDraft" HasAdditionalDraft="@(migrationPreview is not null)" Busy="Busy" Feedback="feedback" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" ShowRefreshAction="true"
         DefinitionReadOnlyReason="@(CanEditRegistration ? null : RegistrationName is null ? ResourceReadOnlyReason.Unspecified : registration?.Value.Definition.Source is ExtensionRegistrationSource.Configuration or ExtensionRegistrationSource.Aspire ? ResourceReadOnlyReason.Managed : ResourceReadOnlyReason.InsufficientPermissions)" AllowAccess="@(RegistrationName is not null && registration is not null)"
         Enabled="@(RegistrationName is null ? null : registration?.Value.Definition.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanEditRegistration || Busy)" EnabledTestId="extension-enabled"
-        Yaml="@SavedYaml" YamlTitle="@(RegistrationName is null ? T("Enrollment") + " · " + Shared["Yaml"] : T("RegistrationYaml"))" YamlDescription="@T("YamlReadOnlyProjection")" YamlReadOnly="true" Actions="actions">
+        Yaml="@SavedYaml" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("YamlReadOnlyProjection")" YamlReadOnly="true" MoreActions="actions">
         <OverviewMetrics>@metrics</OverviewMetrics>
         <OverviewConfiguration>@configuration</OverviewConfiguration>
         <OverviewContent>@FamilySection("connections")</OverviewContent>
-        <IdentityDetails>@if (item is not null) { <dt>@T("ExtensionId")</dt><dd><code>@item.ExtensionId</code></dd> }</IdentityDetails>
+        <IdentityDetails>@if (item is not null) { <dt>@T("ExtensionId")</dt><dd><CopyableValue Value="@item.ExtensionId" PlainText /></dd> }</IdentityDetails>
         <DefinitionContent Context="path">
             <ResourceDefinitionForm @key="form" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="extension-registration-form" FormName="extension-registration"
                 Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
@@ -54,7 +53,7 @@ else
     <UnsavedNavigationGuard IsDirty="@(migrationPreview is not null)" />
     <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" Description="@item?.Extension?.Extension?.Description"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" Sections="OperationalSections" SelectionChanged="OperationalSectionSelected" DefaultSection="overview"
-        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" Actions="actions">
+        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" MoreActions="actions" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")">
         <Content>@if (item is not null)
         {
             <div class="resource-editor-view" hidden="@(!sectionState.Is("overview"))">

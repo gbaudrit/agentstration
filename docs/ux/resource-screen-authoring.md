@@ -81,6 +81,12 @@ Declared section actions render in the content column below the section and befo
 
 Existing adopters using `Content` and `Sections` remain supported during migration. Do not combine that compatibility contract with standard region content. Agent demonstrates the standard contract; this increment does not migrate other resource families or creation flows.
 
+## Extensions adoption
+
+The Extension detail route `/extensions/{RegistrationName}` uses `ConsoleResourceDetailsTemplate`, `ResourceDefinitionForm` and `ResourceIdentityEditor`. Its persisted registration remains the authority for UID, namespace, scope, enablement, validation and ETag. The saved observed version belongs in the header, while availability, contributions and bundle counts occupy the metrics region. Creation uses the shared `CreationWizard` inside the registration dialog, with retained Identity, Connection, Authentication and Review stages. Authorization to create a Tenant registration remains independent of permission to read the aggregated inventory.
+
+Preserve the unified Extensions collection with its row enrollment editor and policy switches. Contribution-count links use the exact extension coordinates plus `#contributions`; details use the shared fragment navigation. The enrollment-management link supplies the instance ID so the collection opens that request, and an unavailable requested ID must never expand a different request. Registration metadata and associated enrollment reads remain independently authorized. A failure reading enrollment must not clear an otherwise authorized registration or its pending form.
+
 ## Inputs and named regions
 
 | Input/region | Required use |

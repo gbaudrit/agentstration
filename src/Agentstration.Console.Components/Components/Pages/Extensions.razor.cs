@@ -25,7 +25,9 @@ public partial class Extensions
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
     private static readonly JsonSerializerOptions IndentedWebJsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    private ExtensionTab activeTab = ExtensionTab.Summary;
+    private Guid? expandedEnrollmentId;
+    private bool showEnrollmentSettings;
+    private bool requestedEnrollmentOpened;
 
     private readonly CancellationTokenSource cancellation = new();
     private Task? initialLoad;
@@ -61,6 +63,8 @@ public partial class Extensions
     private readonly Dictionary<Guid, ResourceScopeRef?> enrollmentScopes = [];
     [Parameter, SupplyParameterFromQuery(Name = "tab")]
     public string? RequestedTab { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "enrollment")]
+    public Guid? RequestedEnrollmentId { get; set; }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
     private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
@@ -71,7 +75,7 @@ public partial class Extensions
     private int EnabledRegistrationCount => registrations?.Count(value => value.Definition.Enabled) ?? 0;
     private int ActiveEnrollmentCount => enrollments?.Count(value => value.Definition.State is AepEnrollmentState.Pending
         or AepEnrollmentState.Unpaired or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
-    private int EnabledEnrollmentModeCount => (pairingCodeEnabled ? 1 : 0) + (sharedKeyFileEnabled ? 1 : 0);
+    private int EnabledEnrollmentModeCount => (enrollmentSettings?.PairingCodeEnabled == true ? 1 : 0) + (enrollmentSettings?.SharedKeyFileEnabled == true ? 1 : 0);
     private ConsoleContextState? catalogContext;
     private string? catalogContextKey;
     private string CurrentCatalogContext => $"{catalogContext?.Current?.UserId:D}|{catalogContext?.Current?.SelectedScopeRef}|{catalogContext?.Current?.TenantId:D}|{catalogContext?.Current?.WorkspaceId:D}";
@@ -95,7 +99,7 @@ public partial class Extensions
             pendingDelete = null; migrationPreview = null; pendingUnenrollment = null;
             activePairingCode = null; activePairingExpiry = null; activePairingUri = null; activeEnrollmentId = null; enrollmentScopes.Clear();
             catalogContextKey = CurrentCatalogContext;
-            if (!CanAdministerEnrollments && activeTab == ExtensionTab.Enrollments) activeTab = ExtensionTab.Summary;
+            expandedEnrollmentId = null; showEnrollmentSettings = false; requestedEnrollmentOpened = false;
             var pending = LoadAsync(); StateHasChanged(); await pending; StateHasChanged();
         });
     }
@@ -135,20 +139,36 @@ public partial class Extensions
             catalogContext.Changed += CatalogContextChanged;
         }
         catalogContextKey = CurrentCatalogContext;
-        SelectRequestedTab();
+        OpenRequestedEnrollment();
         await LoadAsync();
     }
 
-    protected override void OnParametersSet() => SelectRequestedTab();
+    protected override void OnParametersSet() => OpenRequestedEnrollment();
 
-    private void SelectRequestedTab()
+    private void OpenRequestedEnrollment()
     {
-        activeTab = RequestedTab?.ToLowerInvariant() switch
-        {
-            "catalog" => ExtensionTab.Catalog,
-            "enrollments" when CanAdministerEnrollments => ExtensionTab.Enrollments,
-            _ => ExtensionTab.Summary
-        };
+        if (requestedEnrollmentOpened || !string.Equals(RequestedTab, "enrollments", StringComparison.OrdinalIgnoreCase)
+            || !CanAdministerEnrollments || inventory is null) return;
+        expandedEnrollmentId = inventory.FirstOrDefault(item => (RequestedEnrollmentId is null || item.EnrollmentInstanceId == RequestedEnrollmentId) && EnrollmentFor(item) is not null)?.EnrollmentInstanceId;
+        requestedEnrollmentOpened = true;
+    }
+
+    private AepEnrollmentRequestResource? EnrollmentFor(ExtensionInventoryItemResponse item) => CanAdministerEnrollments && item.EnrollmentInstanceId is { } id
+        ? enrollments?.SingleOrDefault(enrollment => enrollment.Definition.InstanceId == id) : null;
+    private bool IsEnrollmentExpanded(ExtensionInventoryItemResponse item) => expandedEnrollmentId is { } id && item.EnrollmentInstanceId == id && EnrollmentFor(item) is not null;
+    private void ToggleEnrollment(ExtensionInventoryItemResponse item) => expandedEnrollmentId = IsEnrollmentExpanded(item) ? null : item.EnrollmentInstanceId;
+    private static string EnrollmentPanelId(AepEnrollmentRequestResource enrollment) => $"extension-enrollment-{enrollment.Definition.InstanceId:N}";
+    private void OpenEnrollmentSettings()
+    {
+        if (!CanAdministerEnrollments || enrollmentSettings is null) return;
+        error = null; pairingCodeEnabled = enrollmentSettings.PairingCodeEnabled; sharedKeyFileEnabled = enrollmentSettings.SharedKeyFileEnabled;
+        showEnrollmentSettings = true;
+    }
+    private void CloseEnrollmentSettings()
+    {
+        if (savingEnrollmentSettings) return;
+        showEnrollmentSettings = false; error = null;
+        if (enrollmentSettings is { } settings) { pairingCodeEnabled = settings.PairingCodeEnabled; sharedKeyFileEnabled = settings.SharedKeyFileEnabled; }
     }
 
     private async Task LoadAsync()
@@ -178,8 +198,9 @@ public partial class Extensions
             if (!IsCurrentCatalog(revision, identity)) return;
             inventory = await inventoryTask; registrations = await registrationsTask; enrollments = await enrollmentsTask;
             enrollmentSettings = await enrollmentSettingsTask; sourceProviders = await sourceProvidersTask;
-            if (enrollmentSettings is { } settings) { pairingCodeEnabled = settings.PairingCodeEnabled; sharedKeyFileEnabled = settings.SharedKeyFileEnabled; }
+            if (!showEnrollmentSettings && enrollmentSettings is { } settings) { pairingCodeEnabled = settings.PairingCodeEnabled; sharedKeyFileEnabled = settings.SharedKeyFileEnabled; }
             catalogLoadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            OpenRequestedEnrollment();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or OperationCanceledException)
@@ -189,7 +210,6 @@ public partial class Extensions
             var forbidden = status is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized;
             if (forbidden) { inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null; if (!CanReadRegistrationContext) ResetRegistrationEditor(); }
             catalogLoadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed) { HasContent = inventory is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
-            if (activeTab != ExtensionTab.Catalog) error = exception as AgentstrationApiException;
         }
         finally { if (IsCurrentCatalog(revision, identity)) loading = false; }
     }
@@ -216,6 +236,7 @@ public partial class Extensions
                 cancellation.Token);
             pairingCodeEnabled = enrollmentSettings.PairingCodeEnabled;
             sharedKeyFileEnabled = enrollmentSettings.SharedKeyFileEnabled;
+            showEnrollmentSettings = false;
             Notifications.Add(new NotificationItem(
                 Guid.NewGuid(),
                 T("EnrollmentModesSaved"),
@@ -422,8 +443,12 @@ public partial class Extensions
         _ => UiStatus.Neutral
     };
     private static long SecondsRemaining(DateTimeOffset expires) => Math.Max(0, (long)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalSeconds));
-    private static string EnrollmentAge(AepEnrollmentRequestResource request) =>
-        $"{Math.Max(0, (long)(DateTimeOffset.UtcNow - request.Definition.AnnouncedAt).TotalMinutes)}m";
+    private string EnrollmentAge(AepEnrollmentRequestResource request)
+    {
+        var minutes = Math.Max(0, (long)(DateTimeOffset.UtcNow - request.Definition.AnnouncedAt).TotalMinutes);
+        return minutes >= 1440 ? T("DurationDays", minutes / 1440)
+            : minutes >= 60 ? T("DurationHours", minutes / 60) : T("DurationMinutes", minutes);
+    }
 
     private async Task EditAsync(ExtensionRegistrationResource registration)
     {
@@ -488,6 +513,7 @@ public partial class Extensions
     private static string DetailUrl(ExtensionInventoryItemResponse item) => item.RegistrationName is not null
         ? $"/extensions/{Uri.EscapeDataString(item.RegistrationName)}?namespace={Uri.EscapeDataString(item.RegistrationNamespace)}&scopeRef={Uri.EscapeDataString((item.RegistrationScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((item.RegistrationScopeRef ?? ResourceScopeRef.Instance).Value)}"
         : $"/extensions/enrollment/{item.EnrollmentInstanceId:D}";
+    private static string ContributionsUrl(ExtensionInventoryItemResponse item) => DetailUrl(item) + "#contributions";
     private string EnrollmentDetailUrl(AepEnrollmentRequestResource enrollment) => inventory?
         .Where(value => value.EnrollmentInstanceId == enrollment.Definition.InstanceId)
         .Select(DetailUrl)
@@ -582,5 +608,4 @@ public partial class Extensions
         GC.SuppressFinalize(this);
     }
 
-    private enum ExtensionTab { Summary, Catalog, Enrollments }
 }

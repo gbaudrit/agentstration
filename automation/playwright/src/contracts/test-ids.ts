@@ -672,6 +672,8 @@ export const TestIds = {
   },
   distribution: {
     extensions: 'distribution-extensions',
+    extensionCatalog: 'extensions-catalog',
+    extensionInventoryRow: 'extension-inventory-row',
     extensionCatalogTab: 'extensions-tab-catalog',
     extensionEnrollmentsTab: 'extensions-tab-enrollments',
     extensionDetails: 'distribution-extension-details',

@@ -39,7 +39,6 @@ export class GovernedExtensionInventoryPage {
   public async openFromCatalog(consoleUrl: string, registration = 'qa-managed'): Promise<void> {
     await this.navigate(`${consoleUrl}/extensions?context=%2Finstance`);
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor();
-    await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
     const link = this.page.locator(`a[href^='/extensions/${registration}?']`).first();
     this.assertScopedLink(await link.getAttribute('href'));
     await link.click();
