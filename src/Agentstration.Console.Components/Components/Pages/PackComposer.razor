@@ -9,8 +9,8 @@
 
 <PageTitle>@T("CreatePackProject") · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
-<PageHeader ScopeRef="CreationScope" Title="@T("CreatePackFromWorkspace")" Description="@T("PackComposer.Description")">
-    <Actions><button type="button" class="button-secondary" disabled="@(loading || creating || reviewing)" @onclick="LoadAsync" data-testid="pack-composer-refresh">@T("Refresh")</button><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions>
+<PageHeader ScopeRef="CreationScope" Title="@T("CreatePackFromWorkspace")" Description="@T("PackComposer.Description")" CollectionHref="@BackUrl" CollectionLabel="@T("Packs")">
+    <Actions><button type="button" class="button-secondary" disabled="@(loading || creating || reviewing)" @onclick="LoadAsync" data-testid="pack-composer-refresh">@T("Refresh")</button></Actions>
 </PageHeader>
 <div data-testid="distribution-pack-composer" data-interactive="@(interactive ? "true" : "false")">
 @if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" /> }
