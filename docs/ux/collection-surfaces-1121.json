@@ -5282,8 +5282,7 @@
       "state": true,
       "actions": false,
       "informationKeys": [
-        "Provider",
-        "Enabled"
+        "Provider"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -5357,6 +5356,11 @@
         "states": "Atomic successful catalog/enrichment replacement, retained failed refresh and successful shrink, authorization clearing, cancellation and stale-context rejection; context includes physical Workspace. Optional inventory errors do not hide primary Tools.",
         "actions": "Preserve legitimate Tool-family navigation; remove redundant Details-only menu. Obsolete local responsive table CSS removed; meaningful provenance styling retained.",
         "validation": "ToolCollectionTests plus maintained ToolCatalogTests and ExtensionsConsoleTests.ToolCatalog; desktop/mobile populated governed-fixture smoke recorded in ledger."
+      },
+      "controlsReview": {
+        "header": "Redundant Providers button removed; existing family tabs retained.",
+        "columns": "Tool identity and provider only; Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tools/controls-review/README.md"
       }
     },
     {
