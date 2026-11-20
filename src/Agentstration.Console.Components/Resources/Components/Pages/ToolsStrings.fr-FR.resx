@@ -169,4 +169,8 @@
   <data name="InputEnvelope" xml:space="preserve"><value>Enveloppe d’entrée</value></data>
   <data name="OriginVersion"><value>Version d’origine</value></data>
   <data name="EditAction" xml:space="preserve"><value>Modifier</value></data>
+  <data name="DefinitionYaml" xml:space="preserve"><value>YAML de la définition d’outil</value></data>
+  <data name="DefinitionYamlHelp" xml:space="preserve"><value>Export en lecture seule de la ToolDefinition enregistrée. Modifiez les champs pris en charge de sa définition.</value></data>
+  <data name="DefinitionGeneration" xml:space="preserve"><value>Génération</value></data>
+  <data name="DefinitionRefreshDraftConflict" xml:space="preserve"><value>Une définition enregistrée plus récente est disponible. Vos saisies en cours sont conservées jusqu’à leur abandon explicite.</value></data>
 </root>

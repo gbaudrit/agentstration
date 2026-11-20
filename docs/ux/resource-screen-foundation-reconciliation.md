@@ -58,7 +58,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `TaskDetails.razor` | Reviewed scoped operational Task; shared navigation, states and retained responses verified below | Work Plane Task/interaction/action/result/artifact projections; independent execution, no invented Resource definition | Not applicable |
 | `TaskFlowRunDetails.razor` | Reviewed operational execution; shared states and verification below | Task-bound FlowRun record, not an editable Resource definition | Not applicable |
 | `ToolCategoryEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
-| `ToolDefinitionEditor.razor` | Previously treated; review again | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `ToolDefinitionEditor.razor` | Core resource variants reconciled; verification below | Actual Flow/Relay Resource frame and exact retained delegated forms, references, mutation rights and read-only YAML | Yes; owning NewToolDefinition |
 | `ToolDetails.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ToolGovernanceAudit.razor` | Reviewed specialized collection; privacy fix and verification below | Execution audit event collection, not a persisted Resource definition | Not applicable |
 | `ToolProviderEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
@@ -463,3 +463,13 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - Duplicate import/scheduling scenario **Not applicable**; #1236 stays deferred. No shared/protected Agent change, CI remediation or full solution lanes.
 
 - Current reconciliation: **48/51** components verified; 3 remaining. The Agent reference is protected.
+
+### ToolDefinitionEditor — Flow and delegated Relay contracts
+
+- Both Core Resource variants use ConsoleResourceDetailsTemplate and ResourceDefinitionForm with their exact shared state/presentation dictionary, real root Fields and first-error focus. Actual metrics precede saved Identity/tags and wrapping Configuration. Definition Identity precedes Configuration and family Flow/Relay contracts, versions/usages, independently authorized Access and final saved read-only YAML. The existing owning NewToolDefinition wizard is preserved; Relay remains an embedded delegate, not an additional route owner.
+- Preserves exact hidden bindings, source contracts, namespace/owner/pins/relative references, family generation/version semantics, ETags, confirmations and disabled states. Unsupported labels remain read-only. All mutations including deletion use the actual resources/write + owner + unmanaged endpoint requirements; inspection/Access stay independent. The standalone creator's no-EditContext contract keeps manual validation while the persisted delegate always has its retained form.
+- Invalid inputs/EditContext and read-only drafts survive navigation/recoverable refresh; changed reads require explicit discard. Same-principal read loss, foreign/replaced identities and disposed callbacks cannot retain or restore private data. Relay does not reuse an InitialSnapshot from another context. Final YAML binds its actual saved value rather than a property-name literal.
+- All 97 Entry/Tool cases, 21 shared cases, 27 post-sync Schema composition cases, TypeScript/catalog checks and warning-free hosts pass. Native EN/dark desktop and FR/light true-touch Flow/Relay checks and protected Agent desktop/mobile pass: [28 real captures and exact hashes](evidence/resource-screen-foundation/tool-definitions/README.md). Existing contract/fallback cases pass; the separate Bootstrap Entry provenance failure is tracked with the Entry migration, without claiming its report wholly green. Overview captures explicitly wait for saved identity and loaded configuration.
+- New duplicate Tool journey **Not applicable**; #1236 stays deferred. Protected Agent source/styles/translations unchanged; no CI remediation or full solution lanes.
+
+- Current reconciliation: **49/51** components verified; 2 remaining. The Agent reference is protected.
