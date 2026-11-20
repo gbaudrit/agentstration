@@ -92,6 +92,10 @@ public sealed class ConsoleConversationsTests
         var list = context.Render<ConsoleConversations>();
         var replayUrl = list.WaitForElement("[data-testid='conversation-row']").GetAttribute("href")!;
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(replayUrl);
+        var current = context.Services.GetRequiredService<NavigationManager>().Uri;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Setup<string>("currentLocation", _ => true).SetResult(current + "#overview");
+        module.Setup<string>("navigate", _ => true).SetResult(current + "#overview");
 
         var resumed = context.Render<ConsoleEntryInteraction>(parameters => parameters
             .Add(value => value.WorkspaceId, WorkspaceId)
@@ -100,7 +104,7 @@ public sealed class ConsoleConversationsTests
 
         resumed.WaitForElement("[data-testid='workplace-conversation-message']");
         StringAssert.Contains(resumed.Markup, "Persisted request");
-        Assert.AreEqual("/conversations", resumed.Find("[data-testid='back-to-conversations']").GetAttribute("href"));
+        Assert.AreEqual("/conversations", resumed.Find(".resource-collection-link").GetAttribute("href"));
         Assert.AreEqual(0, resumed.FindAll(".page-actions .realtime-status").Count);
     }
 
