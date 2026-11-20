@@ -12,10 +12,10 @@
 <UnsavedNavigationGuard IsDirty="@HasPendingResponse" HasUnsavedChanges="@(() => HasPendingResponse)" />
 <PageTitle>@(run is null ? T("FlowRun") : run.Id) · Agentstration</PageTitle>
 <div data-testid="flow-observability-run-details">
-    <ResourceDetailsTemplate Name="@(run?.ProcessOrigin is { } processTitle ? ProcessLabel(processTitle) : T("FlowRun"))" ResourceType="@T("FlowRun")" Domain="flow" IconName="flow-run" Description="@(run?.Id ?? RunId)"
+    <ResourceDetailsTemplate Name="@(run?.ProcessOrigin is { } processTitle ? ProcessLabel(processTitle) : T("FlowRun"))" ResourceType="@T("FlowRun")" Domain="flow" IconName="flow-run" CollectionHref="@RunCollectionUrl" CollectionLabel="@T("BackToRuns")" Description="@(run?.Id ?? RunId)"
                              StatusText="@(run is null ? null : StatusLabel(run.Status))" Status="@(run is null ? UiStatus.Neutral : PlatformDashboardService.ToStatus(run.Status.ToString()))"
                              Sections="Sections" DefaultSection="overview" ResourceIdentity="@loadedKey" SelectionChanged="SelectSectionAsync" SectionState="sectionState" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RetryAsync" Busy="IsLoading" NavigationLabel="@T("RunViewsAriaLabel")">
-        <Actions>@if (run is not null) { <a class="button-secondary" href="@($"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}")">@T("BackToRuns")</a>@if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a> }</Actions>
+        <Actions>@if (run is not null) { @if (!run.Status.IsTerminal()) { <button class="button-danger" @onclick="CancelAsync">@T("Cancel")</button> }<a class="button-secondary" href="/tool-governance/flow/@Uri.EscapeDataString(run.Id)?scopeRef=@Uri.EscapeDataString(run.ExecutionScopeRef.Value)">@T("ToolGovernance")</a><a class="button-secondary" href="@ConsoleResourceUrls.Flow(run.FlowId, run.DefinitionScopeRef)">@T("FlowDefinition")</a> }</Actions>
         <Feedback>
     @if (run is not null) {
     @if (run.Error is not null && activeTab == RunTab.Summary)
@@ -231,6 +231,7 @@
 
 </div>
 @code {
+    private string? RunCollectionUrl => run is null ? null : $"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}";
     [Parameter] public string RunId { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "step")] public string? FocusStep { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
