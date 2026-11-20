@@ -63,6 +63,7 @@
   <data name="Edit" xml:space="preserve">
     <value>Definition</value>
   </data>
+  <data name="EditDefinition" xml:space="preserve"><value>Edit definition</value></data>
   <data name="Access" xml:space="preserve">
     <value>Access</value>
   </data>
@@ -266,4 +267,7 @@
   <data name="NamedResourceScope" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ResourceUid" xml:space="preserve"><value>Resource UUID</value></data>
   <data name="ResourceManifest" xml:space="preserve"><value>Resource manifest</value></data>
+<data name="Preview" xml:space="preserve"><value>Preview</value></data>
+<data name="ClosePreview" xml:space="preserve"><value>Close preview</value></data>
+<data name="QuickActions" xml:space="preserve"><value>Quick actions</value></data>
 </root>

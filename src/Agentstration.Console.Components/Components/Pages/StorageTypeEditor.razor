@@ -12,7 +12,7 @@
 
 @if (!Embedded) { <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@Title · Agentstration</PageTitle>
-<PageHeader Enabled="@(IsPublishing ? null : draft.Enabled)" EnabledChanged="value => draft.Enabled = value" EnabledDisabled="@(busy || !CanWrite)" ScopeRef="ownerScope" EnabledTestId="storage-type-enabled" Title="@Title" Description="@T("Type.ImmutableHelp")" TestId="storage-type-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+<PageHeader CollectionHref="/storage-types" CollectionLabel="@T("TypeCatalog")" Enabled="@(IsPublishing ? null : draft.Enabled)" EnabledChanged="value => draft.Enabled = value" EnabledDisabled="@(busy || !CanWrite)" ScopeRef="ownerScope" EnabledTestId="storage-type-enabled" Title="@Title" Description="@T("Type.ImmutableHelp")" TestId="storage-type-editor"><Actions>@if (!IsNew) { <a class="button-secondary" href="@BackUrl">@T("Cancel")</a> }</Actions></PageHeader>
 }
 @if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
 else

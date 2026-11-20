@@ -15,7 +15,7 @@
 <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
 <ConfirmationDialog IsOpen="confirmCancel" Title="@T("CancelTitle")" Message="@T("CancelMessage")" ConfirmLabel="@T("ConfirmCancellation")" CancelLabel="@T("KeepTask")" TestId="task-cancel-confirmation" OnConfirm="CancelAsync" OnCancel="() => confirmCancel = false" />
 <div data-testid="flow-observability-task-details" data-task-id="@TaskId">
-<ResourceDetailsTemplate Name="@(detail?.Task.Title ?? T("Task"))" ResourceType="@T("Task")" Domain="work" IconName="clipboard"
+<ResourceDetailsTemplate Name="@(detail?.Task.Title ?? T("Task"))" ResourceType="@T("Task")" Domain="work" IconName="clipboard" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/tasks", Services)" CollectionLabel="@TaskStrings["Tasks"]"
                          Description="@F("OperationalWorkTask", ShortId(TaskId))" TechnicalName="@TaskId.ToString()"
                          StatusText="@(detail is null ? null : TaskStrings[$"Status.{detail.Task.Status}"].Value)" Status="@TaskStatus"
                          Sections="Sections" ResourceIdentity="@(loadedKey ?? ContextKey)" DefaultSection="overview" SectionState="sectionState" SelectionChanged="SelectSection"
@@ -28,7 +28,7 @@
             @if (detail.Task.Status == WorkTaskStatus.Paused) { <button class="button-primary" disabled="@IsBusy" @onclick="ResumeAsync">@T("Resume")</button> }
             @if (detail.Task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused) { <button class="button-danger" disabled="@IsBusy" @onclick="() => confirmCancel = true">@T("Cancel")</button> }
         }
-        <a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/tasks", Services)">@T("Back")</a>
+
     </Actions>
     <Feedback>
         @if (newerDetail is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }

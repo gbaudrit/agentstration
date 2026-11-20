@@ -13,12 +13,12 @@
 @{ var presentations = SectionPresentations ?? OwnPresentations; }
 @if (IsNew || Embedded)
 {
-    @if (!Embedded) { <PageHeader ScopeRef="ownerScope" Title="@T("CreateSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor"><Actions><a class="button-secondary" href="/knowledge-sources">@T("Cancel")</a></Actions></PageHeader><UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
+    @if (!Embedded) { <PageHeader CollectionHref="/knowledge-sources" CollectionLabel="@T("Title")" ScopeRef="ownerScope" Title="@T("CreateSource")" Description="@T("ProjectionEditorDescription")" TestId="knowledge-source-editor"></PageHeader><UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
     @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> } else { @EditorForm(presentations) }
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="savedSource" RequestedAddress="@ResourceAddress.Create(ExistingNamespace, KnowledgeResourceKinds.KnowledgeSource, Name!)"
+    <ConsoleResourceDetailsTemplate CollectionHref="/knowledge-sources" CollectionLabel="@T("Title")" Resource="savedSource" RequestedAddress="@ResourceAddress.Create(ExistingNamespace, KnowledgeResourceKinds.KnowledgeSource, Name!)"
         ResourceIdentity="@($"{loadedKey}|{savedSource?.Uid}")" Name="@(savedSource?.Definition.DisplayName ?? Name!)" ResourceType="@T("KnowledgeSource")" Domain="knowledge" IconName="database"
         Description="@savedSource?.Definition.Description" SectionState="ownSections" SectionPresentations="presentations" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
         HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Yaml="@SavedYaml"

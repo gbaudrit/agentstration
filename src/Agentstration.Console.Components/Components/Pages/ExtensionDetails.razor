@@ -51,9 +51,9 @@
 else
 {
     <UnsavedNavigationGuard IsDirty="@(migrationPreview is not null)" />
-    <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" Description="@item?.Extension?.Extension?.Description"
+    <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")" Description="@item?.Extension?.Extension?.Description"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" Sections="OperationalSections" SelectionChanged="OperationalSectionSelected" DefaultSection="overview"
-        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" MoreActions="actions" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")">
+        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" MoreActions="actions">
         <Content>@if (item is not null)
         {
             <div class="resource-editor-view" hidden="@(!sectionState.Is("overview"))">

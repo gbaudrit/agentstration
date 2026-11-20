@@ -10,19 +10,20 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> AgentLabels
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunnerInspectorStrings> InspectorLocalizer
 
 <UnsavedNavigationGuard IsDirty="@HasRunDraft" HasUnsavedChanges="@(() => HasRunDraft)" />
 <PageTitle>@T("PageTitle")</PageTitle>
 <div data-testid="flow-observability-agent-runner" data-interactive="@(interactive ? "true" : "false")">
     <ResourceDetailsTemplate Name="@(state.Run?.Name ?? agent?.Definition.DisplayName ?? T("PageTitle"))" TechnicalName="@(state.Run?.Id ?? agent?.Name)" Namespace="@(state.Run is null ? agent?.Namespace.Value : null)"
-                             ScopeRef="@(state.Run is null ? agent?.ScopeRef : null)" ResourceType="@(state.Run is null ? T("Agent") : I("Run"))" Domain="agent" IconName="robot"
+                             ScopeRef="@(state.Run is null ? agent?.ScopeRef : null)" ResourceType="@(state.Run is null ? T("Agent") : I("Run"))" Domain="agent" IconName="robot" CollectionHref="@(agent is null ? BackUrl : null)" CollectionLabel="@AgentLabels["Agents"]"
                              Description="@(state.Run is null ? agent?.Definition.Description : state.Run.Id)"
                              StatusText="@(state.Run is null ? null : I($"RunState.{state.State}"))" Status="@(state.Run is null ? UiStatus.Neutral : PlatformDashboardService.ToStatus(state.State.ToString()))"
                              LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" Busy="@(loading || creating || preparing)" SectionTestIdPrefix="agent-runner"
                              Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="@(string.IsNullOrWhiteSpace(RunId) ? "run" : "execution/response")" SelectionChanged="SelectSection">
         <Metadata>@if (agent is not null) { <span>@T("Generation", state.Run?.Properties.Agent.Version ?? agent.Generation)</span> }@if (section == "run") { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
-        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(preparing || creating || agent?.ScopeRef is null || !ContextState.HasPermission("resources/write"))">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button><a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a></Actions>
+        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(preparing || creating || agent?.ScopeRef is null || !ContextState.HasPermission("resources/write"))">@(preparing ? T("Reconciling") : T("ReconcileRuntime"))</button>@if (agent is not null) { <a class="button-secondary" href="@BackUrl">@T("BackToAgent")</a> }</Actions>
         <Feedback>
     @if (newerAgent is not null) { <div class="form-alert form-alert-warning" role="status">@T("NewerDefinition") <button type="button" class="button-secondary" disabled="@(loading || creating || preparing)" @onclick="DiscardRunDraftAsync">@Shared["Discard"]</button></div> }
     @if (!string.IsNullOrWhiteSpace(errorMessage))

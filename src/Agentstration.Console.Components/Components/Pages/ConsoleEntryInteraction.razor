@@ -7,15 +7,15 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ConsoleEntryInteractionStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConsoleConversationsStrings> ConversationLabels
 
 <PageTitle>@(entry?.DisplayName ?? T("EntryInteraction")) · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
 <ResourceDetailsTemplate Name="@(entry?.DisplayName ?? T("EntryInteraction"))" TechnicalName="@entry?.Name" Namespace="@entry?.Namespace.Value"
-    ResourceType="@T("ConsoleEntry")" IconName="entry" Domain="entry" Description="@(entry?.Description ?? T("Description"))"
+    ResourceType="@T("ConsoleEntry")" IconName="entry" Domain="entry" Description="@(entry?.Description ?? T("Description"))" CollectionHref="/conversations" CollectionLabel="@ConversationLabels["Title"]"
     ResourceIdentity="@(loadedKey ?? EntryName)" Sections="Sections" DefaultSection="interaction" SelectionChanged="SelectSection"
     LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="@(busy || loading)" SectionTestIdPrefix="console-entry" HasDraft="HasDraft">
     <Actions>
-        <a class="button-secondary" href="/conversations" data-testid="back-to-conversations">@T("BackToConversations")</a>
         @if (CanCancel) { <button class="button-danger" type="button" disabled="@(busy || loading)" @onclick="CancelAsync" data-testid="console-entry-cancel">@T("Cancel")</button> }
         @if (interaction is not null) { <button class="button-secondary" type="button" disabled="@(busy || loading)" @onclick="NewRequestAsync" data-testid="console-entry-new-request">@T("NewRequest")</button> }
     </Actions>

@@ -9,11 +9,11 @@
 
 <PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
-<ConsoleResourceDetailsTemplate Resource="toolSet" Name="@(toolSet?.Definition.DisplayName ?? Name)" ResourceType="@T("ToolSet")" Domain="tool" IconName="layers"
+<ConsoleResourceDetailsTemplate Resource="toolSet" Name="@(toolSet?.Definition.DisplayName ?? Name)" ResourceType="@T("ToolSet")" Domain="tool" IconName="layers" CollectionHref="@BackUrl" CollectionLabel="@T("Title")"
     Description="@toolSet?.Definition.Description" Enabled="toolSet?.Definition.Enabled" EnabledDisabled="true" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
     ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
     AccessVersion="@toolSet?.Definition.Version" Yaml="@SavedYaml" Busy="busy" TestId="resource-toolset-details" SectionTestIdPrefix="toolset">
-    <Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a>@if (CanMutate) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+    <Actions>@if (CanMutate) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
     <Feedback>@if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }</Feedback>
     <OverviewMetrics>@if (toolSet is not null) {
         <MetricCard Label="@T("DraftVersion")" Value="@toolSet.Definition.Version" Detail="@T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")" Status="UiStatus.Info" />

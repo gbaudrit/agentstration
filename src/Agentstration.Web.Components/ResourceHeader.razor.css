@@ -2,8 +2,6 @@
 .resource-header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3) var(--space-4); min-width: 0; margin-bottom: var(--space-3); }
 .resource-header-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3) var(--space-4); min-width: 0; margin-bottom: var(--space-3); }
 .resource-header-toolbar { display: flex; flex: 0 1 auto; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; max-width: 100%; }
-.resource-collection-link { display: grid; place-items: center; flex: 0 0 auto; width: 2rem; height: 2rem; min-height: 2rem; padding: .35rem; text-decoration: none; }
-.resource-collection-link ::deep .ui-icon { width: 1rem; height: 1rem; }
 .resource-header .page-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-3); margin: 0; width: auto; }
 .resource-header-identity { align-items: center; margin-bottom: 0; gap: var(--space-2); }
 .resource-header-identity ::deep .resource-artwork { display: grid; width: 2rem; height: 2rem; flex: 0 0 2rem; }
@@ -19,7 +17,6 @@
 .resource-header ::deep .resource-action-primary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 .resource-header-toolbar ::deep :is(.button-primary, .button-secondary, .button-danger) { min-height: 2rem; padding: .3rem .6rem; font-size: .8rem; }
 .resource-header-toolbar ::deep .resource-action-bar :is(.button-primary, .button-secondary, .button-danger):not([hidden]) { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
-.resource-header-toolbar .resource-collection-link { padding: .35rem; }
 .resource-header-toolbar ::deep .resource-more-actions > summary { display: grid; place-items: center; width: 2rem; height: 2rem; padding: .3rem; }
 .resource-header-toolbar ::deep .resource-enabled-toggle { min-height: 2rem; gap: .4rem; font-size: .8rem; }
 .resource-header-toolbar ::deep .resource-enabled-toggle input[role="switch"] { width: 2.1rem; height: 1.25rem; }
@@ -33,4 +30,7 @@
 @media (max-width: 620px) {
     .resource-header-toolbar { gap: var(--space-2); }
     .resource-header .page-actions { max-width: 100%; gap: var(--space-2); }
+}
+@media (pointer: coarse) {
+    .resource-header-toolbar ::deep .resource-collection-link { min-width: 2.75rem; min-height: 2.75rem; }
 }

@@ -12,13 +12,13 @@
                 <div class="page-actions">
                     @NavigationActions
                     @if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="@EnabledTestId" ShowStateLabel /> }
-                    @if (Actions is not null || PrimaryActions is not null || MoreActions is not null || HasCollectionLink)
+                    @if (Actions is not null || PrimaryActions is not null || MoreActions is not null)
                     {
                         <ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">
                             @Actions
-                            @if (HasCollectionLink) { <a class="button-secondary resource-collection-link" href="@CollectionHref" aria-label="@CollectionLabel" title="@CollectionLabel"><UiIcon Name="list" /></a> }
                         </ResourceActionBar>
                     }
+                    <ResourceCollectionLink Href="@CollectionHref" Label="@CollectionLabel" />
                 </div>
             </div>
         }

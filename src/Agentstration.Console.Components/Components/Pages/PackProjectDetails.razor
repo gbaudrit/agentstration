@@ -10,13 +10,13 @@
 <PageTitle>@Title · Agentstration</PageTitle>
 @{ var presentations = Presentations; var callbackIdentity = Identity; }
 <ConsoleResourceDetailsTemplate Resource="project?.Value" Name="@Title" ResourceType="@T("PackProject")" IconName="package" Domain="package"
+    CollectionHref="@BackUrl" CollectionLabel="@T("Packs")"
     ResourceIdentity="@(loadedKey ?? ProjectId.ToString("D"))" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
     Description="@project?.Value.Definition.Description" StatusText="@(project is null ? null : ProjectStatus)" Status="ProjectTone"
     DefinitionReadOnlyReason="ReadOnlyReason" AllowAccess="OwnScope" LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="busy"
     HasDraft="HasMetadataDraft" HasAdditionalDraft="HasAdditionalDraft" Yaml="@PublicYaml" YamlReadOnly YamlDescription="@T("Project.YamlHelp")"
     SectionTestIdPrefix="pack-project" TestId="distribution-pack-project-details">
     <PrimaryActions>@if (CanAuthor) { <button type="button" class="button-primary" disabled="@busy" @onclick="BuildAsync" data-testid="pack-project-build">@T(building ? "Building" : "BuildPack")</button> }</PrimaryActions>
-    <Actions><a class="button-secondary" href="@BackUrl">@T("BackToPacks")</a></Actions>
     <Feedback>
         @if (message is not null) { <p class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="pack-project-status" data-state="@(hasError ? "error" : "success")">@message</p> }
         @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("Project.RefreshDraftConflict") <button type="button" class="button-secondary" disabled="@busy" @onclick="DiscardResourceDraftsAsync">@T("Project.DiscardResourceDrafts")</button></div> }

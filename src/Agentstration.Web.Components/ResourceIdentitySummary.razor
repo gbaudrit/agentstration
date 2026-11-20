@@ -1,6 +1,6 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Identity
-<FormSection Title="@Shared["Identity"]" Class="resource-identity-summary" TestId="@TestId" Collapsible="HeaderOwnsIdentity" InitiallyCollapsed="HeaderOwnsIdentity">
+<FormSection Title="@Shared["Identity"]" Class="resource-identity-summary" TestId="@TestId" Collapsible="@(Collapsible ?? HeaderOwnsIdentity)" InitiallyCollapsed="@(InitiallyCollapsed ?? HeaderOwnsIdentity)">
     <Actions>@if (Badges is not null) { <div class="resource-identity-heading-actions">@Badges</div> }</Actions>
     <ChildContent>
         <dl class="resource-details resource-identity-facts">
@@ -24,6 +24,8 @@
     [Parameter] public string? Namespace { get; set; }
     [Parameter] public Guid? ResourceUid { get; set; }
     [Parameter] public bool HeaderOwnsIdentity { get; set; }
+    [Parameter] public bool? Collapsible { get; set; }
+    [Parameter] public bool? InitiallyCollapsed { get; set; }
     [Parameter] public bool CopyFacts { get; set; }
     [Parameter] public string? Version { get; set; }
     [Parameter] public string? VersionDescription { get; set; }

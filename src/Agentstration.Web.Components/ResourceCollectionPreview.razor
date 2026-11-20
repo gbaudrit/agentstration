@@ -1,0 +1,92 @@
+@using Agentstration.Resources
+@using Microsoft.AspNetCore.Components.Routing
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<ResourcePreviewPanel IsOpen="@(Enabled && address is not null)" OnClose="Close">
+    @if (Enabled && address is { } selected) { @ChildContent(selected) }
+</ResourcePreviewPanel>
+
+@code {
+    [Parameter, EditorRequired] public string ResourceKind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public RenderFragment<ScopedResourceAddress> ChildContent { get; set; } = null!;
+    [Parameter] public string? ContextKey { get; set; }
+    [Parameter] public bool Enabled { get; set; } = true;
+    private ScopedResourceAddress? address;
+    private string? previousContext;
+    private string collectionPath = string.Empty;
+    private string? restoredLocation;
+    private bool disposed;
+
+    protected override void OnInitialized()
+    {
+        collectionPath = Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath;
+        Navigation.LocationChanged += LocationChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (previousContext is not null && previousContext != ContextKey)
+        {
+            previousContext = ContextKey;
+            Close();
+            return;
+        }
+        previousContext = ContextKey;
+        if (restoredLocation != Navigation.Uri) Restore();
+    }
+
+    public void Open(ScopedResourceAddress target)
+    {
+        if (!Enabled || disposed) return;
+        if (target.Kind != ResourceKind || target.ScopeRef == default)
+            throw new ArgumentException("A collection preview requires an exact address of its resource kind.", nameof(target));
+        var fragment = string.Join('/', "preview", Uri.EscapeDataString(target.Kind), Uri.EscapeDataString(target.ScopeRef.Value),
+            Uri.EscapeDataString(target.Namespace.Value), Uri.EscapeDataString(target.Name));
+        Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + fragment);
+        // Server navigation updates the browser asynchronously. Show the selection
+        // immediately, independently of the later LocationChanged notification.
+        address = target;
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        address = null;
+        if (!disposed && IsCollectionLocation() && Navigation.ToAbsoluteUri(Navigation.Uri).Fragment.StartsWith("#preview/", StringComparison.Ordinal))
+            Navigation.NavigateTo(Navigation.Uri.Split('#')[0], replace: true);
+    }
+
+    private bool IsCollectionLocation() => string.Equals(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase);
+    private void Restore()
+    {
+        restoredLocation = Navigation.Uri;
+        address = null;
+        if (!IsCollectionLocation()) return;
+        var fragment = Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;
+        if (fragment.Length > 2048 || !fragment.StartsWith("#preview/", StringComparison.Ordinal)) return;
+        var segments = fragment[1..].Split('/');
+        if (segments.Length != 5 || segments.Any(string.IsNullOrWhiteSpace)) return;
+        try
+        {
+            var kind = Uri.UnescapeDataString(segments[1]);
+            if (kind != ResourceKind) return;
+            address = ScopedResourceAddress.Create(ResourceScopeRef.Parse(Uri.UnescapeDataString(segments[2])),
+                ResourceNamespace.Parse(Uri.UnescapeDataString(segments[3])), kind, Uri.UnescapeDataString(segments[4]));
+        }
+        catch (Exception error) when (error is ArgumentException or FormatException) { }
+    }
+
+    private void LocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() => { if (!disposed) { Restore(); StateHasChanged(); } });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        Navigation.LocationChanged -= LocationChanged;
+        GC.SuppressFinalize(this);
+    }
+}

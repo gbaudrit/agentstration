@@ -7,8 +7,8 @@ export const AgentOverviewMetricsByLocale = {
 } as const;
 
 export const ResourceSectionTextByLocale = {
-  'en-US': { identity: 'Identity', labels: 'Labels', required: '* Required fields', actions: 'Section actions', applyYaml: 'Apply to form' },
-  'fr-FR': { identity: 'Identité', labels: 'Étiquettes', required: '* Champs obligatoires', actions: 'Actions de la section', applyYaml: 'Appliquer au formulaire' },
+  'en-US': { agentList: 'Back to agents', identity: 'Identity', labels: 'Labels', required: '* Required fields', actions: 'Section actions', applyYaml: 'Apply to form' },
+  'fr-FR': { agentList: 'Retour aux agents', identity: 'Identité', labels: 'Étiquettes', required: '* Champs obligatoires', actions: 'Actions de la section', applyYaml: 'Appliquer au formulaire' },
 } as const;
 
 export const AgentValidationTextByLocale = {

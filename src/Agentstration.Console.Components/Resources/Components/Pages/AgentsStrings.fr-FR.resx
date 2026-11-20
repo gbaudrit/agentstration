@@ -9,4 +9,5 @@
   <data name="List.DeploymentUpdated"><value>Déploiement actualisé</value></data>
   <data name="List.NoDeploymentObserved"><value>Aucun déploiement observé</value></data>
   <data name="List.DeploymentWindowLimited"><value>Les informations de déploiement peuvent être incomplètes. L’absence de correspondance observée ne signifie pas qu’un Agent n’est pas déployé.</value></data>
+<data name="Preview" xml:space="preserve"><value>Aperçu</value></data>
 </root>

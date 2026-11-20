@@ -16,7 +16,7 @@
                          ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
                          ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
                          DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
-                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@ExtensionProvenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent"
+                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@ExtensionProvenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent" OverviewSummary="@OverviewSummary"
                          DefinitionContent="@DefinitionContent" AccessContent="@(Resource is null ? null : AccessContent ?? (CanManageAccess ? AccessPanel : null))" YamlContent="@YamlEditor"
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
                          ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
@@ -67,7 +67,8 @@
     [Parameter] public RenderFragment<string>? AdditionalContent { get; set; }
     [Parameter] public RenderFragment? OverviewMetrics { get; set; }
     [Parameter] public RenderFragment? IdentityDetails { get; set; }
-    [Parameter, EditorRequired] public RenderFragment? OverviewConfiguration { get; set; }
+    [Parameter] public RenderFragment? OverviewConfiguration { get; set; }
+    [Parameter] public RenderFragment<RenderFragment>? OverviewSummary { get; set; }
     [Parameter] public RenderFragment? OverviewContent { get; set; }
     [Parameter, EditorRequired] public RenderFragment<string>? DefinitionContent { get; set; }
     [Parameter] public ResourceScopeRef? DefinitionContextScope { get; set; }

@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourceProviderDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourceProvidersStrings> CollectionLocalizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 @if (IsNew) { <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
@@ -22,7 +23,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("CreateProvider")" Description="@T("Description")"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader Title="@T("CreateProvider")" Description="@T("Description")" CollectionHref="@BackUrl" CollectionLabel="@CollectionLocalizer["Title"]" />
     @if (loading) { <LoadingState Message="@T("Loading")" /> }
     else
     {
@@ -37,6 +38,7 @@
 else
 {
     <ConsoleResourceDetailsTemplate Resource="resource"
+        CollectionHref="@BackUrl" CollectionLabel="@CollectionLocalizer["Title"]"
         Name="@(resource?.Definition.DisplayName ?? Name!)" ResourceType="@T("SourceProvider")" Domain="source" IconName="package"
         StatusText="@(status is null ? null : StatusLabel(status.Status))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
         ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
@@ -50,7 +52,7 @@ else
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
             OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
         <AdditionalContent Context="path">@if (path == "connection") { @ConnectionDetails } else if (path == "usages") { @Usages }</AdditionalContent>
-        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@(busy || refreshing)">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@(busy || refreshing)">@T("Delete")</button> }</Actions>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="source-provider-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="source-provider-submit">@(busy ? T("Saving") : T("SaveChanges"))</button> }</DraftActions>
     </ConsoleResourceDetailsTemplate>
 }

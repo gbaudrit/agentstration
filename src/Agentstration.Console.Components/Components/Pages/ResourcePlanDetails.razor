@@ -16,11 +16,11 @@
 <PageTitle>@(plan?.Value.Title ?? T("Title")) · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="@HasReviewDraft" HasUnsavedChanges="@(() => HasReviewDraft)" />
 <ResourceDetailsTemplate Name="@(plan?.Value.Title ?? T("Title"))" TechnicalName="@(plan?.Value.Id.ToString())"
+                         CollectionHref="@BackUrl" CollectionLabel="@T("Title")"
                          ResourceType="@T("Plan")" Domain="flow" IconName="map" Description="@(plan?.Value.Goal ?? T("DetailDescription"))"
                          StatusText="@(plan is null ? null : T($"Status.{plan.Value.Status}"))" Status="@(plan is null ? UiStatus.Neutral : PlanTone(plan.Value.Status))"
                          Sections="ReviewSections" SectionState="sectionState" SelectionChanged="SelectReviewSection" DefaultSection="overview" ResourceIdentity="@loadedKey"
                          LoadState="loadState" OnRetry="LoadAsync" OnRefresh="LoadAsync" Busy="busy" HasDraft="HasReviewDraft" NavigationTestId="resource-plan-sections" TestId="resource-plan-details" SectionTestIdPrefix="resource-plan">
-    <Actions><a class="button-secondary" href="@BackUrl">@T("BackToPlans")</a></Actions>
     <Feedback>
         @if (!string.IsNullOrWhiteSpace(error)) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
         @if (newerReview is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }

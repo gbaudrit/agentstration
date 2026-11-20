@@ -17,27 +17,28 @@
         @if (!deploymentWindowComplete) { <p class="help-text">@T("List.DeploymentWindowLimited")</p> }
         @if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
     </Feedback>
-    <ItemActions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")">
-        <a href="@EditUrl(item)">@T("Open")</a>
-        @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)">@T("Run")</a></PermissionGate> }
-        @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@EditUrl(item)#definition/configuration">@T("EditDefinition")</a></PermissionGate><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" disabled="@deleting" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
-        <button type="button" @onclick="() => selected = item">@T("QuickInspect")</button>
+    <ItemActions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")" Destructive="@DeleteAction(item)" ShowDestructiveActions="ShowDeleteAction">
+        <a href="@OverviewUrl(item)"><UiIcon Name="arrow-up-right" /><span>@T("Open")</span></a>
+        @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@DefinitionUrl(item)"><UiIcon Name="pencil" /><span>@T("EditDefinition")</span></a></PermissionGate> }
+        @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)"><UiIcon Name="play-circle" /><span>@T("Run")</span></a></PermissionGate> }
+        <button type="button" data-testid="agent-preview" disabled="@(item.ScopeRef is null)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" /><span>@T("Preview")</span></button>
     </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
-@if (selected is not null)
-{
-    <aside class="quick-inspector" aria-label="@T("QuickInspector")">
-        <header><div><p class="eyebrow">@T("Agents")</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusLabel(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="@T("CloseInspector")">×</button></header>
-        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@if (selected.DeploymentUrl is not null) { <a class="text-button" href="@DeploymentUrl(selected)">@selected.DeploymentId</a><span class="resource-secondary"><StatusBadge Text="@DeploymentStatusLabel(selected.Runtime)" Status="@PlatformDashboardService.ToStatus(selected.Runtime)" /></span> } else { @DeploymentStatusLabel(selected.Runtime) }</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
-        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a class="button-primary" href="@RunUrl(selected)">@T("RunAgent")</a></PermissionGate>}<a class="button-secondary" href="@EditUrl(selected)">@T("OpenDetails")</a></div>
-    </aside>
-}
+<ResourceCollectionPreview @ref="preview" ResourceKind="@AgentResourceKinds.Agent" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><AgentResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" RunHref="@PreviewRunUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteAgent")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteAgent")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @code {
-    private CollectionColumn<AgentSummary> IdentityColumn => new("identity", T("Agents"), item => @<CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>);
+    [Parameter] public bool ShowDeleteAction { get; set; } = true;
+    private ResourceCollectionPreview? preview;
+    private void OpenPreview(AgentSummary item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, AgentResourceKinds.Agent, item.Id)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.Agent(address.Namespace, address.Name, address.ScopeRef), Services).Split('#')[0] + "#" + section;
+    private string PreviewRunUrl(ScopedResourceAddress address) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.WithOwnerScope($"/agents/{Uri.EscapeDataString(address.Name)}/run", address.ScopeRef), Services);
+    private RenderFragment? DeleteAction(AgentSummary item) => !CanDelete(item) ? null : @<button class="danger-text" type="button" disabled="@deleting" @onclick="() => RequestDelete(item)"><UiIcon Name="trash" /><span>@T("Delete")</span></button>;
+    private CollectionColumn<AgentSummary> IdentityColumn => new("identity", T("Agents"), item => @<CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@OverviewUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<AgentSummary>> Columns =>
     [
         new("definition", T("Definition"), item => @<strong>@ResourceName(item.Type)</strong>),
