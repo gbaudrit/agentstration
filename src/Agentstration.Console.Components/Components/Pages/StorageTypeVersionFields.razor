@@ -3,25 +3,25 @@
 <section class="panel form-section">
     <h2>@T("Type.VersionContract")</h2><p>@T("Type.ImmutableHelp")</p>
     <div class="form-grid">
-        <FormField Label="@T("Version")"><ClearableText @bind-Value="Draft.Version" maxlength="64" data-testid="storage-type-version" /></FormField>
-        <FormField Label="@T("Type.RequiresService")"><FormCheckbox role="switch" @bind-Value="Draft.RequiresConnectedService" /></FormField>
-        <FormField Label="@T("Type.ConfigurationSchema")" Class="form-span-2"><ClearableText Multiline @bind-Value="Draft.ConfigurationSchema" class="form-code-editor" rows="8" maxlength="262144" data-testid="storage-type-configuration-schema" /></FormField>
-        <FormField Label="@T("Type.EnvelopeSchema")" Class="form-span-2"><ClearableText Multiline @bind-Value="Draft.EnvelopeSchema" class="form-code-editor" rows="8" maxlength="262144" /></FormField>
-        <FormField Label="@T("Type.Requirements")" Class="form-span-2"><ClearableText Multiline @bind-Value="Draft.Requirements" class="form-code-editor" rows="5" maxlength="65536" /></FormField>
+        <FormField Required="true" Label="@T("Version")"><ChildContent><ClearableText @bind-Value="Draft.Version" maxlength="64" data-testid="storage-type-version" /></ChildContent><Validation><ValidationMessage For="() => Draft.Version" /></Validation></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.RequiresConnectedService" /><span>@T("Type.RequiresService")</span></label>
+        <FormField Required="true" Label="@T("Type.ConfigurationSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.ConfigurationSchema" class="form-code-editor" rows="8" maxlength="262144" data-testid="storage-type-configuration-schema" /></ChildContent><Validation><ValidationMessage For="() => Draft.ConfigurationSchema" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.EnvelopeSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.EnvelopeSchema" class="form-code-editor" rows="8" maxlength="262144" /></ChildContent><Validation><ValidationMessage For="() => Draft.EnvelopeSchema" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.Requirements")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.Requirements" class="form-code-editor" rows="5" maxlength="65536" /></ChildContent><Validation><ValidationMessage For="() => Draft.Requirements" /></Validation></FormField>
     </div>
     <p>@T("Type.RequirementsHelp")</p><h3>@T("Capabilities")</h3><p>@T("Type.CapabilitiesHelp")</p>
     <div class="form-grid">
-        <FormField Label="@T("Capability.List")"><FormCheckbox role="switch" @bind-Value="Draft.List" /></FormField>
-        <FormField Label="@T("Capability.Stat")"><FormCheckbox role="switch" @bind-Value="Draft.Stat" /></FormField>
-        <FormField Label="@T("Capability.Read")"><FormCheckbox role="switch" @bind-Value="Draft.Read" /></FormField>
-        <FormField Label="@T("Capability.Write")"><FormCheckbox role="switch" @bind-Value="Draft.Write" /></FormField>
-        <FormField Label="@T("Capability.Delete")"><FormCheckbox role="switch" @bind-Value="Draft.Delete" /></FormField>
-        <FormField Label="@T("Capability.StableVersions")"><FormCheckbox role="switch" @bind-Value="Draft.StableVersions" /></FormField>
-        <FormField Label="@T("Capability.DurableRetention")"><FormCheckbox role="switch" @bind-Value="Draft.DurableRetention" /></FormField>
-        <FormField Label="@T("Deprecated")"><FormCheckbox role="switch" @bind-Value="Draft.Deprecated" /></FormField>
-        <FormField Label="@T("Type.MaximumPageSize")"><ClearableNumber @bind-Value="Draft.MaximumPageSize" min="1" /></FormField>
-        <FormField Label="@T("Type.MaximumReadBytes")"><ClearableNumber @bind-Value="Draft.MaximumReadBytes" min="1" /></FormField>
-        <FormField Label="@T("Type.MaximumWriteBytes")"><ClearableNumber @bind-Value="Draft.MaximumWriteBytes" min="1" /></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.List" /><span>@T("Capability.List")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Stat" /><span>@T("Capability.Stat")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Read" /><span>@T("Capability.Read")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Write" /><span>@T("Capability.Write")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Delete" /><span>@T("Capability.Delete")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.StableVersions" /><span>@T("Capability.StableVersions")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.DurableRetention" /><span>@T("Capability.DurableRetention")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Deprecated" /><span>@T("Deprecated")</span></label>
+        <FormField Required="true" Label="@T("Type.MaximumPageSize")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumPageSize" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumPageSize" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.MaximumReadBytes")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumReadBytes" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumReadBytes" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.MaximumWriteBytes")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumWriteBytes" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumWriteBytes" /></Validation></FormField>
     </div>
 </section>
 @code {

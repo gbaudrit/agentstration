@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class StorageTypeComponentTests
+public sealed partial class StorageTypeComponentTests
 {
     private static readonly ResourceScopeRef Scope = ResourceScopeRef.Tenant(Guid.Parse("10640000-0000-0000-0000-000000000001"));
 
@@ -64,7 +64,8 @@ public sealed class StorageTypeComponentTests
         page.WaitForElement("[data-testid=storage-type-display-name]").Change("Draft retained");
         page.Find("[data-testid=storage-type-configuration-schema]").Change("not-json");
         page.Find("form").Submit();
-        page.WaitForAssertion(() => Assert.IsNotNull(page.Find("[role=alert]")));
+        page.WaitForAssertion(() => Assert.IsNotNull(page.Find("[data-testid=storage-type-configuration-schema]").Closest(".form-field")!.QuerySelector(".validation-message")));
+        Assert.AreEqual("step", page.Find("[data-wizard-step=contract]").GetAttribute("aria-current"));
         Assert.IsNull(client.Created);
         Assert.AreEqual("Draft retained", page.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
     }
@@ -139,7 +140,9 @@ public sealed class StorageTypeComponentTests
             using var context = Setup(client, selectedScope: managed ? Scope.Value : ResourceScopeRef.Workspace(Guid.NewGuid()).Value);
             context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Action(client.Resource, "edit"));
             var page = RenderEditor(context, client.Resource.Name);
-            page.WaitForAssertion(() => Assert.IsNotNull(page.Find("[role=note]")));
+            page.WaitForAssertion(() => Assert.IsTrue(page.Find("[data-testid=storage-type-definition-fields]").HasAttribute("disabled")));
+            page.Find("form").Submit();
+            Assert.IsNull(client.Updated);
             Assert.IsEmpty(page.FindAll("[data-testid=storage-type-save]"));
         }
     }
@@ -323,6 +326,7 @@ public sealed class StorageTypeComponentTests
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-form.js").Setup<bool>("focusFirstInvalid", _ => true).SetResult(true);
         context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IStorageTypesClient>(client);
@@ -354,7 +358,7 @@ public sealed class StorageTypeComponentTests
         public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) { ListScope = scope; return Task.FromResult<IReadOnlyList<StorageTypeResource>>([Resource]); }
         public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) { ResourceReads++; return Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag)); }
         public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
-        public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) { Created = body; return Result(); }
+        public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) { Created = body; Resource = Resource with { Uid = Guid.NewGuid(), Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default }, ScopeRef = body.ScopeRef, Definition = body.Properties }; return Result(); }
         public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; return Result(body.Properties); }
         public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) { Published = body; LastEtag = etag; return Result(Resource.Definition with { Versions = Resource.Definition.Versions.Append(body.Version).ToArray(), PreferredVersion = body.SetPreferred ? body.Version.Version : Resource.Definition.PreferredVersion }); }
         public Task DeleteTypeAsync(ScopedResourceAddress address, string etag, CancellationToken token) => Task.CompletedTask;

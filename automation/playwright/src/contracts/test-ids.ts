@@ -4,6 +4,12 @@ export const TestIds = {
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
     nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
+  storageTypeEditor: {
+    root: 'storage-type-editor', details: 'storage-type-details', form: 'storage-type-form', fields: 'storage-type-definition-fields',
+    identity: 'storage-type-identity-editor', name: 'storage-type-name', displayName: 'storage-type-display-name',
+    namespace: 'storage-type-namespace', enabled: 'storage-type-enabled', version: 'storage-type-version',
+    configurationSchema: 'storage-type-configuration-schema', save: 'storage-type-save', review: 'storage-type-review',
+  },
   connectedServiceEditor: {
     root: 'connected-service-editor', form: 'connected-service-form', fields: 'connected-service-definition-fields',
     identity: 'connected-service-identity-editor', refresh: 'connected-service-refresh', name: 'connected-service-name', displayName: 'connected-service-display-name',
