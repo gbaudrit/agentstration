@@ -68,6 +68,14 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsNotNull(agent);
         Assert.AreEqual("qwen3:1.7b", model.Value.Definition.Model.Name);
         Assert.AreEqual("ollama-chat", agent.Value.Definition.ModelProfile.Name);
+        var revisionAddress = ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
+            AgentResourceKinds.AgentRevision, "ollama-assistant--000001");
+        var revision = await store.GetExactAsync<AgentRevision>(revisionAddress, default);
+        Assert.IsNotNull(revision, "Bootstrap must prepare the executable generation without a manual Apply action.");
+        Assert.AreEqual(agent.Value.Uid, revision.Value.AgentUid);
+        Assert.AreEqual(agent.Value.Generation, revision.Value.AgentVersion);
+        Assert.AreEqual(agent.Value.ScopeRef, revision.Value.ScopeRef);
         var policies = services.GetRequiredService<IResourceAccessPolicyService>();
         var identity = new ResourceAccessIdentity(model.Value.Uid, model.Value.ScopeRef!.Value,
             model.Value.Namespace, model.Value.Kind, model.Value.Generation);
@@ -83,6 +91,8 @@ public sealed partial class DeclarativeBootstrapTests
         var repeatedAgent = await store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(
             ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default, AgentResourceKinds.Agent, "ollama-assistant"), default);
         Assert.AreEqual(agent.ETag, repeatedAgent!.ETag);
+        await ApplyWorkspaceAsync();
+        Assert.AreEqual(revision.ETag, (await store.GetExactAsync<AgentRevision>(revisionAddress, default))!.ETag);
 
         var forbidden = Directory.CreateDirectory(Path.Combine(directory.Path, "forbidden"));
         await File.WriteAllTextAsync(Path.Combine(forbidden.FullName, "profile.yaml"), Profile("forbidden", "tenant"));
@@ -116,6 +126,49 @@ public sealed partial class DeclarativeBootstrapTests
             var failure = await Assert.ThrowsAsync<DeclarativeBootstrapException>(() => handler.ApplyAsync(
                 new BootstrapResourceDocument(), new("aep:untrusted", directory.Path, BootstrapProfileScope.Instance), default));
             StringAssert.Contains(failure.Message, "local administrative");
+        }
+
+        // Model an interruption after the Agent was saved but before preparation.
+        // A different manifest must not activate the retained first definition.
+        await store.DeleteExactAsync(revisionAddress, revision.ETag, default);
+        var agentManifest = Path.Combine(directory.Path, "ollama-workspace", "10-agent.yaml");
+        var originalManifest = await File.ReadAllTextAsync(agentManifest);
+        await File.WriteAllTextAsync(agentManifest, originalManifest.Replace(
+            "Tu es un assistant utile.", "Instructions modifiées dans le catalogue.", StringComparison.Ordinal));
+        await ApplyWorkspaceAsync();
+        Assert.IsNull(await store.GetExactAsync<AgentRevision>(revisionAddress, default));
+
+        await File.WriteAllTextAsync(agentManifest, originalManifest);
+        await ApplyWorkspaceAsync();
+        var resumed = await store.GetExactAsync<AgentRevision>(revisionAddress, default);
+        Assert.IsNotNull(resumed);
+        Assert.AreEqual(revision.Value.DefinitionHash, resumed.Value.DefinitionHash);
+        Assert.AreEqual(agent.ETag, (await store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
+            AgentResourceKinds.Agent, "ollama-assistant"), default))!.ETag);
+
+        // A manual draft after Bootstrap must stay unapplied on the next restart.
+        var updated = await services.GetRequiredService<AgentManagementService>().PutAgentAsync(
+            agent.Value with
+            {
+                Definition = agent.Value.Definition with { Instructions = "Manually edited draft." }
+            }, agent.ETag, false, default);
+        Assert.AreEqual(2L, updated.Value.Generation);
+        await ApplyWorkspaceAsync();
+        Assert.IsNull(await store.GetExactAsync<AgentRevision>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
+            AgentResourceKinds.AgentRevision, "ollama-assistant--000002"), default));
+        Assert.AreEqual(updated.ETag, (await store.GetExactAsync<AgentResource>(ScopedResourceAddress.Create(
+            ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,
+            AgentResourceKinds.Agent, "ollama-assistant"), default))!.ETag);
+
+        async Task ApplyWorkspaceAsync()
+        {
+            var preview = await management.PreviewAsync(applications[2], principal.Id, default);
+            Assert.IsTrue(preview.CanApply, string.Join("; ", preview.Resources.Select(value => value.Message)));
+            Assert.IsTrue(preview.Resources.All(value => value.Disposition == BootstrapResourceDisposition.Skip));
+            var result = await management.ApplyAsync(applications[2], preview.Digest, principal.Id, default);
+            Assert.IsNull(result.Definition.Error);
         }
     }
 }

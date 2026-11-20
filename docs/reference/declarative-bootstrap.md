@@ -371,6 +371,21 @@ Each supported kind is implemented by an `IBootstrapResourceHandler`, which owns
 
 Instance profiles declare `ModelProvider` and `RuntimeProfile` resources. `ModelProfile` and `Agent` may be declared at Instance, Tenant or Workspace scope. Workspace profiles support direct editable `ModelProfile`, `Agent`, `Flow`, and `Entry` manifests, with explicit access grants for ancestor dependencies. They also support `PackInstallation` with a bounded local ZIP source beneath the profile directory; those contained resources retain normal Pack ownership and immutability.
 
+### Agent generation preparation
+
+After creating an Agent, Bootstrap prepares its immutable executable revision
+through the Agent family service, using the exact ownership scope and generation.
+This is the preparation performed by the Console's **Apply generation** action;
+it does not start an extension process, create a server-hosted deployment or run
+model inference. A preparation failure fails the Bootstrap resource application.
+
+Reapplication preserves the saved Agent definition and ETag. It may finish a
+missing initial revision only when the saved generation is still `1` and the
+saved definition exactly matches the selected Bootstrap definition. This also
+repairs unchanged Agents created by older Bootstrap versions. Existing revisions
+are reused. A changed manifest or a later manually edited generation is not
+activated automatically; use the ordinary explicit Apply action for those cases.
+
 ## Flow authoring requirements
 
 Bootstrap Flow manifests use named `output` steps for every terminal result. Manifests must not use the removed, unreleased `failure` step. Declare at least one successful output and one error output; `completed` and `error` are the recommended names. An error output declares `outcome: error` and should provide a stable code, message, and an `outputMapping` when the failure payload must be preserved.
