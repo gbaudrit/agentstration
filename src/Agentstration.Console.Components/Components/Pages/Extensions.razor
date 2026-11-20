@@ -6,8 +6,11 @@
 @inject IServiceProvider Services
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
 
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
+@if (editing) { <UnsavedNavigationGuard IsDirty="HasRegistrationDraft" HasUnsavedChanges="@(() => HasRegistrationDraft)" ViewQueryParameters="@(new[] { "tab" })" /> }
 @if (activeTab != ExtensionTab.Catalog)
 {
     <PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")" />
@@ -62,15 +65,13 @@
         @if (enrollmentSettings is not null)
         {
             <FormGrid>
-                <label class="checkbox-field">
-                    <FormCheckbox @bind-Value="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
-                    @T("PairingCodeMode")
-                    <small>@(enrollmentSettings.PairingCodeConfigurable ? T("PairingCodeMode.Help") : T("ModeDisabledByConfiguration"))</small>
+                <label class="checkbox-field resource-enabled-toggle">
+                    <FormCheckbox role="switch" @bind-Value="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
+                    <span>@T("PairingCodeMode")<small>@(enrollmentSettings.PairingCodeConfigurable ? T("PairingCodeMode.Help") : T("ModeDisabledByConfiguration"))</small></span>
                 </label>
-                <label class="checkbox-field">
-                    <FormCheckbox @bind-Value="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
-                    @T("SharedKeyFileMode")
-                    <small>@(enrollmentSettings.SharedKeyFileConfigurable ? T("SharedKeyFileMode.Help") : T("ModeDisabledByConfiguration"))</small>
+                <label class="checkbox-field resource-enabled-toggle">
+                    <FormCheckbox role="switch" @bind-Value="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
+                    <span>@T("SharedKeyFileMode")<small>@(enrollmentSettings.SharedKeyFileConfigurable ? T("SharedKeyFileMode.Help") : T("ModeDisabledByConfiguration"))</small></span>
                 </label>
             </FormGrid>
             <div class="panel-actions">
@@ -156,36 +157,20 @@
     </div>
 }
 
-@if (activeTab == ExtensionTab.Catalog && editing)
+@if (editing)
 {
-<section class="panel resource-section">
-    <div class="panel-header">
-        <div><p class="eyebrow">@T("Connection")</p><h2>@T("RegisterEndpoint")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
-    </div>
-    <EditForm Model="form" OnValidSubmit="SaveAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-        <FormGrid>
-            <ResourceIdentityFields @bind-DisplayName="form.DisplayName" @bind-TechnicalName="form.Name" IsNew="true" />
-            <FormField Label="@T("Namespace")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Namespace" /></ChildContent></FormField>
-            <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
-            <FormField Label="@T("AepEndpoint")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></ChildContent></FormField>
-            <FormField Label="@T("ExpectedExtensionId")"><HelpContent>@T("ExpectedExtensionId.Help")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.ExpectedExtensionId" /></ChildContent></FormField>
-            <FormField Label="@T("AuthenticationMode")"><ChildContent><ClearableSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></ClearableSelect></ChildContent></FormField>
-            @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
-            {
-                <FormField Label="@T("CredentialName")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialName" /></ChildContent></FormField>
-                <FormField Label="@T("CredentialNamespace")"><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialNamespace" /></ChildContent></FormField>
-                <FormField Label="@T("CredentialScopeRef")"><HelpContent>@T("CredentialScopeRef.Help")</HelpContent><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.CredentialScopeRef" /></ChildContent></FormField>
-            }
-            <label class="checkbox-field"><FormCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-        </FormGrid>
-        <div class="panel-actions">
-            <button class="button-primary" type="submit" disabled="@saving">@T("CreateRegistration")</button>
-            <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
-        </div>
-    </EditForm>
-</section>
+<div hidden="@(activeTab != ExtensionTab.Catalog)" class="resource-editor-view" data-testid="extension-registration-creation">
+    <FormSection Title="@T("RegisterEndpoint")" Description="@T("RegisteredEndpoints.Description")">
+        @if (registrationError is not null) { <div class="form-alert form-alert-danger" role="alert">@registrationError</div> }
+        <ResourceDefinitionForm @key="form" @ref="registrationDefinitionForm" EditContext="RegistrationContext" FieldLabels="RegistrationFieldLabels" Id="extension-registration-create-form" FormName="extension-registration-create"
+            Sections="RegistrationPresentations" OnValidSubmit="SubmitRegistrationAsync" OnInvalidSubmit="InvalidRegistrationAsync" InvalidInputChanged="value => registrationInvalidInput = value" Busy="saving" ReadOnly="@(!CanRegister)" data-testid="extension-registration-create-form">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard @ref="registrationWizard" Steps="RegistrationSteps" OnFinish="FinishRegistrationAsync" OnStepReady="RegistrationStepReady" Busy="saving" Disabled="@(!CanRegister)"
+                FinishLabel="@(creating ? T("CreateRegistration") : T("SaveChanges"))" FinishTestId="extension-create-registration" TestId="extension-registration-wizard" />
+        </ResourceDefinitionForm>
+        <FormActions Busy="saving"><button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button></FormActions>
+    </FormSection>
+</div>
 }
 
 @if (activeTab == ExtensionTab.Catalog)
@@ -195,9 +180,16 @@
                                 Items="@(inventory ?? [])" IdentityColumn="InventoryIdentity" Columns="InventoryColumns" LoadState="catalogLoadState" Disabled="@(!interactive)" OnRefresh="LoadAsync" OnRetry="LoadAsync"
                                 ItemActions="@(HasSourceActions ? InventoryActions : null)" EmptyTitle="@T("NoExtensionsDiscovered")" EmptyMessage="@T("NoExtensionsDiscoveredMessage")">
         <Navigation>@ExtensionNavigation</Navigation>
-        <PrimaryActions>@if (CanRegister && inventory is not null) { <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button> }</PrimaryActions>
-        <EmptyActions>@if (CanRegister && inventory is not null) { <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button> }</EmptyActions>
-        <Feedback><p class="muted">@T("InventorySnapshot.Help")</p>@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" /> }</Feedback>
+        <PrimaryActions>@if (CanRegister) { <button class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button> }</PrimaryActions>
+        <EmptyActions>@if (CanRegister) { <button class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button> }</EmptyActions>
+        <Feedback>
+            <p class="muted">@T("InventorySnapshot.Help")</p>
+            @if (catalogLoadState.Status == ResourceLoadStatus.Forbidden && CanRegister)
+            {
+                <FormActions><button type="button" class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button></FormActions>
+            }
+            @if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" /> }
+        </Feedback>
 
     </ResourceCollectionTemplate>
     @if (activePairingCode is not null)
@@ -211,6 +203,34 @@
 </div>
 
 @code {
+    private RenderFragment RegistrationIdentity => @<FormSection Title="@Shared["Identity"]"><FormGrid>
+        <ResourceIdentityFields DisplayName="@form.DisplayName" DisplayNameChanged="value => form.DisplayName = value" DisplayNameExpression="@(() => form.DisplayName)"
+            TechnicalName="@form.Name" TechnicalNameChanged="value => form.Name = value" TechnicalNameExpression="@(() => form.Name)" IsNew="creating"
+            DisplayNameTestId="extension-registration-display-name" TechnicalNameTestId="extension-registration-name" />
+        <FormField Label="@T("Namespace")" Required><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Namespace" Disabled="@(!creating)" data-testid="extension-registration-namespace" /></ChildContent><Validation><ValidationMessage For="() => form.Namespace" /></Validation></FormField>
+        <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" Value="form.ScopeRef" ValueChanged="RegistrationScopeChanged" Disabled="@(!creating || !CanRegister || saving)"><Validation><ValidationMessage For="() => form.ScopeRef" /></Validation></ResourceScopeFormField>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationConnection => @<FormSection Title="@T("Connection")"><FormGrid>
+        <FormField Label="@T("AepEndpoint")" Required><ChildContent><ClearableText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" data-testid="extension-registration-endpoint" /></ChildContent><Validation><ValidationMessage For="() => form.Endpoint" /></Validation></FormField>
+        <FormField Label="@T("ExpectedExtensionId")"><HelpContent>@T("ExpectedExtensionId.Help")</HelpContent><ChildContent><ClearableText @bind-Value="form.ExpectedExtensionId" data-testid="extension-registration-expected-id" /></ChildContent></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="form.Enabled" data-testid="extension-registration-enabled" /><span>@T("EnabledForDiscovery")</span></label>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationAuthentication => @<FormSection Title="@T("AuthenticationMode")"><FormGrid>
+        <FormField Label="@T("AuthenticationMode")"><ChildContent><ClearableSelect @bind-Value="form.AuthenticationMode" data-testid="extension-registration-authentication"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></ClearableSelect></ChildContent></FormField>
+        <div class="resource-editor-view form-span-2" hidden="@(form.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)">
+            <FormField Label="@T("CredentialName")" Required><ChildContent><ClearableText @bind-Value="form.CredentialName" data-testid="extension-registration-credential-name" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialName" /></Validation></FormField>
+            <FormField Label="@T("CredentialNamespace")"><ChildContent><ClearableText @bind-Value="form.CredentialNamespace" data-testid="extension-registration-credential-namespace" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialNamespace" /></Validation></FormField>
+            <FormField Label="@T("CredentialScopeRef")"><HelpContent>@T("CredentialScopeRef.Help")</HelpContent><ChildContent><ClearableText @bind-Value="form.CredentialScopeRef" data-testid="extension-registration-credential-scope" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialScopeRef" /></Validation></FormField>
+        </div>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationReview => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details">
+        <dt>@T("DisplayName")</dt><dd>@form.DisplayName</dd><dt>@T("Name")</dt><dd><code>@form.Namespace/@form.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="form.ScopeRef" /></dd>
+        <dt>@T("AepEndpoint")</dt><dd class="resource-text">@form.Endpoint</dd><dt>@T("ExpectedExtensionId")</dt><dd>@(form.ExpectedExtensionId ?? "—")</dd>
+        <dt>@T("AuthenticationMode")</dt><dd>@T($"Authentication.{form.AuthenticationMode}")</dd>
+        @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer) { <dt>@T("CredentialName")</dt><dd><code>@form.CredentialScopeRef · @form.CredentialNamespace/@form.CredentialName</code></dd> }
+        <dt>@T("EnabledForDiscovery")</dt><dd>@T(form.Enabled ? "Enabled" : "Disabled")</dd>
+    </dl></FormSection>;
+
     private bool HasSourceActions => inventory?.Any(item => item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) == true;
     private RenderFragment<ExtensionInventoryItemResponse> InventoryActions => item => @<text>@if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) {<CollectionActions ResourceName="@($"{item.DisplayName} ({item.RegistrationNamespace}/{item.RegistrationName ?? item.ExtensionId}, {item.RegistrationScopeRef})")">@if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true)
                     {

@@ -46,7 +46,7 @@ public partial class Extensions
     private bool creating;
     private string? etag;
     private RegistrationForm form = new();
-    private ResourceScopeRef? selectedScope;
+    private ResourceScopeRef? selectedScope { get => form.ScopeRef; set => form.ScopeRef = value; }
     private ExtensionRegistrationResource? pendingDelete;
     private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
     private bool migrating;
@@ -78,7 +78,9 @@ public partial class Extensions
     private long catalogRevision;
     private CancellationTokenSource? catalogPending;
     private ResourceLoadState catalogLoadState = new(ResourceLoadStatus.Loading);
-    private bool CanRegister => catalogContext?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true;
+    private bool CanReadRegistrationContext => catalogContext is { Error: null, Current: not null } && catalogContext.HasPermission(AuthorizationPermissions.ResourcesRead);
+    private bool CanRegister => CanReadRegistrationContext && catalogContext is { Current.SelectedKind: ConsoleContextKind.Tenant or ConsoleContextKind.Workspace }
+        && catalogContext.HasPermission(AuthorizationPermissions.ResourcesWrite);
 
     private void CatalogContextChanged()
     {
@@ -86,8 +88,11 @@ public partial class Extensions
         _ = InvokeAsync(async () =>
         {
             if (disposed) return;
+            var retainRegistration = catalogContextKey == CurrentCatalogContext && catalogContext?.HasPermission(AuthorizationPermissions.ResourcesRead) == true;
+            ++registrationRevision; saving = false;
             inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null;
-            editing = false; form = new(); selectedScope = null; etag = null; pendingDelete = null; migrationPreview = null; pendingUnenrollment = null;
+            if (!retainRegistration) ResetRegistrationEditor();
+            pendingDelete = null; migrationPreview = null; pendingUnenrollment = null;
             activePairingCode = null; activePairingExpiry = null; activePairingUri = null; activeEnrollmentId = null; enrollmentScopes.Clear();
             catalogContextKey = CurrentCatalogContext;
             if (!CanAdministerEnrollments && activeTab == ExtensionTab.Enrollments) activeTab = ExtensionTab.Summary;
@@ -158,7 +163,7 @@ public partial class Extensions
         if (catalogContext is not null && (catalogContext.Error is not null || !catalogContext.HasPermission(AuthorizationPermissions.ResourcesRead)))
         {
             inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null;
-            catalogLoadState = new(catalogContext.Error is null ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed); loading = false; return;
+            ResetRegistrationEditor(); catalogLoadState = new(catalogContext.Error is null ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed); loading = false; return;
         }
         catalogLoadState = new(inventory is null ? ResourceLoadStatus.Loading : ResourceLoadStatus.Refreshing) { HasContent = inventory is not null };
         try
@@ -182,7 +187,7 @@ public partial class Extensions
             if (!IsCurrentCatalog(revision, identity)) return;
             var status = exception is AgentstrationApiException api ? api.StatusCode : (exception as HttpRequestException)?.StatusCode;
             var forbidden = status is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized;
-            if (forbidden) { inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null; }
+            if (forbidden) { inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null; if (!CanReadRegistrationContext) ResetRegistrationEditor(); }
             catalogLoadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed) { HasContent = inventory is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
             if (activeTab != ExtensionTab.Catalog) error = exception as AgentstrationApiException;
         }
@@ -420,17 +425,6 @@ public partial class Extensions
     private static string EnrollmentAge(AepEnrollmentRequestResource request) =>
         $"{Math.Max(0, (long)(DateTimeOffset.UtcNow - request.Definition.AnnouncedAt).TotalMinutes)}m";
 
-    private void StartCreate()
-    {
-        if (!CanRegister || inventory is null) return;
-        activeTab = ExtensionTab.Catalog;
-        form = new();
-        selectedScope = null;
-        etag = null;
-        creating = true;
-        editing = true;
-    }
-
     private async Task EditAsync(ExtensionRegistrationResource registration)
     {
         try
@@ -440,47 +434,9 @@ public partial class Extensions
             selectedScope = snapshot.Value.ScopeRef;
             etag = snapshot.ETag;
             creating = false;
-            editing = true;
+            editing = true; InitializeRegistrationTracking();
         }
         catch (AgentstrationApiException exception) { error = exception; }
-    }
-
-    private async Task SaveAsync()
-    {
-        saving = true;
-        error = null;
-        try
-        {
-            if (!Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint))
-                throw new AgentstrationApiException(T("EndpointMustBeAbsolute"), Guid.NewGuid().ToString("N"));
-            ResourceReference? credential = null;
-            if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
-            {
-                if (string.IsNullOrWhiteSpace(form.CredentialName))
-                    throw new AgentstrationApiException(T("CredentialRequired"), Guid.NewGuid().ToString("N"));
-                ResourceScopeRef? credentialScope = string.IsNullOrWhiteSpace(form.CredentialScopeRef)
-                    ? null
-                    : ResourceScopeRef.Parse(form.CredentialScopeRef);
-                credential = new(form.CredentialName, credentialScope, ResourceNamespace.Parse(form.CredentialNamespace));
-            }
-            var properties = new ExtensionRegistrationProperties
-            {
-                DisplayName = form.DisplayName,
-                Endpoint = endpoint,
-                Enabled = form.Enabled,
-                ExpectedExtensionId = form.ExpectedExtensionId,
-                AuthenticationMode = form.AuthenticationMode,
-                Credential = credential
-            };
-            if (creating)
-                _ = await Client.CreateRegistrationAsync(new(form.Name, properties, form.Namespace, selectedScope), cancellation.Token);
-            else
-                _ = await Client.UpdateRegistrationAsync(ResourceNamespace.Parse(form.Namespace), form.Name, new(properties), etag!, cancellation.Token);
-            editing = false;
-            await LoadAsync();
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { saving = false; }
     }
 
     private async Task ToggleAsync(ExtensionRegistrationResource registration)
@@ -513,7 +469,6 @@ public partial class Extensions
         catch (AgentstrationApiException exception) { error = exception; }
     }
 
-    private void CancelEdit() => editing = false;
 
     private string SourceLabel(string source) => T($"Source.{source}");
     private static string ContributionSummary(ExtensionInventoryItemResponse item) => item.Extension?.Contributions.Count > 0
@@ -618,45 +573,13 @@ public partial class Extensions
 
     public void Dispose()
     {
-        disposed = true;
+        disposed = true; ++registrationRevision;
+        if (registrationContext is not null) { registrationContext.OnValidationRequested -= RegistrationValidationRequested; registrationContext.OnFieldChanged -= RegistrationFieldChanged; }
         if (catalogContext is not null) catalogContext.Changed -= CatalogContextChanged;
         catalogRevision++; catalogPending?.Cancel(); catalogPending?.Dispose();
         cancellation.Cancel();
         cancellation.Dispose();
         GC.SuppressFinalize(this);
-    }
-
-    private sealed class RegistrationForm
-    {
-        [System.ComponentModel.DataAnnotations.Required]
-        public string Name { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.Required]
-        public string Namespace { get; set; } = "default";
-        [System.ComponentModel.DataAnnotations.Required]
-        public string DisplayName { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.Url]
-        public string Endpoint { get; set; } = string.Empty;
-        public bool Enabled { get; set; } = true;
-        public string? ExpectedExtensionId { get; set; }
-        public AepTransportAuthenticationMode AuthenticationMode { get; set; }
-        public string CredentialName { get; set; } = string.Empty;
-        public string CredentialNamespace { get; set; } = ResourceNamespace.DefaultValue;
-        public string CredentialScopeRef { get; set; } = string.Empty;
-
-        public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
-        {
-            Name = resource.Name,
-            Namespace = resource.Namespace.Value,
-            DisplayName = resource.Definition.DisplayName,
-            Endpoint = resource.Definition.Endpoint.AbsoluteUri,
-            Enabled = resource.Definition.Enabled,
-            ExpectedExtensionId = resource.Definition.ExpectedExtensionId,
-            AuthenticationMode = resource.Definition.AuthenticationMode,
-            CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
-            CredentialNamespace = resource.Definition.Credential?.Namespace?.Value ?? resource.Namespace.Value,
-            CredentialScopeRef = resource.Definition.Credential?.ScopeRef?.Value ?? string.Empty
-        };
     }
 
     private enum ExtensionTab { Summary, Catalog, Enrollments }
