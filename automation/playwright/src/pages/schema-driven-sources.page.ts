@@ -248,8 +248,8 @@ export class SchemaDrivenSourcesPage {
   }
 
   private async runProjection(consoleUrl: string, knowledgeSourceName: string): Promise<void> {
-    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}?namespace=default&view=projections`,
-      TestIds.schemaDrivenSources.knowledgeSourceProjectionsTab);
+    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}?namespace=default#projections`,
+      TestIds.schemaDrivenSources.knowledgeSourceProjectionParameters);
     const parameters = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionParameters);
     const start = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceStartProjection);
     await expect(start).toBeDisabled();

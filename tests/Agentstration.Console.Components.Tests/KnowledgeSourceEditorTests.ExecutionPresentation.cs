@@ -82,7 +82,7 @@ public sealed partial class KnowledgeSourceEditorTests
         client.Projections.Clear();
         client.ProjectionStarter = (_, _) => { client.Projections.Add(failed); return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(failed, "failed")); };
         await using var context = CreateContext(client);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         rendered.WaitForAssertion(() => Assert.Contains(explanation, rendered.Markup));

@@ -20,7 +20,7 @@ public sealed partial class KnowledgeSourceEditorTests
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(value => value.Name, source.Name));
-        rendered.WaitForElement("[data-testid=knowledge-source-tools-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "tools");
         rendered.WaitForAssertion(() => Assert.AreEqual(label, rendered.Find("[data-testid=knowledge-publish-tools]").TextContent));
         Assert.AreEqual("1.0.1", rendered.Find("[data-testid=knowledge-tool-exposure-version]").GetAttribute("value"));
         rendered.Find("[data-testid=knowledge-tool-exposure-version]").Input(" ");
@@ -52,7 +52,7 @@ public sealed partial class KnowledgeSourceEditorTests
         context.Services.AddSingleton<IConsoleNavigationContext>(new KnowledgeNavigationContext(DataSourceScope.Value));
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(value => value.Name, "agentstration-documentation"));
-        rendered.WaitForElement("[data-testid=knowledge-source-tools-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "tools");
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid=knowledge-tool-link]")));
         Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-publish-tools]"));
         Assert.IsEmpty(rendered.FindAll("[data-testid=knowledge-tool-exposure-version]"));
@@ -81,7 +81,7 @@ public sealed partial class KnowledgeSourceEditorTests
         client.ToolProposal = new() { SourceUid = source.Uid, SourceGeneration = source.Generation, Digest = "proposal-a", ToolSetName = source.Name + ".access", Ready = true, Tools = [tool] };
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceDetails>(p => p.Add(v => v.Name, source.Name));
-        rendered.WaitForElement("[data-testid=knowledge-source-tools-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "tools");
         rendered.WaitForAssertion(() => Assert.AreEqual(refresh, rendered.Find("[data-testid=knowledge-refresh-tools]").TextContent));
         var proposed = rendered.Find("[data-testid=knowledge-proposed-tool]").TextContent;
         Assert.Contains(added, proposed);

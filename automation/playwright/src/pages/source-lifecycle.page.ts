@@ -189,7 +189,7 @@ export class SourceLifecyclePage {
 
     // Optional input failure is visible in provenance while the valid input publishes.
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).uncheck();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).uncheck();
     await this.saveKnowledge();
     const partial = await this.runProjection(consoleUrl);
     expect(partial.inputIssues).toEqual([expect.objectContaining({ bindingName: 'secondary', code: 'knowledge_projection_acquisition_missing' })]);
@@ -199,7 +199,7 @@ export class SourceLifecyclePage {
 
     const second = await this.acquire(consoleUrl, f.sources[1]);
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).check();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).check();
     await this.saveKnowledge();
     const aggregate = await this.runProjection(consoleUrl);
     expect(aggregate.inputIssues).toEqual([]);
@@ -709,12 +709,12 @@ export class SourceLifecyclePage {
     url.searchParams.set('namespace', 'default');
     url.searchParams.set('scopeRef', this.scope);
     url.searchParams.set('context', this.scope);
-    if (view) { if (path.startsWith('/data-sources/')) url.hash = view === 'definition' ? 'definition/configuration' : view; else url.searchParams.set('view', view); }
+    if (view) url.hash = view === 'definition' ? 'definition/configuration' : view;
     const current = new URL(this.page.url());
-    if (path.startsWith('/data-sources/') && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
+    if ((path.startsWith('/data-sources/') || path.startsWith('/knowledge-sources/')) && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
       await selectResourceSection(this.page, url.hash.slice(1));
       // Fragment navigation retains mounted editors. This method explicitly reopens saved server state after API fixture commands.
-      const refresh = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceRefresh);
+      const refresh = this.page.getByTestId(path.startsWith('/data-sources/') ? TestIds.schemaDrivenSources.dataSourceRefresh : 'knowledge-source-refresh');
       await refresh.click(); await expect(refresh).toBeEnabled();
     } else {
       const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });

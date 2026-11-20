@@ -30,7 +30,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `FlowOrchestrationEditor.razor` | Previously treated; review again | Delegated definition/editor; coordinate with owning detail and preserve creation wizard | No |
 | `FlowRunArtifactDetails.razor` | New foundation migrated; local verification below | Actual immutable Resource, retained content/storage and safe public metadata inspection | Not applicable |
 | `FlowRunDetails.razor` | Reviewed operational execution; shared states and verification below | Scoped FlowRun record, retained response/replay/causality rather than an editable Resource definition | Not applicable |
-| `KnowledgeSourceDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `KnowledgeSourceDetails.razor` | Reviewed | Console template, retained delegated form, exact owner/context, independent YAML/policy/operational drafts and authorized commands | No creation route |
 | `KnowledgeSourceEditor.razor` | Reviewed | Retained common delegated definition form, standalone Console template and creation wizard; owner detail follows separately | Yes |
 | `ModelDetails.razor` | New foundation migrated; local verification recorded below | Immutable observed resource; independent Provider override command, no Model write/creation API | Not applicable |
 | `ModelProfileEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource with pinned Provider options, scoped usages/resolution and properties-only metadata writes | Yes |
@@ -402,3 +402,9 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 
 - Creation uses the common wizard and Identity/Configuration fields with final first-error return. Standalone persisted editing uses the Console adapter; one retained delegated form accepts its owner’s exact section state/presentation dictionary and snapshots. Specialized binding/lifecycle/Storage/composition editors, original dependency references, ETags and rebind confirmation remain in place. Properties-only metadata keeps labels read-only.
 - Targeted component/client checks, actual desktop EN/mobile FR captures and maintained journey adjustments are recorded in [the editor evidence](evidence/resource-screen-foundation/knowledge-editor/README.md). New reusable coverage is **Not applicable**; #1236/#1234 remain deferred. The owning Knowledge detail retains its separate pending pass.
+
+### Knowledge Source detail reconciliation
+
+- The owning detail uses the Console template, saved Overview Identity/labels/Configuration, retained common delegated definition and exact shared state/presentations. Operational Projections/Snapshots/Retrieval/Tools keep their family contracts; independently authorized Access precedes final YAML. Fragment navigation replaces legacy view/tab selection.
+- Refresh and independent definition/YAML saves preserve drafts and original ETags; explicit discard accepts concurrent snapshots. Denied/deleted/context-replaced resources clear private content. Exact owner qualification covers content calls as well as definition and operational commands. The common header switch retains the family activation command and managed definition restrictions do not suppress independently authorized execution.
+- Focused cases, maintained journeys and real EN desktop/FR touch-mobile captures are recorded in [the detail evidence](evidence/resource-screen-foundation/knowledge-details/README.md). New reusable family coverage is **Not applicable**; #1236/#1234 remain deferred. Schema retains its separate pending pass.

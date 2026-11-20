@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { SourcePolicyFixtures, type SourcePolicyFixture } from '../fixtures/source-policies.js';
@@ -92,7 +93,10 @@ export class SourcePoliciesPage {
     await control.change({ advanceSeconds: 3601, reconcile: true });
     const retired = (await fixtures.api('GET', `/api/knowledgesources/${knowledge}/snapshots?scopeRef=%2Finstance`)).value;
     expect(String(retired.find((view: any) => view.snapshot.metadata.name === first.snapshotName).lifecycleState)).toMatch(/retired|3/i);
-    await this.page.goto(`${base}/knowledge-sources/${knowledge}?context=%2Finstance&view=snapshots`);
+    await this.page.goto(`${base}/knowledge-sources/${knowledge}?context=%2Finstance#snapshots`);
+    await selectResourceSection(this.page, "snapshots");
+    const refresh = this.page.getByTestId("knowledge-source-refresh");
+    await refresh.click(); await expect(refresh).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshots)).toContainText(text.retired);
     await this.assertResponsive();
     await control.change({});
@@ -228,8 +232,10 @@ export class SourcePoliciesPage {
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
   }
   public async openKnowledge(base: string, name: string): Promise<void> {
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=definition`);
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#definition/configuration`);
+    await selectResourceSection(this.page, "definition/configuration");
     await expect(this.definition).toBeEnabled();
+    await expect(this.page.locator('[data-definition-section="definition/configuration"]')).toBeVisible();
   }
   public async saveDataset(base: string, name: string, fixtures: SourcePolicyFixtures): Promise<void> {
     const before = (await fixtures.api('GET', `/api/datasources/${name}?scopeRef=%2Finstance`)).value.generation;
@@ -247,7 +253,8 @@ export class SourcePoliciesPage {
   public async project(base: string, name: string, fixtures: SourcePolicyFixtures, failed = false): Promise<any> {
     const path = `/api/knowledgesources/${name}/projections?scopeRef=%2Finstance`;
     const prior = (await fixtures.api('GET', path)).value.map((value: any) => value.metadata.name);
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=projections`);
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#projections`);
+    await selectResourceSection(this.page, "projections");
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceStartProjection).click();
     let selected: any;
@@ -256,7 +263,7 @@ export class SourcePoliciesPage {
       return Boolean(selected);
     }, { timeout: 90_000 }).toBe(true);
     expect(Boolean(selected.snapshotName), JSON.stringify(selected)).toBe(!failed);
-    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=projections`);
+    await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#projections`);
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjections)).toContainText(selected.metadata.name.slice(0, 20));
     return selected;
   }

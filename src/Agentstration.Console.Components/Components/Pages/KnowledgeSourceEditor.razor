@@ -21,7 +21,7 @@ else
     <ConsoleResourceDetailsTemplate Resource="savedSource" RequestedAddress="@ResourceAddress.Create(ExistingNamespace, KnowledgeResourceKinds.KnowledgeSource, Name!)"
         ResourceIdentity="@($"{loadedKey}|{savedSource?.Uid}")" Name="@(savedSource?.Definition.DisplayName ?? Name!)" ResourceType="@T("KnowledgeSource")" Domain="knowledge" IconName="database"
         Description="@savedSource?.Definition.Description" SectionState="ownSections" SectionPresentations="presentations" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
-        HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Yaml="SavedYaml"
+        HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Yaml="@SavedYaml"
         Enabled="model.Enabled" EnabledChanged="SetEnabled" EnabledDisabled="@(!CanEdit || busy)" TestId="knowledge-source-editor" SectionTestIdPrefix="knowledge-source-editor">
         <Actions><a class="button-secondary" href="@DetailsUrl">@T("Back")</a></Actions>
         <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row">@row.Key</Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
@@ -33,16 +33,17 @@ else
 
 @code {
     [Parameter] public string? Name { get; set; }
-    [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [Parameter] public bool Embedded { get; set; }
     [Parameter] public EventCallback<KnowledgeSourceResource> Saved { get; set; }
-    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     [Parameter] public ResourceSnapshot<KnowledgeSourceResource>? Snapshot { get; set; }
     [Parameter] public ResourceSectionState? SectionState { get; set; }
     [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation>? SectionPresentations { get; set; }
     [Parameter] public EventCallback<string> SectionRequested { get; set; }
     [Parameter] public EventCallback<bool> DraftChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback<Exception> ResourceUnavailable { get; set; }
     [Parameter] public int DiscardRevision { get; set; }
     private int observedDiscard;
     private KnowledgeSourceEditorModel model = new();
@@ -56,8 +57,9 @@ else
     private string baseline = "";
     private bool touched, invalidInput, disposed, validationFocus;
     private long loadRevision;
-    private ResourceSnapshot<KnowledgeSourceResource>? newerSnapshot;
-    private ResourceLoadState loadState => loading ? new(ResourceLoadStatus.Loading) : savedSource is not null ? new(ResourceLoadStatus.Ready) { HasContent = true } : new(ResourceLoadStatus.Failed) { Message = message };
+    private ResourceSnapshot<KnowledgeSourceResource>? newerSnapshot, parameterSnapshot;
+    private ResourceLoadStatus? unavailableStatus;
+    private ResourceLoadState loadState => loading ? new(ResourceLoadStatus.Loading) : savedSource is not null ? new(ResourceLoadStatus.Ready) { HasContent = true } : new(unavailableStatus ?? ResourceLoadStatus.Failed) { Message = unavailableStatus is null ? message : null };
     private IKnowledgeSourcesClient ScopedClient => Client.WithOwner(Snapshot?.Value.ScopeRef ?? (ResourceScopeRef.TryParse(ScopeRef, out var owner) ? owner : savedSource?.ScopeRef));
     private bool CanEdit => !ReadOnly && (IsNew || savedSource is { ScopeRef: not null, Governance.IsManaged: false } && ResourceOwnershipContext.CanManage(savedSource.ScopeRef, Services));
     public bool HasDraft => !loading && (touched || invalidInput || DraftSignature != baseline);
@@ -98,10 +100,19 @@ else
     private async Task ObserveSnapshotAsync()
     {
         if (observedDiscard != DiscardRevision) { observedDiscard = DiscardRevision; await DiscardAsync(); return; }
+        if (ReferenceEquals(parameterSnapshot, Snapshot)) return;
+        parameterSnapshot = Snapshot;
         if (Snapshot is not { } snapshot || snapshot.ETag == observedEtag) return;
         if (savedSource is not null && (snapshot.Value.Uid != savedSource.Uid || snapshot.Value.ScopeRef != savedSource.ScopeRef)) { loadedKey = null; await OnParametersSetAsync(); return; }
         if (HasDraft) { newerSnapshot = snapshot; return; }
         loadedKey = null; await OnParametersSetAsync();
+    }
+    public async Task ApplyDefinitionAsync(KnowledgeSourceProperties properties, string originalEtag)
+    {
+        if (!CanEdit || HasDraft || savedSource is null) return;
+        Snapshot = new(savedSource with { Definition = properties }, originalEtag);
+        loadedKey = null; await OnParametersSetAsync();
+        touched = true; await DraftChanged.InvokeAsync(true); await InvokeAsync(StateHasChanged);
     }
     public async Task DiscardAsync() { loadedKey = null; touched = invalidInput = false; newerSnapshot = null; await OnParametersSetAsync(); await DraftChanged.InvokeAsync(false); await InvokeAsync(StateHasChanged); }
     private async Task RefreshAsync()
@@ -116,7 +127,7 @@ else
             if (HasDraft) { if (snapshot.ETag != observedEtag) newerSnapshot = snapshot; return; }
             Snapshot = snapshot; loadedKey = null; await OnParametersSetAsync();
         }
-        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) { ClearPrivate(); message = T("LoadingDetails"); }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) { ClearPrivate(); unavailableStatus = exception.StatusCode == System.Net.HttpStatusCode.NotFound ? ResourceLoadStatus.NotFound : ResourceLoadStatus.Forbidden; message = T("LoadingDetails"); }
         catch (Exception exception) { message = exception.Message; }
     }
     private void ClearPrivate() { loadRevision++; savedSource = null; newerSnapshot = null; model = new(); formContext = null; bindings.Clear(); acquisitionTargets.Clear(); touched = invalidInput = false; baseline = DraftSignature; }
@@ -171,14 +182,14 @@ else
     {
         var key = $"{Name}|{Namespace}|{ScopeRef}|{Navigation.Uri.Split('#')[0]}";
         if (loadedKey == key) { await ObserveSnapshotAsync(); return; }
-        loadedKey = key; var revision = ++loadRevision;
+        loadedKey = key; unavailableStatus = null; var revision = ++loadRevision;
         model = new(); formContext = null; invalidInput = touched = false; savedSource = null; bindings.Clear(); acquisitionTargets.Clear();
         loading = true;
         message = null;
         try
         {
             var dataSourcesTask = DataSources.GetAsync(cancellation.Token);
-            var flowsTask = LoadFlowsAsync();
+            var flowsTask = LoadFlowsAsync(revision);
             await Task.WhenAll(dataSourcesTask, flowsTask);
             if (revision != loadRevision || disposed) return;
             dataSources = await dataSourcesTask;
@@ -188,13 +199,14 @@ else
                 var storagesTask = storageClient.GetStoragesAsync(owner, cancellation.Token);
                 var typesTask = storageClient.GetTypesAsync(owner, cancellation.Token);
                 await Task.WhenAll(storagesTask, typesTask);
+                if (revision != loadRevision || disposed) return;
                 storages = await storagesTask; storageTypes = await typesTask;
             }
             if (!IsNew)
             {
                 var snapshot = Snapshot ?? await ScopedClient.GetAsync(ExistingNamespace, Name!, cancellation.Token);
                 if (revision != loadRevision || disposed) return;
-                savedSource = snapshot.Value; observedEtag = snapshot.ETag;
+                savedSource = snapshot.Value; observedEtag = snapshot.ETag; parameterSnapshot = Snapshot;
                 ownerScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
                 model.Name = snapshot.Value.Name; model.Namespace = snapshot.Value.Namespace.Value; model.Tags = string.Join(Environment.NewLine, snapshot.Value.Metadata.Tags.Select(pair => $"{pair.Key}={pair.Value}"));
@@ -295,6 +307,9 @@ else
                 destination = ResourceOwnershipContext.Resource(Services, "/knowledge-sources", saved.Value.Name, saved.Value.Namespace, saved.Value.ScopeRef!.Value);
             }
         }
+        catch (Exception) when (disposed || revision != loadRevision) { }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound)
+        { ClearPrivate(); unavailableStatus = exception.StatusCode == System.Net.HttpStatusCode.NotFound ? ResourceLoadStatus.NotFound : ResourceLoadStatus.Forbidden; message = T("LoadingDetails"); await ResourceUnavailable.InvokeAsync(exception); }
         catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_fallback_invalid", StringComparison.Ordinal) == true)
         { message = T("FallbackInvalid"); }
         catch (AgentstrationApiException exception) when (exception.ProblemType?.EndsWith("/knowledge_source_lifecycle_invalid", StringComparison.Ordinal) == true)
@@ -315,7 +330,7 @@ else
         finally { busy = false; }
     }
 
-    private async Task LoadFlowsAsync()
+    private async Task LoadFlowsAsync(long revision)
     {
         var summaries = await Flows.GetFlowsAsync(cancellation.Token);
         var details = await Task.WhenAll(summaries.Select(value => Flows.GetFlowAsync(value.Namespace, value.Id, value.ScopeRef, cancellation.Token)));
@@ -328,6 +343,7 @@ else
         var options = versions.Select(value => new FlowOption(value.Flow.ScopeRef!.Value, value.Flow.Namespace, value.Flow.Id,
             value.Flow.DisplayName ?? value.Flow.Name, value.Version.Version,
             value.Version.Metadata.GetValueOrDefault("flow.contract"), value.Version.Graph?.InputSchema?.Clone())).ToArray();
+        if (revision != loadRevision || disposed) return;
         projectionFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Projection).ToArray();
         retrievalFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.Retrieval).ToArray();
         transformationFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.ArtifactTransformation).ToArray();
