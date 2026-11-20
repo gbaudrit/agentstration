@@ -9,3 +9,6 @@ select { width: 100%; max-width: 100%; min-width: 0; }
 .storage-fields > section { min-width: 0; }
 
 @media (max-width: 620px) { .form-actions { bottom: 80px; } }
+
+.storage-reference-summary { display: grid; gap: var(--space-2); min-width: 0; }
+details { min-width: 0; }

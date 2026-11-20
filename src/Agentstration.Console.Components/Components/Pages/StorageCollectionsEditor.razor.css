@@ -5,3 +5,5 @@ code, small { overflow-wrap: anywhere; }
     .form-grid { grid-template-columns: minmax(0, 1fr); }
     .form-span-2 { grid-column: auto; }
 }
+
+.resource-enabled-toggle { display: inline-flex; align-items: center; gap: var(--space-2); }

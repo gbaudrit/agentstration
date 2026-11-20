@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class StorageComponentTests
+public sealed partial class StorageComponentTests
 {
     private static readonly Guid TypeUid = Guid.Parse("10460000-0000-0000-0000-000000000001");
     private static readonly Guid ServiceUid = Guid.Parse("10460000-0000-0000-0000-000000000002");
@@ -561,6 +561,7 @@ public sealed class StorageComponentTests
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-form.js").Setup<bool>("focusFirstInvalid", _ => true).SetResult(true);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IStoragesClient>(client);
         context.Services.AddSingleton<IConnectedServicesClient>(new ServiceClient(serviceGeneration, servicesUnavailable));
@@ -640,7 +641,7 @@ public sealed class StorageComponentTests
             return Task.FromResult(new ResourceSnapshot<StorageResource>(Current, $"\"revision-{revision}\""));
         }
         public Task<IReadOnlyList<StorageUsage>> GetUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
-        public Task<ResourceSnapshot<StorageResource>> CreateAsync(CreateStorageRequest body, CancellationToken token) { Created = body; return Result(); }
+        public Task<ResourceSnapshot<StorageResource>> CreateAsync(CreateStorageRequest body, CancellationToken token) { Created = body; Current = Current with { Uid = Guid.NewGuid(), Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default }, ScopeRef = body.ScopeRef, Definition = body.Properties }; return Result(); }
         public Task<ResourceSnapshot<StorageResource>> UpdateAsync(ScopedResourceAddress address, PutStorageRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; LastAddress = address; return Result(body.Properties); }
         public Task<ResourceSnapshot<StorageResource>> ReconcileAsync(ScopedResourceAddress address, ReconcileStorageRequest body, string etag, CancellationToken token) { Reconciles++; Reconciled = body; LastEtag = etag; LastAddress = address; return Result(body.Properties); }
         public Task<ResourceSnapshot<StorageResource>> DeactivateAsync(ScopedResourceAddress address, string etag, CancellationToken token) { Deactivations++; LastEtag = etag; return Result(Current.Definition with { Enabled = false }); }

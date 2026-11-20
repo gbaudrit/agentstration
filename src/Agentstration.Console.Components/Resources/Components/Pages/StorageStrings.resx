@@ -255,4 +255,5 @@
   <data name="Type.NoUsages" xml:space="preserve"><value>No discoverable usages in this context.</value></data>
   <data name="Type.UsagesUnknown" xml:space="preserve"><value>Usages could not be loaded. Retry to inspect the discoverable references.</value></data>
   <data name="Type.Value" xml:space="preserve"><value>Value</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Descendant use policy</value></data>
 </root>

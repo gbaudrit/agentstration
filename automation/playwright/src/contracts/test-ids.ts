@@ -4,6 +4,11 @@ export const TestIds = {
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
     nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
+  storageEditor: {
+    root: 'storage-editor', form: 'storage-form', fields: 'storage-definition-fields', identity: 'storage-identity-editor',
+    name: 'storage-name', displayName: 'storage-display-name', enabled: 'storage-enabled', type: 'storage-type',
+    service: 'storage-service', configuration: 'storage-configuration', envelope: 'storage-envelope', save: 'storage-save',
+  },
   storageTypeEditor: {
     root: 'storage-type-editor', details: 'storage-type-details', refresh: 'storage-type-refresh', yaml: 'storage-type-yaml', versionSelect: 'storage-type-version-select', form: 'storage-type-form', fields: 'storage-type-definition-fields',
     identity: 'storage-type-identity-editor', name: 'storage-type-name', displayName: 'storage-type-display-name',
