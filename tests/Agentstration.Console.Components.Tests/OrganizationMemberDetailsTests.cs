@@ -14,7 +14,7 @@ namespace Agentstration.Web.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class OrganizationMemberDetailsTests
+public sealed partial class OrganizationMemberDetailsTests
 {
     [TestMethod]
     [DataRow("en-US", "Identity", "Person")]
@@ -29,14 +29,14 @@ public sealed class OrganizationMemberDetailsTests
         Assert.Contains(identity, rendered.Find(".resource-identity-summary").TextContent);
         Assert.Contains(kind, rendered.Find(".resource-identity-summary").TextContent);
         Assert.Contains(handler.First.Id.ToString("D"), rendered.Find(".resource-identity-summary").TextContent);
-        Assert.Contains("Default workspace", rendered.FindAll(".member-details")[1].TextContent);
+        Assert.Contains("Default workspace", rendered.Find(".resource-configuration-summary").TextContent);
         Assert.AreEqual(0, rendered.FindAll(".resource-header .resource-scope-badge, .resource-header [role=switch]").Count);
         Assert.IsEmpty(rendered.FindAll("a[data-resource-section=yaml]"));
         Assert.AreEqual(1, handler.OrganizationReads);
     }
 
     [TestMethod]
-    public void MembershipDraftSurvivesSectionsAndRefreshCancellationThenWritesTheExactWorkspaceAndMember()
+    public async Task MembershipDraftSurvivesSectionsAndRefreshThenWritesTheExactWorkspaceAndMember()
     {
         using var language = new CultureScope("en-US");
         using var handler = new MemberHandler();
@@ -47,18 +47,17 @@ public sealed class OrganizationMemberDetailsTests
         rendered.Find("select").Change(BuiltInIdentityRoleNames.Admin);
         Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty);
         Section(context, "overview");
-        Assert.Contains(BuiltInIdentityRoleNames.Viewer, rendered.FindAll(".member-details")[1].TextContent);
-        rendered.FindAll(".resource-header .resource-action-bar button").Single(button => button.TextContent == "Refresh").Click();
-        rendered.WaitForElement("dialog");
-        rendered.Find("dialog .dialog-actions .button-secondary").Click();
-        Assert.AreEqual(1, handler.OrganizationReads);
+        Assert.Contains(BuiltInIdentityRoleNames.Viewer, rendered.Find(".resource-configuration-summary").TextContent);
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreEqual(2, handler.OrganizationReads);
+        Assert.IsEmpty(rendered.FindAll("dialog"));
         Section(context, "membership");
         Assert.AreEqual(BuiltInIdentityRoleNames.Admin, rendered.Find("select").GetAttribute("value"));
         rendered.FindAll(".resource-details-content button.button-primary").Single(button => button.TextContent == "Save role").Click();
         rendered.WaitForAssertion(() => Assert.AreEqual(BuiltInIdentityRoleNames.Admin, handler.SavedRole));
         Assert.AreEqual($"/api/identity/workspaces/{MemberHandler.WorkspaceId:D}/memberships/{handler.First.Id:D}", handler.WritePath);
         Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty);
-        Assert.AreEqual(1, handler.OrganizationReads);
+        Assert.AreEqual(3, handler.OrganizationReads);
     }
 
     [TestMethod]
@@ -88,7 +87,7 @@ public sealed class OrganizationMemberDetailsTests
         rendered.WaitForElement(".error-panel");
         Assert.IsEmpty(rendered.FindAll(".resource-identity-summary"));
         handler.Missing = false;
-        rendered.Find("[data-testid=console-admin-organization-member-details] > button").Click();
+        rendered.Find(".error-panel button").Click();
         rendered.WaitForElement(".resource-identity-summary");
         Assert.Contains(handler.First.Id.ToString("D"), rendered.Find(".resource-identity-summary").TextContent);
         Assert.AreEqual(2, handler.OrganizationReads);
@@ -154,6 +153,14 @@ public sealed class OrganizationMemberDetailsTests
         public Principal Second { get; } = new(Guid.NewGuid(), PrincipalKind.Human, "Second member", null, PrincipalStatus.Active, DateTimeOffset.UnixEpoch);
         public bool Administrator { get; init; }
         public bool Missing { get; set; }
+        public HttpStatusCode? ReadFailure { get; set; }
+        public Task<HttpResponseMessage>? PendingOrganization { get; set; }
+        public Guid ResponseTenant { get; set; } = TenantId;
+        public Guid CapabilitiesPrincipal { get; set; } = OperatorId;
+        public Guid CapabilitiesWorkspace { get; set; } = WorkspaceId;
+        public string CurrentRole { get => role; set => role = value; }
+        public bool WriteNetworkFailure { get; set; }
+        public bool MembershipPresent { get; private set; } = true;
         public int OrganizationReads { get; private set; }
         public int MembershipReads { get; private set; }
         public int AdministratorReads { get; private set; }
@@ -163,21 +170,28 @@ public sealed class OrganizationMemberDetailsTests
         private string role = BuiltInIdentityRoleNames.Viewer;
         private OrganizationMemberResponse Member(Principal principal) => new(principal, new(Guid.NewGuid(), TenantId, principal.Id, MembershipStatus.Active, DateTimeOffset.UnixEpoch), [], []);
         private WorkspaceMemberResponse Membership(Principal principal) => new(principal, new(Guid.NewGuid(), WorkspaceId, principal.Id, MembershipStatus.Active, DateTimeOffset.UnixEpoch), role, false);
-        public HttpResponseMessage OrganizationResponse() => Ok(new OrganizationAdministrationResponse(new(TenantId, "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch), [], Missing ? [] : [Member(First), Member(Second)]));
+        public HttpResponseMessage OrganizationResponse() => Ok(new OrganizationAdministrationResponse(new(ResponseTenant, "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch), [], Missing ? [] : [Member(First), Member(Second)]));
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
             if (path == "/api/identity/organization")
             {
                 OrganizationReads++;
+                if (ReadFailure is { } code) return new(code) { Content = JsonContent.Create(new { title = "Read unavailable", status = (int)code }) };
+                if (PendingOrganization is { } pending) return await pending;
                 if (OrganizationReads == 1 && FirstOrganization is not null) return await FirstOrganization;
                 return OrganizationResponse();
             }
-            if (path == "/api/identity/administration-capabilities") return Ok(new IdentityAdministrationCapabilitiesResponse(OperatorId, WorkspaceId, Administrator, true));
+            if (path == "/api/identity/administration-capabilities") return Ok(new IdentityAdministrationCapabilitiesResponse(CapabilitiesPrincipal, CapabilitiesWorkspace, Administrator, true));
             if (path == "/api/identity/platform-administrators") { AdministratorReads++; return Ok(Array.Empty<PlatformAdministratorResponse>()); }
-            if (path == $"/api/identity/workspaces/{WorkspaceId:D}/memberships") { MembershipReads++; return Ok(new[] { Membership(First), Membership(Second) }); }
+            if (path == $"/api/identity/workspaces/{WorkspaceId:D}/memberships") { MembershipReads++; return Ok(MembershipPresent ? new[] { Membership(First), Membership(Second) } : new[] { Membership(Second) }); }
+            if (request.Method == HttpMethod.Delete && path == $"/api/identity/workspaces/{WorkspaceId:D}/memberships/{First.Id:D}")
+            {
+                WritePath = path; MembershipPresent = false; return new(HttpStatusCode.NoContent);
+            }
             if (request.Method == HttpMethod.Put && path == $"/api/identity/workspaces/{WorkspaceId:D}/memberships/{First.Id:D}")
             {
+                if (WriteNetworkFailure) throw new HttpRequestException("Network unavailable");
                 var value = await request.Content!.ReadFromJsonAsync<SetWorkspaceMembershipRequest>(cancellationToken);
                 WritePath = path; role = SavedRole = value!.Role;
                 return Ok(Membership(First));

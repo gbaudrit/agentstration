@@ -180,4 +180,7 @@
   <data name="AuditOutcome.Unknown"><value>Inconnu</value></data>
   <data name="Access.EmptyTitle"><value>Aucune attribution de rôle</value></data>
   <data name="Access.EmptyMessage"><value>Les attributions de rôle s’affichent ici quand les membres de l’organisation reçoivent un accès.</value></data>
+  <data name="Member.RefreshDraftConflict" xml:space="preserve"><value>Des accès du membre actualisés sont disponibles. Votre rôle et vos saisies d’authentification en cours sont conservés jusqu’à leur abandon.</value></data>
+  <data name="Member.Value" xml:space="preserve"><value>Valeur</value></data>
+  <data name="Member.OperationUnconfirmed" xml:space="preserve"><value>La modification des accès du membre n’a pas pu être confirmée. Vos saisies sont conservées. Actualisez pour consulter l’état enregistré avant de réessayer.</value></data>
 </root>

@@ -4,6 +4,11 @@ export const TestIds = {
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
     nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
+  organizationMember: {
+    refresh: 'organization-member-refresh', role: 'organization-member-role', saveRole: 'organization-member-save-role',
+    issuer: 'organization-member-issuer', subject: 'organization-member-subject', linkIdentity: 'organization-member-link-identity',
+    unlinkIdentity: 'organization-member-unlink-identity', removeMembership: 'organization-member-remove-membership',
+  },
   storageEditor: {
     root: 'storage-editor', details: 'storage-details', refresh: 'storage-refresh', yaml: 'storage-yaml', form: 'storage-form', fields: 'storage-definition-fields', identity: 'storage-identity-editor',
     name: 'storage-name', displayName: 'storage-display-name', enabled: 'storage-enabled', type: 'storage-type',

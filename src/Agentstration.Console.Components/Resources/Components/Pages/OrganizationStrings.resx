@@ -180,4 +180,7 @@
   <data name="AuditOutcome.Unknown"><value>Unknown</value></data>
   <data name="Access.EmptyTitle"><value>No role assignments</value></data>
   <data name="Access.EmptyMessage"><value>Role assignments appear here when organization members receive access.</value></data>
+  <data name="Member.RefreshDraftConflict" xml:space="preserve"><value>Updated member access is available. Your pending role and authentication inputs are retained until you discard them.</value></data>
+  <data name="Member.Value" xml:space="preserve"><value>Value</value></data>
+  <data name="Member.OperationUnconfirmed" xml:space="preserve"><value>Could not confirm the member access change. Your pending inputs are retained. Refresh to inspect the saved state before retrying.</value></data>
 </root>
