@@ -4,6 +4,7 @@ using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 namespace Agentstration.Web.Console;
+
 public sealed class SchemaEditorModel
 {
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")] public string Name { get; set; } = "";
@@ -25,9 +26,12 @@ public sealed class SchemaEditorModel
     }
     public SchemaProperties Properties(SchemaResource? saved) => new()
     {
-        SourceEvidence = saved?.Definition.SourceEvidence, UsePolicy = saved?.Definition.UsePolicy ?? new(),
-        DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-        Format = saved?.Definition.Format ?? Format.Trim(), Dialect = saved is null ? (string.IsNullOrWhiteSpace(Dialect) ? null : Dialect.Trim()) : saved.Definition.Dialect,
+        SourceEvidence = saved?.Definition.SourceEvidence,
+        UsePolicy = saved?.Definition.UsePolicy ?? new(),
+        DisplayName = DisplayName.Trim(),
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+        Format = saved?.Definition.Format ?? Format.Trim(),
+        Dialect = saved is null ? (string.IsNullOrWhiteSpace(Dialect) ? null : Dialect.Trim()) : saved.Definition.Dialect,
         Content = Content.Clone()
     };
     public static string NextVersion(IReadOnlyList<SchemaVersionResource> values)

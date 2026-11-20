@@ -81,9 +81,13 @@ public partial class FlowDetails
     private sealed record FlowIdentityPresentation : Resource;
     private Resource? SavedIdentity => flow is null ? null : new FlowIdentityPresentation
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = FlowResourceKinds.Flow, Uid = flow.Uid ?? Guid.Empty,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = FlowResourceKinds.Flow,
+        Uid = flow.Uid ?? Guid.Empty,
         Metadata = new() { Name = flow.Id, Namespace = flow.Namespace, Tags = flow.Metadata },
-        ScopeRef = flow.ScopeRef, Governance = flow.Governance, ETag = snapshot?.ETag
+        ScopeRef = flow.ScopeRef,
+        Governance = flow.Governance,
+        ETag = snapshot?.ETag
     };
 
     protected override async Task OnParametersSetAsync()
@@ -109,7 +113,8 @@ public partial class FlowDetails
     private static ResourceLoadStatus FailureStatus(Exception exception) => exception is AgentstrationApiException api ? api.StatusCode switch
     {
         HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
-        HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed
+        HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+        _ => ResourceLoadStatus.Failed
     } : ResourceLoadStatus.Failed;
     private void ClearPrivate()
     {

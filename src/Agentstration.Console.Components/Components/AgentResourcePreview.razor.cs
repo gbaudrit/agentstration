@@ -66,7 +66,8 @@ public partial class AgentResourcePreview
                 HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
                 HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
                 _ => ResourceLoadStatus.Failed
-            }) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+            })
+            { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
         }
     }
 

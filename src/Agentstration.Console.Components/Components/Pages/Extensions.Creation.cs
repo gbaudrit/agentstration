@@ -45,9 +45,15 @@ public partial class Extensions
     };
     private IReadOnlyDictionary<string, string> RegistrationFieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(form.Name)] = IdentityLocalizer["TechnicalName"], [nameof(form.DisplayName)] = IdentityLocalizer["DisplayName"], [nameof(form.Namespace)] = T("Namespace"),
-        [nameof(form.ScopeRef)] = Shared["Scope"], [nameof(form.Endpoint)] = T("AepEndpoint"), [nameof(form.AuthenticationMode)] = T("AuthenticationMode"),
-        [nameof(form.CredentialName)] = T("CredentialName"), [nameof(form.CredentialNamespace)] = T("CredentialNamespace"), [nameof(form.CredentialScopeRef)] = T("CredentialScopeRef")
+        [nameof(form.Name)] = IdentityLocalizer["TechnicalName"],
+        [nameof(form.DisplayName)] = IdentityLocalizer["DisplayName"],
+        [nameof(form.Namespace)] = T("Namespace"),
+        [nameof(form.ScopeRef)] = Shared["Scope"],
+        [nameof(form.Endpoint)] = T("AepEndpoint"),
+        [nameof(form.AuthenticationMode)] = T("AuthenticationMode"),
+        [nameof(form.CredentialName)] = T("CredentialName"),
+        [nameof(form.CredentialNamespace)] = T("CredentialNamespace"),
+        [nameof(form.CredentialScopeRef)] = T("CredentialScopeRef")
     };
     private IReadOnlyList<CreationWizardStep> RegistrationSteps =>
     [
@@ -101,7 +107,9 @@ public partial class Extensions
     }
     private string RegistrationInvalidStep() => ResourceDefinitionForm.FirstInvalidSection(RegistrationContext, RegistrationPresentations) switch
     {
-        "definition/identity" => "identity", "definition/authentication" => "authentication", _ => "connection"
+        "definition/identity" => "identity",
+        "definition/authentication" => "authentication",
+        _ => "connection"
     };
     private Task RegistrationStepReady(string step)
     {
@@ -183,16 +191,27 @@ public partial class Extensions
         private static bool ValidCredentialScope(string value) { try { if (!string.IsNullOrWhiteSpace(value)) _ = ResourceScopeRef.Parse(value); return true; } catch (Exception exception) when (exception is ArgumentException or FormatException) { return false; } }
         public ExtensionRegistrationProperties Properties() => new()
         {
-            DisplayName = DisplayName, Endpoint = new(Endpoint, UriKind.Absolute), Enabled = Enabled, ExpectedExtensionId = ExpectedExtensionId, AuthenticationMode = AuthenticationMode,
+            DisplayName = DisplayName,
+            Endpoint = new(Endpoint, UriKind.Absolute),
+            Enabled = Enabled,
+            ExpectedExtensionId = ExpectedExtensionId,
+            AuthenticationMode = AuthenticationMode,
             Credential = AuthenticationMode != AepTransportAuthenticationMode.StaticBearer ? null : new(CredentialName,
                 string.IsNullOrWhiteSpace(CredentialScopeRef) ? null : ResourceScopeRef.Parse(CredentialScopeRef), ResourceNamespace.Parse(CredentialNamespace))
         };
         public static RegistrationForm From(ExtensionRegistrationResource resource) => new()
         {
-            Name = resource.Name, Namespace = resource.Namespace.Value, DisplayName = resource.Definition.DisplayName, ScopeRef = resource.ScopeRef,
-            Endpoint = resource.Definition.Endpoint.AbsoluteUri, Enabled = resource.Definition.Enabled, ExpectedExtensionId = resource.Definition.ExpectedExtensionId,
-            AuthenticationMode = resource.Definition.AuthenticationMode, CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
-            CredentialNamespace = resource.Definition.Credential?.Namespace?.Value ?? resource.Namespace.Value, CredentialScopeRef = resource.Definition.Credential?.ScopeRef?.Value ?? string.Empty
+            Name = resource.Name,
+            Namespace = resource.Namespace.Value,
+            DisplayName = resource.Definition.DisplayName,
+            ScopeRef = resource.ScopeRef,
+            Endpoint = resource.Definition.Endpoint.AbsoluteUri,
+            Enabled = resource.Definition.Enabled,
+            ExpectedExtensionId = resource.Definition.ExpectedExtensionId,
+            AuthenticationMode = resource.Definition.AuthenticationMode,
+            CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
+            CredentialNamespace = resource.Definition.Credential?.Namespace?.Value ?? resource.Namespace.Value,
+            CredentialScopeRef = resource.Definition.Credential?.ScopeRef?.Value ?? string.Empty
         };
     }
 }

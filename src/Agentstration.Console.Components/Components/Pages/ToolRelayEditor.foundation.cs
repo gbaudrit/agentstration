@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Agentstration.Parameters;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Tools;
-using Agentstration.Web.Console;
 using Agentstration.Web.Components.State;
+using Agentstration.Web.Console;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -42,7 +42,9 @@ public partial class ToolRelayEditor
     };
     private IReadOnlyDictionary<string, string> RelayFieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Version)] = T("RelayVersion"), [nameof(model.Timeout)] = T("TimeoutSeconds")
+        [nameof(model.DisplayName)] = T("DisplayName"),
+        [nameof(model.Version)] = T("RelayVersion"),
+        [nameof(model.Timeout)] = T("TimeoutSeconds")
     };
     private void SelectSection(string? value) { }
     private void NavigateSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
@@ -69,7 +71,8 @@ public partial class ToolRelayEditor
         System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
         System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
         _ => ResourceLoadStatus.Failed
-    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    } : ResourceLoadStatus.Failed)
+    { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     private void ClearPrivate()
     {
         snapshot = newerSnapshot = null; selected = null; baseline = null; rows.Clear(); tools = []; parameters = []; secrets = []; versions = []; usages = [];
@@ -221,8 +224,15 @@ public partial class ToolRelayEditor
             var source = new ToolRelayTarget { Name = selected.Name, Namespace = selected.Namespace, ScopeRef = selected.ScopeRef!.Value, Uid = selected.Uid, Generation = selected.Generation };
             var properties = (draftBase ?? new RelayToolDefinitionProperties { DisplayName = model.DisplayName, Target = source }) with
             {
-                DisplayName = model.DisplayName, Description = model.Description, Version = model.Version, Enabled = snapshot?.Value.Definition.Enabled ?? model.Enabled,
-                RequiresApproval = model.RequiresApproval, InvocationTimeoutSeconds = model.Timeout, Bindings = BuildBindings(), InputEnvelope = model.InputEnvelope, Target = source
+                DisplayName = model.DisplayName,
+                Description = model.Description,
+                Version = model.Version,
+                Enabled = snapshot?.Value.Definition.Enabled ?? model.Enabled,
+                RequiresApproval = model.RequiresApproval,
+                InvocationTimeoutSeconds = model.Timeout,
+                Bindings = BuildBindings(),
+                InputEnvelope = model.InputEnvelope,
+                Target = source
             };
             var saved = snapshot is null ? await Definitions.CreateAsync(new(model.Name, properties, model.Namespace, OwnerScope), cancellation.Token)
                 : await Definitions.UpdateAsync(snapshot.Value.Name, snapshot.Value.Namespace, new(properties), snapshot.ETag, cancellation.Token);

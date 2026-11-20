@@ -2,8 +2,8 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Identity.Contracts;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -46,7 +46,9 @@ public partial class Sources
         ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(model.DisplayName), nameof(model.Name), nameof(model.Namespace), nameof(model.ScopeRef), nameof(model.Description), nameof(model.Tags)] },
         ["definition/configuration"] = new() { Fields = [nameof(model.BindingSelections)] },
         ["definition/refresh"] = new() { Fields = [nameof(model.SourceRefresh), nameof(model.ChannelRefresh), nameof(model.ChannelOverrides)] },
-        ["content"] = new(), ["versions"] = new(), ["yaml"] = new() { ReadOnly = true }
+        ["content"] = new(),
+        ["versions"] = new(),
+        ["yaml"] = new() { ReadOnly = true }
     };
     private IReadOnlyDictionary<string, string> DetailFieldLabels => new Dictionary<string, string> { [nameof(model.DisplayName)] = T("DisplayName") };
     private IReadOnlyList<ResourceNavigationItem> DetailDefinitionSections => [new("definition/refresh", T("RefreshScheduling"), "clock")];

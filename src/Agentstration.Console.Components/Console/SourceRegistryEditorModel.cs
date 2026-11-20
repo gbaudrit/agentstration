@@ -59,7 +59,9 @@ public sealed class SourceRegistryEditorModel
 
     public static SourceRegistryEditorModel From(SourceRegistryRegistrationResource resource) => new()
     {
-        Name = resource.Name, Namespace = resource.Namespace.Value, ScopeRef = resource.ScopeRef,
+        Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         DisplayName = resource.Definition.DisplayName,
         IndexUrl = resource.Definition.IndexUrl.AbsoluteUri,
@@ -67,7 +69,8 @@ public sealed class SourceRegistryEditorModel
         TrustPolicy = resource.Definition.TrustPolicy,
         AuthenticationMode = resource.Definition.AuthenticationMode,
         CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
-        CredentialNamespace = resource.Definition.Credential?.Namespace, CredentialScopeRef = resource.Definition.Credential?.ScopeRef,
+        CredentialNamespace = resource.Definition.Credential?.Namespace,
+        CredentialScopeRef = resource.Definition.Credential?.ScopeRef,
         AllowHttp = resource.Definition.EndpointPolicy.AllowHttp,
         AllowPrivateNetwork = resource.Definition.EndpointPolicy.AllowPrivateNetwork,
         PeriodicEnabled = resource.Definition.RefreshPolicy.PeriodicEnabled,

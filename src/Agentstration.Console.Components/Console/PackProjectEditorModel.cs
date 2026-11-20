@@ -22,12 +22,19 @@ public sealed class PackProjectEditorModel
 
     public static PackProjectEditorModel From(PackProjectResource resource) => new()
     {
-        ResourceName = resource.Name, Namespace = resource.Namespace.Value, ScopeRef = resource.ScopeRef,
+        ResourceName = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
         MetadataTags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(value => value.Key, StringComparer.Ordinal).Select(value => $"{value.Key}={value.Value}")),
-        Publisher = resource.Definition.Publisher, PackName = resource.Definition.PackName, Version = resource.Definition.Version,
-        DisplayName = resource.Definition.DisplayName ?? string.Empty, Description = resource.Definition.Description,
-        Audience = resource.Definition.Audience, Purpose = resource.Definition.Purpose,
-        Categories = string.Join(", ", resource.Definition.Categories), ManifestTags = string.Join(", ", resource.Definition.Tags)
+        Publisher = resource.Definition.Publisher,
+        PackName = resource.Definition.PackName,
+        Version = resource.Definition.Version,
+        DisplayName = resource.Definition.DisplayName ?? string.Empty,
+        Description = resource.Definition.Description,
+        Audience = resource.Definition.Audience,
+        Purpose = resource.Definition.Purpose,
+        Categories = string.Join(", ", resource.Definition.Categories),
+        ManifestTags = string.Join(", ", resource.Definition.Tags)
     };
 
     public UpdatePackProjectCommand Command() => new(Version.Trim(), Empty(DisplayName), Empty(Description), Split(Categories), Split(ManifestTags), Audience, Purpose);

@@ -12,7 +12,9 @@ public partial class EntryEditor
     private bool rawPublish;
     private RawEntryResource RawResource() => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = EntryResourceKinds.Entry, Metadata = new() { Name = model.Name.Trim() },
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = EntryResourceKinds.Entry,
+        Metadata = new() { Name = model.Name.Trim() },
         Definition = new() { DisplayName = model.DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), Presentation = model.Presentation(), Exposure = model.Exposure(), Binding = CurrentBinding(), Behavior = model.Behavior(), Publish = rawPublish }
     };
     private void PrepareRawYaml()
@@ -38,10 +40,17 @@ public partial class EntryEditor
             if (!IsNew && !string.Equals(value.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("EntryNameImmutable"));
             var draft = new EntryDraft
             {
-                WorkspaceId = model.WorkspaceId, Id = new(value.Metadata.Name, EntryResourceNamespace), Name = value.Metadata.Name,
-                DisplayName = value.Definition.DisplayName ?? value.Metadata.Name, Description = value.Definition.Description,
-                Presentation = value.Definition.Presentation, Exposure = value.Definition.Exposure, Binding = value.Definition.Binding,
-                Behavior = value.Definition.Behavior, PublishedBinding = publishedBinding, Revision = draftRevision
+                WorkspaceId = model.WorkspaceId,
+                Id = new(value.Metadata.Name, EntryResourceNamespace),
+                Name = value.Metadata.Name,
+                DisplayName = value.Definition.DisplayName ?? value.Metadata.Name,
+                Description = value.Definition.Description,
+                Presentation = value.Definition.Presentation,
+                Exposure = value.Definition.Exposure,
+                Binding = value.Definition.Binding,
+                Behavior = value.Definition.Behavior,
+                PublishedBinding = publishedBinding,
+                Revision = draftRevision
             };
             // The raw source is an explicit transfer. Keep its exact text on parser/command rejection.
             model = EntryEditorModel.From(draft, BindingKey(draft.Binding, EntryResourceNamespace)); declaredBinding = draft.Binding; bindingEdited = invalidInput = false; rawPublish = value.Definition.Publish;

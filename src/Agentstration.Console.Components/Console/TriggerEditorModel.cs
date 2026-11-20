@@ -49,10 +49,15 @@ public sealed class TriggerEditorModel
     }
     public TriggerProperties Definition(TriggerResource? saved, string targetRequiredMessage, string objectRequiredMessage) => new()
     {
-        DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-        Enabled = saved?.Definition.Enabled ?? false, Source = new() { Schedule = BuildSchedule() },
-        Target = new() { Flow = Target(saved, targetRequiredMessage) }, Input = ParseInput(objectRequiredMessage),
-        MisfirePolicy = MisfirePolicy, ConcurrencyPolicy = ConcurrencyPolicy, ExecutionScope = saved?.Definition.ExecutionScope
+        DisplayName = DisplayName.Trim(),
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+        Enabled = saved?.Definition.Enabled ?? false,
+        Source = new() { Schedule = BuildSchedule() },
+        Target = new() { Flow = Target(saved, targetRequiredMessage) },
+        Input = ParseInput(objectRequiredMessage),
+        MisfirePolicy = MisfirePolicy,
+        ConcurrencyPolicy = ConcurrencyPolicy,
+        ExecutionScope = saved?.Definition.ExecutionScope
     };
     public bool FieldsValid(params string[] fields) => fields.All(field => Validator.TryValidateProperty(GetType().GetProperty(field)!.GetValue(this), new ValidationContext(this) { MemberName = field }, null));
 }

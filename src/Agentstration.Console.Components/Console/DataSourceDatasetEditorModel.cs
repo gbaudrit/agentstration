@@ -53,8 +53,13 @@ public sealed class DataSourceDatasetEditorModel
         if (!LifecycleEnabled && !AllowDirect) return null;
         _ = LifecycleDuration.TryParse(AcquisitionTtl, out var ttl);
         _ = LifecycleDuration.TryParse(HistoryRetention, out var retention);
-        return new() { AllowDirect = AllowDirect, TimeToLive = LifecycleEnabled ? ttl : null,
-            KeepHistory = LifecycleEnabled && KeepHistory, HistoryRetention = LifecycleEnabled && KeepHistory ? retention : null };
+        return new()
+        {
+            AllowDirect = AllowDirect,
+            TimeToLive = LifecycleEnabled ? ttl : null,
+            KeepHistory = LifecycleEnabled && KeepHistory,
+            HistoryRetention = LifecycleEnabled && KeepHistory ? retention : null
+        };
     }
 
     public bool CanSave(bool collectionValid, bool hasOperation, bool parametersValid, bool eligibleOperation, bool currentService) =>
@@ -68,15 +73,25 @@ public sealed class DataSourceDatasetEditorModel
         if (saved.Transformations.Count > 0) compositions["transformations"] = saved.Transformations;
         return new()
         {
-            Name = source.Name, DisplayName = source.Definition.DisplayName, Description = source.Definition.Description,
-            Namespace = source.Namespace.Value, Scope = source.ScopeRef, Enabled = source.Definition.Enabled,
+            Name = source.Name,
+            DisplayName = source.Definition.DisplayName,
+            Description = source.Definition.Description,
+            Namespace = source.Namespace.Value,
+            Scope = source.ScopeRef,
+            Enabled = source.Definition.Enabled,
             Tags = string.Join(Environment.NewLine, source.Metadata.Tags.Select(pair => $"{pair.Key}={pair.Value}")),
-            LifecycleEnabled = saved.Lifecycle is not null, AllowDirect = saved.Lifecycle?.AllowDirect == true,
-            AcquisitionTtl = LifecycleDuration.Format(saved.Lifecycle?.TimeToLive), KeepHistory = saved.Lifecycle?.KeepHistory == true,
+            LifecycleEnabled = saved.Lifecycle is not null,
+            AllowDirect = saved.Lifecycle?.AllowDirect == true,
+            AcquisitionTtl = LifecycleDuration.Format(saved.Lifecycle?.TimeToLive),
+            KeepHistory = saved.Lifecycle?.KeepHistory == true,
             HistoryRetention = LifecycleDuration.Format(saved.Lifecycle?.HistoryRetention),
-            AcquisitionOutputBinding = saved.Acquisition.OutputSchemaBinding, OutputBinding = saved.OutputSchemaBinding,
-            Orchestration = saved.Orchestration, CompositionPoints = compositions,
-            Prefix = saved.Rule.Prefix, Parameters = saved.Acquisition.Parameters.Clone(), DocumentCollectionUid = saved.DocumentCollectionUid ?? Guid.Empty,
+            AcquisitionOutputBinding = saved.Acquisition.OutputSchemaBinding,
+            OutputBinding = saved.OutputSchemaBinding,
+            Orchestration = saved.Orchestration,
+            CompositionPoints = compositions,
+            Prefix = saved.Rule.Prefix,
+            Parameters = saved.Acquisition.Parameters.Clone(),
+            DocumentCollectionUid = saved.DocumentCollectionUid ?? Guid.Empty,
             StorageKey = saved.Storage is { } storage ? $"{storage.StorageUid}:{storage.Generation}:{storage.BindingDigest}" : string.Empty,
             OperationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}",
             ServiceKey = serviceKey

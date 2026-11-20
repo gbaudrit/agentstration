@@ -21,9 +21,15 @@ public sealed record DurableArtifactInspectionModel
         && !string.IsNullOrWhiteSpace(fileName) ? fileName : resource.ArtifactId.ToString();
     public static DurableArtifactInspectionModel From(FlowRunArtifactResource resource) => new()
     {
-        Name = resource.Name, Namespace = resource.Namespace.Value, DisplayName = DisplayNameFor(resource), ScopeRef = resource.ScopeRef,
+        Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        DisplayName = DisplayNameFor(resource),
+        ScopeRef = resource.ScopeRef,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
-        ArtifactId = resource.ArtifactId.ToString(), MediaType = resource.Receipt.MediaType, Length = resource.Receipt.Length,
-        Sha256 = resource.Receipt.Sha256, CreatedAt = resource.CreatedAt
+        ArtifactId = resource.ArtifactId.ToString(),
+        MediaType = resource.Receipt.MediaType,
+        Length = resource.Receipt.Length,
+        Sha256 = resource.Receipt.Sha256,
+        CreatedAt = resource.CreatedAt
     };
 }

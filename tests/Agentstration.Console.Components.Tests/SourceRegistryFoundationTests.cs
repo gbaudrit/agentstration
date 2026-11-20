@@ -94,7 +94,13 @@ public sealed class SourceRegistryFoundationTests
     private sealed class Handler : HttpMessageHandler
     {
         public SourceRegistryRegistrationResource Resource { get; set; } = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SourceRegistryKinds.SourceRegistryRegistration, Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Instance, Generation = 3, Metadata = new() { Name = "team", Tags = new Dictionary<string, string> { ["team"] = "reviewed" } }, Definition = new() { DisplayName = "Saved registry", IndexUrl = new("https://registry.example/index.json"), Enabled = true, AuthenticationMode = SourceRegistryAuthenticationMode.StaticBearer, Credential = new("registry-token", ResourceScopeRef.Instance, new ResourceNamespace("credentials")) } };
-        public string Etag { get; set; } = "\"first\""; public HttpStatusCode? Failure { get; set; } public bool DetailsFailure { get; set; } public int Writes { get; private set; } public int Creates { get; private set; } public int HistoryBound { get; private set; } public string? IfMatch { get; private set; } public SourceRegistryRegistrationProperties? Command { get; private set; }
+        public string Etag { get; set; } = "\"first\""; public HttpStatusCode? Failure { get; set; }
+        public bool DetailsFailure { get; set; }
+        public int Writes { get; private set; }
+        public int Creates { get; private set; }
+        public int HistoryBound { get; private set; }
+        public string? IfMatch { get; private set; }
+        public SourceRegistryRegistrationProperties? Command { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             var path = request.RequestUri!.AbsolutePath;

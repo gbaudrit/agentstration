@@ -129,9 +129,15 @@ public sealed class PackComposerFoundationTests
     }
     private sealed class Handler : HttpMessageHandler
     {
-        public int CatalogReads { get; private set; } public int Previews { get; private set; } public int Creates { get; private set; }
-        public bool PreviewFailure { get; set; } public bool CreateFailure { get; set; } public Task? HoldCreation { get; set; } public HttpStatusCode? CatalogFailure { get; set; }
-        public CreatePackProjectFromWorkspaceCommand? Command { get; private set; } public PreviewPackCompositionCommand? LastPreview { get; private set; }
+        public int CatalogReads { get; private set; }
+        public int Previews { get; private set; }
+        public int Creates { get; private set; }
+        public bool PreviewFailure { get; set; }
+        public bool CreateFailure { get; set; }
+        public Task? HoldCreation { get; set; }
+        public HttpStatusCode? CatalogFailure { get; set; }
+        public CreatePackProjectFromWorkspaceCommand? Command { get; private set; }
+        public PreviewPackCompositionCommand? LastPreview { get; private set; }
         public Guid ProjectUid { get; } = Guid.NewGuid();
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {

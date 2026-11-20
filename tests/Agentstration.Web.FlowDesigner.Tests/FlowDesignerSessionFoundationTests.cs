@@ -14,9 +14,14 @@ public sealed class FlowDesignerSessionFoundationTests
         var workspace = WorkspaceId.New();
         var draft = new FlowDraftResponse(new FlowDraft
         {
-            WorkspaceId = workspace, ScopeRef = ResourceScopeRef.Workspace(workspace.Value), Id = "private-draft", FlowId = new("private-flow"),
-            DisplayName = "Private saved title", Definition = new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
-            CreatedAt = DateTimeOffset.UnixEpoch, UpdatedAt = DateTimeOffset.UnixEpoch
+            WorkspaceId = workspace,
+            ScopeRef = ResourceScopeRef.Workspace(workspace.Value),
+            Id = "private-draft",
+            FlowId = new("private-flow"),
+            DisplayName = "Private saved title",
+            Definition = new() { EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }], Transitions = [] },
+            CreatedAt = DateTimeOffset.UnixEpoch,
+            UpdatedAt = DateTimeOffset.UnixEpoch
         }, "original-etag");
         var store = new FlowEditorStore(); store.Load(draft, "private saved source");
         await store.DispatchAsync(new MoveStepCommand("input", new(10, 20)));

@@ -6,8 +6,8 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
-using Agentstration.Web.FlowDesigner.Components;
 using Agentstration.Web.Console;
+using Agentstration.Web.FlowDesigner.Components;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -161,7 +161,7 @@ public sealed class FlowResourcePreviewTests
     private static FlowResponse Resource(string name) => new(name, "Saved " + name, null, "1.0.0", true, "1.0.0",
         new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent")),
         new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch)
-        { ScopeRef = Scope, Namespace = ResourceNamespace.Default, Uid = Guid.NewGuid() };
+    { ScopeRef = Scope, Namespace = ResourceNamespace.Default, Uid = Guid.NewGuid() };
     private static HttpResponseMessage Response(FlowResponse resource)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(resource) };

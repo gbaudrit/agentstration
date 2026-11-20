@@ -65,8 +65,22 @@ public partial class SourceRegistries
     private RenderFragment? ReadOnlyDiscard => !HasDraft ? null : builder => { builder.OpenElement(0, "button"); builder.AddAttribute(1, "type", "button"); builder.AddAttribute(2, "class", "button-secondary"); builder.AddAttribute(3, "disabled", busy); builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, DiscardAsync)); builder.AddContent(5, Shared["Discard"].Value); builder.CloseElement(); };
     private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(model.Name)] = Shared["TechnicalName"], [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.ScopeRef)] = Shared["Scope"], [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"],
-        [nameof(model.IndexUrl)] = T("IndexUrl"), [nameof(model.CredentialName)] = T("CredentialReference"), [nameof(model.IntervalMinutes)] = T("IntervalMinutes"), [nameof(model.TimeoutSeconds)] = T("TimeoutSeconds"), [nameof(model.MaximumAttempts)] = T("MaximumAttempts"), [nameof(model.InitialBackoffSeconds)] = T("InitialBackoffSeconds"), [nameof(model.MaximumBackoffSeconds)] = T("MaximumBackoffSeconds"), [nameof(model.JitterSeconds)] = T("JitterSeconds"), [nameof(model.StaleAfterMinutes)] = T("StaleAfterMinutes"), [nameof(model.RetainedObservations)] = T("RetainedObservations")
+        [nameof(model.Name)] = Shared["TechnicalName"],
+        [nameof(model.DisplayName)] = T("DisplayName"),
+        [nameof(model.Namespace)] = Shared["Namespace"],
+        [nameof(model.ScopeRef)] = Shared["Scope"],
+        [nameof(model.Description)] = Shared["Description"],
+        [nameof(model.Tags)] = Shared["Labels"],
+        [nameof(model.IndexUrl)] = T("IndexUrl"),
+        [nameof(model.CredentialName)] = T("CredentialReference"),
+        [nameof(model.IntervalMinutes)] = T("IntervalMinutes"),
+        [nameof(model.TimeoutSeconds)] = T("TimeoutSeconds"),
+        [nameof(model.MaximumAttempts)] = T("MaximumAttempts"),
+        [nameof(model.InitialBackoffSeconds)] = T("InitialBackoffSeconds"),
+        [nameof(model.MaximumBackoffSeconds)] = T("MaximumBackoffSeconds"),
+        [nameof(model.JitterSeconds)] = T("JitterSeconds"),
+        [nameof(model.StaleAfterMinutes)] = T("StaleAfterMinutes"),
+        [nameof(model.RetainedObservations)] = T("RetainedObservations")
     };
     private IReadOnlyList<CreationWizardStep> Steps => [new("identity", Shared["Identity"], IdentityFields) { IsComplete = Complete("definition/identity") }, new("configuration", Shared["Configuration"], ConfigurationFields) { IsComplete = Complete("definition/configuration") }, new("refresh", T("RefreshPolicy"), RefreshFields) { IsComplete = Complete("definition/refresh") }];
     private bool Complete(string path) => Presentations[path].Fields.All(field => !editContext.GetValidationMessages(editContext.Field(field)).Any() && Validator.TryValidateProperty(typeof(SourceRegistryEditorModel).GetProperty(field)!.GetValue(model), new ValidationContext(model) { MemberName = field }, null)) && (path != "definition/configuration" || model.HasRequiredCredential);
@@ -159,7 +173,8 @@ public partial class SourceRegistries
     }
     private async Task ToggleAsync(bool value)
     {
-        if (busy || !CanWrite) return; if (IsNew) { model.Enabled = value; return; } if (snapshot is null) return;
+        if (busy || !CanWrite) return; if (IsNew) { model.Enabled = value; return; }
+        if (snapshot is null) return;
         var request = loadVersion; var key = loadedKey; commandBusy = true; error = null;
         try
         {

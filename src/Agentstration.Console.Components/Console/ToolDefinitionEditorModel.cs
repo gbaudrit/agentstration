@@ -22,11 +22,15 @@ public sealed class ToolDefinitionEditorModel
 
     public static ToolDefinitionEditorModel From(ToolDefinitionResource resource) => new()
     {
-        Name = resource.Name, Namespace = resource.Namespace.Value, DisplayName = resource.Definition.DisplayName,
+        Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
-        Enabled = resource.Definition.Enabled, RequiresApproval = resource.Definition.RequiresApproval,
-        TimeoutSeconds = resource.Definition.InvocationTimeoutSeconds, PublicationVersion = resource.Definition.Version,
+        Enabled = resource.Definition.Enabled,
+        RequiresApproval = resource.Definition.RequiresApproval,
+        TimeoutSeconds = resource.Definition.InvocationTimeoutSeconds,
+        PublicationVersion = resource.Definition.Version,
         UseActiveVersion = resource.Definition is not FlowToolDefinitionProperties flow || flow.Flow.UseActiveVersion,
         FlowVersion = resource.Definition is FlowToolDefinitionProperties defined ? defined.Flow.Version ?? string.Empty : string.Empty
     };

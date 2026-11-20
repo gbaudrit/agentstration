@@ -39,14 +39,14 @@ public sealed class ConnectedServiceEditorModel
                 && (original.Type.Namespace ?? ResourceNamespace.Parse(Namespace)) == type.Namespace
                 && original.Type.ScopeRef == type.ScopeRef && original.Version == version.Version && original.SchemaDigest == version.SchemaDigest
                 ? original : new()
-            {
-                Type = new ResourceReference(type.Name,
+                {
+                    Type = new ResourceReference(type.Name,
                 type.ScopeRef ?? throw new InvalidOperationException("The Connected Service type has no exact scope."),
                 type.Namespace),
-                TypeUid = type.Uid,
-                Version = version.Version,
-                SchemaDigest = version.SchemaDigest
-            },
+                    TypeUid = type.Uid,
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest
+                },
             Options = Options.Clone(),
             Bindings = Bindings.Where(value => value.IsConfigured).Select(value => value.ToBinding()).ToArray(),
             UsePolicy = new() { Grants = UseGrants.ToArray() }

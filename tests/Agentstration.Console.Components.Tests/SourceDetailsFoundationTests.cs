@@ -30,7 +30,7 @@ public sealed class SourceDetailsFoundationTests
         Assert.AreEqual(api.View.Source.Source.Uid, template.Resource!.Uid); Assert.AreEqual("public", template.Resource.Metadata.Tags["team"]);
         CollectionAssert.AreEqual(new[] { "overview", "definition/identity", "definition/configuration", "definition/refresh", "content", "versions", "access", "yaml" }, page.FindAll("[data-resource-section]").Select(value => value.GetAttribute("data-resource-section")).ToArray());
         Assert.IsNull(template.Enabled); Assert.IsTrue(template.YamlReadOnly); Assert.AreEqual(api.View.SelectedVersion.Definition.RawManifest, template.Yaml);
-        Assert.IsTrue(page.Markup.IndexOf("resource-overview-metrics", StringComparison.Ordinal) < page.Markup.IndexOf("source-identity-summary", StringComparison.Ordinal));
+        Assert.IsTrue(page.Find(".resource-overview").InnerHtml.IndexOf("resource-overview-metrics", StringComparison.Ordinal) < page.Find(".resource-overview").InnerHtml.IndexOf("source-identity-summary", StringComparison.Ordinal));
         await Select(page, "definition/identity"); var form = page.FindComponent<ResourceDefinitionForm>().Instance;
         Assert.AreSame(template.SectionState, form.SectionState); Assert.AreSame(template.SectionPresentations, form.Sections);
         var identity = page.FindComponent<ResourceIdentityEditor>().Instance; Assert.IsTrue(identity.LabelsReadOnly); Assert.IsTrue(identity.DescriptionReadOnly);

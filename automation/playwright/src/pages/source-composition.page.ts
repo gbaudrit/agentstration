@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { SourceLifecycleFixtures } from '../fixtures/source-lifecycle.js';
@@ -142,9 +143,11 @@ export class SourceCompositionPage {
     const editor = new SourcePoliciesPage(this.page);
     await editor.openKnowledge(base, source);
     const before = (await api.api('GET', `/api/knowledgesources/${source}?scopeRef=%2Finstance`)).value;
+    await selectResourceSection(this.page, 'definition/identity');
     const displayName = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName);
     const pendingName = `${before.definition.displayName}-unsaved`;
     await displayName.fill(pendingName); await displayName.blur();
+    await selectResourceSection(this.page, 'definition/configuration');
     const sequence = this.page.getByTestId(TestIds.sourcePolicies.composition).getByTestId(TestIds.sourcePolicies.sequence);
     const create = sequence.getByTestId(TestIds.sourcePolicies.createTransformation);
     await expect(create).toHaveText(SourcePolicyTextByLocale[locale].createTransformation);

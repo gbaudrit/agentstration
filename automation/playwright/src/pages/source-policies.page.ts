@@ -95,8 +95,9 @@ export class SourcePoliciesPage {
     expect(String(retired.find((view: any) => view.snapshot.metadata.name === first.snapshotName).lifecycleState)).toMatch(/retired|3/i);
     await this.page.goto(`${base}/knowledge-sources/${knowledge}?context=%2Finstance#snapshots`);
     await selectResourceSection(this.page, "snapshots");
-    const refresh = this.page.getByTestId("knowledge-source-refresh");
-    await refresh.click(); await expect(refresh).toBeEnabled();
+    await this.page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await selectResourceSection(this.page, 'snapshots');
     await expect(this.page.getByTestId(TestIds.sourceLifecycle.snapshots)).toContainText(text.retired);
     await this.assertResponsive();
     await control.change({});

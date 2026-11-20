@@ -45,7 +45,8 @@ public sealed class ModelProviderEditorModel
     {
         Name = resource.Name,
         Namespace = resource.Namespace.Value,
-        ScopeRef = resource.ScopeRef, ExtensionScopeRef = resource.Definition.Extension.ScopeRef,
+        ScopeRef = resource.ScopeRef,
+        ExtensionScopeRef = resource.Definition.Extension.ScopeRef,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         originalExtension = resource.Definition.Extension,
         originalExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",

@@ -156,8 +156,12 @@ public sealed class AgentResourcePreviewTests
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, AgentResourceKinds.Agent, name);
     private static AgentResource Resource(string name) => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent, Uid = Guid.NewGuid(), ScopeRef = Scope,
-        Metadata = new() { Name = name, Tags = new Dictionary<string, string> { ["environment"] = "poc" } }, Generation = 1,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = AgentResourceKinds.Agent,
+        Uid = Guid.NewGuid(),
+        ScopeRef = Scope,
+        Metadata = new() { Name = name, Tags = new Dictionary<string, string> { ["environment"] = "poc" } },
+        Generation = 1,
         Definition = new() { DisplayName = "Saved " + name, Instructions = "Saved instructions " + name, ModelProfile = new("profile", ResourceScopeRef.Instance) }
     };
     private static HttpResponseMessage Response(AgentResource resource)

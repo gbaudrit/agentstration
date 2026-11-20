@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { LoginPage } from './login.page.js';
@@ -157,6 +158,7 @@ export class ModelProfileCrossScopePage {
     const target = this.profileUsagesUrl(consoleUrl, fixture);
     const response = await this.page.goto(target, { waitUntil: 'domcontentloaded' });
     expect(response?.status(), target).toBe(200);
+    await selectResourceSection(this.page, 'usages');
     await this.usagesPanel.waitFor({ state: 'visible' });
     await this.expectContext(fixture.scopes.instance);
   }
@@ -386,13 +388,14 @@ export class ModelProfileCrossScopePage {
     const target = new URL(`/modelprofiles/${encodeURIComponent(fixture.modelProfileName)}`, consoleUrl);
     target.searchParams.set('scopeRef', fixture.scopes.instance);
     target.searchParams.set('context', contextScope);
-    target.searchParams.set('tab', 'usages');
+    target.hash = 'usages';
     return target.toString();
   }
 
   private async expectProfileUsages(fixture: ExecutionScopeFixture): Promise<void> {
     await this.expectContext(fixture.scopes.instance);
-    await expect(this.page).toHaveURL(/\/modelprofiles\/[^?]+\?.*tab=usages/);
+    await expect(this.page).toHaveURL(url => /^\/modelprofiles\/[^/]+$/.test(url.pathname) && url.hash === '#usages');
+    await selectResourceSection(this.page, 'usages');
     await this.usagesPanel.waitFor({ state: 'visible' });
   }
 

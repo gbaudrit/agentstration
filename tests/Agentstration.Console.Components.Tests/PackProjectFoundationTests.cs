@@ -126,8 +126,13 @@ public sealed class PackProjectFoundationTests
     {
         public PackProjectResource Resource { get; set; } = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = PackAuthoringKinds.PackProject, ScopeRef = ResourceScopeRef.Instance, Uid = Guid.NewGuid(), Generation = 4, Metadata = new() { Name = "generated-project-identity", Tags = new Dictionary<string, string> { ["team"] = "reviewed" } }, Definition = new() { Publisher = "publisher", PackName = "pack-name", Version = "1.2.3", DisplayName = "Saved pack", SourceArtifact = new("PRIVATE-STORAGE-KEY", "sha256:fixture", 123, "public.pack.zip") } };
         public PackProjectSourceDocument[] Documents { get; private set; } = [new("flows/first.yaml", "Flow", "first", "first saved source"), new("flows/second.yaml", "Flow", "second", "second saved source")];
-        public string Etag { get; set; } = "\"first\""; public bool WriteFailure { get; set; } public bool BuildFailure { get; set; } public bool AlreadyInstalled { get; set; } public HttpStatusCode? ReadFailure { get; set; }
-        public int MetadataWrites { get; private set; } public int SourceWrites { get; private set; } public string? IfMatch { get; private set; }
+        public string Etag { get; set; } = "\"first\""; public bool WriteFailure { get; set; }
+        public bool BuildFailure { get; set; }
+        public bool AlreadyInstalled { get; set; }
+        public HttpStatusCode? ReadFailure { get; set; }
+        public int MetadataWrites { get; private set; }
+        public int SourceWrites { get; private set; }
+        public string? IfMatch { get; private set; }
         private readonly Guid buildId = Guid.NewGuid();
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {

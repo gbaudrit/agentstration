@@ -3,6 +3,7 @@ using Agentstration.Resources;
 using Agentstration.Web.Console;
 
 namespace Agentstration.Web.Tests;
+
 public sealed partial class ApiClientTests
 {
     [TestMethod]
@@ -13,7 +14,8 @@ public sealed partial class ApiClientTests
         {
             paths.Add(request.RequestUri!.PathAndQuery);
             return new HttpResponseMessage(HttpStatusCode.NotFound);
-        })) { BaseAddress = new Uri("http://localhost/") };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
         var client = new KnowledgeSourcesApiClient(http);
         var selected = client.WithOwner(ResourceScopeRef.Instance);
         Assert.IsNull(await selected.GetExposureAsync(ResourceNamespace.Parse("research"), "sample"));
