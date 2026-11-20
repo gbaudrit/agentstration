@@ -101,6 +101,17 @@ export class ConnectedStorageCollectionPage {
       await expect(usage).toHaveCount(1);
       await this.identity(usage, `${namespace}/${fixture.name}`, fixture.name, namespace, false);
     }
+    for (const section of ['definition/identity', 'definition/configuration', 'versions', 'yaml']) {
+      await selectResourceSection(this.page, section);
+      if (section === 'definition/identity') {
+        await expect(this.page.getByTestId(TestIds.storageTypeEditor.name)).toBeDisabled();
+        await expect(this.page.getByTestId(TestIds.storageTypeEditor.displayName)).toBeVisible();
+      }
+      if (section === 'versions') await expect(this.page.getByTestId(TestIds.storageTypeEditor.versionSelect)).toHaveValue('1.0.0');
+      if (section === 'yaml') await expect(this.page.getByTestId(TestIds.storageTypeEditor.yaml)).toHaveAttribute('readonly', '');
+      await this.assertNoOverflow();
+    }
+    await selectResourceSection(this.page, 'overview');
     await this.assertNoOverflow();
   }
 

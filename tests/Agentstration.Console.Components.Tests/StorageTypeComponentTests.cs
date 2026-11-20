@@ -122,7 +122,7 @@ public sealed partial class StorageTypeComponentTests
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
         var page = RenderDetails(context, client.Resource.Name);
-        page.WaitForElement("[data-testid=storage-type-managed]");
+        page.WaitForElement(".resource-readonly-notice");
         Assert.IsEmpty(page.FindAll("[data-testid=storage-type-edit], [data-testid=storage-type-publish], [data-testid=storage-type-delete]"));
         Assert.HasCount(1, page.FindAll(".resource-navigation-rail [data-resource-section=access]"));
         SelectSection(context, "versions");
@@ -269,7 +269,7 @@ public sealed partial class StorageTypeComponentTests
         using var context = Setup(client);
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(StorageTypeLinks.Details(client.Resource));
         var page = RenderDetails(context, client.Resource.Name);
-        SelectSection(context, "definition/configuration");
+        SelectSection(context, "definition/identity");
         var editor = page.FindComponent<StorageTypeEditor>().Instance;
         page.Find("[data-testid=storage-type-display-name]").Change("Pending type title");
         SelectSection(context, "overview"); page.Find("[data-testid=storage-type-enabled]").Change(false);
@@ -278,7 +278,7 @@ public sealed partial class StorageTypeComponentTests
         Assert.AreEqual("Custom type", client.Resource.Definition.DisplayName);
         CollectionAssert.AreEqual(versions.ToArray(), client.Resource.Definition.Versions.ToArray());
         var activationEtag = client.CurrentEtag;
-        SelectSection(context, "definition/configuration");
+        SelectSection(context, "definition/identity");
         Assert.AreSame(editor, page.FindComponent<StorageTypeEditor>().Instance);
         Assert.AreEqual("Pending type title", page.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
         page.Find("form").Submit();
@@ -344,6 +344,9 @@ public sealed partial class StorageTypeComponentTests
         public IReadOnlyList<StorageUsage> Usages { get; init; } = [];
         public int UsageCalls { get; private set; }
         public int ResourceReads { get; private set; }
+        public Exception? ReadError { get; set; }
+        public Exception? UsageError { get; set; }
+        public Task<ResourceSnapshot<StorageTypeResource>>? PendingRead { get; set; }
         private int revision;
 
         public StorageTypeResource Resource { get; set; } = Type();
@@ -356,8 +359,8 @@ public sealed partial class StorageTypeComponentTests
         public PublishStorageTypeVersionRequest? Published { get; private set; }
         public Task<PagedResponse<StorageTypeResource>> GetTypesPageAsync(ResourceScopeRef scope, int skip, int take, CancellationToken token) { ListScope = scope; return Task.FromResult(new PagedResponse<StorageTypeResource>([Resource], null)); }
         public Task<IReadOnlyList<StorageTypeResource>> GetTypesAsync(ResourceScopeRef scope, CancellationToken token) { ListScope = scope; return Task.FromResult<IReadOnlyList<StorageTypeResource>>([Resource]); }
-        public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) { ResourceReads++; return Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag)); }
-        public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return Task.FromResult(Usages); }
+        public Task<ResourceSnapshot<StorageTypeResource>> GetTypeAsync(ScopedResourceAddress address, CancellationToken token) { ResourceReads++; return PendingRead ?? (ReadError is { } error ? Task.FromException<ResourceSnapshot<StorageTypeResource>>(error) : Task.FromResult(new ResourceSnapshot<StorageTypeResource>(Resource, CurrentEtag))); }
+        public Task<IReadOnlyList<StorageUsage>> GetTypeUsagesAsync(ScopedResourceAddress address, CancellationToken token) { UsageCalls++; return UsageError is { } error ? Task.FromException<IReadOnlyList<StorageUsage>>(error) : Task.FromResult(Usages); }
         public Task<ResourceSnapshot<StorageTypeResource>> CreateTypeAsync(CreateStorageTypeRequest body, CancellationToken token) { Created = body; Resource = Resource with { Uid = Guid.NewGuid(), Metadata = new() { Name = body.Name, Namespace = body.Namespace ?? ResourceNamespace.Default }, ScopeRef = body.ScopeRef, Definition = body.Properties }; return Result(); }
         public Task<ResourceSnapshot<StorageTypeResource>> UpdateTypeAsync(ScopedResourceAddress address, PutStorageTypeRequest body, string etag, CancellationToken token) { Updated = body; LastEtag = etag; return Result(body.Properties); }
         public Task<ResourceSnapshot<StorageTypeResource>> PublishTypeVersionAsync(ScopedResourceAddress address, PublishStorageTypeVersionRequest body, string etag, CancellationToken token) { Published = body; LastEtag = etag; return Result(Resource.Definition with { Versions = Resource.Definition.Versions.Append(body.Version).ToArray(), PreferredVersion = body.SetPreferred ? body.Version.Version : Resource.Definition.PreferredVersion }); }

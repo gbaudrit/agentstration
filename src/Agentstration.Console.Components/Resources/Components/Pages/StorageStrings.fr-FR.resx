@@ -250,4 +250,9 @@
 <data name="Validation.DescriptionRange"><value>Utilisez une description de 2 000 caractères au maximum.</value></data>
 <data name="Validation.NamespaceInvalid"><value>Saisissez un espace de noms valide.</value></data>
 <data name="Type.UseUnknown"><value>L’utilisation générique n’a pas été évaluée.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version enregistrée plus récente est disponible. Votre brouillon et sa révision d’origine sont conservés jusqu’à son abandon.</value></data>
+  <data name="Type.Usages" xml:space="preserve"><value>Utilisations découvrables</value></data>
+  <data name="Type.NoUsages" xml:space="preserve"><value>Aucune utilisation découvrable dans ce contexte.</value></data>
+  <data name="Type.UsagesUnknown" xml:space="preserve"><value>Les utilisations n’ont pas pu être chargées. Réessayez pour consulter les références découvrables.</value></data>
+  <data name="Type.Value" xml:space="preserve"><value>Valeur</value></data>
 </root>

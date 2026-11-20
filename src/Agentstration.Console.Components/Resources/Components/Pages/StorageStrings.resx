@@ -250,4 +250,9 @@
 <data name="Validation.DescriptionRange"><value>Use a description of at most 2,000 characters.</value></data>
 <data name="Validation.NamespaceInvalid"><value>Enter a valid namespace.</value></data>
 <data name="Type.UseUnknown"><value>Generic Use has not been evaluated.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved version is available. Your draft and its original revision are retained until you discard it.</value></data>
+  <data name="Type.Usages" xml:space="preserve"><value>Discoverable usages</value></data>
+  <data name="Type.NoUsages" xml:space="preserve"><value>No discoverable usages in this context.</value></data>
+  <data name="Type.UsagesUnknown" xml:space="preserve"><value>Usages could not be loaded. Retry to inspect the discoverable references.</value></data>
+  <data name="Type.Value" xml:space="preserve"><value>Value</value></data>
 </root>
