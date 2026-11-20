@@ -257,7 +257,8 @@ Staged startup repeats the idempotent readiness sequence under the initializatio
 lease even when the durable initialization version is already Ready. New optional
 announcements remain eligible for policy-driven assignment after startup.
 
-The default non-staged startup and `NoBootstrap` activation settings remain valid.
+All standalone startup uses this phased lifecycle. `NoBootstrap` skips initial
+profile application without selecting another startup path.
 Manual preview stays read-only and reports unavailable dependencies without
 enrolling or preparing them. Durable manual progress remains the separate workflow
 tracked by issue #871.
