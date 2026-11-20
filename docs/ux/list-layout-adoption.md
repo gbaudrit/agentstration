@@ -43,16 +43,16 @@ Each screen is completed, checked, committed and published before the next start
 
 | Security audit | Existing privileged latest-200 snapshot without continuation, filters or global total. No local search, filters or pager; explicit EN/FR window limit and shared loaded count. API PlatformAdmin policy remains authoritative. | Template adopted with existing Organization navigation, action/reason codes, audit context, outcome/time and full copyable actor/target/correlation. Unknown labels/outcomes have localized neutral fallbacks; every role/context notification clears cached events before API reauthorization. Five new plus existing localization cases, warning-free Web build, full targeted format, two catalog assertions and real 200-event desktop/mobile metadata smoke pass; [captures and source proof](evidence/list-layout/security-audit/README.md). Role-denial/revocation behavior is covered by component cases; no identity mutation was used for browser preparation. Full lanes and #1242 remain deferred. |
 
-## Remaining top-level Console list adapters
+## Reconciled top-level Console screen inventory
 
-This source inventory identifies concrete top-level list adapters still outside the new page composition. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
+This reconciled inventory records every reviewed top-level screen: migrated catalog adapters, protected pilots, and explicitly retained specialized screens. No listed screen remains unreviewed. Embedded collections, Workplace lists and specialized operations remain governed by `collection-surfaces-1121.json` and require separate bounded review; the presence of `CollectionView` alone does not establish template adoption. Connected Services and Flows are the protected pilots.
 
 | Source | Routes / aliases | Batch status |
 | --- | --- | --- |
 | `AgentRuns.razor` | `/agent-runs` | Adopted |
 | `Agents.razor` | `/agents` | Adopted; server offset pages, unknown total; bounded deployment observations, scoped commands/ETags and inspector preserved. [Evidence](evidence/list-layout/agents/README.md) |
 | `Artifacts.razor` | `/artifacts` | Adopted |
-| `BootstrapProfiles.razor` | `/settings/bootstrap` | Remaining; requires individual contract review |
+| `BootstrapProfiles.razor` | `/settings/bootstrap` | Reviewed outside top-level migration: composition/preview/apply workflow and embedded history, retained. [Contract review](evidence/list-layout/bootstrap-profiles/README.md) |
 | `ConnectedServices.razor` | `/connected-services` | Protected pilot |
 | `DataSourceProfiles.razor` | `/data-source-profiles` | Adopted in this batch |
 | `DataSources.razor` | `/data-sources` | Adopted |
@@ -87,3 +87,13 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Adopted; independent server offset pages with one lookahead, immutable schemas/ETags preserved. [Evidence](evidence/list-layout/transformation-functions/README.md) |
 | `Triggers.razor` | `/triggers` | Adopted |
 | `Vaults.razor` | `/vaults` | Adopted |
+
+## Completion review and validation
+
+Every screen in the reconciled inventory has a disposition. Connected Services and Flows remain protected pilots. Resource Scopes (ownership-tree explorer), Settings (four fixed configuration tuples) and Bootstrap Profiles (ordered composition/preview/apply workflow) retain their specialized compositions after individual source, API and application-contract review. Embedded collections, protected details/creation workflows and Workplace remain outside this top-level migration.
+
+The final populated catalog continuations were published individually: Organization Access `63040fc5`, Organization Members `238d2a62`, Source Registries `37deef47` (shared-branch integration `8ef1d4af`), Sources `1a5bbcbd`, Packs `5c9c53d2`, Agents `351dad81`, Transformation Functions `68f2ca6b` and Extensions `d516a94c`. Specialized reviews are separate commits: Resource Scopes `7374116c` and Settings `9bcfd4ef`; this Bootstrap review completes the inventory. Earlier catalog commits and screen-specific contracts/checks remain recorded above and in their evidence directories. Each delivery was synchronized, published and remote-verified before the next screen; no history rewrite or PR merge was performed.
+
+The final Release solution build succeeds with zero warnings/errors. The required Fast lane ran 2,198 cases: 2,197 pass, one fails in `FlowOrchestrationEditorTests.ParticipantReorderingNotifiesDraftOwnershipAndDiscardRestoresTheSavedOrder` (expected display name `Agent B`, actual technical name `agent-b`). The same single test was restored, compiled and executed in an isolated detached checkout of upstream `118b9ad7`, where it fails identically at line 59. That upstream qualified-participant change and its test fixture are outside the list migration; the fixture supplies unqualified Agent summaries while the editor now resolves qualified participants. The protected editor was not changed or its assertion weakened. This is an existing failure, not a green full-suite claim.
+
+The required Integration lane passes: 1,570 cases total, 1,542 passed, zero failed and 28 optional live-provider/PostgreSQL cases skipped (8m 37s). All three collection inventory assertions pass after inventory-only reconciliation of upstream 67784be2's embedded staged-Artifact SavedSetting frame. No protected detail UI was modified for that reconciliation. Final checks and the exact Fast-lane baseline exception are recorded in [validation.json](evidence/list-layout/bootstrap-profiles/validation.json). Browser and focused per-screen evidence remains in each screen directory; the final functional lanes supersede earlier progress notes that described those lanes as deferred. New reusable #1242 remains blocked pending explicit UX validation and merge; no PR was merged and no issue was closed.

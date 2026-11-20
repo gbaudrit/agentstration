@@ -1,0 +1,12 @@
+{
+  "baseCommit": "9bcfd4efa95d7ee910a33e952aa90855f4db38f8",
+  "route": "/settings/bootstrap",
+  "uiChanged": false,
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor": "8c55b086f4708418f0df4e1648d9afa492391eda",
+    "src/Agentstration.Console.Client/BootstrapProfilesApiClient.cs": "df6ada1ea0f4c0d98938afb10a8936762dab695f",
+    "src/Agentstration.Bootstrap.Api/Api/BootstrapProfileEndpoints.cs": "2c65344d30c063f427fc5c49079f736bcc61a3ee",
+    "src/Agentstration.Infrastructure/Api/BootstrapProfileManagementService.cs": "1d2ccc83d844595fb2274fafd3479a89c6e0efa6",
+    "src/Agentstration.Infrastructure/Api/BootstrapProfileCatalog.cs": "f6cfaef4a8789241f8a38ec888124010ee71b334"
+  }
+}

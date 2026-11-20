@@ -1392,6 +1392,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -1475,6 +1481,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -1558,6 +1570,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -6580,6 +6598,31 @@
         "routeEvidence": [],
         "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
       }
+    },
+    {
+      "id": "staged-artifact-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "line": 31,
+      "host": "console",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
+      }
     }
   ],
   "specialized": [
@@ -7631,6 +7674,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -7705,6 +7754,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -15205,6 +15260,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -15245,6 +15306,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -15285,6 +15352,12 @@
         "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-bootstrap-composition-preview-apply-workflow",
+        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
+        "review": "evidence/list-layout/bootstrap-profiles/README.md",
+        "uiChanged": false
       }
     },
     {
