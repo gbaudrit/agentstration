@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Steps" xml:space="preserve"><value>Étapes de préparation</value></data>
+  <data name="Details" xml:space="preserve"><value>Détails de l’étape</value></data>
+  <data name="NoSteps" xml:space="preserve"><value>Aucune étape à afficher.</value></data>
+  <data name="NoSelectableSteps" xml:space="preserve"><value>Aucune étape ne peut être consultée.</value></data>
+  <data name="FollowCurrent" xml:space="preserve"><value>Suivre l’étape en cours</value></data>
+  <data name="Pending" xml:space="preserve"><value>À venir</value></data>
+  <data name="Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="Waiting" xml:space="preserve"><value>En attente</value></data>
+  <data name="Succeeded" xml:space="preserve"><value>Terminée</value></data>
+  <data name="Failed" xml:space="preserve"><value>Échouée</value></data>
+  <data name="Skipped" xml:space="preserve"><value>Ignorée</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="Interrupted" xml:space="preserve"><value>Interrompue</value></data>
+</root>

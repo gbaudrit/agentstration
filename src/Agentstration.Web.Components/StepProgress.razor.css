@@ -1,0 +1,41 @@
+.step-progress { color: var(--text, #102039); min-width: 0; }
+.step-progress-header { margin-bottom: 1rem; }
+.step-progress-layout { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(0, 1.65fr); gap: 1.25rem; align-items: start; }
+.step-progress-navigation, .step-progress-panel { min-width: 0; border: 1px solid var(--border, #d7e2f4); border-radius: 1rem; background: var(--surface, #fff); box-shadow: 0 .5rem 1.5rem rgb(15 35 75 / 4%); }
+.step-progress-navigation { padding: 1.25rem .75rem; }
+.step-progress-navigation-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: 0 .5rem 1rem; }
+.step-progress-navigation-heading h2 { margin: 0; font-size: 1.15rem; line-height: 1.4; }
+.step-progress-follow { border: 1px solid var(--border, #d7e2f4); border-radius: .5rem; padding: .4rem .65rem; background: var(--surface, #fff); color: var(--primary, #2863ff); font: inherit; font-size: .8rem; cursor: pointer; }
+.step-progress-step { position: relative; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .75rem; align-items: start; width: 100%; padding: .85rem .6rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; }
+.step-progress-step:not(:last-child)::after { position: absolute; content: ""; inset-inline-start: calc(.6rem + 1rem); top: 2.95rem; bottom: -.6rem; width: 2px; background: var(--border, #d7e2f4); }
+.step-progress-step.is-selected { background: var(--primary-soft, #eaf1ff); border-color: color-mix(in srgb, var(--primary, #2863ff) 22%, transparent); }
+.step-progress-step:hover:not(:disabled) { background: var(--surface-2, #f5f7fb); }
+.step-progress-step.is-selected:hover { background: var(--primary-soft, #eaf1ff); }
+.step-progress-marker { z-index: 1; display: flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 2px solid var(--border, #b7c4d9); border-radius: 50%; background: var(--surface, #fff); color: var(--muted, #66748c); font-size: .8rem; font-weight: 650; }
+.step-progress-marker ::deep .ui-icon { width: 1.1rem; height: 1.1rem; }
+.step-progress-copy { display: flex; flex-direction: column; gap: .25rem; min-width: 0; overflow-wrap: anywhere; }
+.step-progress-step-heading { display: flex; gap: .4rem; align-items: center; }
+.step-progress-step-heading ::deep .ui-icon { flex-shrink: 0; width: 1rem; height: 1rem; }
+.step-progress-step-title { font-weight: 650; line-height: 1.4; }
+.step-progress-state, .step-progress-summary { font-size: .8rem; line-height: 1.45; color: var(--muted, #66748c); }
+.step-progress-step.is-active .step-progress-step-title { color: var(--primary, #2863ff); }
+.status-running .step-progress-marker { color: var(--primary, #2863ff); border-color: color-mix(in srgb, var(--primary, #2863ff) 30%, transparent); }
+.status-succeeded .step-progress-marker { color: var(--surface, #fff); border-color: var(--success, #16883b); background: var(--success, #16883b); }
+.status-waiting .step-progress-marker { color: var(--warning, #b86b00); border-color: var(--warning, #b86b00); }
+.status-failed .step-progress-marker, .status-interrupted .step-progress-marker { color: var(--danger, #d33449); border-color: var(--danger, #d33449); }
+.step-progress-spinner { display: block; width: 1.3rem; height: 1.3rem; border: 3px solid currentColor; border-inline-start-color: transparent; border-radius: 50%; animation: step-progress-spin 1s linear infinite; }
+.step-progress-step:disabled { cursor: default; }
+.step-progress-step:disabled .step-progress-copy { opacity: .65; }
+.step-progress-step:focus-visible, .step-progress-follow:focus-visible, .step-progress-panel:focus-visible { outline: 2px solid var(--primary, #2863ff); outline-offset: 3px; }
+.step-progress-panel { padding: 1.5rem; overflow-wrap: anywhere; overflow-x: auto; }
+.step-progress-empty { padding: 1.5rem; color: var(--muted, #66748c); }
+.step-progress-announcement { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes step-progress-spin { to { transform: rotate(360deg); } }
+@media (max-width: 48rem) {
+    .step-progress-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .step-progress-navigation { padding: 1rem .5rem; }
+    .step-progress-panel { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .step-progress-spinner { animation: none; }
+}
