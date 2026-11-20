@@ -17,7 +17,7 @@ export const SharedFormCases = [
   { id: 'knowledge-source', path: '/knowledge-sources/new', source: 'KnowledgeSourceEditor.razor' },
   { id: 'entry', path: '/entries/new?view=definition', source: 'EntryEditor.razor' },
   { id: 'schema', path: '/schemas/new', source: 'SchemaEditor.razor' },
-  { id: 'source-registry', path: '/settings/source-registries/new', source: 'SourceRegistries.razor' },
+  { id: 'source-registry', path: '/settings/source-registries/new?context=%2Finstance', source: 'SourceRegistries.razor' },
   { id: 'pack-composer', path: '/pack-projects/new', source: 'PackComposer.razor' },
 ] as const;
 export type SharedFormCase = typeof SharedFormCases[number];

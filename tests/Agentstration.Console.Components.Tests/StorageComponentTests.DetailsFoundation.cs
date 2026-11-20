@@ -2,8 +2,8 @@ using System.Net;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
 using Agentstration.Web.Components;
-using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.Models;
+using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
 
@@ -36,7 +36,7 @@ public sealed partial class StorageComponentTests
         SelectSection(context, "definition/identity"); var form = cut.FindComponent<ResourceDefinitionForm>().Instance;
         var pending = new TaskCompletionSource<ResourceSnapshot<StorageResource>>(TaskCreationOptions.RunContinuationsAsynchronously); client.PendingRead = pending.Task;
         var refresh = cut.InvokeAsync(() => adapter.OnRefresh.InvokeAsync());
-        cut.WaitForAssertion(() => Assert.IsTrue(cut.Find("[data-testid=storage-refresh]").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.AreEqual("true", cut.Find(".resource-details-body").GetAttribute("aria-busy")));
         Assert.IsFalse(cut.Find("[data-testid=storage-definition-fields]").HasAttribute("disabled"));
         cut.Find("[data-testid=storage-display-name]").Change("Typed during pending refresh");
         pending.SetResult(new(Resource() with { Generation = 9 }, "new-etag")); await refresh;

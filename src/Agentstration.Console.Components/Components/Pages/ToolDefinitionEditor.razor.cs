@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
-using Agentstration.Resources;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -57,7 +57,8 @@ public partial class ToolDefinitionEditor
     };
     private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.TimeoutSeconds)] = T("TimeoutSeconds"),
+        [nameof(model.DisplayName)] = T("DisplayName"),
+        [nameof(model.TimeoutSeconds)] = T("TimeoutSeconds"),
         [nameof(model.PublicationVersion)] = T("RelayVersion")
     };
     private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/implementation", T(acquisitionDefinition is null ? "FlowImplementation" : "AcquisitionImplementation"), "sitemap")];
@@ -264,7 +265,8 @@ public partial class ToolDefinitionEditor
         System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
         System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
         _ => ResourceLoadStatus.Failed
-    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    } : ResourceLoadStatus.Failed)
+    { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     private FlowSummary? Selected() => flows.SingleOrDefault(value => FlowKey(value) == model.SelectedFlow);
     private static string FlowKey(FlowSummary flow) => flow.ScopeRef is { } owner ? $"{owner.Value}|{flow.Namespace.Value}|{flow.Id}" : "";
     private string ExistingFlowKey(ToolDefinitionFlowTarget target, ResourceNamespace ownerNamespace)

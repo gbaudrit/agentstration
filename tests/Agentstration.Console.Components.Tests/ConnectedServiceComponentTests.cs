@@ -292,7 +292,7 @@ public sealed partial class ConnectedServiceComponentTests
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find(".resource-header input[role=switch]").HasAttribute("disabled")));
         Assert.HasCount(1, rendered.FindAll("[data-resource-section=\"definition/configuration\"]"));
         Assert.HasCount(0, rendered.FindAll("[data-resource-section=access]"));
-        StringAssert.Contains(rendered.Find(".resource-identity-summary").InnerHtml, "data-scope-ref=\"/instance\"");
+        StringAssert.Contains(rendered.Find(".resource-header").InnerHtml, "data-scope-ref=\"/instance\"");
     }
 
     [TestMethod]

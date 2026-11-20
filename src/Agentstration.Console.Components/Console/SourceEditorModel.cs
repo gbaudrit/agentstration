@@ -22,8 +22,10 @@ public sealed class SourceEditorModel
         var configuration = value.Source.Configuration.Definition;
         var model = new SourceEditorModel
         {
-            DisplayName = configuration.DisplayName, Name = value.Source.Source.Name,
-            Namespace = value.Source.Source.Namespace.Value, ScopeRef = value.Source.Source.ScopeRef,
+            DisplayName = configuration.DisplayName,
+            Name = value.Source.Source.Name,
+            Namespace = value.Source.Source.Namespace.Value,
+            ScopeRef = value.Source.Source.ScopeRef,
             Description = value.SelectedVersion.Definition.PublishedDefinition.Description,
             Tags = string.Join(Environment.NewLine, value.Source.Source.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
             SourceRefresh = SourceRefreshPolicyForm.From(configuration.Refresh.Source),
@@ -40,7 +42,8 @@ public sealed class SourceEditorModel
     }
     public SourceRefreshConfiguration ToRefreshConfiguration() => new()
     {
-        Source = SourceRefresh.ToPolicy(), Channels = ChannelRefresh.ToPolicy(),
+        Source = SourceRefresh.ToPolicy(),
+        Channels = ChannelRefresh.ToPolicy(),
         ChannelOverrides = ChannelOverrides.Where(pair => pair.Value.Custom).ToDictionary(pair => pair.Key, pair => pair.Value.ToPolicy(), StringComparer.Ordinal)
     };
     public IEnumerable<SourcePolicyValidation> ValidatePolicies()
@@ -67,17 +70,25 @@ public sealed record SourceRefreshPolicyForm
     public int JitterSeconds { get; set; } = 15;
     public static SourceRefreshPolicyForm From(SourceRefreshPolicy policy) => new()
     {
-        original = policy, Enabled = policy.Enabled, IntervalMinutes = Math.Max(1, policy.IntervalSeconds / 60),
-        TimeoutSeconds = policy.TimeoutSeconds, MaximumAttempts = policy.MaximumAttempts,
-        InitialBackoffSeconds = policy.InitialBackoffSeconds, MaximumBackoffSeconds = policy.MaximumBackoffSeconds, JitterSeconds = policy.JitterSeconds
+        original = policy,
+        Enabled = policy.Enabled,
+        IntervalMinutes = Math.Max(1, policy.IntervalSeconds / 60),
+        TimeoutSeconds = policy.TimeoutSeconds,
+        MaximumAttempts = policy.MaximumAttempts,
+        InitialBackoffSeconds = policy.InitialBackoffSeconds,
+        MaximumBackoffSeconds = policy.MaximumBackoffSeconds,
+        JitterSeconds = policy.JitterSeconds
     };
     public SourceRefreshPolicy ToPolicy() => new()
     {
         Enabled = Enabled,
         // Reading a seconds-based policy must not silently round it on an unrelated save.
         IntervalSeconds = original is not null && IntervalMinutes == Math.Max(1, original.IntervalSeconds / 60) ? original.IntervalSeconds : checked(IntervalMinutes * 60),
-        TimeoutSeconds = TimeoutSeconds, MaximumAttempts = MaximumAttempts,
-        InitialBackoffSeconds = InitialBackoffSeconds, MaximumBackoffSeconds = MaximumBackoffSeconds, JitterSeconds = JitterSeconds
+        TimeoutSeconds = TimeoutSeconds,
+        MaximumAttempts = MaximumAttempts,
+        InitialBackoffSeconds = InitialBackoffSeconds,
+        MaximumBackoffSeconds = MaximumBackoffSeconds,
+        JitterSeconds = JitterSeconds
     };
     public IEnumerable<SourcePolicyValidation> Validate(string root)
     {

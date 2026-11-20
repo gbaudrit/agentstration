@@ -328,8 +328,8 @@ export const OrganizationStructureTextByLocale = {
 
 /** Independent collection vocabulary; deliberately not derived from product RESX. */
 export const CollectionTextByLocale = {
-  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'] },
-  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'] },
+  'en-US': { scope: 'Owner scope', state: 'State', actions: 'Actions', unknown: 'Unknown', scopeTypes: ['Instance', 'Tenant', 'Workspace'], joinedScopeTypes: ['Instance', 'Tenant', 'Workspace'] },
+  'fr-FR': { scope: 'Périmètre propriétaire', state: 'État', actions: 'Actions', unknown: 'Inconnu', scopeTypes: ['Instance', 'Tenant', 'Espace de travail'], joinedScopeTypes: ['Instance', 'Tenant', 'Workspace'] },
 } as const;
 
 export const CollectionVersionTextByLocale = {

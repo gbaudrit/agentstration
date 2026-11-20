@@ -249,7 +249,8 @@ public sealed partial class StorageComponentTests
         var page = RenderDetails(context);
         page.WaitForElement("[data-testid=storage-mapping]");
         CollectionAssert.AreEqual(new[] { "overview", "definition/identity", "definition/configuration", "definition/use-policy", "diagnostics", "dependents", "access", "yaml" }, page.FindAll(".resource-navigation-rail [data-resource-section]").Select(link => link.GetAttribute("data-resource-section")).ToArray());
-        StringAssert.Contains(page.Markup, "evidence/documents");
+        StringAssert.Contains(page.Find("[data-testid=storage-identity-summary]").TextContent, "evidence");
+        StringAssert.Contains(page.Find("[data-testid=storage-identity-summary]").TextContent, "documents");
         Assert.IsEmpty(page.FindAll("a[href*='/edit']"));
         SelectSection(context, "yaml");
         StringAssert.Contains(page.Find("[data-testid=storage-yaml]").GetAttribute("value")!, "apiVersion:");

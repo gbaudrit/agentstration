@@ -32,7 +32,7 @@ public sealed partial class StorageTypeComponentTests
         Assert.AreEqual("\"original\"", cut.Find("[data-testid=storage-type-form]").GetAttribute("data-resource-etag"));
         Assert.IsTrue(form.EditContext.GetValidationMessages().Any()); StringAssert.Contains(cut.Markup, "A newer saved version is available");
         SelectSection(context, "yaml"); SelectSection(context, "overview");
-        StringAssert.Contains(cut.Find("[data-testid=storage-type-identity-summary]").TextContent, "Custom type");
+        StringAssert.Contains(cut.Find(".resource-header h1").TextContent, "Custom type");
         cut.Find(".unsaved-changes-bar button[type=button]").Click();
         SelectSection(context, "definition/identity");
         Assert.AreEqual("New saved type", cut.Find("[data-testid=storage-type-display-name]").GetAttribute("value"));
@@ -68,7 +68,7 @@ public sealed partial class StorageTypeComponentTests
         SelectSection(context, "definition/identity"); var form = cut.FindComponent<ResourceDefinitionForm>().Instance;
         var pending = new TaskCompletionSource<ResourceSnapshot<StorageTypeResource>>(TaskCreationOptions.RunContinuationsAsynchronously); client.PendingRead = pending.Task;
         var refresh = cut.InvokeAsync(() => adapter.OnRefresh.InvokeAsync());
-        cut.WaitForAssertion(() => Assert.IsTrue(cut.Find("[data-testid=storage-type-refresh]").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.AreEqual("true", cut.Find(".resource-details-body").GetAttribute("aria-busy")));
         Assert.IsFalse(cut.Find("[data-testid=storage-type-definition-fields]").HasAttribute("disabled"));
         cut.Find("[data-testid=storage-type-display-name]").Change("Typed during refresh");
         pending.SetResult(new(original with { Generation = 2 }, "new-version")); await refresh;

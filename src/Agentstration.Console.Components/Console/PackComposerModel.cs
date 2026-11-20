@@ -17,8 +17,16 @@ public sealed class PackComposerModel
     public bool CoordinatesPresent => !string.IsNullOrWhiteSpace(Publisher) && !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Version);
     public CreatePackProjectFromWorkspaceCommand Command(IReadOnlyList<PackCompositionResourceKey> resources) => new()
     {
-        Publisher = Publisher.Trim(), Name = Name.Trim(), Version = Version.Trim(), DisplayName = Empty(DisplayName), Description = Empty(Description),
-        Audience = Audience, Purpose = Purpose, Categories = Split(Categories), Tags = Split(Tags), Resources = resources
+        Publisher = Publisher.Trim(),
+        Name = Name.Trim(),
+        Version = Version.Trim(),
+        DisplayName = Empty(DisplayName),
+        Description = Empty(Description),
+        Audience = Audience,
+        Purpose = Purpose,
+        Categories = Split(Categories),
+        Tags = Split(Tags),
+        Resources = resources
     };
     private static string? Empty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

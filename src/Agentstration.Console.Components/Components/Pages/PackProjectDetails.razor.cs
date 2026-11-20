@@ -299,7 +299,8 @@ public partial class PackProjectDetails
         PackBindingTargetKind.ModelProvider => modelProviders.Select(value => BindingValue(value.Name, ResourceNamespace.Parse(value.Namespace), value.ScopeRef)),
         PackBindingTargetKind.RuntimeProfile => runtimeProfiles.Select(value => BindingValue(value.Name, ResourceNamespace.Parse(value.Namespace), value.ScopeRef)),
         PackBindingTargetKind.ExtensionRegistration => extensionRegistrations.Select(value => BindingValue(value.Name, value.Namespace, value.ScopeRef)),
-        PackBindingTargetKind.Parameter => parameters.Select(BindingValue), _ => secrets.Select(value => BindingValue(value.Resource.Name, value.Resource.Namespace, value.Resource.ScopeRef))
+        PackBindingTargetKind.Parameter => parameters.Select(BindingValue),
+        _ => secrets.Select(value => BindingValue(value.Resource.Name, value.Resource.Namespace, value.Resource.ScopeRef))
     };
     private string? SelectedBinding(string name) => bindingSelections.GetValueOrDefault(name);
     private void BindingChanged(string name, ChangeEventArgs args) { if (!commandBusy && CanInstallPermission) { bindingSelections[name] = args.Value?.ToString() ?? string.Empty; RememberInstallation(); } }

@@ -1,6 +1,7 @@
 using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 namespace Agentstration.Web.Console;
+
 public static class KnowledgeSourceDetailsModel
 {
     public static string? IdentityError(KnowledgeSourceManifest manifest, KnowledgeSourceResource saved)
@@ -14,10 +15,10 @@ public static class KnowledgeSourceDetailsModel
     }
 }
 public sealed record KnowledgeSourceManifest
-    {
-        public ResourceScopeRef? ScopeRef { get; init; }
-        public required string ApiVersion { get; init; }
-        public required string Kind { get; init; }
-        public required ResourceMetadata Metadata { get; init; }
-        public required KnowledgeSourceProperties Definition { get; init; }
-    }
+{
+    public ResourceScopeRef? ScopeRef { get; init; }
+    public required string ApiVersion { get; init; }
+    public required string Kind { get; init; }
+    public required ResourceMetadata Metadata { get; init; }
+    public required KnowledgeSourceProperties Definition { get; init; }
+}

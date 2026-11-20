@@ -53,7 +53,8 @@ public partial class FlowResourcePreview
                 HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
                 HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
                 _ => ResourceLoadStatus.Failed
-            }) { ErrorId = (error as AgentstrationApiException)?.ErrorId };
+            })
+            { ErrorId = (error as AgentstrationApiException)?.ErrorId };
         }
     }
     private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey && Context.HasPermission(AuthorizationPermissions.ResourcesRead);

@@ -229,11 +229,16 @@ public sealed class TaskDetailsTests
     {
         public static readonly Guid Workspace = Guid.Parse("22222222-2222-2222-2222-222222222222");
         public Guid Id { get; } = Guid.NewGuid(); public Guid ActionId { get; } = Guid.NewGuid();
-        public Guid? ResponseId { get; set; } public Guid ResponseWorkspace { get; set; } = Workspace;
+        public Guid? ResponseId { get; set; }
+        public Guid ResponseWorkspace { get; set; } = Workspace;
         public WorkTaskStatus Status { get; set; } = WorkTaskStatus.Running; public string Title { get; set; } = "Original task"; public HttpStatusCode? Failure { get; set; }
-        public HttpStatusCode? WriteStatus { get; set; } public bool WriteFailure { get; set; } public bool Resolved { get; set; }
-        public string? WritePath { get; private set; } public string? Answer { get; private set; }
-        public int Reads { get; private set; } public int Writes { get; private set; }
+        public HttpStatusCode? WriteStatus { get; set; }
+        public bool WriteFailure { get; set; }
+        public bool Resolved { get; set; }
+        public string? WritePath { get; private set; }
+        public string? Answer { get; private set; }
+        public int Reads { get; private set; }
+        public int Writes { get; private set; }
         public Task<HttpResponseMessage>? Pending { get; set; }
         private PendingActionContract Action => new(ActionId, ResponseWorkspace, null, ResponseId ?? Id, null, PendingActionKind.InputRequired, Resolved ? PendingActionStatus.Completed : PendingActionStatus.Pending, "Response required", null, [new() { Name = "answer", Type = EntryFieldType.Textarea }], DateTimeOffset.UnixEpoch, null, null, 1);
         public HttpResponseMessage Response()

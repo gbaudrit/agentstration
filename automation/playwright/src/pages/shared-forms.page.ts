@@ -57,9 +57,13 @@ export class SharedFormsPage {
     const original = await select.inputValue();
     expect(original).not.toBe('');
     await this.clearField(select, locale);
-    await expect(this.page.locator('.validation-errors')).toContainText(SharedFormTextByLocale[locale].selectionRequired);
+    const messages = select.locator('..').locator('..').locator('.form-field-messages');
+    await expect(messages).toContainText(SharedFormTextByLocale[locale].selectionRequired);
     const url = this.page.url();
-    await this.page.locator('.resource-form button[type=submit]').click();
+    await this.page.locator('[data-wizard-step=refresh]').click();
+    await this.page.getByTestId(TestIds.distribution.sourceRegistryCreate).click();
+    await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
+    await expect(messages).toContainText(SharedFormTextByLocale[locale].selectionRequired);
     await expect(this.page).toHaveURL(url);
     await select.selectOption(original);
     await expect(select).toHaveValue(original);

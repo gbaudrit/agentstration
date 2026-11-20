@@ -29,16 +29,22 @@ public sealed class DataSourceEditorModel
         var parts = ProfileKey.Split('|', 3);
         return new()
         {
-            DisplayName = DisplayName.Trim(), Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-            Enabled = Enabled, Configuration = Configuration.Clone(),
+            DisplayName = DisplayName.Trim(),
+            Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
+            Enabled = Enabled,
+            Configuration = Configuration.Clone(),
             Profile = saved?.Definition.Profile is { } original && ProfileKey == From(saved).ProfileKey ? original : new(parts[2], ResourceScopeRef.Parse(parts[0]), ResourceNamespace.Parse(parts[1]))
         };
     }
 
     public static DataSourceEditorModel From(DataSourceResource source) => new()
     {
-        Name = source.Name, Namespace = source.Namespace.Value, DisplayName = source.Definition.DisplayName,
-        Description = source.Definition.Description, Scope = source.ScopeRef, Enabled = source.Definition.Enabled,
+        Name = source.Name,
+        Namespace = source.Namespace.Value,
+        DisplayName = source.Definition.DisplayName,
+        Description = source.Definition.Description,
+        Scope = source.ScopeRef,
+        Enabled = source.Definition.Enabled,
         Configuration = source.Definition.Configuration.Clone(),
         ProfileKey = source.Definition.Profile is { } profile ? $"{profile.ScopeRef ?? source.ScopeRef}|{profile.Namespace ?? source.Namespace}|{profile.Name}" : string.Empty,
         Tags = string.Join(Environment.NewLine, source.Metadata.Tags.Select(pair => $"{pair.Key}={pair.Value}"))

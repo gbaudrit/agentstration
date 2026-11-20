@@ -1,10 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Agentstration.Knowledge.Contracts;
 using Agentstration.Flows;
+using Agentstration.Knowledge.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components.Pages;
 namespace Agentstration.Web.Console;
+
 public sealed class KnowledgeSourceEditorModel
 {
     [Required, RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")] public string Name { get; set; } = string.Empty;
@@ -62,38 +63,40 @@ public sealed class KnowledgeSourceEditorModel
         ? string.Empty
         : $"{(long)value.Value.TotalHours:00}:{value.Value.Minutes:00}:{value.Value.Seconds:00}";
 }
-    public sealed class KnowledgeSourceBindingModel
+public sealed class KnowledgeSourceBindingModel
+{
+    public KnowledgeDataSourceBinding? Original { get; set; }
+    public string OriginalKey { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string DataSourceKey { get; set; } = string.Empty;
+    public string AcquisitionTargetName { get; set; } = string.Empty;
+    public IReadOnlyList<FlowCompositionCall> Transformations { get; set; } = [];
+    public string TransformationFlowKey { get; set; } = string.Empty;
+    public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
+    public bool ConfigurationValid { get; set; } = true;
+    public bool TargetsLoadFailed { get; set; }
+    public bool Required { get; set; } = true;
+    public bool RefreshIfNecessary { get; set; }
+    public bool AllowStaleOnRefreshFailure { get; set; }
+    public string MaximumFallbackAgeText { get; set; } = string.Empty;
+    public string MaximumAgeText { get; set; } = string.Empty;
+    public static KnowledgeSourceBindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
     {
-        public KnowledgeDataSourceBinding? Original { get; set; }
-        public string OriginalKey { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string DataSourceKey { get; set; } = string.Empty;
-        public string AcquisitionTargetName { get; set; } = string.Empty;
-        public IReadOnlyList<FlowCompositionCall> Transformations { get; set; } = [];
-        public string TransformationFlowKey { get; set; } = string.Empty;
-        public JsonElement Configuration { get; set; } = JsonSerializer.SerializeToElement(new { });
-        public bool ConfigurationValid { get; set; } = true;
-        public bool TargetsLoadFailed { get; set; }
-        public bool Required { get; set; } = true;
-        public bool RefreshIfNecessary { get; set; }
-        public bool AllowStaleOnRefreshFailure { get; set; }
-        public string MaximumFallbackAgeText { get; set; } = string.Empty;
-        public string MaximumAgeText { get; set; } = string.Empty;
-        public static KnowledgeSourceBindingModel From(KnowledgeDataSourceBinding value, ResourceNamespace owner, string transformationFlowKey) => new()
-        {
-            Original = value, OriginalKey = value.DataSource.ScopeRef is null ? string.Empty : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
-            Name = value.Name,
-            DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
-                : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
-            AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
-            TransformationFlowKey = transformationFlowKey,
-            Transformations = value.Transformations,
-            Description = value.Description,
-            Configuration = value.Configuration.Clone(),
-            Required = value.Required,
-            RefreshIfNecessary = value.RefreshIfNecessary,
-            AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure, MaximumFallbackAgeText = LifecycleDuration.Format(value.MaximumFallbackAge),
-            MaximumAgeText = KnowledgeSourceEditorModel.FormatMaximumAge(value.MaximumAge)
-        };
-    }
+        Original = value,
+        OriginalKey = value.DataSource.ScopeRef is null ? string.Empty : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
+        Name = value.Name,
+        DataSourceKey = value.DataSource.ScopeRef is null ? string.Empty
+            : $"{value.DataSource.ScopeRef.Value.Value}|{(value.DataSource.Namespace ?? owner).Value}|{value.DataSource.Name}",
+        AcquisitionTargetName = value.AcquisitionTarget?.Name ?? string.Empty,
+        TransformationFlowKey = transformationFlowKey,
+        Transformations = value.Transformations,
+        Description = value.Description,
+        Configuration = value.Configuration.Clone(),
+        Required = value.Required,
+        RefreshIfNecessary = value.RefreshIfNecessary,
+        AllowStaleOnRefreshFailure = value.AllowStaleOnRefreshFailure,
+        MaximumFallbackAgeText = LifecycleDuration.Format(value.MaximumFallbackAge),
+        MaximumAgeText = KnowledgeSourceEditorModel.FormatMaximumAge(value.MaximumAge)
+    };
+}

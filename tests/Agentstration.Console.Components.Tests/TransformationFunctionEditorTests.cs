@@ -25,9 +25,9 @@ public sealed class TransformationFunctionEditorTests
         using var culture = new TestCultureScope(locale);
         using var context = Context(new FunctionClient());
         var cut = Render(context);
-        Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
-        Assert.Contains("business:fixture", cut.Find(".resource-identity-summary").TextContent.Replace("\n", "").Replace(" ", ""));
-        Assert.IsTrue(cut.Markup.IndexOf("metric-card", StringComparison.Ordinal) < cut.Markup.IndexOf("resource-identity-summary", StringComparison.Ordinal));
+        Assert.Contains(identity, cut.Find(".resource-overview .resource-identity-summary").TextContent);
+        Assert.Contains("business:fixture", cut.Find(".resource-overview .resource-identity-summary").TextContent.Replace("\n", "").Replace(" ", ""));
+        Assert.IsTrue(cut.Find(".resource-overview").InnerHtml.IndexOf("metric-card", StringComparison.Ordinal) < cut.Find(".resource-overview").InnerHtml.IndexOf("resource-identity-summary", StringComparison.Ordinal));
         Assert.IsEmpty(cut.FindAll("form, .schema-document-editor"));
         Assert.HasCount(2, cut.FindAll("pre.runner-json"));
         await Select(cut, "definition/identity");
@@ -40,7 +40,10 @@ public sealed class TransformationFunctionEditorTests
         Assert.AreSame(form.EditContext, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
         await Select(cut, "yaml");
         Assert.IsTrue(cut.Find(".resource-yaml-editor textarea").HasAttribute("readonly"));
-        Assert.Contains("other/function", cut.Find(".resource-header").TextContent);
+        Assert.AreEqual("other", cut.FindComponent<ResourceHeader>().Instance.Namespace);
+        Assert.AreEqual("function", cut.FindComponent<ResourceHeader>().Instance.TechnicalName);
+        Assert.Contains("other", cut.Find(".resource-header .resource-identity-summary").TextContent);
+        Assert.Contains("function", cut.Find(".resource-header .resource-identity-summary").TextContent);
     }
 
     [TestMethod]
@@ -55,7 +58,7 @@ public sealed class TransformationFunctionEditorTests
         Assert.AreSame(originalContext, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
         Assert.HasCount(1, cut.FindAll(".resource-details-feedback .form-alert-warning"));
         Assert.AreEqual("\"initial\"", cut.Find("form").GetAttribute("data-resource-etag"));
-        Assert.Contains("Function fixture", cut.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("Function fixture", cut.Find(".resource-header h1").TextContent);
         await Select(cut, "definition/identity"); Assert.AreEqual("", cut.Find("[data-testid=function-display-name]").GetAttribute("value"));
         Assert.IsTrue(originalContext.GetValidationMessages().Any());
         cut.Find(".unsaved-changes-bar .button-secondary").Click();

@@ -4,9 +4,9 @@ using Agentstration.Resources;
 using Agentstration.Web.FlowDesigner.Backend;
 using Agentstration.Web.FlowDesigner.State;
 using Bunit;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using FlowDesignerComponent = Agentstration.Web.FlowDesigner.Components.FlowDesigner;
 
@@ -19,7 +19,8 @@ public sealed partial class FlowDesignerReadOnlyTests
     {
         using var context = CreateContext();
         var foreign = new FlowDesignerResource(new("different-flow", new("different-namespace")), "Foreign private title", "Foreign description",
-            new Dictionary<string, string>(), new() { EntryStep = "foreign-step", Steps = [new InputFlowStepDefinition { Name = "foreign-step" }] }) { ScopeRef = TestScope };
+            new Dictionary<string, string>(), new() { EntryStep = "foreign-step", Steps = [new InputFlowStepDefinition { Name = "foreign-step" }] })
+        { ScopeRef = TestScope };
         var backend = new BackendStub(false) { LoadOverride = _ => Task.FromResult(new FlowDesignerLoadResult(foreign, "foreign private YAML", "foreign-etag")) };
         ConfigureSavingContext(context, backend);
         var page = context.Render<FlowDesignerComponent>(p => p.Add(value => value.ResourceId, "sample").Add(value => value.ScopeRef, TestScope));
@@ -58,10 +59,15 @@ public sealed partial class FlowDesignerReadOnlyTests
         {
             RunOverride = (target, request) => Task.FromResult(new FlowRun
             {
-                Id = "pristine-run", WorkspaceId = executionWorkspace, FlowId = new(target.ResourceId, target.Namespace),
-                FlowVersion = "draft", DefinitionState = FlowDefinitionState.Draft, DefinitionScopeRef = owner,
+                Id = "pristine-run",
+                WorkspaceId = executionWorkspace,
+                FlowId = new(target.ResourceId, target.Namespace),
+                FlowVersion = "draft",
+                DefinitionState = FlowDefinitionState.Draft,
+                DefinitionScopeRef = owner,
                 Scope = new(tenant, executionWorkspace, Guid.NewGuid()) { LogicalScopeRef = logical },
-                Input = request.Input.Clone(), CreatedAt = DateTimeOffset.UnixEpoch,
+                Input = request.Input.Clone(),
+                CreatedAt = DateTimeOffset.UnixEpoch,
                 DefinitionSnapshot = new(owner, new(target.ResourceId, target.Namespace), "draft", null,
                     new WorkflowFlowDefinition("input", [], []), new Dictionary<string, string>(), DateTimeOffset.UnixEpoch)
             })

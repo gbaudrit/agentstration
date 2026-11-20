@@ -48,15 +48,15 @@ public sealed class ParameterResourceScreenTests
         var client = new Client();
         using var context = Context(client, false);
         var cut = context.Render<ParameterEditor>(p => p.Add(c => c.Name, "saved"));
-        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll(".resource-identity-summary")));
-        Assert.Contains(identity, cut.Find(".resource-identity-summary").TextContent);
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll(".resource-overview .resource-identity-summary")));
+        Assert.Contains(identity, cut.Find(".resource-overview .resource-identity-summary").TextContent);
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
         await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
         cut.Find("[data-testid=parameter-display-name]").Change("Draft parameter");
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
-        Assert.Contains("Saved parameter", cut.Find(".resource-identity-summary").TextContent);
-        Assert.DoesNotContain("Draft parameter", cut.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("Saved parameter", cut.Find(".resource-header h1").TextContent);
+        Assert.DoesNotContain("Draft parameter", cut.Find(".resource-header h1").TextContent);
         Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
         Assert.AreEqual(1, client.Reads);
         await cut.Find("#parameter-resource-form").SubmitAsync();
@@ -114,7 +114,7 @@ public sealed class ParameterResourceScreenTests
         Assert.AreEqual(0, client.Writes);
         Assert.IsNotNull(cut.Find(".validation-message"));
         await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
-        Assert.Contains("Saved parameter", cut.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("Saved parameter", cut.Find(".resource-header h1").TextContent);
         if (discard) cut.Find(".unsaved-changes-bar button[type=button]").Click();
         await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
         cut.Find("[data-testid=parameter-value]").Change("5");

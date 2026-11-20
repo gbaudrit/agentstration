@@ -76,8 +76,11 @@ public sealed partial class FlowDetailsDesignerTests
         using var context = RunLayoutContext();
         var run = LayoutRun("retry-execution");
         var unavailable = true;
-        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { RunLoader = _ => unavailable
-            ? Task.FromException<FlowRun>(new AgentstrationApiException("Unavailable", "fixture", HttpStatusCode.ServiceUnavailable)) : Task.FromResult(run) });
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub
+        {
+            RunLoader = _ => unavailable
+            ? Task.FromException<FlowRun>(new AgentstrationApiException("Unavailable", "fixture", HttpStatusCode.ServiceUnavailable)) : Task.FromResult(run)
+        });
         var cut = context.Render<FlowRunDetails>(p => p.Add(value => value.RunId, run.Id));
         Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
         Assert.IsFalse(cut.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.HasContent);
@@ -89,7 +92,11 @@ public sealed partial class FlowDetailsDesignerTests
 
     private static InputRequest PendingRunInput(FlowRun run) => new()
     {
-        Id = "pending", RunId = run.Id, RuntimeRequestId = "runtime-input", ScopeRef = run.ExecutionScopeRef,
-        Prompt = "Private input request", CreatedAt = FlowClientStub.Now
+        Id = "pending",
+        RunId = run.Id,
+        RuntimeRequestId = "runtime-input",
+        ScopeRef = run.ExecutionScopeRef,
+        Prompt = "Private input request",
+        CreatedAt = FlowClientStub.Now
     };
 }

@@ -239,8 +239,15 @@ public sealed partial class ExtensionsConsoleTests
         {
             CreateCalls++; if (Failure is { } error) return Task.FromException<ResourceSnapshot<ExtensionRegistrationResource>>(error);
             Created = request;
-            return Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                Metadata = new() { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) }, Uid = Guid.NewGuid(), ScopeRef = request.ScopeRef, Definition = request.Properties }, "\"created\""));
+            return Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionRegistration,
+                Metadata = new() { Name = request.Name, Namespace = ResourceNamespace.Parse(request.Namespace) },
+                Uid = Guid.NewGuid(),
+                ScopeRef = request.ScopeRef,
+                Definition = request.Properties
+            }, "\"created\""));
         }
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> UpdateRegistrationAsync(ResourceNamespace ns, string name, PutExtensionRegistrationRequest request, string etag, CancellationToken token) => throw new NotSupportedException();
         public Task DeleteRegistrationAsync(ResourceNamespace ns, string name, string etag, CancellationToken token) => throw new NotSupportedException();

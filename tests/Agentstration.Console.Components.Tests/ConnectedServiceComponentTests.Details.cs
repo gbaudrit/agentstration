@@ -100,7 +100,7 @@ public sealed partial class ConnectedServiceComponentTests
         var response = new TaskCompletionSource<ResourceSnapshot<ConnectedServiceResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
         client.PendingRead = response.Task;
         var refresh = cut.InvokeAsync(() => adapter.OnRefresh.InvokeAsync());
-        cut.WaitForAssertion(() => Assert.IsTrue(cut.Find("[data-testid=connected-service-refresh]").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.AreEqual("true", cut.Find(".resource-details-body").GetAttribute("aria-busy")));
         Assert.IsFalse(cut.Find("[data-testid=connected-service-display-name]").HasAttribute("disabled"));
         cut.Find("[data-testid=connected-service-display-name]").Change("Typed during refresh");
         response.SetResult(new(original with { Generation = 2 }, "new-version"));

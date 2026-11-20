@@ -124,7 +124,7 @@ public sealed partial class DataSourceEditorTests
         }
 
         rendered.Find("[data-testid='data-source-create-tool']").Click();
-        var dialog = rendered.Find("[role='dialog']");
+        var dialog = rendered.Find("[data-testid=acquisition-tool-editor]");
         StringAssert.Contains(dialog.TextContent, "Créer un Tool");
         StringAssert.Contains(dialog.TextContent, acquisition.Target!.DisplayName);
         var fixedParameters = rendered.Find("[data-testid='acquisition-tool-parameters']").TextContent;

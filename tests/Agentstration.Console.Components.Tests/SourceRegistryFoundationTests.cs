@@ -30,6 +30,28 @@ public sealed class SourceRegistryFoundationTests
         await Select(page, "yaml"); var yaml = page.FindComponent<ResourceYamlEditor>().Find("textarea"); Assert.IsTrue(yaml.HasAttribute("readonly")); StringAssert.Contains(yaml.GetAttribute("value")!, "credentials"); Assert.AreEqual(50, api.HistoryBound);
     }
     [TestMethod]
+    [DataRow("en-US", 0)]
+    [DataRow("fr-FR", 0)]
+    [DataRow("en-US", 1)]
+    [DataRow("fr-FR", 1)]
+    public async Task ClearedRequiredSelectionsExposeTheirAssociatedInlineErrorWithoutWriting(string culture, int index)
+    {
+        using var language = new TestCultureScope(culture);
+        using var api = new Handler();
+        using var context = Context(api);
+        var page = Render(context);
+        await Select(page, "definition/configuration");
+        var select = page.WaitForElements("[data-testid=source-registry-form] select")[index];
+        select.Change(string.Empty);
+        var messages = page.Find($"#{select.GetAttribute("id")}-messages");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(messages.TextContent));
+        StringAssert.Contains(select.GetAttribute("aria-describedby")!, messages.Id);
+        Assert.IsTrue(page.FindComponent<ResourceDefinitionForm>().Instance.EditContext.GetValidationMessages().Any());
+        Assert.IsTrue(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.AreEqual(0, api.Writes);
+    }
+
+    [TestMethod]
     public async Task InvalidNumericAndMetadataDraftsKeepTheirContextAndOriginalEtagUntilExplicitDiscard()
     {
         using var api = new Handler(); using var context = Context(api); var page = Render(context); page.WaitForElement("[data-testid=source-registry-identity-summary]");
@@ -94,7 +116,13 @@ public sealed class SourceRegistryFoundationTests
     private sealed class Handler : HttpMessageHandler
     {
         public SourceRegistryRegistrationResource Resource { get; set; } = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SourceRegistryKinds.SourceRegistryRegistration, Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Instance, Generation = 3, Metadata = new() { Name = "team", Tags = new Dictionary<string, string> { ["team"] = "reviewed" } }, Definition = new() { DisplayName = "Saved registry", IndexUrl = new("https://registry.example/index.json"), Enabled = true, AuthenticationMode = SourceRegistryAuthenticationMode.StaticBearer, Credential = new("registry-token", ResourceScopeRef.Instance, new ResourceNamespace("credentials")) } };
-        public string Etag { get; set; } = "\"first\""; public HttpStatusCode? Failure { get; set; } public bool DetailsFailure { get; set; } public int Writes { get; private set; } public int Creates { get; private set; } public int HistoryBound { get; private set; } public string? IfMatch { get; private set; } public SourceRegistryRegistrationProperties? Command { get; private set; }
+        public string Etag { get; set; } = "\"first\""; public HttpStatusCode? Failure { get; set; }
+        public bool DetailsFailure { get; set; }
+        public int Writes { get; private set; }
+        public int Creates { get; private set; }
+        public int HistoryBound { get; private set; }
+        public string? IfMatch { get; private set; }
+        public SourceRegistryRegistrationProperties? Command { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             var path = request.RequestUri!.AbsolutePath;

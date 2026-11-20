@@ -438,7 +438,8 @@ public sealed partial class ExtensionsConsoleTests
         {
             var enrollmentCell = rendered.Find("tbody .enrollment-cell");
             StringAssert.Contains(enrollmentCell.TextContent, "En attente");
-            Assert.IsEmpty(enrollmentCell.QuerySelectorAll("button"));
+            Assert.HasCount(1, enrollmentCell.QuerySelectorAll("[data-testid=extension-enrollment-shortcut]"));
+            StringAssert.Contains(enrollmentCell.TextContent, "Gérer");
             Assert.AreEqual(0, client.RotateCalls);
         });
     }

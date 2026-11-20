@@ -19,10 +19,15 @@ public sealed record ManagedAgentInspectionModel
     public string RuntimeProfile { get; init; } = string.Empty;
     public static ManagedAgentInspectionModel From(AgentResource resource, string source) => new()
     {
-        Name = resource.Name, Namespace = resource.Namespace.Value, DisplayName = resource.Definition.DisplayName,
-        Description = resource.Definition.Description, ScopeRef = resource.ScopeRef,
+        Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        DisplayName = resource.Definition.DisplayName,
+        Description = resource.Definition.Description,
+        ScopeRef = resource.ScopeRef,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
-        Configuration = JsonSerializer.Serialize(resource.Definition), Source = source,
-        ModelProfile = JsonSerializer.Serialize(resource.Definition.ModelProfile), RuntimeProfile = JsonSerializer.Serialize(resource.Definition.RuntimeProfile)
+        Configuration = JsonSerializer.Serialize(resource.Definition),
+        Source = source,
+        ModelProfile = JsonSerializer.Serialize(resource.Definition.ModelProfile),
+        RuntimeProfile = JsonSerializer.Serialize(resource.Definition.RuntimeProfile)
     };
 }

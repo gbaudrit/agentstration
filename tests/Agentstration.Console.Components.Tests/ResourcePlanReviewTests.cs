@@ -12,10 +12,10 @@ using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
-using Microsoft.AspNetCore.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 
@@ -523,10 +523,13 @@ public sealed class ResourcePlanReviewTests
         public ApplyResourceChangeSetRequest? LastApplyRequest { get; private set; }
         public Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken) => Task.FromResult(new ResourcePlanPage([new(Plan, "\"plan\"")], false));
         public Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken) => ReadFailure is { } status ? Task.FromException<ResourcePlanSnapshot?>(new HttpRequestException("public fixture read failure", null, status)) : Task.FromResult<ResourcePlanSnapshot?>(id == Plan.Id.Value ? CurrentPlan : null);
-        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken) { ActivityCalls++; return Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(application is null
+        public Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken)
+        {
+            ActivityCalls++; return Task.FromResult<IReadOnlyList<ResourcePlanActivity>>(application is null
             ? [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch)]
             : [new(Guid.NewGuid(), Plan.Id, Scope, 1, ResourcePlanActivityType.Created, Plan.Origin.PrincipalId, null, DateTimeOffset.UnixEpoch),
-                new(Guid.NewGuid(), Plan.Id, Scope, Plan.Revision, ResourcePlanActivityType.Applied, AppliedPrincipalId, null, DateTimeOffset.UnixEpoch.AddMinutes(1))]); }
+                new(Guid.NewGuid(), Plan.Id, Scope, Plan.Revision, ResourcePlanActivityType.Applied, AppliedPrincipalId, null, DateTimeOffset.UnixEpoch.AddMinutes(1))]);
+        }
         public Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(savedBindings);
         public Task<ResourcePlanBindingDraftSnapshot> SaveBindingsAsync(Guid id, SaveResourcePlanBindingsRequest request, string? expectedETag, CancellationToken cancellationToken)
         {

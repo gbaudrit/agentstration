@@ -88,7 +88,9 @@ public sealed class StorageEditorModel
     public static StorageEditorModel From(StorageResource resource) => new()
     {
         Name = resource.Name,
-        Namespace = resource.Namespace.Value, ScopeRef = resource.ScopeRef, Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}")),
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}")),
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Enabled = resource.Definition.Enabled,

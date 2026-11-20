@@ -230,8 +230,9 @@ export class SchemaAdministrationPage {
     target.hash = view === 'definition' ? 'definition/identity' : view === 'designer' ? 'definition/configuration' : view;
     if (target.origin === new URL(consoleUrl).origin && current.pathname === target.pathname && current.search === target.search) {
       await selectResourceSection(this.page, target.hash.slice(1));
-      const refresh = this.page.getByTestId('schema-refresh');
-      await refresh.click(); await expect(refresh).toBeEnabled();
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+      await selectResourceSection(this.page, target.hash.slice(1));
     } else await this.open(target.toString(), TestIds.schemaAdministration.editor);
   }
 

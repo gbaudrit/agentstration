@@ -713,9 +713,8 @@ export class SourceLifecyclePage {
     const current = new URL(this.page.url());
     if ((path.startsWith('/data-sources/') || path.startsWith('/knowledge-sources/')) && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
       await selectResourceSection(this.page, url.hash.slice(1));
-      // Fragment navigation retains mounted editors. This method explicitly reopens saved server state after API fixture commands.
-      const refresh = this.page.getByTestId(path.startsWith('/data-sources/') ? TestIds.schemaDrivenSources.dataSourceRefresh : 'knowledge-source-refresh');
-      await refresh.click(); await expect(refresh).toBeEnabled();
+      // Reopen the saved server state after API fixture commands; resource headers have no global Refresh action.
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
     } else {
       const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
       expect(response?.status()).toBe(200);

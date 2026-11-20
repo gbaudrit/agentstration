@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Agentstration.Storage.Contracts;
 using Agentstration.Resources;
+using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Web.Console;
 
@@ -119,9 +119,13 @@ public sealed class StorageTypeEditorModel
     }
     public static StorageTypeEditorModel From(StorageTypeResource resource) => new()
     {
-        Name = resource.Name, Namespace = resource.Namespace.Value, ScopeRef = resource.ScopeRef,
+        Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
         Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}")),
-        DisplayName = resource.Definition.DisplayName, Description = resource.Definition.Description,
-        Enabled = resource.Definition.Enabled, PreferredVersion = resource.Definition.PreferredVersion
+        DisplayName = resource.Definition.DisplayName,
+        Description = resource.Definition.Description,
+        Enabled = resource.Definition.Enabled,
+        PreferredVersion = resource.Definition.PreferredVersion
     };
 }

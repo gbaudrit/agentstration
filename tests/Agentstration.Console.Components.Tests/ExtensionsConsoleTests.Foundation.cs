@@ -157,11 +157,28 @@ public sealed partial class ExtensionsConsoleTests
         var instance = Guid.NewGuid();
         var request = new AepEnrollmentRequestResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.AepEnrollmentRequest, Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Instance,
-            Metadata = new() { Name = instance.ToString("N") }, Generation = 2,
-            Definition = new() { InstanceId = instance, TargetScopeRef = ResourceScopeRef.Instance, ExtensionId = "example.extension", ExtensionName = "Saved enrollment identity", ExtensionVersion = "1.2.3",
-                Endpoint = new("https://extension.example.test/"), State = AepEnrollmentState.Available, AnnouncedAt = DateTimeOffset.UnixEpoch,
-                RegistrationName = "manual", CodeSalt = "PRIVATE-SALT", CodeDigest = "PRIVATE-DIGEST", CompletionDigest = "PRIVATE-COMPLETION", CredentialSecretName = "PRIVATE-CREDENTIAL-NAME" }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.AepEnrollmentRequest,
+            Uid = Guid.NewGuid(),
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = instance.ToString("N") },
+            Generation = 2,
+            Definition = new()
+            {
+                InstanceId = instance,
+                TargetScopeRef = ResourceScopeRef.Instance,
+                ExtensionId = "example.extension",
+                ExtensionName = "Saved enrollment identity",
+                ExtensionVersion = "1.2.3",
+                Endpoint = new("https://extension.example.test/"),
+                State = AepEnrollmentState.Available,
+                AnnouncedAt = DateTimeOffset.UnixEpoch,
+                RegistrationName = "manual",
+                CodeSalt = "PRIVATE-SALT",
+                CodeDigest = "PRIVATE-DIGEST",
+                CompletionDigest = "PRIVATE-COMPLETION",
+                CredentialSecretName = "PRIVATE-CREDENTIAL-NAME"
+            }
         };
         var client = new RegistrationFoundationClient { Enrollment = request };
         using var context = await RegistrationContext(client, $"/extensions/enrollment/{instance:D}?context=%2Finstance");
@@ -250,12 +267,23 @@ public sealed partial class ExtensionsConsoleTests
 
     private static AepEnrollmentRequestResource RegistrationEnrollment(Guid instance) => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.AepEnrollmentRequest, Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Instance,
-        Metadata = new() { Name = instance.ToString("N"), Namespace = ResourceNamespace.Parse("team") }, Generation = 1,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ExtensionKinds.AepEnrollmentRequest,
+        Uid = Guid.NewGuid(),
+        ScopeRef = ResourceScopeRef.Instance,
+        Metadata = new() { Name = instance.ToString("N"), Namespace = ResourceNamespace.Parse("team") },
+        Generation = 1,
         Definition = new()
         {
-            InstanceId = instance, TargetScopeRef = ResourceScopeRef.Instance, ExtensionId = "example.extension", ExtensionName = "Saved enrollment identity", ExtensionVersion = "1.2.3",
-            Endpoint = new("https://extension.example.test/"), State = AepEnrollmentState.Available, AnnouncedAt = DateTimeOffset.UnixEpoch, RegistrationName = "manual"
+            InstanceId = instance,
+            TargetScopeRef = ResourceScopeRef.Instance,
+            ExtensionId = "example.extension",
+            ExtensionName = "Saved enrollment identity",
+            ExtensionVersion = "1.2.3",
+            Endpoint = new("https://extension.example.test/"),
+            State = AepEnrollmentState.Available,
+            AnnouncedAt = DateTimeOffset.UnixEpoch,
+            RegistrationName = "manual"
         }
     };
 
@@ -263,9 +291,12 @@ public sealed partial class ExtensionsConsoleTests
     {
         public ResourceSnapshot<ExtensionRegistrationResource> Snapshot { get; set; } = new(new ExtensionRegistrationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-            ScopeRef = ResourceScopeRef.Instance, Generation = 1, Uid = Guid.NewGuid(),
-            Metadata = new() { Name = "manual", Namespace = ResourceNamespace.Parse("team"), Tags = new Dictionary<string,string> { ["owner"] = "fixture" } },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.ExtensionRegistration,
+            ScopeRef = ResourceScopeRef.Instance,
+            Generation = 1,
+            Uid = Guid.NewGuid(),
+            Metadata = new() { Name = "manual", Namespace = ResourceNamespace.Parse("team"), Tags = new Dictionary<string, string> { ["owner"] = "fixture" } },
             Definition = new() { DisplayName = "Saved registration", Endpoint = new("https://extension.example.test/"), Enabled = true, Source = ExtensionRegistrationSource.Manual }
         }, "\"saved-1\"");
         public AepEnrollmentRequestResource? Enrollment { get; set; }

@@ -317,7 +317,7 @@ public sealed partial class ToolRelayEditorTests
         var rendered = await RenderRelay(context, parameters => parameters.Add(value => value.Name, "relay"));
         rendered.WaitForElement("[data-requirement-id='/query'] [data-testid='relay-binding-kind']").Change("Parameter");
         rendered.Find("[data-testid='relay-binding-create']").Click();
-        Assert.IsNull(rendered.Find("[role=dialog]").Closest("form"), "The contextual creator must remain outside the relay form.");
+        Assert.IsNull(rendered.Find("[data-testid=contextual-parameter-create]").Closest("[role=dialog]")!.Closest("form"), "The contextual creator must remain outside the relay form.");
         rendered.Find("[data-testid='contextual-parameter-display-name']").Change("Search query");
         rendered.Find("[data-testid='contextual-parameter-name']").Change("search-query");
         rendered.Find("[data-testid='contextual-parameter-value']").Change("hr");
@@ -327,7 +327,7 @@ public sealed partial class ToolRelayEditorTests
             Assert.IsNotNull(handler.CreatedParameter);
             Assert.AreEqual(Scope, handler.CreatedParameter.ScopeRef);
             Assert.IsTrue(handler.ParameterReads >= 2);
-            Assert.HasCount(0, rendered.FindAll("[role='dialog']"));
+            Assert.HasCount(0, rendered.FindAll("[data-testid=contextual-parameter-create]"));
             Assert.IsFalse(rendered.Find("[data-testid='relay-save-draft']").HasAttribute("disabled"));
         });
         await rendered.Find("#relay-resource-form").SubmitAsync();

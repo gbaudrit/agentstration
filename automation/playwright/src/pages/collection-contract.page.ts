@@ -133,7 +133,11 @@ export class CollectionContractPage {
       }
       const kind = scope.locator('.resource-scope-badge');
       await expect(kind).toBeVisible();
-      expect(text.scopeTypes).toContain((await kind.textContent())?.trim());
+      const label = (await kind.textContent())?.trim() ?? '';
+      if ((await kind.getAttribute('class'))?.includes('resource-scope-badge-named')) {
+        expect(text.joinedScopeTypes.some(type => label === type || label.startsWith(type + ': ') || label.startsWith(type + ' : '))).toBe(true);
+        await expect(kind).toHaveAttribute('title', label);
+      } else expect(text.scopeTypes).toContain(label);
       const disclosure = scope.locator('.disclosure-trigger');
       if (await disclosure.count()) {
         expect((await disclosure.textContent())?.trim()).not.toBe('');
@@ -302,7 +306,9 @@ export class CollectionContractPage {
       await expect(this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor)).toBeVisible();
       expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(namespace);
       const overview = this.page.getByTestId(TestIds.collections.modelProfileOverview);
-      await expect(overview).toContainText('Shared profile');
+      await expect(this.page.locator('.resource-header h1')).toHaveText('Shared profile');
+      const identity = overview.locator('.resource-identity-summary .panel-disclosure');
+      if (await identity.getAttribute('aria-expanded') === 'false') await identity.click();
       await expect(overview.getByText(namespace, { exact: true })).toBeVisible();
       await open();
     }

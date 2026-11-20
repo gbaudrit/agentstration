@@ -6,12 +6,12 @@ import { test } from '../src/fixtures/test.js';
 test.use({ authenticationMode: 'Local' });
 test.setTimeout(240_000);
 
-test('governed artifact content stays bounded, retained on refresh, downloadable, authorized, and integrity checked @smoke', async ({ page, product }) => {
+test('governed artifact content stays bounded, retained across sections, downloadable, authorized, and integrity checked @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectArtifactContent({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });
 
-test('governed artifact content retains loaded content on refresh at mobile width @responsive @smoke', async ({ page, product }) => {
+test('governed artifact content retains loaded content across sections at mobile width @responsive @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   await inspectArtifactContent({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
 });

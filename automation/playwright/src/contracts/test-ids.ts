@@ -685,6 +685,7 @@ export const TestIds = {
     sourceProviderDetails: 'distribution-source-provider-details',
     sourceRegistries: 'distribution-source-registries',
     sourceRegistryDiscovery: 'distribution-source-registry-discovery',
+    sourceRegistryCreate: 'source-registry-create',
     sources: 'distribution-sources',
     sourceImportOpen: 'source-import-open',
     sourceImportYamlMode: 'source-import-yaml-mode',

@@ -5,15 +5,16 @@ using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.Schemas;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
-using Agentstration.Web.Components.State;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Tests;
+
 public sealed partial class SchemaConsoleTests
 {
     private static IRenderedComponent<SchemaEditor> Persisted(BunitContext context)

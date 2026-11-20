@@ -53,7 +53,10 @@ public sealed class AgentResourceSummaryTests
 
     private static AgentResource Resource() => new()
     {
-        Uid = Guid.NewGuid(), ScopeRef = ResourceScopeRef.Instance, ApiVersion = ResourceApiVersions.CoreV1, Kind = AgentResourceKinds.Agent,
+        Uid = Guid.NewGuid(),
+        ScopeRef = ResourceScopeRef.Instance,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = AgentResourceKinds.Agent,
         Metadata = new() { Name = "example" },
         Definition = new() { DisplayName = "Example", Instructions = "Saved instructions", ModelProfile = new("default", ResourceScopeRef.Instance) }
     };

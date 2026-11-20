@@ -84,7 +84,7 @@ public sealed partial class ArtifactAdministrationComponentTests
         var pending = new TaskCompletionSource<StagedArtifactView?>(TaskCreationOptions.RunContinuationsAsynchronously);
         client.NextStagedRead = pending;
         var refresh = cut.InvokeAsync(() => template.OnRefresh.InvokeAsync());
-        cut.WaitForAssertion(() => Assert.IsTrue(cut.Find("[data-testid=staged-artifact-refresh]").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.AreEqual("true", cut.Find(".resource-details-body").GetAttribute("aria-busy")));
         Assert.IsFalse(cut.Find("input[type=datetime-local]").HasAttribute("disabled"));
         var draft = StagedDate(client.Artifact.ExpiresAt.AddHours(2));
         cut.Find("input[type=datetime-local]").Change(draft);

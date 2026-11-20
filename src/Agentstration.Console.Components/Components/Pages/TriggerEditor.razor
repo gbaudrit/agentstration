@@ -63,7 +63,7 @@ else
                 <FormField Required="true" Label="@T("TimeZone")"><ChildContent><ClearableSelect @bind-Value="model.TimeZone">@foreach (var zone in timeZones) { <option value="@zone">@zone</option> }</ClearableSelect><small>@T("TimeZoneHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.TimeZone" /></Validation></FormField>
                 @if (model.ScheduleType == TriggerScheduleType.Once)
                 {
-                    <FormField Required="true" Label="@T("RunAt")" Class="form-span-2"><ChildContent><InputDate @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" data-testid="trigger-run-at" /></ChildContent><Validation><ValidationMessage For="() => model.LocalAt" /></Validation></FormField>
+                    <FormField Required="true" Label="@T("RunAt")" Id="@($"{FormId}-run-at")" Class="form-span-2"><ChildContent><InputDate id="@($"{FormId}-run-at")" aria-describedby="@($"{FormId}-run-at-messages")" aria-required="true" @bind-Value="model.LocalAt" Type="InputDateType.DateTimeLocal" data-testid="trigger-run-at" /></ChildContent><Validation><ValidationMessage For="() => model.LocalAt" /></Validation></FormField>
                 }
                 else if (model.ScheduleType == TriggerScheduleType.Interval)
                 {
