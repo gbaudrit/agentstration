@@ -42,7 +42,7 @@ for (const variant of [
       await pages.agentEditor.openOverview();
       await page.evaluate(() => window.scrollTo(0, 0));
       await pages.agentEditor.expectStandardOverview(variant.locale);
-      await expect(page.getByTestId('agent-identity-summary')).toContainText(fixture.displayName);
+      await pages.agentEditor.expectSavedDisplayName(fixture.displayName);
       await expect(page.getByTestId('agent-configuration-summary')).toContainText(fixture.instructions);
       await expect(page.getByTestId('agent-configuration-summary').locator('input, textarea')).toHaveCount(0);
       const header = await page.locator('.resource-details-template > .resource-header').boundingBox();
@@ -61,7 +61,7 @@ for (const variant of [
       await page.getByTestId(TestIds.agentEditor.displayName).fill('Template saved from overview');
       await page.getByTestId(TestIds.agentEditor.displayName).blur();
       await pages.agentEditor.openOverview();
-      await expect(page.getByTestId('agent-identity-summary')).toContainText(fixture.displayName);
+      await pages.agentEditor.expectSavedDisplayName(fixture.displayName);
       const save = page.getByTestId(TestIds.agentEditor.saveDraft);
       await save.scrollIntoViewIfNeeded();
       const saveBox = await save.boundingBox();
@@ -70,7 +70,7 @@ for (const variant of [
         expect(saveBox!.y + saveBox!.height).toBeLessThanOrEqual(mobileNavigation!.y);
       } else expect(saveBox!.x + saveBox!.width).toBeLessThan(rail!.x);
       await save.click();
-      await expect(page.getByTestId('agent-identity-summary')).toContainText('Template saved from overview');
+      await pages.agentEditor.expectSavedDisplayName('Template saved from overview');
       await expect(page.locator('.unsaved-changes-bar')).toHaveCount(0);
       await pages.agentEditor.openEdit();
       await page.getByTestId(TestIds.agentEditor.displayName).fill('Discard this draft');

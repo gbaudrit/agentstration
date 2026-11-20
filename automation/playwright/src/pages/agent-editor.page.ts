@@ -106,6 +106,11 @@ export class AgentEditorPage {
     await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
   }
 
+  public async expectSavedDisplayName(name: string): Promise<void> {
+    const title = this.page.locator('.resource-details-template > .resource-header h1');
+    await expect(title).toHaveText(name);
+  }
+
   public async expectStandardOverview(locale: SupportedTestLocale): Promise<void> {
     const header = this.page.locator('.resource-details-template > .resource-header');
     const collection = header.locator('.resource-collection-link');
