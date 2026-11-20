@@ -30,17 +30,45 @@ public sealed class BootstrapStartupProgressTests
     }
 
     [TestMethod]
-    public void ReadyInstancesRenderTheNormalRouteAndDeniedCallersSeeNoProgress()
+    public void DeniedCallersSeeNoRouteOrProgress()
     {
-        var api = new StartupClient { Ready = true };
+        var api = new StartupClient { AdmissionDenied = true };
         using var context = Context(api);
         var cut = context.Render<BootstrapStartupGate>(p => p.AddChildContent("normal-route"));
-        StringAssert.Contains(cut.Markup, "normal-route");
-        api.AdmissionDenied = true;
-        cut.Render();
         StringAssert.Contains(cut.Markup, "Access temporarily unavailable");
         Assert.IsFalse(cut.Markup.Contains("normal-route", StringComparison.Ordinal));
         Assert.AreEqual(0, api.Reads);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void AdmittedRoutesKeepTheirComponentDuringContextUpdates(bool ready)
+    {
+        var api = new StartupClient { Ready = ready };
+        using var context = Context(api);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(ready ? "/" : "/startup/progress");
+        var cut = context.Render<BootstrapStartupGate>(p => p.AddChildContent(builder =>
+        {
+            builder.OpenComponent<RouteProbe>(0);
+            builder.CloseComponent();
+        }));
+        var route = cut.FindComponent<RouteProbe>().Instance;
+        api.NextAdmission = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        navigation.NavigateTo(ready ? "/agents?context=%2Finstance" : "/startup/progress?context=%2Finstance");
+        cut.Render();
+        Assert.AreSame(route, cut.FindComponent<RouteProbe>().Instance);
+        Assert.AreEqual(1, api.AdmissionReads);
+        if (!ready)
+        {
+            api.NextAdmission = null;
+            navigation.NavigateTo("/agents");
+            cut.Render();
+            Assert.AreEqual(2, api.AdmissionReads);
+            StringAssert.Contains(navigation.Uri, "/startup/progress?ReturnUrl=%2Fagents");
+            Assert.AreEqual(0, cut.FindComponents<RouteProbe>().Count);
+        }
     }
 
     [TestMethod]
@@ -111,6 +139,7 @@ public sealed class BootstrapStartupProgressTests
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/step-progress.js").Mode = JSRuntimeMode.Loose;
         return context;
     }
+    private sealed class RouteProbe : ComponentBase { }
     private sealed class UserState : AuthenticationStateProvider
     {
         public override Task<AuthenticationState> GetAuthenticationStateAsync() => Task.FromResult(new AuthenticationState(
@@ -123,12 +152,17 @@ public sealed class BootstrapStartupProgressTests
         public bool FailRead { get; set; }
         public bool Timeout { get; set; }
         public int Reads { get; private set; }
+        public int AdmissionReads { get; private set; }
+        public TaskCompletionSource<BootstrapStartupAdmission>? NextAdmission { get; set; }
         public BootstrapStartupSnapshot Snapshot { get; set; } = new(Guid.NewGuid(), 1, false, true, "running",
             [new("topology", "succeeded"), new("extensions", "succeeded"), new("resources", "waiting"), new("finalization", "pending")],
             "resources", new("ModelProfile", "profile", "provider", "model:exact", "required_model_missing", "other", ProviderScopeRef: "/instance"), 2, 1, 0, 0);
-        public Task<BootstrapStartupAdmission> GetAdmissionAsync(CancellationToken cancellationToken) => AdmissionDenied
-            ? throw new AgentstrationApiException("PRIVATE", "fixture", HttpStatusCode.Forbidden)
-            : Task.FromResult(new BootstrapStartupAdmission(Ready));
+        public Task<BootstrapStartupAdmission> GetAdmissionAsync(CancellationToken cancellationToken)
+        {
+            AdmissionReads++;
+            return AdmissionDenied ? throw new AgentstrationApiException("PRIVATE", "fixture", HttpStatusCode.Forbidden)
+                : NextAdmission?.Task.WaitAsync(cancellationToken) ?? Task.FromResult(new BootstrapStartupAdmission(Ready));
+        }
         public Task<BootstrapStartupSnapshot> GetAsync(CancellationToken cancellationToken)
         {
             Reads++;

@@ -23,23 +23,33 @@ else
 @code {
     [Parameter] public RenderFragment? ChildContent { get; set; }
     private readonly CancellationTokenSource stopping = new();
-    private bool allowed, denied, error;
+    private bool allowed, denied, error, ready;
+    private string? admittedPath;
     private int revision;
 
-    protected override Task OnParametersSetAsync() => CheckAsync();
+    protected override Task OnParametersSetAsync()
+    {
+        var path = CurrentRelativeUrl().Split('?', '#')[0];
+        // Readiness is final for this instance. Context/query updates must retain
+        // the admitted route and its layout while their JS initialization runs.
+        return ready || (allowed && string.Equals(admittedPath, path, StringComparison.Ordinal))
+            ? Task.CompletedTask : CheckAsync();
+    }
+    private string CurrentRelativeUrl() => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
     private async Task CheckAsync()
     {
         var request = ++revision;
+        var relative = CurrentRelativeUrl();
+        var path = relative.Split('?', '#')[0];
         allowed = denied = error = false;
         try
         {
             var admission = await Client.GetAdmissionAsync(stopping.Token);
             if (request != revision || stopping.IsCancellationRequested) return;
-            var relative = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
-            var path = relative.Split('?', '#')[0];
+            ready = admission.Ready;
             if (!admission.Ready && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsRepairPath(path))
                 Navigation.NavigateTo(BootstrapStartupNavigation.ProgressUrl(relative).TrimStart('/'), replace: true);
-            else allowed = true;
+            else { admittedPath = path; allowed = true; }
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { if (request == revision) denied = true; }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
