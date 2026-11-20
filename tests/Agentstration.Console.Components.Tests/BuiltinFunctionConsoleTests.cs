@@ -72,6 +72,8 @@ public sealed partial class KnowledgeSourceEditorTests
             Definition = new("json.select", [new("1.0.0", new("native", "1.0.0", ResourceScopeRef.Instance),
                 JsonSerializer.Deserialize<JsonElement>("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""))])
         };
+        public Task<FunctionCatalogPage<TransformationFunctionResource>> ListPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) => Task.FromResult(new FunctionCatalogPage<TransformationFunctionResource>(skip == 0 ? [Function] : [], false));
+        public Task<FunctionCatalogPage<FunctionKindResource>> ListKindsPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) => Task.FromResult(new FunctionCatalogPage<FunctionKindResource>(skip == 0 ? [Kind] : [], false));
         public Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) => Task.FromResult<IReadOnlyList<TransformationFunctionResource>>([Function]);
         public Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) => Task.FromResult<IReadOnlyList<FunctionKindResource>>([Kind]);
         public Task<IReadOnlyList<NativeFunctionDescriptor>> ImplementationsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<NativeFunctionDescriptor>>([

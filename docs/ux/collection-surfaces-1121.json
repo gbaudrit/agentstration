@@ -5467,7 +5467,7 @@
         "/transformation-functions",
         "/function-kinds"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "FunctionKindResource",
       "scope": true,
       "state": true,
@@ -5475,12 +5475,14 @@
       "informationKeys": [
         "Version"
       ],
-      "validation": "source-adopted-current-validation-pending",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "routeEvidence": [
+          "evidence/list-layout/transformation-functions/README.md"
+        ],
+        "interpretation": "Fresh populated EN desktop / FR mobile checks; immutable schemas and protected editor unchanged."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5489,18 +5491,25 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Kinds",
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
+        "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
+        "evidence": "evidence/list-layout/transformation-functions/README.md"
+      }
     },
     {
       "id": "transformation-functions-transformation-function-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
-      "line": 36,
+      "line": 13,
       "host": "console",
       "routes": [
         "/transformation-functions",
         "/function-kinds"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "TransformationFunctionResource",
       "scope": true,
       "state": true,
@@ -5509,12 +5518,14 @@
         "Version",
         "FunctionDescription"
       ],
-      "validation": "source-adopted-current-validation-pending",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "routeEvidence": [],
-        "interpretation": "New main delta: source adoption is distinct from fresh populated browser evidence. See sync-main-1174.md and final PR validation."
+        "routeEvidence": [
+          "evidence/list-layout/transformation-functions/README.md"
+        ],
+        "interpretation": "Fresh populated EN desktop / FR mobile checks; immutable schemas and protected editor unchanged."
       },
       "compactAdoption": {
         "decision": "shared-identity-and-applicable-markers",
@@ -5523,7 +5534,14 @@
         "domainSemantics": "Preserve actual family identifiers, contextual navigation, exact reference/history versions and independently authorized direct actions; no inferred owner or publication cycle.",
         "evidenceStatus": "Fresh validation pending final merged source."
       },
-      "discoveredDuring": "2026-11-18 main synchronization #1174"
+      "discoveredDuring": "2026-11-18 main synchronization #1174",
+      "identityLabel": "Functions",
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
+        "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
+        "evidence": "evidence/list-layout/transformation-functions/README.md"
+      }
     },
     {
       "id": "storages-storage-resource",
@@ -6408,6 +6426,132 @@
         "evidenceStatus": "Source adopted; current browser validation pending."
       },
       "discoveredDuring": "2026-11-19 codex/ux-corrections resource-screen migration"
+    },
+    {
+      "id": "transformation-function-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "line": 69,
+      "host": "console",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Reconciles the existing read-only saved configuration frame introduced upstream; no editor UI change or new browser claim."
+      }
+    },
+    {
+      "id": "flowrunartifactdetails-configurationentry",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "line": 35,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelprofileeditor-profilesetting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "line": 167,
+      "host": "console",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ProfileSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelproviderdetails-setting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "line": 168,
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "modelproviderdetails-modelproviderusageresponse",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "line": 171,
+      "host": "console",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ModelProviderUsageResponse",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "identityLabel": "ModelProfileUsages",
+      "informationKeys": [],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+      }
     }
   ],
   "specialized": [

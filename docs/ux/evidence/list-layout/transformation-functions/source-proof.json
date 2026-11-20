@@ -1,0 +1,19 @@
+{
+  "baseCommit": "e94492bb41fed02d9472b74f1609f57113dee887",
+  "routes": [
+    "/transformation-functions",
+    "/function-kinds"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "598ea6ea842ffab36fdb5efcb201c26709960335",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.cs": "da2ddf34ee996ef22104ffe8689da9c051738370",
+    "src/Agentstration.Console.Client/TransformationFunctionsApiClient.cs": "4043d65a6d5fc71ef5d1cc449757ce31266b9a66",
+    "src/Agentstration.Functions.Api/FunctionEndpoints.cs": "85565bfe9d0442f5532053e5084ba540f6d922a1",
+    "src/Agentstration.Functions/TransformationFunctionService.cs": "a004cb01416542bc843aa47d7034e3c224bd0f76"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-kinds.png"
+  ]
+}

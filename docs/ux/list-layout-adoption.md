@@ -84,6 +84,6 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `ToolProviders.razor` | `/tools/providers` | Adopted in this continuation |
 | `ToolSets.razor` | `/tools/sets` | Adopted in this continuation |
 | `Tools.razor` | `/tools` | Adopted |
-| `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Remaining; requires individual contract review |
+| `TransformationFunctions.razor` | `/function-kinds`, `/transformation-functions` | Adopted; independent server offset pages with one lookahead, immutable schemas/ETags preserved. [Evidence](evidence/list-layout/transformation-functions/README.md) |
 | `Triggers.razor` | `/triggers` | Adopted |
 | `Vaults.razor` | `/vaults` | Adopted |
