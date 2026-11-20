@@ -335,12 +335,15 @@ export class SourceLifecyclePage {
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(name);
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(name);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile), this.fixture.profile);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
     const endpoint = editor.locator('[data-schema-path="$.endpoint"] input');
     await endpoint.fill('x');
     await endpoint.blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
+    await expect(this.page).toHaveURL(/\/data-sources\/new(?:[?#]|$)/);
+    await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
     await editor.locator('[data-schema-path="$.artifactId"] input').fill(this.fixture.artifactIds[index]);
     await endpoint.fill(`https://example.test/lifecycle/${index}`);
     await endpoint.blur();
@@ -354,7 +357,7 @@ export class SourceLifecyclePage {
   private async reviseProfile(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     const f = this.fixture;
     await this.open(consoleUrl, `/data-source-profiles/${f.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await selectResourceSection(this.page, 'definition/acquisition');
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.page.getByTestId(TestIds.sourceLifecycle.profileVersion).fill('1.1.0');
     await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).definition.version).toBe('1.1.0');
@@ -705,9 +708,17 @@ export class SourceLifecyclePage {
     url.searchParams.set('namespace', 'default');
     url.searchParams.set('scopeRef', this.scope);
     url.searchParams.set('context', this.scope);
-    if (view) url.searchParams.set('view', view);
-    const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    expect(response?.status()).toBe(200);
+    if (view) { if (path.startsWith('/data-sources/')) url.hash = view === 'definition' ? 'definition/configuration' : view; else url.searchParams.set('view', view); }
+    const current = new URL(this.page.url());
+    if (path.startsWith('/data-sources/') && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
+      await selectResourceSection(this.page, url.hash.slice(1));
+      // Fragment navigation retains mounted editors. This method explicitly reopens saved server state after API fixture commands.
+      const refresh = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceRefresh);
+      await refresh.click(); await expect(refresh).toBeEnabled();
+    } else {
+      const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBe(200);
+    }
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
   }

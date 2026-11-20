@@ -283,4 +283,8 @@
   <data name="ProfilePublicationPending" xml:space="preserve"><value>The profile was created, but publication was not confirmed. Review its published revisions, then retry publication if needed.</value></data>
   <data name="ProfileRefreshDraftConflict" xml:space="preserve"><value>The saved profile has changed. Your definition or YAML draft and its original ETag are retained. Discard to load the saved profile.</value></data>
   <data name="ProfileResourceIdentityMismatch" xml:space="preserve"><value>The returned profile does not match the requested identity.</value></data>
+  <data name="SourceRefreshDraftConflict" xml:space="preserve"><value>The saved data source has changed. Your drafts and original ETag are retained. Discard to load the saved version.</value></data>
+  <data name="SourceDiscard" xml:space="preserve"><value>Discard</value></data>
+  <data name="SourceSettingValue" xml:space="preserve"><value>Value</value></data>
+  <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
 </root>

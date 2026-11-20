@@ -283,4 +283,8 @@
   <data name="ProfilePublicationPending" xml:space="preserve"><value>Le profil a été créé, mais sa publication n’a pas été confirmée. Vérifiez ses révisions publiées, puis relancez la publication si nécessaire.</value></data>
   <data name="ProfileRefreshDraftConflict" xml:space="preserve"><value>Le profil enregistré a changé. Votre brouillon de définition ou de YAML et son ETag initial sont conservés. Abandonnez les modifications pour charger le profil enregistré.</value></data>
   <data name="ProfileResourceIdentityMismatch" xml:space="preserve"><value>Le profil retourné ne correspond pas à l’identité demandée.</value></data>
+  <data name="SourceRefreshDraftConflict" xml:space="preserve"><value>La source de données enregistrée a changé. Vos brouillons et leur ETag initial sont conservés. Abandonnez les modifications pour charger la version enregistrée.</value></data>
+  <data name="SourceDiscard" xml:space="preserve"><value>Abandonner</value></data>
+  <data name="SourceSettingValue" xml:space="preserve"><value>Valeur</value></data>
+  <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Saisissez un espace de noms valide.</value></data>
 </root>

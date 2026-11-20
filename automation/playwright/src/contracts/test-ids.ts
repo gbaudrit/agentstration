@@ -269,6 +269,7 @@ export const TestIds = {
   },
   schemaDrivenSources: {
     dataSourceEditor: 'data-source-editor',
+    dataSourceRefresh: 'data-source-refresh',
     dataSourceDisplayName: 'data-source-display-name',
     dataSourceName: 'data-source-name',
     dataSourceProfile: 'data-source-profile',

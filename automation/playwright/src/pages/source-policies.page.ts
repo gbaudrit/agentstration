@@ -41,7 +41,7 @@ export class SourcePoliciesPage {
     const first = await this.project(base, knowledge, fixtures);
     expect(first.inputs[0].directInput).toBeTruthy();
     expect(first.inputs[1].storageInput).toBeTruthy();
-    await this.page.goto(`${base}/data-sources/${direct}?context=%2Finstance&scopeRef=%2Finstance&view=acquisitions`);
+    await this.page.goto(`${base}/data-sources/${direct}?context=%2Finstance&scopeRef=%2Finstance#acquisitions`);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.directResult).first()).toContainText(text.direct);
     await control.change({ advanceSeconds: 21 * 60 });
     expect((await fixtures.api('POST', `/api/knowledgesources/${knowledge}/content/status?scopeRef=%2Finstance`, {})).value.preparationRequired).toBe(true);
@@ -102,7 +102,7 @@ export class SourcePoliciesPage {
     await this.page.goto(`${base}/data-sources/new?composition=dataset&context=%2Finstance`);
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     const text = SourcePolicyTextByLocale[locale];
-    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
     await this.wizardSelect('review');
     for (const step of ['identity', 'acquisition', 'storage']) {
       await expect(this.wizardButton(step)).toHaveAttribute('data-step-complete', 'false');
@@ -224,8 +224,8 @@ export class SourcePoliciesPage {
   }
 
   public async openDataset(base: string, name: string): Promise<void> {
-    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance&view=definition`);
-    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toHaveAttribute('data-interactive', 'true');
+    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance#definition/configuration`);
+    await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
   }
   public async openKnowledge(base: string, name: string): Promise<void> {
     await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=definition`);

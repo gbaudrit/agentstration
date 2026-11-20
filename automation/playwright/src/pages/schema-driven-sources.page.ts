@@ -82,7 +82,7 @@ export class SchemaDrivenSourcesPage {
 
   public async assertLocalizedEditorModes(consoleUrl: string, dataSourceName: string,
     expected: { formMode: string; rawMode: string }): Promise<void> {
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(await this.scopeRef())}&view=definition`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(await this.scopeRef())}#definition/configuration`,
       TestIds.schemaDrivenSources.dataSourceEditor);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
     await expect(editor.getByTestId(TestIds.common.schemaFormMode)).toHaveText(expected.formMode);
@@ -116,7 +116,7 @@ export class SchemaDrivenSourcesPage {
         },
       },
     }), 201, `create Data Source '${dataSourceName}'`);
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}&view=definition`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}#definition/configuration`,
       TestIds.schemaDrivenSources.dataSourceEditor);
     const profile = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile);
     const persisted = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
@@ -171,7 +171,7 @@ export class SchemaDrivenSourcesPage {
       `${consoleUrl}/api/datasources/${dataSourceName}/readiness?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}`);
     expect(readiness.ready).toBe(true);
     expect(readiness.acquisition).toBeTruthy();
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}&view=acquisitions`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}#acquisitions`,
       TestIds.schemaDrivenSources.dataSourceAcquisitions);
     const parameters = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionParameters);
     const start = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceStartAcquisition);
