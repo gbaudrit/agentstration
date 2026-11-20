@@ -1126,7 +1126,7 @@
     {
       "id": "organization-members-agentstration-identity-contracts-local-account-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 27,
+      "line": 37,
       "host": "console",
       "routes": [
         "/settings/organization/members"
@@ -1209,13 +1209,13 @@
     {
       "id": "organization-members-agentstration-identity-contracts-organization-member-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
-      "line": 45,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/organization/members"
       ],
-      "renderer": "CollectionView",
-      "itemType": "Agentstration.Identity.Contracts.OrganizationMemberResponse",
+      "renderer": "ResourceCollectionTemplate",
+      "itemType": "OrganizationMemberResponse",
       "identityLabel": "Member",
       "scope": false,
       "state": true,
@@ -1287,6 +1287,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "ba41bf2d086da5a1d576c391e6f033835c2ee025"
+      },
+      "pageComposition": {
+        "contract": "Complete authorized organization members and assignments, exact local 20/50/100 pages; role and scope match one assignment. AuthorizationRead required; optional local-account administration uses existing server capabilities.",
+        "state": "Retained compatible refresh, guarded principal/logical/physical context replacement and denial. Sensitive account draft cleared on context notification.",
+        "evidence": "docs/ux/evidence/list-layout/organization-members/README.md",
+        "tests": "OrganizationMembersCollectionTests; OrganizationLocalizationTests"
       }
     },
     {
