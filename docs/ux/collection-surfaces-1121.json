@@ -1547,17 +1547,17 @@
     {
       "id": "packs-installed-pack-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
-      "line": 43,
+      "line": 12,
       "host": "console",
       "routes": [
         "/packs"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "InstalledPackResource",
       "identityLabel": "Pack",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Purpose",
         "Audience",
@@ -1630,6 +1630,13 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8eacc3f9268d389422b63931845f1e9597fcc3c7"
+      },
+      "pageComposition": {
+        "contract": "Complete authorized InstalledPack and PackProject arrays; exact local pages, name/publisher search, status/purpose/audience/publisher/owner filters. Metrics independent of filtered pages.",
+        "state": "ResourcesRead/Write gates, retained refresh; physical/logical/principal context guard, cleared sensitive catalogs and dialogs on notifications, late-response rejection.",
+        "preserved": "Existing inline detail, projects, install/fork/uninstall dialogs and ETags. Name uses explicit owner-scoped inspection; foreign-owner row switches to owning context. Legacy mutation contracts unchanged.",
+        "evidence": "docs/ux/evidence/list-layout/packs/README.md",
+        "tests": "PacksCollectionTests; PacksComponentTests"
       }
     },
     {

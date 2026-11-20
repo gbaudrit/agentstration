@@ -1,58 +1,35 @@
 @page "/packs"
 @implements IDisposable
 @inject IPacksClient Client
+@inject ConsoleContextState Context
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Packs") · Agentstration</PageTitle>
-<PageHeader Title="@T("Packs")" Description="@T("Packs.Description")">
-    <Actions>
-        <button class="button-secondary" disabled="@loading" @onclick="LoadAsync">@T("Refresh")</button>
-        <a class="button-secondary" href="/pack-projects/new">@T("CreateFromWorkspace")</a>
-        <button class="button-primary" @onclick="OpenInstall">@T("InstallLocalPack")</button>
-    </Actions>
-</PageHeader>
-
 <div data-testid="distribution-packs">
-@if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (packs is null)
-{
-    <LoadingState Message="@T("LoadingInstalledPacks")" />
-}
-else
-{
-    <section class="metric-grid pack-metrics" aria-label="@T("PackMetrics")">
+<ResourceCollectionTemplate TItem="InstalledPackResource" Title="@T("Packs")" Description="@T("Packs.Description")" TestId="packs-collection" ContextKey="@contextKey"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="AdditionalFilters" Items="PageItems" RowTestId="installed-pack-row"
+                            ItemAttributes="@(pack => new Dictionary<string, object> { ["class"] = IsSelected(pack) ? "selected-pack" : string.Empty })"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("NoPacksInstalled")" EmptyMessage="@T("NoPacksInstalledMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <PrimaryActions>@if (CanWrite) { <button class="button-primary" @onclick="OpenInstall" disabled="@(!interactive)">@T("InstallLocalPack")</button> }</PrimaryActions>
+    <Actions>@if (CanWrite) { <a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/pack-projects/new", Services)">@T("CreateFromWorkspace")</a> }</Actions>
+    <Metrics>@if (packs is not null)
+    {
         <MetricCard Label="@T("InstalledPacks")" Value="@packs.Count.ToString()" Detail="@T("VisibleScopes")" Status="UiStatus.Info" />
         <MetricCard Label="@T("ManagedResources")" Value="@packs.Sum(pack => pack.Definition.ManagedResources.Count).ToString()" Detail="@T("CreatedFromPacks")" Status="UiStatus.Success" />
         <MetricCard Label="@T("RequiresAttention")" Value="@AttentionCount.ToString()" Detail="@T("FailedOrDegraded")" Status="@(AttentionCount == 0 ? UiStatus.Neutral : UiStatus.Warning)" />
         <MetricCard Label="@T("PackProjects")" Value="@(projects?.Count.ToString() ?? "—")" Detail="@T("LocalAuthoring")" Status="UiStatus.Info" />
-    </section>
+    }</Metrics>
+    <Feedback>@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }</Feedback>
+    <EmptyActions>@if (CanWrite) { <button class="button-primary" @onclick="OpenInstall" disabled="@(!interactive)">@T("InstallLocalPack")</button> }</EmptyActions>
+</ResourceCollectionTemplate>
 
-    @if (packs.Count == 0)
-    {
-        <EmptyState Title="@T("NoPacksInstalled")" Message="@T("NoPacksInstalledMessage")">
-            <button class="button-primary" @onclick="OpenInstall">@T("InstallLocalPack")</button>
-        </EmptyState>
-    }
-    else
-    {
-        <CollectionView TItem="InstalledPackResource" Items="packs" InformationLabels="@(new string[] { T("Purpose"), T("Audience"), T("Resources"), T("Installed") })" ItemAttributes="@((pack) => new Dictionary<string, object> { ["class"] = IsSelected(pack) ? "selected-pack" : string.Empty })" IdentityLabel="@T("Pack")" StateLabel="@T("Status")">
-        <Identity Context="pack"><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => SelectAsync(pack)" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@(pack.Definition.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="pack.ScopeRef" IconOnly /><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(pack.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></Identity>
-        <Information Context="pack">
-            <CollectionValue Label="@T("Purpose")"><span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span></CollectionValue>
-            <CollectionValue Label="@T("Audience")">@AudienceLabel(pack.Definition.Audience)</CollectionValue>
-            <CollectionValue Label="@T("Resources")">@pack.Definition.ManagedResources.Count</CollectionValue>
-            <CollectionValue Label="@T("Installed")"><time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time></CollectionValue>
-        </Information>
-        <Actions Context="pack">
-<CollectionActions ResourceName="@(DisplayName(pack))"><button class="text-button" @onclick="() => SelectAsync(pack)">@T("Inspect")</button></CollectionActions></Actions>
-    </CollectionView>
-    }
-
+@if (!loadState.BlocksContent)
+{
     @if (selected is not null)
     {
         <section class="panel pack-details" aria-label="@T("SelectedPackDetails")">
@@ -291,3 +268,22 @@ else
     </div>
 }
 </div>
+
+@code {
+    private CollectionColumn<InstalledPackResource> IdentityColumn => new("identity", T("Pack"), pack => @<text><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => OpenPackAsync(pack)" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@pack.Definition.Version" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="pack.ScopeRef" IconOnly /><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(pack.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></text>)
+    {
+        Filters = [new("state", T("Status"), CollectionFilterKind.Choice) { Options = (packs ?? []).Select(pack => pack.Definition.State).Distinct().Select(value => new CollectionFilterOption(value.ToString(), StateLabel(value))).ToArray() }]
+    };
+    private IReadOnlyList<CollectionColumn<InstalledPackResource>> Columns =>
+    [
+        new("purpose", T("Purpose"), pack => @<span class="pack-kind">@PurposeLabel(pack.Definition.Purpose)</span>) { Filters = [new("purpose", T("Purpose"), CollectionFilterKind.Choice) { Options = Enum.GetValues<PackPurpose>().Select(value => new CollectionFilterOption(value.ToString(), PurposeLabel(value))).ToArray() }] },
+        new("audience", T("Audience"), pack => @<text>@AudienceLabel(pack.Definition.Audience)</text>) { Filters = [new("audience", T("Audience"), CollectionFilterKind.Choice) { Advanced = true, Options = Enum.GetValues<PackAudience>().Select(value => new CollectionFilterOption(value.ToString(), AudienceLabel(value))).ToArray() }] },
+        new("resources", T("Resources"), pack => @<text>@pack.Definition.ManagedResources.Count</text>),
+        new("installed", T("Installed"), pack => @<time datetime="@pack.Definition.InstalledAt.ToString("O")">@pack.Definition.InstalledAt.ToLocalTime().ToString("g")</time>)
+    ];
+    private IReadOnlyList<CollectionFilter> AdditionalFilters =>
+    [
+        new("publisher", T("Publisher"), CollectionFilterKind.Choice) { Options = (packs ?? []).Select(pack => pack.Definition.Publisher).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray() },
+        new("scope", T("Scope"), CollectionFilterKind.Choice) { Options = (packs ?? []).Where(pack => pack.ScopeRef is not null).Select(pack => pack.ScopeRef!.Value.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray() }
+    ];
+}

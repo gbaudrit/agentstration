@@ -5,6 +5,7 @@ using Agentstration.Models;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Agentstration.Work;
 using Bunit;
@@ -46,7 +47,7 @@ public sealed class PacksComponentTests
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         CollectionAssert.AreEqual(new[] { "1", "2", "0", "0" }, rendered.FindAll(".metric-card strong").Select(element => element.TextContent).ToArray());
-        await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.Find(".collection-identity-button").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
@@ -129,7 +130,7 @@ public sealed class PacksComponentTests
         var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
-        await rendered.FindAll("button").Single(button => button.TextContent.Contains("Inspect", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.Find(".collection-identity-button").ClickAsync(new());
         await rendered.FindAll("button").Single(button => button.TextContent.Trim().Equals("Fork", StringComparison.Ordinal)).ClickAsync(new());
 
         Assert.IsTrue(rendered.Markup.Contains("Source archive required", StringComparison.Ordinal));
@@ -186,6 +187,8 @@ public sealed class PacksComponentTests
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IConsoleContextProvider>(new ResourceListContextProvider());
+        context.Services.AddSingleton<ConsoleContextState>();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

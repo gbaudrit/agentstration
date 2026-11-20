@@ -65,7 +65,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `OrganizationAccess.razor` | `/settings/organization/access` | Adopted; complete organization assignments, exact local pages and authorization/read gate. [Evidence](evidence/list-layout/organization-access/README.md) |
 | `OrganizationMembers.razor` | `/settings/organization/members` | Adopted; complete member snapshot, exact pages, same-assignment role/scope filters; local-account form preserved. [Evidence](evidence/list-layout/organization-members/README.md) |
 | `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Adopted |
-| `Packs.razor` | `/packs` | Remaining; requires individual contract review |
+| `Packs.razor` | `/packs` | Adopted; complete visible catalog, exact local pages, scoped inspection; dialogs/projects preserved. [Evidence](evidence/list-layout/packs/README.md) |
 | `Parameters.razor` | `/parameters` | Adopted |
 | `ResourcePlans.razor` | `/resource-plans` | Adopted |
 | `ResourceScopes.razor` | `/settings/resource-scopes` | Remaining; requires individual contract review |
