@@ -16,7 +16,7 @@ public partial class FlowDesigner
         CancellationToken queuedCancellation = default)
     {
         if (ReadOnly || Editor.State.Resource is null || Editor.State.ETag is null) return;
-        var target = Target;
+        var target = Target with { ScopeRef = OwnerScope };
         var token = targetCancellation!.Token;
         using var queued = CancellationTokenSource.CreateLinkedTokenSource(token, queuedCancellation);
         var acquired = false;

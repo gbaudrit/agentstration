@@ -256,4 +256,5 @@
   <data name="DraftChangedDuringSave" xml:space="preserve">
     <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
   </data>
+  <data name="IdentityMismatch"><value>The returned Flow does not match the requested namespace, owner, name or published version.</value></data>
 </root>

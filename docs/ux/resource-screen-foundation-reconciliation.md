@@ -25,7 +25,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `DataSourceProfileEditor.razor` | New foundation migrated; local verification recorded below | Historical profile resource; preserve definition-only API and publication/Flow contracts | Yes |
 | `EntryEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
 | `ExtensionDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
-| `FlowDesigner.razor` | Previously remaining | Specialized operational/identity view; inspect supported definition, access and export capabilities | No |
+| `FlowDesigner.razor` | Specialized workshop reconciled; verification below | Dedicated Graph/Definition/Split editor; guarded exact target/session and independent execute versus write capabilities | Not applicable |
 | `FlowDetails.razor` | New foundation migrated; verification below | Actual Flow identity and retained delegated or graph metadata forms; independent execution/Access and final family YAML | Not applicable |
 | `FlowOrchestrationEditor.razor` | Delegated definition reconciled; verification below | Shared retained form and exact owning Flow state/presentation dictionary; specialized references and independent publication draft preserved | Not applicable |
 | `FlowRunArtifactDetails.razor` | New foundation migrated; local verification below | Actual immutable Resource, retained content/storage and safe public metadata inspection | Not applicable |
@@ -433,3 +433,13 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - Family metadata and published identity remain distinct until actual publication. No backend API, fictitious version/revision or generic loader was added. New duplicate Flow journey **Not applicable**; #1236 remains deferred. Protected Agent source/styles/translations are unchanged; no CI remediation or full solution lanes.
 
 - Current reconciliation: **45/51** components verified; 6 remaining. The Agent reference is protected.
+
+### FlowDesigner — specialized graph and definition workshop
+
+- Preserves the actual canvas/palette/inspector and Graph/Definition/Split atelier rather than fabricating a persisted-resource frame or creation wizard. The owning FlowDetails supplies that standard frame. Exact namespace/owner/version/context links and existing namespace aliases are preserved; both graph and raw definition changes join the same leave guard.
+- Accepted target replacement clears the previous private editor session before loading; failed/new/disposed contexts cannot expose or restore an old graph. Returned Flow identity/version/owner and late async operations are checked. Save/run use the actually loaded owner, and navigation follows the accepted execution scope/context.
+- Execution permission remains independent of definition writing: execute-only callers may run an unchanged saved draft without implicit save, while dirty graph/raw input in a read-only definition cannot be submitted. Optional execution capability preserves existing default callers.
+- 104 designer/store and 96 Console Flow cases pass within the coordinated 397 cases; the final overlapping 121-case delta check also passes. EN/dark desktop and FR/light true-touch fragment/raw/session/retention checks plus six maintained Flow/Agent cases pass: [eight real captures and exact hashes](evidence/resource-screen-foundation/flow-designer/README.md). Early temporary fragment/touch-link placement errors were corrected in the probe without product workarounds, forced actions or timeout changes.
+- New duplicate Designer journey **Not applicable**; #1236 stays deferred. Protected Agent source/styles/translations unchanged, no CI remediation and no full solution lanes.
+
+- Current reconciliation: **46/51** components verified; 5 remaining. The Agent reference is protected.
