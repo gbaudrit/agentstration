@@ -49,11 +49,14 @@ public sealed class ModelProviderCollectionTests
         using var culture = new TestCultureScope("en-US");
         using var handler = new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = JsonContent.Create(new { Value = new[]
+            Content = JsonContent.Create(new
+            {
+                Value = new[]
             {
                 new ModelProviderResponse("pending", "pending", new("Pending", "aep", "chat", "extension", "default", "manual", "unknown", null, 0, Discovery: new() { State = "never" }), ScopeRef: ResourceScopeRef.Instance),
                 new ModelProviderResponse("known-empty", "known-empty", new("Known empty", "aep", "chat", "extension", "default", "manual", "available", null, 0, Discovery: new() { State = "succeeded", LastSuccessAt = DateTimeOffset.UnixEpoch }), ScopeRef: ResourceScopeRef.Instance)
-            } })
+            }
+            })
         }));
         using var context = Context(handler);
         var cut = context.Render<ModelProviders>();

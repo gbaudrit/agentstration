@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Bootstrap.Contracts;
-using Agentstration.Identity.Contracts;
 using Agentstration.Identity;
+using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Console;

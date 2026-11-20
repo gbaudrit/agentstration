@@ -10,9 +10,9 @@ using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.AI;
 
 namespace Agentstration.Management.Tests;
 
