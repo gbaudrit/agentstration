@@ -6,12 +6,12 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeWorkerStrings> Localizer
 
 <PageTitle>@T("WorkerDetails") · Agentstration</PageTitle>
-    <ResourceDetailsTemplate Name="@(details?.Worker.DisplayName ?? T("WorkerDetails"))" ResourceType="@T("WorkerDetails")" Domain="runtime" IconName="server"
+    <ResourceDetailsTemplate Name="@(details?.Worker.DisplayName ?? T("WorkerDetails"))" ResourceType="@T("WorkerDetails")" Domain="runtime" IconName="server" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/settings/runtime-workers", Services)" CollectionLabel="@T("BackToWorkers")"
                              Description="@T("DetailsDescription")" StatusText="@(details is null ? null : T($"Presence.{details.Worker.Presence}"))" Status="@(details is null ? UiStatus.Neutral : PresenceStatus(details.Worker.Presence))"
                              Sections="Sections" ResourceIdentity="@(loadedKey ?? WorkerId.ToString("D"))" DefaultSection="overview" SectionState="sectionState" SelectionChanged="SelectSection"
                              LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" SectionTestIdPrefix="runtime-worker" TestId="runtime-worker-details">
         <Metadata>@if (details is not null) { <CopyableValue Value="@details.Worker.WorkerId.ToString("D")" /> }</Metadata>
-        <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/settings/runtime-workers", Services)">@T("BackToWorkers")</a></Actions>
+
         <Content>
         @if (details is not null) {
         <div class="worker-overview" data-worker-section="overview" hidden="@(!sectionState.Is("overview"))">
