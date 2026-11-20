@@ -50,6 +50,7 @@ public sealed partial class ArtifactAdministrationComponentTests
         Assert.AreEqual(ResourceScopeRef.Parse(scopeRef), durable.FindComponent<Agentstration.Web.Components.Pages.DurableArtifactContent>().Instance.ContextScope);
         var staged = context.Render<Agentstration.Web.Components.Pages.StagedArtifactDetails>(parameters =>
             parameters.Add(value => value.Id, client.Artifact.ArtifactId.ToString()));
+        Assert.Contains(Uri.EscapeDataString(scopeRef), staged.Find("[data-testid=artifact-producer-flow-run]").GetAttribute("href")!);
         SelectSection(context, "content");
         staged.WaitForAssertion(() => Assert.Contains("context=" + Uri.EscapeDataString(scopeRef),
             staged.Find("[data-testid=staged-artifact-download]").GetAttribute("href")!));
@@ -115,7 +116,7 @@ public sealed partial class ArtifactAdministrationComponentTests
     private sealed class ArtifactNavigationContext(string scopeRef) : IConsoleNavigationContext
     {
         public string? ScopeRef => scopeRef;
-        public string AddToUri(string uri) => uri;
+        public string AddToUri(string uri) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(uri, "context", scopeRef);
     }
 
     [TestMethod]
@@ -553,7 +554,9 @@ public sealed partial class ArtifactAdministrationComponentTests
             };
         }
 
-        public StagedArtifactView Artifact { get; private set; }
+        public StagedArtifactView Artifact { get; set; }
+        public Exception? StagedReadError { get; set; }
+        public TaskCompletionSource<StagedArtifactView?>? NextStagedRead { get; set; }
         public FlowRunArtifactResource Durable { get; set; }
         public int ContentReadCount { get; private set; }
         public int DurableReadCount { get; private set; }
@@ -582,6 +585,8 @@ public sealed partial class ArtifactAdministrationComponentTests
         public Task<StagedArtifactView?> GetStagedAsync(StagedArtifactId id, CancellationToken cancellationToken = default)
         {
             StagedReadCount++;
+            if (NextStagedRead is { } pending) { NextStagedRead = null; return pending.Task; }
+            if (StagedReadError is { } error) return Task.FromException<StagedArtifactView?>(error);
             return Task.FromResult<StagedArtifactView?>(id == Artifact.ArtifactId ? Artifact : null);
         }
 

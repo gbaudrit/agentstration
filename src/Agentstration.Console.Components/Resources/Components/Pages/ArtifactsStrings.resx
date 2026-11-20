@@ -72,4 +72,5 @@
   <data name="ProducerKind.Agent"><value>Agent</value></data>
   <data name="ProducerKind.Tool"><value>Tool</value></data>
   <data name="ProducerKind.Unknown"><value>Unknown</value></data>
+  <data name="RetentionRefreshDraft" xml:space="preserve"><value>Updated metadata is available. Your retention input is preserved. Discard it to adopt the updated copy.</value></data>
 </root>

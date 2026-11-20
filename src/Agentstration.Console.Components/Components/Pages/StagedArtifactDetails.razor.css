@@ -107,3 +107,6 @@
 .artifact-header ::deep p {
     overflow-wrap: anywhere;
 }
+
+.configuration-key { overflow-wrap: anywhere; }
+.configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -51,6 +51,10 @@ export class ArtifactAdministrationPage {
     await this.openStagedContent();
     await this.page.getByTestId(TestIds.artifacts.stagedReadPreview).click();
     await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toHaveText(smallText);
+    await this.page.getByTestId(TestIds.artifacts.stagedRefresh).click();
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedRefresh)).toBeEnabled();
+    await expect(this.page).toHaveURL(url => url.hash === '#content');
+    await expect(this.page.getByTestId(TestIds.artifacts.stagedContent)).toHaveText(smallText);
     await expect(this.page.getByTestId(TestIds.artifacts.stagedContentStatus)).toBeVisible();
     await this.assertDownload(consoleUrl, small, TestIds.artifacts.stagedDownload, smallText);
 

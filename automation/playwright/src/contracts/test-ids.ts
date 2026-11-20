@@ -361,6 +361,7 @@ export const TestIds = {
   artifacts: {
     list: 'resource-artifacts',
     stagedDetails: 'staged-artifact-details',
+    stagedRefresh: 'staged-artifact-refresh',
     stagedContentPanel: 'staged-artifact-content-panel',
     stagedReadPreview: 'staged-artifact-read-preview',
     stagedReadFull: 'staged-artifact-read-full',
