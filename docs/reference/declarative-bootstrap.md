@@ -1,5 +1,18 @@
 # Declarative bootstrap
 
+Before authentication becomes available, browser HTML navigations display only a
+localized “Starting the instance” message and an activity indicator. The page has
+no dependency on Console assets or identity storage. It polls `GET /startup/ready`
+every two seconds; this anonymous, non-cacheable probe returns an empty HTTP 503
+while login is unavailable and HTTP 204 once administration or full readiness is
+available. The browser then replaces the waiting page with `/login`, preserving a
+validated local return URL. `/startup` also exposes the waiting page directly.
+Neither the page nor its probe discloses Bootstrap resources, errors or progress.
+API requests retain the ordinary initialization fence and Problem Details response;
+`/health/ready` continues to represent full application readiness. Authenticated
+Bootstrap progress and the temporary administrator-only sign-in policy are separate
+follow-up work pending the Console UX consolidation.
+
 Agentstration treats `Agentstration:Bootstrap:Path` as the root of a profile catalog. Each immediate child directory is one independently selectable profile. Startup applies the ordered `Agentstration:Bootstrap:InitialProfiles` list only when `Agentstration:Bootstrap:InitialBootstrapEnabled` is `true`. Initial bootstrap is disabled by default.
 
 Profiles use configuration order; files inside each profile use ordinal lexical filename order. Use profile order for dependencies across profiles and numeric filename prefixes for dependencies inside one profile. A file may contain one YAML resource or several YAML documents separated by `---`. Bootstrap runs after persistence initialization under the fenced instance initialization lifecycle. Handlers only create absent resources and never reconcile existing ones. Legacy endpoint synchronization can run before and after Bootstrap only when `Agentstration:Extensions:DiscoverOnStartup` is explicitly enabled; it is disabled by default. New staged startup accepts extension-initiated announcements instead.

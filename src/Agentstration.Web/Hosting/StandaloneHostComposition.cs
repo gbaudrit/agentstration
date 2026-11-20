@@ -185,6 +185,8 @@ internal static class StandaloneHostCompositionExtensions
                 composition.GenAiObservability.HttpPayloadCapture.MaximumBodyLength);
         }
 
+        app.UseRequestLocalization();
+        if (!composition.ApiOnlyTesting) app.UseMiddleware<BootstrapStartupPageMiddleware>();
         app.Use(async (context, next) =>
         {
             var startup = context.RequestServices.GetRequiredService<BootstrapStartupState>();
@@ -202,7 +204,6 @@ internal static class StandaloneHostCompositionExtensions
         });
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseRequestLocalization();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseMiddleware<PrincipalResolutionMiddleware>();
