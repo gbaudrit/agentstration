@@ -8,26 +8,15 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
 
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
-<PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")">
-    <Actions>
-        @if (activeTab == ExtensionTab.Catalog)
-        {
-            <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
-        }
-    </Actions>
-</PageHeader>
+@if (activeTab != ExtensionTab.Catalog)
+{
+    <PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")" />
+}
 
 <div data-testid="distribution-extensions" data-interactive="@(interactive ? "true" : "false")">
-<ResourceTabs Label="@T("ExtensionTabs")">
-    <button id="extensions-tab-summary" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Summary ? "true" : "false")" aria-controls="extensions-panel-summary" class="@(activeTab == ExtensionTab.Summary ? "active" : null)" data-testid="extensions-tab-summary" @onclick="() => activeTab = ExtensionTab.Summary">@T("Tab.Summary")</button>
-    <button id="extensions-tab-catalog" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Catalog ? "true" : "false")" aria-controls="extensions-panel-catalog" class="@(activeTab == ExtensionTab.Catalog ? "active" : null)" data-testid="extensions-tab-catalog" @onclick="() => activeTab = ExtensionTab.Catalog">@T("Tab.Extensions")</button>
-    @if (CanAdministerEnrollments)
-    {
-        <button id="extensions-tab-enrollments" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Enrollments ? "true" : "false")" aria-controls="extensions-panel-enrollments" class="@(activeTab == ExtensionTab.Enrollments ? "active" : null)" data-testid="extensions-tab-enrollments" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("Tab.Enrollments")</button>
-    }
-</ResourceTabs>
+@if (activeTab != ExtensionTab.Catalog) { @ExtensionNavigation }
 
-@if (error is not null)
+@if (error is not null && activeTab != ExtensionTab.Catalog)
 {
     <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
 }
@@ -202,36 +191,28 @@
 @if (activeTab == ExtensionTab.Catalog)
 {
 <div id="extensions-panel-catalog" role="tabpanel" aria-labelledby="extensions-tab-catalog">
-    <section class="panel resource-section">
-        <div class="panel-header">
-            <div><p class="eyebrow">@T("ExtensionInventory")</p><h2>@T("Tab.Extensions")</h2><p>@T("ExtensionInventory.Description")</p></div>
-            <span>@T("ExtensionCount", FilteredInventory.Count)</span>
-        </div>
-        <ResourceToolbar Label="@T("InventoryFilters")">
-            <SearchBox @bind-Value="search" Placeholder="@T("SearchExtensions")" />
-            <ClearableSelect aria-label="@T("Availability")" @bind-Value="availabilityFilter"><option value="">@T("AllAvailability")</option>@foreach (var status in AvailabilityFilters) { <option value="@status">@StatusLabel(status)</option> }</ClearableSelect>
-            <ClearableSelect aria-label="@T("Enrollment")" @bind-Value="enrollmentFilter"><option value="">@T("AllEnrollments")</option>@foreach (var status in EnrollmentFilters) { <option value="@status">@EnrollmentStatusLabel(status)</option> }</ClearableSelect>
-            <ClearableSelect aria-label="@T("Origin")" @bind-Value="sourceFilter"><option value="">@T("AllOrigins")</option>@foreach (var source in SourceFilters) { <option value="@source">@SourceLabel(source)</option> }</ClearableSelect>
-        </ResourceToolbar>
-    @if (loading && inventory is null)
+    <ResourceCollectionTemplate TItem="ExtensionInventoryItemResponse" Title="@T("Extensions")" Description="@T("ExtensionInventory.Description")" TestId="extensions-catalog" ContextKey="@catalogContextKey" RowTestId="extension-inventory-row"
+                                Items="@(inventory ?? [])" IdentityColumn="InventoryIdentity" Columns="InventoryColumns" LoadState="catalogLoadState" Disabled="@(!interactive)" OnRefresh="LoadAsync" OnRetry="LoadAsync"
+                                ItemActions="@(HasSourceActions ? InventoryActions : null)" EmptyTitle="@T("NoExtensionsDiscovered")" EmptyMessage="@T("NoExtensionsDiscoveredMessage")">
+        <Navigation>@ExtensionNavigation</Navigation>
+        <PrimaryActions>@if (CanRegister && inventory is not null) { <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button> }</PrimaryActions>
+        <EmptyActions>@if (CanRegister && inventory is not null) { <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button> }</EmptyActions>
+        <Feedback><p class="muted">@T("InventorySnapshot.Help")</p>@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" /> }</Feedback>
+
+    </ResourceCollectionTemplate>
+    @if (activePairingCode is not null)
     {
-        <LoadingState Message="@T("DiscoveringExtensions")" />
+        <div class="inline-warning" role="status"><strong>@T("PairingCode")</strong> <code>@activePairingCode</code>@if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }@if (clipboardFallback) { <p>@T("ClipboardFallback")</p><button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button><button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button> }</div>
     }
-    else if (FilteredInventory.Count == 0)
-    {
-        <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
-    }
-    else
-    {
-        <CollectionView TItem="ExtensionInventoryItemResponse" Items="FilteredInventory" InformationLabels="@(new string[] { T("Connection"), T("Enrollment"), T("Contributions") })" IdentityLabel="@T("Extension")" StateLabel="@T("Availability")">
-        <Identity Context="item">
-<CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.RegistrationName is null ? null : item.RegistrationNamespace)" Name="@(item.RegistrationName ?? item.ExtensionId)" Href="@DetailUrl(item)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(item.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="item.RegistrationScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.RegistrationScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Connection")"><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></CollectionValue>
-            <CollectionValue Label="@T("Enrollment")"><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> } else { <span>—</span> }</div></CollectionValue>
-            <CollectionValue Label="@T("Contributions")">@ContributionSummary(item)</CollectionValue>
-        </Information>
-    <Actions Context="item"><CollectionActions ResourceName="@($"{item.DisplayName} ({item.RegistrationNamespace}/{item.RegistrationName ?? item.ExtensionId}, {item.RegistrationScopeRef})")"><a href="@DetailUrl(item)">@T("OpenExtension")</a>@if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true)
+</div>
+}
+
+<ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />
+</div>
+
+@code {
+    private bool HasSourceActions => inventory?.Any(item => item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) == true;
+    private RenderFragment<ExtensionInventoryItemResponse> InventoryActions => item => @<text>@if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) {<CollectionActions ResourceName="@($"{item.DisplayName} ({item.RegistrationNamespace}/{item.RegistrationName ?? item.ExtensionId}, {item.RegistrationScopeRef})")">@if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true)
                     {
                         <div class="inventory-contribution-actions">
                             @foreach (var provider in SourceProviders(item))
@@ -246,16 +227,20 @@
                                 }
                             }
                         </div>
-                    }</CollectionActions></Actions>
-    </CollectionView>
-    }
-    </section>
-    @if (activePairingCode is not null)
+                    }</CollectionActions>}</text>;
+    private RenderFragment ExtensionNavigation => @<ResourceTabs Label="@T("ExtensionTabs")">
+    <button id="extensions-tab-summary" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Summary ? "true" : "false")" aria-controls="extensions-panel-summary" class="@(activeTab == ExtensionTab.Summary ? "active" : null)" data-testid="extensions-tab-summary" @onclick="() => activeTab = ExtensionTab.Summary">@T("Tab.Summary")</button>
+    <button id="extensions-tab-catalog" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Catalog ? "true" : "false")" aria-controls="extensions-panel-catalog" class="@(activeTab == ExtensionTab.Catalog ? "active" : null)" data-testid="extensions-tab-catalog" @onclick="() => activeTab = ExtensionTab.Catalog">@T("Tab.Extensions")</button>
+    @if (CanAdministerEnrollments)
     {
-        <div class="inline-warning" role="status"><strong>@T("PairingCode")</strong> <code>@activePairingCode</code>@if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }@if (clipboardFallback) { <p>@T("ClipboardFallback")</p><button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button><button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button> }</div>
+        <button id="extensions-tab-enrollments" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Enrollments ? "true" : "false")" aria-controls="extensions-panel-enrollments" class="@(activeTab == ExtensionTab.Enrollments ? "active" : null)" data-testid="extensions-tab-enrollments" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("Tab.Enrollments")</button>
     }
-</div>
+</ResourceTabs>;
+    private CollectionColumn<ExtensionInventoryItemResponse> InventoryIdentity => new("identity", T("Extension"), item => @<text><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.RegistrationName is null ? null : item.RegistrationNamespace)" Name="@(item.RegistrationName ?? item.ExtensionId)" Href="@DetailUrl(item)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(item.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="item.RegistrationScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.RegistrationScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></text>);
+    private IReadOnlyList<CollectionColumn<ExtensionInventoryItemResponse>> InventoryColumns =>
+    [
+        new("connection", T("Connection"), item => @<text><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></text>),
+        new("enrollment", T("Enrollment"), item => @<div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> } else { <span>—</span> }</div>),
+        new("contributions", T("Contributions"), item => @<text>@ContributionSummary(item)</text>)
+    ];
 }
-
-<ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />
-</div>

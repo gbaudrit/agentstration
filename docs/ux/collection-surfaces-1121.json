@@ -408,12 +408,12 @@
     {
       "id": "extensions-extension-inventory-item-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
-      "line": 226,
+      "line": 194,
       "host": "console",
       "routes": [
         "/extensions"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "ExtensionInventoryItemResponse",
       "identityLabel": "Extension",
       "scope": true,
@@ -424,8 +424,35 @@
         "Enrollment",
         "Contributions"
       ],
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "source-and-populated-browser-validated",
       "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [
+          "evidence/list-layout/extensions/README.md"
+        ],
+        "interpretation": "Fresh deterministic populated desktop EN and mobile FR catalog checks; Summary/Enrollments and protected details retain their own contracts."
+      },
+      "compactAdoption": {
+        "decision": "shared-identity-and-applicable-markers",
+        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
+        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
+        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
+        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
+        "implementationPR": 1123,
+        "coveragePR": 1132,
+        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
+        "sourceBlob": "a65fd07a0202a7783d3d415d1c5a718ea6f04175"
+      },
+      "pageComposition": {
+        "template": "ResourceCollectionTemplate",
+        "query": "Bounded composite snapshot: full visible registrations, first 200 enrollment requests, bounded bundle observations. No global search/filter/total/pagination.",
+        "navigation": "Existing summary, catalog and enrollment destinations retained.",
+        "states": "Retained compatible refresh; principal/logical/physical context clears metadata and drafts; revisions/cancellation reject obsolete responses.",
+        "actions": "Exact detail link; only meaningful Source Provider contribution commands; registration and enrollment permissions retained.",
+        "evidence": "evidence/list-layout/extensions/README.md"
+      },
+      "historicalVerification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "domainSpecifications": [
@@ -478,17 +505,6 @@
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
         }
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
-        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Family-owned columns, permissions, commands and bounds are preserved.",
-        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
-        "implementationPR": 1123,
-        "coveragePR": 1132,
-        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
-        "sourceBlob": "a65fd07a0202a7783d3d415d1c5a718ea6f04175"
       }
     },
     {

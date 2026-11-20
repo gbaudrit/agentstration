@@ -23,6 +23,67 @@ namespace Agentstration.Web.Tests;
 public sealed class ExtensionsConsoleTests
 {
     [TestMethod]
+    [DataRow("en-US", "snapshot")]
+    [DataRow("fr-FR", "instantané")]
+    public async Task ExtensionCatalogSnapshotHasNoGlobalQueryOrPagingAndRetainsCardsOnFailedRefresh(string locale, string help)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        var seed = (await client.GetExtensionInventoryAsync(default))[0];
+        client.InventoryLoader = _ => Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>(Enumerable.Range(0, 26).Select(i => seed with { Key = $"fixture-{i}", RegistrationName = $"fixture-{i}", DisplayName = $"Fixture {i}" }).ToArray());
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions?tab=catalog");
+        var cut = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        cut.WaitForAssertion(() => Assert.HasCount(26, cut.FindAll("[data-testid=extension-inventory-row]")));
+        Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-pager, .collection-actions"));
+        StringAssert.Contains(cut.Markup, help);
+        await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
+        client.InventoryLoader = _ => throw new HttpRequestException("Private transport detail");
+        await cut.Find("[data-testid=extensions-catalog-refresh]").ClickAsync(new());
+        Assert.HasCount(26, cut.FindAll(".collection-card"));
+        Assert.IsFalse(cut.Markup.Contains("Private transport detail", StringComparison.Ordinal));
+        client.InventoryLoader = _ => Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([seed]);
+        await cut.Find("[data-testid=extensions-catalog] [role=alert] button").ClickAsync(new());
+        Assert.HasCount(1, cut.FindAll(".collection-card"));
+    }
+
+    [TestMethod]
+    public async Task ExtensionCatalogContextNotificationClearsMetadataRejectsOldReadAndDenialRemovesCommands()
+    {
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FakeExtensionsClient(false);
+        var seed = (await client.GetExtensionInventoryAsync(default))[0];
+        context.Services.AddSingleton<IExtensionsClient>(client);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
+        context.Services.AddSingleton(new NotificationState());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/extensions?tab=catalog");
+        var cut = context.Render<Agentstration.Web.Components.Pages.Extensions>();
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindAll("[data-testid=extension-inventory-row]")));
+        var old = new TaskCompletionSource<IReadOnlyList<ExtensionInventoryItemResponse>>();
+        var replacement = new TaskCompletionSource<IReadOnlyList<ExtensionInventoryItemResponse>>();
+        var calls = 0;
+        client.InventoryLoader = _ => ++calls == 1 ? old.Task : replacement.Task;
+        var refresh = cut.Find("[data-testid=extensions-catalog-refresh]").ClickAsync(new());
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default));
+        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll("[data-testid=extension-inventory-row]")));
+        replacement.SetResult([seed with { DisplayName = "Replacement" }]);
+        cut.WaitForAssertion(() => StringAssert.Contains(cut.Markup, "Replacement"));
+        old.SetResult([seed with { DisplayName = "Obsolete" }]);
+        await refresh;
+        Assert.IsFalse(cut.Markup.Contains("Obsolete", StringComparison.Ordinal));
+        client.InventoryLoader = _ => throw new AgentstrationApiException("Private denial", "fixture", System.Net.HttpStatusCode.Forbidden);
+        await cut.Find("[data-testid=extensions-catalog-refresh]").ClickAsync(new());
+        Assert.IsEmpty(cut.FindAll("[data-testid=extension-inventory-row], [data-testid=extensions-catalog] header .button-primary"));
+    }
+
+    [TestMethod]
     public async Task DirectEnrollmentNavigationWaitsForPermissionsBeforeLoadingCommands()
     {
         using var culture = new TestCultureScope("en-US");
@@ -843,8 +904,10 @@ public sealed class ExtensionsConsoleTests
             return Task.FromResult<IReadOnlyList<ExtensionResponse>>([Extension()]);
         }
 
+        public Func<CancellationToken, Task<IReadOnlyList<ExtensionInventoryItemResponse>>>? InventoryLoader { get; set; }
         public Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken)
         {
+            if (InventoryLoader is not null) return InventoryLoader(cancellationToken);
             var extension = Extension();
             return Task.FromResult<IReadOnlyList<ExtensionInventoryItemResponse>>([new ExtensionInventoryItemResponse(
                 "registration:default/llama-cpp-local",
@@ -977,7 +1040,7 @@ public sealed class ExtensionsConsoleTests
             Guid.NewGuid(),
             "default",
             "Default workspace",
-            new HashSet<string>([AuthorizationPermissions.ResourcesWrite], StringComparer.Ordinal),
+            new HashSet<string>([AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite], StringComparer.Ordinal),
             []));
     }
 

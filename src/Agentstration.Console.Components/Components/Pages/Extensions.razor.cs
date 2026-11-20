@@ -61,10 +61,6 @@ public partial class Extensions
     private readonly Dictionary<Guid, ResourceScopeRef?> enrollmentScopes = [];
     [Parameter, SupplyParameterFromQuery(Name = "tab")]
     public string? RequestedTab { get; set; }
-    private string search = string.Empty;
-    private string availabilityFilter = string.Empty;
-    private AepEnrollmentState? enrollmentFilter;
-    private string sourceFilter = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string StatusLabel(string status) => T($"Status.{status}");
     private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
@@ -76,21 +72,28 @@ public partial class Extensions
     private int ActiveEnrollmentCount => enrollments?.Count(value => value.Definition.State is AepEnrollmentState.Pending
         or AepEnrollmentState.Unpaired or AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying) ?? 0;
     private int EnabledEnrollmentModeCount => (pairingCodeEnabled ? 1 : 0) + (sharedKeyFileEnabled ? 1 : 0);
-    private IReadOnlyList<ExtensionInventoryItemResponse> FilteredInventory => (inventory ?? [])
-        .Where(value => string.IsNullOrWhiteSpace(search)
-            || value.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || value.ExtensionId.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || (value.RegistrationName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-            || value.Endpoint.AbsoluteUri.Contains(search, StringComparison.OrdinalIgnoreCase))
-        .Where(value => string.IsNullOrWhiteSpace(availabilityFilter)
-            || string.Equals(value.AvailabilityStatus, availabilityFilter, StringComparison.OrdinalIgnoreCase))
-        .Where(value => enrollmentFilter is null || value.EnrollmentStatus == enrollmentFilter)
-        .Where(value => string.IsNullOrWhiteSpace(sourceFilter)
-            || string.Equals(value.RegistrationSource, sourceFilter, StringComparison.OrdinalIgnoreCase))
-        .ToArray();
-    private IReadOnlyList<string> AvailabilityFilters => (inventory ?? []).Select(value => value.AvailabilityStatus).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray();
-    private IReadOnlyList<AepEnrollmentState> EnrollmentFilters => (inventory ?? []).Where(value => value.EnrollmentStatus.HasValue).Select(value => value.EnrollmentStatus!.Value).Distinct().Order().ToArray();
-    private IReadOnlyList<string> SourceFilters => (inventory ?? []).Select(value => value.RegistrationSource).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToArray();
+    private ConsoleContextState? catalogContext;
+    private string? catalogContextKey;
+    private string CurrentCatalogContext => $"{catalogContext?.Current?.UserId:D}|{catalogContext?.Current?.SelectedScopeRef}|{catalogContext?.Current?.TenantId:D}|{catalogContext?.Current?.WorkspaceId:D}";
+    private long catalogRevision;
+    private CancellationTokenSource? catalogPending;
+    private ResourceLoadState catalogLoadState = new(ResourceLoadStatus.Loading);
+    private bool CanRegister => catalogContext?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true;
+
+    private void CatalogContextChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(async () =>
+        {
+            if (disposed) return;
+            inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null;
+            editing = false; form = new(); selectedScope = null; etag = null; pendingDelete = null; migrationPreview = null; pendingUnenrollment = null;
+            activePairingCode = null; activePairingExpiry = null; activePairingUri = null; activeEnrollmentId = null; enrollmentScopes.Clear();
+            catalogContextKey = CurrentCatalogContext;
+            if (!CanAdministerEnrollments && activeTab == ExtensionTab.Enrollments) activeTab = ExtensionTab.Summary;
+            var pending = LoadAsync(); StateHasChanged(); await pending; StateHasChanged();
+        });
+    }
 
     protected override void OnInitialized()
     {
@@ -119,8 +122,14 @@ public partial class Extensions
 
     private async Task InitializeAsync()
     {
-        if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
-            await context.EnsureLoadedAsync(cancellation.Token);
+        catalogContext = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+        if (catalogContext is not null)
+        {
+            await catalogContext.EnsureLoadedAsync(cancellation.Token);
+            if (disposed) return;
+            catalogContext.Changed += CatalogContextChanged;
+        }
+        catalogContextKey = CurrentCatalogContext;
         SelectRequestedTab();
         await LoadAsync();
     }
@@ -139,37 +148,55 @@ public partial class Extensions
 
     private async Task LoadAsync()
     {
-        loading = true;
-        error = null;
+        if (disposed) return;
+        var revision = ++catalogRevision;
+        catalogPending?.Cancel(); catalogPending?.Dispose();
+        catalogPending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
+        var token = catalogPending.Token;
+        var identity = CurrentCatalogContext;
+        loading = true; error = null;
+        if (catalogContext is not null && (catalogContext.Error is not null || !catalogContext.HasPermission(AuthorizationPermissions.ResourcesRead)))
+        {
+            inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null;
+            catalogLoadState = new(catalogContext.Error is null ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed); loading = false; return;
+        }
+        catalogLoadState = new(inventory is null ? ResourceLoadStatus.Loading : ResourceLoadStatus.Refreshing) { HasContent = inventory is not null };
         try
         {
-            var inventoryTask = Client.GetExtensionInventoryAsync(cancellation.Token);
-            var registrationsTask = Client.GetRegistrationsAsync(cancellation.Token);
-            var enrollmentsTask = CanAdministerEnrollments ? Client.GetEnrollmentsAsync(cancellation.Token) : Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
-            var enrollmentSettingsTask = CanAdministerEnrollments
-                ? GetEnrollmentSettingsAsync()
-                : Task.FromResult<AepEnrollmentSettingsSnapshot?>(null);
+            var inventoryTask = Client.GetExtensionInventoryAsync(token);
+            var registrationsTask = Client.GetRegistrationsAsync(token);
+            var enrollmentsTask = CanAdministerEnrollments ? Client.GetEnrollmentsAsync(token) : Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
+            var enrollmentSettingsTask = CanAdministerEnrollments ? GetEnrollmentSettingsAsync(token) : Task.FromResult<AepEnrollmentSettingsSnapshot?>(null);
             var sourceProvidersClient = Services.GetService(typeof(ISourceProvidersClient)) as ISourceProvidersClient;
-            var sourceProvidersTask = sourceProvidersClient?.GetSourceProvidersAsync(cancellation.Token)
-                ?? Task.FromResult<IReadOnlyList<SourceProviderSummaryResponse>>([]);
+            var sourceProvidersTask = OptionalSourceProvidersAsync(sourceProvidersClient, token);
             await Task.WhenAll(inventoryTask, registrationsTask, enrollmentsTask, enrollmentSettingsTask, sourceProvidersTask);
-            inventory = await inventoryTask;
-            registrations = await registrationsTask;
-            enrollments = await enrollmentsTask;
-            enrollmentSettings = await enrollmentSettingsTask;
-            sourceProviders = await sourceProvidersTask;
-            if (enrollmentSettings is { } settings)
-            {
-                pairingCodeEnabled = settings.PairingCodeEnabled;
-                sharedKeyFileEnabled = settings.SharedKeyFileEnabled;
-            }
+            if (!IsCurrentCatalog(revision, identity)) return;
+            inventory = await inventoryTask; registrations = await registrationsTask; enrollments = await enrollmentsTask;
+            enrollmentSettings = await enrollmentSettingsTask; sourceProviders = await sourceProvidersTask;
+            if (enrollmentSettings is { } settings) { pairingCodeEnabled = settings.PairingCodeEnabled; sharedKeyFileEnabled = settings.SharedKeyFileEnabled; }
+            catalogLoadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or OperationCanceledException)
+        {
+            if (!IsCurrentCatalog(revision, identity)) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode : (exception as HttpRequestException)?.StatusCode;
+            var forbidden = status is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized;
+            if (forbidden) { inventory = null; registrations = null; enrollments = null; sourceProviders = []; enrollmentSettings = null; }
+            catalogLoadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed) { HasContent = inventory is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+            if (activeTab != ExtensionTab.Catalog) error = exception as AgentstrationApiException;
+        }
+        finally { if (IsCurrentCatalog(revision, identity)) loading = false; }
+    }
+    private bool IsCurrentCatalog(long revision, string identity) => !disposed && revision == catalogRevision && identity == CurrentCatalogContext;
+    private static async Task<IReadOnlyList<SourceProviderSummaryResponse>> OptionalSourceProvidersAsync(ISourceProvidersClient? client, CancellationToken token)
+    {
+        try { return client is null ? [] : await client.GetSourceProvidersAsync(token); }
+        catch (Exception error) when (error is AgentstrationApiException or HttpRequestException) { return []; }
     }
 
-    private async Task<AepEnrollmentSettingsSnapshot?> GetEnrollmentSettingsAsync() =>
-        await Client.GetEnrollmentSettingsAsync(cancellation.Token);
+    private async Task<AepEnrollmentSettingsSnapshot?> GetEnrollmentSettingsAsync(CancellationToken token) =>
+        await Client.GetEnrollmentSettingsAsync(token);
 
     private async Task SaveEnrollmentSettingsAsync()
     {
@@ -395,6 +422,7 @@ public partial class Extensions
 
     private void StartCreate()
     {
+        if (!CanRegister || inventory is null) return;
         activeTab = ExtensionTab.Catalog;
         form = new();
         selectedScope = null;
@@ -591,6 +619,8 @@ public partial class Extensions
     public void Dispose()
     {
         disposed = true;
+        if (catalogContext is not null) catalogContext.Changed -= CatalogContextChanged;
+        catalogRevision++; catalogPending?.Cancel(); catalogPending?.Dispose();
         cancellation.Cancel();
         cancellation.Dispose();
         GC.SuppressFinalize(this);

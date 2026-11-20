@@ -57,7 +57,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `DataSourceProfiles.razor` | `/data-source-profiles` | Adopted in this batch |
 | `DataSources.razor` | `/data-sources` | Adopted |
 | `Deployments.razor` | `/agent-instances`, `/deployments` | Adopted |
-| `Extensions.razor` | `/extensions` | Remaining; requires individual contract review |
+| `Extensions.razor` | `/extensions` | Catalog adopted; bounded composite snapshot, no global query/pager. Existing operational destinations/forms retained. [Evidence](evidence/list-layout/extensions/README.md) |
 | `Flows.razor` | `/flows` | Protected pilot |
 | `KnowledgeSources.razor` | `/knowledge-sources` | Adopted |
 | `ModelProfiles.razor` | `/modelprofiles` | Adopted |
