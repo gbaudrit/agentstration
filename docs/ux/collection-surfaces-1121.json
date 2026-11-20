@@ -3608,6 +3608,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "482a1e7037b202dd5ba8c620d82ed30277d9b039"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-specialized-explorer-and-embedded-inventory",
+        "reason": "Primary accessible ownership tree selects a scope; resource list is the selected-node detail, not a standalone resource catalog.",
+        "review": "evidence/list-layout/resource-scopes/README.md",
+        "uiChanged": false
       }
     },
     {
@@ -7387,6 +7393,12 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "482a1e7037b202dd5ba8c620d82ed30277d9b039"
+      },
+      "listLayoutDisposition": {
+        "decision": "retain-specialized-explorer-and-embedded-inventory",
+        "reason": "Primary accessible ownership tree selects a scope; resource list is the selected-node detail, not a standalone resource catalog.",
+        "review": "evidence/list-layout/resource-scopes/README.md",
+        "uiChanged": false
       }
     },
     {

@@ -68,7 +68,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `Packs.razor` | `/packs` | Adopted; complete visible catalog, exact local pages, scoped inspection; dialogs/projects preserved. [Evidence](evidence/list-layout/packs/README.md) |
 | `Parameters.razor` | `/parameters` | Adopted |
 | `ResourcePlans.razor` | `/resource-plans` | Adopted |
-| `ResourceScopes.razor` | `/settings/resource-scopes` | Remaining; requires individual contract review |
+| `ResourceScopes.razor` | `/settings/resource-scopes` | Reviewed outside top-level migration: ownership-tree explorer with selected-node embedded inventory, retained. [Contract review](evidence/list-layout/resource-scopes/README.md) |
 | `RuntimeProfiles.razor` | `/runtimeprofiles` | Adopted in this batch |
 | `RuntimeWorkers.razor` | `/settings/runtime-workers` | Adopted |
 | `Schemas.razor` | `/schemas` | Adopted |
