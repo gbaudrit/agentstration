@@ -257,4 +257,5 @@
   <data name="Type.Value" xml:space="preserve"><value>Valeur</value></data>
   <data name="DescendantUsePolicy" xml:space="preserve"><value>Politique d’utilisation descendante</value></data>
   <data name="Availability.Unknown" xml:space="preserve"><value>Non observée</value></data>
+  <data name="Type.Browse" xml:space="preserve"><value>Types de stockage</value></data>
 </root>

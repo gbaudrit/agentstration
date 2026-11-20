@@ -1,7 +1,0 @@
-summary { overflow-wrap: anywhere; cursor: pointer; padding-block: .75rem; }
-.toolbar { flex-wrap: wrap; }
-
-.storage-type-catalog-identity { display: inline-flex; max-width: calc(100% - 1.5rem); vertical-align: middle; }
-
-.form-section { grid-template-columns: minmax(0, 1fr); }
-.form-section, details, summary { min-width: 0; }

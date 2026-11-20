@@ -27,13 +27,17 @@ public sealed class StorageCollectionTests
         var cut = context.Render<Storages>();
         Assert.AreEqual(1, handler.Requests.Count);
         StringAssert.Contains(handler.Requests[0].Query, "scopeRef=%2Finstance&skip=0&take=20");
-        Assert.AreEqual(1, handler.TypeRequests);
+        Assert.AreEqual(0, handler.TypeRequests);
+        var typeNavigation = cut.Find("[data-testid=storages-page] header [data-testid=storage-types-manage]");
+        Assert.AreEqual(culture == "fr-FR" ? "Types de stockage" : "Storage types", typeNavigation.TextContent);
+        StringAssert.Contains(typeNavigation.GetAttribute("href")!, "/storage-types");
+        Assert.IsEmpty(cut.FindAll("[data-testid=storage-type-evidence], .management-links, section.panel"));
         Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-page-number, .collection-pager [role=status]"));
         await cut.FindAll(".collection-view-switch button")[1].ClickAsync(new());
         Assert.AreEqual(1, handler.Requests.Count);
         await cut.Find(".collection-pager button:last-child").ClickAsync(new());
         Assert.AreEqual(2, handler.Requests.Count);
-        Assert.AreEqual(1, handler.TypeRequests);
+        Assert.AreEqual(0, handler.TypeRequests);
         StringAssert.Contains(handler.Requests[1].Query, "skip=20&take=20");
         Assert.HasCount(1, cut.FindAll(".collection-card"));
         StringAssert.Contains(cut.Find(".resource-name-link").GetAttribute("href")!, "/storages/second?scopeRef=%2Finstance&namespace=catalog");
@@ -91,7 +95,7 @@ public sealed class StorageCollectionTests
         await next;
         StringAssert.Contains(cut.Find(".resource-name-link").TextContent, "replacement");
         await cut.Find("[data-testid=storages-page-refresh]").ClickAsync(new());
-        Assert.IsEmpty(cut.FindAll(".resource-name-link, .collection-pager, [data-testid=storage-create], [data-testid=storage-type-evidence]"));
+        Assert.IsEmpty(cut.FindAll(".resource-name-link, .collection-pager, [data-testid=storage-create], [data-testid=storage-types-manage]"));
     }
 
     [TestMethod]

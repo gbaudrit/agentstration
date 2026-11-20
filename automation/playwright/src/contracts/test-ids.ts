@@ -28,6 +28,7 @@ export const TestIds = {
     bindingLiteral: 'connected-service-binding-literal', bindingTarget: 'connected-service-binding-target',
   },
   connectedStorageCollections: {
+    storageTypesManage: 'storage-types-manage',
     storageRow: 'storage-row', storageName: 'storage-name-link',
     storageTypeRow: 'storage-type-row', storageTypeName: 'storage-type-name-link',
     serviceRow: 'connected-service-row', serviceName: 'connected-service-name-link',

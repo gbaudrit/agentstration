@@ -5640,10 +5640,11 @@
         "issue": 1241,
         "template": "ResourceCollectionTemplate",
         "dataContract": "Primary Storage list reads one bounded skip/take server page through a new family client method. Unknown total; previous/next and 20/50/100 sizes. No page-local search/filter controls or fetch-all Storage pagination.",
-        "supplementaryCatalog": "Existing full type-contract evidence catalog and related journey links retained after the primary collection. Type evidence loads initially/on refresh and is reused across page navigation; no new API or local type pagination introduced.",
+        "supplementaryCatalog": "Removed by user request. A secondary header button opens /storage-types with current navigation context; the list makes no type-catalog request.",
         "identity": "Exact qualified Storage/type links preserve context; type/version and availability/scope/governance markers retained. No content/configuration/Secret values displayed.",
-        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards including supplementary type evidence.",
-        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md."
+        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards.",
+        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md.",
+        "headerReview": "evidence/list-layout/storages/header-review/README.md"
       }
     },
     {
@@ -16096,39 +16097,6 @@
       }
     },
     {
-      "id": "storages-type-version-evidence",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "host": "console",
-      "routes": [
-        "/storages"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
-      "validation": "source-reviewed-current-validation-pending",
-      "discoveredDuring": "2026-11-18 main synchronization #1174",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
-        "routeEvidence": [],
-        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
-        "currentPopulatedEvidence": {
-          "specification": "tests/connected-storage-collection.spec.ts",
-          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
-          "variants": [
-            "en-US/dark/desktop",
-            "fr-FR/light/mobile/touch"
-          ],
-          "gallery": "evidence/1121/main-sync-1181/README.md"
-        }
-      },
-      "compactAdoption": {
-        "decision": "native-domain-presentation",
-        "implementationPR": 1174,
-        "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      }
-    },
-    {
       "id": "storage-documents-collection-choices",
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
       "host": "console",
@@ -18298,6 +18266,44 @@
       "unmountedLegacy": 4,
       "activeCollections": 346,
       "auditedRepeatedItemSources": 147
+    }
+  ],
+  "retiredSurfaces": [
+    {
+      "reason": "User requested removing the supplementary Storage type panel from /storages; header navigation now opens /storage-types. Historical entry retained as evidence only.",
+      "surface": {
+        "id": "storages-type-version-evidence",
+        "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+        "host": "console",
+        "routes": [
+          "/storages"
+        ],
+        "renderer": "native-specialized",
+        "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+        "validation": "source-reviewed-current-validation-pending",
+        "discoveredDuring": "2026-11-18 main synchronization #1174",
+        "verification": {
+          "sourceReviewed": true,
+          "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+          "routeEvidence": [],
+          "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
+          "currentPopulatedEvidence": {
+            "specification": "tests/connected-storage-collection.spec.ts",
+            "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+            "variants": [
+              "en-US/dark/desktop",
+              "fr-FR/light/mobile/touch"
+            ],
+            "gallery": "evidence/1121/main-sync-1181/README.md"
+          }
+        },
+        "compactAdoption": {
+          "decision": "native-domain-presentation",
+          "implementationPR": 1174,
+          "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+          "evidenceStatus": "Fresh validation pending final merged source."
+        }
+      }
     }
   ]
 }
