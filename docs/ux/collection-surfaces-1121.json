@@ -18749,6 +18749,11 @@
       "reason": "Configured creation-step navigation and its content panes, not functional resource datasets. Screen-owned fields and collections keep their own adapters and existing inventory entries."
     },
     {
+      "source": "src/Agentstration.Web.Components/StepProgress.razor",
+      "classification": "non-collection-control",
+      "reason": "Configured progress-step navigation synchronized with a selected content panel; steps are process controls, not independently owned functional datasets. Domain content and collections remain host-owned."
+    },
+    {
       "source": "src/Agentstration.Web.Components/ResourceNavigation.razor",
       "classification": "non-collection-control",
       "reason": "Configured resource-local primary/child navigation entries duplicated into a modal drawer, not functional resource datasets; resource content and collections remain screen-owned."

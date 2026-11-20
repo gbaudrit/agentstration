@@ -47,3 +47,7 @@ it does not start the deferred native reusable Bootstrap scenario #1251.
 Main published ADR-0238 for fragment navigation. The branch's automatic
 enrollment decision moves to [ADR-0245](../../../../../decisions/0245-bootstrap-policies-assign-shared-key-extensions.md)
 without a policy change; both decisions remain indexed independently.
+
+The shared coverage inventories now declare `/startup/progress` as planned under
+#1251 and classify StepProgress step navigation as a process control. The seven
+route and collection inventory guards passed without weakening their assertions.
