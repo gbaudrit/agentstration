@@ -4,6 +4,10 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { test } from '../src/fixtures/test.js';
 
+// Cases open independent creation forms and configure their own appearance.
+// Permit test-level sharding while each CI job still uses a single worker.
+test.describe.configure({ mode: 'parallel' });
+
 for (const definition of SharedFormCases) {
   for (const locale of ['en-US', 'fr-FR'] as const) {
     for (const theme of ['light', 'dark'] as const) {
