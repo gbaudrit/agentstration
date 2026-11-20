@@ -46,17 +46,15 @@
         new("tools", T("Tools"), provider => @<span>@provider.Definition.Discovery.ToolCount</span>)
         {
             Filters = [new("tools", T("Tools"), CollectionFilterKind.Number) { Advanced = true }]
-        },
-        new("enabled", T("Enabled"), provider => @<span>@BooleanLabel(provider.Definition.Enabled)</span>)
-        {
-            Filters = [new("enabled", T("Enabled"), CollectionFilterKind.Choice)
-            {
-                Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))]
-            }]
         }
+
     ];
     private IReadOnlyList<CollectionFilter> ExtraFilters =>
     [
+        new("enabled", T("Enabled"), CollectionFilterKind.Choice)
+        {
+            Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))]
+        },
         new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
         {
             Options = (providers ?? []).Select(provider => provider.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()

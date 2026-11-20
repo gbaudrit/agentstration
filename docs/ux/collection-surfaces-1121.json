@@ -814,8 +814,7 @@
       "actions": false,
       "informationKeys": [
         "Type",
-        "Tools",
-        "Enabled"
+        "Tools"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -889,6 +888,10 @@
         "states": "Compatible refresh retains rows and view. Superseded/foreign-context responses are rejected; context replacement and denied access clear caches. Unknown discovery statuses remain neutral.",
         "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
         "validation": "ToolProviderCollectionTests; current deterministic desktop/mobile smoke, source proof and limits in list-layout-adoption.md."
+      },
+      "columnsReview": {
+        "change": "Enabled information column removed; identity, provider type and tool count retained. Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tool-providers/columns-review/README.md"
       }
     },
     {
