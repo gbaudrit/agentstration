@@ -51,3 +51,11 @@ without a policy change; both decisions remain indexed independently.
 The shared coverage inventories now declare `/startup/progress` as planned under
 #1251 and classify StepProgress step navigation as a process control. The seven
 route and collection inventory guards passed without weakening their assertions.
+
+The broad browser campaign also exposed navigation teardown races: FlowCanvas
+could attach wheel events after its element disappeared, and shell module
+cleanup could receive cancellation after the browser circuit closed. Canvas
+initialization now belongs to its component lifetime, late registrations are
+released, detached canvases ignore wheel callbacks, and canceled shell cleanup
+remains safe. Controlled component regressions and native JavaScript checks
+cover delayed initialization, canceled disposal, normal zoom and frame cleanup.
