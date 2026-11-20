@@ -1,7 +1,8 @@
 namespace Agentstration.Web.Components.State;
 
 public sealed record ConsoleContextSwitchRequest(
-    Uri Location, string CurrentScopeRef, string TargetScopeRef, string FallbackLocation);
+    Uri Location, string CurrentScopeRef, string TargetScopeRef, string FallbackLocation,
+    string? ResourceOwnerScopeRef = null, bool ResourcePage = false);
 
 public sealed record ConsoleContextSwitchDestination(string Location, bool ResourceUnavailable = false);
 

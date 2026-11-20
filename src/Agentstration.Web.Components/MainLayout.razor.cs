@@ -114,7 +114,7 @@ public partial class MainLayout
     private bool themeReady;
     private bool contextSelectorOpen;
     private bool switchingContext;
-    private (string Source, string Target, bool ResourceUnavailable)? pendingContextSwitch;
+    private (string Source, string Target, string Fallback, ConsoleResourceLocation? Resource, bool ResourceUnavailable)? pendingContextSwitch;
     private string? unavailableContextReturn;
     private string contextQuery = string.Empty;
     private int selectedCommandIndex;
@@ -201,6 +201,8 @@ public partial class MainLayout
         Notifications.Changed += StateHasChanged;
         PlatformStatus.Changed += OnPlatformStatusChanged;
         ContextState.Changed += OnContextChanged;
+        ResourceNavigationState.Changed += OnResourceNavigationChanged;
+        ResourceNavigationState.ResourceUnavailable += OnResourceUnavailable;
         NavigationManager.LocationChanged += OnLocationChanged;
         await Task.WhenAll(
             ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token),
@@ -345,24 +347,37 @@ public partial class MainLayout
 
     private async Task SelectContextAsync(ConsoleContextOption option)
     {
-        if (switchingContext || ContextState.IsLoading || !ContextMatchesLocation
+        if (switchingContext || ContextState.IsLoading || ResourceNavigationState.IsLoading || !ContextMatchesLocation
             || ContextState.Current is not { } current || option.ScopeRef == current.SelectedScopeRef) return;
         var source = NavigationManager.Uri;
         switchingContext = true;
         try
         {
-            var path = new Uri(source).AbsolutePath;
+            var sourceUri = new Uri(source);
+            var resource = ResourceNavigationState.GetCurrent(sourceUri, current.SelectedScopeRef);
+            var path = sourceUri.AbsolutePath;
             var collection = NavigationGroups.SelectMany(group => group.Items)
                 .Where(item => item.Url == path || item.Url != "/" && path.StartsWith(item.Url + "/", StringComparison.Ordinal))
                 .OrderByDescending(item => item.Url.Length)
                 .FirstOrDefault()?.Url ?? "/";
             var fallback = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(collection, "context", option.ScopeRef);
+            if (resource?.CollectionLocation is { } declaredCollection)
+            {
+                var location = NavigationManager.ToAbsoluteUri(declaredCollection);
+                if (location.Scheme == sourceUri.Scheme && location.Authority == sourceUri.Authority
+                    && location.AbsolutePath != sourceUri.AbsolutePath)
+                {
+                    var parameters = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(location.Query);
+                    parameters["context"] = option.ScopeRef;
+                    fallback = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(location.GetLeftPart(UriPartial.Path), parameters);
+                }
+            }
             var destination = await ContextSwitchResolver.ResolveAsync(
-                new(new Uri(source), current.SelectedScopeRef, option.ScopeRef, fallback), lifetimeCancellation.Token);
+                new(sourceUri, current.SelectedScopeRef, option.ScopeRef, fallback, resource?.OwnerScopeRef, ResourceNavigationState.HasFrame), lifetimeCancellation.Token);
             if (source != NavigationManager.Uri) return;
             contextSelectorOpen = false;
             contextQuery = string.Empty;
-            pendingContextSwitch = (source, NavigationManager.ToAbsoluteUri(destination.Location).AbsoluteUri, destination.ResourceUnavailable);
+            pendingContextSwitch = (source, NavigationManager.ToAbsoluteUri(destination.Location).AbsoluteUri, fallback, resource, destination.ResourceUnavailable);
             // The existing navigation guard owns all drafts, including Access and hidden editors.
             NavigationManager.NavigateTo(destination.Location);
         }
@@ -397,6 +412,9 @@ public partial class MainLayout
         if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         unavailableContextReturn = pendingContextSwitch is { } pending && pending.Target == args.Location && pending.ResourceUnavailable
             ? pending.Source : null;
+        if (pendingContextSwitch is { } accepted && accepted.Target == args.Location)
+            ResourceNavigationState.BeginSwitch(new Uri(accepted.Source), new Uri(accepted.Target), accepted.Fallback, accepted.Resource);
+        else ResourceNavigationState.LocationChanged(new Uri(args.Location));
         pendingContextSwitch = null;
         var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
         if (requestedContext is not null
@@ -429,6 +447,15 @@ public partial class MainLayout
             platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         _ = InvokeAsync(StateHasChanged);
     }
+    private void OnResourceNavigationChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnResourceUnavailable(ConsoleResourceSwitchFailure failure) => _ = InvokeAsync(async () =>
+    {
+        await Task.Yield();
+        if (!ConsoleResourceNavigationState.SameLocation(failure.Target, new Uri(NavigationManager.Uri))) return;
+        var destination = NavigationManager.ToAbsoluteUri(failure.FallbackLocation).AbsoluteUri;
+        pendingContextSwitch = (failure.SourceLocation, destination, failure.FallbackLocation, null, true);
+        NavigationManager.NavigateTo(destination, replace: true);
+    });
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
@@ -438,6 +465,8 @@ public partial class MainLayout
         Notifications.Changed -= StateHasChanged;
         PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
+        ResourceNavigationState.Changed -= OnResourceNavigationChanged;
+        ResourceNavigationState.ResourceUnavailable -= OnResourceUnavailable;
         NavigationManager.LocationChanged -= OnLocationChanged;
         locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();

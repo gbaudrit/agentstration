@@ -1,0 +1,34 @@
+{
+  "parentRevision": "7ba891adf3e7e775f95c73dba2f8db038379e7f4",
+  "parentComponentSuite": {
+    "total": 1552,
+    "passed": 1536,
+    "failed": 16
+  },
+  "reproducedOnParent": [
+    "AcquisitionToolUsesSavedRecipeAndSelectsOnePublishableArtifact (True)",
+    "CommonFrameKeepsSavedIdentityLabelsAndTheExactFormDeclarations (\"en-US\")",
+    "CommonFrameKeepsSavedIdentityLabelsAndTheExactFormDeclarations (\"fr-FR\")",
+    "ConversationListReturnsToThePersistedGenericInteraction",
+    "DetailUsesResourceNavigationAndYamlContainsReferencesWithoutConnectionValues",
+    "InheritedServiceActivationIsDisabled",
+    "SavedIdentityAndLabelsFollowMetricsAndUseTheCommonRetainedForm (\"en-US\",\"Identity\")",
+    "SavedIdentityAndLabelsFollowMetricsAndUseTheCommonRetainedForm (\"fr-FR\",\"Identit\u00e9\")",
+    "SavedOverviewDoesNotLeakDraftAndSectionsRetainTheFormAndExactUpdate (\"en-US\",\"Identity\")",
+    "SavedOverviewDoesNotLeakDraftAndSectionsRetainTheFormAndExactUpdate (\"fr-FR\",\"Identit\u00e9\")",
+    "ServiceDetailsKeepEditsMadeWhileARefreshIsPending",
+    "SharedCreatorRefreshesOptionsAndSavesItsNewExactReference",
+    "StagedRefreshKeepsInputTypedWhileTheReadIsPending",
+    "StorageKeepsEditsMadeDuringRefreshAndDoesNotLockTheFields",
+    "TypeDetailsShareTheFormStateAndRetainInvalidFieldsAndOriginalEtagUntilDiscard",
+    "TypeRefreshEvaluatesDraftsWhenTheResponseArrivesAndKeepsTheFieldsEditable"
+  ],
+  "additionalPreviouslyReproducedOn82206267": [
+    "LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows"
+  ],
+  "currentFastSuite": {
+    "total": 2550,
+    "passed": 2533,
+    "failed": 17
+  }
+}

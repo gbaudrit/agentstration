@@ -1,77 +1,78 @@
 # POC — Changer de périmètre en conservant sa position
 
-Base : branche `codex/ux-corrections`, commit `82206267`. Les captures correspondent au POC ajouté à cette base, exécuté sur le véritable hôte Console avec les fixtures déterministes existantes. Aucun modèle distant n’est appelé par les vérifications de navigation.
+La branche `codex/poc-context-switch` part de `82206267` sur `codex/ux-corrections`, puis intègre `7ba891ad`. La PR #1256 et la FR #1254 suivent ce POC ; le parcours réutilisable reste différé dans le sous-ticket natif #1255.
 
-## Comportement livré
+## Mécanisme commun aux ressources
 
-- Une page de liste présente dans la navigation principale reste ouverte dans le périmètre cible. Les résultats, droits et états locaux sont rechargés ; la pagination repart de la première page.
-- Les fiches Agent `/agents/{Name}` et `/namespaces/{Namespace}/agents/{Name}` conservent le chemin, le namespace, le propriétaire exact et l’ancre si la même ressource est accessible dans le périmètre cible. Les liens anciens sans propriétaire sont résolus dans le contexte source avant de changer de contexte.
-- Une fiche héritée devient en lecture seule selon les droits existants. Une section devenue inaccessible, comme `#access`, utilise le repli existant vers `#overview` avec son message explicite.
-- Un Agent absent, inaccessible ou remplacé par une autre identité conduit à `/agents?context=…`, avec un message et un lien vers la fiche et le contexte précédents. Un Agent homonyme dans le Workspace cible n’est jamais ouvert à sa place.
-- Le contexte cible est validé séparément de la ressource. Une erreur réseau, serveur, d’authentification ou un contexte refusé laisse la navigation source intacte et produit une notification d’échec ; elle ne devient pas un état « ressource absente ».
-- Le changement passe par `NavigationManager.NavigateTo`. Le garde existant protège les brouillons de définition, YAML, accès et éditeurs masqués. Annuler conserve la page et les saisies ; confirmer abandonne le brouillon avant de charger le nouveau contexte.
-- Le corps de page est démonté pendant le chargement d’un contexte différent. Il est recréé avec la nouvelle identité de contexte, afin de ne pas montrer les données et éditeurs du contexte précédent. Les autres onglets restent indépendants.
+Le switch conserve le chemin, le namespace, les paramètres utiles et l’ancre, puis change le `context` administratif. Il n’existe plus de liste de types pris en charge dans le résolveur, ni de lecture préalable de la ressource par celui-ci. La validation du contexte cible reste distincte, avant d’abandonner une saisie.
 
-La résolution utilise les clients et les endpoints existants, avec `X-Agentstration-Context` explicite sur chaque lecture. Elle ne change aucun cookie de contexte et ne modifie aucune ressource. Le serveur reste responsable de l’autorisation et vérifie à nouveau l’accès au chargement effectif de la fiche.
+`ConsoleResourceDetailsTemplate` enregistre l’identité **déjà chargée** : UID, propriétaire réel, namespace, kind et nom technique. Le switch épingle ce propriétaire dans `scopeRef`, y compris pour les anciens liens sans propriétaire explicite. Il ne remplace jamais le propriétaire par le contexte cible ou par le périmètre présenté visuellement. Le sélecteur attend l’identité d’une fiche en cours de chargement ; une propriété non résolue n’est pas déduite du contexte cible.
 
-## Limites du POC
+La page cible utilise ses lectures et contrôles d’accès habituels. Le composant commun observe leur résultat :
 
-La conservation d’une **fiche** est volontairement limitée aux Agents. Les autres fiches, les écrans de création et les sous-routes spécialisées reviennent à la destination correspondante de la navigation principale, ou à l’accueil si aucune correspondance n’existe. Cela évite de réinterpréter leurs identifiants dans un autre Workspace. Les sous-listes absentes de la navigation principale ne disposent pas encore d’une déclaration dédiée.
+- même identité autorisée : la fiche et son ancre restent ouvertes ; les droits de lecture seule, actions et sections sont recalculés par les règles existantes ;
+- section devenue indisponible, comme Accès sur une ressource héritée : le composant de navigation choisit la section autorisée et affiche son retour explicite ;
+- ressource absente ou interdite, ou identité remplacée : le cadre ne rend pas son contenu et revient à la liste, avec un message et un lien vers la fiche et le contexte précédents ; un homonyme du Workspace peut apparaître dans la liste mais n’est pas ouvert à la place de l’original ;
+- erreur technique de chargement : l’état d’erreur et la commande de nouvel essai de la page restent applicables ; l’erreur ne devient pas une absence de ressource ;
+- navigation plus récente : une réponse tardive de l’ancienne fiche ne déclenche pas de repli sur la nouvelle page.
 
-Le POC conserve la page et sa section ; il ne promet pas une position de défilement identique. Il ne transporte pas les brouillons entre périmètres. Le message de repli appartient au circuit courant, sans persistance après un rechargement complet du document. Si les droits ou la ressource changent entre la vérification préalable et le chargement final, les états bloquants existants de la fiche restent applicables.
+Le mécanisme est partagé par les écrans utilisant le template Console. Chaque famille conserve la responsabilité de ses API, de son chargement et de son autorisation. Le support d’une nouvelle famille ne demande aucun cas supplémentaire dans le switch.
 
-## Vérifications
+## Navigation, brouillons et contexte
 
-Les 18 cas .NET du POC couvrent la résolution de destination, les identités exactes, les homonymes/remplacements, les erreurs attendues et techniques, la protection des brouillons sans barre visible, le retrait du contenu pendant le chargement et les réponses tardives.
+La navigation passe par Blazor et par le garde existant pour les brouillons de définition, YAML, accès et éditeurs masqués. Annuler conserve la page, le contexte et les saisies. Confirmer abandonne le brouillon avant de charger le contexte cible ; aucun brouillon n’est transféré entre périmètres.
 
-Le smoke ponctuel [smoke.mts](smoke.mts) réutilise les fixtures et les page objects existants. Il vérifie sur Chromium réel : conservation de la fiche/ancre et lecture seule, historique sans rechargement, section inaccessible, homonyme présent dans la liste cible, indépendance d’un autre onglet, retour explicite, annulation/confirmation d’un brouillon, français mobile et absence de débordement horizontal ou d’exception navigateur. Résultats : [verification.json](verification.json).
+Le corps de page est retiré pendant le remplacement du contexte et recréé pour le contexte validé. Les API reçoivent le `X-Agentstration-Context` de l’URL. Aucun cookie de contexte n’est modifié ; les autres onglets restent indépendants. Les pages sans identité de ressource conservent également leur emplacement et rechargent leur état. Le POC ne promet pas la position exacte de défilement ni la persistance des notifications après un rechargement complet.
 
-Ce script est une preuve ponctuelle du POC, pas un nouveau parcours réutilisable du catalogue UX. La généralisation et un éventuel parcours catalogué devront suivre le suivi et la validation UX prévus par le dépôt.
+## Correctifs issus des essais
 
-Pour reproduire depuis la racine après installation des dépendances et compilation Release de la solution :
+### Vue d’ensemble
+
+Le défaut conservait les mêmes compteurs après Workspace → Instance alors que les API renvoyaient des valeurs différentes. Le chargement partagé du tableau de bord était conservé pendant toute la durée du circuit Blazor. Il est désormais associé au snapshot de contexte validé. Un retour à un contexte lance une nouvelle lecture ; les tuiles et l’état de santé du menu partagent cette lecture. L’état de santé est réinitialisé pendant son chargement et ignore les succès ou erreurs tardifs d’un contexte précédent.
+
+Le smoke observe 4 Flows en Workspace puis 14 en Instance. Après une autorisation de découverte avec propagation, le retour en Workspace affiche 5, puis l’Instance revient à 14. Les compteurs Agents/Flows sont comparés à l’API à chaque étape, sur bureau et mobile, avec historique et ouverture d’un Flow éditable depuis la tuile, sans F5.
+
+### Accès aux Flows
+
+L’écran envoyait la chaîne littérale `PublishedVersion` au lieu de la valeur calculée, ce qui provoquait `422 resource_identity_stale`. La liaison Razor est corrigée, sans assouplir l’autorisation ou la validation d’identité serveur. Les cas brouillon et publié sont vérifiés.
+
+La synchronisation avec la branche mère conserve ses nouveaux en-têtes et exports complets de ressources. Le Designer de version publiée conserve séparément son source YAML de graphe, vérifié par un test de lecture et de désérialisation.
+
+### Langue
+
+Le changement involontaire vers l’anglais n’est pas reproduit en langue automatique sur Chromium, ni sous AppHost en HTTP/HTTPS sur les ports 5100/7100. Le mainteneur indique qu’il peut s’agir d’une fausse alerte. Aucun comportement de langue n’est modifié.
+
+## Preuves exécutables
+
+Ces scripts sont des smokes ponctuels, pas les nouveaux parcours réutilisables du catalogue UX :
+
+- [Ressources de plusieurs familles](resource-switch-smoke.mts) : Agent, Flow et ModelProfile restent ouverts dans un Workspace avec le propriétaire Instance épinglé ; lecture seule, accès Discover seul, repli de section, retour au propriétaire, ressource révoquée, homonyme distinct, retour explicite et Flow mobile. [Résultats](resource-switch-verification.json).
+- [Vue d’ensemble](overview-smoke.mts) : compteurs, API, aller-retour, visibilité modifiée, historique et Flow éditable sur bureau/mobile. [Résultats](overview-verification.json).
+- [Brouillon Flow et sauvegarde des accès](flow-access-smoke.mts) : parcours de création puis Discover/Use avec descendants, relecture de la politique, français et anglais automatiques. [Résultats](flow-access-verification.json).
+- [Navigation Agent et brouillons](smoke.mts) : identité exacte/ancre, lecture seule, historique, section interdite, homonyme, autre onglet, retour, annulation/confirmation, français mobile et absence d’exception/débordement. [Résultats](verification.json).
+
+Depuis la racine, avec les dépendances installées et la solution compilée en Release :
 
 ```sh
 AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true \
 AGENTSTRATION_CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 node --import ./automation/playwright/node_modules/tsx/dist/esm/index.mjs \
-  docs/ux/evidence/context-switch-poc/smoke.mts
+  docs/ux/evidence/context-switch-poc/resource-switch-smoke.mts
 ```
 
-Le SDK .NET du dépôt doit être dans `PATH`. Le script démarre puis arrête ses propres hôtes et données locales. Il réécrit ses quatre captures et son fichier de résultats dans ce dossier.
+Le SDK .NET du dépôt doit être dans `PATH`. Remplacer le nom du script pour exécuter un autre smoke. Chaque script démarre et arrête ses propres hôtes et données locales ; aucun modèle distant n’est appelé.
 
-## Validation technique exécutée
+## Validation technique
 
-- Solution complète, compilation Release : réussite, aucun avertissement ni erreur.
-- 18 cas .NET du POC, 2 cas de régression Flow et 5 cas de régression pour la vue d’ensemble et l’état de santé : réussite. Les vérifications ciblées Dashboard/Overview (13 cas) et MainLayout/navigation/état de santé (23 cas) passent intégralement. Les 5 nouveaux cas échouent avant le correctif, puis passent après celui-ci.
-- Dernière suite Fast après correction de la vue d’ensemble : 2 493 cas, 2 491 réussites et 2 échecs préexistants (`ConversationListReturnsToThePersistedGenericInteraction` et `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows`). Les deux sont déjà reproduits dans un checkout isolé de `82206267` (1 527 cas, 1 525 réussites et ces 2 échecs). L’échec Artifact intermittent de la campagne précédente n’apparaît pas dans cette exécution.
-- Suite Integration réexécutée après correction de la vue d’ensemble : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés sans fournisseurs réels/PostgreSQL configurés.
-- Tests JavaScript des composants : 17 réussites. Compilation TypeScript : réussite. Catalogues de localisation anglais/français : XML valide, aucune clé dupliquée et clés symétriques.
-- Smoke ponctuel du POC : les huit vérifications de `verification.json` passent, avec les quatre captures ci-dessous.
-- Régressions navigateur ciblées : 11 cas réussis lors de la validation initiale, puis 3 cas hiérarchiques réexécutés après le correctif de la vue d’ensemble (bureau, mobile et localisation), tous réussis sur Chromium système. Les traces et vidéos restent activées ; le binaire ffmpeg du système est utilisé dans cet environnement.
-
-La campagne navigateur globale de 494 cas n’est pas exécutée intégralement pour ce POC. Les régressions ciblées couvrent les contextes hiérarchiques, les ressources héritées, l’inventaire des périmètres et les usages inter-périmètres des profils de modèle, sur bureau, mobile et localisation. Leur ancien lien `tab=usages` est remplacé par `#usages` ; la confirmation native de bascule est remplacée par le dialogue du garde partagé.
-
-## Retour utilisateur : accès Flow et langue automatique
-
-L’échec des accès est reproduit après Workspace → Instance → création d’un Flow brouillon. La page transmettait la chaîne littérale `PublishedVersion` à la politique, au lieu de la version publiée calculée. L’API répondait `422 resource_identity_stale`. La liaison Razor est corrigée ; aucune règle d’autorisation ni de validation d’identité serveur n’est assouplie. Les deux nouveaux cas vérifient une version publiée réelle et l’absence de version publiée pour un brouillon.
-
-Le smoke ponctuel [flow-access-smoke.mts](flow-access-smoke.mts), lancé comme `smoke.mts`, crée un Flow par l’interface après la bascule et enregistre Discover/Use avec propagation aux descendants. Il relit la politique enregistrée par l’API. Les deux exécutions, français et anglais automatiques sans cookie de langue, passent sans erreur navigateur : [résultats](flow-access-verification.json).
-
-Le passage involontaire du français à l’anglais n’a pas été reproduit. Le mainteneur a ensuite indiqué qu’il pouvait s’agir d’une fausse alerte ; aucun comportement de langue n’est modifié. Le signalement précise Chrome, lancement Aspire/AppHost, langue automatique, dès Workspace → Instance. Le parcours équivalent reste en français sur l’hôte Console de test ainsi que sur AppHost, en HTTP (`localhost:5100`) puis en HTTPS (`localhost:7100`, certificat local de test). Les préférences restent automatiques et aucun cookie de langue n’est créé. Ces vérifications ne reproduisent pas le signalement ; elles ne prouvent pas sa résolution. Ce point reste suivi dans la PR brouillon #1256.
-
-## Retour utilisateur : vue d’ensemble conservant les anciens indicateurs
-
-Le défaut est reproduit sans F5 : Workspace → Instance conserve 4 Flows dans la vue d’ensemble alors que l’API renvoie les Flows de l’Instance. `PlatformDashboardService` conservait son chargement partagé pendant toute la durée du circuit Blazor. Remonter la page ne suffisait donc pas à recharger les données.
-
-Le chargement partagé est désormais associé au snapshot de contexte validé. Il reste partagé entre l’état de santé du menu et les tuiles de la page dans ce contexte. Chaque contexte nouvellement chargé, y compris un retour au précédent, lance une nouvelle lecture. L’état de santé attend le contexte validé, est réinitialisé pendant son rechargement et ignore les succès ou échecs tardifs d’un chargement précédent.
-
-Le smoke ponctuel [overview-smoke.mts](overview-smoke.mts), lancé comme `smoke.mts`, compare les compteurs Agents/Flows à l’API dans chaque contexte, sur bureau et mobile français, sans rechargement du document. Dans la fixture, il observe 4 Flows en Workspace puis 14 en Instance. Il ouvre ensuite la liste via la tuile, vérifie que l’identité du Flow de l’Instance reste éditable et que ses accès sont modifiables. Une autorisation avec propagation rend un Flow supplémentaire visible en Workspace : le retour affiche bien 5, puis l’Instance revient à 14. L’historique fonctionne aussi. Aucune règle de lecture seule ou d’autorisation serveur n’est modifiée.
-
-Les deux variantes passent sans exception navigateur ni débordement horizontal : [résultats](overview-verification.json), [capture bureau](overview-desktop-instance.png), [capture mobile](overview-mobile-instance.png). Le parcours réutilisable reste différé dans #1255.
+- Compilation Release complète : aucun avertissement ni erreur.
+- Tests ciblés : 17 cas du résolveur, 39 cas d’état/navigation/état de santé et 98 cas du cadre partagé/Flows/tableau de bord, tous réussis. Les cas du résolveur imposent une seule lecture du contexte et aucune lecture préalable par type de ressource.
+- Fast après généralisation : 2 550 cas, 2 533 réussites, 17 échecs déjà présents hors du correctif. Une copie isolée de `7ba891ad` reproduit 16 de ces échecs (1 552 cas de Console.Components, 1 536 réussites). Le dix-septième, `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows`, est déjà reproduit sur `82206267`. [Liste et comparaison](baseline-failures.json). Le mainteneur confie ces autres corrections à un autre agent ; elles ne sont pas modifiées ici.
+- Integration après généralisation : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés.
+- Après généralisation, les 5 vérifications multi-familles, les 8 vérifications Agent/brouillons, les 2 variantes bureau/mobile de la vue d’ensemble et les 3 régressions navigateur `hierarchical-context` réussissent. La campagne globale de 494 cas n’est pas exécutée intégralement. Les résultats historiques JavaScript (17 cas) et TypeScript précèdent la généralisation, qui ne modifie pas ces sources.
 
 ## Captures
 
-| Situation | Bureau anglais, 1440 × 1000 | Mobile français, 390 × 844 |
-| --- | --- | --- |
-| Agent accessible, ancre YAML conservée | [Capture](desktop-en-accessible.png) | [Capture](mobile-fr-accessible.png) |
-| Agent inaccessible, retour à la liste et homonyme distinct | [Capture](desktop-en-unavailable.png) | [Capture](mobile-fr-unavailable.png) |
+- Flow hérité conservé : [bureau](flow-workspace-retained.png), [mobile](flow-mobile-retained.png).
+- Vue d’ensemble Instance : [bureau](overview-desktop-instance.png), [mobile](overview-mobile-instance.png).
+- Agent accessible : [bureau anglais](desktop-en-accessible.png), [mobile français](mobile-fr-accessible.png).
+- Agent indisponible : [bureau anglais](desktop-en-unavailable.png), [mobile français](mobile-fr-unavailable.png).

@@ -72,6 +72,7 @@ try {
     // Navigate through the overview tile, then the collection, without reloading.
     await page.locator('.overview-metric-groups .metric-card[href="/flows"]').click();
     await expect(page.getByTestId('flow-observability-flows')).toHaveAttribute('data-interactive', 'true');
+    await expect(page.getByTestId('flow-observability-flows')).toHaveAttribute('aria-busy', 'false');
     expect(new URL(page.url()).searchParams.get('context')).toBe('/instance');
     await page.locator(`a[href*="/flows/${flowName}?"]`).click();
     await selectResourceSection(page, 'definition/identity');

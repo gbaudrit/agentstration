@@ -12,6 +12,7 @@
 @inject ConsoleContextState ContextState
 @inject IConsoleNavigationContext NavigationContext
 @inject IConsoleContextSwitchResolver ContextSwitchResolver
+@inject ConsoleResourceNavigationState ResourceNavigationState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
 <div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-theme="@(Preferences.IsDarkTheme ? "dark" : "light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
@@ -56,7 +57,7 @@
                 @if (ContextState.Current is { } context)
                 {
                     <div class="context-switcher">
-                        <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@(switchingContext || ContextState.IsLoading || !ContextMatchesLocation)" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
+                        <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@(switchingContext || ContextState.IsLoading || ResourceNavigationState.IsLoading || !ContextMatchesLocation)" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
                             <span class="context-kind">@ContextKindLabel(context.SelectedKind)</span>
                             <span class="context-name">@SelectedContextLabel(context)</span>
                             <span aria-hidden="true">⌄</span>

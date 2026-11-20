@@ -3,6 +3,7 @@ using Agentstration.Agents.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
@@ -136,6 +137,45 @@ public sealed class ConsoleResourceDetailsTemplateTests
         Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
     }
 
+    [TestMethod]
+    public async Task SharedFrameRegistersTheActualSavedOwnerAndReleasesItsRegistration()
+    {
+        var state = new ConsoleResourceNavigationState();
+        await using (var context = Context(state, new NavigationScope()))
+        {
+            var resource = Example();
+            Render(context, resource);
+            Assert.IsNotNull(state.Current);
+            Assert.AreEqual(resource.Uid, state.Current.Uid);
+            Assert.AreEqual(resource.ScopeRef!.Value.Value, state.Current.OwnerScopeRef);
+        }
+        Assert.IsNull(state.Current);
+    }
+
+    [TestMethod]
+    public void AReplacementIdentityIsSuppressedBeforeAnyResourceContentIsRendered()
+    {
+        var state = new ConsoleResourceNavigationState();
+        var scope = new NavigationScope();
+        using var context = Context(state, scope);
+        var resource = Example();
+        var cut = Render(context, resource);
+        var location = new Uri(context.Services.GetRequiredService<NavigationManager>().Uri);
+        state.BeginSwitch(location, location, "/agents", state.Current);
+        scope.ScopeRef = "/workspaces/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+        cut.Render(p => p.Add(c => c.Resource, resource with { Uid = Guid.NewGuid() })
+            .Add(c => c.Name, "Replacement private title"));
+        Assert.IsEmpty(cut.FindAll(".resource-details"));
+        Assert.DoesNotContain("Replacement private title", cut.Markup);
+        Assert.IsEmpty(cut.FindAll(".resource-header"));
+    }
+
+    private sealed class NavigationScope : IConsoleNavigationContext
+    {
+        public string? ScopeRef { get; set; } = "/instance";
+        public string AddToUri(string uri) => uri;
+    }
+
     private static IRenderedComponent<ConsoleResourceDetailsTemplate> Render(BunitContext context, AgentResource resource) =>
         context.Render<ConsoleResourceDetailsTemplate>(p => p
             .Add(c => c.Resource, resource).Add(c => c.ResourceIdentity, "example|instance")
@@ -155,9 +195,11 @@ public sealed class ConsoleResourceDetailsTemplateTests
         Definition = new() { DisplayName = "Example", Instructions = "Example instructions", ModelProfile = new("default", ResourceScopeRef.Instance) }
     };
 
-    private static BunitContext Context()
+    private static BunitContext Context(ConsoleResourceNavigationState? state = null, NavigationScope? scope = null)
     {
         var context = new BunitContext();
+        if (state is not null) context.Services.AddSingleton(state);
+        if (scope is not null) context.Services.AddSingleton<IConsoleNavigationContext>(scope);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.ComponentFactories.AddStub<ResourceAccessPanel>();

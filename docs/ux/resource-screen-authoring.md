@@ -296,3 +296,10 @@ Use focused component checks for template states/optional slots, retained form i
 The new reusable template journey is deferred to native child [#1236](https://github.com/gbaudrit/agentstration/issues/1236), after explicit maintainer UX validation and implementation merge. Navigation-specific follow-up remains #1234. Do not close #1235 before its children are complete or a maintainer records a waiver.
 
 Initial loading is not a draft. Agent only enables dirty-navigation protection after its saved baseline is loaded. Preferred-culture redirects retain the section fragment, and default context URL normalization uses the public Blazor API so the server navigation state and browser coordinates stay synchronized.
+
+
+## Changing Console context from a resource
+
+The shared Console adapter registers the already loaded resource identity for context navigation: actual UID, owner, namespace, kind, name and optional collection destination. Supply the saved resource and its blocking load/error states through the existing template contract. Presentation scope never replaces the saved owner.
+
+The context switch preserves the resource path and fragment and pins that saved owner. It does not pre-read a family endpoint. The destination page retains responsibility for its normal API authorization and loading. The shared frame observes Forbidden/NotFound or a replacement identity and requests a safe collection fallback with an explicit previous-context link; it suppresses rejected content while navigating. Technical failures retain the page's normal retry state. No family-specific switch resolver or route catalog is required.

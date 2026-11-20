@@ -80,6 +80,6 @@ try {
  results.push({check:'French mobile accessible/unavailable flows and no horizontal overflow',passed:true});
  expect(errors).toEqual([]);
  results.push({check:'no unhandled browser errors',passed:true});
- await fs.writeFile(evidence+'/verification.json',JSON.stringify({revision:'82206267 + working-tree POC',results},null,2)+'\n');
+ await fs.writeFile(evidence+'/verification.json',JSON.stringify({revision:process.env.AGENTSTRATION_EVIDENCE_REVISION ?? 'working tree with shared Console resource context switching',results},null,2)+'\n');
  console.log(JSON.stringify(results,null,2));await context.close();
 } catch(error){console.error(error);throw error;} finally {await browser.close();await product.stop();}

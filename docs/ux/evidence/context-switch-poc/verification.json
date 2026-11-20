@@ -1,5 +1,5 @@
 {
-  "revision": "82206267 + working-tree POC",
+  "revision": "5c8ae96d + shared Console resource context switching",
   "results": [
     {
       "check": "accessible exact Agent and anchor, inherited read-only, no document reload",

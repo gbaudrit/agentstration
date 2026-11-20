@@ -1,9 +1,12 @@
 @namespace Agentstration.Web.Components
+@implements IDisposable
 @using Agentstration.Web.Components.Pages
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Ui
 
+@if (!contextSwitchRejected)
+{
 <UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" ViewQueryParameters="@(new[] { "view", "tab" })" />
 <ResourceDetailsTemplate Name="@Name" ResourceType="@ResourceType" Domain="@Domain" Icon="@Icon" IconName="@IconName"
                          ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
@@ -21,6 +24,7 @@
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
                          ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
                          SectionTestIdPrefix="@SectionTestIdPrefix" TestId="@TestId" />
+}
 
 @code {
     [Parameter, EditorRequired] public Agentstration.Resources.Resource? Resource { get; set; }
@@ -93,6 +97,16 @@
     [Parameter] public string? SectionTestIdPrefix { get; set; }
     [Parameter] public string? TestId { get; set; }
 
+    [CascadingParameter(Name = "ConsoleContextScope")] public string? ConsoleContextScope { get; set; }
+    private readonly object navigationRegistration = new();
+    private ConsoleResourceNavigationState? navigationState;
+    private bool contextSwitchRejected;
+
+    protected override void OnInitialized() => navigationState =
+        Services.GetService(typeof(ConsoleResourceNavigationState)) as ConsoleResourceNavigationState;
+
+    public void Dispose() => navigationState?.Release(navigationRegistration);
+
     private string? accessIdentity;
     private bool accessDirty;
     private string EffectiveIdentity => Resource is null ? $"{ResourceIdentity}|pending" : $"{ResourceIdentity}|{Resource.Uid}|{Resource.ScopeRef}|{Resource.Namespace}|{Resource.Kind}|{Resource.Name}";
@@ -133,6 +147,17 @@
     {
         if (Resource is null && EffectiveLoadState?.BlocksContent != true)
             throw new InvalidOperationException("A pending resource requires a blocking load state.");
+        var contextScope = ConsoleContextScope ?? ResourceOwnershipContext.TryGetCurrent(Services)?.Value
+            ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+        if (navigationState is not null && contextScope is not null)
+        {
+            var location = new Uri(Navigation.Uri);
+            var saved = Resource is { ScopeRef: { } owner } resource
+                ? new ConsoleResourceLocation(location, contextScope, resource.Uid, owner.Value,
+                    resource.Namespace.Value, resource.Kind, resource.Name, CollectionHref)
+                : null;
+            contextSwitchRejected = navigationState.Observe(navigationRegistration, location, contextScope, saved, EffectiveLoadState);
+        }
         var identity = EffectiveIdentity;
         if (accessIdentity != identity || !CanManageAccess) accessDirty = false;
         accessIdentity = identity;
