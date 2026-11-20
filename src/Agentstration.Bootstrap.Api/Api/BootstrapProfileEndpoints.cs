@@ -15,12 +15,13 @@ public static class BootstrapProfileEndpoints
         {
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(new BootstrapStartupAdmission(status.Read().Ready));
-        });
+        }).RequireAuthorization(AgentstrationPolicies.InteractiveUser)
+            .Produces<BootstrapStartupAdmission>().WithSummary("Check authenticated Console startup admission");
         startup.MapGet("", (IBootstrapStartupStatus status, HttpContext context) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(status.Read());
-        }).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        }).RequireAuthorization(AgentstrationPolicies.PlatformAdmin).Produces<BootstrapStartupSnapshot>().WithSummary("Read current Bootstrap startup progress");
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
         group.MapPost("/source-profile", GetSourceProfileAsync);

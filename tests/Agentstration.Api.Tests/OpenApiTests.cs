@@ -89,6 +89,8 @@ public sealed class OpenApiTests
             ("POST", "/api/triggers/{name}/run", AgentstrationPolicies.CanExecuteRuns),
             ("GET", "/api/triggers/{name}/occurrences", AgentstrationPolicies.CanReadRuns),
             ("POST", "/api/triggers/schedule-preview", AgentstrationPolicies.CanReadResources),
+            ("GET", "/api/bootstrap/startup/admission", AgentstrationPolicies.InteractiveUser),
+            ("GET", "/api/bootstrap/startup", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/bootstrap/source-profile", AgentstrationPolicies.PlatformAdmin),
             ("POST", "/api/bootstrap/binding-targets", AgentstrationPolicies.PlatformAdmin),
             ("GET", "/api/modelproviders", AgentstrationPolicies.CanReadResources),
