@@ -128,6 +128,8 @@ export class AgentEditorPage {
     const identityPanel = overview.locator('.resource-identity-summary');
     const disclosure = identityPanel.locator('.panel-disclosure');
     if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+    const configurationDisclosure = overview.locator('.resource-configuration-summary .panel-disclosure');
+    if (await configurationDisclosure.getAttribute('aria-expanded') === 'false') await configurationDisclosure.click();
     const labels = overview.locator('.resource-identity-summary .labels-summary');
     await expect(labels).toBeVisible();
     await expect(overview.locator('.labels-summary')).toHaveCount(1);
