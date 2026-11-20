@@ -12,7 +12,7 @@
 .source-detail-grid > .panel > ::deep input { width: 100%; min-width: 0; }
 .source-detail-grid .resource-details dd { min-width: 0; overflow-wrap: anywhere; }
 .refresh-overview-panel .panel-header { align-items: center; }
-.refresh-overview-value { display: flex; align-items: baseline; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface-2); }
+.refresh-overview-value { display: flex; flex-wrap: wrap; min-width: 0; align-items: baseline; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface-2); }
 .refresh-overview-value strong { font-size: 1.15rem; }
 .refresh-overview-value span, .refresh-overview-empty { color: var(--muted); }
 .source-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
@@ -67,10 +67,10 @@
 .catalog-card small, .catalog-entry span { display: grid; gap: .2rem; }
 .catalog-entry { padding-top: .85rem; margin-top: .85rem; border-top: 1px solid var(--border); }
 .catalog-entry-actions { display: flex; align-items: center; justify-content: flex-end; gap: .85rem; flex: 0 0 auto; }
-.catalog-entry em { color: #b27115; font-style: normal; }
-.text-link { white-space: nowrap; font-weight: 650; }
-.source-pack-dialog { width: min(42rem, 100%); max-height: calc(100vh - 2rem); overflow: auto; }
-.source-delete-dialog { width: min(34rem, 100%); }
+.catalog-entry em { color: var(--warning); font-style: normal; }
+.text-link { white-space: normal; overflow-wrap: anywhere; font-weight: 650; }
+::deep .source-pack-dialog { width: min(42rem, 100%); max-height: calc(100dvh - 2rem); overflow: auto; }
+::deep .source-delete-dialog { width: min(34rem, 100%); }
 .source-delete-retention { padding: .8rem; border: 1px solid var(--border); border-radius: .65rem; background: var(--surface-2); color: var(--muted); }
 .source-pack-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; margin-top: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-2); }
 .source-pack-summary small, .source-pack-resources small { display: block; margin-top: .2rem; color: var(--muted); }

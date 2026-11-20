@@ -36,19 +36,28 @@ export class FormWorkflowsPage {
       return (await response.json()).source.configuration;
     };
     const before = await read();
-    await this.page.locator('#source-scheduling-tab').click();
-    const form = this.page.locator('#source-tab-panel form');
+    const navigation = this.page.getByTestId(TestIds.distribution.sourceSections);
+    await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
+    let menu = navigation.locator('.resource-navigation-rail');
+    if (!await menu.isVisible()) {
+      await this.page.locator('.resource-header .resource-navigation-trigger').click();
+      menu = navigation.locator('dialog');
+      await expect(menu).toBeVisible();
+    }
+    await menu.locator('[data-resource-section="definition/refresh"]').click();
+    await expect(this.page).toHaveURL(url => url.hash === '#definition/refresh');
+    const form = this.page.getByTestId(TestIds.distribution.sourceDefinitionForm);
     const number = form.locator('input[type=number]').first();
     const original = await number.inputValue();
     expect(original).not.toBe('');
     await this.fields.clearField(number, locale);
-    await expect(form.locator('.validation-errors')).toHaveText(/.+/);
-    await form.locator('button[type=submit]').click();
+    await expect(form.locator('.validation-message')).toHaveText(/.+/);
+    await this.page.getByTestId(TestIds.distribution.sourceSave).click();
     await expect(number).toHaveValue('');
     expect(await read()).toEqual(before);
     await number.fill(original);
     await number.press('Tab');
-    await expect(form.locator('.validation-errors')).toHaveCount(0);
+    await expect(form.locator('.validation-message')).toHaveCount(0);
     await this.fields.assertWithinViewport();
   }
 

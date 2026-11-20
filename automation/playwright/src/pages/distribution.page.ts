@@ -210,6 +210,9 @@ export class DistributionPage {
     await this.page.getByTestId(TestIds.distribution.sourceImportOpen).click();
     await this.page.getByTestId(TestIds.distribution.sourceImportYamlMode).click();
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.sourceImportYaml), yaml);
+    await this.page.locator('[data-wizard-step="destination"]').click();
+    await expect(this.page.locator('[data-step-id=destination] select')).not.toHaveValue('');
+    await this.page.locator('[data-wizard-step="review"]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/settings/sources/${encodeURIComponent(publisher)}/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.sourceImportSubmit).click(),

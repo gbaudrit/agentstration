@@ -84,4 +84,21 @@
   <data name="ResolvedRevision" xml:space="preserve"><value>Révision résolue</value></data>
   <data name="ChannelContract" xml:space="preserve"><value>Binding {0} · jeu d’options {1}@{2}</value></data>
   <data name="UnavailableLocaleFallback" xml:space="preserve"><value>{0} · {1} (repli)</value></data>
+  <data name="PublishedYamlHelp" xml:space="preserve"><value>Le manifeste exact et immuable de la version publiée de la Source. Le nom local, les liaisons de fournisseurs et la planification se configurent dans Définition.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Des paramètres enregistrés plus récents sont disponibles. Le formulaire, les saisies invalides et l’ETag initial sont conservés. Abandonnez les modifications pour adopter les dernières valeurs.</value></data>
+  <data name="SavedReceiptPending" xml:space="preserve"><value>La dernière commande a été acceptée. Actualisez pour confirmer les paramètres enregistrés avant une autre écriture ; les autres modifications sont conservées.</value></data>
+  <data name="InstalledPacksUnavailable" xml:space="preserve"><value>L’état des Packs installés est indisponible. Actualisez cette page avant d’installer un Pack.</value></data>
+  <data name="RetainedProvider" xml:space="preserve"><value>Référence enregistrée absente des choix actuels</value></data>
+  <data name="PolicySummary" xml:space="preserve"><value>{0} · intervalle {1}s · délai {2}s · tentatives {3} · reprise {4}–{5}s · gigue {6}s</value></data>
+  <data name="RefreshBackoffOrder" xml:space="preserve"><value>Le délai maximal de reprise doit être supérieur ou égal au délai initial.</value></data>
+  <data name="RefreshJitterBound" xml:space="preserve"><value>La gigue ne peut pas dépasser la moitié de l’intervalle ni 3 600 secondes.</value></data>
+  <data name="DefinitionSaved" xml:space="preserve"><value>Les paramètres locaux modifiés de la Source ont été enregistrés.</value></data>
+  <data name="SourceRefreshFinished" xml:space="preserve"><value>L’actualisation de la définition publiée de la Source est terminée.</value></data>
+  <data name="ImportManifest" xml:space="preserve"><value>Manifeste</value></data>
+  <data name="ImportDestination" xml:space="preserve"><value>Destination</value></data>
+  <data name="ImportReview" xml:space="preserve"><value>Vérifier l’import</value></data>
+  <data name="ImportManifestRequired" xml:space="preserve"><value>Saisissez l’URL HTTP(S) d’un manifeste ou collez le manifeste d’une version publiée de Source.</value></data>
+  <data name="ImportScopeRequired" xml:space="preserve"><value>Choisissez le périmètre de destination.</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="PackPreviewMismatch" xml:space="preserve"><value>Le Pack retourné ne correspond pas à la sélection de Source demandée. Actualisez l’aperçu avant de continuer.</value></data>
 </root>

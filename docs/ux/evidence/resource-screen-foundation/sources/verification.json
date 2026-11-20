@@ -1,0 +1,222 @@
+{
+  "screen": "Source \u2014 saved resource and manifest import",
+  "nativeCases": [
+    {
+      "title": "Source import and saved settings retain drafts across the common resource sections ",
+      "project": "desktop-chromium",
+      "durationMs": 19305
+    },
+    {
+      "title": "Source import and saved settings retain drafts across the common resource sections @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 18899
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+      "reportSha256": "306dd5bd3133c13c1a8534d89f488437d3d5d5ddc574715cec706f0e24070d3d",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/Sources.razor": "97b2b2c61d18c0df09efa4cd750fc3a24fa1178eb685a626a7c30e4cdaf67543",
+        "src/Agentstration.Console.Components/Components/Pages/Sources.razor.cs": "f600dd38b71c969531dee418f2f00b2d8f128e91c6d8c81423d64e3e856d797a",
+        "src/Agentstration.Console.Components/Components/Pages/Sources.Details.cs": "84cf9ec0c19a5039fd8864cf43bfda12876720dd906b4721bfc4c27c49e63a37",
+        "src/Agentstration.Console.Components/Components/Pages/Sources.razor.css": "75d9ab697b09bad15bb96d06d8dd63a36b45711f3bdad6b6f88ca65a2d346fa2",
+        "src/Agentstration.Console.Components/Console/SourceEditorModel.cs": "a4298afa466ba490ceb14d61e62a916ccf60e34e7f2e164b3795173646f0ee3a",
+        "tests/Agentstration.Console.Components.Tests/SourceDetailsFoundationTests.cs": "d97b50959841d2e797c7f42451054531d032808b1473b9e2cb039b8e43df0ed8",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/SourcesStrings.resx": "f253530e32651982095a7424c949160e96329aa919cb9335b0391abc51d4d2c3",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/SourcesStrings.fr-FR.resx": "23b7077a2e7de94f395d2729aa2f6c28f5acc2166fe7644f26f525d26e0bb5f7",
+        "automation/playwright/src/pages/distribution.page.ts": "d126a1ed2e8ed23ffb2cca2e8c3aab42d816f93bffb794ed38314f75b206028a",
+        "automation/playwright/src/pages/form-workflows.page.ts": "347115cb9485d195de71bafc2cde2fce29269ef196dd197c3fc884ea5a1c37af",
+        "automation/playwright/src/contracts/test-ids.ts": "bfa103bf31b283d4c0eefc0aec529790b4d33732054bdcd8d2d52456a9c60b8a"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada"
+      },
+      "campaign": "screens-05"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "sources-regression",
+      "passed": 3,
+      "sha256": "973073c63ac930e35403cb445eff1271c3ccbfec161936683527e153b338caa1"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "source-incomplete-import-desktop-en.png",
+      "sha256": "a1014cca58488152dbb95f8a02390c924945eea1ab82225a1d357e186306a76b"
+    },
+    {
+      "file": "source-manifest-retained-desktop-en.png",
+      "sha256": "023faa711676234b4f9ead52c48c6be91ac8f78126281a3dd461e06487eff301"
+    },
+    {
+      "file": "source-import-review-desktop-en.png",
+      "sha256": "cdf3e01ec5deea1ddd25e27819ee58eaac6ceaf649958041afadb790f3642ccf"
+    },
+    {
+      "file": "source-saved-overview-desktop-en.png",
+      "sha256": "04edc3ce3878e4e8bad2c52f59f6a6f142b94d59d538fd8927e4b1498ff67c6f"
+    },
+    {
+      "file": "source-identity-draft-desktop-en.png",
+      "sha256": "2c0e3dcc56dcfe72c762f72593baa93168ddde3e750f1e6dc220c4578059c3b0"
+    },
+    {
+      "file": "source-invalid-refresh-desktop-en.png",
+      "sha256": "db8550e5a70bc69e3a5e97dd1dc5d6871dafc7ecd456b734c422bf5511b35379"
+    },
+    {
+      "file": "source-retained-refresh-desktop-en.png",
+      "sha256": "adf0f25a3d662dc2a31fc73340a90842f3ca8516ae07e389648215e6c8816b77"
+    },
+    {
+      "file": "source-changed-refresh-desktop-en.png",
+      "sha256": "9d143365a6559d3d789575144fc3c84241c0e85dcc48ae3cc3bb8e1be53021f9"
+    },
+    {
+      "file": "source-discarded-draft-desktop-en.png",
+      "sha256": "cbcd2efd8c2158ab10bf94fa502f61242798c472bb5aaf916cec5b9afba111eb"
+    },
+    {
+      "file": "source-saved-settings-desktop-en.png",
+      "sha256": "c17ee43293f306cc191d829054bcf434e9c4aff88a79824994a40621a94bead5"
+    },
+    {
+      "file": "source-bindings-desktop-en.png",
+      "sha256": "8de6603817762d58fb344fec857dfff8faf17f9182bf1dcd08133ca74696d284"
+    },
+    {
+      "file": "source-content-desktop-en.png",
+      "sha256": "b5995d5ac459db05fcc85c782a0135c313dca63e9299435c1ea154e54dae4c70"
+    },
+    {
+      "file": "source-versions-desktop-en.png",
+      "sha256": "524d5f6ebcb9f597afe176b31f3e732fdd6ac0c2f5dcc272700e4ea108f84983"
+    },
+    {
+      "file": "source-published-yaml-desktop-en.png",
+      "sha256": "04c4d14aeef3f5fe168c007ab9eb8d852c0e0ce1be4b34efc9a3d7b891269cee"
+    },
+    {
+      "file": "source-delete-confirmation-desktop-en.png",
+      "sha256": "1285f381c216f599e63415e7b4ea5c519e46a9cc8700dc67c94c110781d88257"
+    },
+    {
+      "file": "source-incomplete-import-mobile-fr.png",
+      "sha256": "41da64942e01620dcd9a918cd372bafc8b64552252f2f096a3a490333025ef7b"
+    },
+    {
+      "file": "source-manifest-retained-mobile-fr.png",
+      "sha256": "372d544834e73c11bbd67e51eaf211db3e2a297543497141f7f55c0bff6b021e"
+    },
+    {
+      "file": "source-import-review-mobile-fr.png",
+      "sha256": "60c226b08bc4b562bc109e237f7164f79f15a9d1c2cb5778d381e6e6fef70af3"
+    },
+    {
+      "file": "source-saved-overview-mobile-fr.png",
+      "sha256": "b83ac0ee328b47990b607bad82a76db9201491ade044320b08f060724cbd1274"
+    },
+    {
+      "file": "source-identity-draft-mobile-fr.png",
+      "sha256": "8a91cd79a66318a2b4bc09a4ce7054c7ac61d34d8d1905a34b4906a63f3c6604"
+    },
+    {
+      "file": "source-invalid-refresh-mobile-fr.png",
+      "sha256": "f7eddbe381c82612a49457bbadd6ef07cc32d5e2b66db0768ada08a263c795ed"
+    },
+    {
+      "file": "source-retained-refresh-mobile-fr.png",
+      "sha256": "a288386c70bafea9635e22d9f20ee6156ed9871b7bb7dfa14bdfc6a1e27d0fc9"
+    },
+    {
+      "file": "source-changed-refresh-mobile-fr.png",
+      "sha256": "c54feb2f52dcdc8dd19d2e8da31bac56561e67f19aad5403cfb51cf1e3993be7"
+    },
+    {
+      "file": "source-discarded-draft-mobile-fr.png",
+      "sha256": "046dc2294fabec5414b39104627d3ab6891b910093b78542ab949d79146ce811"
+    },
+    {
+      "file": "source-saved-settings-mobile-fr.png",
+      "sha256": "6646a644ca94a101d5f847c68bc4d2efb754e7f3cc860227c719a5e1a7a544b7"
+    },
+    {
+      "file": "source-bindings-mobile-fr.png",
+      "sha256": "9f3dd7d8edbc7f1d98c8100860e3102682b0a8417c25eb37925ecd9ba3f5b8d8"
+    },
+    {
+      "file": "source-content-mobile-fr.png",
+      "sha256": "9083a01cd18377b1ad370975140c23a0650f9eaa1bfcec8b76c8afbe323dd700"
+    },
+    {
+      "file": "source-versions-mobile-fr.png",
+      "sha256": "d9517e48e993482627fe210c267c1dda56c549defed782133e58c5e22734c3de"
+    },
+    {
+      "file": "source-published-yaml-mobile-fr.png",
+      "sha256": "8b129c0e7ed486a98edffb1209e44a8adb0c880b0997348e07488e75bf5be1ed"
+    },
+    {
+      "file": "source-delete-confirmation-mobile-fr.png",
+      "sha256": "4c87e76202f5a2be6f6c0929f3ae5bdc8fd42e7117acaa8decece6214568d4a7"
+    }
+  ],
+  "limits": [
+    "Description/tags and published YAML are read-only because the existing family commands do not update them.",
+    "Source scheduling switches represent actual policies; this family has no resource activation property.",
+    "Initial temporary probe setup was corrected to select the exact deterministic model profile/Instance owner and the existing localized empty-binding sentence, with zero-row/API assertions retained. No product or timeout relaxation was used."
+  ],
+  "postSmokeSynchronization": {
+    "integratedHead": "1d0f1bda",
+    "unchangedSourceOwnedBehavior": true,
+    "maintenanceOnlyTestIdsMergedWithParallelSchemaKeys": "cde8bc2656bf84f7307608aa1e1088b4965b15b8f4323bcc274b7aeb5451bc27"
+  }
+}

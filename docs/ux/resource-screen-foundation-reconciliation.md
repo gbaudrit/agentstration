@@ -49,7 +49,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `SecretEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `SourceProviderDetails.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `SourceRegistries.razor` | Mixed route owner reconciled; verification below | Collection retained; fixed Instance/default creation wizard and common persisted frame/form, exact credentials and independently retained drafts | Yes |
-| `Sources.razor` | Previously remaining | Mixed collection/detail; keep collection template and inspect detail adapter | No |
+| `Sources.razor` | Mixed collection/detail reconciled; verification below | Collection retained; actual Source/configuration UID and ETags, common retained definition and manifest import wizard | Yes |
 | `StagedArtifactDetails.razor` | Reviewed temporary-copy operational projection; shared states and retention verification below | Public content/lease view, not the durable Resource definition contract | Not applicable |
 | `StorageDetails.razor` | New foundation migrated; local verification below | Persisted resource, exact contracts/mappings and retained schema/policy drafts with independent Access | Not applicable |
 | `StorageEditor.razor` | New foundation paired with owning detail; creation verified | Common identity/form/state/presentation contract; exact type/service/export references and explicit rebind preserved | Yes |
@@ -453,3 +453,13 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - Existing metric-grid proportions/global mobile footer are preserved. No shared component or protected Agent change, CI remediation or full solution lane.
 
 - Current reconciliation: **47/51** components verified; 4 remaining. The Agent reference is protected.
+
+### Sources — saved resource, independent configuration groups and import
+
+- Persisted Source uses ConsoleResourceDetailsTemplate and a retained ResourceDefinitionForm with the exact state/presentation dictionary and root Fields. Actual metrics precede saved Identity/tags and Configuration. Standard Definition Identity/Configuration leads to refresh/content/version surfaces, independently authorized Access and final immutable published YAML. Source and mutable configuration retain distinct real UIDs/ETags; unsupported description/tag mutation and activation are not invented.
+- Snapshots/fingerprints for all three command groups are captured before the first await. Acknowledgement clears only submitted values and retains later input. A confirming read must establish all saved groups before rebasing the configuration ETag; an accepted but unconfirmed receipt blocks further writes rather than silently replaying. Original seconds, unavailable exact references, channel overrides, numeric parser state and policy/backoff/jitter rules remain intact. Changed refresh requires explicit discard; private/foreign/disposed targets reject late work.
+- Manifest import keeps its collection template and uses CreationWizard Manifest/Destination/Review with free incomplete navigation, standard fields, real owner selection, retained raw input and explicit finish. Selection intent stays distinct from an automatic initial scope. Existing paging, immutable digest/pins and independent Pack preview/install/delete permissions, confirmations/Escape/focus are preserved. Three Source-owned TestIds and the existing import/scheduling page operations are maintained without changing checkpoints.
+- All 33 focused Plan/Source cases, TypeScript/catalog checks and warning-free Release hosts pass. Native EN/dark desktop and FR/light true-touch import/invalid draft/refresh/conflict/discard/save/YAML/copy/dialog checks plus three existing Source browser cases pass: [30 real captures and exact hashes](evidence/resource-screen-foundation/sources/README.md). Parallel Schema TestIds were then merged while preserving the three Source keys; source behavior is unchanged.
+- Duplicate import/scheduling scenario **Not applicable**; #1236 stays deferred. No shared/protected Agent change, CI remediation or full solution lanes.
+
+- Current reconciliation: **48/51** components verified; 3 remaining. The Agent reference is protected.
