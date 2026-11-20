@@ -11,7 +11,7 @@
 
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <PageTitle>@T("CreationTitle") · Agentstration</PageTitle>
-<PageHeader ScopeRef="identity.ScopeRef" Title="@T("CreationTitle")" Description="@T("CreationDescription")" TestId="resource-tool-definition-editor"><Actions><a class="button-secondary" href="@NavigationContext.AddToUri("/tools/definitions")">@T("Cancel")</a></Actions></PageHeader>
+<PageHeader ScopeRef="identity.ScopeRef" Title="@T("CreationTitle")" Description="@T("CreationDescription")" TestId="resource-tool-definition-editor" CollectionHref="@NavigationContext.AddToUri("/tools/definitions")" CollectionLabel="@T("DefinitionsTitle")" />
 <div class="tool-create-shell" data-testid="tool-definition-create" data-interactive="@((interactive && contextLoaded).ToString().ToLowerInvariant())">
 @if (!contextLoaded) { <LoadingState Message="@T("LoadingDefinitions")" /> }
 else
