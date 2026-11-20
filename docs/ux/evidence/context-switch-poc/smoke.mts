@@ -1,0 +1,85 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium, expect } from '../../../../automation/playwright/node_modules/@playwright/test/index.mjs';
+import { startProductHosts } from '../../../../automation/playwright/src/fixtures/product-hosts.ts';
+import { ProductPages } from '../../../../automation/playwright/src/pages/product.pages.ts';
+import { TestIds } from '../../../../automation/playwright/src/contracts/test-ids.ts';
+const evidence=path.dirname(fileURLToPath(import.meta.url));
+await fs.mkdir(evidence,{recursive:true});
+const product=await startProductHosts('Local');
+const browser=await chromium.launch({executablePath:process.env.AGENTSTRATION_CHROMIUM_EXECUTABLE ?? '/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+const results:any[]=[];
+try {
+ const context=await browser.newContext({viewport:{width:1440,height:1000},locale:'en-US'});
+ const page=await context.newPage(); const pages=new ProductPages(page);
+ const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message));
+ await pages.login.signIn(product.consoleUrl);
+ const fixture=await pages.executionScopes.ensureFixture(product.consoleUrl);
+ const ownerUrl=`${product.consoleUrl}/agents/${fixture.agentName}?scopeRef=%2Finstance&context=%2Finstance`;
+ async function switchTo(scope:string){
+  await page.getByTestId(TestIds.console.contextSelectorTrigger).click();
+  await page.locator(`[data-context-scope-ref="${scope}"]`).click();
+ }
+ async function shell(scope:string){await expect(page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope',scope);}
+ async function atOwner(anchor:string){await page.goto(ownerUrl+'#'+anchor);await shell('/instance');await expect(page.locator('[data-navigation-ready=true]')).toBeAttached(); await expect(page).toHaveURL(new RegExp('#'+anchor+'$'));}
+ await pages.hierarchicalContext.setAgentAccess(product.consoleUrl,fixture,['discover']);
+ await atOwner('yaml');
+ await page.evaluate(()=>{(window as any).__scopePoc='retained';});
+ await switchTo(fixture.scopes.workspace); await shell(fixture.scopes.workspace);
+ await expect(page).toHaveURL(/#yaml$/);
+ expect(new URL(page.url()).searchParams.get('scopeRef')).toBe('/instance');
+ expect(await page.evaluate(()=>(window as any).__scopePoc)).toBe('retained');
+ await expect(page.getByTestId('inherited-resource-notice')).toBeVisible();
+ await page.screenshot({path:evidence+'/desktop-en-accessible.png',fullPage:true});
+ results.push({check:'accessible exact Agent and anchor, inherited read-only, no document reload',passed:true});
+ await page.goBack();await shell('/instance'); await expect(page).toHaveURL(/#yaml$/);
+ await page.goForward();await shell(fixture.scopes.workspace);await expect(page).toHaveURL(/#yaml$/);
+ expect(await page.evaluate(()=>(window as any).__scopePoc)).toBe('retained');
+ results.push({check:'Back and Forward restore each context and anchor without a document reload',passed:true});
+ await atOwner('access');await switchTo(fixture.scopes.workspace);await shell(fixture.scopes.workspace);
+ await expect(page).toHaveURL(/#overview$/);await expect(page.locator('.resource-navigation-feedback')).toBeVisible();
+ results.push({check:'inaccessible Access section falls back to Overview',passed:true});
+ // A same-named Workspace Agent must never replace the Instance Agent.
+ const sourceResponse=await page.request.get(`${product.consoleUrl}/api/agents/${fixture.agentName}?scopeRef=%2Finstance`,{headers:{'X-Agentstration-Context':'/instance'}});
+ const source=await sourceResponse.json();
+ const created=await page.request.put(`${product.consoleUrl}/api/agents/${fixture.agentName}`,{headers:{'X-Agentstration-Context':fixture.scopes.workspace,'If-None-Match':'*'},data:{apiVersion:source.apiVersion,kind:source.kind,metadata:source.metadata,scopeRef:fixture.scopes.workspace,definition:{...source.definition,displayName:'Workspace homonym'}}});
+ expect(created.status(),await created.text()).toBe(200);
+ expect((await created.json()).uid).not.toBe(fixture.agentUid);
+ await pages.hierarchicalContext.setAgentAccess(product.consoleUrl,fixture,[]);
+ await atOwner('yaml');
+ const other=await context.newPage();await other.goto(ownerUrl+'#yaml');await expect(other.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope','/instance');
+ await switchTo(fixture.scopes.workspace);await shell(fixture.scopes.workspace);
+ await expect(page.getByTestId(TestIds.console.contextResourceUnavailable)).toBeVisible();
+ expect(new URL(page.url()).pathname).toBe('/agents');
+ await expect(page.locator('a.resource-name-link').filter({hasText:'Workspace homonym'})).toBeVisible();
+ expect(new URL(other.url()).searchParams.get('context')).toBe('/instance');
+ await expect(other.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope','/instance');await other.close();
+ await page.screenshot({path:evidence+'/desktop-en-unavailable.png',fullPage:true});
+ results.push({check:'unavailable Agent returns to collection without opening Workspace homonym; other tab unaffected',passed:true});
+ await page.getByTestId(TestIds.console.contextReturnPrevious).click();await shell('/instance');await expect(page).toHaveURL(/#yaml$/);
+ results.push({check:'explicit return restores the previous exact resource and anchor',passed:true});
+ await atOwner('definition/identity');
+ const description=page.getByTestId(TestIds.agentEditor.description);
+ await description.fill('Unsubmitted POC draft');await description.blur();
+ const originalUrl=page.url();await switchTo(fixture.scopes.workspace);
+ const dialog=page.getByRole('alertdialog');await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ expect(page.url()).toBe(originalUrl);await expect(description).toHaveValue('Unsubmitted POC draft');await shell('/instance');
+ await switchTo(fixture.scopes.workspace);await page.getByRole('alertdialog').getByRole('button',{name:'Discard',exact:true}).click();await shell(fixture.scopes.workspace);await expect(page.getByTestId(TestIds.console.contextResourceUnavailable)).toBeVisible();
+ results.push({check:'cancel preserves draft and context; explicit discard accepts the switch',passed:true});
+ await page.setViewportSize({width:390,height:844});
+ await pages.consoleAdministration.restoreLanguage(product.consoleUrl,'fr-FR');
+ await pages.hierarchicalContext.setAgentAccess(product.consoleUrl,fixture,['discover']);
+ await atOwner('yaml');await switchTo(fixture.scopes.workspace);await shell(fixture.scopes.workspace);await expect(page).toHaveURL(/#yaml$/);
+ await page.screenshot({path:evidence+'/mobile-fr-accessible.png',fullPage:true});
+ await pages.hierarchicalContext.setAgentAccess(product.consoleUrl,fixture,[]);
+ await atOwner('yaml');await switchTo(fixture.scopes.workspace);await shell(fixture.scopes.workspace);
+ await expect(page.getByTestId(TestIds.console.contextResourceUnavailable)).toContainText('indisponible dans le périmètre sélectionné');
+ await page.screenshot({path:evidence+'/mobile-fr-unavailable.png',fullPage:true});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ results.push({check:'French mobile accessible/unavailable flows and no horizontal overflow',passed:true});
+ expect(errors).toEqual([]);
+ results.push({check:'no unhandled browser errors',passed:true});
+ await fs.writeFile(evidence+'/verification.json',JSON.stringify({revision:'82206267 + working-tree POC',results},null,2)+'\n');
+ console.log(JSON.stringify(results,null,2));await context.close();
+} catch(error){console.error(error);throw error;} finally {await browser.close();await product.stop();}

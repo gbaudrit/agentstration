@@ -113,6 +113,8 @@ export const TestIds = {
     contextOptionInstance: 'context-option-instance',
     contextOptionTenant: 'context-option-tenant',
     contextOptionWorkspace: 'context-option-workspace',
+    contextResourceUnavailable: 'context-resource-unavailable',
+    contextReturnPrevious: 'context-return-previous',
     sidebar: 'console-sidebar',
     sidebarToggle: 'console-sidebar-toggle',
     breadcrumb: 'console-breadcrumb',

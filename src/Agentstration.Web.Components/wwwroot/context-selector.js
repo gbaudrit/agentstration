@@ -12,16 +12,6 @@ export async function selectWorkspace(workspaceId) {
     window.location.reload();
 }
 
-export async function selectContext(scopeRef, confirmationMessage) {
-    if (document.querySelector('.unsaved-changes-bar') && !window.confirm(confirmationMessage)) {
-        return false;
-    }
-    const url = new URL('/', window.location.origin);
-    url.searchParams.set('context', scopeRef);
-    window.location.assign(url.toString());
-    return true;
-}
-
 export function ensureContextUrl(scopeRef, historyEntryState) {
     const url = new URL(window.location.href);
     if (url.searchParams.get('context') === scopeRef) return;

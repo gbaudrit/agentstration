@@ -46,6 +46,7 @@ public static class ConsoleHostServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddAgentstrationWebComponents();
         services.Replace(ServiceDescriptor.Scoped<IConsoleContextProvider, ConsoleContextProvider>());
+        services.Replace(ServiceDescriptor.Scoped<IConsoleContextSwitchResolver, ConsoleContextSwitchResolver>());
         services.Replace(ServiceDescriptor.Scoped<IResourceSearchProvider, ConsoleResourceSearchProvider>());
         services.AddAgentstrationFlowDesigner();
         services.AddScoped<PlatformDashboardService>();

@@ -48,4 +48,9 @@
   <data name="Nav.StorageTypes" xml:space="preserve"><value>Storage types</value></data>
   <data name="Command.CreateStorageType" xml:space="preserve"><value>Create Storage type</value></data>
   <data name="Nav.TransformationFunctions" xml:space="preserve"><value>Transformation functions</value></data>
+  <data name="ContextChangeFailedMessage" xml:space="preserve"><value>The selected context could not be loaded. Try again or return to the previous page.</value></data>
+  <data name="LoadingContext" xml:space="preserve"><value>Loading context…</value></data>
+  <data name="RetryContext" xml:space="preserve"><value>Retry</value></data>
+  <data name="ContextResourceUnavailable" xml:space="preserve"><value>This resource is unavailable in the selected context. Its collection is shown instead.</value></data>
+  <data name="ReturnToPreviousContext" xml:space="preserve"><value>Return to the previous context</value></data>
 </root>
