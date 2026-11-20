@@ -7,15 +7,16 @@
 <UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" ViewQueryParameters="@(new[] { "view", "tab" })" />
 <ResourceDetailsTemplate Name="@Name" ResourceType="@ResourceType" Domain="@Domain" Icon="@Icon" IconName="@IconName"
                          ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
-                         TechnicalName="@(Resource?.Name ?? RequestedAddress?.Name)" Namespace="@(Resource?.Namespace.Value ?? RequestedAddress?.Namespace.Value)" ScopeRef="Resource?.ScopeRef" Description="@Description"
-                         StatusText="@StatusText" Status="Status" Metadata="@Metadata" PrimaryActions="@PrimaryActions" Actions="@Actions" MoreActions="@MoreActions"
+                         TechnicalName="@(Resource?.Name ?? RequestedAddress?.Name)" Namespace="@(Resource?.Namespace.Value ?? RequestedAddress?.Namespace.Value)" ScopeRef="@(PresentationScopeRef ?? Resource?.ScopeRef)" Description="@Description"
+                         Version="@Version" VersionDescription="@VersionDescription" StatusText="@StatusText" Status="Status" Metadata="@Metadata" PrimaryActions="@PrimaryActions" Actions="@Actions" MoreActions="@MoreActions"
+                         CollectionHref="@CollectionHref" CollectionLabel="@CollectionLabel" ShowRefreshAction="ShowRefreshAction"
                          Enabled="Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="EnabledDisabled" EnabledTestId="@EnabledTestId"
                          Feedback="@Feedback" State="@State" LoadState="EffectiveLoadState" OnRetry="OnRetry" OnRefresh="OnRefresh" HasDraft="HasDraft" DraftActions="@DraftActions" Busy="Busy"
                          DefinitionReadOnlyReason="EffectiveReadOnlyReason" ReadOnlyContextActions="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? OwnerContextAction : null)"
                          ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
                          ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
                          DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
-                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityLabels="Resource?.Metadata.Tags" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent"
+                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@ExtensionProvenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent"
                          DefinitionContent="@DefinitionContent" AccessContent="@(Resource is null ? null : AccessContent ?? (CanManageAccess ? AccessPanel : null))" YamlContent="@YamlEditor"
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
                          ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
@@ -35,6 +36,11 @@
     [Parameter] public RenderFragment? IconContent { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? StatusText { get; set; }
+    [Parameter] public string? CollectionHref { get; set; }
+    [Parameter] public string? CollectionLabel { get; set; }
+    [Parameter] public bool ShowRefreshAction { get; set; }
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? VersionDescription { get; set; }
     [Parameter] public UiStatus Status { get; set; }
     [Parameter] public RenderFragment? Metadata { get; set; }
     [Parameter] public RenderFragment? PrimaryActions { get; set; }
@@ -65,6 +71,7 @@
     [Parameter] public RenderFragment? OverviewContent { get; set; }
     [Parameter, EditorRequired] public RenderFragment<string>? DefinitionContent { get; set; }
     [Parameter] public ResourceScopeRef? DefinitionContextScope { get; set; }
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
     [Parameter] public RenderFragment? AccessContent { get; set; }
     [Parameter] public bool AllowAccess { get; set; } = true;
     [Parameter] public string? AccessVersion { get; set; }
@@ -114,6 +121,12 @@
     }
     private RenderFragment YamlEditor => @<ResourceYamlEditor InputTestId="@YamlInputTestId" Value="@Yaml" ValueChanged="YamlChanged" ReadOnly="@(YamlReadOnly || EffectiveReadOnlyReason is not null)" Busy="Busy"
         Error="@YamlError" Label="@YamlLabel" Feedback="@YamlFeedback" />;
+
+    private RenderFragment? ExtensionProvenance => Resource is { ScopeRef: { } owner } saved
+        && saved.Governance.Origin.Kind == ResourceOriginKind.Extension
+        && saved.Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation
+        ? @<ExtensionManagedResourcePanel Governance="saved.Governance" ScopeRef="owner" PresentationScopeRef="PresentationScopeRef" Namespace="saved.Namespace" Kind="@saved.Kind" Name="@saved.Name" Uid="saved.Uid" Embedded />
+        : null;
 
     protected override void OnParametersSet()
     {

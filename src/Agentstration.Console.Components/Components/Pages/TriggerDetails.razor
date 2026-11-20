@@ -15,22 +15,19 @@
 @{ var presentations = Presentations; var editorIdentity = Identity; }
 <ConsoleResourceDetailsTemplate Resource="stored?.Value" Name="@(stored?.Value.Definition.DisplayName ?? Name)" ResourceType="@T("Trigger")" Domain="automation" IconName="clock"
     ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
-    Description="@stored?.Value.Definition.Description" StatusText="@(stored is null ? null : T(stored.Value.Definition.Enabled ? "Enabled" : "Disabled"))" Status="@(stored?.Value.Definition.Enabled == true ? UiStatus.Success : UiStatus.Neutral)"
-    DefinitionContextScope="PhysicalOwner" DefinitionReadOnlyReason="ReadOnlyReason" AllowAccess="false" AccessContent="@(stored is null ? null : AccessPanel)"
+    Description="@stored?.Value.Definition.Description" CollectionHref="@BackUrl" CollectionLabel="@T("ListTriggers")" MoreActions="@(CanManage ? DeleteAction : null)"
+    Version="@(stored?.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture))" VersionDescription="@T("GenerationLabel")"
+    DefinitionContextScope="PhysicalOwner" PresentationScopeRef="@(stored is null ? null : TriggerUi.ContextScope(ContextState.Current))" DefinitionReadOnlyReason="ReadOnlyReason" AllowAccess="false" AccessContent="@(stored is null ? null : AccessPanel)"
     Enabled="stored?.Value.Definition.Enabled" EnabledChanged="ChangeEnabledAsync" EnabledDisabled="@(Busy || !CanManage)" EnabledTestId="trigger-enable"
     LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDraft" Yaml="@TriggerYaml" YamlReadOnly
     YamlTitle="@T("TriggerYaml")" YamlDescription="@T("TriggerYamlHelp")" YamlInputTestId="trigger-yaml-viewer" SectionTestIdPrefix="trigger" TestId="resource-trigger-details">
-    <PrimaryActions>@if (CanExecute) { <button class="button-primary" disabled="@(Busy || stored?.Value.Definition.Enabled != true)" @onclick="RunNowAsync" data-testid="trigger-run-now">@(running ? T("Submitting") : T("RunNow"))</button> }</PrimaryActions>
-    <Actions>@if (CanManage) { <button type="button" class="button-danger" disabled="@Busy" @onclick="() => confirmDelete = true" data-testid="trigger-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
-    <Metadata>@if (stored is { } saved) { <span data-testid="trigger-definition-scope">@T("DefinitionScope") <ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(saved.Value)" Compact /></span> }</Metadata>
+    <PrimaryActions>@if (CanExecute) { <button class="button-primary" disabled="@(Busy || stored?.Value.Definition.Enabled != true)" @onclick="RunNowAsync" data-testid="trigger-run-now"><UiIcon Name="play-circle" />@(running ? T("Submitting") : T("Execute"))</button> }</PrimaryActions>
     <Feedback>@if (message is not null) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="@(hasError ? "trigger-error" : null)">@message</div> }@if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
     <OverviewMetrics>@if (stored is { Value: var trigger }) {
         <MetricCard Label="@T("State")" Value="@T(trigger.Definition.Enabled ? "Enabled" : "Disabled")" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" />
         <MetricCard Label="@T("NextOccurrence")" Value="@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)" Detail="@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)" Status="UiStatus.Info" />
         <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
-        <MetricCard Label="@T("GenerationLabel")" Value="@trigger.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
     }</OverviewMetrics>
-    <IdentityDetails>@if (stored is not null) { <dt>@T("Workspace")</dt><dd>@ContextState.Current?.WorkspaceDisplayName</dd> }</IdentityDetails>
     <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
     <OverviewContent>@if (stored?.Value.Observed.LastOutcome == TriggerLastOutcome.Failed) { <FormSection Title="@T("LastFiringFailed")"><p>@(stored.Value.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></FormSection> }</OverviewContent>
     <DefinitionContent Context="path">@if (stored is { Value: var trigger }) {
@@ -46,6 +43,7 @@
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="trigger-delete-dialog" />
 
 @code {
+    private RenderFragment DeleteAction => @<button type="button" class="button-danger" disabled="@Busy" @onclick="() => confirmDelete = true" data-testid="trigger-delete">@T("Delete")</button>;
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [Parameter] public string Name { get; set; } = "";
     [SupplyParameterFromQuery(Name = "context")] public string? ContextValue { get; set; }

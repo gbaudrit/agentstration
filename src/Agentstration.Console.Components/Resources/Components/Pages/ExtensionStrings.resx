@@ -46,4 +46,5 @@
   <data name="TechnicalDetails"><value>Technical details</value></data>
   <data name="PublishedVersions"><value>Published versions</value></data>
   <data name="InventorySnapshot.Help" xml:space="preserve"><value>This inventory combines registered endpoints with up to 200 enrollment requests. It is a snapshot, not a complete catalog.</value></data>
+  <data name="InstallationDetails" xml:space="preserve"><value>Installation details</value></data>
 </root>

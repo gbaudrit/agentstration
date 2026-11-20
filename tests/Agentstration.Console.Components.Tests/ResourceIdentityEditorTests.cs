@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Console;
@@ -12,6 +13,45 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ResourceIdentityEditorTests
 {
+    [TestMethod]
+    [DataRow("en-US", "Workspace · Project workspace")]
+    [DataRow("fr-FR", "Espace de travail · Project workspace")]
+    public void SavedOwnershipIsAReadOnlyFieldAndCreationRetainsItsScopePicker(string culture, string label)
+    {
+        using var locale = new TestCultureScope(culture);
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var model = new AgentEditorModel { Name = "example", DisplayName = "Example" };
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        ResourceScopeRef? selected = scope;
+        var targets = new[] { new ResourceScopeTargetResponse(scope, ResourceScopeKind.Workspace, "Project workspace", true) };
+        var page = context.Render<CascadingValue<EditContext>>(p => p.Add(c => c.Value, new EditContext(model))
+            .AddChildContent<ResourceIdentityEditor>(identity => identity
+                .Add(c => c.ResourceKind, "Agent").Add(c => c.DisplayName, model.DisplayName).Add(c => c.DisplayNameExpression, () => model.DisplayName)
+                .Add(c => c.TechnicalName, model.Name).Add(c => c.TechnicalNameExpression, () => model.Name)
+                .Add(c => c.Namespace, model.Namespace).Add(c => c.NamespaceExpression, () => model.Namespace)
+                .Add(c => c.DescriptionExpression, (Expression<Func<string?>>)(() => model.Description))
+                .Add(c => c.LabelsExpression, () => model.Tags).Add(c => c.ScopeRef, scope)
+                .Add(c => c.ScopeTargets, targets).Add(c => c.ScopeRefChanged, (ResourceScopeRef? value) => { selected = value; })));
+        var field = page.Find("[data-testid=resource-scope-readonly]");
+        Assert.IsTrue(field.HasAttribute("readonly"));
+        Assert.IsFalse(field.HasAttribute("disabled"));
+        Assert.AreEqual(label, field.GetAttribute("value"));
+        Assert.IsEmpty(page.FindComponents<ResourceScopeFormField>());
+        Assert.IsEmpty(page.FindAll(".resource-scope-badge"));
+        Assert.AreEqual(scope, selected);
+
+        var editor = page.FindComponent<ResourceIdentityEditor>();
+        editor.Render(p => p.Add(c => c.IsNew, true));
+        Assert.IsEmpty(page.FindAll("[data-testid=resource-scope-readonly]"));
+        Assert.AreEqual(scope.Value, page.Find("[data-testid=resource-scope-picker]").GetAttribute("value"));
+        editor.Render(p => p.Add(c => c.ScopeReadOnly, true));
+        Assert.IsEmpty(page.FindAll("select"));
+        Assert.AreEqual(label, page.Find("[data-testid=resource-scope-readonly]").GetAttribute("value"));
+        Assert.AreEqual(scope, selected);
+    }
+
     [TestMethod]
     public void AdditionalPanelsFollowTheCommonPanelAndShareItsEditContext()
     {

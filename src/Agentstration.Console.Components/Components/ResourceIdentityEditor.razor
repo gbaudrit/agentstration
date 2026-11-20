@@ -11,6 +11,7 @@
                                         IsNew="IsNew" Policy="NamePolicy" DisplayNameTestId="@DisplayNameTestId" TechnicalNameTestId="@TechnicalNameTestId" />
                 <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText UpdateOnInput="NamespaceUpdateOnInput" Value="@Namespace" ValueChanged="NamespaceChanged" ValueExpression="NamespaceExpression" Disabled="@(!IsNew || !NamespaceEditable || ReadOnly)" data-testid="@NamespaceTestId" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
                 @if (ScopeContent is not null) { <FormField Label="@Shared["Scope"]" Validation="ScopeValidation">@ScopeContent</FormField> }
+                else if (!IsNew || ScopeReadOnly || ReadOnly) { <ResourceScopeReadOnlyField ScopeRef="@(PresentationScopeRef ?? ScopeRef)" DisplayName="@ScopeTargets?.FirstOrDefault(target => target.ScopeRef == (PresentationScopeRef ?? ScopeRef))?.DisplayName" Validation="ScopeValidation" /> }
                 else { <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" Targets="ScopeTargets" Validation="ScopeValidation" /> }
                 <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" ReadOnly="DescriptionReadOnly" maxlength="@DescriptionMaxLength" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
                 <FormField Label="@Shared["Labels"]" Class="form-span-2"><LabelsEditor Value="@Labels" ValueChanged="LabelsChanged" ValueExpression="LabelsExpression" ReadOnly="@(ReadOnly || LabelsReadOnly)" /></FormField>
@@ -34,6 +35,8 @@
     [Parameter] public bool NamespaceUpdateOnInput { get; set; } = true;
     [Parameter, EditorRequired] public Expression<Func<string>> NamespaceExpression { get; set; } = default!;
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
+    [Parameter] public bool ScopeReadOnly { get; set; }
     [Parameter] public EventCallback<ResourceScopeRef?> ScopeRefChanged { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public EventCallback<string?> DescriptionChanged { get; set; }

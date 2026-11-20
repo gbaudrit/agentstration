@@ -74,6 +74,9 @@ public sealed class ExtensionManagedResourcePresentationTests
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=extension-managed-resource]").TextContent, "Crawl4AI Web Acquisition");
+            Assert.IsNotNull(rendered.Find(".resource-identity-summary [data-testid=extension-managed-resource]"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid=extension-managed-resource]"));
+            Assert.IsFalse(rendered.Find("[data-testid=extension-managed-resource]").ClassList.Contains("panel"));
             Assert.HasCount(0, rendered.FindAll(".resource-header button.button-danger"));
         });
     }
@@ -129,7 +132,7 @@ public sealed class ExtensionManagedResourcePresentationTests
         client.Resource = client.Resource with { Metadata = client.Resource.Metadata with { Tags = new Dictionary<string, string> { ["environment"] = "fixture" } } };
         using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
         var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
-        Assert.Contains("environment: fixture", cut.Find(".resource-identity-summary .labels-summary").TextContent);
+        Assert.Contains("environment : fixture", cut.Find(".resource-identity-summary .labels-summary").TextContent);
         var navigation = cut.FindComponent<ResourceNavigation>().Instance;
         await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
         var form = cut.FindComponent<ResourceDefinitionForm>().Instance; var adapter = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;

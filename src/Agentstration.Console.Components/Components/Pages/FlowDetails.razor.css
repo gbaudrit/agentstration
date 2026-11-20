@@ -9,7 +9,6 @@
 .flow-header-designer { gap: var(--space-2); }
 .flow-header-designer ::deep .ui-icon { width: 17px; height: 17px; }
 .flow-definition-success { margin: 0; color: var(--color-success); }
-.flow-saved-configuration { min-width: 0; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
 .flow-metrics ::deep .metric-card strong,
 .flow-metrics ::deep .metric-card small { overflow-wrap: anywhere; }
 @media (max-width: 720px) {

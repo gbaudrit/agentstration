@@ -11,6 +11,20 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class ResourceDetailsTemplateTests
 {
     [TestMethod]
+    public void OptionalSavedVersionIsForwardedToTheHeaderAndHiddenWhenUnknown()
+    {
+        using var context = Context();
+        var page = context.Render<ResourceDetailsTemplate>(p => p.Add(c => c.Name, "Example").Add(c => c.ResourceType, "Flow")
+            .Add(c => c.Content, "<p>Saved definition</p>"));
+        Assert.IsEmpty(page.FindAll(".resource-version-badge"));
+        page.Render(p => p.Add(c => c.Version, "1.0.0").Add(c => c.VersionDescription, "Published version"));
+        Assert.AreEqual("Version 1.0.0", page.Find(".resource-header-badges .resource-version-badge").TextContent);
+        Assert.AreEqual("Published version", page.Find(".resource-version-badge").GetAttribute("title"));
+        page.Render(p => p.Add(c => c.Version, " "));
+        Assert.IsEmpty(page.FindAll(".resource-version-badge"));
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Required fields", "Section actions")]
     [DataRow("fr-FR", "Champs obligatoires", "Actions de la section")]
     public async Task SectionDeclarationsControlTheLegendAndActionRegionWithoutOwningCommands(string culture, string required, string actionLabel)
@@ -101,6 +115,7 @@ public sealed class ResourceDetailsTemplateTests
                 .Add(c => c.ResourceIdentity, "example|instance").Add(c => c.SectionTestIdPrefix, "example")
                 .Add(c => c.SectionState, sections)
                 .Add(c => c.OverviewMetrics, "<article class='metric-card'>1</article>")
+                .Add(c => c.OverviewContent, "<section class='family-panel'>Family content</section>")
                 .Add(c => c.OverviewConfiguration, "<p>Saved configuration</p>")
                 .Add(c => c.DefinitionContent, _ => probe)
                 .Add(c => c.DefinitionSections, new[] { new ResourceNavigationItem("definition/tools", "Tools", "tool") })
@@ -110,8 +125,13 @@ public sealed class ResourceDetailsTemplateTests
             var navigation = cut.FindComponent<ResourceNavigation>().Instance;
             CollectionAssert.AreEqual(new[] { overview, definition, identity, configuration, "Tools", "History", access, "YAML" },
                 cut.FindAll(".resource-navigation-rail .resource-navigation-entry span").Select(item => item.TextContent).ToArray());
-            CollectionAssert.AreEqual(new[] { "resource-overview-metrics", "panel form-section resource-identity-summary", "panel form-section resource-configuration-summary" },
-                cut.Find("[data-testid=example-overview]").Children.Take(3).Select(item => item.ClassName).ToArray());
+            var overviewPanels = cut.Find("[data-testid=example-overview]").Children;
+            Assert.IsTrue(overviewPanels[0].ClassList.Contains("resource-overview-metrics"));
+            Assert.IsTrue(overviewPanels[1].ClassList.Contains("family-panel"));
+            Assert.IsTrue(overviewPanels[2].ClassList.Contains("resource-identity-summary"));
+            Assert.IsTrue(overviewPanels[^1].ClassList.Contains("resource-configuration-summary"));
+            Assert.AreEqual("true", overviewPanels[2].GetAttribute("data-panel-collapsed"));
+            Assert.AreEqual("true", overviewPanels[^1].GetAttribute("data-panel-collapsed"));
             Assert.IsEmpty(cut.FindComponents<DraftProbe>(), "Access, definition and YAML must mount only on first visit.");
             await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
             Assert.AreEqual("definition/identity", sections.CurrentPath);
@@ -129,7 +149,8 @@ public sealed class ResourceDetailsTemplateTests
             Assert.AreEqual("definition/tools", sections.DefinitionPath);
             Assert.AreSame(editor, cut.FindComponents<DraftProbe>().First().Instance);
             await cut.InvokeAsync(() => navigation.NavigateSection("overview"));
-            Assert.Contains("Saved name", cut.Find("[data-testid=example-identity-summary]").TextContent);
+            Assert.Contains("Saved name", cut.Find(".resource-header h1").TextContent);
+            Assert.IsTrue(cut.Find("[data-testid=example-identity-summary]").TextContent.Contains("example", StringComparison.Ordinal));
             Assert.AreSame(policy, cut.FindComponents<DraftProbe>()[1].Instance);
             Assert.AreSame(yaml, cut.FindComponents<DraftProbe>()[2].Instance);
             CollectionAssert.AreEqual(new[] { "Incomplete definition", "Pending policy", "invalid: [yaml" },
@@ -139,7 +160,8 @@ public sealed class ResourceDetailsTemplateTests
             Assert.AreEqual("yaml", cut.FindAll(".resource-navigation-rail a").Last().GetAttribute("data-resource-section"));
             cut.Render(p => p.Add(c => c.ResourceIdentity, "different|instance").Add(c => c.Name, "Different resource").Add(c => c.TechnicalName, "different"));
             Assert.IsEmpty(cut.FindComponents<DraftProbe>(), "Accepted resource changes must not reuse the previous resource's editors.");
-            Assert.Contains("Different resource", cut.Find("[data-testid=example-identity-summary]").TextContent);
+            Assert.Contains("Different resource", cut.Find(".resource-header h1").TextContent);
+            Assert.AreEqual("different", cut.FindComponent<ResourceIdentityPopover>().Instance.TechnicalName);
         }
         finally { System.Globalization.CultureInfo.CurrentUICulture = previous; }
     }
@@ -207,7 +229,9 @@ public sealed class ResourceDetailsTemplateTests
         Assert.IsTrue(cut.Find("[data-testid=service-activation]").HasAttribute("disabled"));
         cut.Render(p => p.Add(c => c.EnabledTestId, (string?)null));
         Assert.IsFalse(cut.Find("[role=switch]").HasAttribute("data-testid"));
-        Assert.AreEqual("team/endpoint", cut.Find(".resource-header-technical code").TextContent);
+        Assert.AreEqual("endpoint", cut.FindComponent<ResourceIdentityPopover>().Instance.TechnicalName);
+        Assert.AreEqual("team", cut.FindComponent<ResourceIdentityPopover>().Instance.Namespace);
+        Assert.IsEmpty(cut.FindAll(".resource-header-technical"));
         Assert.IsNotNull(cut.Find(".resource-header .page-actions .resource-navigation-trigger"));
         await cut.Find(".resource-header .resource-navigation-trigger").ClickAsync();
         Assert.AreEqual("true", cut.Find(".resource-header .resource-navigation-trigger").GetAttribute("aria-expanded"));
@@ -267,7 +291,7 @@ public sealed class ResourceDetailsTemplateTests
             .Add(c => c.Name, "example").Add(c => c.ResourceType, "Agent").Add(c => c.Content, editor)
             .Add(c => c.SectionTestIdPrefix, "example").Add(c => c.HasDraft, true).Add(c => c.DraftActions, "<button>Save</button>")
             .Add(c => c.LoadState, new ResourceLoadState(ResourceLoadStatus.Ready) { HasContent = true })
-            .Add(c => c.OnRefresh, () => refreshes++).Add(c => c.OnRetry, () => retries++));
+            .Add(c => c.OnRefresh, () => refreshes++).Add(c => c.ShowRefreshAction, true).Add(c => c.OnRetry, () => retries++));
         var instance = cut.FindComponent<DraftProbe>().Instance;
         cut.Find("input").Input("Incomplete draft");
         await cut.Find("[data-testid=example-refresh]").ClickAsync();

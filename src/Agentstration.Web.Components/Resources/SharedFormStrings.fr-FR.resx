@@ -257,4 +257,13 @@
   <data name="CollectionForbiddenMessage" xml:space="preserve"><value>Vous n’avez pas l’autorisation de consulter cette liste dans le contexte sélectionné.</value></data>
   <data name="CollectionEmptyPage" xml:space="preserve"><value>Aucun enregistrement sur cette page</value></data>
   <data name="CollectionContinuePages" xml:space="preserve"><value>Utilisez la pagination pour poursuivre la consultation des résultats.</value></data>
+  <data name="ResourceVersion" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="VersionLabel" xml:space="preserve"><value>Version</value></data>
+  <data name="IdentityQuickView" xml:space="preserve"><value>Identité de la ressource</value></data>
+  <data name="ResourceScopeBadge.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="CloseIdentity" xml:space="preserve"><value>Fermer la fiche Identité</value></data>
+  <data name="NamedResourceScope" xml:space="preserve"><value>{0} : {1}</value></data>
+  <data name="ResourceUid" xml:space="preserve"><value>UUID de la ressource</value></data>
+  <data name="ResourceManifest" xml:space="preserve"><value>Manifeste de la ressource</value></data>
 </root>

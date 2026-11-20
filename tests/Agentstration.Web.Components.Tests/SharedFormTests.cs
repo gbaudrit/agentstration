@@ -319,6 +319,27 @@ public sealed class SharedFormTests
 
     private sealed class CheckboxModel { public bool Enabled { get; set; } }
 
+    [TestMethod]
+    public async Task CollapsiblePanelsRetainTheirMountedInputAndUserSelectedState()
+    {
+        using var context = Context();
+        var cut = context.Render<FormSection>(p => p.Add(c => c.Title, "Identity")
+            .Add(c => c.Collapsible, true).Add(c => c.InitiallyCollapsed, true)
+            .AddChildContent<ClearableText>(input => input.Add(c => c.UpdateOnInput, false)));
+        var input = cut.FindComponent<ClearableText>().Instance;
+        Assert.IsTrue(cut.Find(".form-section-body").HasAttribute("hidden"));
+        Assert.AreEqual("false", cut.Find(".panel-disclosure").GetAttribute("aria-expanded"));
+        await cut.Find(".panel-disclosure").ClickAsync();
+        cut.Find("input").Input("Unsaved local input");
+        await cut.Find(".panel-disclosure").ClickAsync();
+        await cut.Find(".panel-disclosure").ClickAsync();
+        Assert.AreSame(input, cut.FindComponent<ClearableText>().Instance);
+        Assert.AreEqual("Unsaved local input", cut.Find("input").GetAttribute("value"));
+        cut.Render(p => p.Add(c => c.Title, "Saved identity"));
+        Assert.AreEqual("true", cut.Find(".panel-disclosure").GetAttribute("aria-expanded"));
+        Assert.IsFalse(cut.Find(".form-section-body").HasAttribute("hidden"));
+    }
+
     private sealed class TextModel
     {
         [Required] public string Name { get; set; } = string.Empty;

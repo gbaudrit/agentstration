@@ -13,6 +13,8 @@
 
 .resource-owner-scope { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; max-width: 18rem; }
 .resource-scope-badge { flex: 0 0 auto; }
+.resource-owner-joined { min-width: 0; max-width: min(100%, 28rem); }
+.resource-scope-badge-named { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
 .resource-scope-badge-compact {
     padding: .1rem .38rem;

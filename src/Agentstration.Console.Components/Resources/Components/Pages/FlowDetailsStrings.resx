@@ -94,4 +94,7 @@
 <data name="Metadata" xml:space="preserve"><value>Saved metadata</value></data>
 <data name="IdentityMismatch" xml:space="preserve"><value>The returned Flow does not match this resource.</value></data>
 <data name="Back" xml:space="preserve"><value>Back to Flows</value></data>
+  <data name="ListFlows" xml:space="preserve"><value>Flow list</value></data>
+  <data name="ResourceManifestHelp" xml:space="preserve"><value>This manifest reflects the saved resource. Edit the Flow from Definition or its editor.</value></data>
+  <data name="OpenFlowEditor" xml:space="preserve"><value>Open Flow editor</value></data>
 </root>

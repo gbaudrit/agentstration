@@ -1,6 +1,7 @@
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,24 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class ResourceScopeFormFieldTests
 {
+    [TestMethod]
+    public void ReadOnlyScopeNeverBorrowsAnotherOwnersNameOrInventsInstanceOwnership()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workplace = new WorkplaceContextState();
+        var workspaceId = Guid.NewGuid();
+        workplace.SetWorkspace("current", "Current workspace", workspaceId: workspaceId);
+        context.Services.AddSingleton(workplace);
+        var page = context.Render<ResourceScopeReadOnlyField>(p => p.Add(c => c.ScopeRef, ResourceScopeRef.Workspace(workspaceId)));
+        Assert.AreEqual("Workspace · Current workspace", page.Find("input").GetAttribute("value"));
+        page.Render(p => p.Add(c => c.ScopeRef, ResourceScopeRef.Workspace(Guid.NewGuid())));
+        Assert.AreEqual("Workspace", page.Find("input").GetAttribute("value"));
+        page.Render(p => p.Add(c => c.ScopeRef, (ResourceScopeRef?)null));
+        Assert.AreEqual(string.Empty, page.Find("input").GetAttribute("value"));
+    }
+
     [TestMethod]
     public void CompactBadgeKeepsScopeAsInlineMetadata()
     {

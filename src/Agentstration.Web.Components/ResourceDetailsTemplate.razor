@@ -4,10 +4,11 @@
 <div class="resource-details-template" data-testid="@TestId">
     <ResourceHeader Name="@Name" ResourceType="@ResourceType" Domain="@Domain" Icon="@Icon" IconName="@IconName"
                     ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
-                    Description="@Description" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef"
-                    StatusText="@StatusText" Status="Status" Metadata="@Metadata"
+                    Description="@Description" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef" ResourceUid="@(BlocksContent ? null : ResourceUid)"
+                    Version="@Version" VersionDescription="@VersionDescription" StatusText="@StatusText" Status="Status" Metadata="@Metadata"
+                    CollectionHref="@(BlocksContent ? null : CollectionHref)" CollectionLabel="@CollectionLabel" ShowTechnicalIdentity="false" IdentityAvailable="@(!BlocksContent)" IdentityLabels="IdentityLabels" IdentityDetails="IdentityDetails"
                     Enabled="@(BlocksContent ? null : Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(EnabledDisabled || DefinitionReadOnlyReason is not null)" EnabledTestId="@EnabledTestId"
-                    PrimaryActions="@(BlocksContent ? null : PrimaryActions)" Actions="@(BlocksContent ? null : HeaderActions)" MoreActions="@(BlocksContent ? null : MoreActions)" NavigationActions="@(ShowNavigation ? HeaderNavigation() : null)" />
+                    PrimaryActions="@(BlocksContent ? null : PrimaryActions)" Actions="@(BlocksContent ? null : Actions)" MoreActions="@(BlocksContent ? null : HeaderMoreActions)" NavigationActions="@(ShowNavigation ? HeaderNavigation() : null)" />
     @if (LoadState is { BlocksContent: false, Status: ResourceLoadStatus.Refreshing or ResourceLoadStatus.Failed } refreshState)
     {
         <ResourceLoadFeedback State="refreshState" OnRetry="OnRetry" RetryTestId="@SectionTestId("retry")" />
@@ -42,12 +43,12 @@
                     {
                         <div class="resource-overview" hidden="@(SectionState.CurrentPath != "overview")" data-testid="@SectionTestId("overview")">
                             @if (OverviewMetrics is not null) { <div class="resource-overview-metrics">@OverviewMetrics</div> }
+                            @OverviewContent
                             <ResourceIdentitySummary DisplayName="@Name" TechnicalName="@(TechnicalName!)" Namespace="@Namespace" Description="@Description"
-                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" TestId="@SectionTestId("identity-summary")">
+                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" AdditionalContent="@IdentityContent" ResourceUid="ResourceUid" HeaderOwnsIdentity TestId="@SectionTestId("identity-summary")">
                                 <Scope><ResourceScopeBadge ScopeRef="ScopeRef" /></Scope>
                             </ResourceIdentitySummary>
-                            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")">@OverviewConfiguration</FormSection>
-                            @OverviewContent
+                            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")" Collapsible InitiallyCollapsed>@OverviewConfiguration</FormSection>
                         </div>
                         @if (SectionState.HasVisitedDefinition)
                         {
@@ -105,6 +106,8 @@
     [Parameter] public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string? StatusText { get; set; }
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? VersionDescription { get; set; }
     [Parameter] public UiStatus Status { get; set; }
     [Parameter] public bool? Enabled { get; set; }
     [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
@@ -132,10 +135,15 @@
     [Parameter] public ResourceLoadState? LoadState { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public bool ShowRefreshAction { get; set; }
+    [Parameter] public string? CollectionHref { get; set; }
+    [Parameter] public string? CollectionLabel { get; set; }
     // Content/Sections keep existing adopters working while they migrate to the standard regions below.
     [Parameter] public RenderFragment? Content { get; set; }
     [Parameter] public RenderFragment? OverviewMetrics { get; set; }
     [Parameter] public RenderFragment? IdentityDetails { get; set; }
+    [Parameter] public RenderFragment? IdentityContent { get; set; }
+    [Parameter] public Guid? ResourceUid { get; set; }
     [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; } = new Dictionary<string, string>();
     [Parameter] public RenderFragment? OverviewConfiguration { get; set; }
     [Parameter] public RenderFragment? OverviewContent { get; set; }
@@ -157,9 +165,9 @@
     private bool UsesStandardSections => Content is null;
     private bool BlocksContent => LoadState?.BlocksContent == true;
     private bool ShowNavigation => NavigationSections.Count > 0 && !BlocksContent;
-    private RenderFragment? HeaderActions => !OnRefresh.HasDelegate ? Actions : @<text>
+    private RenderFragment? HeaderMoreActions => !ShowRefreshAction || !OnRefresh.HasDelegate ? MoreActions : @<text>
         <button type="button" class="button-secondary" @onclick="OnRefresh" disabled="@(Busy || LoadState?.Status == ResourceLoadStatus.Refreshing)" data-testid="@SectionTestId("refresh")">@Shared["RefreshResource"]</button>
-        @Actions
+        @MoreActions
     </text>;
     private ResourceSectionPresentation? ActivePresentation
     {

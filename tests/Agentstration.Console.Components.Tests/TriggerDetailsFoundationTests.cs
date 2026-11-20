@@ -18,6 +18,47 @@ namespace Agentstration.Web.Tests;
 public sealed class TriggerDetailsFoundationTests
 {
     [TestMethod]
+    [DataRow("en-US", ConsoleContextKind.Instance, "Instance")]
+    [DataRow("fr-FR", ConsoleContextKind.Instance, "Instance")]
+    [DataRow("en-US", ConsoleContextKind.Tenant, "Tenant")]
+    [DataRow("fr-FR", ConsoleContextKind.Tenant, "Tenant")]
+    [DataRow("en-US", ConsoleContextKind.Workspace, "Workspace")]
+    [DataRow("fr-FR", ConsoleContextKind.Workspace, "Espace de travail")]
+    public async Task HeaderAndIdentityPresentTheLogicalScopeWithoutChangingTheStoredOwner(string culture, ConsoleContextKind kind, string label)
+    {
+        using var locale = new TestCultureScope(culture);
+        using var api = new TriggerHandler();
+        using var context = Context(api, kind: kind);
+        var page = Render(context);
+        page.WaitForElement("[data-testid=trigger-identity-summary]");
+        var logical = LogicalScope(kind);
+        Assert.AreEqual(ResourceScopeRef.Workspace(Workspace), page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource!.ScopeRef);
+        Assert.AreEqual(logical, page.FindComponent<ResourceDetailsTemplate>().Instance.ScopeRef);
+        Assert.IsNull(page.FindComponent<ResourceDetailsTemplate>().Instance.DefinitionReadOnlyReason);
+        var badgeLabel = kind == ConsoleContextKind.Instance ? "Instance" : $"{(kind == ConsoleContextKind.Tenant ? "Tenant" : "Workspace")}{(culture == "fr-FR" ? " : " : ": ")}{(kind == ConsoleContextKind.Tenant ? "Development" : "Project workspace")}";
+        Assert.AreEqual(badgeLabel, page.Find(".resource-header .resource-scope-badge").TextContent);
+        Assert.HasCount(1, page.FindAll(".resource-header .resource-scope-badge"));
+        Assert.AreEqual("Version 4", page.Find(".resource-header-badges .resource-version-badge").TextContent);
+        Assert.AreEqual(culture == "fr-FR" ? "Version de configuration" : "Configuration version", page.Find(".resource-version-badge").GetAttribute("title"));
+        Assert.DoesNotContain("Generation", page.Find(".resource-overview-metrics").TextContent);
+        Assert.DoesNotContain("Génération", page.Find(".resource-overview-metrics").TextContent);
+        Assert.IsEmpty(page.FindAll("[data-testid=trigger-definition-scope]"));
+        var identity = page.Find("[data-testid=trigger-identity-summary]");
+        Assert.IsNull(identity.QuerySelector(".resource-scope-text"), "Saved ownership is already shown in the header.");
+        Assert.IsNull(identity.QuerySelector(".resource-scope-badge"));
+        Assert.DoesNotContain("operations", identity.TextContent);
+        Assert.AreEqual(LogicalScope(kind), page.FindComponent<ResourceIdentityPopover>().Instance.ScopeRef);
+        await Select(page, "definition/identity");
+        var owner = page.Find("[data-testid=resource-scope-readonly]");
+        Assert.IsTrue(owner.HasAttribute("readonly"));
+        Assert.AreEqual(kind == ConsoleContextKind.Instance ? label : $"{label} · {(kind == ConsoleContextKind.Tenant ? "Development" : "Project workspace")}", owner.GetAttribute("value"));
+        Assert.DoesNotContain("operations", owner.GetAttribute("value")!);
+        Assert.AreEqual(ResourceScopeRef.Workspace(Workspace), page.FindComponent<ResourceIdentityEditor>().Instance.ScopeRef);
+        await Select(page, "yaml");
+        StringAssert.Contains(page.Find("[data-testid=trigger-yaml-viewer]").GetAttribute("value")!, ResourceScopeRef.Workspace(Workspace).Value);
+    }
+
+    [TestMethod]
     public async Task CommonFrameKeepsActualOwnerTagsOrderedSectionsAndTheSameDefinitionStateAndFields()
     {
         using var api = new TriggerHandler(); using var context = Context(api); var page = Render(context);
@@ -50,11 +91,13 @@ public sealed class TriggerDetailsFoundationTests
         api.Resource = api.Resource with { Generation = 5, Definition = api.Resource.Definition with { DisplayName = "Changed on server" } }; api.Etag = "\"second\"";
         await Select(page, "overview"); await Refresh(page);
         Assert.AreEqual("Saved schedule", page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Name);
+        Assert.AreEqual("Version 4", page.Find(".resource-version-badge").TextContent);
         Assert.IsTrue(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
         await Select(page, "definition/configuration"); Assert.AreEqual("{ retained invalid", page.Find("[data-testid=trigger-input]").GetAttribute("value"));
         Assert.AreSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext); Assert.AreEqual("\"first\"", page.FindComponent<TriggerEditor>().Instance.Version);
         page.Find(".unsaved-changes-bar .button-secondary").Click();
         page.WaitForAssertion(() => Assert.AreEqual("Changed on server", page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Name));
+        Assert.AreEqual("Version 5", page.Find(".resource-version-badge").TextContent);
         Assert.AreNotSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext); Assert.AreEqual("\"second\"", page.FindComponent<TriggerEditor>().Instance.Version);
         Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
     }
@@ -131,6 +174,7 @@ public sealed class TriggerDetailsFoundationTests
     [TestMethod]
     public async Task BoundedHistoryRejectsForeignOccurrencesAndShowsUnknownRatherThanAnInventedEmptyHistory()
     {
+        using var culture = new TestCultureScope("en-US");
         using var api = new TriggerHandler { ForeignHistory = true }; using var context = Context(api); var page = Render(context); page.WaitForElement("[data-testid=trigger-enable]"); await Select(page, "history");
         Assert.IsEmpty(page.FindAll("[data-testid=trigger-occurrence-row]")); StringAssert.Contains(page.Find("[data-testid=trigger-occurrences]").TextContent, "Occurrence history could not be loaded");
         Assert.IsTrue(api.HistoryBounds.All(value => value == 100));
@@ -149,29 +193,37 @@ public sealed class TriggerDetailsFoundationTests
     private static Task Refresh(IRenderedComponent<TriggerDetails> page) => page.InvokeAsync(() => page.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
     private static readonly Guid Workspace = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static IRenderedComponent<TriggerDetails> Render(BunitContext context) => context.Render<TriggerDetails>(p => p.Add(value => value.Name, "schedule"));
-    private static BunitContext Context(TriggerHandler api, bool write = true, bool execute = false)
+    private static readonly Guid Tenant = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static ResourceScopeRef LogicalScope(ConsoleContextKind kind) => kind switch { ConsoleContextKind.Instance => ResourceScopeRef.Instance, ConsoleContextKind.Tenant => ResourceScopeRef.Tenant(Tenant), _ => ResourceScopeRef.Workspace(Workspace) };
+    private static BunitContext Context(TriggerHandler api, bool write = true, bool execute = false, ConsoleContextKind kind = ConsoleContextKind.Instance)
     {
         var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose; context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext());
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(LogicalScope(kind).Value));
         var http = new HttpClient(api) { BaseAddress = new("http://localhost/") }; context.Services.AddSingleton<ITriggerApiClient>(new TriggerApiClient(http)); context.Services.AddSingleton<IFlowApiClient>(new FlowApiClient(http));
-        context.Services.AddSingleton(new ConsoleContextState(new Provider(write, execute))); context.Services.AddSingleton<NotificationState>(); context.Services.AddSingleton(TimeProvider.System);
-        var navigation = context.Services.GetRequiredService<NavigationManager>(); navigation.NavigateTo("http://localhost/triggers/schedule?namespace=schedules&context=%2Finstance");
+        context.Services.AddSingleton(new ConsoleContextState(new Provider(write, execute, kind))); context.Services.AddSingleton<NotificationState>(); context.Services.AddSingleton(TimeProvider.System);
+        var navigation = context.Services.GetRequiredService<NavigationManager>(); navigation.NavigateTo("http://localhost/triggers/schedule?namespace=schedules&context=" + Uri.EscapeDataString(LogicalScope(kind).Value));
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
         module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri);
         foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "access", "yaml", "history", "execution" }) { var url = navigation.Uri + "#" + path; module.Setup<string>("navigate", call => Equals(call.Arguments[0], url)).SetResult(url); }
         return context;
     }
-    private sealed class NavigationContext : IConsoleNavigationContext { public string? ScopeRef => "/instance"; public string AddToUri(string value) => value; }
-    private sealed class Provider(bool write, bool execute) : IConsoleContextProvider
+    private sealed class NavigationContext(string scope) : IConsoleNavigationContext { public string? ScopeRef => scope; public string AddToUri(string value) => value; }
+    private sealed class Provider(bool write, bool execute, ConsoleContextKind kind) : IConsoleContextProvider
     {
-        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken token) => Task.FromResult(new ConsoleContextSnapshot(Guid.NewGuid(), "Operator", "/instance", ConsoleContextKind.Instance, Guid.NewGuid(), "dev", "Development", Workspace, "instance-operations", "Instance operations", new HashSet<string>(new[] { AuthorizationPermissions.ResourcesRead }.Concat(write ? [AuthorizationPermissions.ResourcesWrite] : []).Concat(execute ? [AuthorizationPermissions.RunsExecute] : [])), [], []));
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken token) => Task.FromResult(new ConsoleContextSnapshot(Guid.NewGuid(), "Operator", LogicalScope(kind).Value, kind, Tenant, "dev", "Development", Workspace, "fixture-workspace", kind == ConsoleContextKind.Workspace ? "Project workspace" : kind == ConsoleContextKind.Tenant ? "Tenant operations" : "Instance operations", new HashSet<string>(new[] { AuthorizationPermissions.ResourcesRead }.Concat(write ? [AuthorizationPermissions.ResourcesWrite] : []).Concat(execute ? [AuthorizationPermissions.RunsExecute] : [])), [], []));
     }
     private sealed class TriggerHandler : HttpMessageHandler
     {
         public TriggerResource Resource { get; set; } = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger, Metadata = new() { Name = "schedule", Namespace = ResourceNamespace.Parse("schedules"), Tags = new Dictionary<string, string> { ["team"] = "reviewed" } }, ScopeRef = ResourceScopeRef.Workspace(Workspace), Uid = Guid.NewGuid(), Generation = 4, Definition = new() { DisplayName = "Saved schedule", Input = JsonSerializer.SerializeToElement(new { parameter = "saved" }), Source = new() { Schedule = new() { Type = TriggerScheduleType.Interval, Every = "PT6H", StartAt = DateTimeOffset.Parse("2030-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture), TimeZone = "UTC" } }, Target = new() { Flow = new() { Name = "published-flow", Namespace = ResourceNamespace.Parse("contracts"), ScopeRef = ResourceScopeRef.Instance, Version = "2.3.4", Uid = Guid.NewGuid(), DefinitionHash = "sha256:published" } } } };
         public string Etag { get; set; } = "\"first\"";
-        public HttpStatusCode? ReadFailure { get; set; } public bool ForeignHistory { get; set; } public Task<HttpResponseMessage>? PendingPreview { get; set; }
-        public int Writes { get; private set; } public int Runs { get; private set; } public int Deletes { get; private set; } public string? IfMatch { get; private set; } public List<int> HistoryBounds { get; } = [];
+        public HttpStatusCode? ReadFailure { get; set; }
+        public bool ForeignHistory { get; set; }
+        public Task<HttpResponseMessage>? PendingPreview { get; set; }
+        public int Writes { get; private set; }
+        public int Runs { get; private set; }
+        public int Deletes { get; private set; }
+        public string? IfMatch { get; private set; }
+        public List<int> HistoryBounds { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             var path = request.RequestUri!.AbsolutePath;

@@ -17,27 +17,27 @@ else if (loadError is not null) { <ErrorState Title="@Shared["Unavailable"]" Mes
 else if (flow is not null)
 {
     <ResourceDetailsTemplate Name="@(flow.DisplayName ?? flow.Name)" TechnicalName="@flow.Id" Namespace="@flow.Namespace.Value" ScopeRef="flow.ScopeRef"
-                             Description="@(flow.Description ?? T("DefaultDescription"))" ResourceType="@T("Flow")" Domain="flow" IconName="workflow"
-                             StatusText="@StatusLabel" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)"
+                             Description="@(flow.Description ?? T("DefaultDescription"))" ResourceType="@T("Flow")" Domain="flow" IconName="workflow" ResourceUid="flow.Uid" IdentityLabels="flow.Metadata"
+                             Version="@PublishedVersion" VersionDescription="@T("PublishedVersion")" StatusText="@StatusLabel" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)"
+                             CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)" CollectionLabel="@T("ListFlows")"
                              Enabled="flow.Enabled" EnabledChanged="ToggleEnabledAsync" EnabledDisabled="@(!IsEditable || busy || definitionSaving || orchestrationSaving)" EnabledTestId="flow-enabled"
                              Sections="Sections" ResourceIdentity="@($"{loadedKey}|{flow.Uid}")" DefaultSection="overview" SelectionChanged="SelectSectionAsync"
                              HasDraft="@HasDefinitionDraft" NavigationLabel="@T("DetailsAriaLabel")">
-        <Metadata><span>@FlowLabels[$"Kind.{flow.Definition.Kind}"]</span><span>@T("PublishedVersion"): @(PublishedVersion ?? "—")</span>@if (section == "definition/configuration" && IsEditable) { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
+        <Metadata><ResourceMetadataBadge Value="@FlowLabels[$"Kind.{flow.Definition.Kind}"]" /></Metadata>
         <PrimaryActions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@T("OpenFlowDesigner")</a> }@if (versions.Count > 0) { <button type="button" class="button-primary" data-testid="flow-run-open" disabled="@(!CanExecute || busy)" @onclick="OpenRun">@T("RunFlow")</button> }</PrimaryActions>
-        <Actions><button type="button" class="button-secondary" disabled="@(busy || definitionSaving || orchestrationSaving)" @onclick="RefreshAsync">@T("Refresh")</button><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)">@T("Back")</a></Actions>
         <Feedback><InheritedResourceNotice OwnerScopeRef="FlowScopeRef" />@if (error is not null && !showRun) { <p class="error-panel" role="alert">@error</p> }</Feedback>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || definitionSaving || orchestrationSaving)" @onclick="DiscardDefinition">@Shared["Discard"]</button><button class="button-primary" type="submit" form="@(IsOrchestration ? orchestrationEditor?.FormId : "flow-definition-form")" disabled="@(busy || (IsOrchestration ? orchestrationEditor?.CanSubmit != true : !CanEditDefinition || definitionSaving || definitionInvalid))">@(IsOrchestration ? Shared["Save"] : T("SaveDefinition"))</button></DraftActions>
         <Content>
         <div hidden="@(section != "overview")">
-            <section class="metric-grid flow-metrics"><MetricCard Label="@T("PublishedVersion")" Value="@(PublishedVersion ?? "—")" Detail="@(flow.ActiveVersion is null ? T("NotPublished") : T("ActiveVersion", flow.ActiveVersion))" Status="@(HasPublishedVersion ? UiStatus.Info : UiStatus.Neutral)" /><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Neutral" /></section>
-            <ResourceIdentitySummary DisplayName="@(flow.DisplayName ?? flow.Name)" TechnicalName="@flow.Id" Namespace="@flow.Namespace.Value" Description="@flow.Description"><Scope><ResourceScopeBadge ScopeRef="flow.ScopeRef" /></Scope><AdditionalDetails>@if (flow.Uid is { } uid && uid != Guid.Empty) { <dt>@T("ResourceUid")</dt><dd><CopyableValue Value="@uid.ToString("D")" /></dd> }</AdditionalDetails></ResourceIdentitySummary>
-            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView><details><summary>@T("DefinitionConfiguration")</summary><pre class="flow-saved-configuration">@JsonSerializer.Serialize(flow.Definition, PrettyJson)</pre></details><details><summary>@T("Metadata")</summary><pre class="flow-saved-configuration">@JsonSerializer.Serialize(flow.Metadata, PrettyJson)</pre></details></FormSection>
-            <ExtensionManagedResourcePanel Governance="flow.Governance" ScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" />
-            <section class="panel flow-overview-preview"><div class="panel-header"><div><h2>@T("ExecutionPreview")</h2><p>@T("ExecutionPreviewHelp")</p></div>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</div><FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" /></section>
+            <section class="resource-overview-metrics flow-metrics"><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Neutral" /></section>
+            <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible><Actions>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</Actions><ChildContent><FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" /></ChildContent></FormSection>
+            <ResourceIdentitySummary DisplayName="@(flow.DisplayName ?? flow.Name)" TechnicalName="@flow.Id" Namespace="@flow.Namespace.Value" Description="@flow.Description" ResourceUid="flow.Uid" Labels="flow.Metadata" HeaderOwnsIdentity><Scope><ResourceScopeBadge ScopeRef="flow.ScopeRef" /></Scope><AdditionalContent><ExtensionManagedResourcePanel Governance="flow.Governance" ScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Uid="flow.Uid" Embedded /></AdditionalContent></ResourceIdentitySummary>
+            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView></FormSection>
         </div>
         @if (definitionVisited)
         {
             <div hidden="@(section != "definition/configuration")">
+            @if (IsEditable) { <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p> }
             @if (IsOrchestration)
             {
                 <FlowOrchestrationEditor @ref="orchestrationEditor" FlowId="@flow.Id" FlowNamespace="@flow.Namespace.Value" ScopeRef="flow.ScopeRef" Embedded="true" InitialSnapshot="snapshot" ExternalActions="true" ExternalBusy="busy" DraftChanged="value => orchestrationDirty = value" SavingChanged="value => orchestrationSaving = value" Saved="OrchestrationSavedAsync" />
@@ -72,7 +72,7 @@ else if (flow is not null)
         </div>
         @if (accessVisited && IsOwnerContext)
         { <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="flow.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Version="PublishedVersion" Governance="flow.Governance" /></div> }
-        <div hidden="@(section != "yaml")"><FormSection Title="@T("FlowYaml")" Description="@T(IsEditable ? "FlowYamlEditableHelp" : "FlowYamlReadOnlyHelp")" TestId="flow-yaml-viewer"><FormField Label="@T("FlowYamlDefinition")"><ClearableText Multiline class="form-code-editor runner-json" rows="30" ReadOnly Value="@FlowYaml" aria-label="@T("FlowYamlDefinition")" /></FormField>@if (IsEditable) { <FormActions><a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenYamlEditor")</a></FormActions> }</FormSection></div>
+        <div hidden="@(section != "yaml")"><FormSection Title="@Shared["ResourceManifest"]" Description="@T("ResourceManifestHelp")" TestId="flow-yaml-viewer"><ResourceYamlEditor Value="@FlowYaml" Label="@Shared["ResourceManifest"]" InputTestId="flow-resource-manifest" ReadOnly Actions="@(IsEditable ? FlowEditorAction : null)" /></FormSection></div>
         </Content>
     </ResourceDetailsTemplate>
 }
@@ -88,7 +88,6 @@ else if (flow is not null)
     [Parameter] public string? FlowNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
-    private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true };
     private readonly CancellationTokenSource cancellation = new();
     private FlowResponse? flow;
     private FlowResourceSnapshot? snapshot;
@@ -115,7 +114,8 @@ else if (flow is not null)
     private string? PublishedVersion => flow?.ActiveVersion ?? versions.OrderByDescending(value => value.PublishedAt).FirstOrDefault()?.Version;
     private bool HasPublishedVersion => PublishedVersion is not null;
     private string StatusLabel => T(HasPublishedVersion ? "Status.Published" : "Status.Draft");
-    private string FlowYaml => flow?.Graph is { } graph ? FlowYamlPresentation.ToYaml(graph) : flow is null ? string.Empty : ResourceManifestSerializer.ToYaml(flow.Definition);
+    private string FlowYaml => flow is null ? string.Empty : FlowYamlPresentation.ToYaml(flow);
+    private RenderFragment FlowEditorAction => @<a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenFlowEditor")</a>;
     private string EditorUrl => ResourceOwnershipContext.PreserveNavigation(
         $"{(FlowResourceNamespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows")}/{Uri.EscapeDataString(FlowId)}/designer?scopeRef={Uri.EscapeDataString(FlowScopeRef.Value)}", Services);
     private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("definition", Shared["Definition"], "settings") { Navigable = false }, new("definition/configuration", Shared["Configuration"], "forms"), new("runs", T("Tab.Runs"), "activity"), new("deployments", T("Tab.Deployments"), "history"), new("access", Shared["Access"], "lock") { Visible = IsOwnerContext }, new("yaml", Shared["Yaml"], "code")];

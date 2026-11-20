@@ -50,15 +50,15 @@
 .resource-details-content ::deep .resource-editor-view { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .resource-details-content ::deep .form-section { min-width: 0; }
 
-.resource-overview-metrics {
+.resource-details-content ::deep .resource-overview-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     gap: var(--form-section-gap);
     min-width: 0;
 }
 
-.resource-overview-metrics ::deep .metric-card { min-width: 0; }
-.resource-overview-metrics ::deep .metric-card strong { overflow-wrap: anywhere; }
+.resource-details-content ::deep .resource-overview-metrics .metric-card { min-width: 0; }
+.resource-details-content ::deep .resource-overview-metrics .metric-card strong { overflow-wrap: anywhere; }
 
 .resource-details-with-navigation {
     grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);

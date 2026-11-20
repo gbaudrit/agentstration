@@ -222,7 +222,7 @@ public sealed class ToolDetailsComponentTests
         var client = context.Services.GetRequiredService<ToolClient>();
         client.Resource = client.Resource with { Metadata = client.Resource.Metadata with { Tags = new Dictionary<string, string> { ["environment"] = "fixture" } } };
         var cut = context.Render<ToolDetails>(p => p.Add(c => c.Name, "create-notification"));
-        Assert.Contains("environment: fixture", cut.Find(".resource-identity-summary .labels-summary").TextContent);
+        Assert.Contains("environment : fixture", cut.Find(".resource-identity-summary .labels-summary").TextContent);
         await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
         var form = cut.FindComponent<ResourceDefinitionForm>().Instance; var adapter = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
         Assert.IsTrue(form.ReadOnly); Assert.IsTrue(cut.FindComponent<ResourceIdentityEditor>().Instance.ReadOnly);
@@ -342,6 +342,7 @@ public sealed class ToolDetailsComponentTests
     [TestMethod]
     public void MissingDiscoveryDoesNotInventAnUnavailableStatusOrAvailability()
     {
+        using var culture = new TestCultureScope("en-US");
         using var context = CreateContext(new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) });
         var client = context.Services.GetRequiredService<ToolClient>(); client.Resource = client.Resource with { Definition = client.Resource.Definition with { Discovery = null } };
         var cut = context.Render<ToolDetails>(p => p.Add(c => c.Name, "create-notification"));

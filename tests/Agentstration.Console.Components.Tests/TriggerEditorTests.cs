@@ -20,6 +20,34 @@ namespace Agentstration.Web.Tests;
 public sealed class TriggerEditorTests
 {
     [TestMethod]
+    [DataRow("en-US", ConsoleContextKind.Instance, "Instance")]
+    [DataRow("fr-FR", ConsoleContextKind.Instance, "Instance")]
+    [DataRow("en-US", ConsoleContextKind.Tenant, "Tenant")]
+    [DataRow("fr-FR", ConsoleContextKind.Tenant, "Tenant")]
+    [DataRow("en-US", ConsoleContextKind.Workspace, "Workspace")]
+    [DataRow("fr-FR", ConsoleContextKind.Workspace, "Espace de travail")]
+    public void CreationAndReviewShowTheLogicalScopeWhileTheFormKeepsItsPhysicalOwner(string culture, ConsoleContextKind kind, string label)
+    {
+        using var locale = new TestCultureScope(culture);
+        using var api = new TriggerHandler();
+        using var context = Context(api, kind: kind);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/triggers/new?namespace=schedules");
+        var page = context.Render<TriggerEditor>();
+        page.WaitForElement("[data-testid=trigger-form]");
+        Assert.AreEqual(LogicalScope(kind), page.FindComponent<PageHeader>().Instance.ScopeRef);
+        var owner = page.Find("[data-testid=resource-scope-readonly]");
+        Assert.IsTrue(owner.HasAttribute("readonly"));
+        Assert.AreEqual(kind == ConsoleContextKind.Instance ? label : $"{label} · {(kind == ConsoleContextKind.Tenant ? "Development" : "Project workspace")}", owner.GetAttribute("value"));
+        Assert.DoesNotContain("operations", owner.GetAttribute("value")!);
+        Assert.AreEqual(ResourceScopeRef.Workspace(Workspace), ((TriggerEditorModel)page.FindComponent<ResourceDefinitionForm>().Instance.EditContext.Model).ScopeRef);
+        page.Find("[data-wizard-step=review]").Click();
+        Assert.AreEqual(kind == ConsoleContextKind.Instance ? label : $"{label} · {(kind == ConsoleContextKind.Tenant ? "Development" : "Project workspace")}", page.Find(".resource-identity-summary .resource-scope-text").TextContent);
+        Assert.IsEmpty(page.FindAll(".resource-identity-summary .resource-scope-badge"));
+        Assert.DoesNotContain("operations", page.Find(".resource-identity-summary").TextContent);
+        Assert.AreEqual(0, api.Writes);
+    }
+
+    [TestMethod]
     public void CreationUsesTheWizardAndTheActualFixedOperationalOwnerWithoutAnInventorySelector()
     {
         using var culture = new TestCultureScope("en-US"); using var api = new TriggerHandler(); using var context = Context(api);
@@ -207,32 +235,44 @@ public sealed class TriggerEditorTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/triggers/schedule/edit?namespace=schedules");
         return context.Render<TriggerEditor>(p => p.Add(value => value.Name, "schedule"));
     }
-    private static BunitContext Context(TriggerHandler handler, bool write = true)
+    private static readonly Guid Tenant = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static ResourceScopeRef LogicalScope(ConsoleContextKind kind) => kind switch { ConsoleContextKind.Instance => ResourceScopeRef.Instance, ConsoleContextKind.Tenant => ResourceScopeRef.Tenant(Tenant), _ => ResourceScopeRef.Workspace(Workspace) };
+    private static BunitContext Context(TriggerHandler handler, bool write = true, ConsoleContextKind kind = ConsoleContextKind.Instance)
     {
         var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var http = new HttpClient(handler) { BaseAddress = new("http://localhost/") };
         context.Services.AddSingleton<ITriggerApiClient>(new TriggerApiClient(http)); context.Services.AddSingleton<IFlowApiClient>(new FlowApiClient(http));
-        context.Services.AddSingleton(new ConsoleContextState(new Provider(write))); context.Services.AddSingleton<NotificationState>(); context.Services.AddSingleton<TimeProvider>(new Clock());
+        context.Services.AddSingleton(new ConsoleContextState(new Provider(write, kind))); context.Services.AddSingleton<NotificationState>(); context.Services.AddSingleton<TimeProvider>(new Clock());
         return context;
     }
     private sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow() => new(2026, 11, 20, 12, 0, 0, TimeSpan.Zero); }
-    private sealed class Provider(bool write) : IConsoleContextProvider
+    private sealed class Provider(bool write, ConsoleContextKind kind) : IConsoleContextProvider
     {
-        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken token) => Task.FromResult(new ConsoleContextSnapshot(Guid.NewGuid(), "Operator", "/instance", ConsoleContextKind.Instance, Guid.NewGuid(), "dev", "Development", Workspace, "instance-operations", "Instance operations", new HashSet<string>(write ? [AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite] : [AuthorizationPermissions.ResourcesRead]), [], []));
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken token) => Task.FromResult(new ConsoleContextSnapshot(Guid.NewGuid(), "Operator", LogicalScope(kind).Value, kind, Tenant, "dev", "Development", Workspace, "fixture-workspace", kind == ConsoleContextKind.Workspace ? "Project workspace" : kind == ConsoleContextKind.Tenant ? "Tenant operations" : "Instance operations", new HashSet<string>(write ? [AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite] : [AuthorizationPermissions.ResourcesRead]), [], []));
     }
     private sealed class TriggerHandler : HttpMessageHandler
     {
         public TriggerResource Resource { get; set; } = new()
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = TriggerResourceKinds.Trigger,
-            Metadata = new() { Name = "schedule", Namespace = ResourceNamespace.Parse("schedules"), Tags = new Dictionary<string, string> { ["team"] = "retained" } }, ScopeRef = ResourceScopeRef.Workspace(Workspace), Uid = Guid.NewGuid(), Generation = 4,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = TriggerResourceKinds.Trigger,
+            Metadata = new() { Name = "schedule", Namespace = ResourceNamespace.Parse("schedules"), Tags = new Dictionary<string, string> { ["team"] = "retained" } },
+            ScopeRef = ResourceScopeRef.Workspace(Workspace),
+            Uid = Guid.NewGuid(),
+            Generation = 4,
             Definition = new() { DisplayName = "Saved schedule", Source = new() { Schedule = new() { Type = TriggerScheduleType.Interval, Every = "PT6H", StartAt = new Clock().GetUtcNow().AddHours(1), TimeZone = "Europe/Paris" } }, Target = new() { Flow = new() { Name = "published-flow", Namespace = ResourceNamespace.Parse("contracts"), ScopeRef = ResourceScopeRef.Instance, Version = "2.3.4", Uid = Guid.NewGuid(), DefinitionHash = "sha256:exact-published-definition" } }, ExecutionScope = new(Guid.NewGuid(), Workspace, Guid.NewGuid()) { LogicalScopeRef = ResourceScopeRef.Instance } }
         };
-        public HttpStatusCode? ReadFailure { get; set; } public bool FlowFailure { get; set; } public bool WriteFailure { get; set; }
-        public int FlowReads { get; private set; } public int Writes { get; private set; } public string? IfMatch { get; private set; } public TriggerResource? Saved { get; private set; }
+        public HttpStatusCode? ReadFailure { get; set; }
+        public bool FlowFailure { get; set; }
+        public bool WriteFailure { get; set; }
+        public int FlowReads { get; private set; }
+        public int Writes { get; private set; }
+        public string? IfMatch { get; private set; }
+        public TriggerResource? Saved { get; private set; }
         public List<int> PreviewCounts { get; } = [];
-        public Task<HttpResponseMessage>? PendingPreview { get; set; } public bool PreviewWaiting { get; private set; }
+        public Task<HttpResponseMessage>? PendingPreview { get; set; }
+        public bool PreviewWaiting { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             var path = request.RequestUri!.AbsolutePath;

@@ -111,7 +111,7 @@ else
     {
         <ConsoleResourceDetailsTemplate Resource="savedResource" RequestedAddress="@ResourceAddress.Create(AgentResourceNamespace, AgentResourceKinds.Agent, Name!)" Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Agent")" Domain="agent" Icon="◎"
                                  Description="@(savedResource?.Definition.Description)" StatusText="@(savedResource is null ? null : HeaderStatus)" Status="HeaderStatusTone"
-                                 Feedback="@feedback" LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" HasDraft="@isDirty" TestId="agent-resource-details"
+                                 Feedback="@feedback" LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" ShowRefreshAction HasDraft="@isDirty" TestId="agent-resource-details"
                                  DefinitionSections="AgentDefinitionSections" SectionState="sectionState" ResourceIdentity="@($"{loadedKey}|{selectedScope}|{ContextScopeRef}")" NavigationLabel="@T("AgentSections")"
                                  NavigationTestId="agent-sections" SelectionChanged="SectionSelected" SectionTestIdPrefix="agent"
                                  YamlTitle="@T("AgentYaml")" YamlDescription="@T("AgentYamlHelp")"
@@ -127,7 +127,7 @@ else
             <OverviewConfiguration>@overviewConfiguration</OverviewConfiguration>
             <OverviewContent>@overviewContent</OverviewContent>
             <DefinitionContent Context="section">@definitionContent</DefinitionContent>
-            <Metadata>@if (savedResource is not null) { <span>@T("Generation", generation)</span> }</Metadata>
+            <Metadata>@if (savedResource is not null) { <ResourceMetadataBadge Value="@T("Generation", generation)" /> }</Metadata>
             <PrimaryActions>@if (savedResource is not null && AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }</PrimaryActions>
             <Actions>@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || refreshing || isDirty)" title="@(isDirty ? T("SaveBeforeApply") : null)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
             <DraftActions>

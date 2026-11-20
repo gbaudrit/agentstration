@@ -14,6 +14,40 @@ namespace Agentstration.Web.Tests;
 public sealed class ConsoleResourceDetailsTemplateTests
 {
     [TestMethod]
+    public void ManagementSectionIsComposedAutomaticallyFromTheSavedGovernance()
+    {
+        using var context = Context();
+        var resource = Example();
+        var page = Render(context, resource);
+        Assert.IsEmpty(page.FindAll("[data-testid=extension-managed-resource]"));
+        var managed = resource with { Governance = ResourceGovernance.Extension("/instance/ExtensionBundleInstallation/fixture", "Fixture.Extension", "1.0.0") };
+        page.Render(p => p.Add(c => c.Resource, managed));
+        Assert.Contains("Fixture.Extension", page.Find(".resource-identity-summary [data-testid=extension-managed-resource]").TextContent);
+        Assert.AreEqual("true", page.Find(".resource-overview .resource-identity-summary").GetAttribute("data-panel-collapsed"));
+        page.Render(p => p.Add(c => c.Resource, resource));
+        Assert.IsEmpty(page.FindAll("[data-testid=extension-managed-resource]"));
+    }
+
+    [TestMethod]
+    public async Task ScopePresentationDoesNotChangeTheResourceIdentityOrAccessOwner()
+    {
+        using var context = Context();
+        var resource = Example();
+        var page = Render(context, resource);
+        var logical = ResourceScopeRef.Tenant(Guid.Parse("33333333-3333-3333-3333-333333333333"));
+        page.Render(p => p.Add(c => c.PresentationScopeRef, logical));
+        Assert.AreEqual(logical, page.FindComponent<ResourceDetailsTemplate>().Instance.ScopeRef);
+        Assert.AreEqual(resource.Uid, page.FindComponent<ResourceDetailsTemplate>().Instance.ResourceUid);
+        Assert.AreEqual(resource.Uid.ToString("D"), page.Find(".resource-overview .resource-identity-facts dd:first-of-type .copyable-text").TextContent);
+        Assert.AreSame(resource, page.Instance.Resource);
+        Assert.IsNull(page.FindComponent<ResourceDetailsTemplate>().Instance.DefinitionReadOnlyReason);
+        await page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        var access = page.FindComponent<Stub<ResourceAccessPanel>>().Instance;
+        Assert.AreEqual(resource.ScopeRef, access.Parameters.Get(p => p.OwnerScopeRef));
+        Assert.AreEqual(resource.Uid, access.Parameters.Get(p => p.ResourceUid));
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task ManagedAndPermissionReadOnlyDefinitionsRetainIndependentAccessCommands(bool managed)

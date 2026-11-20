@@ -25,7 +25,7 @@ export const GovernedInventoryTextByLocale = {
     kinds: ['ToolSet', 'Flow', 'Data Source Profile'], scope: 'Instance',
     bundleVersion: 'Bundle version', extensionVersion: 'Extension version',
     mutations: ['Delete', 'Save', 'Save changes', 'Publish', 'Activate', 'Apply YAML'],
-    yamlEditor: 'Open YAML editor',
+    yamlEditor: 'Open Flow editor',
     delete: 'Delete', save: 'Save',
   },
   'fr-FR': {
@@ -36,7 +36,7 @@ export const GovernedInventoryTextByLocale = {
     kinds: ['ToolSet', 'Flow', 'Profil de source de données'], scope: 'Instance',
     bundleVersion: 'Version du bundle', extensionVersion: 'Version de l’extension',
     mutations: ['Supprimer', 'Enregistrer', 'Enregistrer les modifications', 'Publier', 'Activer', 'Appliquer le YAML'],
-    yamlEditor: 'Ouvrir l’éditeur YAML',
+    yamlEditor: 'Ouvrir l’éditeur du Flow',
     delete: 'Supprimer', save: 'Enregistrer',
   },
 } as const;

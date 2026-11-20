@@ -100,13 +100,15 @@ export class InheritedResourceReadOnlyPage {
     await expect(this.notice.getByText(sharedNotice ? expected.definitionTitle : expected.title, { exact: true })).toBeVisible();
     await expect(this.notice.getByText(sharedNotice ? expected.definitionMessage : expected.message, { exact: true })).toBeVisible();
     const scopePresentation = sharedNotice ? this.page.locator('.resource-header .resource-scope-badge') : this.notice;
-    await expect(scopePresentation.getByText(ownerLabel, { exact: true })).toBeVisible();
+    if (sharedNotice) await expect(scopePresentation).toContainText(ownerLabel);
+    else await expect(scopePresentation.getByText(ownerLabel, { exact: true })).toBeVisible();
     const action = this.notice.getByTestId(TestIds.common.switchToOwnerContext);
     await expect(action).toHaveText(expected.changeScope);
     const ownerScope = ownerLabel === 'Instance' ? '/instance' : /\/tenants\/[0-9a-f-]+/i;
     const href = await action.getAttribute('href');
     expect(href).toBeTruthy();
     const context = new URL(href!, this.page.url()).searchParams.get('context');
+    if (sharedNotice) await expect(this.page.locator('.resource-header .resource-owner-scope')).toHaveAttribute('data-scope-ref', context!);
     if (typeof ownerScope === 'string') expect(context).toBe(ownerScope);
     else expect(context).toMatch(ownerScope);
 

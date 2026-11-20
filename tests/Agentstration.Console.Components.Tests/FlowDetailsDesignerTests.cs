@@ -5,6 +5,7 @@ using Agentstration.Agents.Contracts;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Contracts;
@@ -24,6 +25,62 @@ namespace Agentstration.Web.Tests;
 [DoNotParallelize]
 public sealed partial class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    [DataRow("en-US", "Resource manifest")]
+    [DataRow("fr-FR", "Manifeste de la ressource")]
+    public void YamlUsesTheStandardEditorAndTheSavedResourceInsteadOfThePendingDraft(string language, string title)
+    {
+        using var culture = new TestCultureScope(language);
+        using var context = FlowContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var client = new FlowClientStub { Metadata = new Dictionary<string, string> { [FlowMetadataKeys.Contract] = "saved/v1" } };
+        context.Services.AddSingleton<IFlowApiClient>(client);
+        AddConsoleContext(context);
+        var page = context.Render<FlowDetails>(p => p.Add(c => c.FlowId, "sample"));
+        Assert.IsEmpty(page.FindAll(".flow-saved-configuration"));
+        SelectFlowSection(context, "definition/configuration");
+        page.Find("[data-testid=flow-definition-display-name]").Input("Pending local title");
+        SelectFlowSection(context, "yaml");
+
+        Assert.AreEqual(title, page.Find("[data-testid=flow-yaml-viewer] h2").TextContent);
+        Assert.HasCount(1, page.FindComponents<ResourceYamlEditor>());
+        var editor = page.FindComponent<ResourceYamlEditor>().Instance;
+        Assert.IsTrue(editor.ReadOnly);
+        Assert.IsFalse(editor.ValueChanged.HasDelegate);
+        var manifest = ResourceManifestSerializer.FromYaml<JsonElement>(editor.Value);
+        Assert.AreEqual("sample", manifest.GetProperty("metadata").GetProperty("name").GetString());
+        Assert.AreEqual("default", manifest.GetProperty("metadata").GetProperty("namespace").GetString());
+        Assert.AreEqual("Sample", manifest.GetProperty("definition").GetProperty("displayName").GetString());
+        Assert.AreEqual("saved/v1", manifest.GetProperty("definition").GetProperty("metadata").GetProperty(FlowMetadataKeys.Contract).GetString());
+        Assert.AreEqual("input", manifest.GetProperty("definition").GetProperty("graph").GetProperty("entryStep").GetString());
+        Assert.AreEqual(1, client.DraftLoadCount);
+        Assert.IsNull(client.LastDraftUpdate);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Published version")]
+    [DataRow("fr-FR", "Version publiée")]
+    public void HeaderShowsThePublishedVersionOnceBesideTheTitle(string culture, string description)
+    {
+        using var locale = new TestCultureScope(culture);
+        using var context = FlowContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { Metadata = new Dictionary<string, string> { ["team"] = "data", [FlowMetadataKeys.Contract] = "fixture/v1" } });
+        AddConsoleContext(context);
+
+        var page = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
+
+        Assert.AreEqual("Version 1.0.0", page.Find(".resource-header-badges .resource-version-badge").TextContent);
+        Assert.AreEqual(description, page.Find(".resource-version-badge").GetAttribute("title"));
+        Assert.HasCount(1, page.FindAll(".resource-header-badges .resource-metadata > .resource-metadata-badge"));
+        Assert.IsEmpty(page.FindAll(".resource-header-copy > .resource-metadata"));
+        Assert.Contains("team : data", page.Find(".resource-details-main .resource-identity-summary .labels-summary").TextContent);
+        Assert.Contains("flow.contract : fixture/v1", page.Find(".resource-identity-popover .labels-summary").TextContent);
+        Assert.IsFalse(page.Find(".resource-metadata").TextContent.Contains("1.0.0", StringComparison.Ordinal));
+        SelectFlowSection(context, "definition/configuration");
+        Assert.AreEqual("Version 1.0.0", page.Find(".resource-header-badges .resource-version-badge").TextContent);
+    }
+
     [TestMethod]
     [DataRow("en-US", "artifact_processing_json_invalid", "text/plain")]
     [DataRow("fr-FR", "artifact_processing_json_invalid", "text/plain")]
@@ -805,6 +862,7 @@ public sealed partial class FlowDetailsDesignerTests
             this.extensionManaged = extensionManaged;
         }
         public ResourceScopeRef ScopeRef => scopeRef;
+        public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
         public ResourceNamespace RequestedNamespace { get; private set; }
         public int SnapshotReads { get; private set; }
         public UpdateFlowRequest? LastDefinitionUpdate { get; private set; }
@@ -823,7 +881,7 @@ public sealed partial class FlowDetailsDesignerTests
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
-            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, new Dictionary<string, string>(), Now, Now, Graph)
+            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, Metadata, Now, Now, Graph)
             {
                 Namespace = @namespace,
                 ScopeRef = scopeRef,

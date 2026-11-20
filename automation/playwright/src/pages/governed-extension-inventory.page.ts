@@ -13,6 +13,15 @@ export class GovernedExtensionInventoryPage {
   public get managed(): Locator { return this.page.getByTestId(TestIds.governedInventory.managed); }
   public get contributions(): Locator { return this.page.getByTestId(TestIds.governedInventory.contributions); }
 
+  private async openManagedIdentity(): Promise<void> {
+    const identity = this.page.locator('.resource-details-main .resource-identity-summary');
+    const disclosure = identity.locator('.panel-disclosure');
+    if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+    await expect(this.managed).toBeVisible();
+    const details = this.managed.locator('.extension-management-details');
+    if (await details.getAttribute('open') === null) await details.locator('summary').click();
+  }
+
   private async navigate(url: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'networkidle' });
     expect(response?.ok(), `Governed inventory route ${url}`).toBe(true);
@@ -99,10 +108,11 @@ export class GovernedExtensionInventoryPage {
     const hrefs = await this.inventory.getByTestId(TestIds.governedInventory.resources).locator('a').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')!));
     for (const href of hrefs) {
       await this.navigate(new URL(href, consoleUrl).href);
+      await this.openManagedIdentity();
       await expect(this.managed).toContainText(GovernedInventoryTextByLocale[locale].managed);
       await expect(this.managed).toContainText('9.0.0');
       await expect(this.managed).toContainText('2.4.0');
-      const owner = this.managed.locator('a');
+      const owner = this.managed.locator('.extension-management-summary > a');
       this.assertScopedLink(await owner.getAttribute('href'));
       await this.assertNoMutation(locale);
       if (href.includes('/flows/')) {
@@ -121,10 +131,12 @@ export class GovernedExtensionInventoryPage {
         await expect(this.page.locator('#profile-resource-form > fieldset')).toHaveAttribute('disabled', '');
       }
       await this.navigate(new URL(href, consoleUrl).href);
-      await this.managed.locator('a').click();
+      await this.openManagedIdentity();
+      await this.managed.locator('.extension-management-summary > a').click();
       await expect(this.page).toHaveURL(url => url.pathname === '/extensions/qa-managed' && url.searchParams.get('namespace') === namespace);
     }
     await this.navigate(`${consoleUrl}/data-source-profiles/qa-managed?${query}`);
+    await this.openManagedIdentity();
     await expect(this.managed).toBeVisible();
     await this.navigate(`${consoleUrl}/data-source-profiles?context=%2Finstance`);
     const profileRow = this.page.locator('tbody tr, .collection-card').filter({ has: this.page.locator("a.resource-name-link[href^='/data-source-profiles/qa-managed?']") });

@@ -36,7 +36,6 @@ else
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics>@if (profile is not null) { <MetricCard Label="@T("ActiveVersion")" Value="@(profile.ActiveVersion ?? "—")" Detail="@T("Published")" Status="@(profile.ActiveVersion is null ? UiStatus.Neutral : UiStatus.Success)" /> }</OverviewMetrics>
         <OverviewConfiguration>@Configuration</OverviewConfiguration>
-        <OverviewContent>@if (profile?.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="profile.Governance" ScopeRef="owner" Namespace="profile.Namespace" Kind="@DataSourceResourceKinds.DataSourceProfile" Name="@profile.Name" Uid="profile.Uid" /> }</OverviewContent>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="profile-resource-form" FormName="data-source-profile" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             Busy="busy" ReadOnly="@(!CanManage)" Disabled="@(HasRawDraft || !interactive)" InvalidInputChanged="value => invalidInput = value" /></DefinitionContent>

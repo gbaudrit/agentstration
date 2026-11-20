@@ -21,7 +21,6 @@
         <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
     }</OverviewMetrics>
     <OverviewConfiguration>@Configuration</OverviewConfiguration>
-    <OverviewContent>@if (toolSet?.ScopeRef is { } managedOwner) { <ExtensionManagedResourcePanel Governance="toolSet.Governance" ScopeRef="managedOwner" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Uid="toolSet.Uid" /> }</OverviewContent>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="toolset-inspection-form" FormName="toolset-inspection"
         Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
     <AdditionalContent Context="path">@Versions</AdditionalContent>

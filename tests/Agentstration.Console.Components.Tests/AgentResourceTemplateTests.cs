@@ -70,7 +70,7 @@ public sealed class AgentResourceTemplateTests
         Assert.AreEqual("environment", cut.Find("[data-testid=agent-identity-summary] .resource-label strong").TextContent);
         Assert.Contains("production", cut.Find("[data-testid=agent-identity-summary] .labels-summary").TextContent);
         Assert.HasCount(1, cut.FindAll("[data-testid=agent-overview] .labels-summary"));
-        Assert.AreEqual(labels, cut.Find("[data-testid=agent-identity-summary] .labels-summary").ParentElement!.PreviousElementSibling!.TextContent);
+        Assert.AreEqual(labels, cut.Find("[data-testid=agent-identity-summary] .labels-summary").Closest("dd")!.PreviousElementSibling!.TextContent);
     }
 
     [TestMethod]
@@ -112,7 +112,7 @@ public sealed class AgentResourceTemplateTests
         cut.Find("[data-testid=agent-display-name]").Input("Unsaved agent name");
         await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
         Assert.AreEqual("overview", sections.CurrentPath);
-        Assert.Contains("Saved agent", cut.Find("[data-testid=agent-identity-summary]").TextContent);
+        Assert.Contains("Saved agent", cut.Find(".resource-header h1").TextContent);
         Assert.DoesNotContain("Unsaved agent name", cut.Find("[data-testid=agent-identity-summary]").TextContent);
         Assert.IsNotNull(cut.Find(".resource-details-main > .unsaved-changes-bar"));
         Assert.AreEqual("agent-resource-form", cut.Find("[data-testid=agent-save-draft]").GetAttribute("form"));

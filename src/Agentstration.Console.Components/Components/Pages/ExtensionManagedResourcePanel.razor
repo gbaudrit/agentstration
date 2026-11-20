@@ -3,17 +3,39 @@
 
 @if (IsExtensionManaged)
 {
-    <section class="panel form-section" data-testid="extension-managed-resource">
-        <div class="panel-header">
-            <div>
-                <p class="eyebrow">@T("ManagedReadOnly")</p>
-                <h2>@(owner?.Extension.DisplayName ?? Governance.Origin.Reference)</h2>
-                <p>@T("ManagedResourceHelp")</p>
+    @if (Embedded)
+    {
+        <section class="resource-extension-provenance" data-testid="extension-managed-resource" aria-labelledby="@headingId">
+            <div class="extension-management-summary">
+                <h3 id="@headingId">@T("ManagingExtension")</h3>
+                @if (owner is not null) { <a class="text-button" href="@owner.ExtensionUrl">@owner.Extension.DisplayName</a> }
+                else { <span>@Governance.Origin.Reference</span> }
+                @if (!string.IsNullOrWhiteSpace(Governance.Origin.Version)) { <ResourceMetadataBadge Label="@T("ExtensionVersion")" Value="@Governance.Origin.Version" /> }
+                <span class="extension-management-hint">@T("ManagedReadOnly")</span>
+                @if (owner is not null) { <span class="extension-management-hint">@T($"InstallationState.{owner.Installation.State}")</span> }
             </div>
-        </div>
-        <dl class="resource-details">
+            <details class="extension-management-details"><summary>@T("InstallationDetails")</summary><p>@T("ManagedResourceHelp")</p><dl class="resource-details extension-management-facts">@Facts</dl></details>
+        </section>
+    }
+    else
+    {
+        <section class="panel form-section" data-testid="extension-managed-resource">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">@T("ManagedReadOnly")</p>
+                    <h2>@(owner?.Extension.DisplayName ?? Governance.Origin.Reference)</h2>
+                    <p>@T("ManagedResourceHelp")</p>
+                </div>
+            </div>
+            <dl class="resource-details">@Facts</dl>
+        </section>
+    }
+}
+
+@code {
+    private RenderFragment Facts => @<text>
             <dt>@T("ExtensionVersion")</dt><dd>@Governance.Origin.Version</dd>
-            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="ScopeRef" /></dd>
+            <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="@(PresentationScopeRef ?? ScopeRef)" /></dd>
             @if (owner is not null)
             {
                 <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@owner.ExtensionUrl">@owner.Installation.ExtensionId</a></dd>
@@ -21,19 +43,18 @@
                 <dt>@T("BundleVersion")</dt><dd>@owner.Installation.BundleVersion</dd>
                 <dt>@T("InstallationState")</dt><dd>@T($"InstallationState.{owner.Installation.State}")</dd>
             }
-        </dl>
-    </section>
-}
-
-@code {
+        </text>;
     [Parameter, EditorRequired] public ResourceGovernance Governance { get; set; } = ResourceGovernance.User;
     [Parameter, EditorRequired] public ResourceScopeRef ScopeRef { get; set; }
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
     [Parameter, EditorRequired] public ResourceNamespace Namespace { get; set; }
     [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
     [Parameter] public Guid? Uid { get; set; }
+    [Parameter] public bool Embedded { get; set; }
 
     private ExtensionManagedResourceOwner? owner;
+    private readonly string headingId = $"extension-management-{Guid.NewGuid():N}";
     private bool IsExtensionManaged => Governance.Origin.Kind == ResourceOriginKind.Extension
         && Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation;
     private string T(string key) => Localizer[key];

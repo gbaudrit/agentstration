@@ -16,7 +16,7 @@
 {
     <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
     <PageTitle>@T(IsNew ? "NewTrigger" : "EditTrigger") · Agentstration</PageTitle>
-    <PageHeader ScopeRef="existing?.Value.ScopeRef" Title="@(IsNew ? T("NewTrigger") : model.DisplayName.Length > 0 ? model.DisplayName : RequestedName ?? T("EditTrigger"))" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
+    <PageHeader ScopeRef="TriggerUi.ContextScope(ContextState.Current)" Title="@(IsNew ? T("NewTrigger") : model.DisplayName.Length > 0 ? model.DisplayName : RequestedName ?? T("EditTrigger"))" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
         <Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions>
     </PageHeader>
 }
@@ -47,10 +47,9 @@ else
     private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@TriggerResourceKinds.Trigger" NamePolicy="ResourceNamePolicy.Trigger" IsNew="IsNew" ReadOnly="@(!CanWrite)"
         DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
         TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
-        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="model.ScopeRef" Description="@model.Description" DescriptionChanged="value => model.Description = value" DescriptionExpression="@(() => model.Description)" DescriptionMaxLength="500"
-        Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" TestId="trigger-identity-editor">
-        <ScopeContent><span class="trigger-owner-context"><ResourceScopeBadge ScopeRef="model.ScopeRef" /><span>@ContextState.Current?.WorkspaceDisplayName</span></span></ScopeContent>
-    </ResourceIdentityEditor>;
+        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="model.ScopeRef" PresentationScopeRef="TriggerUi.ContextScope(ContextState.Current)" ScopeReadOnly="true"
+        Description="@model.Description" DescriptionChanged="value => model.Description = value" DescriptionExpression="@(() => model.Description)" DescriptionMaxLength="500"
+        Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true" DisplayNameTestId="trigger-display-name" TechnicalNameTestId="trigger-name" TestId="trigger-identity-editor" />;
     private RenderFragment ConfigurationFields => @<div class="resource-editor-view">@TargetFields @ScheduleFields @InputFields</div>;
     private RenderFragment<string> DefinitionContent => path => path == "definition/identity" ? IdentityFields : ConfigurationFields;
     private RenderFragment TargetFields => @<FormSection Title="@T("PublishedFlow")" Eyebrow="@T("Target")"><ChildContent>
@@ -92,7 +91,7 @@ else
             </FormGrid>
 
         </ChildContent></FormSection>;
-    private RenderFragment ReviewFields => @<div class="resource-editor-view"><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Namespace="@model.Namespace" Description="@model.Description" Labels="existing?.Value.Metadata.Tags"><Scope><ResourceScopeBadge ScopeRef="model.ScopeRef" /></Scope></ResourceIdentitySummary>
+    private RenderFragment ReviewFields => @<div class="resource-editor-view"><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Namespace="@model.Namespace" Description="@model.Description" Labels="existing?.Value.Metadata.Tags"><Scope><ResourceScopeBadge ScopeRef="TriggerUi.ContextScope(ContextState.Current)" /></Scope></ResourceIdentitySummary>
         <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("Flow")</dt><dd><code>@model.FlowKey</code></dd><dt>@T("Schedule")</dt><dd>@ScheduleReview</dd><dt>@T("Enabled")</dt><dd>@T("No")</dd></dl><pre class="trigger-json">@model.InputJson</pre></FormSection></div>;
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }

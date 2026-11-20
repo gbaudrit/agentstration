@@ -46,4 +46,5 @@
   <data name="TechnicalDetails"><value>Détails techniques</value></data>
   <data name="PublishedVersions"><value>Versions publiées</value></data>
   <data name="InventorySnapshot.Help" xml:space="preserve"><value>Cet inventaire combine les points de terminaison enregistrés avec au plus 200 demandes d’enrôlement. Il présente un instantané du catalogue, qui peut être incomplet.</value></data>
+  <data name="InstallationDetails" xml:space="preserve"><value>Détails de l’installation</value></data>
 </root>

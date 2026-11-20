@@ -1,34 +1,27 @@
-using System.Text.Json;
 using Agentstration.Flows;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
+using Agentstration.Flows.Contracts;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
 public static class FlowYamlPresentation
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly ISerializer Serializer = new SerializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .DisableAliases()
-        .Build();
-
-    public static string ToYaml(FlowGraphDefinition definition)
+    public static string ToYaml(FlowResponse resource) => ResourceManifestSerializer.ToYaml(new
     {
-        var json = JsonSerializer.Serialize(definition, JsonOptions);
-        var normalized = Normalize(JsonDocument.Parse(json).RootElement);
-        return Serializer.Serialize(normalized);
-    }
-
-    private static object? Normalize(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Object => value.EnumerateObject().ToDictionary(property => property.Name, property => Normalize(property.Value), StringComparer.Ordinal),
-        JsonValueKind.Array => value.EnumerateArray().Select(Normalize).ToArray(),
-        JsonValueKind.String => value.GetString(),
-        JsonValueKind.Number when value.TryGetInt64(out var integer) => integer,
-        JsonValueKind.Number => value.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        _ => null
-    };
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = FlowResourceKinds.Flow,
+        Metadata = new { resource.Namespace, Name = resource.Id },
+        resource.ScopeRef,
+        Definition = new
+        {
+            DisplayName = resource.DisplayName ?? resource.Name,
+            resource.Description,
+            resource.Version,
+            resource.Enabled,
+            Spec = resource.Definition,
+            resource.Metadata,
+            resource.Graph
+        }
+    });
 }

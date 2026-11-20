@@ -1,0 +1,9 @@
+.resource-identity-trigger-host { display: inline-flex; }
+.resource-identity-trigger { width: 2rem; height: 2rem; padding: .35rem; }
+.resource-identity-popover { position: fixed; inset: auto; margin: 0; width: min(34rem, calc(100vw - 1rem)); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); box-shadow: var(--shadow-md); overflow: visible; }
+.resource-identity-popover::before { content: ""; position: absolute; top: -5px; left: var(--identity-arrow-left, 50%); width: 8px; height: 8px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); background: var(--surface); transform: translateX(-50%) rotate(45deg); }
+.resource-identity-popover-content { max-height: var(--identity-max-height, 70vh); overflow: auto; overscroll-behavior: contain; border-radius: inherit; }
+.resource-identity-popover::backdrop { background: transparent; }
+.resource-identity-popover ::deep .resource-identity-summary { margin: 0; border: 0; box-shadow: none; }
+.resource-identity-popover ::deep .panel-header { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.resource-identity-popover ::deep .panel-header h2 { margin: 0; }

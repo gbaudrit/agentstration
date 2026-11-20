@@ -58,7 +58,7 @@ export class GovernedKnowledgePage {
     const configuration = this.publishedTools.locator('.resource-configuration-summary');
     await expect(configuration).toBeVisible();
     await expect(this.publishedTools.locator('.resource-identity-summary .resource-label')
-      .filter({ hasText: 'agentstration.io/category' })).toHaveText('agentstration.io/category: knowledge-source');
+      .filter({ hasText: 'agentstration.io/category' })).toHaveText('agentstration.io/category : knowledge-source');
     await expect(configuration).toContainText(`agentstration.io/knowledge-source=${knowledge}`);
     await this.page.goto(`${consoleUrl}/tools/sets?context=${encodeURIComponent(scope)}`);
     await expect(this.page.getByTestId(TestIds.resourceAdministration.toolSets)).toBeVisible();

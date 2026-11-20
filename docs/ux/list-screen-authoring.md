@@ -92,6 +92,8 @@ The adapter owns cancellation and request revisions. Check the latest request, P
 
 The template contains no resource client, repository, automatic retries, business predicates or mutation command. Family-specific dialogs remain outside it when needed.
 
+For resources physically stored in an internal operational Workspace, present the logical Instance/Tenant/Workspace administrative scope. Internal operational Workspace names, IDs and badges do not belong in collection identities, summaries or filter choices. Keep the physical coordinates internally for exact queries and commands; an inherited Flow target's owner is a separate fact, not the Trigger's scope. Follow the [resource-screen operational Workspace rule](resource-screen-authoring.md#internal-operational-workspaces) and verify all three administrative modes.
+
 ## Pilot data contracts
 
 | Pilot | Query and count semantics |

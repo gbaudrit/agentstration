@@ -1,0 +1,8 @@
+.resource-metadata-badge { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; max-width: 100%; padding: .2rem .5rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .75rem; font-weight: 500; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
+.resource-metadata-badge strong { font-weight: 650; }
+.resource-metadata-text { min-width: 0; }
+.resource-metadata-actions { display: inline-flex; flex: 0 0 auto; }
+.resource-metadata-actions ::deep .copy-value { width: 1.5rem; height: 1.5rem; min-height: 1.5rem; padding: .2rem; border: 0; background: transparent; }
+.resource-metadata-actions ::deep .copyable-value { flex-wrap: nowrap; }
+.resource-metadata-badge:hover .resource-metadata-actions ::deep .copy-value,
+.resource-metadata-badge:focus-within .resource-metadata-actions ::deep .copy-value { opacity: 1; }

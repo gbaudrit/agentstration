@@ -257,4 +257,13 @@
   <data name="CollectionForbiddenMessage" xml:space="preserve"><value>You do not have permission to view this collection in the selected context.</value></data>
   <data name="CollectionEmptyPage" xml:space="preserve"><value>No records on this page</value></data>
   <data name="CollectionContinuePages" xml:space="preserve"><value>Use the page controls to continue browsing the results.</value></data>
+  <data name="ResourceVersion" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="VersionLabel" xml:space="preserve"><value>Version</value></data>
+  <data name="IdentityQuickView" xml:space="preserve"><value>Resource identity</value></data>
+  <data name="ResourceScopeBadge.Workspace" xml:space="preserve"><value>Workspace</value></data>
+  <data name="CloseIdentity" xml:space="preserve"><value>Close resource identity</value></data>
+  <data name="NamedResourceScope" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ResourceUid" xml:space="preserve"><value>Resource UUID</value></data>
+  <data name="ResourceManifest" xml:space="preserve"><value>Resource manifest</value></data>
 </root>

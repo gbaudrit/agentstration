@@ -127,8 +127,8 @@ export class OperationalTriggersPage {
     ]);
     await this.details.waitFor({ state: 'visible' });
     await expect(this.details).toContainText(fixture.triggerDisplayName);
-    await expect(this.page.getByTestId(TestIds.triggers.definitionScope)
-      .locator('.resource-scope-badge[title="/instance"]')).toBeVisible();
+    await expect(this.details.locator('.resource-header .resource-owner-scope[data-scope-ref="/instance"] .resource-scope-badge')).toBeVisible();
+    await expect(this.details.locator('.resource-header .resource-scope-badge')).toHaveCount(1);
 
     await this.open(
       `${consoleUrl}/triggers/${encodeURIComponent(fixture.triggerName)}/edit`,
@@ -159,7 +159,8 @@ export class OperationalTriggersPage {
     expect(trigger.scopeRef).toBe(operationalScopeRef);
     expect(trigger.definition.target.flow.scopeRef).toBe(fixture.execution.scopes.instance);
     expect(trigger.definition.executionScope ?? null).toBeNull();
-    await expect(this.details.locator(`.resource-scope-badge[title="${operationalScopeRef}"]`).first()).toBeVisible();
+    await expect(this.details.locator(`.resource-scope-badge[title="${operationalScopeRef}"]`)).toHaveCount(0);
+    await expect(this.details.locator('.resource-header .resource-owner-scope[data-scope-ref="/instance"] .resource-scope-badge')).toBeVisible();
     return identity.context.workspaceId;
   }
 

@@ -21,6 +21,8 @@ Before making a non-trivial change, read:
 - For persisted Console resource screens, follow `docs/ux/resource-screen-authoring.md` for the shared template, composition order and required component mapping.
 - For Console resource list screens, follow `docs/ux/list-screen-authoring.md` for the shared page template, column/filter declarations and explicit pagination/count semantics.
 
+Console resource presentation must not expose internal Instance/Tenant operational Workspaces in normal headers, Identity, creation/review summaries, pickers or collection badges. For resources backed by such a Workspace, present their logical administrative scope; in Workspace mode, show the actual user Workspace. Ordinary and inherited resources continue to show their actual resource owner. Preserve physical ownership internally for authorization, persistence, commands and faithful technical exports. Follow the operational Workspace rules in the UX guides.
+
 Inspect the existing implementation before adding a new abstraction. This is an intentionally small MVP; extend the current verticals instead of creating parallel frameworks.
 
 ## Repository Map

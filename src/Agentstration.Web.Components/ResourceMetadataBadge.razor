@@ -1,0 +1,9 @@
+<span class="resource-metadata-badge @Class" title="@Tooltip" tabindex="@(Tooltip is null ? null : "0")"><span class="resource-metadata-text">@if (!string.IsNullOrWhiteSpace(Label)) { <strong>@Label</strong><text> : </text> }@Value</span>@if (Actions is not null) { <span class="resource-metadata-actions">@Actions</span> }</span>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Tooltip { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

@@ -108,6 +108,9 @@ export class AgentEditorPage {
     await expect(cards).toHaveCount(3);
     await expect(cards.locator('.metric-label')).toHaveText([...AgentOverviewMetricsByLocale[locale]]);
     await expect(overview.locator('.state-comparison')).toHaveCount(0);
+    const identityPanel = overview.locator('.resource-identity-summary');
+    const disclosure = identityPanel.locator('.panel-disclosure');
+    if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
     const labels = overview.locator('.resource-identity-summary .labels-summary');
     await expect(labels).toBeVisible();
     await expect(overview.locator('.labels-summary')).toHaveCount(1);
@@ -226,9 +229,12 @@ export class AgentEditorPage {
 
   public async refresh(): Promise<void> {
     const button = this.page.getByTestId(TestIds.agentEditor.refresh);
+    if (!await button.isVisible()) await this.page.locator('.resource-header .resource-more-actions > summary').click();
     await button.click();
     await expect(button).toBeEnabled();
     await expect(this.page.locator('.resource-refresh-status, .resource-refresh-error')).toHaveCount(0);
+    const menu = this.page.locator('.resource-header .resource-more-actions[open] > summary');
+    if (await menu.count()) await menu.click();
   }
 
   public async selectModelProfile(selection: ProfileSelection): Promise<void> {

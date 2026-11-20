@@ -94,4 +94,7 @@
 <data name="Metadata" xml:space="preserve"><value>Métadonnées enregistrées</value></data>
 <data name="IdentityMismatch" xml:space="preserve"><value>Le Flow renvoyé ne correspond pas à cette ressource.</value></data>
 <data name="Back" xml:space="preserve"><value>Retour aux Flows</value></data>
+  <data name="ListFlows" xml:space="preserve"><value>Liste des Flows</value></data>
+  <data name="ResourceManifestHelp" xml:space="preserve"><value>Ce manifeste reflète la ressource enregistrée. Modifiez le Flow depuis Définition ou son éditeur.</value></data>
+  <data name="OpenFlowEditor" xml:space="preserve"><value>Ouvrir l’éditeur du Flow</value></data>
 </root>

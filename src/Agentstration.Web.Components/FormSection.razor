@@ -1,10 +1,11 @@
-<section @attributes="AdditionalAttributes" data-testid="@(TestId ?? AdditionalAttributes?.GetValueOrDefault("data-testid"))" class="panel form-section @Class" aria-labelledby="@titleId">
-    <div class="panel-header"><div>
+<section @attributes="AdditionalAttributes" data-testid="@(TestId ?? AdditionalAttributes?.GetValueOrDefault("data-testid"))" class="panel form-section @Class @(Collapsible ? "panel-collapsible" : null)" aria-labelledby="@titleId" data-panel-collapsed="@(Collapsible ? collapsed.ToString().ToLowerInvariant() : null)">
+    <div class="panel-header"><div class="panel-heading-copy">
         @if (!string.IsNullOrWhiteSpace(Eyebrow)) { <p class="eyebrow">@Eyebrow</p> }
-        <h2 id="@titleId">@Title</h2>
-        @if (!string.IsNullOrWhiteSpace(Description)) { <p>@Description</p> }
+        <h2 id="@titleId">@if (Collapsible) { <button type="button" class="panel-disclosure" aria-expanded="@((!collapsed).ToString().ToLowerInvariant())" aria-controls="@bodyId" @onclick="Toggle"><TablerIcon Name="@(collapsed ? "chevron-right" : "chevron-down")" /><span>@Title</span></button> } else { @Title }</h2>
+        @if (!string.IsNullOrWhiteSpace(Description)) { <p hidden="@(Collapsible && collapsed)">@Description</p> }
     </div>@Actions</div>
-    @ChildContent
+    @if (Collapsible) { <div id="@bodyId" class="form-section-body" hidden="@collapsed">@ChildContent</div> }
+    else { @ChildContent }
 </section>
 
 @code {
@@ -15,6 +16,12 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? TestId { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Collapsible { get; set; }
+    [Parameter] public bool InitiallyCollapsed { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
     private readonly string titleId = $"section-{Guid.NewGuid():N}";
+    private readonly string bodyId = $"panel-{Guid.NewGuid():N}";
+    private bool collapsed;
+    protected override void OnInitialized() => collapsed = InitiallyCollapsed;
+    private void Toggle() => collapsed = !collapsed;
 }
