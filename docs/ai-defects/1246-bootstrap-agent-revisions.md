@@ -89,8 +89,16 @@ activate a changed catalog definition, and preservation of a later manual draft.
   changed-manifest and manual-draft assertions.
 - Complete AEP SDK suite: **59 passed**. Dedicated PostgreSQL storage validation
   passed.
-- Supplementary hosted-module diagnostics were still running when these results
-  were recorded; no outcome is claimed for that additional job.
-- The local execution environment failed to start because its configuration was
-  canceled. No local browser smoke or documentation production build was run for
-  this correction. No Console component or user journey was added.
+- The supplementary [hosted-module diagnostics job](https://github.com/gbaudrit/agentstration/actions/runs/44715734782/job/136220724625)
+  later completed with one Data Sources test failure (79 passed, 5 skipped).
+  Its captured summary does not identify that test, so no causal attribution is
+  made here. The other diagnostic group passed. The failed job was not rerun
+  during the milestone audit and is not reported as green.
+- The local environment was unavailable for the initial correction. Later local
+  validation at published product baseline 90ed3960 passed the clean Release
+  build, all 1,561 Fast tests, and 1,588 Integration tests with 28 optional skips
+  and zero failures (1,616 total), including the complete Data Sources module.
+- The later real-process Ollama-fixture Bootstrap/restart smoke verifies exact-scope
+  AgentRevision existence and retained UID/ETag. Existing desktop/mobile public
+  waiting/login smoke and documentation/ADR/LikeC4 builds also passed. No new
+  Console component or user journey was added by this Agent revision correction.
