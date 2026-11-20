@@ -37,6 +37,8 @@ public sealed class ResourceDefinitionFormTests
                 .Add(c => c.SectionRequested, path => state.Select(path)).Add(c => c.OnValidSubmit, _ => saved++)
                 .Add(c => c.InvalidInputChanged, value => invalidDraft = value));
             var form = cut.FindComponent<EditForm>().Instance;
+            // Blazor must receive invalid submissions before the owning hidden section can be revealed.
+            Assert.IsTrue(cut.Find("form").HasAttribute("novalidate"));
             Assert.IsEmpty(cut.FindAll("#Name"));
             await cut.Find("form").SubmitAsync();
             Assert.AreEqual("definition/identity", state.CurrentPath);

@@ -16,7 +16,7 @@ for (const variant of [
         await testInfo.attach('layout-geometry', { body: JSON.stringify(await new ConnectedStorageCollectionPage(page).layoutDiagnostics(), null, 2), contentType: 'application/json' });
       if (variant.locale !== 'en-US') await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
     });
-    test(`new Storage and Connected Service collections retain the compact contract ${variant.tag} @collections @smoke`, async ({ page, product, context }, testInfo) => {
+    test(`new Storage and Connected Service collections retain compact collections and standard resource sections ${variant.tag} @collections @smoke`, async ({ page, product, context }, testInfo) => {
       const pages = new ProductPages(page);
       await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
       await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);

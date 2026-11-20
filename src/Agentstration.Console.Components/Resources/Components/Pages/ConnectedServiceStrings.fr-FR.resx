@@ -163,4 +163,9 @@
 <data name="CompleteConfiguration"><value>Complétez la configuration obligatoire avant de créer le service connecté.</value></data>
 <data name="IdentityMismatch"><value>Le service connecté retourné ne correspond pas à l’identité demandée.</value></data>
   <data name="TypeContractUnavailable" xml:space="preserve"><value>Le contrat de type épinglé est indisponible dans ce contexte. Les valeurs enregistrées restent consultables ; la configuration ne peut être modifiée que lorsque le contrat exact est disponible.</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Utilisation descendante</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version actualisée est disponible. Votre brouillon et sa version d’origine sont conservés. Abandonnez le brouillon pour adopter la ressource actualisée.</value></data>
+  <data name="RequiredBindingsMissing" xml:space="preserve"><value>Configurez les liaisons obligatoires : {0}.</value></data>
+  <data name="ConfigurationInvalid" xml:space="preserve"><value>Corrigez les erreurs de configuration avant d’enregistrer.</value></data>
+  <data name="ConcurrencyConflict" xml:space="preserve"><value>Ce service a été modifié sur le serveur. Votre brouillon est conservé. Abandonnez-le pour adopter la ressource actualisée avant d’enregistrer à nouveau.</value></data>
 </root>

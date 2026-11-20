@@ -1,10 +1,2 @@
-.connected-service-overview ::deep .connected-service-configuration-summary .data-grid {
-    table-layout: fixed;
-    min-width: 0;
-}
-
-.connected-service-overview ::deep .connected-service-configuration-summary .data-grid th:first-child { width: 24%; }
-.connected-service-overview ::deep .connected-service-configuration-summary .data-grid th:nth-child(2) { width: 20%; }
-.connected-service-overview ::deep .connected-service-configuration-summary .data-grid th:last-child { width: 56%; }
 .configuration-key { overflow-wrap: anywhere; }
 .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }

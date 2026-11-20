@@ -6,7 +6,7 @@ export const TestIds = {
   },
   connectedServiceEditor: {
     root: 'connected-service-editor', form: 'connected-service-form', fields: 'connected-service-definition-fields',
-    identity: 'connected-service-identity-editor', name: 'connected-service-name', displayName: 'connected-service-display-name',
+    identity: 'connected-service-identity-editor', refresh: 'connected-service-refresh', name: 'connected-service-name', displayName: 'connected-service-display-name',
     type: 'connected-service-type', save: 'connected-service-save', enabled: 'connected-service-enabled',
     requirement: 'connected-service-value-requirement', bindingKind: 'connected-service-binding-kind',
     bindingLiteral: 'connected-service-binding-literal', bindingTarget: 'connected-service-binding-target',
@@ -19,7 +19,7 @@ export const TestIds = {
     storageEnabled: 'storage-enabled', storageDisplayName: 'storage-display-name',
     serviceDetails: 'connected-service-details',
     serviceDisplayName: 'connected-service-display-name',
-    serviceYamlViewer: 'connected-service-yaml-viewer',
+    serviceYamlViewer: 'connected-service-yaml-editor',
   },
   collections: { modelProfileOverview: 'model-profile-overview' },
   formAdapters: {

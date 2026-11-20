@@ -19,7 +19,7 @@
 @if (loading || loadFailed) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@(error is AgentstrationApiException { IsConcurrencyConflict: true } ? T("ConcurrencyConflict") : error.Message)</div> }
     <ResourceDefinitionForm @key="editContext" @ref="definitionForm" EditContext="editContext" FieldLabels="FieldLabels" Id="@FormId" FormName="connected-service-editor"
         Sections="@(SectionPresentations ?? DefinitionPresentations())" SectionState="SectionState" SectionContent="@(SectionState is null ? null : DefinitionContent)" SectionRequested="SectionRequested"
         OnValidSubmit="SubmitAsync" OnInvalidSubmit="InvalidSubmitAsync" InvalidInputChanged="value => invalidInput = value" ReadOnly="@(!CanMutate)" Busy="IsBusy"
@@ -34,6 +34,8 @@ else
 }
 
 @code {
+    [Parameter] public bool SaveBlocked { get; set; }
+    [Parameter] public ResourceReadOnlyReason? ReadOnlyReason { get; set; }
     [Parameter] public ResourceSectionState? SectionState { get; set; }
     [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation>? SectionPresentations { get; set; }
     [Parameter] public EventCallback<string> SectionRequested { get; set; }
@@ -99,6 +101,7 @@ else
     [Parameter] public EventCallback<bool> DraftChanged { get; set; }
     public string FormId { get; } = $"connected-service-form-{Guid.NewGuid():N}";
     public bool CanSubmit => CanSave;
+    public bool CanEdit => CanMutate && !IsBusy && !SaveBlocked;
     public bool IsDirty => !loading && baseline is not null && (Fingerprint != baseline || invalidInput || !optionsValid || touched);
     private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope, selectedVariantKey });
     private string? baseline;
@@ -112,7 +115,7 @@ else
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private ResourceSnapshot<ConnectedServiceResource>? savedSnapshot;
     private bool CanWrite => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesWrite);
-    private bool CanMutate => CanWrite && (IsNew ? scopeTargets.Any(target => target.CanWrite && target.ScopeRef == selectedScope) : savedSnapshot?.Value.Governance.IsManaged == false && ResourceOwnershipContext.CanManage(selectedScope, Services));
+    private bool CanMutate => ReadOnlyReason is null && CanWrite && (IsNew ? scopeTargets.Any(target => target.CanWrite && target.ScopeRef == selectedScope) : savedSnapshot?.Value.Governance.IsManaged == false && ResourceOwnershipContext.CanManage(selectedScope, Services));
     private bool IdentityComplete => selectedScope is not null && System.ComponentModel.DataAnnotations.Validator.TryValidateObject(model, new(model), null, true);
     private IReadOnlyList<CreationWizardStep> Steps => [new("identity", Shared["Identity"], IdentityFields) { IsComplete = IdentityComplete }, new("configuration", Shared["Configuration"], ConfigurationFields) { IsComplete = SelectedVariant is not null && RequiredBindingsPresent && optionsValid }, new("access", Shared["Access"], SharingFields) { IsComplete = true }, new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && RequiredBindingsPresent && optionsValid }];
     private async Task FinishAsync(CreationWizardFinish finish)
@@ -177,8 +180,8 @@ else
     private long loadVersion;
     private Exception? error;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanSave => CanMutate && !IsBusy && optionsValid && selectedScope is not null && SelectedVariant is not null && RequiredBindingsPresent;
-    private bool RequiredBindingsPresent => SelectedVariant is { } variant && variant.Version.Inputs.Where(value => value.Required).All(value => Binding(value).IsConfigured);
+    private bool CanSave => CanMutate && !SaveBlocked && !IsBusy && optionsValid && selectedScope is not null && SelectedVariant is not null && RequiredBindingsPresent;
+    private bool RequiredBindingsPresent => SelectedVariant is { } variant && model.MissingRequiredBindings(variant.Version.Inputs).Count == 0;
     private IReadOnlyList<TypeVariant> Variants => catalog.Where(type => type.Definition.Enabled).SelectMany(type => type.Definition.Versions.Select(version => new TypeVariant(type, version))).OrderBy(value => value.Label, StringComparer.OrdinalIgnoreCase).ToArray();
     private string VariantLabel(TypeVariant variant) => Variants.Count(value => value.Label == variant.Label) > 1
         ? $"{variant.Label} · {variant.Type.ScopeRef}/{variant.Type.Namespace}/{variant.Type.Name}" : variant.Label;
@@ -374,7 +377,13 @@ else
     {
         if (!ReferenceEquals(context.Model, model)) return;
         messages ??= new(context); messages.Clear();
-        if (!optionsValid) messages.Add(context.Field(nameof(model.Options)), T("CompleteConfiguration"));
+        if (SelectedVariant is { } variant)
+        {
+            var missing = model.MissingRequiredBindings(variant.Version.Inputs);
+            if (missing.Count > 0) messages.Add(context.Field(nameof(model.Bindings)), T("RequiredBindingsMissing", string.Join(", ", missing)));
+            if (!optionsValid)
+                messages.Add(context.Field(nameof(model.Options)), T("ConfigurationInvalid"));
+        }
         context.NotifyValidationStateChanged();
     }
     private void OptionsValidationChanged(JsonSchemaInputValidationState state)

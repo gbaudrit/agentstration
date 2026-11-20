@@ -124,7 +124,7 @@ export class ConnectedStorageCollectionPage {
       await this.assertNoOverflow();
     }
     await expect(this.page.getByTestId(TestIds.connectedStorageCollections.serviceYamlViewer).locator('textarea[readonly]')).toBeVisible();
-    await selectResourceSection(this.page, 'definition/configuration');
+    await selectResourceSection(this.page, 'definition/identity');
     const field = this.page.getByTestId(TestIds.connectedStorageCollections.serviceDisplayName);
     await expect(field).toBeVisible();
     await this.clearAndRestore(field, await field.inputValue());

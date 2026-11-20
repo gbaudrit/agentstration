@@ -25,6 +25,10 @@ public sealed class ConnectedServiceEditorModel
     public List<ConnectedServiceBindingEditorModel> Bindings { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
 
+    public IReadOnlyList<string> MissingRequiredBindings(IEnumerable<ConnectedServiceInputDescriptor> inputs) => inputs
+        .Where(input => input.Required && !Bindings.Any(binding => binding.InputId == input.Id && binding.IsConfigured))
+        .Select(input => input.Id).ToArray();
+
     public ConnectedServiceProperties Properties(ConnectedServiceTypeResource type,
         ConnectedServiceTypeVersionDescriptor version) => new()
         {

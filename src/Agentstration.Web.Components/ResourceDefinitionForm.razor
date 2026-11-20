@@ -3,7 +3,7 @@
 @inject IJSRuntime JS
 
 <EditForm @key="EditContext" EditContext="EditContext" OnValidSubmit="ValidSubmitAsync" OnInvalidSubmit="InvalidSubmitAsync" FormName="@FormName"
-          @attributes="AdditionalAttributes" id="@Id" class="resource-form" tabindex="-1" data-validation-context="@focusIdentity" aria-busy="@Busy.ToString().ToLowerInvariant()">
+          @attributes="AdditionalAttributes" novalidate id="@Id" class="resource-form" tabindex="-1" data-validation-context="@focusIdentity" aria-busy="@Busy.ToString().ToLowerInvariant()">
     <LocalizedDataAnnotationsValidator FieldLabels="FieldLabels" />
     <FormDraftMonitor InvalidInputChanged="InvalidInputChanged" />
     <fieldset class="resource-definition-fields" disabled="@Locked" data-testid="@FieldsTestId">

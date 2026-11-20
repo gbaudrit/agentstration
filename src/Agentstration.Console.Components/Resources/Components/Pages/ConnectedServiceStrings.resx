@@ -163,4 +163,9 @@
 <data name="CompleteConfiguration"><value>Complete the required configuration before creating the Connected Service.</value></data>
 <data name="IdentityMismatch"><value>The returned Connected Service does not match the requested identity.</value></data>
   <data name="TypeContractUnavailable" xml:space="preserve"><value>The pinned type contract is unavailable in this context. Saved values remain available for inspection; configuration cannot be changed until the exact contract is available.</value></data>
+  <data name="DescendantUsePolicy" xml:space="preserve"><value>Descendant use</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A refreshed version is available. Your draft and its original version are retained. Discard the draft to adopt the refreshed resource.</value></data>
+  <data name="RequiredBindingsMissing" xml:space="preserve"><value>Configure the required bindings: {0}.</value></data>
+  <data name="ConfigurationInvalid" xml:space="preserve"><value>Correct the configuration errors before saving.</value></data>
+  <data name="ConcurrencyConflict" xml:space="preserve"><value>This service changed on the server. Your draft is retained. Discard it to adopt the refreshed resource before saving again.</value></data>
 </root>
