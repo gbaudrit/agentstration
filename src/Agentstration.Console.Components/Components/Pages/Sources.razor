@@ -11,6 +11,8 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourcesStrings> Localizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
+@if (!IsCollection)
+{
 <PageHeader ScopeRef="detail?.Source.Source.ScopeRef" Title="@T("Title")" Description="@T("Description")">
     <Actions>
         @if (detail is not null)
@@ -27,24 +29,30 @@
     </Actions>
 </PageHeader>
 
+}
+
 <div data-testid="distribution-sources" data-interactive="@(interactive ? "true" : "false")">
-@if (denied)
+@if (IsCollection)
 {
-    <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (busy && sources is null && detail is null)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (detail is null)
-{
-    @if (importing)
+    <ResourceCollectionTemplate TItem="SourceConsoleListItem" Title="@T("Title")" Description="@T("Description")" TestId="sources-collection" ContextKey="@collectionContextKey"
+                                IdentityColumn="SourceIdentityColumn" Columns="SourceColumns" AdditionalFilters="SourceAdditionalFilters" Items="SourcePageItems" RowTestId="source-row"
+                                ItemAttributes="@(item => new Dictionary<string, object> { ["data-source-publisher"] = item.Source.Source.Definition.Publisher, ["data-source-name"] = item.Source.Source.Name })"
+                                Query="sourceQuery" QueryChanged="ChangeSourceQueryAsync" Pagination="SourcePagination" LoadState="collectionLoad" Disabled="@(!interactive || busy)"
+                                SearchEnabled SearchLabel="@T("Search")" SearchPlaceholder="@T("SearchPlaceholder")"
+                                EmptyTitle="@T("NoSources")" EmptyMessage="@T("NoSourcesMessage")" OnRefresh="LoadCollectionAsync" OnRetry="RetryCollectionAsync">
+        <PrimaryActions>@if (hasCollectionAuthorization) { <button class="button-primary" disabled="@busy" @onclick="OpenCollectionImport" data-testid="source-import-open">@T("ImportSource")</button> }</PrimaryActions>
+        <Actions>@if (hasCollectionAuthorization) { <a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/settings/source-registries/discovery", Services)">@T("DiscoverFromRegistries")</a> }</Actions>
+        <Metrics>@if (sources is not null)
+        {
+            <MetricCard Label="@T("Sources")" Value="@sources.Count.ToString()" Detail="@T("ReusableCatalogs")" Status="UiStatus.Info" />
+            <MetricCard Label="@T("Versions")" Value="@sources.Sum(value => value.Source.VersionCount).ToString()" Detail="@T("ImmutableHistory")" Status="UiStatus.Neutral" />
+            <MetricCard Label="@T("Healthy")" Value="@sources.Count(IsHealthy).ToString()" Detail="@T("LastImportSucceeded")" Status="UiStatus.Success" />
+        }</Metrics>
+        <Feedback>@if (error is not null) { <ErrorState Message="@error"><button class="button-secondary" @onclick="() => error = null">@T("Close")</button></ErrorState> }</Feedback>
+    </ResourceCollectionTemplate>
+    @if (importing && hasCollectionAuthorization)
     {
-        <section class="panel source-import">
+        <section class="panel source-import" id="source-import-form" tabindex="-1" @ref="importForm">
             <div class="panel-header"><div><p class="eyebrow">@T("NewSource")</p><h2>@T("ImportSource")</h2><p>@T("ImportDescription")</p></div></div>
             <div class="source-import-tabs" role="tablist" aria-label="@T("ImportMethod")">
                 <button class="text-button @(importMode == "url" ? "active" : null)" type="button" @onclick='() => SetImportMode("url")'>@T("FromUrl")</button>
@@ -65,35 +73,22 @@ else if (detail is null)
         </section>
     }
 
-    <section class="metric-grid source-metrics" aria-label="@T("SourceSummary")">
-        <MetricCard Label="@T("Sources")" Value="@FilteredSources.Count.ToString()" Detail="@T("ReusableCatalogs")" Status="UiStatus.Info" />
-        <MetricCard Label="@T("Versions")" Value="@(sources?.Sum(value => value.Source.VersionCount).ToString() ?? "0")" Detail="@T("ImmutableHistory")" Status="UiStatus.Neutral" />
-        <MetricCard Label="@T("Healthy")" Value="@(sources?.Count(IsHealthy).ToString() ?? "0")" Detail="@T("LastImportSucceeded")" Status="UiStatus.Success" />
-    </section>
-
-    <FormSection Title="@T("AvailableSources")" Eyebrow="@T("Distribution")" Description="@T("AvailableSourcesDescription")"><Actions><button class="button-secondary" disabled="@busy" @onclick="LoadAsync">@T("Refresh")</button></Actions><ChildContent>
-        <FormField Label="@T("Search")" Class="source-search"><ChildContent><ClearableText @bind-Value="search" placeholder="@T("SearchPlaceholder")" /></ChildContent></FormField>
-        @if (FilteredSources.Count == 0)
-        {
-            <EmptyState Title="@T("NoSources")" Message="@T("NoSourcesMessage")" />
-        }
-        else
-        {
-            <div class="source-table">
-                <CollectionView TItem="SourceConsoleListItem" Items="FilteredSources" InformationLabels="@(new string[] { T("Origin"), T("LatestImport") })" RowTestId="source-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-source-publisher"] = item.Source.Source.Definition.Publisher, ["data-source-name"] = item.Source.Source.Name })" IdentityLabel="@T("Source")" StateLabel="@T("Health")">
-        <Identity Context="item">
-<CollectionIdentity DisplayName="@item.Source.Configuration.Definition.DisplayName" Namespace="@item.Source.Source.Namespace.Value" Name="@item.Source.Source.Name" Href="@SourceUrl(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" IconOnly /><ManagedResourceBadge IsManaged="@item.Source.Source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Origin")">@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</CollectionValue>
-            <CollectionValue Label="@T("LatestImport")"><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></CollectionValue>
-        </Information>
-        <Actions Context="item">
-<CollectionActions ResourceName="@(item.Source.Configuration.Definition.DisplayName)"><a class="text-link" href="@SourceUrl(item)">@T("Open") →</a></CollectionActions></Actions>
-    </CollectionView>
-            </div>
-        }
-    </ChildContent></FormSection>
 }
+else
+{
+@if (denied)
+{
+    <ErrorState Title="@T("PlatformAdministratorRequired")" Message="@T("PlatformAdministratorRequiredMessage")" />
+}
+else if (error is not null)
+{
+    <ErrorState Message="@error"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+}
+else if (detail is null)
+{
+    <LoadingState Message="@T("Loading")" />
+}
+
 else
 {
     <section class="source-heading panel" data-testid="source-details" data-source-publisher="@Publisher" data-source-name="@Name">
@@ -270,6 +265,8 @@ else
     </main>
 }
 
+}
+
 @if (confirmDeleteSource && detail is not null)
 {
     <div class="dialog-backdrop" role="presentation" @onclick="CloseDeleteSource">
@@ -328,7 +325,6 @@ else
     private IReadOnlyList<SourceConsoleListItem>? sources;
     private SourceConsoleDetailView? detail;
     private readonly Dictionary<string, SourceConsoleBindingSelection> bindingSelections = new(StringComparer.Ordinal);
-    private string search = string.Empty;
     private string displayName = string.Empty;
     private RefreshPolicyForm sourceRefresh = new();
     private RefreshPolicyForm channelRefresh = new();
@@ -342,7 +338,14 @@ else
     private ResourceScopeRef? importScope;
     private bool importing;
     private bool interactive;
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
+    private ElementReference importForm;
+    private bool focusImport;
+    private void OpenCollectionImport() { importing = !importing; focusImport = importing; }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        if (focusImport && importing) { focusImport = false; await importForm.FocusAsync(); }
+    }
     private bool busy;
     private bool denied;
     private string? error;
@@ -368,7 +371,6 @@ else
     private bool deletingSource;
     private string? deleteError;
 
-    private IReadOnlyList<SourceConsoleListItem> FilteredSources => (sources ?? []).Where(value => string.IsNullOrWhiteSpace(search) || value.Source.Configuration.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || value.Source.Source.Definition.Publisher.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private IReadOnlyList<SourceConsoleChannelView> DisplayedChannels => detail is null ? [] : detail.Channels.Count <= 1 ? detail.Channels : detail.Channels.Where(channel => channel.Definition.Name == selectedChannelName).ToArray();
     private bool CanImport => importScope is not null && (importMode == "url" ? Uri.TryCreate(importUrl, UriKind.Absolute, out _) : !string.IsNullOrWhiteSpace(importYaml));
     private bool CanInstallPack => packPreview is not null && !packPreviewing && !packInstalling
@@ -379,6 +381,7 @@ else
 
     private async Task LoadAsync()
     {
+        if (IsCollection) { await LoadCollectionAsync(); return; }
         busy = true; error = null;
         try
         {
@@ -602,7 +605,7 @@ else
     private static string Short(string value) => value.Length <= 14 ? value : value[..14];
     private static bool IsHealthy(SourceConsoleListItem source) => IsHealthy(source.Source);
     private static bool IsHealthy(SourceView source) => source.Observed.Definition.LastOutcome != SourceImportOutcome.Rejected;
-    private string SourceUrl(SourceConsoleListItem source) => SourceUrl(source.Source);
+    private string SourceUrl(SourceConsoleListItem source) => ResourceOwnershipContext.PreserveNavigation(SourceUrl(source.Source), Services);
     private string SourceUrl(SourceView source) => $"/settings/sources/{Uri.EscapeDataString(source.Source.Definition.Publisher)}/{Uri.EscapeDataString(source.Source.Name)}?scopeRef={Uri.EscapeDataString(source.Source.ScopeRef!.Value.ToString())}";
     private string BootstrapUrl(SourceConsoleChannelView channel, SourceCatalogView catalog, SourceBootstrapEntryView entry)
     {
@@ -710,5 +713,25 @@ else
             JitterSeconds = JitterSeconds
         };
     }
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { DisposeCollection(); lifetime.Cancel(); lifetime.Dispose(); GC.SuppressFinalize(this); }
+}
+
+@code {
+    private CollectionColumn<SourceConsoleListItem> SourceIdentityColumn => new("identity", T("Source"), item => @<text><CollectionIdentity DisplayName="@item.Source.Configuration.Definition.DisplayName" Namespace="@item.Source.Source.Namespace.Value" Name="@item.Source.Source.Name" Href="@SourceUrl(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" IconOnly /><ManagedResourceBadge IsManaged="@item.Source.Source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></text>)
+    {
+        Filters = [new("health", T("Health"), CollectionFilterKind.Choice) { Options = (sources ?? []).Select(item => item.Source.Observed.Definition.LastOutcome).Distinct().Select(value => new CollectionFilterOption(value.ToString(), ImportOutcome(value))).ToArray() }]
+    };
+    private IReadOnlyList<CollectionColumn<SourceConsoleListItem>> SourceColumns =>
+    [
+        new("origin", T("Origin"), item => @<text>@if (item.Source.Configuration.Definition.Origin is { } origin) { <a class="text-link source-origin" href="@origin.Url" target="_blank" rel="noopener noreferrer" title="@origin.Url">@origin.Url</a> } else { <span class="source-origin">@T("PastedManifest")</span> }</text>)
+        {
+            Filters = [new("origin", T("Origin"), CollectionFilterKind.Choice) { Options = [new("url", T("FromUrl")), new("pasted", T("PastedManifest"))] }]
+        },
+        new("import", T("LatestImport"), item => @<text><strong>@(item.LatestVersion?.Definition.Version ?? "—")</strong><br /><small>@item.Source.Observed.Definition.LastAttemptAt.ToLocalTime().ToString("g") · @F("VersionCount", item.Source.VersionCount)</small></text>)
+    ];
+    private IReadOnlyList<CollectionFilter> SourceAdditionalFilters =>
+    [
+        new("publisher", T("Publisher"), CollectionFilterKind.Choice) { Advanced = true, Options = (sources ?? []).Select(item => item.Source.Source.Definition.Publisher).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray() },
+        new("scope", T("OwnershipScope"), CollectionFilterKind.Choice) { Advanced = true, Options = (sources ?? []).Select(item => item.Source.Source.ScopeRef!.Value.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray() }
+    ];
 }

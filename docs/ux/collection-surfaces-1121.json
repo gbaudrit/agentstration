@@ -5013,18 +5013,18 @@
     {
       "id": "sources-source-console-list-item",
       "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
-      "line": 83,
+      "line": 37,
       "host": "console",
       "routes": [
         "/settings/sources",
         "/settings/sources/{Publisher}/{Name}"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceConsoleListItem",
       "identityLabel": "Source",
       "scope": true,
       "state": true,
-      "actions": true,
+      "actions": false,
       "informationKeys": [
         "Origin",
         "LatestImport"
@@ -5094,6 +5094,13 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "1d37e4240befcea387357030fd0dfffa7c241f17"
+      },
+      "pageComposition": {
+        "contract": "Complete PlatformAdmin-authorized Source Console response; exact local 20/50/100 pages, name/publisher search, import outcome/origin and advanced publisher/owner filters. Metrics describe complete response independently of criteria.",
+        "state": "Retained compatible refresh; physical/logical/principal context key, API reauthorization on notifications, stale/denied response protection.",
+        "preserved": "Existing import form and complete detail/command branches, publisher+name+owner destinations; redundant Open-only row menu omitted.",
+        "evidence": "docs/ux/evidence/list-layout/sources/README.md",
+        "tests": "SourcesCollectionTests; SourcesLocalizationTests; SourceConsoleLocalePresentationTests"
       }
     },
     {

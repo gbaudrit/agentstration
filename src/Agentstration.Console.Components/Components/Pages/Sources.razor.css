@@ -1,23 +1,9 @@
-.source-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .source-import { margin-bottom: 1.25rem; }
 .source-import-tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
 .source-import-tabs .active { color: var(--primary); box-shadow: inset 0 -2px var(--primary); }
 .form-wide { grid-column: 1 / -1; }
 .form-wide ::deep textarea { min-height: 15rem; resize: vertical; font-family: var(--font-mono, monospace); }
-.source-search { display: grid; gap: .45rem; max-width: 36rem; margin: 1rem 0; }
-.source-search ::deep input { width: 100%; min-width: 0; }
-.source-table { min-width: 0; }
-.source-table ::deep .data-grid { min-width: 52rem; table-layout: fixed; white-space: normal; }
-.source-table ::deep th:nth-child(1) { width: 18%; }
-.source-table ::deep th:nth-child(2) { width: 13%; }
-.source-table ::deep th:nth-child(3) { width: 30%; }
-.source-table ::deep th:nth-child(4) { width: 17%; }
-.source-table ::deep th:nth-child(5) { width: 14%; }
-.source-table ::deep th:nth-child(6) { width: 8%; }
-.source-table ::deep td { min-width: 0; }
-.source-table ::deep code,
-.source-table ::deep small { overflow-wrap: anywhere; }
-.source-origin { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-origin { display: block; overflow-wrap: anywhere; }
 .detail-origin { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .version-link { padding: 0; vertical-align: baseline; }
 .source-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
@@ -114,7 +100,7 @@
 .source-pack-resources article + article { border-top: 1px solid var(--border); }
 .source-pack-resources article > span { min-width: 0; }
 @media (max-width: 760px) {
-    .source-metrics, .source-detail-grid, .refresh-policy-grid { grid-template-columns: 1fr; }
+    .source-detail-grid, .refresh-policy-grid { grid-template-columns: 1fr; }
     .refresh-policy-fields, .refresh-policy-fields.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .source-heading, .channel-card > header, .catalog-entry { align-items: stretch; flex-direction: column; }
     .catalog-entry-actions { justify-content: flex-start; }

@@ -76,7 +76,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `Settings.razor` | `/settings` | Remaining; requires individual contract review |
 | `SourceProviders.razor` | `/sourceproviders` | Adopted |
 | `SourceRegistries.razor` | `/settings/source-registries` | Adopted via isolated list adapter; bounded 1,000-registration snapshot, API PlatformAdmin, commands/ETags preserved. [Evidence](evidence/list-layout/source-registries/README.md) |
-| `Sources.razor` | `/settings/sources` | Remaining; requires individual contract review |
+| `Sources.razor` | `/settings/sources` | Adopted; complete PlatformAdmin catalog, exact local pages; import and detail preserved. [Evidence](evidence/list-layout/sources/README.md) |
 | `StorageTypes.razor` | `/storage-types` | Adopted |
 | `Storages.razor` | `/storages` | Adopted |
 | `ToolCategories.razor` | `/tools/categories` | Adopted in this continuation |
