@@ -2,6 +2,7 @@
 @page "/modelproviders/{Name}"
 @implements IDisposable
 @inject IModelProvidersClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> CollectionLabels
 @inject IExtensionsClient ExtensionsClient
 @inject IParametersClient ParametersClient
 @inject ISecretsClient SecretsClient
@@ -30,19 +31,19 @@ RenderFragment definition = @<text>@if (model is not null) {
 @if (IsNew)
 {
     <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft || creators.Count > 0)" />
-    <PageHeader Title="@T("CreateProvider")" Description="@T("Description")" TestId="resource-model-provider-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Title="@T("CreateProvider")" Description="@T("Description")" TestId="resource-model-provider-editor"></PageHeader>
     @if (model is null) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
     else { @Feedback @definition }
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProvider")" Domain="model" IconName="plug"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProvider")" Domain="model" IconName="plug"
         StatusText="@(status is null ? null : StatusLabel(status.Status))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" ResourceIdentity="@(loadedKey ?? Name ?? string.Empty)"
         SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@Busy"
         DefinitionReadOnlyReason="@(CanWrite ? null : ResourceReadOnlyReason.InsufficientPermissions)" HasDraft="HasDraft" HasAdditionalDraft="@(creators.Count > 0)"
         Yaml="@(resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource))" SectionTestIdPrefix="model-provider-details" TestId="resource-model-provider-editor">
         <PrimaryActions>@if (CanWrite && resource is not null) { <a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }</PrimaryActions>
-        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-provider-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-provider-delete">@T("Delete")</button> }</Actions>
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
             <MetricCard Label="@T("AvailableModels")" Value="@(modelsKnown ? ModelCount(models.Count) : "—")" Detail="@T("Discovery")" />

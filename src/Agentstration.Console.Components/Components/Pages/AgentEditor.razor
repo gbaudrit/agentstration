@@ -23,8 +23,7 @@
 
 @if (IsNew)
 {
-    <PageHeader Eyebrow="@T("Agent")" Title="@T("CreateAgent")" Description="@T("CreateDescription")">
-        <Actions><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
+    <PageHeader CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Eyebrow="@T("Agent")" Title="@T("CreateAgent")" Description="@T("CreateDescription")">
     </PageHeader>
 }
 
@@ -109,7 +108,7 @@ else
     }
     else
     {
-        <ConsoleResourceDetailsTemplate Resource="savedResource" RequestedAddress="@ResourceAddress.Create(AgentResourceNamespace, AgentResourceKinds.Agent, Name!)" Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Agent")" Domain="agent" Icon="◎"
+        <ConsoleResourceDetailsTemplate CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Resource="savedResource" RequestedAddress="@ResourceAddress.Create(AgentResourceNamespace, AgentResourceKinds.Agent, Name!)" Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Agent")" Domain="agent" Icon="◎"
                                  Description="@(savedResource?.Definition.Description)" StatusText="@(savedResource is null ? null : HeaderStatus)" Status="HeaderStatusTone"
                                  Feedback="@feedback" LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" ShowRefreshAction HasDraft="@isDirty" TestId="agent-resource-details"
                                  DefinitionSections="AgentDefinitionSections" SectionState="sectionState" ResourceIdentity="@($"{loadedKey}|{selectedScope}|{ContextScopeRef}")" NavigationLabel="@T("AgentSections")"

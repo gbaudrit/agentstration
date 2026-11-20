@@ -16,8 +16,8 @@
 {
     <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
     <PageTitle>@T(IsNew ? "NewTrigger" : "EditTrigger") · Agentstration</PageTitle>
-    <PageHeader ScopeRef="TriggerUi.ContextScope(ContextState.Current)" Title="@(IsNew ? T("NewTrigger") : model.DisplayName.Length > 0 ? model.DisplayName : RequestedName ?? T("EditTrigger"))" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
-        <Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions>
+    <PageHeader CollectionHref="/triggers" CollectionLabel="@T("Triggers")" ScopeRef="TriggerUi.ContextScope(ContextState.Current)" Title="@(IsNew ? T("NewTrigger") : model.DisplayName.Length > 0 ? model.DisplayName : RequestedName ?? T("EditTrigger"))" Description="@(IsNew ? T("Editor.NewDescription") : T("Editor.EditDescription", model.Name))" TestId="resource-trigger-editor">
+        <Actions>@if (!IsNew) { <a class="button-secondary" href="@BackUrl">@T("Cancel")</a> }</Actions>
     </PageHeader>
 }
 @if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }

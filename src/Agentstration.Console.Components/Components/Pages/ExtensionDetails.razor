@@ -19,7 +19,7 @@
     </div>;
     RenderFragment actions = @<text>@if (CanEditRegistration) { <button type="button" class="button-secondary" @onclick="EditIdentity">@T("Edit")</button> }
         @if (CanDeleteRegistration) { <button type="button" class="button-danger" @onclick="() => confirmDelete = true" disabled="@Busy">@T("Delete")</button> }
-        <a class="button-secondary" href="@BackUrl">@T("BackToExtensions")</a></text>;
+        </text>;
     RenderFragment configuration = @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
         <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
         <Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href" target="_blank" rel="noopener noreferrer">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information>
@@ -29,7 +29,7 @@
 }
 @if (SavedResource is not null || loadState.BlocksContent)
 {
-    <ConsoleResourceDetailsTemplate Resource="SavedResource" Name="@SavedDisplayName" ResourceType="@(RegistrationName is null ? T("Enrollment") : T("Extension"))" Domain="extension" IconName="puzzle"
+    <ConsoleResourceDetailsTemplate Resource="SavedResource" Name="@SavedDisplayName" ResourceType="@(RegistrationName is null ? T("Enrollment") : T("Extension"))" Domain="extension" IconName="puzzle" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")"
         Description="@item?.Extension?.Extension?.Description" StatusText="@(item is null ? null : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" AdditionalContent="FamilySection"
         NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" SectionTestIdPrefix="extension" TestId="distribution-extension-details"
@@ -52,7 +52,7 @@
 else
 {
     <UnsavedNavigationGuard IsDirty="@(migrationPreview is not null)" />
-    <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" Description="@item?.Extension?.Extension?.Description"
+    <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")" Description="@item?.Extension?.Extension?.Description"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" Sections="OperationalSections" SelectionChanged="OperationalSectionSelected" DefaultSection="overview"
         NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" Actions="actions">
         <Content>@if (item is not null)

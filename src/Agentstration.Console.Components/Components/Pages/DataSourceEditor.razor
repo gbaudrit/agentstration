@@ -30,13 +30,13 @@ else
     @if (IsNew)
     {
         <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
-        <PageHeader Title="@T("CreateSource")" Description="@T("DataSourcesHelp")" TestId="data-source-editor"><Actions><a class="button-secondary" href="/data-sources">@T("Back")</a></Actions></PageHeader>
+        <PageHeader CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Title="@T("CreateSource")" Description="@T("DataSourcesHelp")" TestId="data-source-editor"></PageHeader>
         @feedback
         @if (loading) { <LoadingState Message="@T("Loading")" /> } else { @form }
     }
     else
     {
-        <ConsoleResourceDetailsTemplate Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
+        <ConsoleResourceDetailsTemplate CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
             Name="@(source?.Definition.DisplayName ?? Name!)" ResourceType="@T("DatasetDataSource")" Domain="data" IconName="database" Description="@source?.Definition.Description"
             ResourceIdentity="@($"{loadedKey}|{source?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections"
             LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshResourceAsync" Feedback="feedback" HasDraft="HasDraft" HasAdditionalDraft="@(businessTouched || toolAcquisition is not null)"
@@ -44,7 +44,7 @@ else
             @bind-Yaml="rawYaml" YamlReadOnly="@(!CanManage || FormDirty)" YamlTitle="@T("DataSourceYaml")" YamlDescription="@T("DataSourceYamlHelp")"
             Enabled="@(source is null ? null : model.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanManage || busy || resourceRefreshing)" EnabledTestId="data-source-enabled-option"
             SectionTestIdPrefix="data-source" TestId="data-source-editor">
-            <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || resourceRefreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
+            <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || resourceRefreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
             <OverviewMetrics>
                 <MetricCard Label="@T("State")" Value="@(readiness is null ? "—" : T(readiness.Ready ? "Ready" : "NotReady"))" Status="@(readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning)" />
                 <MetricCard Label="@T("Profile")" Value="@(readiness?.Profile?.Definition.DisplayName ?? source?.Definition.Profile?.Name)" Detail="@(readiness?.Profile?.Version ?? "—")" Url="@ProfileUrl" />

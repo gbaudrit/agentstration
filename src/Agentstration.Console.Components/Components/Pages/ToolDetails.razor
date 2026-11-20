@@ -6,10 +6,11 @@
 @inject IToolsClient Client
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> ToolLabels
 
 <PageTitle>@(tool?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
-<ConsoleResourceDetailsTemplate Resource="tool" Name="@(tool?.Definition.DisplayName ?? Name)" ResourceType="@T("Tool")" Domain="tool" IconName="wrench" Description="@tool?.Definition.Description"
+<ConsoleResourceDetailsTemplate Resource="tool" Name="@(tool?.Definition.DisplayName ?? Name)" ResourceType="@T("Tool")" Domain="tool" IconName="wrench" Description="@tool?.Definition.Description" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/tools", Services)" CollectionLabel="@ToolLabels["Title"]"
     StatusText="@(tool?.Definition.Discovery is { } discovery ? AvailabilityLabel(discovery.Available) : null)" Status="@(tool?.Definition.Discovery?.Available == true ? UiStatus.Success : tool?.Definition.Discovery is null ? UiStatus.Neutral : UiStatus.Warning)"
     Enabled="tool?.Definition.Enabled" EnabledChanged="ToggleAsync" EnabledDisabled="@(!CanWrite || tool?.Governance.IsManaged != false || toggling || refreshing)" EnabledTestId="tool-enabled-toggle"
     ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" SelectionChanged="SelectSection"

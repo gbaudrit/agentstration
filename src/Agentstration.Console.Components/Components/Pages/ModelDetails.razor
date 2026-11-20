@@ -10,11 +10,11 @@
 
 <PageTitle>@(model?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
-<ConsoleResourceDetailsTemplate Resource="model" Name="@(model?.Definition.DisplayName ?? Name)" ResourceType="@T("Model")" Domain="model" IconName="stack-2"
+<ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("BackToProviders")" Resource="model" Name="@(model?.Definition.DisplayName ?? Name)" ResourceType="@T("Model")" Domain="model" IconName="stack-2"
     StatusText="@(model is null ? null : ObservationLabel)" Status="ObservationTone" ResourceIdentity="@(loadedKey ?? Name)"
     SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
     DefinitionReadOnlyReason="ResourceReadOnlyReason.Unspecified" HasAdditionalDraft="HasOverrideDraft" Yaml="@ModelYaml" Busy="@Busy" SectionTestIdPrefix="model" TestId="resource-model-details">
-    <Actions>@if (ProviderUrl is { } providerUrl) { <a class="button-secondary" href="@providerUrl">@T("OpenProvider")</a> }<a class="button-secondary" href="@BackUrl">@T("BackToProviders")</a></Actions>
+    <Actions>@if (ProviderUrl is { } providerUrl) { <a class="button-secondary" href="@providerUrl">@T("OpenProvider")</a> }</Actions>
     <Feedback>@Feedback</Feedback>
     <OverviewMetrics>
         <MetricCard Label="@T("Availability")" Value="@ObservationLabel" Detail="@model?.Definition.ProviderStatus" HelpText="@T("AvailabilityHelp")" Status="@ObservationTone" />

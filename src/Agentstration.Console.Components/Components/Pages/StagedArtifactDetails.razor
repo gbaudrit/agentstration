@@ -11,12 +11,12 @@
 <ConfirmationDialog IsOpen="confirmPurge" Title="@T("DeleteTitle")" Message="@T("PurgeHelp")" ConfirmLabel="@T("ConfirmDelete")" CancelLabel="@T("Cancel")" TestId="staged-artifact-purge-confirmation" OnConfirm="PurgeAsync" OnCancel="() => confirmPurge = false" />
 
 <UnsavedNavigationGuard IsDirty="@HasRetentionDraft" HasUnsavedChanges="@(() => HasRetentionDraft)" />
-<ResourceDetailsTemplate Name="@(artifact?.FileName ?? Id)" ResourceType="@T("Staged")" Domain="artifact" IconName="file"
+<ResourceDetailsTemplate Name="@(artifact?.FileName ?? Id)" ResourceType="@T("Staged")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
     Description="@T("DetailsDescription")" StatusText="@(artifact is null ? null : T($"Status.{artifact.Status}"))" Status="@(artifact is null ? UiStatus.Neutral : Tone(artifact.Status))"
     Sections="Sections" SelectionChanged="SelectSection" ResourceIdentity="@loadedKey" SectionState="sectionState" DefaultSection="overview" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
     Busy="IsBusy" HasDraft="HasRetentionDraft" SectionTestIdPrefix="staged-artifact" TestId="staged-artifact-details">
         <Metadata>@if (artifact is not null) { <CopyableValue Value="@artifact.ArtifactId.ToString()" /> }</Metadata>
-        <Actions><button class="button-danger" type="button" disabled="@(IsBusy || !CanDelete || !PurgeEligible)" title="@(!PurgeEligible ? T("PurgeIneligible") : null)" data-testid="staged-artifact-delete" @onclick="() => confirmPurge = true">@T("Delete")</button><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)">@T("Back")</a></Actions>
+        <Actions><button class="button-danger" type="button" disabled="@(IsBusy || !CanDelete || !PurgeEligible)" title="@(!PurgeEligible ? T("PurgeIneligible") : null)" data-testid="staged-artifact-delete" @onclick="() => confirmPurge = true">@T("Delete")</button></Actions>
         <Feedback>@if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }@if (newerArtifact is not null) { <div class="form-alert form-alert-warning" role="status">@T("RetentionRefreshDraft")</div> }</Feedback>
         <Content>@if (artifact is not null) {
         <div data-artifact-section="overview" hidden="@(!sectionState.Is("overview"))">

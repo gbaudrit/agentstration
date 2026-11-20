@@ -19,7 +19,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("CreateParameter")" Description="@T("Editor.Description")" TestId="resource-parameter-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@T("Parameters")" Title="@T("CreateParameter")" Description="@T("Editor.Description")" TestId="resource-parameter-editor"></PageHeader>
     @if (loading) { <LoadingState Message="@T("Loading")" /> }
     else
     {
@@ -33,7 +33,7 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="savedResource" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, Name!)"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Parameters")" Resource="savedResource" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Default, ParameterResourceKinds.Parameter, Name!)"
         Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Parameter")" Domain="parameter" IconName="settings" Description="@savedResource?.Definition.Description"
         ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" HasDraft="IsDirty"
         LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" Feedback="feedback" Busy="@(busy || refreshing)"
@@ -52,7 +52,7 @@ else
                 OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-testid="parameter-form" />
         </DefinitionContent>
         <AdditionalContent Context="path">@Usages</AdditionalContent>
-        <Actions>@if (CanManage) { <button type="button" class="button-danger" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="parameter-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanManage) { <button type="button" class="button-danger" @onclick="RequestDelete" disabled="@(busy || refreshing)" data-testid="parameter-delete">@T("Delete")</button> }</Actions>
         <DraftActions><button class="text-button" type="button" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="parameter-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="parameter-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
     </ConsoleResourceDetailsTemplate>
 }

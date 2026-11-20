@@ -20,7 +20,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("AddProvider")" Description="@T("Description")" TestId="resource-tool-provider-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader Title="@T("AddProvider")" Description="@T("Description")" TestId="resource-tool-provider-editor" CollectionHref="@BackUrl" CollectionLabel="@ProviderLabels["Title"]" />
     @if (loading) { <LoadingState Message="@T("Loading")" /> }
     else
     {
@@ -33,7 +33,7 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="provider" Name="@(provider?.Definition.DisplayName ?? Name!)" ResourceType="@T("ToolProvider")" Domain="tool" IconName="server"
+    <ConsoleResourceDetailsTemplate Resource="provider" Name="@(provider?.Definition.DisplayName ?? Name!)" ResourceType="@T("ToolProvider")" Domain="tool" IconName="server" CollectionHref="@BackUrl" CollectionLabel="@ProviderLabels["Title"]"
         StatusText="@(provider is null ? null : StatusLabel(provider.Definition.Discovery.Status))" Status="@ProviderStatus(provider?.Definition.Discovery.Status)"
         Enabled="model.Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="@(!CanMutate || busy || refreshing)"
         LoadState="loadState" OnRetry="RetryAsync" OnRefresh="ReloadAsync" ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations"
@@ -46,7 +46,7 @@ else
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanMutate)" /></DefinitionContent>
         <AdditionalContent Context="path">@Tools</AdditionalContent>
-        <Actions>@if (CanMutate) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@(busy || refreshing)"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" type="button" @onclick="RefreshAsync" disabled="@(busy || refreshing)"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanMutate) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@(busy || refreshing)"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" type="button" @onclick="RefreshAsync" disabled="@(busy || refreshing)"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }</Actions>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="tool-provider-resource-form" class="button-primary" disabled="@(busy || refreshing)">@T("SaveProvider")</button></DraftActions>
     </ConsoleResourceDetailsTemplate>
 }

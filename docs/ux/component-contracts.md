@@ -45,6 +45,12 @@ For example, an application-owned stylesheet can override these values without c
 
 This is an override example, not a shipped theme selector or a new persisted preference. Named-theme authoring, distribution and selection remain future work. Validate contrast, keyboard focus, both appearances and mobile layout for each real theme; changing a primary color alone is not sufficient evidence.
 
+## Return to the owning collection
+
+`CollectionHref` and a localized `CollectionLabel` are optional on `ConsoleResourceDetailsTemplate`, `ResourceDetailsTemplate`, `ResourceHeader` and creation `PageHeader`. Families declare a real destination; the header places one icon-only `ResourceCollectionLink` last, after other actions and overflow. Remove duplicate Back/All links to that same collection, while keeping distinct parent/source links and commands that cancel or discard a draft.
+
+The shared link supplies its accessible name/tooltip, compact desktop size and 44 px touch target. It preserves explicit destination context, execution scope, query and fragment, and uses the existing optional `IConsoleNavigationContext` to add logical context only when missing. It has no inferred route, API calls or mutable global page state. Standard anchors retain router and unsaved-navigation guards. A known collection destination remains usable when resource content is loading or unavailable. Embedded editors rely on their owning header; specialized workshops can reuse the same link directly.
+
 ## Bounded model collections
 
 The Console client uses `GET /api/modelprofiles/queries/lookup` for inline profile choices and `GET /api/modelprofiles/{name}/usages/page` for authorized direct consumers. Continuations are protected and query-bound; existing list/usages endpoints remain compatible. Choice rows omit usage totals rather than report a fabricated zero. The shared summary contract represents an unknown UsageCount with null; legacy list responses still provide their known totals.

@@ -106,7 +106,20 @@ export class AgentEditorPage {
     await expect(this.page.getByTestId(TestIds.agentEditor.overview)).toBeVisible();
   }
 
+  public async expectSavedDisplayName(name: string): Promise<void> {
+    const title = this.page.locator('.resource-details-template > .resource-header h1');
+    await expect(title).toHaveText(name);
+  }
+
   public async expectStandardOverview(locale: SupportedTestLocale): Promise<void> {
+    const header = this.page.locator('.resource-details-template > .resource-header');
+    const collection = header.locator('.resource-collection-link');
+    await expect(collection).toHaveAccessibleName(ResourceSectionTextByLocale[locale].agentList);
+    await expect(collection).toBeVisible();
+    const destination = new URL((await collection.getAttribute('href'))!, this.page.url());
+    expect(destination.pathname).toBe('/agents');
+    expect(destination.searchParams.get('context')).toBe(new URL(this.page.url()).searchParams.get('context'));
+    await expect(header.locator('.page-actions > .resource-collection-link:last-child')).toHaveCount(1);
     const overview = this.page.getByTestId(TestIds.agentEditor.overview);
     const cards = overview.locator('.resource-overview-metrics .metric-card');
     await expect(cards).toHaveCount(3);
@@ -115,6 +128,8 @@ export class AgentEditorPage {
     const identityPanel = overview.locator('.resource-identity-summary');
     const disclosure = identityPanel.locator('.panel-disclosure');
     if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+    const configurationDisclosure = overview.locator('.resource-configuration-summary .panel-disclosure');
+    if (await configurationDisclosure.getAttribute('aria-expanded') === 'false') await configurationDisclosure.click();
     const labels = overview.locator('.resource-identity-summary .labels-summary');
     await expect(labels).toBeVisible();
     await expect(overview.locator('.labels-summary')).toHaveCount(1);

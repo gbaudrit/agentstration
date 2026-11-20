@@ -14,7 +14,7 @@
 @if (IsNew)
 {
     <UnsavedNavigationGuard IsDirty="HasDefinitionDraft" HasUnsavedChanges="@(() => HasDefinitionDraft)" />
-    <PageHeader Title="@T("CreateProfile")" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="/data-source-profiles" CollectionLabel="@T("Profiles")" Title="@T("CreateProfile")" Description="@T("ProfilesHelp")" TestId="data-source-profile-editor"></PageHeader>
     <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" />
     @if (loadState.HasContent)
     {
@@ -27,7 +27,7 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="profile" Name="@(profile?.Definition.DisplayName ?? Name!)" ResourceType="@T("Profile")" Domain="data" IconName="database" Description="@profile?.Definition.Description"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Profiles")" Resource="profile" Name="@(profile?.Definition.DisplayName ?? Name!)" ResourceType="@T("Profile")" Domain="data" IconName="database" Description="@profile?.Definition.Description"
         Enabled="@(profile is null ? null : model.Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(!CanManage || busy || refreshing || HasRawDraft || !interactive)" EnabledTestId="profile-enabled"
         ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
         LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" DefinitionReadOnlyReason="@(HasWritePermission ? null : ResourceReadOnlyReason.InsufficientPermissions)"
@@ -41,7 +41,7 @@ else
             Busy="busy" ReadOnly="@(!CanManage)" Disabled="@(HasRawDraft || !interactive)" InvalidInputChanged="value => invalidInput = value" /></DefinitionContent>
         <AdditionalContent Context="path">@RevisionFields</AdditionalContent>
         <YamlFeedback>@if (HasMetadataDraft) { <p class="inline-info">@T("ProfileSaveBeforeYaml")</p> }</YamlFeedback>
-        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
         <DraftActions><button class="button-secondary" type="button" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (HasRawDraft) { <button class="button-primary" type="button" disabled="@(busy || refreshing)" @onclick="SaveYamlAsync">@T("ApplyYaml")</button> } else { <button class="button-primary" type="submit" form="profile-resource-form" disabled="@(busy || refreshing)" data-testid="profile-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
     </ConsoleResourceDetailsTemplate>
 }

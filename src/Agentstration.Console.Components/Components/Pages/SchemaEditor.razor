@@ -13,20 +13,20 @@
 @{ var presentations = Presentations; }
 @if (IsNew)
 {
-    <PageHeader Title="@T("CreateTitle")" Description="@T("EditorDescription")" TestId="schema-editor"><Actions><a class="button-secondary" href="/schemas">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="/schemas" CollectionLabel="@T("Title")" Title="@T("CreateTitle")" Description="@T("EditorDescription")" TestId="schema-editor"></PageHeader>
     <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
     @Feedback
     @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> } else { @DefinitionForm(presentations) }
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="schema" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(NamespaceQuery), SchemaResourceKinds.Schema, Name!)"
+    <ConsoleResourceDetailsTemplate CollectionHref="/schemas" CollectionLabel="@T("Title")" Resource="schema" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(NamespaceQuery), SchemaResourceKinds.Schema, Name!)"
         ResourceIdentity="@($"{loadedKey}|{schema?.Uid}")" Name="@(schema?.Definition.DisplayName ?? Name!)" ResourceType="@T("Schema")" Domain="schema" IconName="file-text" Description="@schema?.Definition.Description"
         SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
         HasDraft="HasDraft" HasAdditionalDraft="publicationTouched" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
         Yaml="@rawYaml" YamlChanged="value => rawYaml = value" YamlReadOnly="@(!CanEdit || FormDirty || sourceDirty)" YamlError="@error" YamlInputTestId="schema-yaml-source"
         YamlTitle="@T("YamlManifest")" YamlDescription="@T("YamlHelp")" TestId="schema-editor" SectionTestIdPrefix="schema">
-        <Actions><a class="button-secondary" href="/schemas">@T("Back")</a></Actions>
+
         <OverviewMetrics>@if (schema is not null) {
             <MetricCard Label="@T("Generation")" Value="@schema.Generation.ToString()" />
             <MetricCard Label="@T("Format")" Value="@schema.Definition.Format" Detail="@(schema.Definition.Dialect ?? "—")" Status="@(SavedFormatAvailable ? UiStatus.Success : UiStatus.Warning)" />

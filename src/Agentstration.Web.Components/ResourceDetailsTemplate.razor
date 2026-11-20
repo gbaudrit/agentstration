@@ -6,7 +6,7 @@
                     ImageSource="@ImageSource" DarkImageSource="@DarkImageSource" IconContent="@IconContent"
                     Description="@Description" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef" ResourceUid="@(BlocksContent ? null : ResourceUid)"
                     Version="@Version" VersionDescription="@VersionDescription" StatusText="@StatusText" Status="Status" Metadata="@Metadata"
-                    CollectionHref="@(BlocksContent ? null : CollectionHref)" CollectionLabel="@CollectionLabel" ShowTechnicalIdentity="false" IdentityAvailable="@(!BlocksContent)" IdentityLabels="IdentityLabels" IdentityDetails="IdentityDetails"
+                    CollectionHref="@CollectionHref" CollectionLabel="@CollectionLabel" ShowTechnicalIdentity="false" IdentityAvailable="@(!BlocksContent)" IdentityLabels="IdentityLabels" IdentityDetails="IdentityDetails"
                     Enabled="@(BlocksContent ? null : Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(EnabledDisabled || DefinitionReadOnlyReason is not null)" EnabledTestId="@EnabledTestId"
                     PrimaryActions="@(BlocksContent ? null : PrimaryActions)" Actions="@(BlocksContent ? null : Actions)" MoreActions="@(BlocksContent ? null : HeaderMoreActions)" NavigationActions="@(ShowNavigation ? HeaderNavigation() : null)" />
     @if (LoadState is { BlocksContent: false, Status: ResourceLoadStatus.Refreshing or ResourceLoadStatus.Failed } refreshState)

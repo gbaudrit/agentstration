@@ -2,6 +2,7 @@
 @page "/modelprofiles/{Name}"
 @implements IDisposable
 @inject IModelProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilesStrings> CollectionLabels
 @inject IModelProvidersClient ProvidersClient
 @inject IExtensionsClient ExtensionsClient
 @inject IResourceScopeInventoryClient Scopes
@@ -31,18 +32,18 @@
 @if (IsNew)
 {
     <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
-    <PageHeader Title="@T("CreateModelProfile")" Description="@T("Description")" TestId="resource-model-profile-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Title="@T("CreateModelProfile")" Description="@T("Description")" TestId="resource-model-profile-editor"></PageHeader>
     @if (model is null || loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
     else { @Feedback @definition }
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProfile")" Domain="model" IconName="adjustments"
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProfile")" Domain="model" IconName="adjustments"
         Description="@resource?.Definition.Description" StatusText="@(resolution is null ? null : StatusLabel(resolution.Status))" Status="@(resolution is null ? UiStatus.Neutral : ModelManagementUi.Status(resolution.Status))"
         ResourceIdentity="@(loadedKey ?? Name ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
         AllowAccess="OwnScope" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDraft" DefinitionReadOnlyReason="ExplicitReadOnlyReason" Yaml="@(resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource))"
         SectionTestIdPrefix="model-profile" TestId="resource-model-profile-editor">
-        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }</Actions>
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics><MetricCard Label="@T("ProfileStatus")" Value="@StatusLabel(resolution?.Status)" Status="@ModelManagementUi.Status(resolution?.Status)" /><MetricCard Label="@T("AgentUsages")" Value="@(usageOverallTotal is { } count ? AgentCount(count) : "—")" Detail="@T("AgentUsagesDescription")" /></OverviewMetrics>
         <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>

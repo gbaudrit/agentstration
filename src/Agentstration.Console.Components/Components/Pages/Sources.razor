@@ -46,13 +46,14 @@ else
 {
     var presentations = DetailPresentations;
     <div data-testid="source-details" data-source-publisher="@Publisher" data-source-name="@Name"><ConsoleResourceDetailsTemplate Resource="detail?.Source.Source" Name="@(detail?.Source.Configuration.Definition.DisplayName ?? Name ?? T("Title"))" ResourceType="@T("Source")" Domain="source" IconName="database"
+        CollectionHref="@SourceCollectionUrl" CollectionLabel="@T("Title")"
         ResourceIdentity="@detailKey" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DetailDefinitionSections" AdditionalSections="DetailAdditionalSections"
         Description="@detail?.SelectedVersion.Definition.PublishedDefinition.Description" LoadState="detailLoadState" OnRefresh="RefreshDetailAsync" OnRetry="RefreshDetailAsync" Busy="DetailBusy"
         DefinitionReadOnlyReason="DetailReadOnlyReason" HasDraft="HasDefinitionDraft" HasAdditionalDraft="@(packSelection is not null)" AllowAccess="OwnScope"
         StatusText="@(detail is null ? null : VerificationLabel(detail.Verification.Status))" Status="@(detail is null ? UiStatus.Neutral : VerificationTone(detail.Verification.Status))"
         Yaml="@(detail?.SelectedVersion.Definition.RawManifest ?? string.Empty)" YamlReadOnly YamlTitle="@T("ManifestYaml")" YamlDescription="@T("PublishedYamlHelp")"
         NavigationTestId="source-sections" SectionTestIdPrefix="source" TestId="source-resource-details">
-        <Actions><a class="button-secondary" href="@SourceCollectionUrl">@T("AllSources")</a>@if (CanDelete) { <button class="button-danger" type="button" disabled="@DetailBusy" @onclick="() => confirmDeleteSource = true">@T("DeleteSource")</button> }</Actions>
+        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@DetailBusy" @onclick="() => confirmDeleteSource = true">@T("DeleteSource")</button> }</Actions>
         <PrimaryActions>@if (CanRefresh) { <button type="button" class="button-primary" disabled="@(DetailBusy || detail?.Source.Configuration.Definition.Origin is null)" title="@(detail?.Source.Configuration.Definition.Origin is null ? T("PastedSourceCannotRefresh") : null)" @onclick="RefreshSourceAsync">@T("RefreshSource")</button> }</PrimaryActions>
         <Feedback>
             @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }

@@ -14,7 +14,7 @@
 @if (!Embedded)
 {
     <PageTitle>@T(IsNew ? "Create" : "Edit") · Agentstration</PageTitle>
-    <PageHeader Enabled="model.Enabled" EnabledChanged="value => model.Enabled = value" EnabledDisabled="@(busy || !CanWrite)" ScopeRef="ownerScope" EnabledTestId="storage-enabled" Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions></PageHeader>
+    <PageHeader CollectionHref="/storages" CollectionLabel="@T("Storages")" Enabled="model.Enabled" EnabledChanged="value => model.Enabled = value" EnabledDisabled="@(busy || !CanWrite)" ScopeRef="ownerScope" EnabledTestId="storage-enabled" Title="@T(IsNew ? "Create" : "Edit")" Description="@T("Editor.Description")" TestId="storage-editor"><Actions>@if (!IsNew) { <a class="button-secondary" href="@BackUrl">@T("Cancel")</a> }</Actions></PageHeader>
 }
 @if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
 else

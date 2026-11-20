@@ -9,11 +9,11 @@
 <PageTitle>@T("MemberAccess") · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
 <div data-testid="console-admin-organization-member-details" data-member-id="@UserId">
-    <ResourceDetailsTemplate Name="@(member?.Principal.DisplayName ?? T("MemberAccess"))" ResourceType="@T("MemberAccess")" Domain="identity" IconName="user"
+    <ResourceDetailsTemplate Name="@(member?.Principal.DisplayName ?? T("MemberAccess"))" ResourceType="@T("MemberAccess")" Domain="identity" IconName="user" CollectionHref="@BackUrl" CollectionLabel="@T("Members")"
                              Description="@T("MemberAccess.Description")" StatusText="@(member is null ? null : T($"Status.{member.Principal.Status}"))" Status="@(member?.Principal.Status == PrincipalStatus.Active ? UiStatus.Success : UiStatus.Neutral)"
                              Sections="Sections" ResourceIdentity="@loadedKey" DefaultSection="overview" SelectionChanged="SelectSection" SectionState="sectionState" LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="IsBusy" HasDraft="IsDirty" SectionTestIdPrefix="organization-member">
         <Metadata><CopyableValue Value="@UserId.ToString("D")" /></Metadata>
-        <Actions><a class="button-secondary" href="@BackUrl">@T("Members")</a></Actions>
+
         <Feedback>@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("Member.RefreshDraftConflict")</div> }</Feedback>
         <Content>@if (member is not null) {
         <div hidden="@(section != "overview")">

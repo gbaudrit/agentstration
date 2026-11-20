@@ -19,7 +19,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("Create")" Description="@T("EditorDescription")" TestId="resource-tool-category-editor"><Actions><a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions></PageHeader>
+    <PageHeader Title="@T("Create")" Description="@T("EditorDescription")" TestId="resource-tool-category-editor" CollectionHref="@BackUrl" CollectionLabel="@T("Title")" />
     @if (loading) { <LoadingState Message="@T("Loading")" /> }
     else if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
     else
@@ -34,7 +34,7 @@
 }
 else
 {
-    <ConsoleResourceDetailsTemplate Resource="category" Name="@(category?.Definition.DisplayName ?? Name!)" ResourceType="@T("Category")" Domain="tool" IconName="layers" Description="@category?.Definition.Description"
+    <ConsoleResourceDetailsTemplate Resource="category" Name="@(category?.Definition.DisplayName ?? Name!)" ResourceType="@T("Category")" Domain="tool" IconName="layers" Description="@category?.Definition.Description" CollectionHref="@BackUrl" CollectionLabel="@T("Title")"
         LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations"
         Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" TestId="resource-tool-category-editor" SectionTestIdPrefix="category">
@@ -45,7 +45,7 @@ else
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" Id="category-resource-form" FormName="tool-category-editor"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
-        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="category-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="category-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
     </ConsoleResourceDetailsTemplate>
 }

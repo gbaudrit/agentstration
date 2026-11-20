@@ -31,13 +31,13 @@
     if (IsNew)
     {
         <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
-        <PageHeader Title="@T("CreateSource")" Description="@T("DatasetHelp")" TestId="data-source-dataset-editor"><Actions><a class="button-secondary" href="/data-sources">@T("Back")</a></Actions></PageHeader>
+        <PageHeader CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Title="@T("CreateSource")" Description="@T("DatasetHelp")" TestId="data-source-dataset-editor"></PageHeader>
         @feedback
         @if (loading) { <LoadingState Message="@T("Loading")" /> } else { @form }
     }
     else
     {
-        <ConsoleResourceDetailsTemplate Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
+        <ConsoleResourceDetailsTemplate CollectionHref="/data-sources" CollectionLabel="@T("DataSources")" Resource="source" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(Namespace), DataSourceResourceKinds.DataSource, Name!)"
             Name="@(source?.Definition.DisplayName ?? Name!)" ResourceType="@T("DatasetDataSource")" Domain="data" IconName="database" Description="@source?.Definition.Description"
             ResourceIdentity="@($"{loadedKey}|{source?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="BusinessSections"
             LoadState="loadState" OnRetry="LoadInitialAsync" OnRefresh="RefreshAsync" Feedback="feedback" HasDraft="HasDraft"
@@ -46,7 +46,7 @@
             Enabled="@(source is null ? null : model.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanManage || busy || resourceRefreshing)" EnabledTestId="dataset-enabled"
             SectionTestIdPrefix="dataset" TestId="data-source-dataset-editor">
             <PrimaryActions>@if (source is not null) { <button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || resourceRefreshing || !interactive || readiness?.CanAcquire != true)" @onclick="StartAsync"><UiIcon Name="play-circle" />@T("StartAcquisition")</button> }</PrimaryActions>
-            <Actions><a class="button-secondary" href="/data-sources">@T("Back")</a></Actions>
+
             <OverviewMetrics><MetricCard Label="@T("Generation")" Value="@source?.Generation.ToString()" /><MetricCard Label="@T("State")" Value="@(readiness is null ? "—" : T(readiness.Ready ? "Ready" : "NotReady"))" Status="@(readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning)" /></OverviewMetrics>
             <OverviewConfiguration><CollectionView TItem="DatasetSetting" Items="SavedSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
             <OverviewContent>@OverviewContent</OverviewContent>

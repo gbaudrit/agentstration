@@ -28,7 +28,7 @@
 }
 @if (IsNew)
 {
-    <PageHeader Title="@T("CreateEntry")" Description="@T("Entry.Description")"><Actions><a class="button-secondary" href="@BackUrl">@T("BackToEntries")</a></Actions></PageHeader>
+    <PageHeader Title="@T("CreateEntry")" Description="@T("Entry.Description")" CollectionHref="@BackUrl" CollectionLabel="@T("Entries")" />
     @if (loading) { <LoadingState Message="@T("LoadingEntry")" /> }
     else if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RefreshAsync" /> }
     else {
@@ -40,13 +40,13 @@
 }
 else
 {
-    <ResourceDetailsTemplate Name="@(saved?.Value.DisplayName ?? Name)" ResourceType="@T("WorkplaceEntry")" Description="@saved?.Value.Description" TechnicalName="@(saved?.Value.Name ?? Name)" Namespace="@EntryResourceNamespace.Value" Domain="work" IconName="layout-grid"
+    <ResourceDetailsTemplate Name="@(saved?.Value.DisplayName ?? Name)" ResourceType="@T("WorkplaceEntry")" Description="@saved?.Value.Description" TechnicalName="@(saved?.Value.Name ?? Name)" Namespace="@EntryResourceNamespace.Value" Domain="work" IconName="layout-grid" CollectionHref="@BackUrl" CollectionLabel="@T("Entries")"
         ResourceIdentity="@($"{loadedKey}|{saved?.Value.WorkspaceId}")" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
         LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="ReadOnlyReason"
         SelectionChanged="SelectSectionAsync" NavigationLabel="@T("EntrySections")" SectionTestIdPrefix="entry" TestId="resource-entry-editor" YamlTitle="@T("EntryYaml")" YamlDescription="@T(CanWrite ? "EntryYamlEditableHelp" : "EntryYamlReadOnlyHelp")">
         <Metadata><div class="entry-summary-bar" aria-label="@T("EntryStatus")" data-testid="entry-status" data-state="@(published is null ? "draft" : "published")"><StatusBadge Text="@T(published is null ? "Draft" : "Published")" Status="@(published is null ? UiStatus.Neutral : UiStatus.Success)" /><span>@(published is null ? T("Revision", draftRevision) : T("Version", published.Version))</span></div></Metadata>
         <PrimaryActions>@if (saved is not null && CanWrite) { <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(busy || loading || HasRawDraft)" data-testid="entry-publish">@T("PublishPinnedVersion")</button> }</PrimaryActions>
-        <Actions>@if (published is not null) { <a class="button-secondary" href="@WorkspaceConfigurationUrl">@T("UseInWorkplace")</a> }<a class="button-secondary" href="@BackUrl">@T("BackToEntries")</a></Actions>
+        <Actions>@if (published is not null) { <a class="button-secondary" href="@WorkspaceConfigurationUrl">@T("UseInWorkplace")</a> }</Actions>
         <Feedback>@feedback</Feedback>
         <OverviewMetrics>@if (saved is not null) { <MetricCard Label="@T("DraftRevision")" Value="@draftRevision.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("PublishedVersionLabel")" Value="@(published?.Version.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")" /><MetricCard Label="@T("PublishedDashboards")" Value="@(usageLoaded ? PublishedUsages.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) : "—")" /> }</OverviewMetrics>
         <IdentityDetails><dt>@T("EntryExecutionWorkspace")</dt><dd>@WorkspaceDisplayName</dd></IdentityDetails>
