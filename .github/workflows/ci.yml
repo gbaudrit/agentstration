@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, validation/bootstrap-agent-activation-1246]
   workflow_dispatch:
 
 permissions:
