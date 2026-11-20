@@ -1,0 +1,247 @@
+{
+  "screen": "Entry \u2014 Work definition and six-step creation",
+  "nativeCases": [
+    {
+      "title": "Entry wizard and saved Work definition retain independent drafts ",
+      "project": "desktop-chromium",
+      "durationMs": 26211
+    },
+    {
+      "title": "Entry wizard and saved Work definition retain independent drafts @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 25119
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "048f41a8680c83c3880a8da7b0f1ac7417ec6095",
+      "reportSha256": "5057e146dca88c17370e7b30f512a7f5eff78b1b0e29c9ebe2b60dcf8102d271",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor": "84dc57bd19f27c31ff79adca0ed5a6ed14f87e3005f6f5eb1700691b0c194a34",
+        "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor.cs": "47d75f0b58b853c40f79ec0da47db75f00f8079016134ea1086dc10c72d84471",
+        "src/Agentstration.Console.Components/Components/Pages/EntryEditor.manifest.cs": "31624f9add7d6ff0f58475d2ef4b60cd8e0e3ae6e624e8af2ec8f582682e26ab",
+        "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor.css": "65e9af421e72bb41e67812d72253a1b55afc9317f13d60ddc17f6950b2fc4133",
+        "src/Agentstration.Console.Components/Console/EntryEditorModel.cs": "590ec42f1cb323252ee7fee5024ce5b954da6f122b4bc1aa7628856a0f479a36",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/WorkplaceStrings.resx": "998b268053899e50473bc34b8a0ed24ff6a3e1077aac37fe5f9b4615aa2011f9",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/WorkplaceStrings.fr-FR.resx": "6053317247782b44e2b8c55a9b78bc629f52016b921d5a30360d6d8d5c738067",
+        "src/Agentstration.Web.Components/ResourceDetailsTemplate.razor": "50432d233f4cd41f65989e66194dfc21fa38f27f1c1f07866079e419d72940bb",
+        "tests/Agentstration.Console.Components.Tests/EntryAdministrationComponentTests.cs": "620eb6a5c99e84057ad00b021b37c2884051399697850e6390845be03bc20d18",
+        "tests/Agentstration.Console.Components.Tests/EntryAdministrationComponentTests.Foundation.cs": "90da8bcbd17e0c681414f81ae86e4b9029c2158e2ec0f30da6fe229f4f736cc8",
+        "tests/Agentstration.Web.Components.Tests/ResourceIdentityScopePresentationTests.cs": "8bbf45ec2f68a382f6e98972bc300d75e5c609e7b9139311ae6db0c961a99ffd"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce"
+      },
+      "campaign": "screens-08"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "bootstrap-regression",
+      "passed": 1,
+      "sha256": "eaa46ef938ca21babd184d3f792db80dc01fc63179305f30b84c0cf6dedb33b0"
+    },
+    {
+      "file": "agent-regression",
+      "passed": 2,
+      "sha256": "5953eb99d3e8ef777a8b650054cc54a6d7541f24676e1f5307ed1bc7fbc654a7"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "entry-editor-incomplete-identity-desktop-en.png",
+      "sha256": "3af30e1076e49ea83afd91ecd3ee8939170e7379c2c04e8a89bdae921ff9d257"
+    },
+    {
+      "file": "entry-editor-creation-review-desktop-en.png",
+      "sha256": "bfcd0e8960511f2265a3b4de43e2091800e1bbbd5cb9b53c8925e7df7817b551"
+    },
+    {
+      "file": "entry-editor-overview-desktop-en.png",
+      "sha256": "76c74c355b1b2021d6284828057eaee937fde5e1938617fd166ffc2a3256ac56"
+    },
+    {
+      "file": "entry-editor-invalid-identity-desktop-en.png",
+      "sha256": "fb9a424fecd1fa85c2b9b7f0ae803003389f55d5d3fc1db07ac604d1686a22a8"
+    },
+    {
+      "file": "entry-editor-retained-refresh-desktop-en.png",
+      "sha256": "e7e6efa8758fcba3015b5de9cb0643d455b1b98b9e0f51258b2f5aef7faef4a7"
+    },
+    {
+      "file": "entry-editor-invalid-yaml-desktop-en.png",
+      "sha256": "4ad96c9f1d0c17361619033c60f44dfc42647ac933dd09711018d0e585e26d2c"
+    },
+    {
+      "file": "entry-editor-saved-definition-desktop-en.png",
+      "sha256": "27e16931f9ebd0c2839a37403873ee84975d554ab3c51cc3b72ea5c9e2e50eb4"
+    },
+    {
+      "file": "entry-editor-preview-desktop-en.png",
+      "sha256": "8d239e9c4435112ab04c89ae9e2eaad331a472b1d53816341800171eb39a8867"
+    },
+    {
+      "file": "entry-editor-usage-desktop-en.png",
+      "sha256": "4ed6f4ae777db883b4e7e9e175ee06e0e8a8bf2e3cf6311de7adec8b6b69c66c"
+    },
+    {
+      "file": "entry-editor-published-version-desktop-en.png",
+      "sha256": "865aa0f052ba0c6c8985ab15815f330bfc1236afed1081e988eed3b9c188aa3d"
+    },
+    {
+      "file": "entry-editor-incomplete-identity-mobile-fr.png",
+      "sha256": "48a6f2f4e7fd30082d785bec66ac8ca7d8e1dfad8578af2b688f231e2f2c375d"
+    },
+    {
+      "file": "entry-editor-creation-review-mobile-fr.png",
+      "sha256": "42b25eba0f73b9e957d7c292e2fc2accc9acfd815eb67c9fba4206d4f5716d44"
+    },
+    {
+      "file": "entry-editor-overview-mobile-fr.png",
+      "sha256": "6b0482fe728abae4b5ddf56771697e71fd2cd6e5b0f56b5c6952c10fe0f84cde"
+    },
+    {
+      "file": "entry-editor-invalid-identity-mobile-fr.png",
+      "sha256": "1dc19525ac31c83a7e0f3b76e3266d34f7ea66e9bda8f339b26984cb21ab916b"
+    },
+    {
+      "file": "entry-editor-retained-refresh-mobile-fr.png",
+      "sha256": "fa9eb62a004fb442a23d59f352a71d38f1721c277d68d162cd4f5aaf03b32568"
+    },
+    {
+      "file": "entry-editor-invalid-yaml-mobile-fr.png",
+      "sha256": "c333b9f7a54f27a2a55bdf0dc7cdf73072ec2a659b3b4e06544a8e6ea87c56e2"
+    },
+    {
+      "file": "entry-editor-saved-definition-mobile-fr.png",
+      "sha256": "f9f130bcdce85a3a53000f13eabb4ec698427ccdd4632531b2d2e1f843db1d93"
+    },
+    {
+      "file": "entry-editor-preview-mobile-fr.png",
+      "sha256": "90e2010da98d7bc5a4db20b47b5b656f8981dde2c1a4ba3f1f9bc42e05766f4a"
+    },
+    {
+      "file": "entry-editor-usage-mobile-fr.png",
+      "sha256": "75b5e9ee23567c18bd82f72e06a7bb7a4c6af2cbca56e893224dcdf91eef97e6"
+    },
+    {
+      "file": "entry-editor-published-version-mobile-fr.png",
+      "sha256": "f49cc4558171e3996d3df499daa8e8de5c4e06abd37fa9b1141f019c1302958a"
+    }
+  ],
+  "limits": [
+    "The existing Agent picker emits namespace and a null owner; Agent resolution uses the visible hierarchy. Exact declared relative binding is preserved. This migration does not claim backend homonym-owner support or silently pin an inferred Instance owner.",
+    "The existing Work Entry update API supplies no ETag and retains its last-write-wins contract.",
+    "The official Assistant profile currently contains ambiguous Tool ownership across Instance and Workspace and is not modified by this screen migration. The provenance journey requires a successful real Bootstrap application of an isolated Workspace test profile and does not accept a partially applied official profile.",
+    "An initial temporary French probe checked an old mounted circuit after saving preferences through the API. The final setup verifies persisted language/theme, opens the real editor, then checks its actual appearance; no product fix, timeout increase or assertion reduction was used."
+  ],
+  "maintainedSelections": {
+    "reportSha256": "c868c527eba0fd16d54e0f19b134a0406f6542e8fb1b09a166c7a524f1bddd12",
+    "passedCases": [
+      {
+        "title": "a command fallback opens and executes the generic Console Entry interaction @smoke",
+        "project": "desktop-chromium"
+      },
+      {
+        "title": "Flow, Agent, and ToolDefinition editors expose reusable contracts consistently @smoke",
+        "project": "desktop-chromium"
+      }
+    ],
+    "wholeReportUnexpected": 1,
+    "otherFailure": "The old Bootstrap setup lacked the Assistant workspace profile; the final separate Bootstrap report verifies its repaired deterministic preparation."
+  },
+  "maintainedPreparationSourceHashes": {
+    "automation/playwright/src/pages/entry-editor.page.ts": "1bfcf7d57985e7df3707e91614645a62cb3bf7e10ff5751f483dae1209a98f3b",
+    "automation/playwright/src/journeys/exercise-bootstrap-provenance.journey.ts": "c58df5c7e683c85e0f2f667c1d34f099022478d0f6274a87c7df8174d1bb9c30",
+    "automation/playwright/src/fixtures/product-hosts.ts": "7802982a0d9e9bc31e8ac54a64423137baf97b96d1c4f5d21c9a7eb545b2092f",
+    "automation/playwright/src/fixtures/test.ts": "87503bf9e35eecd556dbe16c5553a1c0e728411bcea80a9a249da2b29d7a7791",
+    "automation/playwright/tests/bootstrap-provenance.spec.ts": "cb3c8212f034835ec2bb86486e6556c59ad0b1f8b10904c38bbd74e35d127842",
+    "automation/playwright/fixtures/bootstrap-provenance/playwright-bootstrap-provenance/profile.yaml": "cdd5557d4701b357e087b7785e6997a63249c5b09ed101a07c643a8ad8f4e1cb",
+    "automation/playwright/fixtures/bootstrap-provenance/playwright-bootstrap-provenance/10-agent.yaml": "15181d147fa4a406d0792fc86b823161ed94a36ba6f13bc3062a7d5802fcf126",
+    "automation/playwright/fixtures/bootstrap-provenance/playwright-bootstrap-provenance/20-flow.yaml": "02003ea6975dda568c4e2e3903a0cddeb59fae4a53efc5ae780786586c938b20",
+    "automation/playwright/fixtures/bootstrap-provenance/playwright-bootstrap-provenance/30-entry.yaml": "5dafbab1286cac64bb7de1a87a6bcc50cbafb406277ef1eefe7465edf593657c",
+    "automation/playwright/src/pages/agent-editor.page.ts": "4d1e89cf7b23fef14f9a64ba39b788d387ec1789738f9f992d11eb2f95a4676b",
+    "automation/playwright/src/pages/distribution.page.ts": "c24b32183172c0effd8c0720c36794ed4880688fd732fd69dfbce7584eb63b06",
+    "automation/playwright/fixtures/bootstrap-provenance/playwright-bootstrap-provenance/40-pack-entry.yaml": "5654426c3e61b188ddfab0ab3a2798fcd2be8ad986745355087bb362d9773296"
+  },
+  "maintainedPreparation": "Existing Bootstrap journey previews and applies an isolated Workspace fixture profile using exact authorized model/runtime bindings; The namespaced Entry/Flow/Agent edits, Pack read-only assertion and checkpoints remain. A separate default-namespace Entry homonym is used for the Pack step because the current Composer export catalogue only supports default namespace; exact namespace and physical Workspace are verified before selection. Production profiles are unchanged. The fixture exists only in the temporary catalogue of its dedicated worker.",
+  "postSyncFocusedChecks": {
+    "extensions": {
+      "passed": 50,
+      "sha256": "dd16981c759f2f910e57677677d5278d736f6680e4cc8dc07d8485d3c2afa17c"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "a0ad5cb9d1a9737ed3e7f469699c4511e90651f19f28d3d18b8b636986f8d2fb"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "ca31a649db3aa32718e15d3d4ca45ce6bcbd50f74a265163855bd07b6b54199f"
+    },
+    "schema-composition": {
+      "passed": 27,
+      "sha256": "92c3b5adaadefe2347809ddf10e4947e13acaee2ddc4cadfb6998029464adc2e"
+    }
+  },
+  "validationNote": "These post-synchronization focused checks overlap earlier targetedGroupChecks; their counts must not be added as distinct tests.",
+  "finalSharedSynchronization": {
+    "commit": "fe2eec88",
+    "note": "Preserved the parallel optional MetricCard child-content and Connected Service diagnostics change; merged the common matrix without losing local work and rebuilt all three hosts before final browser checks.",
+    "checks": {
+      "connected-service": {
+        "passed": 30,
+        "sha256": "4ad976a8c9cbc2fc1fc75e5384d34c09cce2fa9579e62f6e95d788721d67e995"
+      },
+      "shared": {
+        "passed": 21,
+        "sha256": "1c27922304e3cd12b15af25c3456050d01f0f18b9cd2814d3504452dc8b4b0d6"
+      }
+    },
+    "typescriptSha256": "e0d5fd0bdebcba8fe9c7e303d0e6bfcfbbc4cda1af1190b751ea1251221ce456"
+  }
+}

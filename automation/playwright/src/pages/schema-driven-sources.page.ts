@@ -82,7 +82,7 @@ export class SchemaDrivenSourcesPage {
 
   public async assertLocalizedEditorModes(consoleUrl: string, dataSourceName: string,
     expected: { formMode: string; rawMode: string }): Promise<void> {
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(await this.scopeRef())}&view=definition`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(await this.scopeRef())}#definition/configuration`,
       TestIds.schemaDrivenSources.dataSourceEditor);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
     await expect(editor.getByTestId(TestIds.common.schemaFormMode)).toHaveText(expected.formMode);
@@ -116,7 +116,7 @@ export class SchemaDrivenSourcesPage {
         },
       },
     }), 201, `create Data Source '${dataSourceName}'`);
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}&view=definition`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}#definition/configuration`,
       TestIds.schemaDrivenSources.dataSourceEditor);
     const profile = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile);
     const persisted = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
@@ -171,7 +171,7 @@ export class SchemaDrivenSourcesPage {
       `${consoleUrl}/api/datasources/${dataSourceName}/readiness?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}`);
     expect(readiness.ready).toBe(true);
     expect(readiness.acquisition).toBeTruthy();
-    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}&view=acquisitions`,
+    await this.open(`${consoleUrl}/data-sources/${dataSourceName}?namespace=default&scopeRef=${encodeURIComponent(scopeRef)}#acquisitions`,
       TestIds.schemaDrivenSources.dataSourceAcquisitions);
     const parameters = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceAcquisitionParameters);
     const start = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceStartAcquisition);
@@ -203,6 +203,7 @@ export class SchemaDrivenSourcesPage {
   private async createKnowledgeSource(consoleUrl: string, scopeRef: string, dataSourceName: string, knowledgeSourceName: string,
     transformationFlow: string, projectionFlow: string): Promise<void> {
     await this.open(`${consoleUrl}/knowledge-sources/new`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await selectContaining(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), projectionFlow);
     const binding = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).first();
     await binding.getByRole('textbox').first().fill('origin');
@@ -239,7 +240,7 @@ export class SchemaDrivenSourcesPage {
   }
 
   private async verifyKnowledgeEdit(consoleUrl: string, knowledgeSourceName: string): Promise<void> {
-    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}/edit?namespace=default`,
+    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}/edit?namespace=default#definition/configuration`,
       TestIds.schemaDrivenSources.knowledgeSourceEditor);
     const configuration = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceTransformationConfiguration);
     await expect(field(configuration, '$.prefix').locator('input')).toHaveValue('docs');
@@ -247,8 +248,8 @@ export class SchemaDrivenSourcesPage {
   }
 
   private async runProjection(consoleUrl: string, knowledgeSourceName: string): Promise<void> {
-    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}?namespace=default&view=projections`,
-      TestIds.schemaDrivenSources.knowledgeSourceProjectionsTab);
+    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}?namespace=default#projections`,
+      TestIds.schemaDrivenSources.knowledgeSourceProjectionParameters);
     const parameters = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionParameters);
     const start = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceStartProjection);
     await expect(start).toBeDisabled();

@@ -7,58 +7,54 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" />
 <PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-@if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
-else if (resource is null) { @if (error is not null) { <ErrorState Message="@error" /> } }
-else if (resource.Definition is RelayToolDefinitionProperties)
+@if (resource?.Definition is RelayToolDefinitionProperties)
 {
     <ToolRelayEditor @key="loadedKey" Name="@Name" NamespaceQuery="@NamespaceQuery" ScopeRefValue="@ScopeRefValue" InitialSnapshot="snapshot" />
 }
 else
 {
-    <ResourceDetailsTemplate Name="@resource.Definition.DisplayName" Description="@resource.Definition.Description" ResourceType="@T("Definition")" Domain="tool" IconName="wrench"
-                             TechnicalName="@resource.Name" Namespace="@resource.Namespace.Value" ScopeRef="resource.ScopeRef"
-                             Enabled="enabled" EnabledChanged="value => enabled = value" EnabledDisabled="@(!CanMutate || saving)"
-                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{resource.Uid}")" DefaultSection="overview" SelectionChanged="SelectSectionAsync" HasDraft="IsDirty" TestId="resource-tool-definition-editor">
-        <Metadata><ManagedResourceBadge IsManaged="@resource.Governance.IsManaged" IsReadOnly="@(resource.ScopeRef is not null && !CanManage)" />@if (section == "definition/configuration") { <span class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</span> }</Metadata>
-        <Actions>@if (CanMutate) { <button class="button-danger" type="button" disabled="@saving" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions>
-        <Feedback>@if (resource.ScopeRef is { } owner) { <InheritedResourceNotice OwnerScopeRef="owner" /> }@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }</Feedback>
-        <Content>
-            <div hidden="@(section != "overview")">
-                <ResourceIdentitySummary DisplayName="@resource.Definition.DisplayName" TechnicalName="@resource.Name" Namespace="@resource.Namespace.Value" Description="@resource.Definition.Description"><Scope><ResourceScopeBadge ScopeRef="resource.ScopeRef" /></Scope></ResourceIdentitySummary>
-                <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></FormSection>
-            </div>
-            <div hidden="@(!section.StartsWith("definition/", StringComparison.Ordinal))">
-                <EditForm @key="formContext" EditContext="formContext" OnSubmit="SaveAsync" id="tool-definition-resource-form" class="resource-form"><FormDraftMonitor InvalidInputChanged="value => invalidInput = value" /><fieldset class="resource-definition-fields" disabled="@(!CanMutate || saving)"><div hidden="@(section != "definition/configuration")">@IdentityFields @OptionsFields</div><div hidden="@(section != "definition/implementation")">@ImplementationFields</div></fieldset></EditForm>
-            </div>
-            <div hidden="@(section != "versions")">
+    var presentations = Presentations;
+    <ConsoleResourceDetailsTemplate Resource="resource" RequestedAddress="RequestedAddress" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("Definition")" Domain="tool" IconName="wrench"
+        Description="@resource?.Definition.Description" ResourceIdentity="@($"{loadedKey}|{resource?.Uid}")" SectionState="sectionState" SectionPresentations="presentations"
+        DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" SelectionChanged="SelectSectionAsync"
+        DefinitionReadOnlyReason="DefinitionReadOnlyReason" LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" HasDraft="IsDirty" Busy="saving"
+        Enabled="resource?.Definition.Enabled" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanMutate || saving || loading)"
+        Yaml="@SavedYaml" YamlReadOnly="true" YamlTitle="@T("DefinitionYaml")" YamlDescription="@T("DefinitionYamlHelp")"
+        TestId="resource-tool-definition-editor" SectionTestIdPrefix="tool-definition">
+        <Actions>@if (CanMutate) { <button class="button-danger" type="button" disabled="@(saving || loading)" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="@BackUrl">@T("Cancel")</a></Actions>
+        <Feedback>@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }@if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("DefinitionRefreshDraftConflict")</div> }</Feedback>
+        <OverviewMetrics>@if (resource is not null) { <MetricCard Label="@T("DefinitionGeneration")" Value="@resource.Generation.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("RelayVersion")" Value="@resource.Definition.Version" /> }</OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path">
+            <ResourceDefinitionForm @key="formContext" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" OnValidSubmit="SaveAsync" Id="tool-definition-resource-form" FormName="tool-definition"
+                Sections="presentations" SectionState="sectionState" SectionContent="DefinitionContent" SectionRequested="ShowSection" ReadOnly="@(!CanMutate)" Busy="saving" Disabled="loading" InvalidInputChanged="value => invalidInput = value" />
+        </DefinitionContent>
+        <AdditionalContent Context="path">
+            @if (path == "versions") {
                 @HistoryFeedback
                 <FormSection Title="@T("RelayVersions")"><CollectionView TItem="ToolDefinitionVersionResource" Items="versions" IdentityLabel="@T("RelayVersion")" InformationLabels="@(new[] { T("Flow"), T("PublishedAt") })"><Identity Context="version"><CollectionIdentity DisplayName="@version.Definition.Version" Name="@version.Name" Namespace="@version.Namespace.Value" IconName="history"><IconBadges><ResourceScopeBadge ScopeRef="version.ScopeRef" IconOnly /></IconBadges></CollectionIdentity></Identity><Information Context="version"><CollectionValue Label="@T("Flow")">@(version.Definition is FlowToolDefinitionProperties flow ? FlowText(flow.Flow, version.Namespace) : T("AcquisitionImplementation"))</CollectionValue><CollectionValue Label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</CollectionValue></Information></CollectionView></FormSection>
-            </div>
-            <div hidden="@(section != "usages")">
+            }
+            else {
                 @HistoryFeedback
                 <FormSection Title="@T("RelayUsages")"><CollectionView TItem="ToolDefinitionUsage" Items="usages" IdentityLabel="@T("Tool")" InformationLabels="@(new[] { T("Version"), T("RelayVersion") })"><Identity Context="usage"><CollectionIdentity DisplayName="@usage.Name" Name="@usage.Name" Namespace="@usage.Namespace.Value" Href="@UsageUrl(usage)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" IconOnly /></IconBadges></CollectionIdentity></Identity><Information Context="usage"><CollectionValue Label="@T("Version")"><CollectionVersion Label="@T("Version")" Value="@usage.Version" /></CollectionValue><CollectionValue Label="@T("RelayVersion")"><CollectionVersion Label="@T("RelayVersion")" Value="@usage.RelayVersion" /></CollectionValue></Information></CollectionView></FormSection>
-            </div>
-            @if (accessVisited && CanManage && resource.ScopeRef is { } accessOwner) { <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="resource.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="accessOwner" Namespace="resource.Namespace" Kind="@ToolResourceKinds.ToolDefinition" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" /></div> }
-        </Content>
-        <DraftActions><button type="button" class="button-secondary" disabled="@saving" @onclick="DiscardAsync">@Shared["Discard"]</button><button type="submit" form="tool-definition-resource-form" class="button-primary" data-testid="tool-definition-save" disabled="@(saving || loadingContract || acquisitionDefinition is null && !contractLoaded)">@T("Save")</button></DraftActions>
-    </ResourceDetailsTemplate>
+
+            }
+        </AdditionalContent>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(saving || loading)" @onclick="DiscardAsync">@Shared["Discard"]</button><button type="submit" form="tool-definition-resource-form" class="button-primary" data-testid="tool-definition-save" disabled="@(saving || loading || loadingContract)">@T("Save")</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 <ConfirmationDialog IsOpen="confirmDelete" Title="@T("Delete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {
-    private RenderFragment IdentityFields => @<FormSection Title="@Shared["Identity"]"><FormGrid>
-        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="false" />
-        <FormField Label="@T("Namespace")"><ClearableText Value="@namespaceValue" Disabled="true" /></FormField>
-        <FormField Label="@Shared["Scope"]"><ResourceScopeBadge ScopeRef="resource!.ScopeRef" /></FormField>
-        <FormField Optional="true" Label="@T("DefinitionDescription")" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" rows="3" /></FormField>
-    </FormGrid></FormSection>;
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.ToolDefinition" DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="resource!.ScopeRef" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true" ReadOnly="@(!CanMutate)" />;
     private RenderFragment OptionsFields => @<FormSection Title="@Shared["Configuration"]"><FormGrid>
-        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="requiresApproval" /> <span>@T("RequiresApproval")</span></label>
-        <FormField Required="true" Label="@T("RelayVersion")"><Validation><ValidationMessage For="() => publicationVersion" /></Validation><ChildContent><ClearableText @bind-Value="publicationVersion" /></ChildContent></FormField>
-        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="publish" /> <span>@T("PublishVersion")</span></label>
-        <FormField Required="true" Label="@T("TimeoutSeconds")"><Validation><ValidationMessage For="() => timeoutSeconds" /></Validation><ChildContent><ClearableNumber @bind-Value="timeoutSeconds" min="1" max="900" /></ChildContent></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.RequiresApproval" /> <span>@T("RequiresApproval")</span></label>
+        <FormField Required="true" Label="@T("RelayVersion")"><Validation><ValidationMessage For="() => model.PublicationVersion" /></Validation><ChildContent><ClearableText @bind-Value="model.PublicationVersion" /></ChildContent></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.Publish" /> <span>@T("PublishVersion")</span></label>
+        <FormField Required="true" Label="@T("TimeoutSeconds")"><Validation><ValidationMessage For="() => model.TimeoutSeconds" /></Validation><ChildContent><ClearableNumber @bind-Value="model.TimeoutSeconds" min="1" max="900" /></ChildContent></FormField>
     </FormGrid></FormSection>;
     private RenderFragment ImplementationFields => @<div>
     @if (acquisitionDefinition?.Acquisition is { } acquisition)
@@ -76,9 +72,9 @@ else
     {
     <section class="panel"><div class="panel-header"><h2>@T("FlowImplementation")</h2></div>
         <FormGrid>
-            <FormField Required="true" Label="@T("Flow")"><ClearableSelect TValue="string" data-testid="tool-definition-flow" @bind-Value="selectedFlow" @bind-Value:after="FlowSelectionChangedAsync"><option value="">—</option>@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</ClearableSelect></FormField>
-            <label class="resource-enabled-toggle"><FormCheckbox role="switch" data-testid="tool-definition-use-active-version" @bind-Value="useActiveVersion" @bind-Value:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
-            @if (!useActiveVersion) { <FormField Label="@T("Version")"><ClearableText UpdateOnInput="false" data-testid="tool-definition-version" @bind-Value="flowVersion" @bind-Value:after="LoadContractAsync" /></FormField> }
+            <FormField Required="true" Label="@T("Flow")"><Validation><ValidationMessage For="() => model.SelectedFlow" /></Validation><ChildContent><ClearableSelect TValue="string" data-testid="tool-definition-flow" @bind-Value="model.SelectedFlow" @bind-Value:after="FlowSelectionChangedAsync"><option value="">—</option>@if (Selected() is null && model.SelectedFlow.Length > 0) { <option value="@model.SelectedFlow">@model.SelectedFlow</option> }@foreach(var flow in flows){<option value="@FlowKey(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name (@flow.ActiveVersion)</option>}</ClearableSelect></ChildContent></FormField>
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" data-testid="tool-definition-use-active-version" @bind-Value="model.UseActiveVersion" @bind-Value:after="LoadContractAsync" /> <span>@T("UseActiveVersion")</span></label>
+            @if (!model.UseActiveVersion) { <FormField Label="@T("Version")"><ClearableText UpdateOnInput="false" data-testid="tool-definition-version" @bind-Value="model.FlowVersion" @bind-Value:after="LoadContractAsync" /></FormField> }
             <div class="form-span-2">
                 @if (loadingContract)
                 {
@@ -111,199 +107,6 @@ else
     }
 
     </div>;
+
     private RenderFragment HistoryFeedback => @<div>@if (historyLoading) { <LoadingState Message="@T("LoadingDefinitions")" /> }@if (historyError is not null) { <ErrorState Message="@historyError" /><button type="button" class="button-secondary" @onclick="LoadHistoryAsync">@T("Refresh")</button> }</div>;
-    [Parameter] public string? Name { get; set; }
-    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceQuery { get; set; }
-    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
-    private readonly CancellationTokenSource cancellation = new();
-    private ResourceSnapshot<ToolDefinitionResource>? snapshot;
-    private ToolDefinitionResource? resource;
-    private AcquisitionToolDefinitionProperties? acquisitionDefinition;
-    private IReadOnlyList<FlowSummary> flows = [];
-    private IReadOnlyList<ToolDefinitionVersionResource> versions = [];
-    private IReadOnlyList<ToolDefinitionUsage> usages = [];
-    private string name = "", namespaceValue = "default", displayName = "", description = "", selectedFlow = "", flowVersion = "", inputSchema = "{}", outputSchema = "", loadedContractVersion = "", publicationVersion = "1.0.0", section = "overview", savedFingerprint = "", savedFlowSelection = "";
-    private bool enabled = true, requiresApproval, useActiveVersion = true, publish, loading = true, saving, loadingContract, contractLoaded, invalidInput, policyDirty, accessVisited, confirmDelete, historyLoading, historyLoaded;
-    private int? timeoutSeconds = 90;
-    private string? loadedKey, error, historyError;
-    private long loadVersion, contractVersion;
-    private EditContext formContext = null!;
-    private ValidationMessageStore messages = null!;
-    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/tools/definitions", Services);
-    private bool CanManage => resource?.ScopeRef is { } owner && ResourceOwnershipContext.CanManage(owner, Services);
-    private bool CanMutate => CanManage && resource?.Governance.IsManaged == false;
-    private string Fingerprint => JsonSerializer.Serialize(new { displayName, description, enabled, requiresApproval, timeoutSeconds, selectedFlow, useActiveVersion, flowVersion, publicationVersion, publish });
-    private string FlowSelection => JsonSerializer.Serialize(new { selectedFlow, useActiveVersion, flowVersion });
-    private bool IsDirty => !loading && resource?.Definition is not RelayToolDefinitionProperties && CanMutate && (Fingerprint != savedFingerprint || invalidInput);
-    private bool HasUnsavedChanges => IsDirty || policyDirty;
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("definition", Shared["Definition"], "settings") { Navigable = false, Visible = CanMutate }, new("definition/configuration", Shared["Configuration"], "forms") { Visible = CanMutate }, new("definition/implementation", T(acquisitionDefinition is null ? "FlowImplementation" : "AcquisitionImplementation"), "sitemap") { Visible = CanMutate }, new("versions", T("RelayVersions"), "history"), new("usages", T("RelayUsages"), "link"), new("access", Shared["Access"], "lock") { Visible = CanManage }];
-    private async Task SelectSectionAsync(string? value)
-    {
-        section = value ?? "overview"; accessVisited |= section == "access";
-        if (section is "versions" or "usages" && !historyLoaded) await LoadHistoryAsync();
-    }
-    protected override async Task OnParametersSetAsync()
-    {
-        var key = $"{Name}|{NamespaceQuery}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
-        if (key == loadedKey) return;
-        loadedKey = key; var request = ++loadVersion; contractVersion++;
-        loading = true; resource = null; snapshot = null; error = historyError = null; versions = []; usages = []; flows = [];
-        invalidInput = policyDirty = accessVisited = confirmDelete = saving = historyLoading = historyLoaded = false; section = "overview";
-        if (string.IsNullOrWhiteSpace(Name)) { Navigation.NavigateTo(ResourceOwnershipContext.PreserveNavigation("/tools/definitions/new", Services)); loading = false; return; }
-        try
-        {
-            var ns = ResourceNamespace.Parse(NamespaceQuery); var requestedName = Name;
-            ResourceScopeRef? owner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
-            var saved = owner is { } exact ? await Client.GetAsync(exact, requestedName, ns, cancellation.Token) : await Client.GetAsync(requestedName, ns, cancellation.Token);
-            if (request != loadVersion) return;
-            if (saved.Value.Name != requestedName || saved.Value.Namespace != ns || owner is { } requestedOwner && saved.Value.ScopeRef != requestedOwner) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
-            if (saved.Value.Definition is RelayToolDefinitionProperties) { snapshot = saved; resource = saved.Value; return; }
-            if (saved.Value.Definition is FlowToolDefinitionProperties && saved.Value.ScopeRef is { } sourceContext && !saved.Value.Governance.IsManaged && ResourceOwnershipContext.CanManage(sourceContext, Services))
-            {
-                var available = await Flows.GetFlowsAsync(sourceContext, cancellation.Token);
-                if (request != loadVersion) return;
-                flows = available;
-            }
-            ApplySnapshot(saved);
-            if (acquisitionDefinition is null && CanMutate) await RefreshContractAsync();
-            if (request == loadVersion) { savedFlowSelection = FlowSelection; savedFingerprint = Fingerprint; }
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) { resource = null; error = exception.Message; loadedKey = null; } }
-        finally { if (request == loadVersion) loading = false; }
-    }
-    private void ApplySnapshot(ResourceSnapshot<ToolDefinitionResource> saved)
-    {
-        snapshot = saved; resource = saved.Value; var value = resource.Definition;
-        acquisitionDefinition = value as AcquisitionToolDefinitionProperties;
-        name = resource.Name; namespaceValue = resource.Namespace.Value; displayName = value.DisplayName; description = value.Description ?? ""; enabled = value.Enabled; requiresApproval = value.RequiresApproval; timeoutSeconds = value.InvocationTimeoutSeconds; publicationVersion = value.Version; publish = false;
-        if (value is FlowToolDefinitionProperties flow) { useActiveVersion = flow.Flow.UseActiveVersion; flowVersion = flow.Flow.Version ?? ""; selectedFlow = ExistingFlowKey(flow.Flow, resource.Namespace); }
-        else { selectedFlow = flowVersion = ""; useActiveVersion = true; }
-        inputSchema = Pretty(value.InputSchema); outputSchema = value.OutputSchema is { } output ? Pretty(output) : ""; loadedContractVersion = flowVersion; contractLoaded = false; invalidInput = false;
-        if (formContext is not null) formContext.OnFieldChanged -= FieldChanged;
-        formContext = new(this); messages = new(formContext); formContext.OnFieldChanged += FieldChanged;
-        savedFlowSelection = FlowSelection; savedFingerprint = Fingerprint;
-    }
-    private void FieldChanged(object? sender, FieldChangedEventArgs args) { messages.Clear(args.FieldIdentifier); formContext.NotifyValidationStateChanged(); }
-    private bool Validate()
-    {
-        messages.Clear();
-        if (string.IsNullOrWhiteSpace(displayName)) messages.Add(new FieldIdentifier(this, nameof(displayName)), T("DisplayNameRequired"));
-        var identity = new ToolDefinitionCreationIdentity { Name = name, DisplayName = displayName, Namespace = namespaceValue, Version = publicationVersion };
-        if (!identity.IsComplete && !string.IsNullOrWhiteSpace(displayName)) messages.Add(new FieldIdentifier(this, nameof(publicationVersion)), T("PublicationVersionInvalid"));
-        if (timeoutSeconds is not (>= 1 and <= 900)) messages.Add(new FieldIdentifier(this, nameof(timeoutSeconds)), T("TimeoutRange"));
-        formContext.NotifyValidationStateChanged(); return formContext.Validate() && !invalidInput;
-    }
-    private async Task FlowSelectionChangedAsync() { flowVersion = Selected()?.ActiveVersion ?? ""; await LoadContractAsync(); }
-    private async Task LoadContractAsync() { if (Selected() is null) { ClearContract(); return; } await RefreshContractAsync(); }
-    private async Task<bool> RefreshContractAsync()
-    {
-        var request = ++contractVersion; loadingContract = true; contractLoaded = false; error = null;
-        try
-        {
-            var flow = Selected() ?? throw new InvalidOperationException(T("SelectFlow"));
-            var version = useActiveVersion ? flow.ActiveVersion : flowVersion;
-            if (string.IsNullOrWhiteSpace(version)) throw new InvalidOperationException(T("FlowVersionRequired"));
-            var published = await Flows.GetFlowVersionAsync(flow.Namespace, flow.Id, version, flow.ScopeRef, resource!.ScopeRef!.Value, cancellation.Token);
-            if (request != contractVersion) return false;
-            var ambiguous = false; var output = published.Graph?.ResolveSingleSuccessOutputSchema(out ambiguous);
-            if (ambiguous) throw new InvalidOperationException(T("FlowOutputContractAmbiguous"));
-            inputSchema = published.Graph?.ResolveInputSchema() is { } input ? Pretty(input) : "{}"; outputSchema = output is { } result ? Pretty(result) : ""; flowVersion = loadedContractVersion = version; contractLoaded = true; return true;
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return false; }
-        catch (Exception exception) { if (request == contractVersion) error = exception.Message; return false; }
-        finally { if (request == contractVersion) loadingContract = false; }
-    }
-    private void ClearContract() { contractVersion++; error = null; loadingContract = contractLoaded = false; inputSchema = "{}"; outputSchema = loadedContractVersion = ""; }
-    private async Task SaveAsync()
-    {
-        if (!CanMutate || saving) return;
-        if (!Validate()) { Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#definition/configuration"); return; }
-        saving = true; error = null; var request = loadVersion; var original = resource!;
-        try
-        {
-            ToolDefinitionProperties? properties = acquisitionDefinition;
-            if (properties is null)
-            {
-                var unchanged = FlowSelection == savedFlowSelection;
-                if (!await RefreshContractAsync() || request != loadVersion) return;
-                var flow = Selected()!;
-                properties = ((FlowToolDefinitionProperties)original.Definition) with { DisplayName = displayName, InputSchema = unchanged || original.Definition.FixedArguments is not null || original.Definition.InputSchemaBinding is not null ? original.Definition.InputSchema : InputSchemaContent!.Value, OutputSchema = unchanged || original.Definition.OutputSchemaBinding is not null ? original.Definition.OutputSchema : OutputSchemaContent, Flow = unchanged && original.Definition is FlowToolDefinitionProperties savedFlow ? savedFlow.Flow : new() { Name = flow.Id, Namespace = flow.Namespace, ScopeRef = flow.ScopeRef, UseActiveVersion = useActiveVersion, Version = useActiveVersion ? null : flowVersion } };
-            }
-            properties = properties with { DisplayName = displayName, Description = string.IsNullOrWhiteSpace(description) ? null : description, Enabled = enabled, RequiresApproval = requiresApproval, InvocationTimeoutSeconds = timeoutSeconds!.Value, Version = publicationVersion, Publish = publish };
-            var saved = await Client.UpdateAsync(original.Name, original.Namespace, new(properties), snapshot!.ETag, cancellation.Token);
-            if (request != loadVersion) return;
-            ApplySnapshot(saved); if (acquisitionDefinition is null) await RefreshContractAsync();
-            if (request == loadVersion) { savedFlowSelection = FlowSelection; savedFingerprint = Fingerprint; historyLoaded = false; }
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) error = exception.Message; }
-        finally { if (request == loadVersion) saving = false; }
-    }
-    private async Task DiscardAsync()
-    {
-        if (saving || snapshot is null) return;
-        var request = loadVersion; saving = true;
-        try
-        {
-            ApplySnapshot(snapshot); error = null;
-            if (resource?.Definition is FlowToolDefinitionProperties && CanMutate) await RefreshContractAsync();
-            if (request == loadVersion) { savedFlowSelection = FlowSelection; savedFingerprint = Fingerprint; }
-        }
-        finally { if (request == loadVersion) saving = false; }
-    }
-    private async Task DeleteAsync()
-    {
-        if (!CanMutate || saving || resource is null || snapshot is null) return;
-        confirmDelete = false; saving = true; var request = loadVersion; var target = resource;
-        try { await Client.DeleteAsync(target.Name, target.Namespace, snapshot.ETag, cancellation.Token); if (request != loadVersion) return; savedFingerprint = Fingerprint; invalidInput = policyDirty = false; Navigation.NavigateTo(BackUrl); }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) error = exception.Message; }
-        finally { if (request == loadVersion) saving = false; }
-    }
-    private async Task LoadHistoryAsync()
-    {
-        if (historyLoading || resource?.ScopeRef is not { } owner) return;
-        var request = loadVersion; var target = resource; historyLoading = true; historyError = null;
-        try
-        {
-            var publications = Client.GetVersionsAsync(owner, target.Name, target.Namespace, cancellation.Token); var consumers = Client.GetUsagesAsync(owner, target.Name, target.Namespace, cancellation.Token);
-            await Task.WhenAll(publications, consumers);
-            if (request != loadVersion) return;
-            versions = await publications; usages = await consumers; historyLoaded = true;
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (request == loadVersion) historyError = exception.Message; }
-        finally { if (request == loadVersion) historyLoading = false; }
-    }
-    private FlowSummary? Selected() => flows.SingleOrDefault(value => FlowKey(value) == selectedFlow);
-    private static string FlowKey(FlowSummary flow) => flow.ScopeRef is { } owner ? $"{owner.Value}|{flow.Namespace.Value}|{flow.Id}" : "";
-    private string ExistingFlowKey(ToolDefinitionFlowTarget target, ResourceNamespace ownerNamespace)
-    {
-        var ns = target.Namespace ?? ownerNamespace;
-        if (target.ScopeRef is { } owner) return $"{owner.Value}|{ns.Value}|{target.Name}";
-        var candidates = flows.Where(value => value.Namespace == ns && value.Id == target.Name).ToArray(); return candidates.Length == 1 ? FlowKey(candidates[0]) : "";
-    }
-    private static string Pretty(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
-    private JsonElement? InputSchemaContent => ParseOrNull(inputSchema);
-    private JsonElement? OutputSchemaContent => ParseOrNull(outputSchema);
-    private static JsonElement? ParseOrNull(string value) { if (string.IsNullOrWhiteSpace(value)) return null; try { using var document = JsonDocument.Parse(value); return document.RootElement.Clone(); } catch (JsonException) { return null; } }
-    private static string FlowText(ToolDefinitionFlowTarget flow, ResourceNamespace ns) => $"{(flow.ScopeRef is { } owner ? owner.Value + " · " : "")}{flow.Namespace ?? ns}/{flow.Name}{(!flow.UseActiveVersion && !string.IsNullOrWhiteSpace(flow.Version) ? " · " + flow.Version : "")}";
-    private string UsageUrl(ToolDefinitionUsage usage) => ResourceOwnershipContext.Resource(Services, usage.Kind switch { "Agent" => "/agents", "Flow" => "/flows", _ => "/tools/sets" }, usage.Name, usage.Namespace, usage.ScopeRef);
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration
-    {
-        get
-        {
-            if (resource is null) return [];
-            var value = resource.Definition; var result = new List<ConfigurationEntry> { new(T("Enabled"), T(value.Enabled ? "Yes" : "No")), new(T("RequiresApproval"), T(value.RequiresApproval ? "Yes" : "No")), new(T("TimeoutSeconds"), value.InvocationTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)), new(T("RelayVersion"), value.Version), new(T("PublishVersion"), T(value.Publish ? "Yes" : "No")), new(T("InputContract"), Pretty(value.InputSchema)), new(T("OutputContract"), value.OutputSchema is { } output ? Pretty(output) : "—") };
-            if (value.Bindings.Count > 0 || value.FixedArguments is not null) result.Add(new(T("FixedInputBindings"), JsonSerializer.Serialize(new { value.Bindings, value.FixedArguments }, new JsonSerializerOptions { WriteIndented = true })));
-            if (value.InputSchemaBinding is not null || value.OutputSchemaBinding is not null) result.Add(new(T("SchemaReferences"), JsonSerializer.Serialize(new { value.InputSchemaBinding, value.OutputSchemaBinding }, new JsonSerializerOptions { WriteIndented = true })));
-            if (value is FlowToolDefinitionProperties flow) { result.Add(new(T("Flow"), FlowText(flow.Flow, resource.Namespace))); result.Add(new(T("UseActiveVersion"), T(flow.Flow.UseActiveVersion ? "Yes" : "No"))); }
-            if (value is AcquisitionToolDefinitionProperties acquisition) { result.Add(new(T("AcquisitionTemplate"), $"{acquisition.Acquisition.TemplateNamespace}/{acquisition.Acquisition.TemplateId}")); result.Add(new(T("AcquisitionOutput"), acquisition.Acquisition.ArtifactName ?? "artifact")); }
-            return result;
-        }
-    }
-    public void Dispose() { loadVersion++; contractVersion++; if (formContext is not null) formContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

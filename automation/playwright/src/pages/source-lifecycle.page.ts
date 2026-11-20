@@ -189,7 +189,7 @@ export class SourceLifecyclePage {
 
     // Optional input failure is visible in provenance while the valid input publishes.
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).uncheck();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).uncheck();
     await this.saveKnowledge();
     const partial = await this.runProjection(consoleUrl);
     expect(partial.inputIssues).toEqual([expect.objectContaining({ bindingName: 'secondary', code: 'knowledge_projection_acquisition_missing' })]);
@@ -199,7 +199,7 @@ export class SourceLifecyclePage {
 
     const second = await this.acquire(consoleUrl, f.sources[1]);
     await this.editKnowledge(consoleUrl);
-    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('checkbox', { name: text.requiredInput }).check();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).nth(1).getByRole('switch', { name: text.requiredInput }).check();
     await this.saveKnowledge();
     const aggregate = await this.runProjection(consoleUrl);
     expect(aggregate.inputIssues).toEqual([]);
@@ -243,7 +243,8 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByRole('checkbox', { name: text.enabled, exact: false }).check();
+    await this.page.locator('[data-wizard-step=configuration]').click();
+    await this.page.getByRole('switch', { name: text.enabled, exact: false }).check();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
@@ -335,12 +336,15 @@ export class SourceLifecyclePage {
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).fill(name);
     await this.page.getByRole('textbox', { name: text.displayName, exact: true }).blur();
     await expect(this.page.getByRole('textbox', { name: text.technicalName, exact: false })).toHaveValue(name);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceProfile), this.fixture.profile);
     const editor = this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceConfiguration);
     const endpoint = editor.locator('[data-schema-path="$.endpoint"] input');
     await endpoint.fill('x');
     await endpoint.blur();
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeDisabled();
+    await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
+    await expect(this.page).toHaveURL(/\/data-sources\/new(?:[?#]|$)/);
+    await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
     await editor.locator('[data-schema-path="$.artifactId"] input').fill(this.fixture.artifactIds[index]);
     await endpoint.fill(`https://example.test/lifecycle/${index}`);
     await endpoint.blur();
@@ -354,7 +358,7 @@ export class SourceLifecyclePage {
   private async reviseProfile(consoleUrl: string, text: ExpectedText['sourceLifecycle']): Promise<void> {
     const f = this.fixture;
     await this.open(consoleUrl, `/data-source-profiles/${f.profile}`, TestIds.sourceLifecycle.profileEditor);
-    await selectResourceSection(this.page, 'definition/acquisition');
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.page.getByTestId(TestIds.sourceLifecycle.profileVersion).fill('1.1.0');
     await this.page.getByTestId(TestIds.sourceLifecycle.profileSave).click();
     await expect.poll(async () => (await this.read<ResourceWire>(consoleUrl, `/api/datasourceprofiles/${f.profile}`)).definition.version).toBe('1.1.0');
@@ -429,7 +433,7 @@ export class SourceLifecyclePage {
     await choose(binding.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource), source);
   }
   private async saveKnowledge(): Promise<void> {
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave)).toBeEnabled();
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
@@ -455,7 +459,7 @@ export class SourceLifecyclePage {
   }
 
   private async editKnowledge(consoleUrl: string): Promise<void> {
-    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
   }
   private async runProjection(consoleUrl: string): Promise<Projection> {
     const before = await this.read<Projection[]>(consoleUrl, this.knowledgeApi() + '/projections');
@@ -597,7 +601,7 @@ export class SourceLifecyclePage {
       await this.post(consoleUrl, '/api/knowledgesources', {
         name: `${f.knowledge}-ancestor`, scopeRef: f.scope, properties: this.knowledgeProperties(ancestorName, '/instance'),
       }, 201);
-      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
       await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource).locator('option:checked')).toContainText(ancestorName);
     }
     if (knowledge) {
@@ -705,9 +709,17 @@ export class SourceLifecyclePage {
     url.searchParams.set('namespace', 'default');
     url.searchParams.set('scopeRef', this.scope);
     url.searchParams.set('context', this.scope);
-    if (view) url.searchParams.set('view', view);
-    const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    expect(response?.status()).toBe(200);
+    if (view) url.hash = view === 'definition' ? 'definition/configuration' : view;
+    const current = new URL(this.page.url());
+    if ((path.startsWith('/data-sources/') || path.startsWith('/knowledge-sources/')) && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
+      await selectResourceSection(this.page, url.hash.slice(1));
+      // Fragment navigation retains mounted editors. This method explicitly reopens saved server state after API fixture commands.
+      const refresh = this.page.getByTestId(path.startsWith('/data-sources/') ? TestIds.schemaDrivenSources.dataSourceRefresh : 'knowledge-source-refresh');
+      await refresh.click(); await expect(refresh).toBeEnabled();
+    } else {
+      const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBe(200);
+    }
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
   }

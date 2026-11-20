@@ -49,7 +49,7 @@ export class GovernedExtensionInventoryPage {
 
   public async inspectInventory(locale: SupportedTestLocale): Promise<void> {
     const text = GovernedInventoryTextByLocale[locale];
-    await this.page.getByRole('tab', { name: text.resources, exact: true }).click();
+    await selectResourceSection(this.page, 'resources');
     const installation = this.inventory.getByTestId(TestIds.governedInventory.installation);
     await expect(installation).toContainText('qa-managed');
     await expect(installation).toContainText(text.installed);
@@ -150,7 +150,7 @@ export class GovernedExtensionInventoryPage {
   public async inspectContributionsAndTools(consoleUrl: string, locale: SupportedTestLocale): Promise<void> {
     const text = GovernedInventoryTextByLocale[locale];
     await this.navigate(`${consoleUrl}/extensions/qa-managed?${query}`);
-    await this.page.getByRole('tab', { name: text.contributions, exact: true }).click();
+    await selectResourceSection(this.page, 'contributions');
     for (const [id, label, hasLink] of [
       ['ready', text.available, true], ['disabled', text.unavailable, true],
       ['missing', text.missing, false], ['conflict', text.conflict, false],
@@ -183,7 +183,7 @@ export class GovernedExtensionInventoryPage {
       this.assertScopedLink(await owner.getAttribute('href'));
     }
     await owners.first().click();
-    await this.page.getByRole('tab', { name: text.contributions, exact: true }).click();
+    await selectResourceSection(this.page, 'contributions');
   }
 
   public async inspectOrdinaryResources(consoleUrl: string, locale: SupportedTestLocale): Promise<void> {
@@ -210,15 +210,15 @@ export class GovernedExtensionInventoryPage {
   public async inspectDegraded(consoleUrl: string, locale: SupportedTestLocale): Promise<void> {
     const text = GovernedInventoryTextByLocale[locale];
     await this.openFromCatalog(consoleUrl, 'qa-degraded');
-    await this.page.getByRole('tab', { name: text.resources, exact: true }).click();
+    await selectResourceSection(this.page, 'resources');
     await expect(this.inventory).toContainText(text.degraded);
     await expect(this.inventory).toContainText('fixture: recorded definition drift');
     await expect(this.inventory.getByTestId(TestIds.governedInventory.resources).locator('a')).toHaveCount(0);
     await expect(this.inventory.getByTestId(TestIds.governedInventory.publications).locator('li')).toHaveCount(3);
-    await this.page.getByRole('tab', { name: text.contributions, exact: true }).click();
+    await selectResourceSection(this.page, 'contributions');
     const bundle = this.contributions.locator("[data-contribution-id='qa-degraded']");
     await expect(bundle).toContainText(text.conflict);
     await expect(bundle.locator('a')).toHaveCount(0);
-    await this.page.getByRole('tab', { name: text.resources, exact: true }).click();
+    await selectResourceSection(this.page, 'resources');
   }
 }

@@ -1,0 +1,129 @@
+{
+  "base": "c68b5979a028c2338b2361e5ae55faf6dc412b1d",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor": "594cb0028ca97543e1bc522a069d280796d1b8e65856f2e9b2ed532b950b3cde",
+    "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor.cs": "41c74129db395ab8884cee3b66b193fe4612fc2919bd3bb8ce02ccb356b63e3b",
+    "src/Agentstration.Console.Components/Console/SourceRegistryEditorModel.cs": "8c0c09edc4af8635380c942dae0187303d72d57d5bc3712d73751ffb320f0417",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SourceRegistriesStrings.fr-FR.resx": "4ccea617cbb7377858ce0706b8775b5de9ae4a2762e32fda17b17aa66052232c",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/SourceRegistriesStrings.resx": "9c5a4512d34ed7980163d96c9a32172399ad7ed199fa1e8bd95f7494585ff721",
+    "tests/Agentstration.Console.Components.Tests/SourceRegistryFoundationTests.cs": "ab085e9dfc4be3726c9368c338b9c38c5807ac347f190af895d078ae12ae4e05"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "ada926b551be7cd68eb6ac953918a427ec2f4c39220439fa95f82e6db11f35d4",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "f7129c24f62ed984437eca73b81a474019632bdc25254bf4e32380423285d8ab",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "68104b3752bdda4af730100cc98c50c2b8e84a3dc35b64120a54d21ad36a7eca",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "ada926b551be7cd68eb6ac953918a427ec2f4c39220439fa95f82e6db11f35d4",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "ada926b551be7cd68eb6ac953918a427ec2f4c39220439fa95f82e6db11f35d4",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "f7129c24f62ed984437eca73b81a474019632bdc25254bf4e32380423285d8ab",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "f7129c24f62ed984437eca73b81a474019632bdc25254bf4e32380423285d8ab",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "68104b3752bdda4af730100cc98c50c2b8e84a3dc35b64120a54d21ad36a7eca",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "68104b3752bdda4af730100cc98c50c2b8e84a3dc35b64120a54d21ad36a7eca"
+  },
+  "phases": [
+    {
+      "name": "source-registries",
+      "exitCode": 0,
+      "seconds": 95.2
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "targetedTests": {
+    "passed": 26,
+    "logSha256": "1f2f2525bf6759f93531f3322cbe385adb610f921b80d593bcb6335d7a133849"
+  },
+  "browserCases": {
+    "native": 2,
+    "maintainedRegistrySmoke": 1
+  },
+  "maintainedSmokeReportSha256": "506079aa633e89a5827a25ef668818a78e53627a573ebe51b5313487207e8a31",
+  "screenshots": [
+    {
+      "file": "source-registries-incomplete-identity-desktop-en.png",
+      "sha256": "fbb6858eddc188e56834aada52be8085281f6731512d620cc077715d4aa9a89b"
+    },
+    {
+      "file": "source-registries-wizard-refresh-desktop-en.png",
+      "sha256": "e54556269b9bc133148db89d7e4e9751cac2107f214c8ebbca931296eb817979"
+    },
+    {
+      "file": "source-registries-overview-desktop-en.png",
+      "sha256": "1ea45f2e0148b021bcc575559ad0e808cc8cc1ed802db6a5566704d738e9b775"
+    },
+    {
+      "file": "source-registries-invalid-index-desktop-en.png",
+      "sha256": "da4bfc0e61182a3162e8eae0cdfc4cdd6abab9b6ab22ba395b24757d85bf0b0b"
+    },
+    {
+      "file": "source-registries-retained-refresh-desktop-en.png",
+      "sha256": "2d9b2fa5f6b07c185a41ec14bdb191f94639e23faaec1dd0eedf281dba0fbd30"
+    },
+    {
+      "file": "source-registries-origin-desktop-en.png",
+      "sha256": "2664cdc6067d041e25e95271196284ce832ac7fdc3668f1f2e8f45bb6a0d38d2"
+    },
+    {
+      "file": "source-registries-history-desktop-en.png",
+      "sha256": "2785ee78dcf0d1c5ccbae94ddbd5550c9f813b24a497a1d15465ea4b9aa2c10c"
+    },
+    {
+      "file": "source-registries-yaml-desktop-en.png",
+      "sha256": "47bcbf76245c16e9f3dabef2baf210e06b20c93f1eff475ff47f8a0af8ea5da2"
+    },
+    {
+      "file": "source-registries-inherited-readonly-desktop-en.png",
+      "sha256": "091e73efbeafec660b070a5cdfa902e76a161b440541ee034cfa33fae0ca5bd4"
+    },
+    {
+      "file": "source-registries-incomplete-identity-mobile-fr.png",
+      "sha256": "5d02673190976e2fc9ce9669e93d6cefd75f320448954ae7146d111b751e029b"
+    },
+    {
+      "file": "source-registries-wizard-refresh-mobile-fr.png",
+      "sha256": "e5f1cbf6489863820b6c4cc667f8a7d07120b447f19bd4ae3c461063692f3930"
+    },
+    {
+      "file": "source-registries-overview-mobile-fr.png",
+      "sha256": "4d00edc181112cc0ccd289a63ceb14907666fcedcf7844e44ce5c690a3cffd28"
+    },
+    {
+      "file": "source-registries-invalid-index-mobile-fr.png",
+      "sha256": "f480ea95760b638c163333d3f4c73ecb3958283ae89a49379911e6c6f549158f"
+    },
+    {
+      "file": "source-registries-retained-refresh-mobile-fr.png",
+      "sha256": "7b9154fcbb155ed9c65bee2644b3c5afe478793ea71430473265d25ddf0a6ad2"
+    },
+    {
+      "file": "source-registries-origin-mobile-fr.png",
+      "sha256": "f0acdd16d9f9749c36c4d7f217b0a332d07082c59cc27bc0b45203de1829233c"
+    },
+    {
+      "file": "source-registries-history-mobile-fr.png",
+      "sha256": "df1cbcf7abe301d5aa780d35361e955e5ce185820204cbd9eb16c6392732015c"
+    },
+    {
+      "file": "source-registries-yaml-mobile-fr.png",
+      "sha256": "fcbebf58ec911043041c631df59ef0e0e7c2fc01129d9d001861b96c66dcc0a9"
+    },
+    {
+      "file": "source-registries-inherited-readonly-mobile-fr.png",
+      "sha256": "d947c20ef4b256266df4a441714028fb427e36c404f2fa709b763fa21978dff7"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "nativeProbeSha256": "2c5e75469de335bea8936f8c3297da0d97ac35f8bf4092e166c29ad7199a4736",
+  "limits": [
+    "Inherited inspection fixture explicitly grants discovery/use on both the registration and its separately owned observed-state Resource; without grants the existing API conceals them. No authorization behavior was broadened.",
+    "Native smoke uses a public fixture URL and disabled periodic refresh, and does not fetch the Internet. Actual registry retrieval remains covered by the existing family tests; refresh history remains take=50.",
+    "Global mobile platform/navigation overlay remains visible in real full-page captures.",
+    "No CI investigation/remediation, no full solution lanes at maintainer request; transverse #1236 stays deferred until UX validation and merge."
+  ]
+}

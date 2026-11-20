@@ -300,6 +300,16 @@ public sealed class FlowEditorStore
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
 
+    // An accepted target/context replacement must not retain the previous Flow's private graph,
+    // source, undo history or save acknowledgement session while the next authorized read runs.
+    public void Clear()
+    {
+        sessionId = Guid.NewGuid(); editRevision = sourceRevision = 0;
+        undo.Clear(); redo.Clear();
+        flowCallOutputs = new Dictionary<string, IReadOnlyList<FlowDesignerOutput>>(StringComparer.Ordinal);
+        State = new(); Changed();
+    }
+
     public void Load(FlowDesignerLoadResult result, FlowDesignerTarget target)
     {
         sessionId = Guid.NewGuid();

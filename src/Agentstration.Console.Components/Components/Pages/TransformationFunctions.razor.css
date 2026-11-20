@@ -1,0 +1,18 @@
+/* Family column proportions: descriptions carry the long native contract text. */
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .data-grid {
+    table-layout: fixed;
+    min-width: 58rem;
+}
+
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .data-grid th:first-child { width: 29%; }
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .data-grid th:nth-child(2) { width: 11%; }
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .data-grid th:nth-child(3) { width: 9%; }
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .data-grid th:last-child { width: 51%; }
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .collection-identity-cell .collection-identity { width: 100%; }
+
+.function-kind { font-size: .7rem; color: var(--muted); }
+
+.transformation-function-catalogs ::deep [data-testid="function-catalog"] .collection-card .collection-value:last-child {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .25rem;
+}

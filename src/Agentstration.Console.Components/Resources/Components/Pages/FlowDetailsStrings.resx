@@ -97,4 +97,6 @@
   <data name="ListFlows" xml:space="preserve"><value>Flow list</value></data>
   <data name="ResourceManifestHelp" xml:space="preserve"><value>This manifest reflects the saved resource. Edit the Flow from Definition or its editor.</value></data>
   <data name="OpenFlowEditor" xml:space="preserve"><value>Open Flow editor</value></data>
+  <data name="RefreshDraftConflict"><value>The saved Flow or its metadata draft changed elsewhere. Your inputs are retained; discard them to load the newer snapshot.</value></data>
+  <data name="HistoryUnavailable"><value>Published versions or recent runs could not be read. Refresh to try again.</value></data>
 </root>

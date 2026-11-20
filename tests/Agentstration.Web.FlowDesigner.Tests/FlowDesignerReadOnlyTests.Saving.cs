@@ -284,8 +284,11 @@ public sealed partial class FlowDesignerReadOnlyTests
         Assert.AreEqual(0, backend.SaveCount);
         Assert.AreEqual(0, backend.ValidationCount);
         Assert.IsNull(backend.LastPublishVersion);
-        Assert.IsTrue(store.State.IsDirty);
-        Assert.AreEqual(new FlowNodePosition(10, 20), store.State.Resource!.Definition.Designer.NodePositions["input"]);
+        Assert.IsFalse(store.State.IsDirty);
+        Assert.IsNull(store.State.Resource);
+        Assert.AreEqual(string.Empty, store.State.SourceText);
+        Assert.IsFalse(store.CanUndo);
+        Assert.HasCount(0, rendered.FindAll(".flow-editor-shell"));
         StringAssert.Contains(rendered.Markup, "Flow load unavailable");
     }
 

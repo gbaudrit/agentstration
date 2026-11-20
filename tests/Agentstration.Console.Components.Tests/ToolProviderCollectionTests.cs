@@ -29,6 +29,8 @@ public sealed class ToolProviderCollectionTests
         var cut = context.Render<ToolProviders>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
         Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(3, cut.FindAll("th"));
+        Assert.IsFalse(cut.FindAll("th").Any(heading => heading.TextContent == (cultureName == "fr-FR" ? "Activé" : "Enabled")));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/providers/provider-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         Assert.HasCount(5, cut.FindAll(".resource-tabs a"));
@@ -40,6 +42,7 @@ public sealed class ToolProviderCollectionTests
         await cut.Find(".resource-toolbar button[aria-controls]").ClickAsync(new());
         await cut.Find("[data-filter-key=namespace] select").ChangeAsync(new() { Value = "team" });
         Assert.HasCount(8, cut.FindAll(".collection-card"));
+        Assert.HasCount(2, cut.FindAll(".collection-card").First().QuerySelectorAll(".collection-value"));
         await cut.Find("input[type=search]").InputAsync(new() { Value = "absent" });
         Assert.AreEqual(noMatches, cut.Find(".empty-state h2").TextContent);
         Assert.IsEmpty(cut.FindAll(".collection-card, .collection-pager"));
@@ -122,9 +125,9 @@ public sealed class ToolProviderCollectionTests
         StringAssert.Contains(cut.Find(".resource-name-link").TextContent, "Provider 44");
         Assert.AreEqual(UiStatus.Neutral, cut.FindComponent<StatusBadge>().Instance.Status);
         await cut.Find(".collection-active-filters .text-button").ClickAsync(new());
+        await cut.Find(".resource-toolbar button[aria-controls]").ClickAsync(new());
         await cut.Find("[data-filter-key=enabled] select").ChangeAsync(new() { Value = "false" });
         Assert.HasCount(15, cut.FindAll("tbody tr"));
-        await cut.Find(".resource-toolbar button[aria-controls]").ClickAsync(new());
         await cut.Find("[data-filter-key=tools] input").InputAsync(new() { Value = "3" });
         Assert.HasCount(1, cut.FindAll(".resource-name-link"));
         StringAssert.Contains(cut.Find(".resource-name-link").TextContent, "Provider 3");

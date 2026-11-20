@@ -6,6 +6,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -15,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class DataSourceEditorTests
+public sealed partial class DataSourceEditorTests
 {
     private static readonly ResourceScopeRef Scope = ResourceScopeRef.Workspace(
         Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
@@ -32,45 +33,47 @@ public sealed class DataSourceEditorTests
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
             $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}");
 
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters
             .Add(component => component.Name, "documentation"));
 
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(4, rendered.FindAll(".metric-card"));
+            Assert.DoesNotContain("ResourceReference {", rendered.Find(".resource-configuration-summary").TextContent);
+            Assert.Contains("default/web-builtin", rendered.Find(".resource-configuration-summary").TextContent);
             StringAssert.Contains(rendered.Markup, "Génération");
             StringAssert.Contains(rendered.Markup, "Dernière acquisition");
             StringAssert.Contains(rendered.Markup, "Réussie");
-            StringAssert.Contains(rendered.Markup, "1 acquisition(s)");
+            StringAssert.Contains(rendered.FindAll(".metric-card")[3].TextContent, Acquisition.CreatedAt.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture));
             Assert.AreEqual("data-source-web-acquisition-builtin", rendered.Find("[data-testid='data-source-acquisition-flow-link'] strong").TextContent.Trim());
-            Assert.AreEqual("/flows/data-source-web-acquisition-builtin", rendered.Find("[data-testid='data-source-acquisition-flow-link']").GetAttribute("href"));
+            StringAssert.Contains(rendered.Find("[data-testid='data-source-acquisition-flow-link']").GetAttribute("href"), "/flows/data-source-web-acquisition-builtin?namespace=default&scopeRef=");
         });
 
-        rendered.FindAll("[role='tab']").Single(value => value.TextContent == "Définition").Click();
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.WaitForAssertion(() =>
         {
             var enabled = rendered.Find("[data-testid='data-source-enabled-option']");
-            Assert.IsTrue(enabled.ClassList.Contains("data-source-choice"));
-            Assert.IsTrue(rendered.Markup.IndexOf("data-source-enabled-option", StringComparison.Ordinal)
-                < rendered.Markup.IndexOf("Configuration (JSON)", StringComparison.Ordinal));
+            Assert.AreEqual("switch", enabled.GetAttribute("role"));
+            Assert.IsNotNull(enabled.Closest(".resource-header"));
             Assert.AreEqual("https://docs.agentstration.io",
                 rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
         });
 
-        rendered.FindAll("[role='tab']").Single(value => value.TextContent == "Acquisitions").Click();
+        DataSourceScreenTestSupport.Select(rendered, "acquisitions");
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-acquisitions']"));
             Assert.HasCount(1, rendered.FindAll("[data-schema-path='$.query'] input"));
-            Assert.AreEqual("Réussie", rendered.Find(".status-badge").TextContent.Trim());
+            Assert.AreEqual("Réussie", rendered.Find("[data-testid=data-source-acquisition-row] .status-badge").TextContent.Trim());
             Assert.AreEqual("flowrun-data-source", rendered.Find(".data-source-flow-run").GetAttribute("title"));
         });
 
-        rendered.FindAll("[role='tab']").Single(value => value.TextContent == "YAML").Click();
+        DataSourceScreenTestSupport.Select(rendered, "yaml");
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-yaml-editor']"));
-            Assert.IsTrue(rendered.Find(".data-source-yaml-field").QuerySelector("textarea") is not null);
+            Assert.IsTrue(rendered.Find("[data-testid=data-source-yaml-editor]").QuerySelector("textarea") is not null);
             StringAssert.Contains(rendered.Markup, "YAML de la source de données");
         });
     }
@@ -107,8 +110,9 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.AddSingleton<IToolDefinitionsClient>(new ToolDefinitionsApiClient(http));
         var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
-        navigation.NavigateTo($"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+        navigation.NavigateTo($"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#acquisitions");
 
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid='data-source-acquisition-row']");
         var linkedTool = rendered.WaitForElement("[data-testid='data-source-linked-tool']");
@@ -141,8 +145,9 @@ public sealed class DataSourceEditorTests
             new CreateToolDefinitionFromAcquisitionRequest("catalogue-mobilite", "Catalogue mobilité", "results"), handler.Request));
         Assert.AreEqual("/api/tooldefinitions/from-acquisition/acquisition-1?namespace=default", handler.Path);
         var scope = Uri.EscapeDataString(Scope.Value);
-        Assert.AreEqual($"/tools/agentstration.catalogue-mobilite?namespace=default&scopeRef={scope}&context={scope}#execution",
-            new Uri(navigation.Uri).PathAndQuery + new Uri(navigation.Uri).Fragment);
+        Assert.IsFalse(rendered.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!(), $"Definition: {rendered.FindComponent<ConsoleResourceDetailsTemplate>().Instance.HasDraft}; additional: {rendered.FindComponent<ConsoleResourceDetailsTemplate>().Instance.HasAdditionalDraft}; dialogs: {rendered.FindAll("[role=dialog]").Count}");
+        rendered.WaitForAssertion(() => Assert.AreEqual($"/tools/agentstration.catalogue-mobilite?namespace=default&scopeRef={scope}&context={scope}#execution",
+            new Uri(navigation.Uri).PathAndQuery + new Uri(navigation.Uri).Fragment));
     }
 
     [TestMethod]
@@ -178,8 +183,9 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.AddSingleton<IArtifactsClient>(artifacts);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#acquisitions");
 
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         const string toggle = "[data-testid='data-source-acquisition-preview']";
         const string viewer = "[data-testid='staged-artifact-content']";
@@ -232,8 +238,9 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourcesClient>(client);
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=acquisitions");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#acquisitions");
 
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters
             .Add(component => component.Name, "documentation"));
 
@@ -254,8 +261,9 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(targeted: true));
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=discovery");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#discovery");
 
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForAssertion(() =>
         {
@@ -277,7 +285,8 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub(historyFails: true));
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=definition");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#definition/configuration");
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForAssertion(() =>
         {
@@ -285,8 +294,8 @@ public sealed class DataSourceEditorTests
             Assert.AreEqual("https://docs.agentstration.io", rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value"));
             Assert.IsFalse(rendered.Find("fieldset").HasAttribute("disabled"));
         });
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == "YAML").Click();
-        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Find(".data-source-yaml-field").OuterHtml, "docs.agentstration.io"));
+        DataSourceScreenTestSupport.Select(rendered, "yaml");
+        rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Find("[data-testid=data-source-yaml-editor]").OuterHtml, "docs.agentstration.io"));
     }
 
     [TestMethod]
@@ -298,7 +307,8 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub(omitProfile: true));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=definition");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#definition/configuration");
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForAssertion(() =>
         {
@@ -318,6 +328,7 @@ public sealed class DataSourceEditorTests
         var clock = new ManualTimeProvider();
         var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
         await using var context = DiscoveryContext(client, clock);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
         rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
@@ -331,13 +342,13 @@ public sealed class DataSourceEditorTests
             StringAssert.Contains(runLink, "context=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
         });
 
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Définition" : "Definition")).Click();
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.Find("[data-schema-path='$.url'] input").Input("https://edited.example.test");
         client.DiscoveryHistory = [client.AcceptedDiscovery with { State = DataSourceDiscoveryState.Running }];
         await rendered.InvokeAsync(clock.Tick);
         rendered.WaitForAssertion(() => Assert.AreEqual("https://edited.example.test",
             rendered.Find("[data-schema-path='$.url'] input").GetAttribute("value")));
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Découverte" : "Discovery")).Click();
+        DataSourceScreenTestSupport.Select(rendered, "discovery");
         rendered.WaitForAssertion(() => StringAssert.Contains(
             rendered.Find("[data-testid=data-source-discovery-row]").TextContent, running));
 
@@ -369,6 +380,7 @@ public sealed class DataSourceEditorTests
         var clock = new ManualTimeProvider();
         var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
         await using var context = DiscoveryContext(client, clock);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
         rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
@@ -398,6 +410,7 @@ public sealed class DataSourceEditorTests
         var clock = new ManualTimeProvider();
         var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
         await using var context = DiscoveryContext(client, clock);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
         rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
@@ -418,6 +431,7 @@ public sealed class DataSourceEditorTests
         var clock = new ManualTimeProvider();
         var client = new SourceClientStub(targeted: true) { DiscoveryHistory = [] };
         await using var context = DiscoveryContext(client, clock);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-start-discovery]").Click();
         rendered.Find("[data-testid=data-source-discovery-history-tab]").Click();
@@ -450,6 +464,7 @@ public sealed class DataSourceEditorTests
             DiscoveryHistory = Enumerable.Range(0, 50).Select(index => Discovery with { Metadata = Discovery.Metadata with { Name = $"discovery-{index}" } }).ToArray()
         };
         await using var context = DiscoveryContext(client, clock);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
         var resultsTab = rendered.Find("[data-testid=data-source-discovery-results-tab]");
@@ -482,6 +497,7 @@ public sealed class DataSourceEditorTests
         client.TargetResource = client.TargetResource with { Metadata = client.TargetResource.Metadata with { Name = targetName } };
         client.DiscoveryHistory = [Discovery with { Uid = Guid.NewGuid(), Metadata = Discovery.Metadata with { Name = "discovery-2" } }];
         await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-discovery-choice]");
         Assert.IsFalse(rendered.Find("[data-testid=data-source-discovery-choice] button:not(.field-clear)").HasAttribute("disabled"));
@@ -519,6 +535,7 @@ public sealed class DataSourceEditorTests
         var client = new SourceClientStub(targeted: true) { ReconcileFails = true };
         client.DiscoveryHistory = [Discovery with { Uid = Guid.NewGuid() }];
         await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-reconcile-target]").Click();
         rendered.WaitForAssertion(() =>
@@ -541,6 +558,7 @@ public sealed class DataSourceEditorTests
             Manifest = new() { Choices = ineligible ? [new() { Id = "documents", DisplayName = "Documents", Eligible = false }] : [] }
         }];
         await using var context = DiscoveryContext(client, new ManualTimeProvider());
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
         rendered.WaitForElement("[data-testid=data-source-acquisition-target-row]");
         if (ineligible)
@@ -561,7 +579,7 @@ public sealed class DataSourceEditorTests
         context.Services.AddSingleton<IDataSourcesClient>(client);
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
-            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}&view=discovery");
+            $"/data-sources/documentation?namespace=default&scopeRef={Uri.EscapeDataString(Scope.Value)}#discovery");
         return context;
     }
 
@@ -762,12 +780,21 @@ public sealed class DataSourceEditorTests
             return Task.FromResult(new ResourceSnapshot<DataSourceAcquisitionTargetResource>(TargetResource, "\"target-v2\""));
         }
         public bool DiscoveryReadFails { get; set; }
+        public bool CanRun { get; set; } = true;
         public int DiscoveryReads { get; private set; }
         public TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>? DeferredDiscoveryRead { get; set; }
         public bool ReadingDeferredDiscovery { get; private set; }
         public bool TargetStale { get; set; } = true;
         public Task<IReadOnlyList<DataSourceResource>> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<DataSourceResource>>([Source]);
-        public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new ResourceSnapshot<DataSourceResource>(Source with { Metadata = Source.Metadata with { Name = name } }, "\"etag\""));
+        public DataSourceResource Saved { get; set; } = Source;
+        public string ReadEtag { get; set; } = "\"etag\"";
+        public string? LastWriteEtag { get; private set; }
+        public Exception? ReadFailure { get; set; }
+        public Task<ResourceSnapshot<DataSourceResource>>? PendingRead { get; set; }
+        public int Updates { get; private set; }
+        public int Deletes { get; private set; }
+        public Task<ResourceSnapshot<DataSourceResource>> GetAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) =>
+            ReadFailure is { } failure ? Task.FromException<ResourceSnapshot<DataSourceResource>>(failure) : PendingRead ?? Task.FromResult(new ResourceSnapshot<DataSourceResource>(Saved with { Metadata = Saved.Metadata with { Name = name } }, ReadEtag));
         public Task<DataSourceReadiness> GetReadinessAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, CancellationToken cancellationToken = default) => Task.FromResult(new DataSourceReadiness(true, true, ResolvedProfile, [],
             new ResolvedDataSourceFlowBinding("data-source-web-acquisition-builtin", ResourceNamespace.Default,
                 "1.0.1", false, AcquisitionInputSchema, null, DataSourceFlowContracts.Acquisition,
@@ -775,11 +802,17 @@ public sealed class DataSourceEditorTests
             { ScopeRef = Scope },
             targeted ? new("discover", ResourceNamespace.Default, "1.0.0", false, null, null,
                 DataSourceFlowContracts.Discovery, "sha256:discovery")
-            { ScopeRef = Scope } : null));
+            { ScopeRef = Scope } : null)
+        { CanAcquire = CanRun });
         public Task<IReadOnlyList<DataSourceAcquisitionResource>> GetAcquisitionsAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, CancellationToken cancellationToken = default) => historyFails ? throw new InvalidOperationException("history unavailable") : Task.FromResult<IReadOnlyList<DataSourceAcquisitionResource>>([AcquisitionResult]);
         public Task<ResourceSnapshot<DataSourceResource>> CreateAsync(CreateDataSourceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<DataSourceResource>> UpdateAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, PutDataSourceRequest request, string etag, CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(Saved.Namespace, ns); Assert.AreEqual(Saved.Name, name); Assert.AreEqual(Saved.ScopeRef, scope);
+            Updates++; LastWriteEtag = etag; Saved = Saved with { Definition = request.Properties }; ReadEtag = "updated-etag";
+            return Task.FromResult(new ResourceSnapshot<DataSourceResource>(Saved, ReadEtag));
+        }
+        public Task DeleteAsync(ResourceNamespace ns, string name, ResourceScopeRef scope, string etag, CancellationToken cancellationToken = default) { Deletes++; LastWriteEtag = etag; return Task.CompletedTask; }
         public Task<ResourceSnapshot<DataSourceAcquisitionResource>> StartAcquisitionAsync(ResourceNamespace ns, string name, ResourceScopeRef sourceScope, StartDataSourceAcquisitionRequest request, CancellationToken cancellationToken = default)
         {
             StartedRequest = request;

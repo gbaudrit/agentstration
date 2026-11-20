@@ -16,6 +16,7 @@ export interface PackProjectDefinition {
   displayName: string;
   resourceKind?: string;
   resourceName?: string;
+  resourceNamespace?: string;
 }
 
 export class DistributionPage {
@@ -83,14 +84,13 @@ export class DistributionPage {
     expect((await this.page.goto(`${consoleUrl}/tools`))?.ok()).toBe(true);
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     const frame = this.page.locator('.resource-collection').first();
-    await this.showCollectionTable();
-    const row = frame.locator('tbody tr').first();
-    await expect(row.locator('.collection-identity')).toBeVisible();
-    await expect(row.locator(':scope > td')).toHaveCount(4);
-    await expect(row).toHaveCSS('display', layout === 'columns' ? 'table-row' : 'grid');
     if (layout === 'columns') {
+      await this.showCollectionTable();
+      const row = frame.locator('tbody tr').first();
+      await expect(row.locator('.collection-identity')).toBeVisible();
+      await expect(row.locator(':scope > td')).toHaveCount(2);
       await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
-        if (cells.length !== 4 || cells.some(cell => !cell.isConnected)) return Infinity;
+        if (cells.length !== 2 || cells.some(cell => !cell.isConnected)) return Infinity;
         return Math.max(...cells.map(cell => {
           const range = document.createRange();
           range.selectNodeContents(cell);
@@ -98,33 +98,13 @@ export class DistributionPage {
           const bounds = cell.getBoundingClientRect();
           return Math.abs(content.y + content.height / 2 - bounds.y - bounds.height / 2);
         }));
-      }), { message: 'Resource identity, provider, enabled value and actions share each row’s vertical center.' }).toBeLessThan(2);
-    } else {
-      await expect(frame.locator('thead')).toBeHidden();
-      await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
-        const bounds = cells.map(cell => cell.getBoundingClientRect());
-        return cells.length === 4 && cells.every((cell, index) => cell.isConnected
-          && bounds[index].height > 0 && (index === 0 || bounds[index].top >= bounds[index - 1].bottom));
-      }), { message: 'Mobile preserves the ordered identity, provider, enabled value and action blocks.' }).toBe(true);
+      }), { message: 'Tool identity and provider share the vertical center of each row.' }).toBeLessThan(2);
     }
-    const assertChevron = async () => {
-      const trigger = frame.locator('.collection-actions-menu > summary').first();
-      await expect(trigger).toBeVisible();
-      await expect.poll(() => trigger.evaluate(element => {
-        const icon = element.querySelector('svg')!.getBoundingClientRect();
-        const button = element.getBoundingClientRect();
-        return Math.abs(icon.y + icon.height / 2 - button.y - button.height / 2);
-      }), { message: 'The Actions chevron stays centered vertically inside its button.' }).toBeLessThan(1);
-      await trigger.focus();
-      await trigger.press('ArrowDown');
-      await expect(frame.locator('.collection-actions-panel a').first()).toBeFocused();
-      await this.page.keyboard.press('Escape');
-      await expect(trigger).toBeFocused();
-      await expect(trigger.locator('..')).not.toHaveAttribute('open', '');
-    };
-    await assertChevron();
-    await frame.locator('.collection-view-switch button').nth(1).click();
-    await assertChevron();
+    await frame.locator('.collection-view-switch button').last().click();
+    const card = frame.locator('.collection-card').first();
+    await expect(card.locator('.collection-identity')).toBeVisible();
+    await expect(card.locator('.collection-value')).toHaveCount(1);
+    await expect(frame.locator('.collection-actions')).toHaveCount(0);
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
 
@@ -231,6 +211,9 @@ export class DistributionPage {
     await this.page.getByTestId(TestIds.distribution.sourceImportOpen).click();
     await this.page.getByTestId(TestIds.distribution.sourceImportYamlMode).click();
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.sourceImportYaml), yaml);
+    await this.page.locator('[data-wizard-step="destination"]').click();
+    await expect(this.page.locator('[data-step-id=destination] select')).not.toHaveValue('');
+    await this.page.locator('[data-wizard-step="review"]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/settings/sources/${encodeURIComponent(publisher)}/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.sourceImportSubmit).click(),
@@ -246,10 +229,23 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
     await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
-    const add = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${project.resourceName ?? 'system-direct-agent-dotnet-expert'}"]`)
-      .getByTestId(TestIds.distribution.packProjectAddResource);
+    const resourceName = project.resourceName ?? 'system-direct-agent-dotnet-expert';
+    let resource = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${resourceName}"]`);
+    if (project.resourceNamespace) {
+      resource = resource.filter({ has: this.page.getByText(`${project.resourceNamespace}/${resourceName}`, { exact: true }) });
+    }
+    const add = resource.getByTestId(TestIds.distribution.packProjectAddResource);
+    await this.page.locator('[data-wizard-step=resources]').click();
+    await expect(this.page.locator('[data-step-id=resources]')).toBeVisible();
+    await expect(resource).toHaveCount(1);
+    if (project.resourceNamespace) {
+      await expect(resource.locator('.collection-qualified-name code')).toHaveText(`${project.resourceNamespace}/${resourceName}`);
+    }
     await add.waitFor({ state: 'visible' });
+    await expect(add).toBeEnabled();
     await add.click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await expect(this.page.locator('[data-step-id=review]')).toBeVisible();
     const create = this.page.getByTestId(TestIds.distribution.packProjectCreate);
     await expect(create).toBeEnabled();
     await Promise.all([
@@ -257,7 +253,7 @@ export class DistributionPage {
       create.click(),
     ]);
     await this.page.getByTestId(TestIds.distribution.packProjectDetails).waitFor({ state: 'visible' });
-    return this.page.url().split('/').at(-1)!;
+    return new URL(this.page.url()).pathname.split('/').at(-1)!;
   }
 
   public async openSourceDetailsFromList(publisher: string, name: string): Promise<void> {
@@ -273,9 +269,25 @@ export class DistributionPage {
     await this.page.locator(`[data-testid="${TestIds.distribution.packProjectStatus}"][data-state="success"]`).waitFor({ state: 'visible' });
   }
 
-  public async installPackProject(): Promise<string> {
-    await this.page.getByTestId(TestIds.distribution.packProjectInstall).click();
-    await this.page.getByTestId(TestIds.distribution.packProjectStatus).waitFor({ state: 'visible' });
+  public async installPackProject(bindings: readonly { name: string; namespace: string; scopeRef: string | null }[] = []): Promise<string> {
+    for (const target of bindings) {
+      const value = `${target.scopeRef ? target.scopeRef + '|' : ''}${target.namespace}:${target.name}`;
+      const selection = this.page.locator('.studio-bindings select').filter({
+        has: this.page.locator(`option[value="${value}"]`),
+      });
+      await expect(selection).toHaveCount(1);
+      await expect(selection).toBeEnabled();
+      await selection.selectOption(value);
+      await expect(selection).toHaveValue(value);
+    }
+    const install = this.page.getByTestId(TestIds.distribution.packProjectInstall);
+    await expect(install).toBeEnabled();
+    const status = this.page.getByTestId(TestIds.distribution.packProjectStatus);
+    const buildStatus = await status.innerText();
+    await install.click();
+    await status.waitFor({ state: 'visible' });
+    await expect(status).not.toHaveText(buildStatus);
+    await expect(status).toHaveAttribute('data-state', 'success');
     return this.page.getByTestId(TestIds.distribution.packProjectNamespace).innerText();
   }
 

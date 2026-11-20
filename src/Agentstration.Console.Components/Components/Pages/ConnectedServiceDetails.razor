@@ -21,13 +21,14 @@
     <Actions>@if (CanReconcile) { <button class="button-secondary" type="button" disabled="@Busy" @onclick="RequestReconcile">@T("Reconcile")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
     <Feedback>@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@(error is AgentstrationApiException { IsConcurrencyConflict: true } ? T("ConcurrencyConflict") : error.Message)</div> }@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
     <OverviewMetrics>
-        <MetricCard Label="@T("Availability")" Value="@StatusLabel(Availability)" Status="@StatusColor(Availability)" />
+        <MetricCard Label="@T("Availability")" Value="@StatusLabel(Availability)" Status="@StatusColor(Availability)">
+            @Diagnostics
+        </MetricCard>
         <MetricCard Label="@T("Generation")" Value="@(resource?.Generation.ToString() ?? "—")" />
         <MetricCard Label="@T("Dependents")" Value="@(usageCount?.ToString() ?? "—")" Detail="@T("DependentsExplanation")" />
     </OverviewMetrics>
     <IdentityDetails>@if (resource is { } saved) { <dt>@T("ServiceType")</dt><dd>@(TypeResource?.Definition.DisplayName ?? saved.Definition.Type.Type.Name) · @saved.Definition.Type.Version</dd> }</IdentityDetails>
     <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
-    <OverviewContent>@Diagnostics</OverviewContent>
     <DefinitionContent Context="path">
         @if (resource is { } saved)
         {
@@ -231,10 +232,11 @@
             </CollectionView>
         }
     </div>;
-    private RenderFragment Diagnostics => @<FormSection Title="@T("Diagnostics")">
+    private RenderFragment Diagnostics => @<div class="service-diagnostics">
+        <h3>@T("Diagnostics")</h3>
         @if (resource?.ObservedState is not { } observed) { <p>@T("NotObserved")</p> }
-        else { <dl class="resource-details"><dt>@T("ObservedAt")</dt><dd>@observed.ObservedAt.ToLocalTime().ToString("g")</dd><dt>@T("Code")</dt><dd><code>@(observed.Code ?? "—")</code></dd><dt>@T("Message")</dt><dd>@(observed.Message ?? "—")</dd></dl> }
-    </FormSection>;
+        else { <dl><dt>@T("ObservedAt")</dt><dd>@observed.ObservedAt.ToLocalTime().ToString("g")</dd><dt>@T("Code")</dt><dd><code>@(observed.Code ?? "—")</code></dd><dt>@T("Message")</dt><dd>@(observed.Message ?? "—")</dd></dl> }
+    </div>;
     private RenderFragment Dependents => @<FormSection Title="@T("Dependents")" Description="@T("DependentsExplanation")">
         @if (usageCount is null) { <p role="status">@Shared["UsageError"]</p> }
         else if (usages.Count == 0) { <p>@T("NoDependents")</p> }

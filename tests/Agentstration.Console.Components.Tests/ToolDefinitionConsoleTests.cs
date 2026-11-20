@@ -20,7 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ToolDefinitionConsoleTests
+public sealed partial class ToolDefinitionConsoleTests
 {
     [TestMethod]
     public void DefinitionsPageListsFlowBackedMcpTools()
@@ -144,9 +144,9 @@ public sealed class ToolDefinitionConsoleTests
         var client = new DefinitionClient { Resource = resource };
         using var context = SavedContext(client);
         var cut = context.Render<ToolDefinitionEditor>(p => p.Add(c => c.Name, resource.Name));
-        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
         Assert.Contains("Saved Tool", cut.Find(".resource-identity-summary").TextContent);
-        await Select(cut, "definition/configuration");
+        await Select(cut, "definition/identity");
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
         cut.FindComponent<ResourceIdentityFields>().Find("input:not([disabled])").Input("Local Tool draft");
         await Select(cut, "overview");
         Assert.Contains("Saved Tool", cut.Find(".resource-identity-summary").TextContent);
@@ -168,22 +168,25 @@ public sealed class ToolDefinitionConsoleTests
     }
 
     [TestMethod]
-    public async Task DiscardRestoresTheSavedActiveFlowContractAndHeaderActivation()
+    public async Task ActivationRetainsTheInvalidDefinitionAndDiscardKeepsAcknowledgedEnablement()
     {
         using var culture = new TestCultureScope("en-US");
-        var client = new DefinitionClient { Resource = SavedDefinition() };
-        using var context = SavedContext(client);
+        var client = new DefinitionClient { Resource = SavedDefinition() }; using var context = SavedContext(client);
         var cut = context.Render<ToolDefinitionEditor>(p => p.Add(c => c.Name, client.Resource!.Name));
         await Select(cut, "definition/configuration");
-        cut.Find(".resource-header input[role=switch]").Change(false);
+        var form = cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext;
+        var timeout = cut.FindComponents<FormField>().Single(f => f.Instance.Label == "Timeout (seconds)").Find("input");
+        timeout.Change("invalid");
+        await cut.Find(".resource-header input[role=switch]").ChangeAsync(new ChangeEventArgs { Value = false });
         Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
-        await Select(cut, "overview");
-        await cut.Find(".unsaved-changes-bar .button-secondary").ClickAsync();
+        Assert.AreSame(form, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
+        Assert.AreEqual("invalid", timeout.GetAttribute("value"));
+        Assert.IsFalse(client.Resource!.Definition.Enabled); Assert.IsNull(client.Updated);
+        await Select(cut, "overview"); await cut.Find(".unsaved-changes-bar .button-secondary").ClickAsync();
         Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
-        Assert.IsTrue(cut.Find(".resource-header input[role=switch]").HasAttribute("checked"));
+        Assert.IsFalse(cut.Find(".resource-header input[role=switch]").HasAttribute("checked"));
         await Select(cut, "definition/implementation");
         Assert.Contains("1.2.0", cut.Find("[data-testid=tool-definition-contract]").ParentElement!.TextContent);
-        Assert.IsNull(client.Updated);
     }
 
     [TestMethod]
@@ -198,7 +201,9 @@ public sealed class ToolDefinitionConsoleTests
         var cut = context.Render<ToolDefinitionEditor>(p => p.Add(c => c.Name, resource.Name));
         Assert.Contains("Saved Tool", cut.Find(".resource-identity-summary").TextContent);
         Assert.IsTrue(cut.Find(".resource-header input[role=switch]").HasAttribute("disabled"));
-        Assert.IsEmpty(cut.FindAll("a[data-resource-section^='definition/'], .resource-header button.button-danger, .unsaved-changes-bar"));
+        Assert.IsEmpty(cut.FindAll(".resource-header button.button-danger, .unsaved-changes-bar"));
+        await Select(cut, "definition/identity");
+        Assert.IsTrue(cut.Find("#tool-definition-resource-form fieldset").HasAttribute("disabled"));
         await cut.Find("#tool-definition-resource-form").SubmitAsync();
         Assert.IsNull(client.Updated);
     }
@@ -232,16 +237,17 @@ public sealed class ToolDefinitionConsoleTests
             Flow = new() { Name = "contract-flow", UseActiveVersion = true }
         }
     };
-    private static BunitContext SavedContext(DefinitionClient client)
+    private static BunitContext SavedContext(DefinitionClient client, ConsoleContextState? state = null)
     {
         var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolDefinitionsClient>(client); context.Services.AddSingleton<IFlowApiClient>(new FlowClient()); context.Services.AddSingleton<ISchemasClient>(new SchemasClient());
         context.Services.AddSingleton<IConsoleNavigationContext>(new CreationContext());
+        if (state is not null) context.Services.AddSingleton(state);
         var nav = context.Services.GetRequiredService<NavigationManager>();
         nav.NavigateTo("/tools/definitions/notification.send?scopeRef=" + Uri.EscapeDataString(client.Resource!.ScopeRef!.Value.Value));
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js"); var url = nav.Uri.Split('#')[0];
-        foreach (var path in new[] { "overview", "definition/configuration", "definition/implementation", "versions", "usages" }) module.Setup<string>("navigate", call => call.Arguments[0] is string target && target.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(url + "#" + path);
+        foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "definition/implementation", "versions", "usages", "yaml" }) module.Setup<string>("navigate", call => call.Arguments[0] is string target && target.EndsWith("#" + path, StringComparison.Ordinal)).SetResult(url + "#" + path);
         return context;
     }
     private static Task Select(IRenderedComponent<ToolDefinitionEditor> cut, string section) => cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection(section));
@@ -256,6 +262,8 @@ public sealed class ToolDefinitionConsoleTests
     private sealed class DefinitionClient : IToolDefinitionsClient
     {
         public ToolDefinitionResource? Resource { get; set; }
+        public Exception? ReadError { get; set; }
+        public Exception? WriteError { get; set; }
         public Agentstration.Tools.Contracts.PutToolDefinitionRequest? Updated { get; private set; }
         public string? LastEtag { get; private set; }
         public int Reads { get; private set; }
@@ -285,6 +293,7 @@ public sealed class ToolDefinitionConsoleTests
         public async Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken)
         {
             Reads++;
+            if (ReadError is not null) throw ReadError;
             if (Resource is not null) return new(Resource, "definition-etag");
             var resource = (await GetAsync(cancellationToken)).Single(value => value.Name == name);
             return new(resource with
@@ -296,10 +305,14 @@ public sealed class ToolDefinitionConsoleTests
         public Task<ResourceSnapshot<ToolDefinitionResource>> CreateAsync(Agentstration.Tools.Contracts.CreateToolDefinitionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolDefinitionResource>> UpdateAsync(string name, ResourceNamespace @namespace, Agentstration.Tools.Contracts.PutToolDefinitionRequest request, string etag, CancellationToken cancellationToken)
         {
-            Updated = request; LastEtag = etag; Resource = Resource! with { Definition = request.Properties };
+            Updated = request; LastEtag = etag; if (WriteError is not null) throw WriteError; Resource = Resource! with { Definition = request.Properties };
             return Task.FromResult(new ResourceSnapshot<ToolDefinitionResource>(Resource, "saved-etag"));
         }
-        public Task<ResourceSnapshot<ToolDefinitionResource>> SetEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ToolDefinitionResource>> SetEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string etag, CancellationToken cancellationToken)
+        {
+            LastEtag = etag; Resource = Resource! with { Definition = Resource.Definition with { Enabled = enabled } };
+            return Task.FromResult(new ResourceSnapshot<ToolDefinitionResource>(Resource, "enabled-etag"));
+        }
         public Task DeleteAsync(string name, ResourceNamespace @namespace, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 

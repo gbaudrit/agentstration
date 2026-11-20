@@ -6,287 +6,148 @@
 @inject NavigationManager Navigation
 @inject ConsoleContextState ContextState
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> FlowLabels
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings> Localizer
+
 <PageTitle>@(flow?.DisplayName ?? flow?.Name ?? T("Flow")) · Agentstration</PageTitle>
-<UnsavedNavigationGuard IsDirty="@HasUnsavedChanges" HasUnsavedChanges="@(() => HasUnsavedChanges)" />
-<div data-testid="flow-observability-flow-details">
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (loadError is not null) { <ErrorState Title="@Shared["Unavailable"]" Message="@loadError" /><button type="button" class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button> }
-else if (flow is not null)
-{
-    <ResourceDetailsTemplate Name="@(flow.DisplayName ?? flow.Name)" TechnicalName="@flow.Id" Namespace="@flow.Namespace.Value" ScopeRef="flow.ScopeRef"
-                             Description="@(flow.Description ?? T("DefaultDescription"))" ResourceType="@T("Flow")" Domain="flow" IconName="workflow" ResourceUid="flow.Uid" IdentityLabels="flow.Metadata"
-                             Version="@PublishedVersion" VersionDescription="@T("PublishedVersion")" StatusText="@StatusLabel" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)"
-                             CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)" CollectionLabel="@T("ListFlows")"
-                             Enabled="flow.Enabled" EnabledChanged="ToggleEnabledAsync" EnabledDisabled="@(!IsEditable || busy || definitionSaving || orchestrationSaving)" EnabledTestId="flow-enabled"
-                             Sections="Sections" ResourceIdentity="@($"{loadedKey}|{flow.Uid}")" DefaultSection="overview" SelectionChanged="SelectSectionAsync"
-                             HasDraft="@HasDefinitionDraft" NavigationLabel="@T("DetailsAriaLabel")">
-        <Metadata><ResourceMetadataBadge Value="@FlowLabels[$"Kind.{flow.Definition.Kind}"]" /></Metadata>
-        <PrimaryActions>@if (!IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@T("OpenFlowDesigner")</a> }@if (versions.Count > 0) { <button type="button" class="button-primary" data-testid="flow-run-open" disabled="@(!CanExecute || busy)" @onclick="OpenRun">@T("RunFlow")</button> }</PrimaryActions>
-        <Feedback><InheritedResourceNotice OwnerScopeRef="FlowScopeRef" />@if (error is not null && !showRun) { <p class="error-panel" role="alert">@error</p> }</Feedback>
-        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || definitionSaving || orchestrationSaving)" @onclick="DiscardDefinition">@Shared["Discard"]</button><button class="button-primary" type="submit" form="@(IsOrchestration ? orchestrationEditor?.FormId : "flow-definition-form")" disabled="@(busy || (IsOrchestration ? orchestrationEditor?.CanSubmit != true : !CanEditDefinition || definitionSaving || definitionInvalid))">@(IsOrchestration ? Shared["Save"] : T("SaveDefinition"))</button></DraftActions>
-        <Content>
-        <div hidden="@(section != "overview")">
-            <section class="resource-overview-metrics flow-metrics"><MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)" /><MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /><MetricCard Label="@T("RecentRuns")" Value="@runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded))" Status="UiStatus.Neutral" /></section>
-            <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible><Actions>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</Actions><ChildContent><FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" /></ChildContent></FormSection>
-            <ResourceIdentitySummary DisplayName="@(flow.DisplayName ?? flow.Name)" TechnicalName="@flow.Id" Namespace="@flow.Namespace.Value" Description="@flow.Description" ResourceUid="flow.Uid" Labels="flow.Metadata" HeaderOwnsIdentity><Scope><ResourceScopeBadge ScopeRef="flow.ScopeRef" /></Scope><AdditionalContent><ExtensionManagedResourcePanel Governance="flow.Governance" ScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Uid="flow.Uid" Embedded /></AdditionalContent></ResourceIdentitySummary>
-            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView></FormSection>
-        </div>
-        @if (definitionVisited)
-        {
-            <div hidden="@(section != "definition/configuration")">
-            @if (IsEditable) { <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p> }
-            @if (IsOrchestration)
-            {
-                <FlowOrchestrationEditor @ref="orchestrationEditor" FlowId="@flow.Id" FlowNamespace="@flow.Namespace.Value" ScopeRef="flow.ScopeRef" Embedded="true" InitialSnapshot="snapshot" ExternalActions="true" ExternalBusy="busy" DraftChanged="value => orchestrationDirty = value" SavingChanged="value => orchestrationSaving = value" Saved="OrchestrationSavedAsync" />
-            }
-            else
-            {
-                <section class="flow-definition-sheet">
-                @if (definitionLoading) { <LoadingState Message="@T("Loading")" /> }
-                else if (definitionContext is not null)
-                {
-                    <EditForm @key="definitionContext" EditContext="definitionContext" OnSubmit="SaveDefinitionAsync" id="flow-definition-form" FormName="flow-definition" class="flow-definition-form resource-form" data-testid="flow-definition-form" novalidate>
-                        <FormDraftMonitor InvalidInputChanged="value => definitionInvalid = value" />
-                        <fieldset class="resource-definition-fields" disabled="@(!CanEditDefinition || definitionSaving || busy)">
-                        <FormSection Title="@Shared["Identity"]"><FormGrid>
-                            <ResourceIdentityFields @bind-DisplayName="definitionDisplayName" @bind-TechnicalName="definitionTechnicalName" IsNew="false" Policy="ResourceNamePolicy.Flow" DisplayNameTestId="flow-definition-display-name" TechnicalNameTestId="flow-definition-name" />
-                            <FormField Label="@T("Namespace")"><ClearableText Value="@FlowResourceNamespace.Value" ReadOnly data-testid="flow-definition-namespace" /></FormField><FormField Label="@Shared["Scope"]"><ResourceScopeBadge ScopeRef="flow.ScopeRef" /></FormField>
-                            <FormField Label="@T("Description")" Class="form-span-2"><ClearableText Multiline @bind-Value="definitionDescription" rows="4" data-testid="flow-definition-description" /></FormField>
-                        </FormGrid></FormSection>
-                        <FormSection Title="@Shared["Configuration"]"><p>@T(CanEditDefinition ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p><FormActions>@if (IsEditable) { <a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenFlowDesigner")</a> }</FormActions></FormSection>
-                        </fieldset>
-                        @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
-                        @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
-                    </EditForm>
-                }
-                </section>
-            }
-            </div>
-        }
-        <div hidden="@(section != "runs")"><div class="toolbar"><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flow-runs", Services)">@T("AllFlowRuns")</a></div>@if (runs.Count == 0) { <EmptyState Title="@T("NoRunsTitle")" Message="@T("NoRunsMessage")" /> } else { <RunGrid Runs="runs" /> }</div>
-        <div hidden="@(section != "deployments")">
-            <CollectionView TItem="FlowVersionResponse" Items="versions" InformationLabels="@(new string[] { T("Version"), T("Published") })" IdentityLabel="@T("Deployment")" StateLabel="@T("Status")"><Identity Context="version"><code>local</code></Identity><State Context="version"><StatusBadge Text="@(version.Version == flow.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></State><Information Context="version"><CollectionValue Label="@T("Version")">@version.Version</CollectionValue><CollectionValue Label="@T("Published")">@version.PublishedAt.LocalDateTime.ToString("g")</CollectionValue></Information></CollectionView>
-        </div>
-        @if (accessVisited && IsOwnerContext)
-        { <div hidden="@(section != "access")"><ResourceAccessPanel ResourceUid="flow.Uid" DraftChanged="value => policyDirty = value" OwnerScopeRef="FlowScopeRef" Namespace="FlowResourceNamespace" Kind="@FlowResourceKinds.Flow" Name="@flow.Id" Version="PublishedVersion" Governance="flow.Governance" /></div> }
-        <div hidden="@(section != "yaml")"><FormSection Title="@Shared["ResourceManifest"]" Description="@T("ResourceManifestHelp")" TestId="flow-yaml-viewer"><ResourceYamlEditor Value="@FlowYaml" Label="@Shared["ResourceManifest"]" InputTestId="flow-resource-manifest" ReadOnly Actions="@(IsEditable ? FlowEditorAction : null)" /></FormSection></div>
-        </Content>
-    </ResourceDetailsTemplate>
+@{
+    var presentations = SectionPresentations;
+    var renderIdentity = CurrentRenderIdentity;
 }
+<div data-testid="flow-observability-flow-details">
+    <ConsoleResourceDetailsTemplate Resource="SavedIdentity" RequestedAddress="@ResourceAddress.Create(RequestedNamespace, FlowResourceKinds.Flow, FlowId)"
+        Name="@(flow?.DisplayName ?? flow?.Name ?? FlowId)" Description="@flow?.Description" ResourceType="@T("Flow")" Domain="flow" IconName="workflow"
+        Version="@PublishedVersion" VersionDescription="@T("PublishedVersion")"
+        CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)" CollectionLabel="@T("ListFlows")"
+        StatusText="@(flow is null ? null : StatusLabel)" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)"
+        Enabled="flow?.Enabled" EnabledChanged="ToggleEnabledAsync" EnabledDisabled="@(!IsEditable || Busy)" EnabledTestId="flow-enabled"
+        ResourceIdentity="@($"{loadedKey}|{flow?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" SelectionChanged="SelectSectionAsync"
+        AdditionalSections="AdditionalSections" NavigationLabel="@T("DetailsAriaLabel")" SectionTestIdPrefix="flow"
+        LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDefinitionDraft" HasAdditionalDraft="HasRunDraft"
+        DefinitionReadOnlyReason="ReadOnlyReason" AccessVersion="PublishedVersion"
+        Yaml="@FlowYaml" YamlReadOnly="true" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("ResourceManifestHelp")" YamlLabel="@Shared["ResourceManifest"]">
+        <Metadata>@if (flow is not null) { <ResourceMetadataBadge Value="@FlowLabels[$"Kind.{flow.Definition.Kind}"]" /> }</Metadata>
+        <PrimaryActions>
+            @if (flow is not null && !IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@T("OpenFlowDesigner")</a> }
+            @if (versions.Count > 0) { <button type="button" class="button-primary" data-testid="flow-run-open" disabled="@(!CanExecute || Busy)" @onclick="OpenRun">@T("RunFlow")</button> }
+        </PrimaryActions>
+        <Feedback>
+            @if (error is not null && !showRun) { <p class="error-panel" role="alert">@error</p> }
+            @if (HasNewerSnapshot) { <div class="form-alert form-alert-warning" role="status" data-testid="flow-refresh-conflict">@T("RefreshDraftConflict")</div> }
+            @if (definitionError is not null) { <p class="error-panel" role="alert">@definitionError</p> }
+            @if (definitionSaved && !DefinitionDirty) { <p class="flow-definition-success" role="status">@T("DefinitionSaved")</p> }
+        </Feedback>
+        <DraftActions>
+            <button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinitionAsync">@Shared["Discard"]</button>
+            <button class="button-primary" type="submit" form="@(IsOrchestration ? orchestrationEditor?.FormId : "flow-definition-form")" disabled="@(Busy || (IsOrchestration ? orchestrationEditor?.CanSubmit != true : !CanEditDefinition))">@T("SaveDefinition")</button>
+        </DraftActions>
+        <OverviewMetrics>
+            @if (flow is not null)
+            {
+                <MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)" />
+                <MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" />
+                <MetricCard Label="@T("RecentRuns")" Value="@(runsKnown ? runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")" Detail="@(runsKnown ? SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded)) : T("HistoryUnavailable"))" Status="UiStatus.Neutral" />
+            }
+        </OverviewMetrics>
+        <OverviewConfiguration>
+            <CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+                <Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity>
+                <Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information>
+            </CollectionView>
+        </OverviewConfiguration>
+        <OverviewContent>
+            @if (flow is not null)
+            {
+                <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible>
+                    <Actions>@if (IsOrchestration) { <StatusBadge Text="@StrategyLabel(Orchestration!.Strategy)" Status="UiStatus.Info" /> }</Actions>
+                    <ChildContent><FlowTopologyViewer Graph="PreviewTopology" Title="@T("FlowTopology")" InitiallyFit="true" /></ChildContent>
+                </FormSection>
+            }
+        </OverviewContent>
+        <DefinitionContent Context="path">
+            @if (flow is not null && IsOrchestration)
+            {
+                <FlowOrchestrationEditor @ref="orchestrationEditor" FlowId="@flow.Id" FlowNamespace="@flow.Namespace.Value" ScopeRef="flow.ScopeRef"
+                    Embedded="true" InitialSnapshot="snapshot" ExternalActions="true" ExternalBusy="Busy" DraftChanged="value => OrchestrationDraftChanged(renderIdentity, value)"
+                    SavingChanged="value => OrchestrationSavingChanged(renderIdentity, value)" Saved="value => OrchestrationSavedAsync(renderIdentity, value)" SectionState="sectionState" SectionPresentations="presentations" SectionRequested="ShowSectionAsync" />
+            }
+            else if (definitionLoading) { <LoadingState Message="@T("Loading")" /> }
+            else if (definitionContext is not null)
+            {
+                <div class="flow-definition-sheet flow-definition-form">
+                    <ResourceDefinitionForm @key="definitionContext" @ref="definitionForm" EditContext="definitionContext" FieldLabels="FieldLabels"
+                        OnValidSubmit="SaveDefinitionAsync" InvalidInputChanged="value => definitionInvalid = value" Id="flow-definition-form" FormName="flow-definition"
+                        ReadOnly="@(!CanEditDefinition)" Busy="Busy" Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSectionContent"
+                        SectionRequested="ShowSectionAsync" data-testid="flow-definition-form" />
+                </div>
+            }
+        </DefinitionContent>
+        <AdditionalContent Context="path">
+            @if (path == "runs")
+            {
+                <FormActions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flow-runs", Services)">@T("AllFlowRuns")</a></FormActions>
+                @if (!runsKnown) { <ErrorState Title="@Shared["Unavailable"]" Message="@T("HistoryUnavailable")" /> }
+                else if (runs.Count == 0) { <EmptyState Title="@T("NoRunsTitle")" Message="@T("NoRunsMessage")" /> }
+                else { <RunGrid Runs="runs" /> }
+            }
+            else if (path == "deployments")
+            {
+                @if (!versionsKnown) { <ErrorState Title="@Shared["Unavailable"]" Message="@T("HistoryUnavailable")" /> }
+                else
+                {
+                    <CollectionView TItem="FlowVersionResponse" Items="versions" InformationLabels="@(new string[] { T("Version"), T("Published") })" IdentityLabel="@T("Deployment")" StateLabel="@T("Status")">
+                        <Identity Context="version"><code>local</code></Identity>
+                        <State Context="version"><StatusBadge Text="@(version.Version == flow?.ActiveVersion ? T("Active") : T("Published"))" Status="@(version.Version == flow?.ActiveVersion ? UiStatus.Success : UiStatus.Info)" /></State>
+                        <Information Context="version"><CollectionValue Label="@T("Version")">@version.Version</CollectionValue><CollectionValue Label="@T("Published")">@version.PublishedAt.LocalDateTime.ToString("g")</CollectionValue></Information>
+                    </CollectionView>
+                }
+            }
+        </AdditionalContent>
+    </ConsoleResourceDetailsTemplate>
 </div>
-<ConfirmationDialog IsOpen="confirmRefresh" Title="@Shared["LeaveTitle"]" Message="@Shared["LeaveMessage"]" ConfirmLabel="@Shared["Discard"]" OnConfirm="LoadAsync" OnCancel="() => confirmRefresh = false" />
+
 <div class="flow-run-modal-host">
 <ModalFrame IsOpen="showRun" TitleId="run-flow-title" OnClose="() => showRun = false" Class="run-dialog">
     <section data-testid="flow-run-dialog"><h2 id="run-flow-title">@T("RunFlow")</h2><FormField Label="@T("PublishedVersion")"><ClearableSelect TValue="string" Value="runVersion" ValueChanged="ChangeRunVersion" AllowClear="false">@foreach (var version in versions) { <option value="@version.Version">@version.Version</option> }</ClearableSelect></FormField><div class="flow-run-input"><h3>@T("FlowInput")</h3><p class="muted">@T("FlowInputHelp")</p><JsonSchemaInputEditor Schema="SelectedRunVersion?.Graph?.InputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="submitting" /></div>@if (error is not null) { <p class="error-panel" role="alert">@error</p> }<FormActions Class="dialog-actions"><button class="button-secondary" type="button" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" type="button" disabled="@(submitting || !runInputValid || !CanExecute || SelectedRunVersion is null)" data-testid="flow-run-submit" @onclick="SubmitRunAsync">@(submitting ? T("Starting") : T("RunFlow"))</button></FormActions></section>
 </ModalFrame>
 </div>
+
 @code {
-    [Parameter] public string FlowId { get; set; } = string.Empty;
-    [Parameter] public string? FlowNamespace { get; set; }
-    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
-    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
-    private readonly CancellationTokenSource cancellation = new();
-    private FlowResponse? flow;
-    private FlowResourceSnapshot? snapshot;
-    private FlowOrchestrationEditor? orchestrationEditor;
-    private IReadOnlyList<FlowVersionResponse> versions = [];
-    private IReadOnlyList<FlowRun> runs = [];
-    private FlowDraftResponse? definitionDraft;
-    private EditContext? definitionContext;
-    private ValidationMessageStore? definitionMessages;
-    private string section = "overview", runVersion = "", definitionDisplayName = "", definitionTechnicalName = "", definitionDescription = "";
-    private string? loadedKey, error, loadError, definitionError;
-    private bool loading = true, busy, showRun, submitting, runInputValid = true, definitionVisited, accessVisited, policyDirty, orchestrationDirty, orchestrationSaving, confirmRefresh;
-    private bool definitionLoaded, definitionLoading, definitionSaving, definitionSaved, definitionInvalid;
-    private long loadVersion;
-    private JsonElement runInput = JsonSerializer.SerializeToElement(new { });
-    private ResourceNamespace RequestedNamespace => ResourceNamespace.Parse(FlowNamespace ?? NamespaceValue);
-    private ResourceNamespace FlowResourceNamespace => flow?.Namespace ?? RequestedNamespace;
-    private ResourceScopeRef FlowScopeRef => flow!.ScopeRef!.Value;
-    private bool IsOwnerContext => ResourceOwnershipContext.CanManage(flow?.ScopeRef, Services);
-    private bool IsEditable => flow is { Governance.IsManaged: false } && IsOwnerContext && ContextState.HasPermission("resources/write");
-    private bool CanExecute => ContextState.HasPermission("runs/execute");
-    private bool IsOrchestration => flow?.Definition is OrchestrationFlowDefinition;
-    private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
-    private string? PublishedVersion => flow?.ActiveVersion ?? versions.OrderByDescending(value => value.PublishedAt).FirstOrDefault()?.Version;
-    private bool HasPublishedVersion => PublishedVersion is not null;
-    private string StatusLabel => T(HasPublishedVersion ? "Status.Published" : "Status.Draft");
-    private string FlowYaml => flow is null ? string.Empty : FlowYamlPresentation.ToYaml(flow);
-    private RenderFragment FlowEditorAction => @<a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T("OpenFlowEditor")</a>;
-    private string EditorUrl => ResourceOwnershipContext.PreserveNavigation(
-        $"{(FlowResourceNamespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows")}/{Uri.EscapeDataString(FlowId)}/designer?scopeRef={Uri.EscapeDataString(FlowScopeRef.Value)}", Services);
-    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("definition", Shared["Definition"], "settings") { Navigable = false }, new("definition/configuration", Shared["Configuration"], "forms"), new("runs", T("Tab.Runs"), "activity"), new("deployments", T("Tab.Deployments"), "history"), new("access", Shared["Access"], "lock") { Visible = IsOwnerContext }, new("yaml", Shared["Yaml"], "code")];
-    private bool HasDefinitionDraft => DefinitionDirty || orchestrationEditor?.IsDirty == true;
-    private bool HasUnsavedChanges => !loading && (DefinitionDirty || definitionInvalid || orchestrationDirty || policyDirty);
-    private bool CanEditDefinition => IsEditable && definitionDraft is not null;
-    private bool DefinitionDirty => definitionDraft is not null && (definitionDisplayName.Trim() != definitionDraft.Value.DisplayName || NormalizedDescription != NormalizeDescription(definitionDraft.Value.Description));
-    private string? NormalizedDescription => NormalizeDescription(definitionDescription);
-    private static string? NormalizeDescription(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => version.Version == runVersion);
-    private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
-    private FlowTopologyGraph PreviewTopology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.ProjectPreview(flow.Definition, flow.Graph);
-    private int TopologyNodeCount => Topology.Nodes.Count(node => node.Type is not "input" and not "output" and not "conversation" and not "manager");
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private string StrategyLabel(FlowOrchestrationStrategy strategy) => Localizer[$"Strategy.{strategy}"];
-    private string SucceededRunCount(int count) => T(count == 1 ? "SucceededRunCount.One" : "SucceededRunCount.Many", count);
-    private sealed record SavedSetting(string Label, string Value);
-    private IReadOnlyList<SavedSetting> SavedConfiguration => flow is null ? [] : [new(T("Kind"), FlowLabels[$"Kind.{flow.Definition.Kind}"]), new(Shared["Enabled"], Shared[flow.Enabled ? "Enabled" : "Disabled"]), new(T("PublishedVersion"), PublishedVersion ?? "—"), new(T("LastPublication"), versions.Count == 0 ? "—" : versions.Max(value => value.PublishedAt).LocalDateTime.ToString("g"))];
-    protected override Task OnParametersSetAsync()
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor
+        ResourceKind="@FlowResourceKinds.Flow" DisplayName="@definitionModel.DisplayName" DisplayNameChanged="value => definitionModel.DisplayName = value" DisplayNameExpression="@(() => definitionModel.DisplayName)"
+        TechnicalName="@definitionModel.Name" TechnicalNameChanged="value => definitionModel.Name = value" TechnicalNameExpression="@(() => definitionModel.Name)"
+        Namespace="@definitionModel.Namespace" NamespaceExpression="@(() => definitionModel.Namespace)" ScopeRef="flow?.ScopeRef"
+        @bind-Description="definitionModel.Description" @bind-Labels="definitionModel.Tags" ReadOnly="@(!CanEditDefinition)" NamePolicy="ResourceNamePolicy.Flow"
+        TestId="flow-identity-editor" DisplayNameTestId="flow-definition-display-name" TechnicalNameTestId="flow-definition-name" NamespaceTestId="flow-definition-namespace" DescriptionTestId="flow-definition-description" />;
+    private RenderFragment ConfigurationFields => @<FormSection Title="@Shared["Configuration"]"><p>@T(CanEditDefinition ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></FormSection>;
+    private RenderFragment<string> DefinitionSectionContent => path => path == "definition/identity" ? IdentityFields : ConfigurationFields;
+    private RenderFragment? DesignerAction => flow is null || !IsEditable || IsOrchestration ? null : @<a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T(sectionState.Is("yaml") ? "OpenYamlEditor" : "OpenFlowDesigner")</a>;
+    private RenderFragment? DiscardAction => !HasDefinitionDraft ? null : @<button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinitionAsync">@Shared["Discard"]</button>;
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> SectionPresentations
     {
-        var key = $"{FlowId}|{RequestedNamespace}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}|{ContextState.Current?.WorkspaceId}";
-        if (loadedKey == key) return Task.CompletedTask;
-        return LoadAsync();
-    }
-    private async Task LoadAsync()
-    {
-        var revision = ++loadVersion; var id = FlowId; var resourceNamespace = RequestedNamespace;
-        loading = true; flow = null; snapshot = null; loadError = error = definitionError = null; versions = []; runs = [];
-        definitionDraft = null; definitionContext = null; definitionMessages = null; orchestrationEditor = null;
-        section = "overview"; busy = showRun = submitting = confirmRefresh = definitionVisited = accessVisited = policyDirty = orchestrationDirty = orchestrationSaving = false;
-        definitionLoaded = definitionLoading = definitionSaving = definitionSaved = definitionInvalid = false;
-        try
+        get
         {
-            await ContextState.EnsureLoadedAsync(cancellation.Token);
-            if (revision != loadVersion) return;
-            loadedKey = $"{id}|{resourceNamespace}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}|{ContextState.Current!.WorkspaceId}";
-            ResourceScopeRef? requested = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
-            FlowResourceSnapshot saved;
-            if (requested is { } owner) saved = await Client.GetFlowSnapshotAsync(resourceNamespace, id, owner, cancellation.Token);
-            else
+            var values = IsOrchestration
+                ? new Dictionary<string, ResourceSectionPresentation>(FlowOrchestrationEditor.CreateSectionPresentations(!IsEditable), StringComparer.Ordinal)
+                : new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+                {
+                    ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(definitionModel.Name), nameof(definitionModel.Namespace), nameof(definitionModel.DisplayName), nameof(definitionModel.Description), nameof(definitionModel.Tags)], ReadOnly = !CanEditDefinition, ReadOnlyActions = DiscardAction },
+                    ["definition/configuration"] = new() { Actions = DesignerAction, ReadOnlyActions = DesignerAction ?? DiscardAction }
+                };
+            if (IsOrchestration && HasDefinitionDraft)
             {
-                var visible = await Client.GetFlowAsync(resourceNamespace, id, null, cancellation.Token);
-                if (revision != loadVersion) return;
-                ValidateIdentity(visible, id, resourceNamespace, null);
-                saved = await Client.GetFlowSnapshotAsync(resourceNamespace, id, visible.ScopeRef!.Value, cancellation.Token);
-                if (!SameIdentity(saved.Value, visible)) throw new InvalidOperationException(T("IdentityMismatch"));
+                foreach (var path in new[] { "definition/identity", "definition/configuration" })
+                    values[path] = values[path] with { ReadOnlyActions = DiscardAction };
             }
-            if (revision != loadVersion) return;
-            ValidateIdentity(saved.Value, id, resourceNamespace, requested);
-            var historyTask = Client.GetFlowVersionsAsync(resourceNamespace, id, saved.Value.ScopeRef, cancellation.Token);
-            var recentTask = Client.GetFlowRunsAsync(resourceNamespace, id, saved.Value.ScopeRef, ResourceScopeRef.Workspace(ContextState.Current!.WorkspaceId), cancellation.Token);
-            await Task.WhenAll(historyTask, recentTask);
-            if (revision != loadVersion) return;
-            snapshot = saved; flow = saved.Value; versions = await historyTask; runs = await recentTask;
-            runVersion = flow.ActiveVersion ?? versions.FirstOrDefault()?.Version ?? "";
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception exception) { if (revision == loadVersion) { loadError = exception.Message; loadedKey = null; } }
-        finally { if (revision == loadVersion) loading = false; }
-    }
-    private void ValidateIdentity(FlowResponse value, string id, ResourceNamespace resourceNamespace, ResourceScopeRef? owner)
-    {
-        if (value.Id != id || value.Namespace != resourceNamespace || value.ScopeRef is null || owner is not null && value.ScopeRef != owner) throw new InvalidOperationException(T("IdentityMismatch"));
-    }
-    private static bool SameIdentity(FlowResponse value, FlowResponse expected) => value.Id == expected.Id && value.Namespace == expected.Namespace && value.ScopeRef == expected.ScopeRef
-        && (expected.Uid is not { } uid || uid == Guid.Empty || value.Uid == uid);
-    private async Task SelectSectionAsync(string? value)
-    {
-        section = value ?? "overview";
-        if (section == "definition/configuration") { definitionVisited = true; if (!IsOrchestration) await LoadDefinitionAsync(); }
-        accessVisited |= section == "access";
-    }
-    private async Task LoadDefinitionAsync()
-    {
-        if (definitionLoaded || definitionLoading || flow is null) return;
-        var revision = loadVersion; var current = flow;
-        definitionLoading = true; definitionError = null;
-        try
-        {
-            if (IsEditable)
-            {
-                var draft = await Client.GetDraftAsync(current.Namespace, current.Id, current.ScopeRef!.Value, cancellation.Token);
-                if (revision != loadVersion) return;
-                if (draft.Value.FlowId.Value != current.Id || draft.Value.FlowId.Namespace != current.Namespace || draft.Value.ScopeRef != current.ScopeRef) throw new InvalidOperationException(T("IdentityMismatch"));
-                definitionDraft = draft; definitionDisplayName = draft.Value.DisplayName; definitionDescription = draft.Value.Description ?? "";
-            }
-            else { definitionDisplayName = current.DisplayName ?? current.Name; definitionDescription = current.Description ?? ""; }
-        }
-        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
-        { if (revision == loadVersion) { definitionDisplayName = current.DisplayName ?? current.Name; definitionDescription = current.Description ?? ""; definitionError = T("DefinitionDraftUnavailable"); } }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        { if (revision == loadVersion) { definitionDisplayName = current.DisplayName ?? current.Name; definitionDescription = current.Description ?? ""; definitionError = exception.Message; } }
-        finally
-        {
-            if (revision == loadVersion) { definitionTechnicalName = current.Id; definitionLoaded = true; definitionLoading = false; NewDefinitionContext(); }
+            values["yaml"] = new() { ReadOnly = true, ReadOnlyActions = DesignerAction ?? DiscardAction };
+            return values;
         }
     }
-    private void NewDefinitionContext()
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        if (definitionContext is not null) definitionContext.OnFieldChanged -= DefinitionFieldChanged;
-        definitionContext = new(this); definitionMessages = new(definitionContext); definitionContext.OnFieldChanged += DefinitionFieldChanged;
-    }
-    private void DefinitionFieldChanged(object? sender, FieldChangedEventArgs args) { definitionMessages?.Clear(args.FieldIdentifier); definitionContext?.NotifyValidationStateChanged(); _ = InvokeAsync(StateHasChanged); }
-    private async Task SaveDefinitionAsync(EditContext context)
-    {
-        if (!CanEditDefinition || definitionSaving || busy || !DefinitionDirty || definitionInvalid) return;
-        definitionMessages!.Clear(); var name = definitionDisplayName.Trim();
-        if (name.Length is < 1 or > 200) { definitionMessages.Add(new FieldIdentifier(this, nameof(definitionDisplayName)), T("DefinitionDisplayNameRequired")); definitionContext!.NotifyValidationStateChanged(); return; }
-        var revision = loadVersion; var current = definitionDraft!; var owner = FlowScopeRef; var resourceNamespace = FlowResourceNamespace; var id = flow!.Id;
-        definitionSaving = true; definitionError = null; definitionSaved = false;
-        try
-        {
-            var saved = await Client.SaveDraftAsync(resourceNamespace, id, owner, new(name, NormalizedDescription, current.Value.Tags, current.Value.Definition), current.ETag, cancellation.Token);
-            if (revision != loadVersion) return;
-            if (saved.Value.FlowId.Value != id || saved.Value.FlowId.Namespace != resourceNamespace || saved.Value.ScopeRef != owner) throw new InvalidOperationException(T("IdentityMismatch"));
-            definitionDraft = saved; definitionDisplayName = saved.Value.DisplayName; definitionDescription = saved.Value.Description ?? ""; definitionSaved = true; definitionInvalid = false; NewDefinitionContext();
-        }
-        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.PreconditionFailed) { if (revision == loadVersion) definitionError = T("DefinitionSaveConflict"); }
-        catch (Exception exception) when (exception is not OperationCanceledException) { if (revision == loadVersion) definitionError = exception.Message; }
-        finally { if (revision == loadVersion) definitionSaving = false; }
-    }
-    private void DiscardDefinition()
-    {
-        if (busy || definitionSaving || orchestrationSaving) return;
-        if (IsOrchestration) { orchestrationEditor?.Discard(); return; }
-        if (definitionDraft is null) return;
-        definitionDisplayName = definitionDraft.Value.DisplayName; definitionDescription = definitionDraft.Value.Description ?? "";
-        definitionInvalid = definitionSaved = false; definitionError = null; NewDefinitionContext();
-    }
-    private async Task ToggleEnabledAsync(bool value)
-    {
-        if (busy || definitionSaving || orchestrationSaving || !IsEditable || snapshot is null) return;
-        var current = snapshot; var revision = loadVersion; busy = true; error = null;
-        try
-        {
-            var saved = await Client.UpdateFlowAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef!.Value,
-                new(current.Value.Description, current.Value.Version, value, current.Value.Definition, current.Value.Metadata) { DisplayName = current.Value.DisplayName }, current.ETag, cancellation.Token);
-            if (revision != loadVersion) return;
-            if (!SameIdentity(saved.Value, current.Value)) throw new InvalidOperationException(T("IdentityMismatch"));
-            snapshot = saved; flow = saved.Value; orchestrationEditor?.ApplyActivationSnapshot(saved);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException) { if (revision == loadVersion) error = exception.Message; }
-        finally { if (revision == loadVersion) busy = false; }
-    }
-    private async Task OrchestrationSavedAsync(FlowResourceSnapshot value)
-    {
-        if (snapshot is null || !SameIdentity(value.Value, snapshot.Value)) return;
-        var changedPublication = value.Value.ActiveVersion != snapshot.Value.ActiveVersion; var revision = loadVersion;
-        snapshot = value; flow = value.Value;
-        if (changedPublication)
-        {
-            try { var savedVersions = await Client.GetFlowVersionsAsync(value.Value.Namespace, value.Value.Id, value.Value.ScopeRef, cancellation.Token); if (revision == loadVersion) { versions = savedVersions; runVersion = value.Value.ActiveVersion ?? ""; } }
-            catch (Exception exception) when (exception is not OperationCanceledException) { if (revision == loadVersion) error = exception.Message; }
-        }
-    }
-    private Task RefreshAsync() { if (HasUnsavedChanges) { confirmRefresh = true; return Task.CompletedTask; } return LoadAsync(); }
-    private void OpenRun() { if (!CanExecute || versions.Count == 0) return; showRun = true; error = null; runInputValid = true; runInput = ParseInput(flow?.Metadata.GetValueOrDefault("agentstration.io/sample-input") ?? "{}"); }
-    private void ChangeRunVersion(string? value) { runVersion = value ?? ""; error = null; }
-    private Task UpdateRunInputValidation(JsonSchemaInputValidationState value) { runInputValid = value.IsValid; return Task.CompletedTask; }
-    private async Task SubmitRunAsync()
-    {
-        if (!runInputValid || !CanExecute || submitting || SelectedRunVersion is null || flow is null) return;
-        var revision = loadVersion; var current = flow; submitting = true; error = null;
-        try
-        {
-            var run = await Client.CreateFlowRunAsync(current.Namespace, current.Id, new(runInput.Clone(), runVersion, "local", FlowRunTrigger.Manual) { DefinitionScopeRef = current.ScopeRef }, cancellation.Token);
-            if (revision == loadVersion) Navigation.NavigateTo(ResourceOwnershipContext.PreserveNavigation($"/flow-runs/{Uri.EscapeDataString(run.Id)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", Services));
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException) { if (revision == loadVersion) error = exception.Message; }
-        finally { if (revision == loadVersion) submitting = false; }
-    }
-    private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
-    public void Dispose() { if (definitionContext is not null) definitionContext.OnFieldChanged -= DefinitionFieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
+        [nameof(definitionModel.Name)] = IdentityLocalizer["TechnicalName"], [nameof(definitionModel.Namespace)] = Shared["Namespace"],
+        [nameof(definitionModel.DisplayName)] = T("DisplayName"), [nameof(definitionModel.Description)] = Shared["Description"], [nameof(definitionModel.Tags)] = Shared["Labels"]
+    };
 }

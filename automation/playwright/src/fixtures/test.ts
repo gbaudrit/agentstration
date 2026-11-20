@@ -13,6 +13,7 @@ interface AgentstrationWorkerFixtures {
   authenticationMode: 'Development' | 'Local';
   initialBootstrapEnabled: boolean;
   formPendingFixture: boolean;
+  bootstrapProvenanceFixture: boolean;
   aiProvider: 'Deterministic' | 'Managed';
 }
 
@@ -24,6 +25,7 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   authenticationMode: ['Development', { option: true, scope: 'worker' }],
   initialBootstrapEnabled: [true, { option: true, scope: 'worker' }],
   formPendingFixture: [false, { option: true, scope: 'worker' }],
+  bootstrapProvenanceFixture: [false, { option: true, scope: 'worker' }],
   aiProvider: ['Deterministic', { option: true, scope: 'worker' }],
   sourcePolicyFixture: [false, { option: true, scope: 'worker' }],
   acquisitionFailureFixture: [false, { option: true, scope: 'worker' }],
@@ -31,14 +33,14 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   organizationStructureFixture: [false, { option: true, scope: 'worker' }],
   // The worker-scoped key gives the expanded campaign its own managed product data.
   collectionCampaign: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture }, use) => {
+  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture);
     try {
       await use(product);
     } finally {

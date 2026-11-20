@@ -11,7 +11,7 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("NoTypes")" EmptyMessage="@T("Type.ListHelp")"
                             OnRefresh="ReloadAsync" OnRetry="RetryAsync">
-    <Actions><a class="button-secondary" href="@Navigate("/storages")">@T("Back")</a></Actions>
+    <Actions><a class="button-secondary" href="@Navigate("/storages")">@T("Storages")</a></Actions>
 </ResourceCollectionTemplate>
 
 @code {

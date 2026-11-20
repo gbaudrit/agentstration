@@ -792,6 +792,10 @@
         "navigation": "Legitimate Tool-family destinations and Knowledge Sources action retained with context; exact owner-qualified name links replace redundant Inspect-only actions. No creation workflow invented.",
         "states": "Retained rows/view and stable query on compatible refresh; superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
         "validation": "ToolSetCollectionTests; deterministic desktop/mobile fixture smoke and source proof recorded in list-layout-adoption.md."
+      },
+      "headerReview": {
+        "change": "Knowledge Sources header shortcut removed by user request; five family tabs and all catalog information/filters retained.",
+        "evidence": "evidence/list-layout/tool-sets/header-review/README.md"
       }
     },
     {
@@ -810,8 +814,7 @@
       "actions": false,
       "informationKeys": [
         "Type",
-        "Tools",
-        "Enabled"
+        "Tools"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -885,6 +888,10 @@
         "states": "Compatible refresh retains rows and view. Superseded/foreign-context responses are rejected; context replacement and denied access clear caches. Unknown discovery statuses remain neutral.",
         "actions": "Exact name link retained; redundant Manage-only column removed. Creation requires resources/write.",
         "validation": "ToolProviderCollectionTests; current deterministic desktop/mobile smoke, source proof and limits in list-layout-adoption.md."
+      },
+      "columnsReview": {
+        "change": "Enabled information column removed; identity, provider type and tool count retained. Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tool-providers/columns-review/README.md"
       }
     },
     {
@@ -2795,6 +2802,10 @@
         "actions": "Existing direct primary Edit action retained as required by the maintained regression, along with exact resource-name links. Creation requires resources/write and preserves the existing NavigationContext.AddToUri destination.",
         "states": "Compatible refresh retains rows, selected view and stable query. Superseded/foreign-context responses rejected; context replacement and denied access clear caches; controls wait for interactivity.",
         "validation": "ToolDefinitionCollectionTests and the existing direct-edit/list regression; deterministic desktop/mobile smoke and inventory limits in list-layout-adoption.md."
+      },
+      "actionsReview": {
+        "change": "Edit remains a direct exact-scoped link, styled as a standard secondary button with a localized plain Edit/Modifier label instead of an arrow-text shortcut.",
+        "evidence": "evidence/list-layout/tool-definitions/actions-review/README.md"
       }
     },
     {
@@ -5282,8 +5293,7 @@
       "state": true,
       "actions": false,
       "informationKeys": [
-        "Provider",
-        "Enabled"
+        "Provider"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -5357,6 +5367,11 @@
         "states": "Atomic successful catalog/enrichment replacement, retained failed refresh and successful shrink, authorization clearing, cancellation and stale-context rejection; context includes physical Workspace. Optional inventory errors do not hide primary Tools.",
         "actions": "Preserve legitimate Tool-family navigation; remove redundant Details-only menu. Obsolete local responsive table CSS removed; meaningful provenance styling retained.",
         "validation": "ToolCollectionTests plus maintained ToolCatalogTests and ExtensionsConsoleTests.ToolCatalog; desktop/mobile populated governed-fixture smoke recorded in ledger."
+      },
+      "controlsReview": {
+        "header": "Redundant Providers button removed; existing family tabs retained.",
+        "columns": "Tool identity and provider only; Enabled remains an additional filter under More filters.",
+        "evidence": "evidence/list-layout/tools/controls-review/README.md"
       }
     },
     {
@@ -5561,6 +5576,7 @@
       "state": true,
       "actions": false,
       "informationKeys": [
+        "Kind",
         "Version",
         "FunctionDescription"
       ],
@@ -5587,6 +5603,11 @@
         "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
         "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
         "evidence": "evidence/list-layout/transformation-functions/README.md"
+      },
+      "columnReview": {
+        "type": "Actual FunctionKind names referenced by all declared versions, with repeated names collapsed; compact muted presentation like Flow types.",
+        "description": "51% of desktop table width; full-width description value in cards. Family-scoped proportions affect only the transformation-function catalog.",
+        "evidence": "evidence/list-layout/transformation-functions/column-review/README.md"
       }
     },
     {
@@ -5634,10 +5655,11 @@
         "issue": 1241,
         "template": "ResourceCollectionTemplate",
         "dataContract": "Primary Storage list reads one bounded skip/take server page through a new family client method. Unknown total; previous/next and 20/50/100 sizes. No page-local search/filter controls or fetch-all Storage pagination.",
-        "supplementaryCatalog": "Existing full type-contract evidence catalog and related journey links retained after the primary collection. Type evidence loads initially/on refresh and is reused across page navigation; no new API or local type pagination introduced.",
+        "supplementaryCatalog": "Removed by user request. A secondary header button opens /storage-types with current navigation context; the list makes no type-catalog request.",
         "identity": "Exact qualified Storage/type links preserve context; type/version and availability/scope/governance markers retained. No content/configuration/Secret values displayed.",
-        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards including supplementary type evidence.",
-        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md."
+        "states": "Retained compatible rows/view and successful pager facts; failed-page retry, one bounded shrink fallback, stale/context replacement and denied-access guards.",
+        "validation": "StorageCollectionTests and affected StorageComponentTests list regressions plus deterministic populated desktop/mobile API smoke. Limits in list-layout-adoption.md.",
+        "headerReview": "evidence/list-layout/storages/header-review/README.md"
       }
     },
     {
@@ -5895,6 +5917,10 @@
         "states": "Retained successful rows and pager facts on failed page or refresh; retry requested page; removed terminal page falls back once to page one; context replacement and stale response protection.",
         "actions": "Existing authorized create and Storages navigation retained.",
         "validation": "StorageTypeCollectionTests plus maintained existing list regressions; real API desktop/mobile smoke; list-layout-adoption.md records limits."
+      },
+      "headerLabelReview": {
+        "navigation": "Header /storages destination uses the existing localized Storages label instead of Back to Storages; owner/context and permissions unchanged.",
+        "evidence": "evidence/list-layout/storage-types/header-review/README.md"
       }
     },
     {
@@ -16090,39 +16116,6 @@
       }
     },
     {
-      "id": "storages-type-version-evidence",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "host": "console",
-      "routes": [
-        "/storages"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
-      "validation": "source-reviewed-current-validation-pending",
-      "discoveredDuring": "2026-11-18 main synchronization #1174",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
-        "routeEvidence": [],
-        "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
-        "currentPopulatedEvidence": {
-          "specification": "tests/connected-storage-collection.spec.ts",
-          "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
-          "variants": [
-            "en-US/dark/desktop",
-            "fr-FR/light/mobile/touch"
-          ],
-          "gallery": "evidence/1121/main-sync-1181/README.md"
-        }
-      },
-      "compactAdoption": {
-        "decision": "native-domain-presentation",
-        "implementationPR": 1174,
-        "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
-        "evidenceStatus": "Fresh validation pending final merged source."
-      }
-    },
-    {
       "id": "storage-documents-collection-choices",
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
       "host": "console",
@@ -18292,6 +18285,44 @@
       "unmountedLegacy": 4,
       "activeCollections": 346,
       "auditedRepeatedItemSources": 147
+    }
+  ],
+  "retiredSurfaces": [
+    {
+      "reason": "User requested removing the supplementary Storage type panel from /storages; header navigation now opens /storage-types. Historical entry retained as evidence only.",
+      "surface": {
+        "id": "storages-type-version-evidence",
+        "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+        "host": "console",
+        "routes": [
+          "/storages"
+        ],
+        "renderer": "native-specialized",
+        "adaptation": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+        "validation": "source-reviewed-current-validation-pending",
+        "discoveredDuring": "2026-11-18 main synchronization #1174",
+        "verification": {
+          "sourceReviewed": true,
+          "sharedContract": "Native applicable identity, context, bounded data and accessible interaction; preserve family semantics.",
+          "routeEvidence": [],
+          "interpretation": "New specialized dataset reviewed explicitly; old host images do not certify its populated interaction.",
+          "currentPopulatedEvidence": {
+            "specification": "tests/connected-storage-collection.spec.ts",
+            "sourceCommit": "2c6a1adfcbdef5a64c8c28d48d9b992f799e8547",
+            "variants": [
+              "en-US/dark/desktop",
+              "fr-FR/light/mobile/touch"
+            ],
+            "gallery": "evidence/1121/main-sync-1181/README.md"
+          }
+        },
+        "compactAdoption": {
+          "decision": "native-domain-presentation",
+          "implementationPR": 1174,
+          "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
+          "evidenceStatus": "Fresh validation pending final merged source."
+        }
+      }
     }
   ]
 }

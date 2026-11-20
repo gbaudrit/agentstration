@@ -26,7 +26,8 @@ public sealed class ToolDefinitionCollectionTests
         using var context = Context(handler);
         var cut = context.Render<ToolDefinitions>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.HasCount(20, cut.FindAll(".collection-primary-actions a"));
+        Assert.HasCount(20, cut.FindAll(".collection-primary-actions a.button-secondary"));
+        Assert.AreEqual(cultureName == "fr-FR" ? "Modifier" : "Edit", cut.Find(".collection-primary-actions a").TextContent);
         Assert.IsEmpty(cut.FindAll(".collection-actions-menu"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/definitions/definition-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

@@ -6,12 +6,19 @@ using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
 using Agentstration.Web.FlowDesigner.Backend;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Localization;
 
 namespace Agentstration.Web.FlowDesigner.Components;
 
 internal static class FlowInspectorPresentation
 {
+    internal static string PreserveNavigationContext(string url, string currentUri)
+    {
+        var context = QueryHelpers.ParseQuery(new Uri(currentUri).Query).GetValueOrDefault("context").ToString();
+        return string.IsNullOrWhiteSpace(context) ? url : QueryHelpers.AddQueryString(url, "context", context);
+    }
+
     internal static string AgentUrl(FlowDesignerAgent agent) => (agent.Namespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(agent.Name)}"
         : $"/namespaces/{Uri.EscapeDataString(agent.Namespace.Value)}/agents/{Uri.EscapeDataString(agent.Name)}")

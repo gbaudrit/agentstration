@@ -57,6 +57,7 @@
     [Parameter] public string? WorkspaceDisplayName { get; set; }
     [Parameter, EditorRequired] public ResourceScopeRef ContextScope { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<string> OnCreated { get; set; }
 
     private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
     private readonly CancellationTokenSource cancellation = new();
@@ -93,7 +94,8 @@
             var scope = Uri.EscapeDataString((created.ScopeRef ?? ContextScope).Value);
             var context = Uri.EscapeDataString(ContextScope.Value);
             var toolName = Uri.EscapeDataString(AgentstrationToolProvider.ToolResourceName(created.Name));
-            Navigation.NavigateTo($"/tools/{toolName}?namespace={Uri.EscapeDataString(created.Namespace.Value)}&scopeRef={scope}&context={context}#execution");
+            var destination = $"/tools/{toolName}?namespace={Uri.EscapeDataString(created.Namespace.Value)}&scopeRef={scope}&context={context}#execution";
+            if (OnCreated.HasDelegate) await OnCreated.InvokeAsync(destination); else Navigation.NavigateTo(destination);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)

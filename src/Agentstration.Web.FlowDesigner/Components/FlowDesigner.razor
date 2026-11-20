@@ -19,7 +19,7 @@ else
 {
     <header class="designer-toolbar @(focusMode ? "designer-focus" : null)">
         <div>
-            <p class="eyebrow"><a href="/flows">@T("Flows")</a> / <code>@Editor.State.Namespace.Value</code> / @ResourceId / @(ReadOnly ? T("Published", Editor.State.PublishedVersion ?? string.Empty) : T("Draft"))</p>
+            <p class="eyebrow"><a href="@FlowListUrl">@T("Flows")</a> / <code>@Editor.State.Namespace.Value</code> / @ResourceId / @(Editor.State.PublishedVersion is { } published ? T("Published", published) : T("Draft"))</p>
             <h1>@Editor.State.Resource.DisplayName</h1>
             @if (!ReadOnly)
             {
@@ -28,7 +28,7 @@ else
             }
             else
             {
-                <span class="draft-revision">@T("PublishedVersion", Editor.State.PublishedVersion ?? string.Empty)</span>
+                <span class="draft-revision">@(Editor.State.PublishedVersion is { } publishedVersion ? T("PublishedVersion", publishedVersion) : T("Revision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—"))</span>
                 <span class="read-only-badge">@T("ReadOnly")</span>
                 @if (Editor.State.PublishedVersion is not null)
                 { <a class="button-secondary open-flow-draft" data-testid="flow-designer-open-draft" href="@DraftUrl">@T("OpenDraft")</a> }
@@ -41,9 +41,9 @@ else
             }
         </div>
         <div class="designer-actions">
+            @if (CanRunDraft) { <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button> }
             @if (!ReadOnly)
             {
-                <button class="button-secondary" @onclick="OpenRun">@T("RunDraft")</button>
                 <button class="button-primary" data-testid="flow-designer-save" disabled="@saving" @onclick="SaveAsync">@T("Save")</button>
                 <div class="designer-more-actions @(moreActionsOpen ? "open" : null)">
                     <button type="button" class="button-secondary designer-more-toggle" aria-label="@T("MoreActions")" aria-expanded="@moreActionsOpen" @onclick="() => moreActionsOpen = !moreActionsOpen"><UiIcon Name="dots" /><span>@T("MoreActions")</span></button>
@@ -321,7 +321,7 @@ else
 
     @if (showRun)
     {
-        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<FormActions Class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></FormActions></section></div>
+        <div class="dialog-backdrop"><section class="dialog run-dialog" role="dialog" aria-modal="true" aria-labelledby="run-draft-title" data-testid="flow-designer-run-dialog"><h2 id="run-draft-title">@T("RunDraftRevision", Editor.State.Resource.DraftRevision?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")</h2><div class="flow-run-input"><h3>@T("InputJson")</h3><JsonSchemaInputEditor Schema="EffectiveInputSchema" Value="runInput" ValueChanged="value => runInput = value" ValidationChanged="UpdateRunInputValidation" Disabled="runningDraft" /></div>@if (runError is not null) { <p class="error-panel" role="alert">@runError</p> }<FormActions Class="dialog-actions"><button class="button-secondary" disabled="@runningDraft" @onclick="() => showRun = false">@T("Cancel")</button><button class="button-primary" disabled="@(runningDraft || !runInputValid || !CanRunDraft)" data-testid="flow-designer-run-submit" @onclick="RunDraftAsync">@(runningDraft ? T("RunningDraft") : T("RunDraft"))</button></FormActions></section></div>
     }
     @if (portInspection is { } inspection)
     {

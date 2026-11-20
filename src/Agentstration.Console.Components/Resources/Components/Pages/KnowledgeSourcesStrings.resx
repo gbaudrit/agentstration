@@ -201,4 +201,12 @@
   <data name="RecordCount" xml:space="preserve"><value>{0} JSON records</value></data>
   <data name="ActiveVersionLabel"><value>active</value></data>
   <data name="Scope"><value>Scope</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="SettingValue" xml:space="preserve"><value>Value</value></data>
+  <data name="DiscardDraft" xml:space="preserve"><value>Discard draft</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer version is available. Your draft is retained until you explicitly discard it.</value></data>
+  <data name="NamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+  <data name="IdentityChanged" xml:space="preserve"><value>The resource identity changed. Reopen the source.</value></data>
+<data name="Identity" xml:space="preserve"><value>Identity</value></data>
+<data name="SettingName" xml:space="preserve"><value>Name</value></data>
 </root>

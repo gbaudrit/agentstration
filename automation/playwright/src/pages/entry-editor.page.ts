@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { selectResourceSection } from './resource-sections.js';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit, selectFirstAvailable } from './controls.js';
 
@@ -44,31 +45,40 @@ export class EntryEditorPage {
   public constructor(private readonly page: Page) {}
 
   public async openNew(consoleUrl: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/entries/new?view=definition`, { waitUntil: 'domcontentloaded' });
+    const response = await this.page.goto(`${consoleUrl}/entries/new`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`New Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
-    await this.page.locator(
-      `[data-testid="${TestIds.entryEditor.definitionFields}"][data-interactive="true"]`,
-    ).waitFor({ state: 'visible' });
-  }
-
-  public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
-    const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/entries/${encodeURIComponent(name)}?view=definition`, { waitUntil: 'domcontentloaded' });
-    if (!response?.ok()) throw new Error(`Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await expect(this.page.locator('#entry-resource-form')).toHaveAttribute('data-interactive', 'true');
     await this.definitionFields.waitFor({ state: 'visible' });
   }
 
+  public async open(consoleUrl: string, namespace: string, name: string): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}/namespaces/${encodeURIComponent(namespace)}/entries/${encodeURIComponent(name)}#definition/identity`, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error(`Entry page returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await selectResourceSection(this.page, 'definition/identity');
+    await this.definitionFields.waitFor({ state: 'visible' });
+    await expect(this.page.locator('#entry-resource-form')).toHaveAttribute('data-interactive', 'true');
+  }
+
   public async saveDraft(): Promise<void> {
+    const previousPublication = await this.status.getAttribute('data-state');
     await this.page.getByTestId(TestIds.entryEditor.saveDraft).click();
-    await expect(this.status).toHaveAttribute('data-state', 'draft');
+    await expect(this.page.locator('.unsaved-changes-bar')).toHaveCount(0);
+    await expect(this.status).toHaveAttribute('data-state', previousPublication ?? 'draft');
   }
 
   public async fillIdentity(entry: Pick<EntryDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
-    await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.name), entry.name);
+    await this.selectDestination('identity');
+    const name = this.page.getByTestId(TestIds.entryEditor.name);
+    if (await name.isEnabled()) await fillAndCommit(name, entry.name);
+    else await expect(name).toHaveValue(entry.name);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.displayName), entry.displayName);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.description), entry.description);
   }
 
   public async configureAppearance(entry: Pick<EntryDefinition, 'presentationKind' | 'placeholder' | 'icon'>): Promise<void> {
+    await this.selectDestination('presentation');
     await this.page.getByTestId(TestIds.entryEditor.presentationKind).selectOption(entry.presentationKind);
     await fillAndCommit(this.page.getByTestId(TestIds.entryEditor.placeholder), entry.placeholder);
     if (entry.icon) {
@@ -79,6 +89,7 @@ export class EntryEditorPage {
   }
 
   public async configureExposure(entry: Pick<EntryDefinition, 'exposeConsole' | 'consoleFallback'>): Promise<void> {
+    await this.selectDestination('configuration');
     const exposeConsole = entry.exposeConsole === true || entry.consoleFallback === true;
     await this.page.getByTestId(TestIds.entryEditor.exposureConsole).setChecked(exposeConsole);
     if (exposeConsole) {
@@ -88,6 +99,7 @@ export class EntryEditorPage {
 
   public async configureInteraction(entry: Pick<EntryDefinition,
     'participantsVisibility' | 'progressVisibility' | 'taskDisplay' | 'resultsDisplay'>): Promise<void> {
+    await this.selectDestination('presentation');
     await this.page.getByTestId(TestIds.entryEditor.participantsVisibility).selectOption(entry.participantsVisibility);
     await this.page.getByTestId(TestIds.entryEditor.progressVisibility).selectOption(entry.progressVisibility);
     await this.page.getByTestId(TestIds.entryEditor.taskDisplay).selectOption(entry.taskDisplay);
@@ -95,6 +107,7 @@ export class EntryEditorPage {
   }
 
   public async configurePrimaryField(field: EntryFieldDefinition): Promise<void> {
+    await this.selectDestination('fields');
     const card = this.page.getByTestId(TestIds.entryEditor.fieldCard).first();
     await fillAndCommit(card.getByTestId(TestIds.entryEditor.fieldName), field.name);
     await fillAndCommit(card.getByTestId(TestIds.entryEditor.fieldLabel), field.label);
@@ -114,6 +127,7 @@ export class EntryEditorPage {
   }
 
   private async bindTarget(kind: 'Agent' | 'Flow', resourceName: string, namespace: string): Promise<void> {
+    await this.selectDestination('configuration');
     await this.page.getByTestId(TestIds.entryEditor.targetKind).selectOption(kind);
     const target = this.page.getByTestId(TestIds.entryEditor.targetResource);
     const legacyValues = [`${namespace}:${resourceName}`, resourceName];
@@ -131,12 +145,14 @@ export class EntryEditorPage {
   }
 
   public async configureBehavior(entry: Pick<EntryDefinition, 'taskCreationMode' | 'allowConversation' | 'streamResponse'>): Promise<void> {
+    await this.selectDestination('configuration');
     await this.page.getByTestId(TestIds.entryEditor.taskMode).selectOption(entry.taskCreationMode);
     await this.page.getByTestId(TestIds.entryEditor.allowConversation).setChecked(entry.allowConversation);
     await this.page.getByTestId(TestIds.entryEditor.streamResponse).setChecked(entry.streamResponse);
   }
 
   public async configureSuggestions(suggestions: readonly EntrySuggestionDefinition[]): Promise<void> {
+    await this.selectDestination('suggestions');
     for (const suggestion of suggestions) {
       await this.page.getByTestId(TestIds.entryEditor.addSuggestion).click();
       const card = this.page.getByTestId(TestIds.entryEditor.suggestionCard).last();
@@ -146,8 +162,16 @@ export class EntryEditorPage {
   }
 
   public async publish(): Promise<void> {
+    if (await this.page.locator('.creation-wizard').count()) await this.selectDestination('review');
     await this.page.getByTestId(TestIds.entryEditor.publish).click();
     await this.page.locator(`[data-testid="${TestIds.entryEditor.status}"][data-state="published"]`).waitFor({ state: 'visible' });
+  }
+
+  public async selectDestination(step: 'identity' | 'configuration' | 'presentation' | 'fields' | 'suggestions' | 'review'): Promise<void> {
+    if (await this.page.locator('.creation-wizard').count()) {
+      await this.page.locator(`[data-wizard-step="${step}"]`).click();
+      await expect(this.page.locator(`[data-step-id="${step}"]`)).toBeVisible();
+    } else await selectResourceSection(this.page, `definition/${step}`);
   }
 
   public get definitionFields(): Locator { return this.page.getByTestId(TestIds.entryEditor.definitionFields); }

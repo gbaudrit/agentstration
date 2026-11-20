@@ -1,0 +1,114 @@
+{
+  "base": "a30c9d8079b8eda2f05d465053739771eb606c7f",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor": "9775a3f6406c28e5164275681968a9e24b4e3591791b09041d0aea8bedaff3df",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentRunnerStrings.fr-FR.resx": "fff69910deb621e8ece93e3977de18eafbbe592f6d2c01a09ba4e965eb5b9fc2",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentRunnerStrings.resx": "991df6eb2c46bce508effc9683220ed5c0487e50fc0a24f427f18de252e48f87",
+    "tests/Agentstration.Console.Components.Tests/AgentRunnerScreenTests.cs": "7ae50e1ce780d4b043e44d4cd8b9365a290b4e8410e6ef1fc82270bd253e2102"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "299592f52508fe982109a4a9b6029c0011bbf47368b5f6c836568ed91a91fa7d",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "c47fd604418fd612ff2ce7cb04d523cd982767b44fbd63a1783ae2ac530dac90",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "18f677fb5e756a497bc1be52372b6747ea226b424b960bf7cee9cb2cf687a3f7",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "299592f52508fe982109a4a9b6029c0011bbf47368b5f6c836568ed91a91fa7d",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "299592f52508fe982109a4a9b6029c0011bbf47368b5f6c836568ed91a91fa7d",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "c47fd604418fd612ff2ce7cb04d523cd982767b44fbd63a1783ae2ac530dac90",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "c47fd604418fd612ff2ce7cb04d523cd982767b44fbd63a1783ae2ac530dac90",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "18f677fb5e756a497bc1be52372b6747ea226b424b960bf7cee9cb2cf687a3f7",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "18f677fb5e756a497bc1be52372b6747ea226b424b960bf7cee9cb2cf687a3f7"
+  },
+  "phases": [
+    {
+      "name": "agent-runner",
+      "exitCode": 0,
+      "seconds": 96.5
+    },
+    {
+      "name": "execution-scopes-regression",
+      "exitCode": 0,
+      "seconds": 118.4
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "targetedTests": {
+    "passed": 15,
+    "logSha256": "54c20e7572e5c8642022685fad956950daa171853819ddfb2e14722e29374cc3"
+  },
+  "browserCases": {
+    "native": 2,
+    "maintainedExecutionScopes": 2
+  },
+  "screenshots": [
+    {
+      "file": "agent-runner-invalid-request-desktop-en.png",
+      "sha256": "04dd2ff39a412bb7d2639b7e1c2fac57388335565e82d5851a5dfe4655d480c2"
+    },
+    {
+      "file": "agent-runner-overview-desktop-en.png",
+      "sha256": "7ab1fe7d468c7a45f17b23f7132f706df73c96efbfb6df2438537e95f7066ce7"
+    },
+    {
+      "file": "agent-runner-retained-refresh-desktop-en.png",
+      "sha256": "797f745511378d6afeb5ca2b121c564e635d86db53d9b72efb04c8186819aa62"
+    },
+    {
+      "file": "agent-runner-response-desktop-en.png",
+      "sha256": "e7ffdd32935d3a96fa6aada414066808ffb00d6264349bee1a03afe6bfadb587"
+    },
+    {
+      "file": "agent-runner-recorded-overview-desktop-en.png",
+      "sha256": "d5f9530bb5e1c24c4c77349e91bab8dab4af02b561e5a8701acdeca9d2b23436"
+    },
+    {
+      "file": "agent-runner-raw-desktop-en.png",
+      "sha256": "fe54a94c92d717e185df3f199205e4f166b7b34e94959b7c76306370cf2ef177"
+    },
+    {
+      "file": "agent-runner-history-desktop-en.png",
+      "sha256": "bec99db78fcd411c4c3bf606974e781be8d4ee8e870d5d330b1046bf00d9d475"
+    },
+    {
+      "file": "agent-runner-invalid-request-mobile-fr.png",
+      "sha256": "baffdc61474e3de3d2ba1f641f8f5f62bd8b0b19d2e8746557451af9bbe46dae"
+    },
+    {
+      "file": "agent-runner-overview-mobile-fr.png",
+      "sha256": "8f15c04df418b57c3625ccbf5b3ae126494f8d9fd5198e4ee785e8df201dbde0"
+    },
+    {
+      "file": "agent-runner-retained-refresh-mobile-fr.png",
+      "sha256": "69fdef74612601cdee8b59ceb7f48aa9ee9b1129f8a12e239d814aabee678317"
+    },
+    {
+      "file": "agent-runner-response-mobile-fr.png",
+      "sha256": "9774d5ae9bde262d39eb30e332f9889c6c79ab30ad97efd514ec82dacd6617fa"
+    },
+    {
+      "file": "agent-runner-recorded-overview-mobile-fr.png",
+      "sha256": "2d6d417724619b1d9cd2be2fb5e331158a231585731413675a0e5e23a78e9ec3"
+    },
+    {
+      "file": "agent-runner-raw-mobile-fr.png",
+      "sha256": "cde23daa2128b23343d03cacd0c7ee16f942a257756c8d3f6db5c9ff8024d56f"
+    },
+    {
+      "file": "agent-runner-history-mobile-fr.png",
+      "sha256": "6c862a044d24a2d2882108143e4a95001613d936b98ed7a4c677bafcc86007c4"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "nativeProbeSha256": "353b5a60e8a0de652c300c1b323e90d733dbf90013aea7b1f600bf4c4ccd7656",
+  "limits": [
+    "Operational RuntimeRun DTO and new-execution request use specialized navigation and raw JSON; no fabricated control-plane Resource UID/policy/definition/YAML API.",
+    "Existing global mobile platform/navigation overlay remains visible in real full-page captures.",
+    "No CI investigation/remediation, no full solution lanes at maintainer request; new reusable #1236 stays deferred until UX validation and merge."
+  ]
+}

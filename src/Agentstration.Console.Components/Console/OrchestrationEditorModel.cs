@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
@@ -7,6 +9,10 @@ namespace Agentstration.Web.Console;
 public sealed class OrchestrationEditorModel
 {
     public string Name { get; set; } = "multi-agent-review";
+    [Required, StringLength(200)] public string DisplayName { get; set; } = "multi-agent-review";
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+    public string Tags { get; set; } = string.Empty;
+    [JsonIgnore] public string PublishVersion { get; set; } = string.Empty;
     public string? Description { get; set; } = "Coordinates multiple agents to produce a reviewed result.";
     public string Version { get; set; } = "0.1.0";
     public bool Enabled { get; set; } = true;
@@ -110,6 +116,9 @@ public sealed class OrchestrationEditorModel
         var model = new OrchestrationEditorModel
         {
             Name = flow.Name,
+            DisplayName = flow.DisplayName ?? flow.Name,
+            Namespace = flow.Namespace.Value,
+            Tags = string.Join(Environment.NewLine, flow.Metadata.OrderBy(value => value.Key, StringComparer.Ordinal).Select(value => $"{value.Key}={value.Value}")),
             Description = flow.Description,
             Version = flow.Version,
             Enabled = flow.Enabled,

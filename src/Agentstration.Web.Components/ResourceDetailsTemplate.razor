@@ -45,9 +45,7 @@
                             @if (OverviewMetrics is not null) { <div class="resource-overview-metrics">@OverviewMetrics</div> }
                             @OverviewContent
                             <ResourceIdentitySummary DisplayName="@Name" TechnicalName="@(TechnicalName!)" Namespace="@Namespace" Description="@Description"
-                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" AdditionalContent="@IdentityContent" ResourceUid="ResourceUid" HeaderOwnsIdentity TestId="@SectionTestId("identity-summary")">
-                                <Scope><ResourceScopeBadge ScopeRef="ScopeRef" /></Scope>
-                            </ResourceIdentitySummary>
+                                                     Labels="IdentityLabels" AdditionalDetails="@IdentityDetails" AdditionalContent="@IdentityContent" ResourceUid="ResourceUid" HeaderOwnsIdentity Scope="@(ScopeRef is null ? null : IdentityScope)" TestId="@SectionTestId("identity-summary")" />
                             <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="@SectionTestId("configuration-summary")" Collapsible InitiallyCollapsed>@OverviewConfiguration</FormSection>
                         </div>
                         @if (SectionState.HasVisitedDefinition)
@@ -144,7 +142,7 @@
     [Parameter] public RenderFragment? IdentityDetails { get; set; }
     [Parameter] public RenderFragment? IdentityContent { get; set; }
     [Parameter] public Guid? ResourceUid { get; set; }
-    [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; } = new Dictionary<string, string>();
+    [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; }
     [Parameter] public RenderFragment? OverviewConfiguration { get; set; }
     [Parameter] public RenderFragment? OverviewContent { get; set; }
     [Parameter] public RenderFragment<string>? DefinitionContent { get; set; }
@@ -165,6 +163,7 @@
     private bool UsesStandardSections => Content is null;
     private bool BlocksContent => LoadState?.BlocksContent == true;
     private bool ShowNavigation => NavigationSections.Count > 0 && !BlocksContent;
+    private RenderFragment IdentityScope => @<ResourceScopeBadge ScopeRef="ScopeRef" />;
     private RenderFragment? HeaderMoreActions => !ShowRefreshAction || !OnRefresh.HasDelegate ? MoreActions : @<text>
         <button type="button" class="button-secondary" @onclick="OnRefresh" disabled="@(Busy || LoadState?.Status == ResourceLoadStatus.Refreshing)" data-testid="@SectionTestId("refresh")">@Shared["RefreshResource"]</button>
         @MoreActions
@@ -212,8 +211,8 @@
     {
         if (UsesStandardSections)
         {
-            if (!BlocksContent && (OverviewConfiguration is null || DefinitionContent is null || YamlContent is null || string.IsNullOrWhiteSpace(TechnicalName) || ScopeRef is null))
-                throw new ArgumentException("Standard resource sections require saved identity, owner, overview configuration, definition and YAML content.");
+            if (!BlocksContent && (OverviewConfiguration is null || DefinitionContent is null || YamlContent is null || string.IsNullOrWhiteSpace(TechnicalName)))
+                throw new ArgumentException("Standard resource sections require saved identity, overview configuration, definition and YAML content.");
             if (Sections.Count > 0 || DefaultSection is not null)
                 throw new ArgumentException("Standard resource sections own the navigation and default destination.");
             if (DefinitionSections.Any(item => !item.Path.StartsWith("definition/", StringComparison.Ordinal) || item.Path is "definition/identity" or "definition/configuration" || item.Path.Count(value => value == '/') != 1))

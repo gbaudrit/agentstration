@@ -33,6 +33,7 @@ public partial class Sources
     protected override async Task OnInitializedAsync()
     {
         ContextState.Changed += CollectionContextChanged;
+        ContextState.Changed += DetailContextChanged;
         await ContextState.EnsureLoadedAsync(lifetime.Token);
         if (collectionDisposed) return;
         collectionContextKey = CurrentContextKey;
@@ -85,7 +86,7 @@ public partial class Sources
             if (!IsCurrent(requestRevision, scope)) return;
             var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
             var forbidden = status is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-            if (forbidden) { sources = null; hasCollectionAuthorization = false; }
+            if (forbidden) { sources = null; hasCollectionAuthorization = false; ResetImportDraft(); busy = false; }
             collectionLoad = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed)
             {
                 HasContent = sources is not null,
@@ -103,8 +104,10 @@ public partial class Sources
         {
             if (collectionDisposed || !IsCollection) return;
             // PlatformAdmin is rechecked by the API after every context notification.
-            importing = false; importYaml = importUrl = ""; importScope = null; error = null;
-            sources = null; hasCollectionAuthorization = false;
+            if (CurrentContextKey != collectionContextKey)
+            {
+                ResetImportDraft(); busy = false; error = null; sources = null; hasCollectionAuthorization = false;
+            }
             var loading = LoadCollectionAsync();
             StateHasChanged();
             await loading;

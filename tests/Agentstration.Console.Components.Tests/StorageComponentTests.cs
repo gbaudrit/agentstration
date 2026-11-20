@@ -94,7 +94,7 @@ public sealed partial class StorageComponentTests
     }
 
     [TestMethod]
-    public void ListShowsExactScopedLinksAndBuiltinAndExtensionEvidence()
+    public void ListShowsExactScopedLinksAndHeaderTypeNavigation()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = Setup(new());
@@ -104,13 +104,9 @@ public sealed partial class StorageComponentTests
             var href = page.Find("[data-testid=storage-name-link]").GetAttribute("href")!;
             StringAssert.Contains(href, Uri.EscapeDataString(Scope.Value));
             StringAssert.Contains(href, "namespace=evidence");
-            Assert.HasCount(2, page.FindAll("[data-testid=storage-type-evidence]"));
-            var typeIdentity = page.Find("[data-testid=storage-type-evidence] summary");
-            Assert.AreEqual(StorageTypeLinks.Details(Type()), typeIdentity.QuerySelector(".resource-name-link")!.GetAttribute("href"));
-            Assert.AreEqual("default/remote", typeIdentity.QuerySelector(".copyable-value code")!.GetAttribute("title"));
-            Assert.IsNotNull(typeIdentity.QuerySelector(".resource-owner-icon"));
-            StringAssert.Contains(page.Markup, "No content operations advertised");
-            StringAssert.Contains(page.Markup, "storage-provider");
+            var typeNavigation = page.Find("header [data-testid=storage-types-manage]");
+            StringAssert.Contains(typeNavigation.GetAttribute("href")!, "/storage-types");
+            Assert.IsEmpty(page.FindAll("[data-testid=storage-type-evidence], .management-links"));
             Assert.DoesNotContain("DO-NOT-DISPLAY", page.Markup, StringComparison.Ordinal);
         });
     }

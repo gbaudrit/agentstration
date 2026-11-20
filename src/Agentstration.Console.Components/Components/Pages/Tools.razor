@@ -13,7 +13,6 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
-    <Actions><a class="button-secondary" href="@Navigate("/tools/providers")">@T("Providers")</a></Actions>
     <Navigation><ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs></Navigation>
 </ResourceCollectionTemplate>
 
@@ -33,14 +32,12 @@
         new("provider", T("Provider"), tool => @<text>@if (ManagingExtension(tool) is { } extension) {
             <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@ExtensionLocalizer["ExtensionVersion"]: @extension.Version</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div>
             @if (tool.Governance.Origin.Version is { } originVersion) { <small>@T("OriginVersion"): @originVersion</small> }</div>
-        } else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }</text>),
-        new("enabled", T("Enabled"), tool => @<span>@BooleanLabel(tool.Definition.Enabled)</span>)
-        {
-            Filters = [new("enabled", T("Enabled"), CollectionFilterKind.Choice) { Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))] }]
-        }
+        } else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }</text>)
+
     ];
     private IReadOnlyList<CollectionFilter> ExtraFilters =>
     [
+        new("enabled", T("Enabled"), CollectionFilterKind.Choice) { Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))] },
         new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
         {
             Options = (items ?? []).Select(tool => tool.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()

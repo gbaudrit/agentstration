@@ -170,28 +170,16 @@ export class ConnectedStorageCollectionPage {
   }
 
   private async inspectCatalog(consoleUrl: string, fixture: ConnectedStorageFixture): Promise<void> {
-    const qualified = `${fixture.namespaces[0]}/${fixture.type}`;
-    const evidence = this.page.locator('details').filter({
-      has: this.page.locator('.collection-qualified-name').filter({ hasText: qualified }),
-    });
-    await expect(evidence).toHaveCount(1);
-    await expect(evidence).toHaveJSProperty('open', false);
-    const summary = evidence.locator('summary');
-    const copy = summary.locator('.copy-value');
-    const before = this.page.url();
-    await copy.focus();
-    await copy.click();
-    await expect.poll(() => this.page.evaluate(() => navigator.clipboard.readText())).toBe(qualified);
-    expect(this.page.url()).toBe(before);
-    await expect(evidence).toHaveJSProperty('open', false);
-    await summary.focus();
-    await summary.press('Enter');
-    await expect(evidence).toHaveJSProperty('open', true);
-    await summary.press('Enter');
-    await expect(evidence).toHaveJSProperty('open', false);
-    await summary.locator('.resource-name-link').click();
+    const navigate = this.page.getByTestId(TestIds.connectedStorageCollections.storageTypesManage);
+    await expect(navigate).toHaveClass(/button-secondary/);
+    await expect(navigate).toHaveAttribute('href', /context=%2Finstance/);
+    await navigate.click();
+    await expect(this.page).toHaveURL(url => url.pathname === '/storage-types');
+    const row = this.page.getByTestId(TestIds.connectedStorageCollections.storageTypeRow)
+      .filter({ hasText: `${fixture.namespaces[0]}/${fixture.type}` });
+    await expect(row).toHaveCount(1);
+    await row.getByTestId(TestIds.connectedStorageCollections.storageTypeName).click();
     await expect(this.page).toHaveURL(url => url.pathname === `/storage-types/${fixture.type}`);
-    expect(new URL(this.page.url()).pathname).toBe(`/storage-types/${fixture.type}`);
     expect(new URL(this.page.url()).searchParams.get('namespace')).toBe(fixture.namespaces[0]);
     expect(new URL(this.page.url()).searchParams.get('scopeRef')).toBe('/instance');
     await this.open(consoleUrl, '/storages');

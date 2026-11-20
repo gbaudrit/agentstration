@@ -1,0 +1,12 @@
+{
+  "baseCommit": "b3685b367c796d90934cd146bce3ea57c515c553",
+  "route": "/tools/definitions",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor": "8155002af4ceda80ed9e1efd2ce3f8ee1fc6e769"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-action.png"
+  ]
+}

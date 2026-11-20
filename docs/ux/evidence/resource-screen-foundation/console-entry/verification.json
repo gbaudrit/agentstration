@@ -1,0 +1,137 @@
+{
+  "base": "5f2c0060764b004236ed872961aa42db2724923c",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor": "f5838b1ef88f9d95e4ed1f65cbbef7ae992747a36447a0affa90fa5b80c9eb14",
+    "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor.cs": "c7a6491d24d557f22887df266a00593f74fc648c9902d8dcdbb4373e1f073311",
+    "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor.css": "9579b9c635e7a44dce705f4f7a9a014145f5cd3fbe76640fcebc0952c9dde6f1",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConsoleEntryInteractionStrings.fr-FR.resx": "f75352f0779ca8f20e3708256a02031c97a2367dca60d80524d4fdfeec39d097",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConsoleEntryInteractionStrings.resx": "92f57682779cf47e65c07b4e563711134a119fcc8718e52c41882be2a3195223",
+    "src/Agentstration.Workplace.Components/ConversationComposer.razor": "4ee0257c12f99ccc5b5fdb9cec038746ed2e900ecfc5c8ad8e17537126a3acc1",
+    "src/Agentstration.Workplace.Components/EntryRenderer.razor": "8af3e885be84295db70f24442cfbea5e7a8cb722dbc1fda9c9712595bed36a1b",
+    "src/Agentstration.Workplace.Components/FormEntry.razor": "ca6cb4b45ed0491495a58a8f7fd576c84b361b3ebe5bf511cee4107134d23e28",
+    "src/Agentstration.Workplace.Components/InteractionView.razor": "5b31a728f388232a6ff75f6a7b6805a2e56b91cfcb7ba2e2e4974d4a5819a622",
+    "src/Agentstration.Workplace.Components/PromptEntry.razor": "ee4f7086b26ff10b659761db177ef7411ec04dfa21a251af5d42615df2d44d4a",
+    "src/Agentstration.Workplace.Components/Resources/WorkplaceLayoutStrings.fr-FR.resx": "6ee9ab1289db2db4d72424d7b57900ff9b969d6d5f6c003685b2bbb68d8cbdf3",
+    "src/Agentstration.Workplace.Components/Resources/WorkplaceLayoutStrings.resx": "f18bb0207ab5e698b80252d2a6f17c877ef6af7fca8ef35ff745312bf3fdec0e",
+    "tests/Agentstration.Console.Components.Tests/ConsoleEntryInteractionTests.Foundation.cs": "85f4c801f68976088fc918674b7138ff84fd2e8c30006da507805da7c179c8b3",
+    "tests/Agentstration.Console.Components.Tests/ConsoleEntryInteractionTests.cs": "c7c39c2bfc2c57daf409b93138cbd8d5490197b7130c07897afac44baa11e033",
+    "tests/Agentstration.Workplace.Components.Tests/EntryDraftTrackingTests.cs": "cb03987333e51cd7731605f726a07a8f03c28e1ed4603f8738e5e7a4331b1f18"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "d7aac11517702fc48a179d02915a3fe641903a73d6744b3fe69d6f61fed62dd3",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "19afbb0bf45f1b62ba4c9d7e1050b7e5962abcf1b2c5771f4be44bf99535a76c",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6e39de4d65a0f35012ac7b419edbc04073b33cab2abf219645ea0afbe96d6cba",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "d7aac11517702fc48a179d02915a3fe641903a73d6744b3fe69d6f61fed62dd3",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "d7aac11517702fc48a179d02915a3fe641903a73d6744b3fe69d6f61fed62dd3",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "19afbb0bf45f1b62ba4c9d7e1050b7e5962abcf1b2c5771f4be44bf99535a76c",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "19afbb0bf45f1b62ba4c9d7e1050b7e5962abcf1b2c5771f4be44bf99535a76c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6e39de4d65a0f35012ac7b419edbc04073b33cab2abf219645ea0afbe96d6cba",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "6e39de4d65a0f35012ac7b419edbc04073b33cab2abf219645ea0afbe96d6cba"
+  },
+  "phases": [
+    {
+      "name": "console-entry",
+      "exitCode": 0,
+      "seconds": 80.4
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "targetedTests": {
+    "console-entry-tests-07.log": {
+      "passed": 33,
+      "sha256": "5332ba3c0cf20e6f574c2de356175b92547c258dd6bf179e8fb567b698e8dc96"
+    },
+    "console-entry-workplace-tests-03.log": {
+      "passed": 34,
+      "sha256": "8797f0cad2982c79cc0ae3d1572cc31f969674a04911f88ee7d183623610b72b"
+    }
+  },
+  "browserCases": {
+    "native": 2,
+    "maintainedConsoleEntry": 1,
+    "protectedAgent": 2
+  },
+  "maintainedReportSha256": "d87682cc17c695b52c32e56b6f49c4c5e6d85c2bf70d76dd6654ebb08cb4de31",
+  "screenshots": [
+    {
+      "file": "console-entry-request-desktop-en.png",
+      "sha256": "9e1228c7e0227750dd234fe9e997fd7afa7234cb362364d233fd36c81c517740"
+    },
+    {
+      "file": "console-entry-overview-desktop-en.png",
+      "sha256": "48fd4f2e5f4af750910fa1f9f4d95bbf675b96a2bffa9d7e535902d4957b960a"
+    },
+    {
+      "file": "console-entry-refreshed-request-desktop-en.png",
+      "sha256": "29cf2ff366fb7929bb04f19f8ce609df0c4e03d9c9dea7f35dca4e1c53e84ad9"
+    },
+    {
+      "file": "console-entry-response-desktop-en.png",
+      "sha256": "a2c506ab21d1cfdc0a45d1d82d7b45c12bf48a4719e689172ed32b6e4029059d"
+    },
+    {
+      "file": "console-entry-recorded-overview-desktop-en.png",
+      "sha256": "28337def4a79bd3f90e375a7a5c2d42b33a131f3d90e9c860845512580c0e96d"
+    },
+    {
+      "file": "console-entry-retained-follow-up-desktop-en.png",
+      "sha256": "26a5da4c526cea6eef7383782c26e83ab034d25cb5284d623ac2b4a989a23a19"
+    },
+    {
+      "file": "console-entry-cancel-leave-desktop-en.png",
+      "sha256": "5922e6a4040ac48e1e29650fe74fea6c88bb8ea644e6839a18cc88b506ffabde"
+    },
+    {
+      "file": "console-entry-request-mobile-fr.png",
+      "sha256": "7fd1d634b11af8a16a2b496bd24d2f39ef944d8e4dafb7fde88338c53cac0b23"
+    },
+    {
+      "file": "console-entry-overview-mobile-fr.png",
+      "sha256": "a56d7f7a03a1fc374bc17555cf0d1c58cfec3de440b70d2acb574a3adbc0f864"
+    },
+    {
+      "file": "console-entry-refreshed-request-mobile-fr.png",
+      "sha256": "cd33fd8a3469f908972820f67d7c982badc0552b1b68142dfffa9c660cfb12c6"
+    },
+    {
+      "file": "console-entry-response-mobile-fr.png",
+      "sha256": "f6fcde9fe43bcb3b7ecf421a808d0179adea8696ad57a8d8201b325fb2f6916c"
+    },
+    {
+      "file": "console-entry-recorded-overview-mobile-fr.png",
+      "sha256": "947376f425ab14e8f6b005702242da99365708cd394d61db590c529c42067091"
+    },
+    {
+      "file": "console-entry-retained-follow-up-mobile-fr.png",
+      "sha256": "55180e74c9db22be4a6493cf156930e3db176c65ad9b59664b6b54e0974e2f82"
+    },
+    {
+      "file": "console-entry-cancel-leave-mobile-fr.png",
+      "sha256": "7a6666e20d95094875678423adb0defbdd6b88938ba16f9ecf0e6d80fa26e548"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "nativeProbeSha256": "1b669aa2187712b9c7c3d0c00f196bb22ee3719c91d3b0d1716c81e4c581a133",
+  "limits": [
+    "EntryResponse is a published Work projection, not Core Resource: no fabricated resource owner, UID, labels, editable Definition, generic Access or YAML. The actual execution Workspace is labelled as business context.",
+    "Pending-question transitions and rejected sends are covered by focused components; native browser uses the deterministic published Prompt Entry.",
+    "Existing circuit-scoped realtime client joins its initial workspace set; changing contexts relies on guarded authorized reads/manual refresh, without introducing a new subscription API in this screen migration.",
+    "No CI investigation or full solution lanes; transverse #1236 remains deferred pending explicit UX validation and merge."
+  ],
+  "postSync": {
+    "commit": "b233d779638284b5203e86fed0d3c9f9d332707f",
+    "parallelCommit": "b233d779",
+    "scope": "DataSource-only implementation and its maintained journeys; no shared/ConsoleEntry/Agent sources changed. Preserved by fast-forward.",
+    "targetedConsoleTestsPassed": 33,
+    "testLogSha256": "efde9bbd2381f8b9cf80bf8d1aae6e322f30dd3c510fe2a7b68b6630e7ffffa4",
+    "releaseBuild": "0 warnings; 0 errors"
+  }
+}

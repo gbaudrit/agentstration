@@ -10,24 +10,9 @@
                             IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" ContextKey="@contextKey" RowTestId="storage-row"
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("Empty.Title")" EmptyMessage="@T("Empty.Description")"
-                            OnRefresh="ReloadAsync" OnRetry="RetryAsync" />
-@if (types is not null && !loadState.BlocksContent)
-{
-    <section class="panel form-section"><div class="panel-header"><h2>@T("TypeCatalog")</h2><a href="@Navigate("/storage-types")" data-testid="storage-types-manage">@T("Type.Manage")</a></div><p>@T("TypeCatalog.Help")</p>
-        @if (types.Count == 0) { <p>@T("NoTypes")</p> }
-        @foreach (var type in types)
-        {
-            @foreach (var version in type.Definition.Versions)
-            {
-                <details data-testid="storage-type-evidence"><summary><span class="collection-identity storage-type-catalog-identity">
-                    <span class="collection-family-icon"><ResourceIcon IconName="database" /><span class="collection-icon-badges"><ResourceScopeBadge ScopeRef="type.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable}")" Status="@AvailabilityStatus(type.ObservedVersions.FirstOrDefault(value => value.Version == version.Version)?.Availability ?? StorageAvailability.Unavailable)" IconOnly /><ManagedResourceBadge IsManaged="@type.Governance.IsManaged" IsReadOnly="@(type.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></span></span>
-                    <span class="collection-identity-text"><span class="collection-name-heading"><a class="resource-name-link" href="@Navigate(StorageTypeLinks.Details(type))" title="@type.Definition.DisplayName">@type.Definition.DisplayName</a></span><span class="collection-qualified-name"><CopyableValue Value="@($"{type.Namespace}/{type.Name}")" /></span><span class="collection-identity-versions"><CollectionVersion Label="@T("Version")" Value="@version.Version" /></span></span>
-                </span></summary><StorageTypeEvidence Choice="new(type, version)" /></details>
-            }
-        }
-    </section>
-    <nav class="management-links" aria-label="@T("RelatedJourneys")"><a href="@Navigate("/connected-services")">@T("ConnectedServices")</a><a href="@Navigate("/data-sources")">@T("DataSources")</a><a href="@Navigate("/knowledge-sources")">@T("KnowledgeSources")</a></nav>
-}
+                            OnRefresh="ReloadAsync" OnRetry="RetryAsync">
+    <Actions>@if (Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { <a class="button-secondary" href="@Navigate("/storage-types")" data-testid="storage-types-manage">@T("Type.Browse")</a> }</Actions>
+</ResourceCollectionTemplate>
 
 @code {
     private string T(string key) => Localizer[key].Value;

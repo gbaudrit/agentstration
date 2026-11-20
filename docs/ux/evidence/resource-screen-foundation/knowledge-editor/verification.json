@@ -1,0 +1,53 @@
+{
+  "browser": "154.0.8037.57",
+  "captures": [
+    "wizard-incomplete-desktop-en.png",
+    "first-error-desktop-en.png",
+    "wizard-configuration-desktop-en.png",
+    "invalid-refresh-retained-desktop-en.png",
+    "identity-retained-desktop-en.png",
+    "discarded-desktop-en.png",
+    "wizard-incomplete-mobile-fr.png",
+    "first-error-mobile-fr.png",
+    "wizard-configuration-mobile-fr.png",
+    "invalid-refresh-retained-mobile-fr.png",
+    "identity-retained-mobile-fr.png",
+    "discarded-mobile-fr.png"
+  ],
+  "checks": [
+    "desktop-en: wizard incomplete navigation and final first-error focus; actual creation; immutable identity; raw lifecycle and identity retained across section changes/refresh; explicit discard; bounds",
+    "mobile-fr: wizard incomplete navigation and final first-error focus; actual creation; immutable identity; raw lifecycle and identity retained across section changes/refresh; explicit discard; bounds"
+  ],
+  "productBaseHead": "6609dedeca16c95d20efdec5c5f3fa338b7961d9",
+  "sourceSha256": {
+    "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor": "22342f575002d4e7aed2fe7f79501ae6e84b1b8098ad71325ad8affaa869f309",
+    "src/Agentstration.Console.Components/Console/KnowledgeSourceEditorModel.cs": "c3b21c43203c0780875f73754396f5058aacb2a7a20948aabdbeeebbdb75b0d2",
+    "src/Agentstration.Console.Client/KnowledgeSourcesApiClient.cs": "fcfdee590c3cb3ef2fc41c6b1f9f5d9f84adf5b79481b02af18a4141a3e76695"
+  },
+  "hostSha256": {
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.dll": "af3077739d518a4f2dfb5d6e04b5dcf37e63167fafa078bce56fc69a8dae9bf6",
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "57d5c8d2a27695aebb410dfa6e964c319f30ee030623442c7086b24755f8bb9e"
+  },
+  "captureSha256": {
+    "wizard-incomplete-desktop-en.png": "6e6f340c47f3cfd18c33dddd1f96f645d4f8966df9f6ac76a0a2bfa07aea1e9c",
+    "first-error-desktop-en.png": "fa2869a256434e584b0a7b8c495fa9b35797fbd2f9e7ee76b6aca96002c249b0",
+    "wizard-configuration-desktop-en.png": "468c2de00dba121f12cc45077c949669116a539768504146735baed7c8d38c9a",
+    "invalid-refresh-retained-desktop-en.png": "d3156fae563c0ec414d5fec64f2ebac3a5254e73aec3a46eff1ed7a3868586bd",
+    "identity-retained-desktop-en.png": "5ba1974e91f85996ba2942f04b82ded84c5d8432cb4d9226d81ada6c58acc675",
+    "discarded-desktop-en.png": "4a189c89523380b5e3f95b2b3d5b1aee2015b13c1b282321864d29b5b654f6a8",
+    "wizard-incomplete-mobile-fr.png": "19d9cdbc8ef981a11e9deea67a4c4f0ebe83a997922c1fcf2a53832704203d96",
+    "first-error-mobile-fr.png": "448ee0e8e3cfdf8a8d541e3238779c6321be370a99748ec865b14bfdc4d3a64a",
+    "wizard-configuration-mobile-fr.png": "0ef28bfb05cb55c3afc335d44beb51c6712b87217636be24c1076c6f1c0ab5c6",
+    "invalid-refresh-retained-mobile-fr.png": "8e7f3097cea1ccaa00c69b543f107bc9888afdd1449ee8ac8936df2c7d129088",
+    "identity-retained-mobile-fr.png": "cdaf989e81b546982043cc69de2a51ffaedf6f72527be02fa089145bb021806a",
+    "discarded-mobile-fr.png": "2790f2f995e9d05269f8378eb79bd49bd9c872582a7a7674ccd280bcecf248c1"
+  },
+  "validation": {
+    "componentCases": 81,
+    "clientCases": 1,
+    "maintainedSchemaDrivenBrowserCases": 2,
+    "nativeModes": 2,
+    "typescript": "passed",
+    "releaseBuild": "0 warnings, 0 errors"
+  }
+}

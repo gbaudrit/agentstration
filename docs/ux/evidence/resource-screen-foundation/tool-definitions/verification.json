@@ -1,0 +1,243 @@
+{
+  "screen": "Tool Definition \u2014 Flow and Relay contracts",
+  "nativeCases": [
+    {
+      "title": "Tool definition Flow and Relay retain saved identity and independent drafts ",
+      "project": "desktop-chromium",
+      "durationMs": 22497
+    },
+    {
+      "title": "Tool definition Flow and Relay retain saved identity and independent drafts @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 41544
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "048f41a8680c83c3880a8da7b0f1ac7417ec6095",
+      "reportSha256": "5057e146dca88c17370e7b30f512a7f5eff78b1b0e29c9ebe2b60dcf8102d271",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor": "4afc3cea0bf2228fb3d05a61b81f6eea27ba865cade123b2c3d4fc9fccf8632f",
+        "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor.cs": "4d928c0a9292ea37fde99c4b474241fc11b8be5ae0ea40d3ba39f5ba574ae29f",
+        "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor": "83fe74152e870ede5e9e92cb3195e151d01e50a3d2a9556d67581719cf2f7133",
+        "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.foundation.cs": "0026c51adfdcf0be48704f7295bd13cf074cf06fda0ab86baabb3c2543e2829a",
+        "src/Agentstration.Console.Components/Console/ToolDefinitionEditorModel.cs": "1bcdaccdf4d14a417a725e774b171e2a52011008d5750d0480ca7f85bdfd2d4e",
+        "src/Agentstration.Console.Components/Console/ToolRelayEditorModel.cs": "3a54af37c9bdd7c93f51f3766db8e4fd19e1f7e1396e8ba6dd84039aec6197b6",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ToolsStrings.resx": "ab872fc26a776d00a2d67e0800bb8387044e6d5e1b33401494a2cd685c3bd886",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ToolsStrings.fr-FR.resx": "3e2006e63a63cfb980f748a0333e26498a411f4de790315407f65e6efc825e5a",
+        "tests/Agentstration.Console.Components.Tests/ToolDefinitionConsoleTests.cs": "24f6ad16f4da8bc8d5e460e9e5ecdde10c72d44e992c2aa7574c13d6ea84f95a",
+        "tests/Agentstration.Console.Components.Tests/ToolDefinitionConsoleTests.Foundation.cs": "a89fe0271d3d128fc917ed06a1eb9460e9abf868f3ac62c3da42eaff9fdba6a4",
+        "tests/Agentstration.Console.Components.Tests/ToolRelayEditorTests.cs": "ade3a31b7c90e5e86ba333c5f6806eadb672b50c4cb86e9ddb6ccd2674581953",
+        "tests/Agentstration.Console.Components.Tests/ToolPermissionPresentationTests.cs": "af289c3f5a35da7367e9a818d1fc46ef75a127af291ecd023f1feeee8eb87147"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "c3d5d67eef0b6dcbb9fe7558645b23a93e442a3ae08edf187e7c56d0c9ec0b63",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "fc341a7dba4d1d2bb34e647a4f97da270486cbf0668bb9bbb1773e616ae006e4",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "78f2d75b294bfce37aaa2578c19cdef7c867434f04eefdbe9f6d344d1495d593",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "d7df762bbcd9fc240338fe9ef47813977fb436451bc182b0fe1b30084ecf37ce"
+      },
+      "campaign": "screens-08"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "agent-regression",
+      "passed": 2,
+      "sha256": "05415642c793b97938d150e0bb20b1a7ca02a1055d0ba3b629c20c13438daa68"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "new-tool-flow-configuration-desktop-en.png",
+      "sha256": "6842bd53a957665ede7fc3d17b8d7213c4755a2809fe45efe83ed83401937268"
+    },
+    {
+      "file": "new-tool-flow-review-desktop-en.png",
+      "sha256": "e148493e96a0435ad083a13c71321610430ee544758bac862f26c417a56fb63d"
+    },
+    {
+      "file": "tool-definition-flow-overview-desktop-en.png",
+      "sha256": "9eb3e96bc55c06d3049d43aa9d425a522bb14d0cf5b7e7c332ebdcc1874eb2dc"
+    },
+    {
+      "file": "tool-definition-flow-retained-refresh-desktop-en.png",
+      "sha256": "6f4ed87431acf599e60844db97dd4016259b434cede6c56e6b7dfd6914122a10"
+    },
+    {
+      "file": "tool-definition-flow-yaml-desktop-en.png",
+      "sha256": "bf01a227b400c6df6193fea2a7be98c5f3f61f9971e19375a7bbac5bf3480c47"
+    },
+    {
+      "file": "tool-definition-flow-versions-desktop-en.png",
+      "sha256": "127ce50b032b1cd43108eaeb6c73c6926cfafca3d80e78ecb761d28cc945b209"
+    },
+    {
+      "file": "tool-definition-flow-usages-desktop-en.png",
+      "sha256": "213ef73b344f39774732e78a9e4feba463ec2bd9cf6f2492fbd558e36ee18586"
+    },
+    {
+      "file": "new-tool-relay-configuration-desktop-en.png",
+      "sha256": "7db1231a3dae830d0ace18a5459b0aba04b320a059038a584614405479b56555"
+    },
+    {
+      "file": "new-tool-relay-review-desktop-en.png",
+      "sha256": "29dcb1ba05784ecc5c89dfc5c0554313f4583b0b9d834994f4181b6f87783377"
+    },
+    {
+      "file": "tool-definition-relay-overview-desktop-en.png",
+      "sha256": "70eb511f4f52933f05281d981d68e8a70615fa05d9538a1202dd47ff6669beca"
+    },
+    {
+      "file": "tool-definition-relay-retained-refresh-desktop-en.png",
+      "sha256": "fb63bbaf8cc0a7e0f83886d108e316c3d3aac0688cfeb9bcfdbd29214dafad75"
+    },
+    {
+      "file": "tool-definition-relay-yaml-desktop-en.png",
+      "sha256": "2b778b704c69bd1842a39d03723c2926d724a17507fece4168056d0b077d4900"
+    },
+    {
+      "file": "tool-definition-relay-versions-desktop-en.png",
+      "sha256": "bfd6b5930338155bbf1a18ce03a11337710ce80e3a591d5b138ee91439cc985b"
+    },
+    {
+      "file": "tool-definition-relay-usages-desktop-en.png",
+      "sha256": "3d33164f430e0201a9590cba6db68ff816a9138d43f7a1e6d13dca7b236bb20c"
+    },
+    {
+      "file": "new-tool-flow-configuration-mobile-fr.png",
+      "sha256": "bbdcf04c16fa07b941c5cec2114303fe95e7ec3a6996da14a0dd4dcf951195a7"
+    },
+    {
+      "file": "new-tool-flow-review-mobile-fr.png",
+      "sha256": "309278e373c6024ffc4554c6edfc6dcadb6686abaa1a6137fe38d47bced9e39b"
+    },
+    {
+      "file": "tool-definition-flow-overview-mobile-fr.png",
+      "sha256": "ae47caf1a6c37adc0caa8fbb2069f1d76a8475fd82c97eaa4f62507bb7109e1e"
+    },
+    {
+      "file": "tool-definition-flow-retained-refresh-mobile-fr.png",
+      "sha256": "8cd2fe4451943bfe8e95345bf31677a794f77f2ea62bdce1d9a1e64bc01d54dd"
+    },
+    {
+      "file": "tool-definition-flow-yaml-mobile-fr.png",
+      "sha256": "46c6c1267afc9d025990ffdbd8da878541a5f1339debcbfe30aa46d11dfe064e"
+    },
+    {
+      "file": "tool-definition-flow-versions-mobile-fr.png",
+      "sha256": "2570f82c6fe97feaf55e30833553059ee75b8170ab813af9e1abeca2030776c0"
+    },
+    {
+      "file": "tool-definition-flow-usages-mobile-fr.png",
+      "sha256": "61025cbffdd690986e9ec0007ba45f5090b76d09d1dc043df36d31beac5ff50f"
+    },
+    {
+      "file": "new-tool-relay-configuration-mobile-fr.png",
+      "sha256": "e8f80a7a3070859e067e7bfe0ce327db79899d42202c1601e776047c33b47bf8"
+    },
+    {
+      "file": "new-tool-relay-review-mobile-fr.png",
+      "sha256": "0bbb35c455b381e6690076308edb8a9f56038b49491e612dd13f3b93c4e0611a"
+    },
+    {
+      "file": "tool-definition-relay-overview-mobile-fr.png",
+      "sha256": "0b68e7a309d12715663d7c4ce5f359c52a6f3708ac2956128871a7f7896bd187"
+    },
+    {
+      "file": "tool-definition-relay-retained-refresh-mobile-fr.png",
+      "sha256": "96d0828cac450788370313ba6ff3f6cd34dd25a28d7bf2ad5774c249be7abbe7"
+    },
+    {
+      "file": "tool-definition-relay-yaml-mobile-fr.png",
+      "sha256": "117233d374f703ecfe8b4e52bbb4d9a31742e63f062837e9d921e7fb399858a2"
+    },
+    {
+      "file": "tool-definition-relay-versions-mobile-fr.png",
+      "sha256": "13adc2f6dec19c8acec1d0f520707f56834a594bb46c5c3f57e063ea6f1c9e3c"
+    },
+    {
+      "file": "tool-definition-relay-usages-mobile-fr.png",
+      "sha256": "ec7a7da63e345322e0e4591098aa5d14ba17e6f6db262ecc17ab21fbbfc52d2e"
+    }
+  ],
+  "limits": [
+    "Metadata labels remain read-only under the current properties-only API.",
+    "An early temporary Overview capture ran before the body finished loading; the final native probe adds explicit saved-identity, configuration, idle-body and navigation assertions without a timing delay or product workaround."
+  ],
+  "postSyncFocusedChecks": {
+    "extensions": {
+      "passed": 50,
+      "sha256": "dd16981c759f2f910e57677677d5278d736f6680e4cc8dc07d8485d3c2afa17c"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "a0ad5cb9d1a9737ed3e7f469699c4511e90651f19f28d3d18b8b636986f8d2fb"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "ca31a649db3aa32718e15d3d4ca45ce6bcbd50f74a265163855bd07b6b54199f"
+    },
+    "schema-composition": {
+      "passed": 27,
+      "sha256": "92c3b5adaadefe2347809ddf10e4947e13acaee2ddc4cadfb6998029464adc2e"
+    }
+  },
+  "validationNote": "These post-synchronization focused checks overlap earlier targetedGroupChecks; their counts must not be added as distinct tests.",
+  "maintainedSelections": {
+    "reportSha256": "c868c527eba0fd16d54e0f19b134a0406f6542e8fb1b09a166c7a524f1bddd12",
+    "passedCases": [
+      {
+        "title": "a command fallback opens and executes the generic Console Entry interaction @smoke",
+        "project": "desktop-chromium"
+      },
+      {
+        "title": "Flow, Agent, and ToolDefinition editors expose reusable contracts consistently @smoke",
+        "project": "desktop-chromium"
+      }
+    ],
+    "wholeReportUnexpected": 1,
+    "otherFailure": "Bootstrap Entry provenance is tracked with the separate Entry migration; this report is not claimed wholly green."
+  }
+}

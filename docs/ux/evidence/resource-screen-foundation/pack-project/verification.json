@@ -1,0 +1,131 @@
+{
+  "base": "6561ceb3077775e4be786e8d2eca55940ee54215",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor": "35037cee7b3aff514bcf9f75879a49a359b9ed5c12ad42bf544f2ed925c8ff9e",
+    "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor.cs": "2b7b07b442b732dbbb65807d210bd830231fb70c09740d790dedcc6491bd242f",
+    "src/Agentstration.Console.Components/Components/Pages/PackProjectSourceEditor.razor": "99f6ca5cfb6d2098f04201698429e1116be509de4ecd2e618b252e2102a936a1",
+    "src/Agentstration.Console.Components/Components/Shared/PackAgentDefinitionForm.razor": "e1564bf0bc85da91fa5924826c256e7595530d7d076f2c3f90fa69689eec362c",
+    "src/Agentstration.Console.Components/Console/PackProjectEditorModel.cs": "91feadb7b23b2ac40f96bea24ed72b429b2886a4348f0818c860d5101690bc37",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/PackStrings.fr-FR.resx": "9d803c01742448170d1367e6f01d176adf3a63c96a0b89377baaeb9fbcf0d364",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/PackStrings.resx": "24f9a5fafbc610c1cf09c0f224375577ad53ace829be1bf684ecd8ad1c8db0cf",
+    "tests/Agentstration.Console.Components.Tests/PackAgentDefinitionFormTests.cs": "4ca05a70ffbfe18e8c3eaafac7b69e96cc0013d2ebfacc4529bf4b34af8aebc5",
+    "tests/Agentstration.Console.Components.Tests/PackProjectFoundationTests.cs": "0422bbd3491f6a44bf554b4639c9572be4ed2ff922b3613ecb87b22473ec2e59",
+    "tests/Agentstration.Console.Components.Tests/PackProjectSourceEditorTests.cs": "27be581b3a2a4e838f6741e20dc86270f9fcb07721217c202fad51b46ee80f48"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "52c7968c04f95ad06252c63a64c1a669c76c57ee2538e82411688a7c1470cf1d",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "b19b1b02492f12a7ec41f8eb11b2f4f04c8b0592d8ef33549e678f60608916e2",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "60637160c7048dddcb87c62d978eece1b704428e41b18b2a5f8f229f8549e019",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "52c7968c04f95ad06252c63a64c1a669c76c57ee2538e82411688a7c1470cf1d",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "52c7968c04f95ad06252c63a64c1a669c76c57ee2538e82411688a7c1470cf1d",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "b19b1b02492f12a7ec41f8eb11b2f4f04c8b0592d8ef33549e678f60608916e2",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "b19b1b02492f12a7ec41f8eb11b2f4f04c8b0592d8ef33549e678f60608916e2",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "60637160c7048dddcb87c62d978eece1b704428e41b18b2a5f8f229f8549e019",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "60637160c7048dddcb87c62d978eece1b704428e41b18b2a5f8f229f8549e019"
+  },
+  "phases": [
+    {
+      "name": "pack-project",
+      "exitCode": 0,
+      "seconds": 71.6
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "targetedTests": {
+    "passed": 38,
+    "logSha256": "5fc8f212e564c18298e5c8f20db38ecba96fdfa381b483459b42c7c5700607d3"
+  },
+  "browserCases": {
+    "native": 2,
+    "distribution-regression": {
+      "passed": 1,
+      "reportSha256": "c844078068d9e1d30b54c42984dc3f77f304b197f0fe78673f8027e737354a87"
+    },
+    "agent-regression": {
+      "passed": 2,
+      "reportSha256": "3cdba4c78719feac5c32251167874416a4e5eb304b100175a003abe23ecac3c0"
+    }
+  },
+  "screenshots": [
+    {
+      "file": "pack-project-overview-desktop-en.png",
+      "sha256": "2a3d770c90c83f9a04293971f8c279f61c10a719d403e1cff63d08b2865e30b8"
+    },
+    {
+      "file": "pack-project-identity-desktop-en.png",
+      "sha256": "bab7aaeb037c2d1c6f6faab8cb5112149e74c8673074e9c6beee5cbff8efdf2e"
+    },
+    {
+      "file": "pack-project-invalid-version-desktop-en.png",
+      "sha256": "53dd14d67e211a7ed291195780457ea1814667e5cbb4e187701dee6bd74ad248"
+    },
+    {
+      "file": "pack-project-source-draft-desktop-en.png",
+      "sha256": "1369138e6877a768cb86291d82c4059e47115f37cecbe754a975541da681871b"
+    },
+    {
+      "file": "pack-project-source-saved-desktop-en.png",
+      "sha256": "5d5cab25e54169c4774824d4e80aa4e68a1b983b00dadaa36e2024e546d18119"
+    },
+    {
+      "file": "pack-project-yaml-desktop-en.png",
+      "sha256": "8a40487671b5f12862362b571d90ae391794200385a35f9fb2991d3b91b7781a"
+    },
+    {
+      "file": "pack-project-installation-desktop-en.png",
+      "sha256": "6f3ca72573f545f7fa0f82382e5407aba11c7e8251e09a6e0dfc9864e3a513c4"
+    },
+    {
+      "file": "pack-project-build-history-desktop-en.png",
+      "sha256": "d22ebfe7bc13c8e9e0e670f86dd8d52ecf6012b92654c6c8451c2c7679763e73"
+    },
+    {
+      "file": "pack-project-overview-mobile-fr.png",
+      "sha256": "fd58e08dc32a319e4cba9fb244ab2cd0809f692e75c918fb63c38ae6135cc8b0"
+    },
+    {
+      "file": "pack-project-identity-mobile-fr.png",
+      "sha256": "f248f8364067c953952984016b1bb85c44489f68e2f796c71b48c0cebcb09524"
+    },
+    {
+      "file": "pack-project-invalid-version-mobile-fr.png",
+      "sha256": "7bba1c702644d6d783bdb3e2f601f5477c543451c59e84cc12acfd7f6ca8c4a8"
+    },
+    {
+      "file": "pack-project-source-draft-mobile-fr.png",
+      "sha256": "1ac047cc9f0790f936f632fc5ee0bb21bb78ed8299f50b129fc9ff9032a895a9"
+    },
+    {
+      "file": "pack-project-source-saved-mobile-fr.png",
+      "sha256": "315b8eb9ee9ec372ea45b08620aaad5575490355ed7052fd58e9d027d6f76e95"
+    },
+    {
+      "file": "pack-project-yaml-mobile-fr.png",
+      "sha256": "4667122a5cf46878de09b27cab09ef4298c4c488ad017c39f1b13c7b51fb79b0"
+    },
+    {
+      "file": "pack-project-installation-mobile-fr.png",
+      "sha256": "11192f0046e8dbc2c4e4d50ed84e6d27ebddf0b0b90f713ee2ca720f46e3f5cb"
+    },
+    {
+      "file": "pack-project-build-history-mobile-fr.png",
+      "sha256": "6396374ad25254b8e8d003c8dd4e320789b6f169490031674fd81f2cd01ca566"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "nativeProbeSha256": "9808acc596628c3e67802e56c9f9954a91d9176164bc035edc9a2da5ea75e748",
+  "limits": [
+    "Existing Pack authoring scope-policy/ADR discrepancy remains documented without a backend change.",
+    "Initial local native probe awaited server-side Blazor HTTP from the browser and later omitted opening a secondary action menu; the probe was corrected and rerun without product changes or weakened assertions.",
+    "Global mobile platform/navigation overlay remains visible in real full-page captures.",
+    "No CI investigation/remediation; no full solution lanes at maintainer request; new transverse #1236 remains deferred until UX validation and merge."
+  ]
+}

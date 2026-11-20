@@ -29,15 +29,15 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub(source) { DependenciesStale = true };
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
-        rendered.WaitForElement("[data-testid=knowledge-source-projections-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         Assert.IsTrue(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled"));
-        rendered.Find("[data-testid=knowledge-source-definition-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.WaitForElement("[data-testid=knowledge-rebind-dependencies]").Click();
         rendered.FindComponent<EditForm>().Find("form").Submit();
         rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation-confirm]").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(client.UpdatedRequest?.RebindDependencies));
         rendered.WaitForAssertion(() => Assert.IsTrue(client.ReadinessCalls >= 2));
-        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled")));
         rendered.Find("[data-testid=knowledge-start-projection]").Click();
         rendered.WaitForAssertion(() => Assert.IsNotNull(client.StartedProjectionRequest));
@@ -77,8 +77,9 @@ public sealed partial class KnowledgeSourceEditorTests
         });
         var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
         Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-source-definition-fields']")!.HasAttribute("disabled"));
-        Assert.AreEqual("false", document.QuerySelector("[data-testid='knowledge-source-definition-fields']")!.GetAttribute("data-interactive"));
-        Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-source-save']")!.HasAttribute("disabled"));
+        Assert.AreEqual("true", document.QuerySelector("[data-testid='knowledge-source-definition-fields']")!.HasAttribute("disabled").ToString().ToLowerInvariant());
+        if (embedded) Assert.IsTrue(document.QuerySelector("[data-testid='knowledge-source-save']")!.HasAttribute("disabled"));
+        else Assert.IsTrue(document.QuerySelector("[data-wizard-step=configuration]")!.HasAttribute("disabled"));
         Assert.IsNull(client.CreatedRequest);
         Assert.IsNull(client.UpdatedRequest);
     }
@@ -93,6 +94,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var sources = new DataSourcesClientStub { FailTargets = true };
         using var context = CreateContext(client, sources);
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
         rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
             .Change($"{DataSourceScope.Value}|default|documentation");
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[role='alert']").TextContent));
@@ -119,6 +121,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub { RejectNativeDataset = true };
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
         rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
             .Change($"{DataSourceScope.Value}|default|documentation");
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Dataset Knowledge");
@@ -151,7 +154,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
         Assert.DoesNotContain("Non-executable draft", rendered.Markup);
         Assert.DoesNotContain("ResolvedFlowsHelp", rendered.Markup);
-        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         Assert.IsTrue(rendered.Find("[data-testid=knowledge-start-projection]").HasAttribute("disabled"));
         Assert.IsNull(client.StartedProjectionRequest);
     }
@@ -163,11 +166,12 @@ public sealed partial class KnowledgeSourceEditorTests
         using var context = CreateContext(new KnowledgeClientStub());
 
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
 
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("knowledge-source-editor", rendered.FindComponent<EditForm>().Instance.FormName);
-            Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-definition-fields']").GetAttribute("data-interactive"));
+            Assert.AreEqual("false", rendered.Find("[data-testid='knowledge-source-definition-fields']").HasAttribute("disabled").ToString().ToLowerInvariant());
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-definition-fields']").HasAttribute("disabled"));
             var fields = rendered.FindAll(".form-grid > .form-field");
             Assert.AreEqual("knowledge-source-display-name", fields[0].QuerySelector("input")?.GetAttribute("data-testid"));
@@ -176,7 +180,7 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-source-projection-flow']").HasAttribute("required"));
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-source-retrieval-flow']").HasAttribute("required"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
-            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].resource-enabled-toggle"));
             Assert.IsTrue(
                 rendered.Markup.IndexOf("knowledge-source-editor-enabled-option", StringComparison.Ordinal)
                 < rendered.Markup.IndexOf("knowledge-source-projection-flow", StringComparison.Ordinal));
@@ -200,6 +204,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub();
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
 
         rendered.WaitForAssertion(() => Assert.HasCount(1,
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
@@ -231,6 +236,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub();
         using var context = CreateContext(client, new DataSourcesClientStub(withTarget: true));
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
 
         rendered.WaitForElement("[data-testid='knowledge-source-binding-data-source']")
             .Change($"{DataSourceScope.Value}|default|documentation");
@@ -250,6 +256,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub();
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
 
         rendered.WaitForAssertion(() => Assert.HasCount(1,
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
@@ -273,6 +280,7 @@ public sealed partial class KnowledgeSourceEditorTests
         var client = new KnowledgeClientStub();
         using var context = CreateContext(client);
         var rendered = context.Render<KnowledgeSourceEditor>();
+        rendered.Find("[data-wizard-step=configuration]").Click();
 
         rendered.WaitForElement("[data-testid='knowledge-source-data-source-bindings']");
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Transformed documentation");
@@ -296,7 +304,8 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
-        rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-projections']").GetAttribute("data-interactive"));
         rendered.WaitForElement("[data-schema-path='$.locale'] input").Input("fr-FR");
         rendered.Find("[data-testid='knowledge-start-projection']").Click();
@@ -315,6 +324,9 @@ public sealed partial class KnowledgeSourceEditorTests
 
         var rendered = context.Render<KnowledgeSourceEditor>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
+
 
         rendered.WaitForAssertion(() =>
         {
@@ -350,6 +362,9 @@ public sealed partial class KnowledgeSourceEditorTests
             .NavigateTo("/knowledge-sources/agentstration-documentation/edit?namespace=default");
         var rendered = context.Render<KnowledgeSourceEditor>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
+
 
         rendered.WaitForAssertion(() => Assert.HasCount(1,
             rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']")));
@@ -369,6 +384,9 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
         Assert.IsFalse(client.UpdatedRequest!.RebindDependencies);
         var ordinarySave = client.UpdatedRequest;
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/agentstration-documentation/edit?namespace=default#definition/configuration");
+        rendered.Render(p => p.Add(x => x.Name, "agentstration-documentation"));
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.Find("[data-testid=knowledge-rebind-dependencies]").Click();
         rendered.WaitForElement("[data-testid=knowledge-rebind-confirmation]");
         Assert.AreSame(ordinarySave, client.UpdatedRequest);
@@ -391,18 +409,19 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
+
         rendered.WaitForAssertion(() =>
         {
-            var tabs = rendered.FindAll("[role='tab']");
-            Assert.HasCount(8, tabs);
+            var tabs = rendered.FindAll(".resource-navigation-rail [data-resource-section]");
+            Assert.HasCount(9, tabs);
             CollectionAssert.AreEqual(
-                new[] { "Overview", "Definition", "Projections", "Snapshots", "Retrieval", "Tools", "Access", "YAML" },
+                new[] { "Overview", "Identity", "Configuration", "Projections", "Snapshots", "Retrieval", "Tools", "Access", "YAML" },
                 tabs.Select(tab => tab.TextContent).ToArray());
-            Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-overview-tab']").GetAttribute("aria-selected"));
+            Assert.AreEqual("page", rendered.Find(".resource-navigation-rail [data-resource-section='overview']").GetAttribute("aria-current"));
             Assert.HasCount(1, rendered.FindAll(".metric-grid"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-acquisitions']"));
-            Assert.AreEqual("/flows/knowledge-projection-builtin", rendered.Find("[data-testid='knowledge-projection-flow-link']").GetAttribute("href"));
-            Assert.AreEqual("/flows/knowledge-retrieval-builtin", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
+            Assert.AreEqual("/flows/knowledge-projection-builtin?namespace=default", rendered.Find("[data-testid='knowledge-projection-flow-link']").GetAttribute("href"));
+            Assert.AreEqual("/flows/knowledge-retrieval-builtin?namespace=default", rendered.Find("[data-testid='knowledge-retrieval-flow-link']").GetAttribute("href"));
             Assert.IsTrue(rendered.Find("[data-testid='knowledge-projection-flow-link']").ClassList.Contains("knowledge-flow-card"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-source-profile-link']"));
             Assert.AreEqual("Delete", rendered.Find("[data-testid='knowledge-source-delete']").TextContent);
@@ -414,13 +433,13 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Find("[data-testid='knowledge-source-delete-dialog'] .button-secondary").Click();
         rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll("[data-testid='knowledge-source-delete-dialog']")));
 
-        rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual("true", rendered.Find("[data-testid='knowledge-source-projections-tab']").GetAttribute("aria-selected"));
+            Assert.AreEqual("page", rendered.Find(".resource-navigation-rail [data-resource-section='projections']").GetAttribute("aria-current"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-projections']"));
-            Assert.IsEmpty(rendered.FindAll(".metric-grid"));
-            Assert.AreEqual("knowledge-source-projections-tab", rendered.Find("[role='tabpanel']").GetAttribute("aria-labelledby"));
+            Assert.IsTrue(rendered.Find(".resource-overview").HasAttribute("hidden"));
+            Assert.AreEqual("Projections", rendered.Find(".resource-details-content").GetAttribute("aria-label"));
         });
 
         rendered.Find("[data-testid='knowledge-start-projection']").Click();
@@ -430,13 +449,13 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-projection-row']"));
         });
 
-        rendered.Find("[data-testid='knowledge-source-snapshots-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "snapshots");
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-snapshots']")));
 
-        rendered.Find("[data-testid='knowledge-source-retrieval-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "retrieval");
         rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-retrieval-verification']")));
 
-        rendered.Find("[data-testid='knowledge-source-tools-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "tools");
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-tool-exposure']"));
@@ -475,7 +494,7 @@ public sealed partial class KnowledgeSourceEditorTests
         using var context = CreateContext(client);
         context.Services.AddSingleton<IConsoleNavigationContext>(new KnowledgeNavigationContext(logicalScope));
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(component => component.Name, source.Name));
-        rendered.Find("[data-testid=knowledge-source-projections-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         var expectedQuery = "?scopeRef=" + Uri.EscapeDataString(DataSourceScope.Value) + "&context=" + Uri.EscapeDataString(logicalScope);
         rendered.WaitForAssertion(() =>
         {
@@ -485,7 +504,7 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.IsNull(rows[1].QuerySelector("a"));
             Assert.Contains(notStarted, rows[1].TextContent);
         });
-        rendered.Find("[data-testid=knowledge-source-snapshots-tab]").Click();
+        DataSourceScreenTestSupport.Select(rendered, "snapshots");
         rendered.Find(".knowledge-snapshot-link").Click();
         rendered.WaitForAssertion(() =>
         {
@@ -510,10 +529,11 @@ public sealed partial class KnowledgeSourceEditorTests
         var snapshot = ExistingSnapshot();
         using var context = CreateContext(new KnowledgeClientStub(ProjectedSource(), snapshots: [snapshot]));
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
-            .NavigateTo("/knowledge-sources/agentstration-documentation?view=snapshots");
+            .NavigateTo("/knowledge-sources/agentstration-documentation#snapshots");
 
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
+
 
         rendered.WaitForAssertion(() =>
         {
@@ -528,7 +548,7 @@ public sealed partial class KnowledgeSourceEditorTests
                 "application/json");
         });
 
-        rendered.Find("[data-testid='knowledge-source-retrieval-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "retrieval");
         rendered.Find("[data-testid='knowledge-retrieval-operation']").Change("read");
         rendered.WaitForAssertion(() =>
             Assert.IsFalse(rendered.Find("[data-testid='knowledge-retrieval-run']").HasAttribute("disabled")));
@@ -544,15 +564,16 @@ public sealed partial class KnowledgeSourceEditorTests
             retrievalResult: ExistingRetrievalResult(snapshot));
         using var context = CreateContext(client);
         context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
-            .NavigateTo("/knowledge-sources/agentstration-documentation?view=retrieval");
+            .NavigateTo("/knowledge-sources/agentstration-documentation#retrieval");
 
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
+
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("Consultation",
-                rendered.Find("[data-testid='knowledge-source-retrieval-tab']").TextContent);
+                rendered.Find("[data-resource-section='retrieval']").TextContent);
             Assert.AreEqual("Recherche regex",
                 rendered.Find("[data-testid='knowledge-retrieval-operation'] option[value='search_regex']").TextContent);
         });
@@ -580,7 +601,9 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
-        rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
+
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
@@ -591,7 +614,7 @@ public sealed partial class KnowledgeSourceEditorTests
         rendered.Find("[data-testid=knowledge-source-save]").Click();
         rendered.WaitForAssertion(() => Assert.IsNotNull(client.UpdatedRequest));
 
-        rendered.Find("[data-testid='knowledge-source-projections-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "projections");
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered
             .Find("[data-testid='knowledge-projection-parameters']")
             .ParentElement!.ClassList.Contains("knowledge-projection-parameters")));
@@ -607,8 +630,10 @@ public sealed partial class KnowledgeSourceEditorTests
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters
             .Add(component => component.Name, "agentstration-documentation"));
 
-        rendered.WaitForAssertion(() => Assert.HasCount(8, rendered.FindAll("[role='tab']")));
-        rendered.Find("[data-testid='knowledge-source-definition-tab']").Click();
+
+        rendered.WaitForAssertion(() => Assert.HasCount(9, rendered.FindAll(".resource-navigation-rail [data-resource-section]")));
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
         rendered.WaitForAssertion(() =>
         {
             var technicalName = rendered.Find("[data-testid='knowledge-source-name']");
@@ -616,7 +641,7 @@ public sealed partial class KnowledgeSourceEditorTests
             Assert.IsTrue(technicalName.HasAttribute("readonly"));
             Assert.IsTrue(technicalName.HasAttribute("disabled"));
             Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-data-source-bindings']"));
-            Assert.HasCount(1, rendered.FindAll("[data-testid='knowledge-source-editor-enabled-option'].knowledge-choice"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid=knowledge-source-enabled][role=switch]"));
         });
 
         rendered.Find("[data-testid='knowledge-source-display-name']").Change("Updated documentation");
@@ -631,32 +656,32 @@ public sealed partial class KnowledgeSourceEditorTests
             StringAssert.Contains(rendered.Markup, "The Knowledge Source definition was saved.");
         });
 
-        rendered.Find("[data-testid='knowledge-source-tools-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "tools");
         rendered.WaitForAssertion(() =>
         {
             var approval = rendered.Find("[data-testid='knowledge-source-approval-option']");
-            Assert.IsTrue(approval.ClassList.Contains("knowledge-choice"));
+            Assert.IsTrue(approval.ClassList.Contains("resource-enabled-toggle"));
             StringAssert.Contains(approval.TextContent, "Require approval for every generated Tool");
         });
 
-        rendered.Find("[data-testid='knowledge-source-yaml-tab']").Click();
+        DataSourceScreenTestSupport.Select(rendered, "yaml");
         rendered.WaitForAssertion(() =>
         {
-            var yaml = rendered.Find("[data-testid='knowledge-source-yaml-editor']");
+            var yaml = rendered.Find("[data-testid='knowledge-source-yaml-source']");
             Assert.IsFalse(yaml.HasAttribute("readonly"));
             var value = yaml.GetAttribute("value") ?? yaml.TextContent;
             StringAssert.Contains(value, "kind: KnowledgeSource");
             StringAssert.Contains(value, "displayName: Updated documentation");
         });
 
-        var yamlEditor = rendered.Find("[data-testid='knowledge-source-yaml-editor']");
+        var yamlEditor = rendered.Find("[data-testid='knowledge-source-yaml-source']");
         var yamlValue = yamlEditor.GetAttribute("value") ?? yamlEditor.TextContent;
         yamlEditor.Input(yamlValue.Replace("Updated documentation", "Updated from YAML", StringComparison.Ordinal));
         rendered.Find("[data-testid='knowledge-source-yaml-save']").Click();
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual("Updated from YAML", client.UpdatedRequest?.Properties.DisplayName);
-            var savedYaml = rendered.Find("[data-testid='knowledge-source-yaml-editor']");
+            var savedYaml = rendered.Find("[data-testid='knowledge-source-yaml-source']");
             StringAssert.Contains(savedYaml.GetAttribute("value") ?? savedYaml.TextContent, "displayName: Updated from YAML");
         });
     }
@@ -727,6 +752,7 @@ public sealed partial class KnowledgeSourceEditorTests
         context.Services.AddSingleton<IConsoleNavigationContext>(documents);
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
         var page = context.Render<KnowledgeSourceEditor>();
+        page.Find("[data-wizard-step=configuration]").Click();
         page.WaitForElement("[data-testid=knowledge-output-storage]");
         await page.Find("[data-testid=knowledge-source-display-name]").ChangeAsync("Alerts");
         await page.Find("[data-testid=knowledge-source-data-source-bindings] select").ChangeAsync($"{DataSourceScope.Value}|default|documentation");
@@ -745,6 +771,9 @@ public sealed partial class KnowledgeSourceEditorTests
     private static BunitContext CreateContext(IKnowledgeSourcesClient knowledge, IDataSourcesClient? dataSourcesClient = null, IFlowApiClient? flows = null)
     {
         var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var resourceNavigation = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        resourceNavigation.Setup<string>("navigate", _ => true).SetResult("http://localhost/#overview");
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton(knowledge);
@@ -783,6 +812,7 @@ public sealed partial class KnowledgeSourceEditorTests
     });
     private static KnowledgeSourceResource ProjectedSource() => new()
     {
+        Uid = Guid.Parse("11111111-2222-3333-4444-555555555555"),
         ApiVersion = ResourceApiVersions.CoreV1,
         Kind = KnowledgeResourceKinds.KnowledgeSource,
         Metadata = new() { Name = "agentstration-documentation" },
@@ -891,6 +921,12 @@ public sealed partial class KnowledgeSourceEditorTests
         public int ReadinessCalls { get; private set; }
         public CreateKnowledgeSourceRequest? CreatedRequest { get; private set; }
         public PutKnowledgeSourceRequest? UpdatedRequest { get; private set; }
+        public ResourceSnapshot<KnowledgeSourceResource>? ReadOverride { get; set; }
+        public Exception? ReadFailure { get; set; }
+        public Func<string, Task<ResourceSnapshot<KnowledgeSourceResource>>>? ReadSource { get; set; }
+        public Exception? WriteFailure { get; set; }
+        public string CurrentEtag { get; set; } = "\"etag-1\"";
+        public string? UpdatedEtag { get; private set; }
         public StartKnowledgeProjectionRequest? StartedProjectionRequest { get; private set; }
         public PublishKnowledgeSourceToolExposureRequest? PublishedExposureRequest { get; private set; }
         public bool RejectExposurePublication { get; set; }
@@ -912,7 +948,7 @@ public sealed partial class KnowledgeSourceEditorTests
         public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<KnowledgeSourceResource>>(source is null ? [] : [source]);
         public Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            source is not null ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source, "\"etag-1\"")) : throw new NotSupportedException();
+            ReadSource is not null ? ReadSource(name) : ReadFailure is not null ? Task.FromException<ResourceSnapshot<KnowledgeSourceResource>>(ReadFailure) : ReadOverride is not null ? Task.FromResult(ReadOverride) : source is not null ? Task.FromResult(new ResourceSnapshot<KnowledgeSourceResource>(source, CurrentEtag)) : throw new NotSupportedException();
         public Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(CreateKnowledgeSourceRequest request, CancellationToken cancellationToken = default)
         {
             if (RejectNativeDataset && request.Properties.Enabled) throw new AgentstrationApiException("private-response-detail", "test-error", System.Net.HttpStatusCode.UnprocessableEntity)
@@ -930,7 +966,8 @@ public sealed partial class KnowledgeSourceEditorTests
         }
         public Task<ResourceSnapshot<KnowledgeSourceResource>> UpdateAsync(ResourceNamespace @namespace, string name, PutKnowledgeSourceRequest request, string etag, CancellationToken cancellationToken = default)
         {
-            UpdatedRequest = request;
+            if (WriteFailure is not null) return Task.FromException<ResourceSnapshot<KnowledgeSourceResource>>(WriteFailure);
+            UpdatedRequest = request; UpdatedEtag = etag; CurrentEtag = "\"etag-2\""; ReadOverride = null;
             if (source is not null) source = source with { Definition = request.Properties };
             if (request.RebindDependencies) DependenciesStale = false;
             return source is not null

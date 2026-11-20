@@ -103,7 +103,7 @@ public sealed class AgentRunnerScreenTests
         using var handler = new Handler(); using var context = Context(handler, canWrite: false); var rendered = NewRunner(context);
         rendered.WaitForElement("[data-testid=agent-run-prompt]").Change("A valid fixture prompt");
         Assert.IsTrue(rendered.Find("[data-testid=agent-run-submit]").HasAttribute("disabled"));
-        Assert.IsTrue(rendered.Find(".resource-header .resource-action-bar button.button-secondary").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.FindAll(".resource-header .resource-action-bar button").Single(value => value.TextContent.Trim() == "Reconcile runtime").HasAttribute("disabled"));
         rendered.Find("form").Submit();
         Assert.IsNull(handler.Created);
         Assert.AreEqual(0, handler.Prepares);
@@ -121,11 +121,74 @@ public sealed class AgentRunnerScreenTests
         Assert.AreEqual("other", rendered.FindComponent<ResourceDetailsTemplate>().Instance.TechnicalName);
     }
 
+    [TestMethod]
+    public async Task SharedRequestFormTracksInputBeforeBlurAndRefreshRetainsInvalidValuesAndItsEditContext()
+    {
+        using var handler = new Handler(); using var context = Context(handler); var page = NewRunner(context);
+        page.WaitForElement("[data-testid=agent-run-prompt]").Input("Input before blur"); page.Find("form .text-button").Click(); page.Find("form input[type=number]").Change("invalid");
+        var form = page.FindComponent<ResourceDefinitionForm>().Instance.EditContext; Assert.IsTrue(page.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty);
+        await page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext); Assert.AreEqual("Input before blur", page.Find("[data-testid=agent-run-prompt]").GetAttribute("value")); Assert.AreEqual("invalid", page.Find("form input[type=number]").GetAttribute("value"));
+        Assert.IsTrue(page.Find("[data-testid=agent-run-submit]").HasAttribute("disabled")); Assert.AreEqual(2, handler.AgentReads);
+        Assert.AreEqual(ResourceLoadStatus.Ready, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+    }
+
+    [TestMethod]
+    public async Task NewGenerationDoesNotSilentlyReplaceAPendingRequestAndExplicitDiscardAdoptsIt()
+    {
+        using var handler = new Handler(); using var context = Context(handler); var page = NewRunner(context); page.WaitForElement("[data-testid=agent-run-prompt]").Input("Keep generation seven");
+        var form = page.FindComponent<ResourceDefinitionForm>().Instance.EditContext; handler.Agent = handler.Agent with { Generation = 8 };
+        await page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync()); Assert.AreSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
+        StringAssert.Contains(page.Markup, "pending execution request still uses the loaded generation"); Assert.AreEqual("Keep generation seven", page.Find("[data-testid=agent-run-prompt]").GetAttribute("value"));
+        page.FindAll("button").Single(value => value.TextContent.Trim() == "Discard").Click(); page.WaitForAssertion(() => Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty));
+        Assert.AreNotSame(form, page.FindComponent<ResourceDefinitionForm>().Instance.EditContext); page.Find("[data-testid=agent-run-prompt]").Input("Execute generation eight"); page.Find("form").Submit();
+        page.WaitForAssertion(() => Assert.IsNotNull(handler.Created)); Assert.AreEqual(8, handler.Created!.Agent.Version);
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.Forbidden, ResourceLoadStatus.Forbidden)]
+    [DataRow(HttpStatusCode.NotFound, ResourceLoadStatus.NotFound)]
+    [DataRow(HttpStatusCode.ServiceUnavailable, ResourceLoadStatus.Failed)]
+    public async Task RefreshUsesCommonStatesRetainsRecoverableDraftsAndClearsPrivateReadLoss(HttpStatusCode status, ResourceLoadStatus expected)
+    {
+        using var handler = new Handler(); using var context = Context(handler); var page = NewRunner(context); page.WaitForElement("[data-testid=agent-run-prompt]").Input("Private draft");
+        handler.AgentLoader = _ => Task.FromResult(new HttpResponseMessage(status) { Content = JsonContent.Create(new { title = "public_fixture_failure" }) });
+        await page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync()); Assert.AreEqual(expected, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
+        if (status == HttpStatusCode.ServiceUnavailable) { Assert.AreEqual("Private draft", page.Find("[data-testid=agent-run-prompt]").GetAttribute("value")); Assert.IsTrue(page.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty); }
+        else { Assert.IsEmpty(page.FindAll("[data-testid=agent-run-prompt]")); Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty); }
+    }
+
+    [TestMethod]
+    public async Task AReplacementAgentUidClearsTheOperationalViewAndAnInitialReadFailureCanRetry()
+    {
+        using var handler = new Handler(); handler.AgentLoader = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = JsonContent.Create(new { title = "public_fixture_failure" }) });
+        using var context = Context(handler); var page = NewRunner(context); page.WaitForAssertion(() => Assert.AreEqual(ResourceLoadStatus.Failed, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status));
+        handler.AgentLoader = null; await page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRetry.InvokeAsync()); page.WaitForElement("[data-testid=agent-run-prompt]").Input("Pending");
+        handler.Agent = handler.Agent with { Uid = Guid.NewGuid() }; await page.InvokeAsync(() => page.FindComponent<ResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreEqual(ResourceLoadStatus.NotFound, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status); Assert.IsEmpty(page.FindAll("[data-testid=agent-run-prompt]"));
+    }
+
+    [TestMethod]
+    public void IndependentExecutionPermissionRemainsUsableForAManagedInheritedDefinitionWithoutWritePermission()
+    {
+        using var handler = new Handler(); handler.Agent = handler.Agent with { Governance = ResourceGovernance.Core("fixture") }; using var context = Context(handler, canWrite: false, canExecute: true); var page = NewRunner(context);
+        page.WaitForElement("[data-testid=agent-run-prompt]").Input("Authorized execution"); Assert.IsFalse(page.Find("[data-testid=agent-run-submit]").HasAttribute("disabled")); Assert.IsNull(page.FindComponent<ResourceDetailsTemplate>().Instance.DefinitionReadOnlyReason);
+        page.Find("form").Submit(); page.WaitForAssertion(() => Assert.IsNotNull(handler.Created)); Assert.AreEqual(0, handler.Prepares);
+    }
+
+    [TestMethod]
+    public void LosingEventReadAccessClearsTheLiveRunAndPrivatePendingRequest()
+    {
+        using var handler = new Handler { DenyObservation = true }; using var context = Context(handler); var page = NewRunner(context); page.WaitForElement("[data-testid=agent-run-prompt]").Input("Private live request");
+        page.Find("form").Submit(); page.WaitForAssertion(() => Assert.AreEqual(ResourceLoadStatus.Forbidden, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status));
+        Assert.IsEmpty(page.FindAll("[data-testid=agent-run-details], [data-testid=agent-run-prompt]")); Assert.IsFalse(page.FindComponent<UnsavedNavigationGuard>().Instance.IsDirty); Assert.DoesNotContain("Private live request", page.Markup);
+    }
+
     private static readonly ResourceScopeRef Owner = ResourceScopeRef.Instance;
     private static readonly ResourceScopeRef Execution = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
     private static IRenderedComponent<AgentRunner> NewRunner(BunitContext context) => context.Render<AgentRunner>(p => p.Add(value => value.Name, "runner"));
     private static void Select(BunitContext context, string path) { var navigation = context.Services.GetRequiredService<NavigationManager>(); navigation.NavigateTo(navigation.Uri.Split('#')[0] + "#" + path); }
-    private static BunitContext Context(Handler handler, bool canWrite = true, NavigationContext? navigationContext = null)
+    private static BunitContext Context(Handler handler, bool canWrite = true, NavigationContext? navigationContext = null, bool? canExecute = null)
     {
         var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -135,7 +198,7 @@ public sealed class AgentRunnerScreenTests
         context.Services.AddSingleton<IAgentRunnerManagementClient>(new ManagementApiClient(http));
         context.Services.AddSingleton<IAgentRunnerRuntimeClient>(new RuntimeApiClient(http));
         context.Services.AddSingleton<IAgentsModelClient>(new AgentsModelApiClient(http));
-        context.Services.AddSingleton<IConsoleContextProvider>(new ContextProvider(canWrite)); context.Services.AddScoped<ConsoleContextState>();
+        context.Services.AddSingleton<IConsoleContextProvider>(new ContextProvider(canWrite, canExecute ?? canWrite)); context.Services.AddScoped<ConsoleContextState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/agents/runner/run?namespace=team&scopeRef=" + Uri.EscapeDataString(Owner.Value) + "#run");
         return context;
     }
@@ -144,15 +207,15 @@ public sealed class AgentRunnerScreenTests
         public string? ScopeRef { get; set; }
         public string AddToUri(string uri) => ScopeRef is null ? uri : QueryHelpers.AddQueryString(uri, "context", ScopeRef);
     }
-    private sealed class ContextProvider(bool canWrite) : IConsoleContextProvider
+    private sealed class ContextProvider(bool canWrite, bool canExecute) : IConsoleContextProvider
     {
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(Guid.NewGuid(), "Fixture actor", Guid.NewGuid(), "fixture", "Fixture tenant", Execution.TargetId!.Value, "fixture", "Fixture workspace",
-            canWrite ? new HashSet<string> { "resources/read", "resources/write", "runs/read", "runs/execute" } : new HashSet<string> { "resources/read", "runs/read" }, []));
+            new HashSet<string>(new[] { "resources/read", "runs/read" }.Concat(canWrite ? ["resources/write"] : []).Concat(canExecute ? ["runs/execute"] : [])), []));
     }
     private sealed class Handler : HttpMessageHandler
     {
         private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-        public AgentResource Agent { get; } = new()
+        public AgentResource Agent { get; set; } = new()
         {
             Uid = Guid.NewGuid(),
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -164,6 +227,7 @@ public sealed class AgentRunnerScreenTests
         };
         public RuntimeRun Stored => Run("recorded", new("runner", 2) { Namespace = new("team"), ScopeRef = Owner, ResourceUid = Agent.Uid });
         public CreateRuntimeRunRequest? Created { get; private set; }
+        public bool DenyObservation { get; init; }
         public int AgentReads { get; private set; }
         public int RunReads { get; private set; }
         public int Prepares { get; private set; }
@@ -177,8 +241,9 @@ public sealed class AgentRunnerScreenTests
             if (path.EndsWith("/model", StringComparison.Ordinal)) { ModelOwner = query["scopeRef"].ToString(); return Reply(new AgentModelResponse(new(new("current-profile", "current-profile")), new(null, new("current-model"), new(new(), new(), new())), "ready", [])); }
             if (path.EndsWith("/readiness", StringComparison.Ordinal)) { ReadinessOwner = query["scopeRef"].ToString(); return Reply(new AgentRuntimeReadinessResponse("runner", 7, true, "Ready", null, null, null)); }
             if (path.EndsWith("/prepare", StringComparison.Ordinal)) { Prepares++; return Reply(new PrepareAgentRuntimeResponse("runner", 7, "deployment", "revision", "Ready")); }
+            if (path.EndsWith("/events", StringComparison.Ordinal) && DenyObservation) return new(HttpStatusCode.Forbidden) { Content = JsonContent.Create(new { title = "event_read_denied" }) };
             if (path.EndsWith("/events", StringComparison.Ordinal)) return new(HttpStatusCode.OK) { Content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "text/event-stream") };
-            if (path == "/api/runtime/runs" && request.Method == HttpMethod.Post) { Created = await request.Content!.ReadFromJsonAsync<CreateRuntimeRunRequest>(Json, cancellationToken); return Reply(Run("created", Created!.Agent)); }
+            if (path == "/api/runtime/runs" && request.Method == HttpMethod.Post) { Created = await request.Content!.ReadFromJsonAsync<CreateRuntimeRunRequest>(Json, cancellationToken); var created = Run("created", Created!.Agent); return Reply(DenyObservation ? created with { Status = created.Status with { State = RuntimeRunState.Running } } : created); }
             if (path == "/api/runtime/runs") return Reply(new RuntimeRunPageResponse([Stored]));
             if (path == "/api/runtime/runs/recorded") { RunReads++; return Reply(Stored); }
             if (path.Contains("/agents/", StringComparison.Ordinal)) { AgentReads++; var name = path.Split('/').Last(); return AgentLoader is not null ? await AgentLoader(name) : Reply(Agent with { Metadata = Agent.Metadata with { Name = name } }); }
