@@ -341,9 +341,24 @@ public sealed class AgentBootstrapResourceHandler(
         {
             ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation)
         };
-        if (await service.GetAgentExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken) is not null)
+        var existing = await service.GetAgentExactAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellationToken);
+        if (existing is not null)
+        {
+            // Resume an interrupted initial preparation, including Agents created by
+            // older Bootstrap versions. Never activate later user-authored generations
+            // or substitute a changed catalog definition for the saved definition.
+            if (existing.Value.Generation == 1 && JsonElement.DeepEquals(
+                    JsonSerializer.SerializeToElement(existing.Value.Definition),
+                    JsonSerializer.SerializeToElement(value.Definition)))
+                _ = await service.EnsureExecutionRevisionAsync(
+                    existing.Value.Namespace, existing.Value.Name, existing.Value.ScopeRef,
+                    existing.Value.Generation, cancellationToken);
             return BootstrapResourceApplyResult.Skipped;
-        _ = await service.PutAgentAsync(value, null, true, cancellationToken);
+        }
+        var created = await service.PutAgentAsync(value, null, true, cancellationToken);
+        _ = await service.EnsureExecutionRevisionAsync(
+            created.Value.Namespace, created.Value.Name, created.Value.ScopeRef,
+            created.Value.Generation, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
 
