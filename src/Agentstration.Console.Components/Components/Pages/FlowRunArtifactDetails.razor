@@ -8,12 +8,12 @@
 
 <PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
-<ConsoleResourceDetailsTemplate Resource="artifact" Name="@(artifact is null ? Id : ArtifactName(artifact))" ResourceType="@T("Artifact")" Domain="artifact" IconName="file"
+<ConsoleResourceDetailsTemplate Resource="artifact" Name="@(artifact is null ? Id : ArtifactName(artifact))" ResourceType="@T("Artifact")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
     StatusText="@(artifact is null ? null : T("Immutable"))" Status="UiStatus.Neutral" ResourceIdentity="@(loadedKey ?? Id)"
     SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
     LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="loading" DefinitionReadOnlyReason="ResourceReadOnlyReason.Unspecified"
     Yaml="@SavedYaml" YamlDescription="@T("MetadataYamlHelp")" SectionTestIdPrefix="durable-artifact" TestId="durable-artifact-details">
-    <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)">@T("Back")</a></Actions>
+
     <OverviewMetrics>@if (artifact is not null) {
         <MetricCard Label="@T("MediaType")" Value="@artifact.Receipt.MediaType" Detail="@T("Immutable")" Status="UiStatus.Neutral" />
         <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Receipt.Length)" Detail="@ExactSize(artifact.Receipt.Length)" />
